@@ -1,8 +1,7 @@
 //! The Netdata-facing layer of the systemd journal stack: the
 //! systemd-journal Functions protocol and logs-UI formatting (`netdata`),
-//! the plugin's self-monitoring charts (`charts`), and a re-export facade
-//! that lets the function handler reach the query engine and file registry
-//! without depending on those crates.
+//! and a re-export facade that lets the function handler reach the query
+//! engine and file registry without depending on those crates.
 //!
 //! Position: journal-engine supplies the query/index/cache machinery and
 //! journal-registry the file discovery/monitoring. The engine's surface is
@@ -12,8 +11,7 @@
 //! journal-registry is consumed only for the re-export (nothing else in the
 //! crate references it). netdata also builds directly on journal-core and
 //! journal-index types (the `journal-core`/`journal-index` deps in
-//! `Cargo.toml`), and `charts` registers on the plugin runtime `rt` (the
-//! `rt` dep in `Cargo.toml`, imported at the top of `charts.rs`).
+//! `Cargo.toml`).
 //!
 //! Consumers: otel-legacy-logs is the only in-tree dependent
 //! (the `journal-function` dep in `otel-legacy-logs/Cargo.toml`) and its
@@ -25,13 +23,6 @@
 //! (the `journal-sdk-engine`/`journal-sdk-registry` deps in
 //! `netflow-plugin/Cargo.toml`); this crate has no published twin.
 
-// The plugin's self-monitoring charts (`charts.rs`): `JournalMetrics::new`
-// registers the FileIndexing/BucketCache/BucketOperations
-// chart handles (ids journal.file_indexing, journal.bucket_cache,
-// journal.bucket_operations) on a StdPluginRuntime. Nothing in-tree calls
-// JournalMetrics::new or updates the dimensions (grep-verified), so the
-// charts exist but are never registered - unpopulated today.
-pub mod charts;
 // The systemd-journal Functions protocol and logs-UI formatting:
 // request/response types, facet/histogram/table rendering, UI response
 // building, severity mapping and field-name transformations - nine
@@ -64,13 +55,6 @@ pub use journal_engine::{
     FileIndexCacheBuilder, FileIndexKey, Histogram, HistogramEngine, IndexingLimits, LogEntryData,
     LogQuery, QueryTimeRange, Result, Table, batch_compute_file_indexes, calculate_bucket_duration,
     entry_data_to_table,
-};
-
-// The crate's own chart structs (`JournalMetrics`, `FileIndexingMetrics`,
-// `BucketCacheMetrics`, `BucketOperationsMetrics`); no external
-// importer (grep-verified) - see the comment on `pub mod charts` above.
-pub use charts::{
-    BucketCacheMetrics, BucketOperationsMetrics, FileIndexingMetrics, JournalMetrics,
 };
 
 // Flat subset of journal-registry's re-export list

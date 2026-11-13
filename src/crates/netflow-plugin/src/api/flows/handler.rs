@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use netdata_plugin_error::{NetdataPluginError, Result};
 use netdata_plugin_protocol::{FunctionCall, FunctionDeclaration, FunctionResult, HttpAccess};
-use rt::{FunctionCallContext, FunctionHandler};
+use netdata_plugin_rt::{FunctionCallContext, FunctionHandler};
 use serde_json::{Map, Value};
 use std::sync::Arc;
 use tokio::task;

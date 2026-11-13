@@ -1,6 +1,6 @@
 //! Shared fixtures for the sfsq traces integration suites: every
 //! `tests/traces_*.rs` binary declares `mod common;` (attributes,
-//! by_id, gate, overview, rollup_tail, search, slowest); the
+//! by_id, gate, overview, rollup_tail, search); the
 //! ng_wal_equivalence.rs logs harness builds its own fixtures instead.
 //! Contents: OTLP span specs and request builders, a WAL writer running
 //! the production normalize→flatten→encode pipeline, and `TraceSource`
@@ -61,16 +61,6 @@ pub fn kv_double(k: &str, v: f64) -> KeyValue {
     }
 }
 
-/// An attribute with NO value — flattens to a `Null` entry, the key
-/// stays present. Only traces_attributes.rs exercises this.
-pub fn kv_null(k: &str) -> KeyValue {
-    KeyValue {
-        key: k.into(),
-        value: None,
-        key_strindex: 0,
-    }
-}
-
 #[derive(Clone)]
 pub struct SpanSpec {
     /// The owning trace (defaults to the shared [`TRACE`]; the search
@@ -83,7 +73,7 @@ pub struct SpanSpec {
     pub name: &'static str,
     pub kind: i32,
     /// OTLP status `(code, message)`; `None` sends no status object, which
-    /// is stored as the OTel default (`status_code = UNSET`, no message).
+    /// is stored as the OTel default (`status.code = UNSET`, no message).
     pub status: Option<(i32, &'static str)>,
     /// W3C trace state, stored verbatim when non-empty.
     pub trace_state: &'static str,
@@ -273,13 +263,36 @@ pub fn whole_range(wal_path: &Path) -> wal::FrameRange {
     wal::FrameRange::new(wal::HEADER_SIZE as u64, len)
 }
 
-/// Seal `wal_path` into `<id>.sfst` under `dir` with the production
-/// sealer (`ng_index::build_sfst_traces_file`) and return the sealed
-/// source over it — the standard "a sealed file" fixture.
+/// Index `wal_path` into `<id>.sfst` under `dir` with the production
+/// indexing function (`ng_index::index_traces_file`) and return
+/// the sealed source over it — the standard "a sealed file" fixture.
 pub fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
     let out = dir.join(format!("{id}.sfst"));
-    ng_index::build_sfst_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
+    ng_index::index_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
     sealed_source_at(&out, id)
+}
+
+/// Make chunk `id` ABSENT from a sealed SFST by renaming its TOC entry
+/// to an id no reader asks for — the "older file without this chunk"
+/// shape, made from a real modern indexed file (payload bytes
+/// untouched).
+pub fn hide_chunk(path: &Path, id: [u8; 4]) {
+    let mut bytes = std::fs::read(path).unwrap();
+    let num_chunks = u32::from_le_bytes(bytes[8..12].try_into().unwrap()) as usize;
+    let toc_start = chunk_file::container::HEADER_SIZE;
+    let entry_size = 12; // ChunkId(4) + offset u64 LE
+    let mut hidden = false;
+    for i in 0..num_chunks {
+        let at = toc_start + i * entry_size;
+        if bytes[at..at + 4] == id {
+            // Unique per hidden chunk (the TOC rejects duplicate ids).
+            bytes[at] = b'Z';
+            hidden = true;
+            break;
+        }
+    }
+    assert!(hidden, "chunk {:?} not found in TOC", id);
+    std::fs::write(path, &bytes).unwrap();
 }
 
 /// Flip the first payload byte of chunk `id` inside a sealed SFST — a
@@ -297,9 +310,9 @@ pub fn corrupt_chunk(path: &Path, id: [u8; 4]) {
 }
 
 /// A sealed-file source over an ALREADY-WRITTEN `.sfst` — for suites
-/// that doctor the sealed bytes (chunk corruption) and must not
-/// re-seal over their surgery when building the source vectors. Pattern:
-/// seal once, corrupt in place, then source the doctored file.
+/// that doctor the sealed bytes (chunk corruption) and must not re-index
+/// over their surgery when building the source vectors. Pattern: index
+/// once, corrupt in place, then source the doctored file.
 pub fn sealed_source_at(path: &Path, id: &str) -> TraceSource {
     let bytes = std::fs::read(path).unwrap();
     let summary = sfst::read_summary(&bytes).unwrap();
@@ -317,7 +330,7 @@ pub fn sealed_source_at(path: &Path, id: &str) -> TraceSource {
 /// overlap protection instead of silently evading it via distinct ids.
 pub fn memory_source(wal_path: &Path, id: &str) -> TraceSource {
     let range = whole_range(wal_path);
-    let (summary, bytes) = ng_index::build_sfst_traces_range(wal_path, range).unwrap();
+    let (summary, bytes) = ng_index::index_traces_range(wal_path, range).unwrap();
     TraceSource::Sfst(TraceSfstCandidate {
         source_id: SourceId::new(id.to_string()),
         summary,
@@ -374,8 +387,8 @@ pub fn missing_source(dir: &Path, id: &str, min_s: u32, max_s: u32) -> TraceSour
 }
 
 /// A minimal valid SFST WITHOUT the optional `TRSU` trace-rollup chunk —
-/// a hand-built pre-rollup ("legacy") file. The overview and slowest
-/// suites use it to pin the never-mixed rule: a rollup-less file
+/// a hand-built pre-rollup ("legacy") file. The overview suite
+/// uses it to pin the never-mixed rule: a rollup-less file
 /// contributes no traces to rollup-backed results and the status reports
 /// `RollupAbsent`. Returns the sealed-file source wrapping it.
 pub fn legacy_sfst_source(dir: &Path, name: &str) -> TraceSource {
@@ -387,6 +400,7 @@ pub fn legacy_sfst_source(dir: &Path, name: &str) -> TraceSource {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

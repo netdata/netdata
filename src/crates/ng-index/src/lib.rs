@@ -1,28 +1,28 @@
-//! `ng-index`: build a standard SFST index file from a flattened-frame WAL.
+//! `ng-index`: index a flattened-frame WAL into a standard SFST index file.
 //!
 //! The WAL of flattened frames is written by the OTel receivers — `otel-ingestor`
 //! in production, `ng-ingest` standalone — in the frame format owned by `ng-flatten`.
 //! This crate decodes it, feeds the typed, array-collapsed entries into an
-//! [`sfst::RowIndex`], and seals a standard SFST file: logs via [`build_sfst`], traces
-//! via [`build_sfst_traces_file`]. Consumers: `otel-ledger` and `sfsq`.
+//! [`sfst::RowIndex`], and writes a standard SFST file: logs via [`index_logs_dir`],
+//! traces via [`index_traces_file`]. Consumers: `otel-ledger` and `sfsq`.
 
 use std::path::{Path, PathBuf};
 
+mod indexing;
 mod perf;
-mod sfst_build;
-pub use perf::{Metrics, Rss, read_rss};
-pub use sfst_build::{
-    SfstStats, build_sfst, build_sfst_file, build_sfst_range, build_sfst_traces_file,
-    build_sfst_traces_range, to_sfst_tree,
+pub use indexing::{
+    SfstStats, index_logs_dir, index_logs_file, index_logs_range, index_traces_file,
+    index_traces_range, to_sfst_tree,
 };
+pub use perf::{Metrics, Rss, read_rss};
 
 // Re-export the flattening + frame vocabulary so consumers get it from `ng-index`
-// alone rather than adding `ng-flatten`; in-tree, `sfst_build` reads it via `crate::`.
+// alone rather than adding `ng-flatten`; in-tree, `indexing` reads it via `crate::`.
 pub use ng_flatten::{
     Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame,
 };
 
-/// Errors reading a flattened WAL or building an SFST from it.
+/// Errors reading a flattened WAL or indexing it into an SFST.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     // Wrapper variants (`Wal`, `Io`, `Sfst`) are `transparent` — `#[from]` already

@@ -105,7 +105,7 @@ impl FileIndexKey {
 /// The handle is a cheap, shared clone. It is `Send + Sync` because
 /// otel-legacy-logs stores it in the plugin's shared handler state
 /// (`otel-legacy-logs/src/handler.rs` `LegacyLogsHandlerInner`), which the runtime requires to be
-/// `Send + Sync` (`netdata-plugin/bridge/src/function.rs` `FunctionHandler`).
+/// `Send + Sync` (`otel-bridge/src/function.rs` `FunctionHandler`).
 ///
 /// Semantics: `insert` is synchronous — the value enters the memory tier
 /// immediately and, under the builder's `WriteOnInsertion` policy

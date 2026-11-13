@@ -1,19 +1,19 @@
 //! Ledger-side handling of responses from the indexer component (sealed WALs).
 //!
-//! The seal itself runs in `crate::indexer` (src/crates/otel-ledger/src/indexer.rs):
-//! one component per pipeline turns closed WAL files into SFSTs and replies
-//! with an `IndexerResponse`. This module is the reply's consumer —
-//! `handle_indexer_resp` registers the sealed SFST (or suppresses an empty
-//! one), drops the WAL's query-time chunks, queues the WAL delete, optionally
-//! queues an upload, and runs retention. Dispatched from the run loop
-//! ([`crate::Ledger::run`]) and from the shutdown flush drain
-//! (`Ledger::flush_catalogs_on_shutdown`), so a seal completing during
-//! shutdown is still applied.
+//! The indexing operation itself runs in `crate::indexer`
+//! (src/crates/otel-ledger/src/indexer.rs): one component per pipeline turns
+//! closed WAL files into SFSTs and replies with an `IndexerResponse`. This
+//! module is the reply's consumer — `handle_indexer_resp` registers the
+//! sealed SFST (or suppresses an empty one), drops the WAL's query-time
+//! chunks, queues the WAL delete, optionally queues an upload, and runs
+//! retention. Dispatched from the run loop ([`crate::Ledger::run`]) and from
+//! the shutdown flush drain (`Ledger::flush_catalogs_on_shutdown`), so an
+//! indexing operation completing during shutdown is still applied.
 
 use std::path::PathBuf;
 
-use bridge::signals::Signal;
 use file_registry::{FileId, SeqKey, TenantId};
+use otel_bridge::signals::Signal;
 
 use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 
@@ -48,18 +48,22 @@ enum Indexed {
 impl Ledger {
     #[tracing::instrument(skip_all)]
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
-        let (seq, summary, size) = match resp {
-            IndexerResponse::IndexFailed { path, error } => {
+        let (file_id, summary, size) = match resp {
+            IndexerResponse::IndexFailed { file_id, error } => {
                 // Intentional divergence from `recover_unindexed`: at runtime
                 // the entry stays tracked (and queryable as a WAL) until the
-                // next restart's recovery retries the seal and orphans it.
-                tracing::error!(path = %path.display(), "indexing failed: {error}");
+                // next restart's recovery retries the indexing operation and
+                // orphans it.
+                tracing::error!(seq = file_id.seq, "indexing failed: {error}");
                 return;
             }
             IndexerResponse::Indexed {
-                seq, summary, size, ..
-            } => (seq, summary, size),
+                file_id,
+                summary,
+                size,
+            } => (file_id, summary, size),
         };
+        let seq = file_id.seq;
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");
 
@@ -81,11 +85,10 @@ impl Ledger {
                 tracing::error!(seq, "indexed unknown seq; no tenant mapping");
                 return;
             };
-            let Some(wal_file) = registry.wal.get(seq) else {
+            if registry.wal.get(seq).is_none() {
                 tracing::error!(seq, "indexed unknown WAL");
                 return;
-            };
-            let file_id = wal_file.id;
+            }
             let wal_path = registry.wal.file_path(file_id);
 
             if summary.record_count == 0 {
@@ -97,9 +100,9 @@ impl Ledger {
                 }
             } else {
                 // Tracked under the WAL's own `FileId`, so the SFST inherits its
-                // `part_key` — the partition key embedded in the filename, not a
+                // `partition_key` — the partition key embedded in the filename, not a
                 // summary field — and the selector and the `files:true` inventory
-                // both read `id.part_key` and cannot disagree. The summary's
+                // both read `id.partition_key` and cannot disagree. The summary's
                 // timestamps/record_count/content_meta land on the registry
                 // entry; the uploader response handler
                 // (`Ledger::handle_uploader_resp`) reads them back.
@@ -133,9 +136,12 @@ impl Ledger {
                     seq = file_id.seq,
                     "indexed an empty WAL (0 log rows); deleting WAL + empty index, not uploading",
                 );
-                // A query may have built a chunk for this seq against the
+                // A query may have indexed a chunk for this seq against the
                 // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_chunk_indexer.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,
@@ -171,6 +177,9 @@ impl Ledger {
                 // queued, so a racing query resolves the seq to the SFST, never
                 // a gap.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_chunk_indexer.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,

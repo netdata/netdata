@@ -36,8 +36,8 @@
 //!   each chunk (and its crc32) to a `Write + Seek` sink as it is
 //!   produced — so the producer can drop each payload immediately —
 //!   and patches the TOC on [`finish`](StreamingWriter::finish). Right
-//!   for large files built chunk-by-chunk (SFST indexes): peak memory
-//!   is one chunk, not the whole file.
+//!   for large files written chunk-by-chunk (SFST indexes): peak
+//!   memory is one chunk, not the whole file.
 //!
 //! Consumers (grep-verified): sfst writes its indexes through
 //! [`StreamingWriter`] (sfst/src/writer.rs) and reads them through

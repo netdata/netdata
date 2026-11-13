@@ -502,6 +502,97 @@ modules:
                 - name: repurposed
   - meta:
       plugin_name: windows.plugin
+      module_name: PerflibPagingFile
+      monitored_instance:
+        name: Paging Files (Win)
+        link: "https://learn.microsoft.com/en-us/troubleshoot/windows-client/performance/introduction-to-the-page-file"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "windows.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - pagefile
+        - paging file
+        - swap
+    overview:
+      data_collection:
+        metrics_description: |
+          This collector monitors the size and usage of each paging file (`pagefile.sys`) on Windows systems.
+
+          Use it to see which paging file is filling up and how a system-managed file grows. The host-wide `mem.swap`
+          and `mem.committed` charts are different: they report system commit charge against the commit limit, which
+          counts physical memory plus all paging files.
+        method_description: |
+          It reads the `Paging File` object from Perflib once per collection. For each file, `% Usage` gives the pages
+          in use and the file size in pages; both are converted to bytes with the system page size.
+      supported_platforms:
+        include: ["windows"]
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: |
+            Every paging file the system reports is charted automatically. Charts for a removed paging file become
+            obsolete; a file added later appears without restarting Netdata.
+        limits:
+          description: ""
+        performance_impact:
+          description: |
+            One Perflib query per collection of a small kernel object with one instance per paging file.
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:windows:PerflibPagingFile]"
+          description: "The Netdata main configuration file."
+        options:
+          description: ""
+          folding:
+            title: "Config option"
+            enabled: false
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+        examples:
+          folding:
+            enabled: false
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: paging file
+          description: "These metrics refer to a single paging file."
+          labels:
+            - name: pagefile
+              description: "Paging file path, for example `C:/pagefile.sys` (backslashes are shown as forward slashes)."
+          metrics:
+            - name: mem.pagefile_usage
+              description: Paging file usage
+              unit: "bytes"
+              chart_type: stacked
+              dimensions:
+                - name: free
+                - name: used
+  - meta:
+      plugin_name: windows.plugin
       module_name: PerflibProcesses
       monitored_instance:
         name: System statistics

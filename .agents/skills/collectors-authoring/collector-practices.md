@@ -59,6 +59,20 @@ Mechanisms:
 - Avoid lifecycle churn when absence can be transient. Choose the source-appropriate successful-observation/expiry
   policy instead of a universal one-minute timer; do not delay a known permanent removal solely to satisfy that timer.
 
+Rotating V1 selections (a TOP-N set that changes between refreshes):
+
+- Identity: tie chart identity to the source object. Key per-entity state by its identity fields (a struct), not a
+  joined string: `name + "_" + table` keys collide even where the chart IDs differ (`pk` + `order_items` versus
+  `pk_order` + `items`), and evicting on a key mismatch turns that collision into chart loss or churn.
+- Retirement: keep chart references per selected entity, so retirement is identity-exact and linear in its charts.
+- Re-entry: verify runtime emission and stored Agent rates. `src/go/plugin/framework/jobruntime/job_v1_render.go`
+  emits a zero/omitted BEGIN interval for new or previously unmeasured charts, so the Agent measures elapsed time.
+  Clearing obsolete alone does not reset incremental counters (`src/database/rrdset.c`); collection-gap handling
+  lives in `src/database/rrdset-collection.c`.
+- Derived ratios: seed collector-computed ratios from two complete observations.
+- Example: `src/go/plugin/go.d/collector/postgres/relations_emission_test.go` demonstrates retirement, pruning and
+  stable-identity return; its captured frames can be replayed through an isolated Agent.
+
 ### 1.6 Verify The Supported Source Contract
 
 Before designing a collector or interpreting a changed payload, verify the relevant supported protocol/application
@@ -289,7 +303,6 @@ Generated outputs are not editing sources. Identify the actual input before corr
   context Go code, `config_schema.json`, metadata and README content. Use
   `src/go/plugin/ibm.d/AGENTS.md#auto-generated-files` and `.agents/skills/integrations-lifecycle/ibm-d.md` for the
   producer chain and safe preview; do not treat `config.go` as generated or ignore the runtime schema output.
-- Rust chart definitions may be derived at compile time through `charts-derive`; edit its input.
 
 Use `.agents/skills/integrations-lifecycle/consistency.md#delivery-boundary-source-pr-versus-post-merge-pr` for which
 runtime outputs ship with the source change and which generated documentation follows after merge. Preserve existing
@@ -475,7 +488,7 @@ than copying go.d wiring or applying the new-go.d V2 mandate to it.
 | Topology Function schema & guide | topology actors, links, evidence, overlays | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json`, `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`, `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` |
 | Functions validator | E2E + schema validation | `src/go/tools/functions-validation/README.md` |
 | ibm.d framework | starting `ibm.d` work | `src/go/plugin/ibm.d/AGENTS.md`, `src/go/plugin/ibm.d/framework/README.md` |
-| Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `bridge/`, `charts-derive/`, `schema/`, `types/`, `error/`) |
+| Rust plugin SDK | new Rust plugin | `src/crates/netdata-plugin/` (`rt/`, `protocol/`, `metrics/`, `schema/`, `types/`, `error/`) |
 | Rust NetFlow plugin | NetFlow / sFlow / IPFIX work | `src/crates/netflow-plugin/` |
 | OTEL ingestion mappings | per-metric YAML routing | `src/crates/otel-ingestor/` (configs under `configs/otel.d/v1/metrics/`) |
 | SNMP profiles | adding/extending an SNMP profile or trap profile | `.agents/skills/collectors-snmp-profiles/SKILL.md`, `.agents/skills/collectors-snmp-trap-profiles/SKILL.md`; format spec: `src/go/plugin/go.d/collector/snmp/profile-format.md` |

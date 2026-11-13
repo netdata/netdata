@@ -1,6 +1,6 @@
 //! Tests for the two GET arg→payload shims in `mod.rs`:
 //! `patch_args_into_payload` — the logs pipeline's shim, replicating
-//! the rt-level one — and `patch_traces_args_into_payload` — the
+//! the netdata-plugin-rt one — and `patch_traces_args_into_payload` — the
 //! traces pipeline's strict-shape variant (wired per-signal in
 //! pipeline.rs / traces_pipeline.rs). Pure functions over
 //! `(args, payload)`, so there are no fixtures: each test calls a
@@ -62,7 +62,7 @@ fn out_of_range_window_tokens_are_skipped_like_non_numeric_ones() {
 #[test]
 fn no_synthesis_without_args_or_over_an_existing_payload() {
     // No args: nothing to synthesize. An existing payload (a POST
-    // body, or the upstream rt shim's output) is never overwritten:
+    // body, or the upstream netdata-plugin-rt shim's output) is never overwritten:
     // the shim returns None and the caller falls back to it.
     assert!(patch_args_into_payload(&[], None).is_none());
     assert!(patch_args_into_payload(&["info".to_string()], Some(b"{}")).is_none());

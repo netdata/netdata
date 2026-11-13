@@ -37,7 +37,7 @@
 //!   `LedgerSender`.
 //! - Recovery: [`recovery`] reconciles local disk, the in-memory
 //!   registries, and remote storage in three per-signal phases before the
-//!   run loop starts — the fail-closed startup catalog diff-sync
+//!   run loop starts — the required startup catalog diff-sync
 //!   (`startup`), the per-tenant local replay with retention eviction
 //!   (`local`), and the per-tenant remote reconciliation (`remote`).
 //!
@@ -68,7 +68,7 @@
 //!   semaphore-bounded concurrent PUTs over [`storage::Storage`]).
 //! - [`catalog_builder`] — the per-signal catalog-rotation component:
 //!   accumulates `otel_catalog::CatalogEntry` rows per scope and rotates a
-//!   scope to an immutable catalog file on count, period, or flush
+//!   scope to a catalog file on count, period, or flush
 //!   triggers.
 //! - [`storage`] — the backend-agnostic [`storage::Storage`] seam and its
 //!   opendal [`storage::OpendalStorage`] impl, keeping opendal confined to
@@ -78,8 +78,8 @@
 //! - [`remote_read`] — [`remote_read::RemoteRead::fetch`]: fetches
 //!   remote-only catalog entries back through the process's shared
 //!   download cache (`file-cache`).
-//! - [`chunk`] — the query-time [`chunk::ChunkCache`]: memoized per-chunk
-//!   SFST builds over durable WAL prefixes, with singleflight and a
+//! - [`chunk`] — the query-time [`chunk::ChunkCache`]: memoized chunk
+//!   indexing over durable WAL prefixes, with singleflight and a
 //!   byte-budget LRU.
 //! - [`query`] — per-tenant remote candidate selection: the remote-only
 //!   catalog entries a query must fetch back, planned as
@@ -104,7 +104,7 @@
 //! (`Ledger`), the indexer component, and the log-content crates (`sfsq`,
 //! `otel-logs-identity`) this substrate must never see. The ingestor is not
 //! a cargo consumer — it reaches the ledger through the [`ipc`] socket
-//! above, depending on `bridge`, `ferryboat`, and `wal` instead.
+//! above, depending on `otel-bridge`, `ferryboat`, and `wal` instead.
 
 pub mod catalog_builder;
 pub mod chunk;

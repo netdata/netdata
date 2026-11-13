@@ -7,7 +7,7 @@
 //! module owns the partitioning rule, next to the
 //! [`scan_frame_boundaries`](crate::scan_frame_boundaries) scan whose
 //! output it folds; it is pure framing math — nothing here knows what
-//! the frames contain or what the consumer builds from a chunk.
+//! the frames contain or what the consumer indexes from a chunk.
 //!
 //! The fold's input is one scan over the WAL's durable bound:
 //! `FrameRange::new(HEADER_SIZE, valid_up_to)` — `valid_up_to` is the
@@ -20,13 +20,13 @@
 //!
 //! Both parts are read back with
 //! [`Reader::open_range`](crate::Reader::open_range), the bounded mode
-//! of `reader.rs`. A chunk's range is one window: the ledger builds it
-//! into an SFST with `ng_index::build_sfst_range` /
-//! `build_sfst_traces_range` (record count cross-checked against
+//! of `reader.rs`. A chunk's range is one window: the ledger indexes
+//! it into an SFST with `ng_index::index_logs_range` /
+//! `index_traces_range` (record count cross-checked against
 //! [`ChunkBoundary::entry_count`]) and memoizes the image
-//! (file-lifecycle's `ChunkCache`). The tail from
-//! [`tail_start`] to `valid_up_to` is row-scanned per query by sfsq's
-//! WAL scans; a frame crossing the bound stops the read cleanly.
+//! (file-lifecycle's `ChunkCache`). The tail from [`tail_start`] to
+//! `valid_up_to` is row-scanned per query by sfsq's WAL scans; a frame
+//! crossing the bound stops the read cleanly.
 //!
 //! Chunk boundaries are **append-only and immutable**: a boundary is
 //! fixed by the frame entry counts up to it, so a durable bound
@@ -38,7 +38,8 @@
 //!
 //! `otel-ledger` (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`):
 //! per-query chunk + tail planning, `min_entries` wired from its
-//! `CHUNK_MIN_ENTRIES` (16_384, a fixed default today). `sfsq`
+//! `CHUNK_MIN_ENTRIES` (16_384, logs) and `TRACES_CHUNK_MIN_ENTRIES`
+//! (4_096, traces) — fixed defaults today. `sfsq`
 //! (`tests/ng_wal_equivalence.rs`): partitions fixtures with this rule
 //! — `u64::MAX` for the all-tail shape, small thresholds for the
 //! chunk + tail merge path — and asserts chunk + tail serving equals
@@ -65,13 +66,13 @@ pub struct ChunkBoundary {
     /// recorded by the scan; the start is the fold's `start` or the prior
     /// chunk's end), i.e. a valid
     /// [`Reader::open_range`](crate::Reader::open_range) window the
-    /// ledger passes straight to `ng_index::build_sfst_range` /
-    /// `build_sfst_traces_range`.
+    /// ledger passes straight to `ng_index::index_logs_range` /
+    /// `index_traces_range`.
     pub range: crate::FrameRange,
     /// Log records in the chunk — the sum of the frames' entry counts,
     /// at least `min_entries`. The ledger passes this as the expected
-    /// count its chunk builds cross-check the built SFST against (the
-    /// shortfall check `reader.rs` defers to its callers).
+    /// count its chunk indexing cross-checks the indexed chunk against
+    /// (the shortfall check `reader.rs` defers to its callers).
     pub entry_count: u64,
 }
 
@@ -104,8 +105,8 @@ pub fn chunk_boundaries(
     min_entries: u64,
 ) -> Vec<ChunkBoundary> {
     // `min_entries == 0` would make every frame its own chunk —
-    // degenerate, and contrary to the >=16K design intent (the ledger
-    // wires `CHUNK_MIN_ENTRIES` = 16_384). The threshold is
+    // degenerate, and contrary to the design intent (the ledger wires
+    // thousands: 16_384 for logs, 4_096 for traces). The threshold is
     // caller-supplied, so guard it in debug rather than at runtime
     // cost.
     debug_assert!(min_entries > 0, "min_entries must be positive");
@@ -140,6 +141,42 @@ pub fn tail_start(chunks: &[ChunkBoundary], start: u64) -> u64 {
     chunks.last().map_or(start, |c| c.range.end())
 }
 
+/// A [`chunk_boundaries`] fold kept current as the durable prefix grows:
+/// it holds the complete chunks so far and the frames after the last of
+/// them (the tail's frames), and [`extend`](Self::extend) folds only the
+/// newly scanned frames. Because boundaries are append-only, the result
+/// always equals one fold over the whole scan.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChunkFold {
+    chunks: Vec<ChunkBoundary>,
+    tail_frames: Vec<FrameBoundary>,
+}
+
+impl ChunkFold {
+    /// Fold `frames` — the scan of the bytes that follow everything folded
+    /// so far — into the chunks. `start` and `min_entries` must be the same
+    /// on every call (the fold's origin and threshold).
+    pub fn extend(&mut self, frames: &[FrameBoundary], start: u64, min_entries: u64) {
+        self.tail_frames.extend_from_slice(frames);
+        let base = tail_start(&self.chunks, start);
+        let first_index = self.chunks.len() as u32;
+        let added = chunk_boundaries(&self.tail_frames, base, min_entries);
+        if let Some(last) = added.last() {
+            let end = last.range.end();
+            self.tail_frames.retain(|f| f.end_offset > end);
+        }
+        self.chunks.extend(added.into_iter().map(|c| ChunkBoundary {
+            index: first_index + c.index,
+            ..c
+        }));
+    }
+
+    /// The complete chunks so far, in index order.
+    pub fn chunks(&self) -> &[ChunkBoundary] {
+        &self.chunks
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,6 +187,7 @@ mod tests {
         FrameBoundary {
             end_offset,
             entry_count,
+            decoded_len: 0,
         }
     }
 
@@ -212,6 +250,24 @@ mod tests {
         let chunks = chunk_boundaries(&[], 64, 10);
         assert!(chunks.is_empty());
         assert_eq!(tail_start(&chunks, 64), 64);
+    }
+
+    #[test]
+    fn an_extended_fold_equals_one_fold_over_the_whole_scan() {
+        // Frames of varied sizes, split into every pair of increments.
+        let frames: Vec<FrameBoundary> = (1..=12u64)
+            .map(|i| fb(100 * i, (i % 5 + 2) as u32))
+            .collect();
+        let whole = chunk_boundaries(&frames, 64, 10);
+        for a in 0..=frames.len() {
+            for b in a..=frames.len() {
+                let mut fold = ChunkFold::default();
+                fold.extend(&frames[..a], 64, 10);
+                fold.extend(&frames[a..b], 64, 10);
+                fold.extend(&frames[b..], 64, 10);
+                assert_eq!(fold.chunks(), &whole[..], "split at {a}, {b}");
+            }
+        }
     }
 
     #[test]

@@ -32,8 +32,7 @@
 //! bounds back with `update_time_range` (`journal-engine/src/indexing.rs`);
 //! journal-function re-exports `Monitor`/`Registry` (`journal-function/src/lib.rs`)
 //! for otel-legacy-logs' watch → process_event → find_files_in_range loop
-//! (`otel-legacy-logs/src/handler.rs`); journal-log-writer folds
-//! `RegistryError` (`journal-log-writer/src/error.rs`).
+//! (`otel-legacy-logs/src/handler.rs`).
 
 pub mod error;
 pub use error::RegistryError;

@@ -6,12 +6,7 @@
 //! spawns (`system_profiler`, `sysctl`), and nothing is cached: call once at
 //! startup and pass the value around rather than re-querying per entry.
 //!
-//! Consumers (grep-verified): journal-log-writer imports the functions flat
-//! via the crate-root re-export ([`crate::load_machine_id`],
-//! [`crate::load_boot_id`]) — machine ID becomes the journal directory name
-//! `<path>/<machine-id>` (`journal-log-writer/src/log/mod.rs`
-//! `create_chain`) and boot ID resumes the per-boot monotonic tail
-//! (`journal-log-writer/src/log/mod.rs` `Log::new`); ng-ingest calls
+//! Consumers (grep-verified): ng-ingest calls
 //! `journal_common::load_machine_id`/`load_boot_id` directly for its
 //! file-registry identity (`ng-ingest/src/main.rs` `main` and
 //! `ng-ingest/src/bin/traces.rs` `main`). [`crate::load_hostname`] is

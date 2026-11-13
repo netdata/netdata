@@ -1,4 +1,4 @@
-//! Span events and links: the `EVNB` / `LNKB` chunks and their build-side
+//! Span events and links: the `EVNB` / `LNKB` chunks and their write-side
 //! accumulators.
 //!
 //! Rows hold their event/link *values* as regular interned tokens (searchable
@@ -14,12 +14,12 @@
 //! when meaningful — at least one event/link, or a nonzero dropped count that
 //! must survive — detected via the TOC, no format version bump.
 //!
-//! Flow: the traces-seal producer fills the accumulators
-//! (`src/crates/ng-index/src/sfst_build.rs`), `build.rs` reorders and writes
+//! Flow: traces indexing fills the accumulators
+//! (`src/crates/ng-index/src/indexing.rs`), `index_writer.rs` reorders and writes
 //! the chunks after `TIDX`, and `ChunkReader::event_index` / `link_index`
 //! validate and decode them; the trace session materializes per-span
 //! events/links from them. Row positions are **chronological**, like every
-//! per-row column — the build reorders the insertion-order accumulators
+//! per-row column — the writer reorders the insertion-order accumulators
 //! through the same time permutation.
 //!
 //! Span-level `dropped_events_count` / `dropped_links_count` ride here as a
@@ -304,14 +304,14 @@ fn validate_offsets(what: &str, offsets: &[u32], count: usize, total: usize) -> 
 }
 
 // ---------------------------------------------------------------------------
-// Build-side accumulators (insertion order, interner slots)
+// Write-side accumulators (insertion order, interner slots)
 // ---------------------------------------------------------------------------
 
-/// Insertion-order accumulator for [`EventIndex`]: the traces-seal producer
-/// pushes each span's events ([`push_event`](Self::push_event)) and seals the
-/// row ([`end_row`](Self::end_row)) — exactly one `end_row` per
-/// [`RowIndex::row`](crate::RowIndex::row) call, enforced at build by the
-/// row-count check. Holds interner [`KvSlot`]s; the build remaps rows to
+/// Insertion-order accumulator for [`EventIndex`]: the producer indexing
+/// traces pushes each span's events ([`push_event`](Self::push_event)) and
+/// seals the row ([`end_row`](Self::end_row)) — exactly one `end_row` per
+/// [`RowIndex::row`](crate::RowIndex::row) call, enforced at write time by
+/// the row-count check. Holds interner [`KvSlot`]s; the writer remaps rows to
 /// chronological order and translates slots to file [`KvId`]s.
 #[derive(Debug, Clone)]
 pub struct EventRows {
@@ -364,7 +364,7 @@ impl EventRows {
         self.row_offsets.push(self.times.len() as u32);
     }
 
-    /// Rows accumulated so far (must equal the row count at build).
+    /// Rows accumulated so far (must equal the row count at write time).
     pub fn num_rows(&self) -> usize {
         self.row_dropped.len()
     }
@@ -376,7 +376,7 @@ impl EventRows {
         !self.times.is_empty() || self.row_dropped.iter().any(|&d| d != 0)
     }
 
-    /// Chronological reorder + slot→file-id translation (build phase 2).
+    /// Chronological reorder + slot→file-id translation (Phase 2).
     /// `positions` yields insertion-order indices in chronological order —
     /// the same permutation every per-row column rides.
     pub(crate) fn reordered(
@@ -477,7 +477,7 @@ impl LinkRows {
         self.row_offsets.push(self.flags.len() as u32);
     }
 
-    /// Rows accumulated so far (must equal the row count at build).
+    /// Rows accumulated so far (must equal the row count at write time).
     pub fn num_rows(&self) -> usize {
         self.row_dropped.len()
     }
@@ -487,7 +487,7 @@ impl LinkRows {
         !self.flags.is_empty() || self.row_dropped.iter().any(|&d| d != 0)
     }
 
-    /// Chronological reorder + slot→file-id translation (build phase 2).
+    /// Chronological reorder + slot→file-id translation (Phase 2).
     pub(crate) fn reordered(
         &self,
         positions: impl Iterator<Item = usize>,
@@ -707,6 +707,7 @@ mod tests {
                 event_index: true,
                 link_index: false,
                 trace_rollup: false,
+                trace_rollup_stats: false,
                 mid_fields: 0,
                 high_fields: 0,
                 stream_batches: 1,

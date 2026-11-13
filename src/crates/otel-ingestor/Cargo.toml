@@ -12,16 +12,19 @@ name = "otel_ingestor"
 path = "src/lib.rs"
 
 [dependencies]
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
+otel-derived-metrics = { workspace = true }
 ferryboat = { workspace = true }
-flatten_otel = { workspace = true }
+flatten-otel = { workspace = true }
 ng-flatten = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 
 # WAL writing
 file-registry = { workspace = true }
 otel-logs-identity = { workspace = true }
 otel-catalog = { workspace = true }
+otel-service-map = { workspace = true }
 prost = { workspace = true }
 serde = { workspace = true, features = ["rc"] }
 sfst = { workspace = true }
@@ -42,6 +45,7 @@ serde_json = { workspace = true, features = ["preserve_order"] }
 serde_regex = { workspace = true }
 serde_yaml = { workspace = true }
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 tokio-rustls = { workspace = true }
 tonic = { workspace = true, features = ["gzip", "tls-ring"] }
 tracing = { workspace = true }
@@ -50,6 +54,7 @@ uuid = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }
 # TLS listener tests: certificates generated per run, the test client config,
 # and the process crypto provider the otel-plugin binary installs at startup.
 rcgen = { workspace = true }

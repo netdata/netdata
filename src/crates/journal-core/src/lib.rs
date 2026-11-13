@@ -22,10 +22,9 @@
 //! offset-array types ([`file::offset_array::List`],
 //! [`file::offset_array::Cursor`], [`file::offset_array::InlinedCursor`]).
 //!
-//! Consumers: journal-index, journal-engine, journal-function and
-//! journal-log-writer (each one's Cargo.toml) - all depend
-//! on this crate directly. What each adds: high-level writing with rotation
-//! and retention (journal-log-writer), indexing and querying (journal-index),
+//! Consumers: journal-index, journal-engine and journal-function (each
+//! one's Cargo.toml) - all depend on this crate directly. What each adds:
+//! indexing and querying (journal-index),
 //! and the query engine and Functions APIs (journal-engine, journal-function;
 //! both also build on journal-index and journal-registry).
 //!
@@ -36,8 +35,8 @@
 
 // Crate-wide error type: every fallible file-layer call returns its
 // `Result` alias, and the consumers' error enums wrap `JournalError` -
-// through `journal_core::error::` in journal-index/src/error.rs and
-// journal-log-writer/src/error.rs, flat in journal-engine/src/error.rs.
+// through `journal_core::error::` in journal-index/src/error.rs, flat in
+// journal-engine/src/error.rs.
 pub mod error;
 
 // Collection type aliases re-exported from journal-common; journal-function
@@ -74,12 +73,10 @@ pub use error::{JournalError, Result};
 
 // File-layer re-exports: a flat subset of file/mod.rs's surface, mirroring
 // the published twin (src/crates/jf/journal_file/src/lib.rs). Code usually
-// imports these via `journal_core::file::...` instead; the only flat import
-// in code today is journal-log-writer's `use journal_core::JournalFile`
-// (journal-log-writer/src/log/chain.rs).
+// imports these via `journal_core::file::...` instead.
 pub use file::{
-    BucketUtilization, Direction, JournalCursor, JournalFile, JournalFileOptions, JournalReader,
-    JournalWriter, Location,
+    Direction, JournalCursor, JournalFile, JournalFileOptions, JournalReader, JournalWriter,
+    Location,
 };
 
 // SIGBUS handler, renamed on the way out (`install_handler` in

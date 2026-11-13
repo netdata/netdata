@@ -5,9 +5,9 @@
 //!
 //! One capture assembles, per requested range: the registry snapshot's
 //! sealed SFSTs; each active WAL's durable prefix as chunk images plus a
-//! row-scanned tail, built OFF the registry lock through the shared
-//! singleflight [`ChunkCache`] (the traces seal:
-//! `ng_index::build_sfst_traces_range`); and — with remote storage —
+//! row-scanned tail, indexed OFF the registry lock through the shared
+//! singleflight [`ChunkCache`] (traces chunk indexing:
+//! `ng_index::index_traces_range`); and — with remote storage —
 //! the range's remote-only files, planned from catalogs read off the
 //! same lock and downloaded once through the shared download cache. A
 //! remote file whose bytes could not be obtained, and each unreadable
@@ -18,9 +18,12 @@
 //! (`rpc/logs/handler.rs::resolve_wal`): descriptors captured under ONE
 //! brief registry read lock (one `valid_up_to` per WAL — the whole
 //! query sees one consistent durable prefix), and the logs failure
-//! policy: a WAL whose chunks won't build/parse is refused WHOLE for
+//! policy: a WAL whose chunks won't index is refused WHOLE for
 //! this snapshot (logged; its data returns via the sealed SFST after
-//! rotation, or on a later query — build errors aren't cached).
+//! rotation, or on a later query — indexing errors aren't cached). Unlike
+//! the logs handler, the capture says so ([`Capture::refused`]) and every
+//! traces answer that lacks it is partial `source_failure`: spans quietly
+//! missing would read as data that does not exist.
 //!
 //! Source identity per `sfsq::traces::sources` (the engine rejects
 //! duplicate ids and overlapping WAL byte ranges): always the file's
@@ -41,19 +44,21 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use bridge::function::ProgressState;
 use file_cache::CacheError;
 use file_lifecycle::chunk::ChunkCache;
 use file_lifecycle::query::{CatalogFile, RemotePlan};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use file_lifecycle::remote_read::RemoteRead;
 use file_registry::{FileId, TenantId};
+use otel_bridge::function::ProgressState;
 use sfsq::traces::{
     SourceId, TraceSfstCandidate, TraceSource, TraceUnavailable, TraceWalTail, WalCoverage,
 };
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use wal::prefix::{chunk_boundaries, tail_start};
+use wal::prefix::tail_start;
+
+use crate::ledger::wal_prefix::{WalPrefixes, index_chunk};
 
 /// Filename extensions of the source-id derivation (the registries'
 /// own on-disk extensions, which those crates keep private).
@@ -71,8 +76,8 @@ struct ResolvedWal {
     tail: Option<wal::FrameRange>,
 }
 
-/// One built chunk of that WAL: its boundary identity (`index` within
-/// the WAL, byte `range`), the SFST summary from the build, and the
+/// One indexed chunk of that WAL: its boundary identity (`index` within
+/// the WAL, byte `range`), the SFST summary from indexing, and the
 /// `Arc`-shared byte image every copy that selected the WAL reuses.
 struct ResolvedChunk {
     index: u32,
@@ -90,6 +95,21 @@ struct ResolvedChunk {
 pub(crate) struct Capture {
     pub(crate) sets: Vec<Vec<TraceSource>>,
     pub(crate) pins: Vec<file_cache::CachedFile>,
+    /// Parallel to `sets`: whether `ranges[i]` selected a WAL that was
+    /// refused (its chunks would not index), so `sets[i]` lacks its data.
+    pub(crate) refused: Vec<bool>,
+}
+
+/// What a capture does with the offloaded files a range selects.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RemotePolicy {
+    /// Download them, within the download cache; a footprint over its
+    /// capacity fails the capture ([`CaptureError::TooLarge`]).
+    Download,
+    /// Fetch nothing: each becomes an unavailable source, which the
+    /// engine reports as `remote_unavailable`. For the modes whose
+    /// answer must stay cheap whatever the retention holds.
+    Skip,
 }
 
 /// Why a capture failed as a whole. Everything narrower degrades into the
@@ -112,8 +132,9 @@ pub(crate) enum CaptureError {
 pub(crate) struct TracesSourceSupplier {
     registries: Arc<RwLock<TenantRegistries>>,
     chunk_cache: Arc<ChunkCache>,
-    /// Minimum records per chunk boundary (`wal::prefix::chunk_boundaries`).
-    min_entries: u64,
+    /// The active WALs' chunk boundaries, kept current across queries and
+    /// shared with the chunk indexer.
+    prefixes: Arc<WalPrefixes>,
     /// Reading evicted files back; `None` when remote storage is disabled.
     remote: Option<RemoteRead>,
 }
@@ -122,21 +143,21 @@ impl TracesSourceSupplier {
     pub(crate) fn new(
         registries: Arc<RwLock<TenantRegistries>>,
         chunk_cache: Arc<ChunkCache>,
-        min_entries: u64,
+        prefixes: Arc<WalPrefixes>,
         remote: Option<RemoteRead>,
     ) -> Self {
         Self {
             registries,
             chunk_cache,
-            min_entries,
+            prefixes,
             remote,
         }
     }
 
     /// One snapshot, `copies` identical source vectors: a thin wrapper
     /// over [`capture_ranges`](Self::capture_ranges) repeating the same
-    /// window. The one-shot modes (trace, overview/slowest, the
-    /// enumeration pair) capture one copy each; search instead hands its
+    /// window. The one-shot modes (trace, suggest) capture one copy each;
+    /// search instead hands its
     /// completion range to both roles through
     /// [`capture_ranges`](Self::capture_ranges) — see there.
     ///
@@ -148,11 +169,18 @@ impl TracesSourceSupplier {
         tenant: &TenantId,
         time_range: std::ops::Range<u32>,
         copies: usize,
+        remote_policy: RemotePolicy,
         cancel: &CancellationToken,
         progress: &ProgressState,
     ) -> Result<Capture, CaptureError> {
-        self.capture_ranges(tenant, &vec![time_range; copies], cancel, progress)
-            .await
+        self.capture_ranges(
+            tenant,
+            &vec![time_range; copies],
+            remote_policy,
+            cancel,
+            progress,
+        )
+        .await
     }
 
     /// One snapshot, one source vector per entry in `ranges` —
@@ -166,10 +194,9 @@ impl TracesSourceSupplier {
     /// file-granularity caveat: spans living only in files outside the
     /// range merge a truncated envelope). So a pass whose window is
     /// narrower than another's — the Functions view's window aggregate
-    /// beside its page — must be handed its OWN file set, or it returns
-    /// different numbers than the standalone mode does for the same
-    /// window: a widened envelope can change a trace's duration bin,
-    /// drop it from the grid, or grow the span/error totals. The same
+    /// beside its page — must be handed its OWN file set: with the page's
+    /// wider set, a widened envelope can change a trace's duration bin,
+    /// drop it from the grid, or grow its error counts. The same
     /// logic keeps search's two roles on ONE capture: both get the
     /// completion range (the match window widened by the slack) as
     /// identical copies — the engine narrows the window role itself,
@@ -182,15 +209,19 @@ impl TracesSourceSupplier {
     /// second capture call would break — and each WAL resolves ONCE,
     /// its chunk bytes `Arc`-shared by every copy that selected it.
     ///
-    /// Remote files are planned first, so a query whose remote footprint
-    /// exceeds the download cache fails ([`CaptureError::TooLarge`]) before
-    /// any WAL work or download; the union of every range's remote files is
-    /// then downloaded once. A cancelled call returns no copies.
+    /// Remote files are planned first. Under [`RemotePolicy::Download`], a
+    /// query whose remote footprint exceeds the download cache fails
+    /// ([`CaptureError::TooLarge`]) before any WAL work or download, and the
+    /// union of every range's remote files is then downloaded once. Under
+    /// [`RemotePolicy::Skip`], nothing downloads and every planned remote
+    /// file becomes an unavailable source. A cancelled call returns no
+    /// copies.
     ///
     /// Sets `progress`'s total before the downloads: the sources of the
     /// DISTINCT ranges (each is walked by one engine pass that ticks
     /// once per source; search's window role shares the completion range
-    /// and does not tick) plus one unit per planned download — an upper
+    /// and does not tick) plus one unit per planned download (none under
+    /// [`RemotePolicy::Skip`]) — an upper
     /// bound, as a cached file downloads nothing. One case undercounts:
     /// when the Functions view's aggregate range happens to equal its
     /// completion range, two passes tick over the one counted range, so
@@ -199,12 +230,14 @@ impl TracesSourceSupplier {
         &self,
         tenant: &TenantId,
         ranges: &[std::ops::Range<u32>],
+        remote_policy: RemotePolicy,
         cancel: &CancellationToken,
         progress: &ProgressState,
     ) -> Result<Capture, CaptureError> {
         let cancelled = || Capture {
             sets: Vec::new(),
             pins: Vec::new(),
+            refused: Vec::new(),
         };
         if ranges.is_empty() {
             return Ok(cancelled());
@@ -248,16 +281,22 @@ impl TracesSourceSupplier {
             union,
             unreadable,
         } = match (&self.remote, remote_input) {
-            (Some(remote), Some(input)) => {
-                let capacity = remote.cache().capacity();
-                tokio::task::spawn_blocking(move || input.plan_within(capacity))
+            (Some(remote), Some(input)) => match remote_policy {
+                RemotePolicy::Download => {
+                    let capacity = remote.cache().capacity();
+                    tokio::task::spawn_blocking(move || input.plan_within(capacity))
+                        .await
+                        .map_err(CaptureError::Planning)?
+                        .map_err(|too_large| CaptureError::TooLarge {
+                            at_least: too_large.at_least,
+                            capacity: too_large.capacity,
+                        })?
+                }
+                // Nothing downloads, so the cache's capacity is moot.
+                RemotePolicy::Skip => tokio::task::spawn_blocking(move || input.plan())
                     .await
-                    .map_err(CaptureError::Planning)?
-                    .map_err(|too_large| CaptureError::TooLarge {
-                        at_least: too_large.at_least,
-                        capacity: too_large.capacity,
-                    })?
-            }
+                    .map_err(CaptureError::Planning)?,
+            },
             _ => RemotePlan::default(),
         };
         // Ranges with no plan (remote storage disabled) contribute no
@@ -282,6 +321,12 @@ impl TracesSourceSupplier {
         if cancel.is_cancelled() {
             return Ok(cancelled());
         }
+        // `resolve_wal` returns `None` for a cancel too, but a cancelled
+        // capture has returned above: what is missing now was refused.
+        let refused_distinct: Vec<bool> = snapshots
+            .iter()
+            .map(|(_, wals)| wals.iter().any(|wal| !resolved.contains_key(&wal.id)))
+            .collect();
 
         let mut distinct_sources: Vec<Vec<TraceSource>> = snapshots
             .iter()
@@ -304,10 +349,14 @@ impl TracesSourceSupplier {
             .zip(&unreadable_per_range)
             .map(|((local, remote), catalogs)| local.len() + remote.len() + catalogs.len())
             .sum();
-        progress.set_total(sources_total + union.len());
+        let downloads = match remote_policy {
+            RemotePolicy::Download => union.len(),
+            RemotePolicy::Skip => 0,
+        };
+        progress.set_total(sources_total + downloads);
 
         let (downloaded, pins) = match &self.remote {
-            Some(remote) if !union.is_empty() => {
+            Some(remote) if remote_policy == RemotePolicy::Download && !union.is_empty() => {
                 match remote.fetch(union, cancel, progress.done_counter()).await {
                     Ok(fetched) => (fetched.files, fetched.pins),
                     Err(CacheError::Cancelled) => return Ok(cancelled()),
@@ -366,15 +415,20 @@ impl TracesSourceSupplier {
             }
         }
         let sets = per_copy
-            .into_iter()
-            .map(|at| distinct_sources[at].clone())
+            .iter()
+            .map(|&at| distinct_sources[at].clone())
             .collect();
-        Ok(Capture { sets, pins })
+        let refused = per_copy.iter().map(|&at| refused_distinct[at]).collect();
+        Ok(Capture {
+            sets,
+            pins,
+            refused,
+        })
     }
 
     /// Resolve one active WAL into chunk images + the tail range, or
     /// `None` to refuse the whole WAL (logs failure policy — see the
-    /// module docs). Polls `cancel` between chunk builds; a cancelled
+    /// module docs). Polls `cancel` between chunks; a cancelled
     /// call returns `None` (indistinguishable from refusal on purpose —
     /// the capture's result is discarded either way).
     async fn resolve_wal(&self, wal: &WalDesc, cancel: &CancellationToken) -> Option<ResolvedWal> {
@@ -384,88 +438,50 @@ impl TracesSourceSupplier {
             return None;
         }
         let header = wal::HEADER_SIZE as u64;
-        let scan_path = wal.path.clone();
-        let valid_up_to = wal.valid_up_to;
-        let frames = match tokio::task::spawn_blocking(move || {
-            wal::scan_frame_boundaries(&scan_path, wal::FrameRange::new(header, valid_up_to))
-        })
-        .await
+        // Boundaries up to this snapshot's bound; only frames no earlier
+        // call folded are scanned.
+        let boundaries = match self
+            .prefixes
+            .chunks(wal.id.seq, &wal.path, wal.valid_up_to)
+            .await
         {
-            Ok(Ok(frames)) => frames,
-            Ok(Err(e)) => {
-                tracing::warn!(seq = wal.id.seq, "traces WAL boundary scan failed: {e}");
-                return None;
-            }
+            Ok(boundaries) => boundaries,
             Err(e) => {
-                tracing::warn!(
-                    seq = wal.id.seq,
-                    "traces WAL boundary scan task failed: {e}"
-                );
+                tracing::warn!(seq = wal.id.seq, "traces WAL {e}");
                 return None;
             }
         };
         // The boundary scan is itself a blocking phase — poll on the way
-        // out of it, then again before each chunk build.
+        // out of it, then again before each chunk.
         if cancel.is_cancelled() {
             return None;
         }
 
-        let boundaries = chunk_boundaries(&frames, header, self.min_entries);
         let mut chunks = Vec::with_capacity(boundaries.len());
         for chunk in &boundaries {
             if cancel.is_cancelled() {
                 return None;
             }
             let seq = wal.id.seq;
-            let path = wal.path.clone();
-            let (range, expected) = (chunk.range, chunk.entry_count);
-            // The traces seal for this byte range, singleflighted
-            // through the shared cache — (seq, index) keys never
+            // Traces chunk indexing for this byte range, singleflighted
+            // through the shared cache — normally a hit, as the chunk
+            // indexer indexed it when the writer synced; otherwise this
+            // joins its indexing or indexes it. (seq, index) keys never
             // collide with logs because seqs are process-global (one
-            // shared highwater). Record-count cross-check as in the
-            // logs path.
-            let init = async move {
-                match tokio::task::spawn_blocking(move || {
-                    ng_index::build_sfst_traces_range(&path, range)
-                })
-                .await
-                {
-                    Ok(Ok((summary, bytes))) => {
-                        if u64::from(summary.record_count) != expected {
-                            Err(format!(
-                                "chunk record count {} != expected {expected}",
-                                summary.record_count
-                            ))
-                        } else {
-                            Ok(Arc::new(bytes))
-                        }
-                    }
-                    Ok(Err(e)) => Err(format!("build_sfst_traces_range: {e}")),
-                    Err(e) => Err(format!("build task: {e}")),
-                }
-            };
-            match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(bytes) => match sfst::IndexReader::open(&bytes[..]) {
-                    Ok(reader) => chunks.push(ResolvedChunk {
-                        index: chunk.index,
-                        range: chunk.range,
-                        summary: reader.summary().clone(),
-                        bytes,
-                    }),
-                    Err(e) => {
-                        tracing::warn!(
-                            seq,
-                            index = chunk.index,
-                            "traces chunk parse failed; refusing this WAL: {e}"
-                        );
-                        return None;
-                    }
-                },
+            // shared highwater).
+            let init = index_chunk(ng_index::index_traces_range, wal.path.clone(), *chunk);
+            match self.chunk_cache.get_or_index(seq, chunk.index, init).await {
+                Ok(indexed) => chunks.push(ResolvedChunk {
+                    index: chunk.index,
+                    range: chunk.range,
+                    summary: indexed.summary.clone(),
+                    bytes: Arc::clone(&indexed.bytes),
+                }),
                 Err(e) => {
                     tracing::warn!(
                         seq,
                         index = chunk.index,
-                        "traces chunk build failed; refusing this WAL: {e}"
+                        "traces chunk indexing failed; refusing this WAL: {e}"
                     );
                     return None;
                 }

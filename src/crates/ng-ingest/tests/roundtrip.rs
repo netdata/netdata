@@ -505,7 +505,7 @@ fn trace_request_roundtrips_through_a_wal_frame() {
     }
     assert_eq!(at(&leaves, "name"), [&Value::Str("GET /x".into())]);
     assert_eq!(at(&leaves, "kind"), [&Value::Str("SERVER".into())]);
-    assert_eq!(at(&leaves, "status_code"), [&Value::Str("ERROR".into())]);
+    assert_eq!(at(&leaves, "status.code"), [&Value::Str("ERROR".into())]);
     assert_eq!(
         at(&leaves, "resource.attributes.service.name"),
         [&Value::Str("svc".into())]

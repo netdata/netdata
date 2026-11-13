@@ -36,13 +36,14 @@ use serde::{Deserialize, Serialize};
 /// One uploaded SFST as one catalog row.
 ///
 /// One entry describes exactly one SFST, and an SFST holds exactly one
-/// partition: its `part_key` lives only in `id` and is what query filtering
-/// matches on; the stream identity itself is the opaque `content_meta` blob.
+/// partition: its `partition_key` lives only in `id` and is what query
+/// filtering matches on; the stream identity itself is the opaque
+/// `content_meta` blob.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CatalogEntry {
     /// The SFST's full identity (`FileId` — see file-registry `types.rs`) and
     /// the map key of `Catalog::entries`: one entry per `FileId` per catalog.
-    /// `id.part_key` is the partition `Query::partition_keys` filters on;
+    /// `id.partition_key` is the partition `Query::partition_keys` filters on;
     /// `id.seq` sorts remote-plan output and, with the identity, forms the
     /// `SeqKey` lifecycle key.
     pub id: FileId,
@@ -112,15 +113,15 @@ impl CatalogEntry {
     }
 }
 
-/// Deterministic opaque partition key for tests. The catalog treats `part_key`
-/// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
-/// per logical stream without depending on the content-plane identity codec —
-/// same label → same key, different label → (almost surely) different key.
-/// A `pub(crate)` fixture for the sibling tests (`catalog.rs`, `registry.rs`);
-/// the same helper is mirrored in file-lifecycle (`test_helpers.rs`), `wal`
-/// and `sfst`.
+/// Deterministic opaque partition key for tests. The catalog treats
+/// `partition_key` as an opaque `u64` and never decodes it, so tests fabricate
+/// distinct keys per logical stream without depending on the content-plane
+/// identity codec — same label → same key, different label → (almost surely)
+/// different key. A `pub(crate)` fixture for the sibling tests (`catalog.rs`,
+/// `registry.rs`); the same helper is mirrored in file-lifecycle
+/// (`test_helpers.rs`), `wal` and `sfst`.
 #[cfg(test)]
-pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     namespace.hash(&mut h);
@@ -158,5 +159,11 @@ mod tests {
         let json = serde_json::to_vec(&entry).unwrap();
         let parsed: CatalogEntry = serde_json::from_slice(&json).unwrap();
         assert_eq!(parsed, entry);
+
+        // The stored name of the partition key is part of the catalog format:
+        // catalogs written before the Rust field was renamed must still parse.
+        let text = String::from_utf8(json).unwrap();
+        assert!(text.contains(r#""part_key":42"#), "{text}");
+        assert!(!text.contains("partition_key"), "{text}");
     }
 }

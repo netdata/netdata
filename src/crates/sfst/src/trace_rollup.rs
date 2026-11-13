@@ -1,7 +1,7 @@
 //! The optional per-file trace rollup (`TRSU` chunk): one summary row
 //! per distinct set (non-UNSET) trace id in the file, so trace-level
-//! queries (overview, slowest, root facets) fold aggregates without
-//! assembling traces.
+//! queries (the overview grid, the search gate's root checks) read
+//! per-trace aggregates without assembling traces.
 //!
 //! Pinned semantics:
 //!
@@ -24,18 +24,17 @@
 //!
 //! # Lifecycle
 //!
-//! ng-index's span walk (`src/crates/ng-index/src/sfst_build.rs`) folds
+//! ng-index's span walk (`src/crates/ng-index/src/indexing.rs`) folds
 //! every stored span into [`TraceRollupRows`] — the `EventRows`
-//! pattern: build-side interner [`KvSlot`]s, translated to file
-//! [`KvId`]s at seal (`build.rs`), rows emitted sorted by trace id
-//! after the span structures. `writer.rs` packs the additive,
+//! pattern: write-side interner [`KvSlot`]s, translated to file
+//! [`KvId`]s at write time (`index_writer.rs`), rows emitted sorted by trace
+//! id after the span structures. `writer.rs` packs the additive,
 //! TOC-indexed chunk (like `TIDX`/`EVNB`; no format version bump — a
 //! reader that predates `TRSU` never looks the id up). `reader.rs`
 //! decodes the chunk and rejects a file whose `TRCE` column is missing,
 //! so a missing rollup row can never prove "trace absent". Consumers:
-//! sfsq's traces fold and root gate (`src/crates/sfsq/src/traces/`)
-//! and the per-file root-ref resolver
-//! (`index_reader/rollup_resolver.rs`).
+//! sfsq's traces fold and root gate (`src/crates/sfsq/src/traces/`) and
+//! the per-file root-ref resolver (`index_reader/rollup_resolver.rs`).
 
 use std::collections::HashMap;
 
@@ -209,6 +208,169 @@ impl TraceRollup {
         }
         (lo < n && self.trace_ids.get(lo) == trace_id).then_some(lo)
     }
+
+    /// The root claim and envelope of `trace_id`'s row, copied out, or
+    /// `None` when this file holds no spans of that trace.
+    pub fn row(&self, trace_id: TraceId) -> Option<RollupRow> {
+        Some(self.row_at(self.find(trace_id)?))
+    }
+
+    /// Row `index`'s root claim and envelope, copied out (`index <
+    /// len()`).
+    pub fn row_at(&self, index: usize) -> RollupRow {
+        RollupRow {
+            root_claim: self.root_is_true_root[index],
+            root_service_ref: self.root_service_refs[index],
+            root_name_ref: self.root_name_refs[index],
+            root_span_id: self.root_span_ids.get(index),
+            min_start_ns: self.min_start_ns[index],
+            max_end_ns: self.max_end_ns[index],
+        }
+    }
+}
+
+/// The sealed per-row stats (`TRSS` chunk), index-parallel to a
+/// [`TraceRollup`]'s rows (same order, ids not repeated). Counts are
+/// stored rows, like the rollup's; starts are offsets from the row's
+/// `min_start_ns` so the encoding stays small.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct TraceRollupStats {
+    /// The latest stored span start minus `min_start_ns`.
+    pub max_start_offsets_ns: Vec<u64>,
+    /// The root candidate's start minus `min_start_ns` on
+    /// [`ROOT_CLAIM_TRUE`] and [`ROOT_CLAIM_WITHHELD`] rows; 0 on
+    /// [`ROOT_CLAIM_NONE`] rows.
+    pub root_start_offsets_ns: Vec<u64>,
+    /// Row `i`'s service entries are
+    /// `service_offsets[i]..service_offsets[i + 1]` (one more than rows).
+    pub service_offsets: Vec<u32>,
+    /// File-interner [`KvId`] of the entry's resource `service.name`, or
+    /// [`ROLLUP_NO_REF`] for spans without one; strictly increasing
+    /// within a row, so the sentinel sorts last.
+    pub service_refs: Vec<u32>,
+    /// Stored spans of the entry's service.
+    pub service_spans: Vec<u32>,
+    /// Of those, spans with ERROR status.
+    pub service_errors: Vec<u32>,
+}
+
+impl TraceRollupStats {
+    /// Validate the decoded chunk against the file's rollup (the reader
+    /// calls this): one row per rollup row, well-formed entry ranges,
+    /// in-range strictly increasing refs, per-row counts summing to the
+    /// rollup's, and starts inside the row's envelope.
+    pub(crate) fn validate(&self, rollup: &TraceRollup, kv_total: u32) -> Result<(), crate::Error> {
+        let corrupt = |what: &str| {
+            Err(crate::Error::CorruptIndex(format!(
+                "trace rollup stats: {what}"
+            )))
+        };
+        let n = rollup.len();
+        if self.max_start_offsets_ns.len() != n
+            || self.root_start_offsets_ns.len() != n
+            || self.service_offsets.len() != n + 1
+        {
+            return corrupt("rows do not match the rollup's");
+        }
+        let entries = self.service_refs.len();
+        if self.service_spans.len() != entries || self.service_errors.len() != entries {
+            return corrupt("service entries are not index-parallel");
+        }
+        if self.service_offsets[0] != 0 || self.service_offsets[n] as usize != entries {
+            return corrupt("service offsets do not span the entries");
+        }
+        for i in 0..n {
+            let (from, to) = (
+                self.service_offsets[i] as usize,
+                self.service_offsets[i + 1] as usize,
+            );
+            if from >= to || to > entries {
+                return corrupt("a row's service entries are empty or out of range");
+            }
+            let (mut spans, mut errors) = (0u64, 0u64);
+            for e in from..to {
+                let r = self.service_refs[e];
+                if r != ROLLUP_NO_REF && r >= kv_total {
+                    return corrupt("a service ref is out of range");
+                }
+                if e > from && self.service_refs[e - 1] >= r {
+                    return corrupt("a row's service refs are not strictly increasing");
+                }
+                if self.service_spans[e] == 0 || self.service_errors[e] > self.service_spans[e] {
+                    return corrupt("a service entry's counts are inconsistent");
+                }
+                spans += u64::from(self.service_spans[e]);
+                errors += u64::from(self.service_errors[e]);
+            }
+            if spans != u64::from(rollup.span_counts[i])
+                || errors != u64::from(rollup.error_counts[i])
+            {
+                return corrupt("service counts do not sum to the rollup's");
+            }
+            // `TraceRollup::validate` already proved min_start <= max_end.
+            let width = i128::from(rollup.max_end_ns[i]) - i128::from(rollup.min_start_ns[i]);
+            let (max_start, root) = (self.max_start_offsets_ns[i], self.root_start_offsets_ns[i]);
+            if i128::from(max_start) > width || root > max_start {
+                return corrupt("a start offset falls outside the row's envelope");
+            }
+            if rollup.root_is_true_root[i] == ROOT_CLAIM_NONE && root != 0 {
+                return corrupt("a row without a root candidate carries a root start");
+            }
+        }
+        Ok(())
+    }
+
+    /// Row `index`'s stats with absolute starts (`stats` validated
+    /// against `rollup`, `index < rollup.len()`).
+    pub fn row_at(&self, rollup: &TraceRollup, index: usize) -> StatsRow {
+        let min_start = rollup.min_start_ns[index];
+        let (from, to) = (
+            self.service_offsets[index] as usize,
+            self.service_offsets[index + 1] as usize,
+        );
+        StatsRow {
+            max_start_ns: min_start.saturating_add_unsigned(self.max_start_offsets_ns[index]),
+            root_start_ns: min_start.saturating_add_unsigned(self.root_start_offsets_ns[index]),
+            services: (from..to)
+                .map(|e| {
+                    (
+                        self.service_refs[e],
+                        self.service_spans[e],
+                        self.service_errors[e],
+                    )
+                })
+                .collect(),
+        }
+    }
+}
+
+/// One rollup row's stats ([`TraceRollupStats`]), copied out with
+/// absolute starts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StatsRow {
+    pub max_start_ns: i64,
+    /// The root candidate's start on TRUE and WITHHELD claims; the row's
+    /// min start otherwise.
+    pub root_start_ns: i64,
+    /// `(service ref, stored spans, ERROR spans)`, refs ascending, the
+    /// no-ref sentinel last.
+    pub services: Vec<(u32, u32, u32)>,
+}
+
+/// The columns of one rollup row a trace-level filter reads, copied out
+/// so the decoded rollup can be dropped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RollupRow {
+    /// [`ROOT_CLAIM_NONE`], [`ROOT_CLAIM_TRUE`] or [`ROOT_CLAIM_WITHHELD`].
+    pub root_claim: u8,
+    /// See [`TraceRollup::root_service_refs`].
+    pub root_service_ref: u32,
+    /// See [`TraceRollup::root_name_refs`].
+    pub root_name_ref: u32,
+    /// See [`TraceRollup::root_span_ids`].
+    pub root_span_id: SpanId,
+    pub min_start_ns: i64,
+    pub max_end_ns: i64,
 }
 
 /// One trace's in-progress aggregate (insertion phase).
@@ -218,16 +380,20 @@ struct Acc {
     max_end_ns: i64,
     span_count: u32,
     error_count: u32,
+    max_start_ns: i64,
+    /// Stored spans and ERROR spans per resource `service.name` slot
+    /// (`None` = no such attribute); a handful of entries per trace.
+    services: Vec<(Option<KvSlot>, u32, u32)>,
     /// The earliest unset-parent span seen so far, when any.
     root: Option<Root>,
     /// The incumbent took a full tie against a root candidate with
-    /// different recorded facets: the seal abstains from claiming a
-    /// root. Cleared when a strictly earlier candidate installs.
+    /// different recorded facets: the writer abstains from claiming
+    /// a root. Cleared when a strictly earlier candidate installs.
     root_ambiguous: bool,
 }
 
 /// A root candidate: what the rollup keeps about the span that would be
-/// the trace's root (`service`/`name` are build-side interner slots).
+/// the trace's root (`service`/`name` are write-side interner slots).
 #[derive(Debug, Clone)]
 struct Root {
     start_ns: i64,
@@ -237,10 +403,10 @@ struct Root {
     name: Option<KvSlot>,
 }
 
-/// Insertion-order accumulator for [`TraceRollup`]. The indexer's span
-/// walk (`ng-index/src/sfst_build.rs`) calls
-/// [`record_span`](Self::record_span) once per stored span; the seal
-/// calls `sealed`, translating interner [`KvSlot`]s to
+/// Insertion-order accumulator for [`TraceRollup`]. ng-index's span
+/// walk (`ng-index/src/indexing.rs`) calls
+/// [`record_span`](Self::record_span) once per stored span; the writer
+/// calls `sealed_with_stats`, translating interner [`KvSlot`]s to
 /// file [`KvId`]s and emitting rows sorted by trace id.
 #[derive(Debug, Clone, Default)]
 pub struct TraceRollupRows {
@@ -283,10 +449,20 @@ impl TraceRollupRows {
             max_end_ns: i64::MIN,
             span_count: 0,
             error_count: 0,
+            max_start_ns: i64::MIN,
+            services: Vec::new(),
             root: None,
             root_ambiguous: false,
         });
         acc.min_start_ns = acc.min_start_ns.min(start_ns);
+        acc.max_start_ns = acc.max_start_ns.max(start_ns);
+        match acc.services.iter_mut().find(|(slot, ..)| *slot == service) {
+            Some((_, spans, errors)) => {
+                *spans = spans.saturating_add(1);
+                *errors = errors.saturating_add(u32::from(is_error));
+            }
+            None => acc.services.push((service, 1, u32::from(is_error))),
+        }
         acc.max_end_ns = acc.max_end_ns.max(end_ns);
         acc.span_count = acc.span_count.saturating_add(1);
         if is_error {
@@ -298,8 +474,8 @@ impl TraceRollupRows {
         // FULL (start_ns, span_id) tie the combiner keeps tie-breaking
         // through keys (kind, content) this recorder does not model, so
         // a challenger with different recorded facets (kind, service,
-        // name) marks the claim AMBIGUOUS and the seal emits no root —
-        // honest-or-absent, storage-order independent, never a wrong
+        // name) marks the claim AMBIGUOUS and the writer emits no root
+        // — honest-or-absent, storage-order independent, never a wrong
         // claim a pruning consumer could act on. Identical-facet ties
         // (plain resends) keep the claim; a strictly earlier span
         // installs a fresh unambiguous incumbent.
@@ -336,11 +512,18 @@ impl TraceRollupRows {
         !self.map.is_empty()
     }
 
-    /// Seal the accumulator into the stored form: translate root-ref
-    /// slots to file KvIds through the build's shared `kv_to_file` table
-    /// (so refs point at exactly the ids the rows carry) and emit rows
-    /// sorted by trace id.
+    /// Convert the accumulator into the stored form: translate root-ref
+    /// slots to file KvIds through the writer's shared `kv_to_file`
+    /// table (so refs point at exactly the ids the rows carry) and emit
+    /// rows sorted by trace id.
+    #[cfg(test)]
     pub(crate) fn sealed(&self, kv_to_file: &[KvId]) -> TraceRollup {
+        self.sealed_with_stats(kv_to_file).0
+    }
+
+    /// The rollup ([`sealed`](Self::sealed)) and its per-row stats, from
+    /// one pass over the sorted ids, so the two stay index-parallel.
+    pub(crate) fn sealed_with_stats(&self, kv_to_file: &[KvId]) -> (TraceRollup, TraceRollupStats) {
         let translate = |slot: &Option<KvSlot>| -> u32 {
             slot.as_ref()
                 .map(|s| kv_to_file[s.idx()].0)
@@ -350,8 +533,40 @@ impl TraceRollupRows {
         ids.sort_unstable();
 
         let mut out = TraceRollup::default();
+        let mut stats = TraceRollupStats::default();
+        stats.service_offsets.push(0);
+        let offset = |from: i64, to: i64| (i128::from(to) - i128::from(from)) as u64;
         for id in ids {
             let acc = &self.map[id];
+            stats
+                .max_start_offsets_ns
+                .push(offset(acc.min_start_ns, acc.max_start_ns));
+            stats.root_start_offsets_ns.push(
+                acc.root
+                    .as_ref()
+                    .map_or(0, |r| offset(acc.min_start_ns, r.start_ns)),
+            );
+            let mut services: Vec<(u32, u32, u32)> = acc
+                .services
+                .iter()
+                .map(|(slot, spans, errors)| (translate(slot), *spans, *errors))
+                .collect();
+            services.sort_unstable();
+            for (r, spans, errors) in services {
+                // Distinct slots are distinct file ids; merge regardless.
+                if stats.service_refs.last() == Some(&r)
+                    && stats.service_refs.len() > *stats.service_offsets.last().unwrap() as usize
+                {
+                    let last = stats.service_spans.len() - 1;
+                    stats.service_spans[last] = stats.service_spans[last].saturating_add(spans);
+                    stats.service_errors[last] = stats.service_errors[last].saturating_add(errors);
+                    continue;
+                }
+                stats.service_refs.push(r);
+                stats.service_spans.push(spans);
+                stats.service_errors.push(errors);
+            }
+            stats.service_offsets.push(stats.service_refs.len() as u32);
             out.trace_ids.push(*id);
             out.min_start_ns.push(acc.min_start_ns);
             out.max_end_ns.push(acc.max_end_ns);
@@ -384,7 +599,7 @@ impl TraceRollupRows {
                 }
             }
         }
-        out
+        (out, stats)
     }
 }
 
@@ -488,6 +703,115 @@ mod tests {
         let sealed = rows.sealed(&table);
         assert_eq!(sealed.root_service_refs, vec![7]);
         assert_eq!(sealed.root_name_refs, vec![9]);
+    }
+
+    /// The stats partition each row's stored spans and errors by service
+    /// (resends count; spans without a service are the `ROLLUP_NO_REF`
+    /// entry, last), with refs sorted through the kv table.
+    #[test]
+    fn stats_partition_the_rollup_counts_per_service() {
+        use crate::kv_interner::KvSlot;
+        let mut rows = TraceRollupRows::new();
+        let (a, b) = (Some(KvSlot(1)), Some(KvSlot(0)));
+        rows.record_span(tid(1), sid(1), true, 10, 5, 0, false, a, None);
+        rows.record_span(tid(1), sid(2), false, 12, 5, 0, true, b, None);
+        rows.record_span(tid(1), sid(2), false, 12, 5, 0, true, b, None); // resend
+        rows.record_span(tid(1), sid(3), false, 14, 5, 0, false, None, None);
+        rows.record_span(tid(2), sid(4), false, 20, 5, 0, false, a, None);
+        // Slot 0 → file id 9, slot 1 → file id 4: b sorts after a.
+        let (rollup, stats) = rows.sealed_with_stats(&[KvId(9), KvId(4)]);
+        assert_eq!(
+            stats,
+            TraceRollupStats {
+                max_start_offsets_ns: vec![4, 0],
+                root_start_offsets_ns: vec![0, 0],
+                service_offsets: vec![0, 3, 4],
+                service_refs: vec![4, 9, ROLLUP_NO_REF, 4],
+                service_spans: vec![1, 2, 1, 1],
+                service_errors: vec![0, 2, 0, 0],
+            }
+        );
+        stats.validate(&rollup, 10).unwrap();
+    }
+
+    /// Max start and root start are offsets from the row's min start; a
+    /// withheld claim keeps its candidate's start, no claim reads 0.
+    #[test]
+    fn stats_record_max_and_root_starts() {
+        let mut rows = TraceRollupRows::new();
+        // TRUE: the root starts after an earlier non-root span.
+        rows.record_span(tid(1), sid(9), false, 100, 5, 0, false, None, None);
+        rows.record_span(tid(1), sid(1), true, 130, 5, 0, false, None, None);
+        rows.record_span(tid(1), sid(2), false, 170, 5, 0, false, None, None);
+        // WITHHELD: a full tie with different kinds.
+        rows.record_span(tid(2), sid(1), true, 200, 5, 1, false, None, None);
+        rows.record_span(tid(2), sid(1), true, 200, 5, 2, false, None, None);
+        rows.record_span(tid(2), sid(2), false, 260, 5, 0, false, None, None);
+        // NONE: no unset-parent span.
+        rows.record_span(tid(3), sid(3), false, 300, 5, 0, false, None, None);
+        rows.record_span(tid(3), sid(4), false, 310, 5, 0, false, None, None);
+        let (rollup, stats) = rows.sealed_with_stats(&[]);
+        assert_eq!(rollup.root_is_true_root, vec![1, 2, 0]);
+        assert_eq!(stats.max_start_offsets_ns, vec![70, 60, 10]);
+        assert_eq!(stats.root_start_offsets_ns, vec![30, 0, 0]);
+        stats.validate(&rollup, 0).unwrap();
+    }
+
+    /// Every invariant the reader relies on rejects its corruption.
+    #[test]
+    fn validate_rejects_each_stats_corruption_class() {
+        use crate::kv_interner::KvSlot;
+        let mut rows = TraceRollupRows::new();
+        rows.record_span(tid(1), sid(1), true, 10, 50, 0, true, Some(KvSlot(0)), None);
+        rows.record_span(tid(1), sid(2), false, 20, 5, 0, false, None, None);
+        rows.record_span(
+            tid(2),
+            sid(3),
+            false,
+            30,
+            5,
+            0,
+            false,
+            Some(KvSlot(0)),
+            None,
+        );
+        let (rollup, good) = rows.sealed_with_stats(&[KvId(3)]);
+        good.validate(&rollup, 4).unwrap();
+        type Breaker = fn(&mut TraceRollupStats);
+        let cases: [(&str, Breaker); 12] = [
+            ("row count", |s| {
+                s.max_start_offsets_ns.pop();
+            }),
+            ("offsets length", |s| {
+                s.service_offsets.pop();
+            }),
+            ("entries not parallel", |s| {
+                s.service_spans.pop();
+            }),
+            ("offsets start", |s| s.service_offsets[0] = 1),
+            ("offsets end", |s| {
+                *s.service_offsets.last_mut().unwrap() += 1
+            }),
+            ("empty row", |s| s.service_offsets[1] = 0),
+            ("ref range", |s| s.service_refs[0] = 4),
+            ("ref order", |s| s.service_refs.swap(0, 1)),
+            ("zero spans", |s| s.service_spans[2] = 0),
+            ("sum", |s| s.service_spans[1] += 1),
+            ("start outside the envelope", |s| {
+                s.max_start_offsets_ns[1] = 99
+            }),
+            ("root start without a root", |s| {
+                s.root_start_offsets_ns[1] = 1
+            }),
+        ];
+        for (what, break_it) in cases {
+            let mut bad = good.clone();
+            break_it(&mut bad);
+            assert!(
+                matches!(bad.validate(&rollup, 4), Err(crate::Error::CorruptIndex(_))),
+                "{what}"
+            );
+        }
     }
 
     #[test]

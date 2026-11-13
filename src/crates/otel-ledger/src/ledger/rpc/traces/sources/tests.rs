@@ -9,8 +9,8 @@
 //! files are tracked in the registry WITHOUT bytes on disk — capture
 //! never opens sealed files, so registry summaries pass through and
 //! the engine opens files later — while WAL tests write REAL trace
-//! WALs (OTLP → ng-flatten trace frames) so chunk builds run the
-//! actual traces seal.
+//! WALs (OTLP → ng-flatten trace frames) so chunk indexing runs the
+//! actual traces indexing.
 //!
 //! Not pinned here: the wire layer above (`handler/tests.rs`,
 //! `remote_tests.rs`), the `EvictionFailed`/`Planning` capture errors,
@@ -21,7 +21,7 @@ use super::*;
 use crate::ledger::rpc::traces::fixtures::{
     TestRemote, install_sfst, install_wal, make_registries, otlp_req, test_file_id,
 };
-use bridge::function::ProgressState;
+use otel_bridge::function::ProgressState;
 
 // ── supplier and id helpers ─────────────────────────────────────────
 
@@ -35,7 +35,7 @@ fn make_supplier_with_min_entries(min_entries: u64) -> TracesSourceSupplier {
     TracesSourceSupplier::new(
         make_registries(),
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        min_entries,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(min_entries)),
         None,
     )
 }
@@ -70,6 +70,7 @@ async fn empty_registries_yield_empty_copies() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -90,6 +91,7 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -128,6 +130,7 @@ async fn copies_are_structurally_identical() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -150,6 +153,7 @@ async fn window_pruning_is_file_granular() {
             &TenantId::from("default"),
             900..2000,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -188,6 +192,7 @@ async fn wal_resolves_to_chunks_and_a_tail() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -199,9 +204,9 @@ async fn wal_resolves_to_chunks_and_a_tail() {
     assert_eq!(ids.len(), 2, "one chunk + one tail: {ids:?}");
     assert_eq!(ids[0], format!("{}#chunk000000", wal_id(1)));
     let TraceSource::Sfst(chunk) = &sources[0] else {
-        panic!("first source must be the built chunk");
+        panic!("first source must be the indexed chunk");
     };
-    // The chunk was built through the traces seal: its summary counts
+    // The chunk went through the traces indexing: its summary counts
     // the 6 spans of frames 0+1, and the bytes are servable in-memory.
     assert_eq!(chunk.summary.record_count, 6);
     assert!(matches!(&chunk.source, sfsq::Source::Memory(_)));
@@ -235,17 +240,19 @@ async fn wal_below_min_entries_is_all_tail() {
     )
     .await;
 
-    let mut sets = supplier
+    let capture = supplier
         .capture(
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
         .await
-        .unwrap()
-        .sets;
+        .unwrap();
+    assert_eq!(capture.refused, [false], "the WAL resolved");
+    let mut sets = capture.sets;
     let sources = sets.pop().unwrap();
     assert_eq!(sources.len(), 1);
     let TraceSource::Tail(tail) = &sources[0] else {
@@ -284,18 +291,21 @@ async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
         f.write_all(&garbage).unwrap();
     }
 
-    let mut sets = supplier
+    // Every copy that selected the WAL is told of the refusal (an active
+    // WAL is selected for any range: its time bounds are still open).
+    let capture = supplier
         .capture(
             &TenantId::from("default"),
             0..u32::MAX,
-            1,
+            2,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
         .await
-        .unwrap()
-        .sets;
-    let sources = sets.pop().unwrap();
+        .unwrap();
+    assert_eq!(capture.refused, [true, true]);
+    let sources = &capture.sets[0];
     assert_eq!(sources.len(), 1, "only the sealed file survives");
     assert!(matches!(&sources[0], TraceSource::Sfst(c) if c.coverage.is_none()));
 }
@@ -321,6 +331,7 @@ async fn cancelled_capture_with_a_wal_returns_empty_and_caches_nothing() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -343,6 +354,7 @@ async fn cancelled_capture_returns_empty() {
             &TenantId::from("default"),
             0..u32::MAX,
             2,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -362,6 +374,7 @@ async fn capture_is_tenant_scoped() {
             &TenantId::from("tenant-b"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -401,6 +414,7 @@ async fn source_ids_do_not_depend_on_the_directory() {
                 &TenantId::from("default"),
                 0..u32::MAX,
                 1,
+                RemotePolicy::Download,
                 &CancellationToken::new(),
                 &ProgressState::new(),
             )
@@ -445,6 +459,7 @@ async fn chunk_ids_order_numerically() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )
@@ -473,6 +488,7 @@ async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
         .capture_ranges(
             &TenantId::from("default"),
             &[0..u32::MAX, 0..u32::MAX, 900..2000],
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &progress,
         )
@@ -494,13 +510,58 @@ fn remote_supplier(
     TracesSourceSupplier::new(
         registries,
         Arc::new(ChunkCache::new(64 * 1024 * 1024)),
-        4,
+        Arc::new(crate::ledger::wal_prefix::WalPrefixes::new(4)),
         Some(remote.read()),
     )
 }
 
 #[tokio::test]
-async fn too_large_fails_before_any_download_or_chunk_build() {
+async fn skip_plans_without_downloading_and_never_fails_too_large() {
+    // A cache too small for either file: Download would fail TooLarge,
+    // Skip answers with one unavailable source per offloaded file.
+    let registries = make_registries();
+    let remote = TestRemote::new(100);
+    for seq in 1..=2 {
+        remote
+            .evicted(
+                &registries,
+                "default",
+                file_registry::test_identity(),
+                seq,
+                vec![otlp_req(0x10 + seq as u8, 3, seq * 1_000_000_000)],
+            )
+            .await;
+    }
+    let supplier = remote_supplier(registries, &remote);
+    let progress = ProgressState::new();
+
+    let capture = supplier
+        .capture(
+            &TenantId::from("default"),
+            0..u32::MAX,
+            1,
+            RemotePolicy::Skip,
+            &CancellationToken::new(),
+            &progress,
+        )
+        .await
+        .unwrap();
+
+    let sources = &capture.sets[0];
+    assert_eq!(sources.len(), 2);
+    assert!(
+        sources
+            .iter()
+            .all(|s| matches!(s, TraceSource::Unavailable(_))),
+        "every offloaded file is reported, none fetched"
+    );
+    assert!(capture.pins.is_empty());
+    assert_eq!(remote.cache.file_count(), 0, "nothing downloaded");
+    assert_eq!(progress.load(), (0, 2), "no download units in the total");
+}
+
+#[tokio::test]
+async fn too_large_fails_before_any_download_or_chunk_indexing() {
     let registries = make_registries();
     let remote = TestRemote::new(100);
     for seq in 1..=2 {
@@ -515,7 +576,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
             .await;
     }
     // A local WAL the capture would have chunked, so the probe below
-    // can prove no chunk was built.
+    // can prove no chunk was indexed.
     install_wal(
         &registries,
         "default",
@@ -534,6 +595,7 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &progress,
         )
@@ -553,14 +615,14 @@ async fn too_large_fails_before_any_download_or_chunk_build() {
     );
     // An erring init makes the probe succeed only if a chunk image was
     // already cached under (seq, index): the error proves nothing was
-    // built.
+    // indexed.
     let probe = supplier
         .chunk_cache
-        .get_or_build(test_file_id(9).seq, 0, async {
-            Err::<Arc<Vec<u8>>, &str>("not built")
+        .get_or_index(test_file_id(9).seq, 0, async {
+            Err::<Arc<file_lifecycle::chunk::IndexedChunk>, &str>("not indexed")
         })
         .await;
-    assert!(probe.is_err(), "no chunk was built");
+    assert!(probe.is_err(), "no chunk was indexed");
 }
 
 // A pre-cancelled call stops before the download phase: the evicted
@@ -587,6 +649,7 @@ async fn a_cancelled_capture_downloads_nothing() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &cancel,
             &ProgressState::new(),
         )
@@ -623,6 +686,7 @@ async fn remote_sources_are_named_like_local_sealed_files() {
             &TenantId::from("default"),
             0..u32::MAX,
             1,
+            RemotePolicy::Download,
             &CancellationToken::new(),
             &ProgressState::new(),
         )

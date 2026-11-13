@@ -49,13 +49,18 @@ func newRedactor(values map[string]string) *textRedactor {
 	}
 }
 func (r *textRedactor) text(value string) string {
+	return clip(r.redacted(value))
+}
+
+// redacted leaves clipping to typed consumers that must disclose it.
+func (r *textRedactor) redacted(value string) string {
 	value = r.patterns.Apply(r.exact.Replace(value))
 	// An upstream text cap or cancellation may remove a PEM closing marker.
 	// Retain no suffix of an unfinished block just because it no longer matches.
 	if start := strings.Index(strings.ToLower(value), "-----begin "); start >= 0 {
 		value = value[:start] + "[REDACTED]"
 	}
-	return clip(value)
+	return value
 }
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= TextLimit {
@@ -76,12 +81,18 @@ type reporterResult struct {
 	CaptureState         string                      `json:"capture_state"`
 }
 
-type frame struct {
-	Type   string           `json:"type"`
-	Event  *synthetic.Event `json:"event,omitempty"`
-	Result *reporterResult  `json:"result,omitempty"`
+// wireEnvelope separates strict core decoding from optional-body validation.
+// Raw optional data never crosses the sink boundary.
+type wireEnvelope struct {
+	Type          string          `json:"type"`
+	Event         json.RawMessage `json:"event,omitempty"`
+	Result        json.RawMessage `json:"result,omitempty"`
+	ExtensionInit json.RawMessage `json:"extension_init,omitempty"`
+	Extension     json.RawMessage `json:"extension,omitempty"`
 }
+
 type sink struct {
+	evidence     *evidenceState
 	streams      map[string]*diagnosticStream
 	streamEvents map[string]synthetic.Event
 	mu           sync.Mutex
@@ -96,15 +107,17 @@ type sink struct {
 	tests        map[string]synthetic.Event
 }
 type sinkSnapshot struct {
-	events  []synthetic.Event
-	dropped int
-	result  *reporterResult
-	err     error
-	partial *synthetic.TestCounts
+	evidence *synthetic.FailureEvidence
+	events   []synthetic.Event
+	dropped  int
+	result   *reporterResult
+	err      error
+	partial  *synthetic.TestCounts
 }
 
 func newSink(kind synthetic.Kind, capture bool, redact *textRedactor) *sink {
 	return &sink{
+		evidence:     newEvidenceState(kind),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
 		kind:         kind,
@@ -131,7 +144,7 @@ func (s *sink) consume(reader io.Reader) error {
 		}
 		decoder := json.NewDecoder(strings.NewReader(string(raw)))
 		decoder.DisallowUnknownFields()
-		var record frame
+		var record wireEnvelope
 		if err := decoder.Decode(&record); err != nil {
 			return s.fail(fmt.Errorf("invalid runner protocol frame: %w", err))
 		}
@@ -144,31 +157,55 @@ func (s *sink) consume(reader io.Reader) error {
 			s.mu.Unlock()
 			return s.fail(errors.New("runner sent a frame after its terminal result"))
 		}
+		var protocolErr error
 		switch record.Type {
 		case "event":
-			if record.Event == nil || record.Result != nil {
-				s.mu.Unlock()
-				return s.fail(errors.New("invalid runner event envelope"))
+			if record.Result != nil || record.ExtensionInit != nil || record.Extension != nil {
+				protocolErr = errors.New("invalid runner event envelope")
+				break
 			}
-			if err := validateEvent(*record.Event); err != nil {
-				s.mu.Unlock()
-				return s.fail(err)
+			var event synthetic.Event
+			if err := decodeCore(record.Event, &event); err != nil {
+				protocolErr = err
+			} else if err := validateEvent(event); err != nil {
+				protocolErr = err
+			} else {
+				s.evidence.core()
+				s.add(event)
 			}
-			s.add(*record.Event)
 		case "result":
-			if record.Result == nil || record.Event != nil {
-				s.mu.Unlock()
-				return s.fail(errors.New("invalid runner result envelope"))
+			if record.Event != nil || record.ExtensionInit != nil || record.Extension != nil {
+				protocolErr = errors.New("invalid runner result envelope")
+				break
 			}
-			if err := validateResult(s.kind, s.capture, record.Result); err != nil {
-				s.mu.Unlock()
-				return s.fail(err)
+			var result reporterResult
+			if err := decodeCore(record.Result, &result); err != nil {
+				protocolErr = err
+			} else if err := validateResult(s.kind, s.capture, &result); err != nil {
+				protocolErr = err
+			} else {
+				s.evidence.core()
+				result.Error = s.redact.text(result.Error)
+				s.result = &result
 			}
-			record.Result.Error = s.redact.text(record.Result.Error)
-			s.result = record.Result
+		case "extension_init", "extension":
+			if record.Event != nil || record.Result != nil ||
+				record.Type == "extension_init" && record.Extension != nil ||
+				record.Type == "extension" && record.ExtensionInit != nil {
+				protocolErr = errors.New("mixed runner extension envelope")
+				break
+			}
+			if record.Type == "extension_init" {
+				s.evidence.init(record.ExtensionInit)
+			} else {
+				s.evidence.accept(record.Extension, s.redact)
+			}
 		default:
+			protocolErr = errors.New("unsupported runner frame type")
+		}
+		if protocolErr != nil {
 			s.mu.Unlock()
-			return s.fail(errors.New("unsupported runner frame type"))
+			return s.fail(protocolErr)
 		}
 		s.mu.Unlock()
 	}
@@ -177,6 +214,18 @@ func (s *sink) consume(reader io.Reader) error {
 	}
 	return nil
 }
+func decodeCore(raw json.RawMessage, value any) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return errors.New("missing runner core body")
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return fmt.Errorf("invalid runner core body: %w", err)
+	}
+	return nil
+}
+
 func (s *sink) fail(err error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -280,11 +329,12 @@ func (s *sink) snapshot() sinkSnapshot {
 		partial = &counts
 	}
 	return sinkSnapshot{
-		events:  append([]synthetic.Event{}, s.events...),
-		dropped: s.dropped,
-		result:  s.result,
-		err:     s.err,
-		partial: partial,
+		evidence: s.evidence.snapshot(),
+		events:   append([]synthetic.Event{}, s.events...),
+		dropped:  s.dropped,
+		result:   s.result,
+		err:      s.err,
+		partial:  partial,
 	}
 }
 func validateEvent(event synthetic.Event) error {
@@ -417,6 +467,7 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
 type wireRequest struct {
+	Extensions        []string          `json:"extensions,omitempty"`
 	Version           int               `json:"version"`
 	Kind              synthetic.Kind    `json:"kind"`
 	RunID             string            `json:"run_id"`

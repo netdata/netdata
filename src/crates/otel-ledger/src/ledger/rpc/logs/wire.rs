@@ -217,7 +217,7 @@ pub struct TenantFiles {
 #[derive(Debug, Serialize)]
 pub struct WalFileEntry {
     pub seq: u64,
-    /// Stream-identity hash, 16-hex (matches the `{part_key:016x}` in the filename).
+    /// Stream-identity hash, 16-hex (matches the `{partition_key:016x}` in the filename).
     pub ns_hash: String,
     pub stream: StreamId,
     /// `active` (being written) or `archived` (sealed, awaiting indexing).
@@ -233,7 +233,7 @@ pub struct WalFileEntry {
 #[derive(Debug, Serialize)]
 pub struct SfstFileEntry {
     pub seq: u64,
-    /// Stream-identity hash, 16-hex (matches the `{part_key:016x}` in the filename).
+    /// Stream-identity hash, 16-hex (matches the `{partition_key:016x}` in the filename).
     pub ns_hash: String,
     pub stream: StreamId,
     pub size: u64,

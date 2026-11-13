@@ -4,7 +4,7 @@
 //! The request is a JSON payload, not query args: the bridge deserializes
 //! the call payload into `JournalRequest` and serializes the
 //! `JournalResponse` back (`HandlerAdapter::handle_raw` in
-//! `netdata-plugin/bridge/src/function.rs`);
+//! `otel-bridge/src/function.rs`);
 //! the UI's GET-style args (`info`, `after:N`, `before:M`) are shimmed into
 //! that payload first (`patch_args_into_payload`, applied in
 //! `otel-legacy-logs/src/lib.rs`).
@@ -24,7 +24,7 @@ use std::collections::HashMap;
 
 /// The request the logs UI sends - deserialized from the call payload, or
 /// from `{}` when the payload is absent (the bridge deserializes absent
-/// payloads from `{}`, `netdata-plugin/bridge/src/function.rs`), so every field
+/// payloads from `{}`, `otel-bridge/src/function.rs`), so every field
 /// carries its serde default when the UI omits it.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct JournalRequest {
@@ -262,7 +262,7 @@ pub struct JournalResponse {
     /// Completion percent of the call. The final result always says 100 -
     /// intermediate progress is delivered as separate FUNCTION_PROGRESS
     /// messages (the progress ticker of `RawFunctionHandler::handle_raw` in
-    /// `netdata-plugin/bridge/src/function.rs`).
+    /// `otel-bridge/src/function.rs`).
     pub progress: u32,
 
     /// Protocol version under the `"v"` key; 3 tells the UI it may POST

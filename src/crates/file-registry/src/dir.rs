@@ -165,7 +165,7 @@ impl FileDir {
     /// The highest [`FileId::seq`] among this directory's parseable files;
     /// `0` when the directory is missing or holds none of them.
     ///
-    /// Every parseable file counts, regardless of pipeline, `part_key`, or
+    /// Every parseable file counts, regardless of pipeline, `partition_key`, or
     /// which process instance wrote it: seqs restart on reseed, so the
     /// startup seed must dominate the highest seq still on disk, from any
     /// earlier instance. Directory-open errors propagate — a silently
@@ -276,7 +276,7 @@ mod tests {
     }
 
     /// Create an empty data file named
-    /// `<machine>-<instance>-<pipeline:05>-<seq:010>-<part_key:016x>.<ext>`
+    /// `<machine>-<instance>-<pipeline:05>-<seq:010>-<partition_key:016x>.<ext>`
     /// under `dir` — the probe file the recursive-scan tests below rely on.
     fn touch_file(dir: &Path, seq: u64, ext: &str) {
         let id = FileId::new(ident(), 0, seq, 0);

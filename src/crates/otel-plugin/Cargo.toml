@@ -13,7 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 anyhow = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 clap = { workspace = true }
 bytesize = { workspace = true }
 ferryboat = { workspace = true }
@@ -23,7 +23,7 @@ netdata-plugin-types = { workspace = true }
 otel-ledger = { workspace = true }
 otel-ingestor = { workspace = true }
 otel-legacy-logs = { workspace = true }
-rt = { workspace = true }
+netdata-plugin-rt = { workspace = true }
 # Process-level TLS crypto provider selection (see `main`).
 rustls = { workspace = true }
 sfsq-cli = { workspace = true }
@@ -37,5 +37,7 @@ file-registry = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
+# `test-util` gives the paused clock for the supervisor's keepalive tests.
+tokio = { workspace = true, features = ["test-util"] }
 # Lets config tests capture the warnings that config resolution logs.
 tracing-subscriber = { workspace = true }

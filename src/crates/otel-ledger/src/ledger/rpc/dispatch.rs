@@ -10,17 +10,17 @@
 //! in `ledger/traces_pipeline.rs`). The call
 //! gets a per-call `CancellationToken` registered in `Ledger::transactions`
 //! and is spawned onto a task running the
-//! `bridge::function` engine's `RawFunctionHandler::handle_raw`
-//! (`bridge/src/function.rs`).
+//! `otel_bridge::function` engine's `RawFunctionHandler::handle_raw`
+//! (`otel-bridge/src/function.rs`).
 //! Results and progress funnel back through `Ledger::outbound_tx` into
 //! [`crate::Ledger::run`]. The transaction map is only touched from the single
 //! run-loop task, so it needs no lock.
 
 use std::sync::Arc;
 
-use bridge::function::FunctionContext;
-use bridge::{LedgerRequest, LedgerResponse};
 use netdata_plugin_protocol::{FunctionCall, Message};
+use otel_bridge::function::FunctionContext;
+use otel_bridge::{LedgerRequest, LedgerResponse};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
@@ -131,7 +131,7 @@ impl Ledger {
     /// registration that lets Cancel reach the in-flight call; the engine
     /// owns JSON deserialization, progress reporting, cancellation, and JSON
     /// serialization of the response (`HandlerAdapter::handle_raw`,
-    /// `bridge/src/function.rs`).
+    /// `otel-bridge/src/function.rs`).
     fn dispatch_function_call(
         &mut self,
         transaction: String,

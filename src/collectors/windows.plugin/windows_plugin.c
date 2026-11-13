@@ -355,6 +355,14 @@ static struct proc_module {
      .rd = NULL,
      .thread = NULL,
      .cleanup = NULL},
+    {.name = "PerflibPagingFile",
+     .dim = "PerflibPagingFile",
+     .enabled = CONFIG_BOOLEAN_YES,
+     .update_every = UPDATE_EVERY_MIN,
+     .func = do_PerflibPagingFile,
+     .rd = NULL,
+     .thread = NULL,
+     .cleanup = do_PerflibPagingFile_cleanup},
 
     // WMI metrics
     {.name = "GetFSRMQuota",

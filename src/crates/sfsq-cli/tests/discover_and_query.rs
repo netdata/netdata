@@ -5,14 +5,14 @@
 //!
 //! Fixtures go through the production path: OTLP `ResourceLogs` →
 //! `ng_flatten` flatten + `encode_log_frame` → `wal::Writer` →
-//! `ng_index::build_sfst_file` at seal time. Files are FileId-named (the
+//! `ng_index::index_logs_file` at index time. Files are FileId-named (the
 //! writer names WAL files; a sealed SFST reuses its source WAL's FileId,
-//! sharing the sequence — exactly how the ledger names a seal,
+//! sharing the sequence — exactly how the ledger names an indexed file,
 //! otel-ledger/src/ledger/ingestor.rs), so the CLI's directory-scan discovery
 //! picks them up and its SFST-wins dedup gets a real WAL/SFST pair.
 //!
 //! The strongest assertion here is tail-vs-sealed equivalence: querying a WAL
-//! through the row-scanned tail must return the same rows as sealing it into
+//! through the row-scanned tail must return the same rows as indexing it into
 //! an SFST and querying that — the correctness premise of the offline WAL
 //! path. The engine-side twin of that pin lives in sfsq's
 //! tests/ng_wal_equivalence.rs; this file is the CLI-facing one.
@@ -37,8 +37,8 @@ const BASE_S: u64 = 1_000_000;
 const NS: u64 = 1_000_000_000;
 /// The one stream a fixture `ResourceLogs` carries: `service.namespace` /
 /// `service.name`, each empty when absent. Mirrors the ingestor's private
-/// `extract_stream` (otel-ingestor/src/logs_service.rs) because both feed the
-/// part_key a WAL filename embeds — the filename-hash assertions below fail
+/// `ResourceLogsExt::service_stream` (otel-ingestor/src/logs_service.rs) because both feed the
+/// partition_key a WAL filename embeds — the filename-hash assertions below fail
 /// if the two ever drift.
 fn stream_of(rl: &ResourceLogs) -> ServiceStream {
     let mut namespace = "";
@@ -144,9 +144,9 @@ fn encode_ng_frame(batch: Vec<ResourceLogs>) -> (Vec<u8>, usize) {
 }
 
 /// As [`write_wal`], but with an explicit starting sequence (the ephemeral
-/// allocator's first seq is `seq_start + 1`), so multiple WAL files sealed
+/// allocator's first seq is `seq_start + 1`), so multiple WAL files indexed
 /// separately get distinct FileIds — the filename embeds the seq. The tenant
-/// dir must hold no other `*.wal` at call time (seal + remove the previous
+/// dir must hold no other `*.wal` at call time (index + remove the previous
 /// one first); the assert inside pins one file per call.
 fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start: u64) -> PathBuf {
     std::fs::create_dir_all(wal_tenant_dir).unwrap();
@@ -166,12 +166,12 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
         let (data, count) = encode_ng_frame(b.clone());
         let ingestion = TimestampNs((BASE_S + 500 + i as u64) * NS);
         let stream = stream_of(&b[0]);
-        let part_key = otel_logs_identity::part_key(&stream);
+        let partition_key = otel_logs_identity::partition_key(&stream);
         let content_meta =
             otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
         writer
             .write_frame(
-                part_key,
+                partition_key,
                 &content_meta,
                 &data,
                 wal::FrameMeta {
@@ -194,15 +194,15 @@ fn write_wal_seq(wal_tenant_dir: &Path, batches: &[Vec<ResourceLogs>], seq_start
     wals.pop().unwrap()
 }
 
-/// Seal `wal_path` into an SFST under `sfst_tenant_dir`, named after the
-/// WAL's own FileId — same sequence, exactly how the ledger names a seal
-/// (otel-ledger/src/ledger/ingestor.rs) — so discovery's SFST-wins dedup
-/// sees the production relationship.
-fn seal_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
+/// Index `wal_path` into an SFST under `sfst_tenant_dir`, named after
+/// the WAL's own FileId — same sequence, exactly how the ledger names an
+/// indexed file (otel-ledger/src/ledger/ingestor.rs) — so discovery's
+/// SFST-wins dedup sees the production relationship.
+fn index_to_sfst(wal_path: &Path, sfst_tenant_dir: &Path) -> PathBuf {
     std::fs::create_dir_all(sfst_tenant_dir).unwrap();
     let id = FileId::parse(wal_path).expect("wal fileid");
     let out = sfst_tenant_dir.join(id.to_filename("sfst"));
-    ng_index::build_sfst_file(wal_path, &out, &ng_index::Metrics::new()).expect("index");
+    ng_index::index_logs_file(wal_path, &out, &ng_index::Metrics::new()).expect("index");
     out
 }
 
@@ -268,7 +268,7 @@ fn limit_returns_newest_n_and_reports_total_matched() {
 #[test]
 fn tail_equals_sealed_sfst() {
     // The core equivalence: row-scanning a WAL tail must equal querying the
-    // SFST that WAL seals into.
+    // SFST that WAL is indexed into.
     let tmp = tempfile::tempdir().unwrap();
     let dirs = Dirs {
         wal: tmp.path().join("wal"),
@@ -282,8 +282,8 @@ fn tail_equals_sealed_sfst() {
     // Via tail (no SFST present yet).
     let (tail_matched, tail_rows) = query_all(&dirs);
 
-    // Seal to SFST, remove the WAL → query the SFST only.
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default"));
+    // Index to SFST, remove the WAL → query the SFST only.
+    index_to_sfst(&wal_path, &dirs.sfst.join("default"));
     std::fs::remove_file(&wal_path).unwrap();
     let (sfst_matched, sfst_rows) = query_all(&dirs);
 
@@ -310,10 +310,10 @@ fn wal_stream_filter_matches_absent_namespace() {
     let wal_dir = dirs.wal.join("default");
     std::fs::create_dir_all(&wal_dir).unwrap();
 
-    // The WAL filename embeds the stream's part_key — the canonical `ns_hash`
-    // via `otel_logs_identity::part_key` — so for a service.name without
-    // service.namespace it is `compute_ns_hash(None, name)`, exactly what the
-    // ingestor stamps on real files.
+    // The WAL filename embeds the stream's partition_key — the canonical
+    // `ns_hash` via `otel_logs_identity::partition_key` — so for a service.name
+    // without service.namespace it is `compute_ns_hash(None, name)`, exactly
+    // what the ingestor stamps on real files.
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let mut writer = wal::Writer::new(
         &wal_dir,
@@ -328,11 +328,11 @@ fn wal_stream_filter_matches_absent_namespace() {
     .expect("writer");
     let (data, count) = encode_ng_frame(batch_for(records(0..10), "", "api"));
     let stream = ServiceStream::new("", "api");
-    let part_key = otel_logs_identity::part_key(&stream);
+    let partition_key = otel_logs_identity::partition_key(&stream);
     let content_meta = otel_logs_identity::encode_content_meta(&stream).expect("identity encodes");
     writer
         .write_frame(
-            part_key,
+            partition_key,
             &content_meta,
             &data,
             wal::FrameMeta {
@@ -352,7 +352,7 @@ fn wal_stream_filter_matches_absent_namespace() {
         .find(|p| p.extension().is_some_and(|x| x == "wal"))
         .unwrap();
     assert_eq!(
-        FileId::parse(&wal_path).unwrap().part_key,
+        FileId::parse(&wal_path).unwrap().partition_key,
         compute_ns_hash(None, Some("api")),
     );
 
@@ -384,7 +384,7 @@ fn dedup_sfst_wins_over_wal_same_seq() {
         sfst: tmp.path().join("sfst"),
     };
     let wal_path = write_wal(&dirs.wal.join("default"), &[batch(records(0..40))]);
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default")); // WAL left in place
+    index_to_sfst(&wal_path, &dirs.sfst.join("default")); // WAL left in place
 
     let d = discover(&dirs, "default", None, 0..u32::MAX).unwrap();
     assert_eq!(d.sources.len(), 1, "the shared seq must yield one source");
@@ -437,7 +437,7 @@ fn time_window_prunes_sfst() {
         sfst: tmp.path().join("sfst"),
     };
     let wal_path = write_wal(&dirs.wal.join("default"), &[batch(records(0..30))]);
-    seal_to_sfst(&wal_path, &dirs.sfst.join("default"));
+    index_to_sfst(&wal_path, &dirs.sfst.join("default"));
     // The WAL must go so the layout is SFST-only: discovery's dedup set holds
     // only windowed SFST candidates (sfsq-cli/src/discover.rs), so a WAL left
     // behind would still be scanned as a tail despite the pruned SFST.
@@ -525,13 +525,14 @@ fn stream_filter_selects_matching_sfst() {
     let wal = dirs.wal.join("default");
     let sfst = dirs.sfst.join("default");
 
-    // Distinct seqs → distinct FileIds → two coexisting SFSTs. Seal + remove
-    // each WAL before writing the next (write_wal_seq expects an empty dir).
+    // Distinct seqs → distinct FileIds → two coexisting SFSTs. Index +
+    // remove each WAL before writing the next (write_wal_seq expects an
+    // empty dir).
     let a = write_wal_seq(&wal, &[batch_for(records(0..20), "nsA", "svcA")], 0);
-    seal_to_sfst(&a, &sfst);
+    index_to_sfst(&a, &sfst);
     std::fs::remove_file(&a).unwrap();
     let b = write_wal_seq(&wal, &[batch_for(records(20..50), "nsB", "svcB")], 1);
-    seal_to_sfst(&b, &sfst);
+    index_to_sfst(&b, &sfst);
     std::fs::remove_file(&b).unwrap();
 
     let stream_a = ServiceStream::new("nsA", "svcA");

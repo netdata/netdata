@@ -14,9 +14,8 @@
 //! the hot path.
 //!
 //! Consumers (grep-verified):
-//! - journal-index and journal-log-writer fold this error in via `#[from]`
-//!   (`IndexError::Journal` in journal-index/src/error.rs;
-//!   `WriterError::Journal` in journal-log-writer/src/error.rs);
+//! - journal-index folds this error in via `#[from]`
+//!   (`IndexError::Journal` in journal-index/src/error.rs);
 //!   journal-engine folds it into `EngineError` through the flat re-export
 //!   (journal-engine/src/error.rs). Each wrapper's `{0}` Display forwards
 //!   these strings, and their size asserts (`IndexError <= 32`,

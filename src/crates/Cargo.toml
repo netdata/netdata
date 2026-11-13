@@ -2,62 +2,60 @@
 resolver = "2"
 exclude = ["jf"]
 members = [
-    # Individual crates
-    "journal-common",
-    "journal-core",
-    "journal-index",
-    "chunk-file",
-    "treight",
-    "sfst",
-    "journal-log-writer",
-    "journal-engine",
-    "journal-registry",
-    "journal-function",
-
-    # Netdata plugin workspace members
+    # Shared Rust plugin SDK: the pluginsd protocol, the plugin runtime, the
+    # config-form schema, derived-metrics charts and the value types any Netdata
+    # Rust plugin builds on.
     "netdata-plugin/error",
+    "netdata-plugin/metrics",
     "netdata-plugin/protocol",
     "netdata-plugin/rt",
     "netdata-plugin/schema",
     "netdata-plugin/types",
-    "netdata-plugin/bridge",
-    "netdata-plugin/charts-derive",
 
-    # Netdata OTEL workspace members
-    "otel-plugin",
-    "otel-ledger",
+    # OTel plugin: the supervisor binary, its worker processes and their IPC.
+    "ferryboat",
     "file-lifecycle",
+    "otel-bridge",
+    "otel-derived-metrics",
+    "otel-ingestor",
+    "otel-job-scheduler",
+    "otel-ledger",
+    "otel-legacy-logs",
+    "otel-plugin",
+    "otel-service-map",
+
+    # OTel storage, indexing and query; none of these speak the plugin protocol.
+    "chunk-file",
+    "file-cache",
+    "file-registry",
+    "flatten-otel",
+    "ng-flatten",
+    "ng-index",
     "otel-catalog",
     "otel-logs-identity",
-    "file-cache",
-    "flatten-otel",
-
-    # Stress test tools
-    "otel-streams",
-
-    # IPC / RPC
-    "ferryboat",
-
-    "otel-ingestor",
-    "otel-legacy-logs",
-
-    # WAL
-    "file-registry",
-    "wal",
-
-    # SFST build + query
     "sfsq",
     "sfsq-cli",
+    "sfst",
+    "treight",
+    "wal",
 
-    # OTLP→WAL/indexing experiment (SOW-20260627)
+    # OTel tools: OTLP load generators and a standalone OTLP-to-WAL receiver.
     "ng-ingest",
-    "ng-index",
-    "ng-flatten",
+    "otel-streams",
 
-    # Netdata NetFlow workspace members
+    # Legacy journal stack: reads the former OTel plugin's journal files for
+    # otel-legacy-logs. Unrelated to jf, the C systemd-journal plugin's reader.
+    "journal-common",
+    "journal-core",
+    "journal-engine",
+    "journal-function",
+    "journal-index",
+    "journal-registry",
+
+    # NetFlow plugin.
     "netflow-plugin",
 
-    # Plugin IPC library
+    # Plugin IPC library, Rust implementation (the C one is src/libnetdata/netipc).
     "netipc",
 ]
 
@@ -71,140 +69,104 @@ collapsible_if = "allow"
 
 [workspace.dependencies]
 
-# --- merged from master (deps required by master's journal/netflow/rdp crates) ---
-arbitrary = "1.3"
-async-stream = "0.3"
-bitvec = "1.0.1"
-duct = "0.13"
-foyer = { version = "0.20.0", features = ["serde"] }
-hdrhistogram = { version = "7.5" }
-hyper-util = "0.1"
-indexmap = "2.9"
-journal-log-writer = { path = "journal-log-writer" }
-bridge = { path = "netdata-plugin/bridge" }
-netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
+# Internal crates: shared Rust plugin SDK.
+netdata-plugin-error = { path = "netdata-plugin/error" }
+netdata-plugin-metrics = { path = "netdata-plugin/metrics" }
+netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
+netdata-plugin-schema = { path = "netdata-plugin/schema" }
 netdata-plugin-types = { path = "netdata-plugin/types" }
-tokio-stream = "0.1"
-tower = "0.5"
-static_assertions = "1.1"
-thiserror = "2"
-zerocopy = { version = "0.9.0-alpha.0" }
-libc = "0.2"
-memmap2 = "0.9"
-memchr = "2.7"
-uuid = { version = "1.0"}
-nix = { version = "0.30" }
 
-ruzstd = "0.9.1"
-siphasher = "1.0"
-hashers = "1.0"
-twox-hash = { version = "2.1", default-features = false }
-# Pinned exactly: the no-`unsafe`-in-crate guarantee was audited per-version
-# (v0.17.0, `grep -rc unsafe src/` == 0); re-audit before any bump.
-fastbloom = { version = "=0.17.0", features = ["serde"] }
-rand = "0.9"
-lz4_flex = { version = "0.12", default-features = false, features = ["std", "safe-decode", "checked-decode"] }
-lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
-md5 = "0.7"
-arrayvec = "0.7"
-cardinality-estimator = "1.0"
+# Internal crates: OTel plugin.
+ferryboat = { path = "ferryboat" }
+file-lifecycle = { path = "file-lifecycle" }
+otel-bridge = { path = "otel-bridge" }
+otel-derived-metrics = { path = "otel-derived-metrics" }
+otel-ingestor = { path = "otel-ingestor" }
+otel-job-scheduler = { path = "otel-job-scheduler" }
+otel-ledger = { path = "otel-ledger" }
+otel-legacy-logs = { path = "otel-legacy-logs" }
+otel-service-map = { path = "otel-service-map" }
 
-fst = { git = "https://github.com/vkalintiris/fst.git", branch="bumpalo" }
-roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
-serde = { version = "1.0" }
-serde_bytes = "0.11"
-hashbrown = "0.17"
-rustc-hash = "2.1"
-rmp-serde = "1.3.1"
-bincode = { version = "2.0", features = ["serde"] }
-notify = "8.2"
+# Internal crates: OTel storage, indexing and query.
+chunk-file = { path = "chunk-file" }
+file-cache = { path = "file-cache" }
+file-registry = { path = "file-registry" }
+flatten-otel = { path = "flatten-otel" }
+ng-flatten = { path = "ng-flatten" }
+ng-index = { path = "ng-index" }
+otel-catalog = { path = "otel-catalog" }
+otel-logs-identity = { path = "otel-logs-identity" }
+sfsq = { path = "sfsq" }
+sfsq-cli = { path = "sfsq-cli" }
+sfst = { path = "sfst" }
+treight = { path = "treight" }
+wal = { path = "wal" }
 
-walkdir = "2.4"
-crossbeam-channel = "0.5"
-regex = "1.10"
-moka = { version = "0.12", features = ["future"] }
-serde_json = "1.0"
-anyhow = "1.0"
-chrono = { version = "0.4" }
+# Internal crates: legacy journal stack.
+journal-common = { path = "journal-common" }
+journal-core = { path = "journal-core" }
+journal-engine = { path = "journal-engine" }
+journal-function = { path = "journal-function" }
+journal-index = { path = "journal-index", default-features = false }
+journal-registry = { path = "journal-registry" }
 
-
-async-trait = "0.1.89"
-serde_yaml = "0.9.34"
-serde_regex = "1.1.0"
-tokio = { version = "1.45", features = ["full"] }
-ipnet = "2.11.0"
-ipnet-trie = "0.3.0"
-
-# Tracing
-console-subscriber = "0.5"
-tracing = { version = "0.1" }
-tracing-journald = "0.3"
-tracing-futures = { version = "0.2.5" }
-tracing-subscriber = "0.3"
-opentelemetry-proto = "0.33"
-prost = "0.14"
-
-# Netdata plugin
-schemars = "1.0"
-
-# Proc-macro toolkit (charts-derive)
-syn = "2.0"
-quote = "1.0"
-proc-macro2 = "1.0"
-
-# Journal histogram dependencies
-atoi = "2.0"
-bitflags = "2.9"
-bytes = "1"
-futures = "0.3"
-phf = { version = "0.12", default-features = false }
-phf_codegen = "0.12"
-tokio-util = { version = "0.7", features = ["codec"] }
-lru = "0.19"
-parking_lot = "0.12"
+# External crates used by more than one group (plugin SDK, OTel, legacy
+# journal stack, NetFlow, netipc).
 allocative = "0.3.4"
+anyhow = "1.0"
+async-trait = "0.1.89"
+bitflags = "2.9"
 bumpalo = { version = "3", features = ["std"] }
-rayon = "1.11.0"
-itoa = "1.0"
-
-base64 = "0.22"
-
-# Published systemd-journal-sdk crates (netflow-plugin). Keys use the
-# journal-sdk-* prefix because the plain journal-* names are taken by the
-# internal path crates elsewhere in this file; in-code idents are journal_sdk_*.
-journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.8.1" }
-journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.8.1" }
-journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.8.1" }
-journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.8.1" }
-journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.8.1" }
-journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.8.1" }
-journal-sdk-registry = { package = "systemd-journal-sdk-registry", version = "0.8.1" }
-
-# NetFlow-specific dependencies
-jaq-core = "3.0.0"
-jaq-json = "2.0.0"
-jaq-std = "3.0.0"
-maxminddb = "0.27.3"
-netflow_parser = "1.0.6"
-netgauze-bgp-pkt = "0.11.0"
-netgauze-bmp-pkt = "0.11.0"
-sflow-parser = "0.6.0"
-socket2 = "0.6.3"
-tonic-prost = "0.14"
-tonic-prost-build = "0.14"
-protoc-bin-vendored = "3"
-etherparse = "0.20.1"
-pcap-file = "2.0.0"
-
-# OTEL-specific dependencies
-atty = "0.2"
+bytes = "1"
 bytesize = { version = "2.3.1", features = ["serde"] }
+chrono = { version = "0.4" }
 clap = { version = "4", features = ["derive"] }
-criterion = { version = "0.5" }
+console-subscriber = "0.5"
+flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
+fst = { git = "https://github.com/vkalintiris/fst.git", branch="bumpalo" }
+futures = "0.3"
+hashbrown = "0.17"
 humantime = "2.2"
 humantime-serde = "1.1"
+itoa = "1.0"
+libc = "0.2"
+lru = "0.19"
+lz4_flex = { version = "0.12", default-features = false, features = ["std", "safe-decode", "checked-decode"] }
+memmap2 = "0.9"
+nix = { version = "0.30" }
+notify = "8.2"
+parking_lot = "0.12"
+proptest = "1.9"
+prost = "0.14"
+regex = "1.10"
+reqwest = { version = "0.13.2", default-features = false }
+roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
+rustc-hash = "2.1"
+schemars = "1.0"
+serde = { version = "1.0" }
+serde_json = "1.0"
+serde_yaml = "0.9.34"
+tempfile = { version = "3" }
+thiserror = "2"
+tokio = { version = "1.45", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 tonic = "0.14"
+tracing = { version = "0.1" }
+tracing-subscriber = "0.3"
+twox-hash = { version = "2.1", default-features = false }
+uuid = { version = "1.0"}
+zerocopy = { version = "0.9.0-alpha.0" }
+
+# External crates: shared Rust plugin SDK only.
+atoi = "2.0"
+futures-util = { version = "0.3", features = ["sink"] }
+indexmap = "2"
+phf = { version = "0.12", default-features = false }
+phf_codegen = "0.12"
+tracing-journald = "0.3"
+
+# External crates: OTel only.
 
 # OTLP/HTTP receiver front end for otel-ingestor: axum router served alongside
 # the tonic gRPC transport, with http/http-body-util request plumbing and
@@ -212,59 +174,13 @@ tonic = "0.14"
 # default features off: the receiver decodes bodies itself (prost + serde_json
 # with mirrored Content-Type) and never uses the Json/Form/Query extractors,
 # and skipping them keeps serde_path_to_error out of the graph (and keeps
-# axum from adding serde_urlencoded, which opendal's S3 signer pulls in anyway). http2 is enabled so the h2 ALPN entry the TLS listener advertises is
+# axum from adding serde_urlencoded, which opendal's S3 signer pulls in
+# anyway). http2 is enabled so the h2 ALPN entry the TLS listener advertises is
 # honest; http1 + tokio are what axum::serve needs.
 axum = { version = "0.8", default-features = false, features = ["http1", "http2", "tokio"] }
 http = "1"
 http-body-util = "0.1"
 tokio-rustls = "0.26"
-# Test-only: in-memory CA/server/client certificates for the OTLP/HTTP TLS
-# listener tests, so no key material is committed. Default features select
-# `ring`, the workspace's rustls backend.
-rcgen = "0.14"
-
-flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
-
-# Internal workspace crates
-journal-common = { path = "journal-common" }
-journal-core = { path = "journal-core" }
-journal-index = { path = "journal-index", default-features = false }
-chunk-file = { path = "chunk-file" }
-journal-engine = { path = "journal-engine" }
-journal-registry = { path = "journal-registry" }
-journal-function = { path = "journal-function" }
-rdp = { path = "rdp" }
-treight = { path = "treight" }
-sfst = { path = "sfst" }
-sfsq = { path = "sfsq" }
-sfsq-cli = { path = "sfsq-cli" }
-
-# Netdata plugin crates
-netdata-plugin-error = { path = "netdata-plugin/error" }
-netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
-netdata-plugin-schema = { path = "netdata-plugin/schema" }
-rt = { path = "netdata-plugin/rt" }
-
-# Netdata OTEL crates
-
-flatten_otel = { path = "flatten-otel" }
-
-# Ledger
-otel-ledger = { path = "otel-ledger" }
-file-lifecycle = { path = "file-lifecycle" }
-otel-ingestor = { path = "otel-ingestor" }
-otel-legacy-logs = { path = "otel-legacy-logs" }
-otel-catalog = { path = "otel-catalog" }
-file-cache = { path = "file-cache" }
-
-# IPC / RPC crates
-ferryboat = { path = "ferryboat" }
-
-file-registry = { path = "file-registry" }
-otel-logs-identity = { path = "otel-logs-identity" }
-wal = { path = "wal" }
-ng-flatten = { path = "ng-flatten" }
-ng-index = { path = "ng-index" }
 
 # reqwest-rustls-tls is load-bearing: without a TLS backend, reqwest rejects
 # every https:// URL in-process (S3/STS never reachable). Guarded by
@@ -278,20 +194,77 @@ opendal = { version = "0.59", default-features = false, features = [
   "auto-register-services",
 ] }
 
-rustls = { version = "0.23", default-features = false, features = ["ring"] }
-tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
-url = "2"
+# Pinned exactly: the no-`unsafe`-in-crate guarantee was audited per-version
+# (v0.17.0, `grep -rc unsafe src/` == 0); re-audit before any bump.
+fastbloom = { version = "=0.17.0", features = ["serde"] }
 
+# Test-only: in-memory CA/server/client certificates for the OTLP/HTTP TLS
+# listener tests, so no key material is committed. Default features select
+# `ring`, the workspace's rustls backend.
+rcgen = "0.14"
+
+base64 = "0.22"
+bincode = { version = "2.0", features = ["serde"] }
 crc32fast = "1"
-tempfile = { version = "3" }
-
-proptest = "1.9"
-zstd = "0.13"
-fsst-rs = "0.5"
-futures-util = { version = "0.3", features = ["sink"] }
+criterion = { version = "0.5" }
 flate2 = "1"
-reqwest = { version = "0.13.2", default-features = false }
+moka = { version = "0.12", features = ["future"] }
+opentelemetry-proto = "0.33"
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+serde_bytes = "0.11"
+serde_regex = "1.1.0"
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+tower = "0.5"
+url = "2"
+zstd = "0.13"
 
+# External crates: legacy journal stack only.
+async-stream = "0.3"
+crossbeam-channel = "0.5"
+foyer = { version = "0.20.0", features = ["serde"] }
+hashers = "1.0"
+lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
+md5 = "0.7"
+rand = "0.9"
+rayon = "1.11.0"
+ruzstd = "0.9.1"
+siphasher = "1.0"
+static_assertions = "1.1"
+walkdir = "2.4"
+
+# External crates: NetFlow only.
+
+# Published systemd-journal-sdk crates. Keys use the journal-sdk-* prefix
+# because the plain journal-* names are taken by the internal path crates
+# elsewhere in this file; in-code idents are journal_sdk_*.
+journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.8.1" }
+journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.8.1" }
+journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.8.1" }
+journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.8.1" }
+journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.8.1" }
+journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.8.1" }
+journal-sdk-registry = { package = "systemd-journal-sdk-registry", version = "0.8.1" }
+
+bitvec = "1.0.1"
+etherparse = "0.20.1"
+ipnet = "2.11.0"
+ipnet-trie = "0.3.0"
+jaq-core = "3.0.0"
+jaq-json = "2.0.0"
+jaq-std = "3.0.0"
+maxminddb = "0.27.3"
+memchr = "2.7"
+netflow_parser = "1.0.6"
+netgauze-bgp-pkt = "0.11.0"
+netgauze-bmp-pkt = "0.11.0"
+pcap-file = "2.0.0"
+protoc-bin-vendored = "3"
+rmp-serde = "1.3.1"
+sflow-parser = "0.6.0"
+socket2 = "0.6.3"
+tokio-stream = "0.1"
+tonic-prost = "0.14"
+tonic-prost-build = "0.14"
 
 [profile.dev]
 opt-level = 1

@@ -46,7 +46,7 @@
 //!
 //! # Users (grep-verified)
 //!
-//! - Streaming atomic write: `sfst::build` — the only direct [`AtomicFile`]
+//! - Streaming atomic write: `sfst::index_writer` — the only direct [`AtomicFile`]
 //!   user (`create` + [`annotate`] + `commit`).
 //! - [`write_atomic`]: file-lifecycle catalog rotation and startup install
 //!   (both under `spawn_blocking`), the WAL seq high-water file, file-cache
@@ -68,7 +68,7 @@ pub const TMP_SUFFIX: &str = ".tmp";
 /// The temp path for `final_path`: the suffix is appended, never
 /// substituted, so the final name (and its extension) stays visible in
 /// directory listings of interrupted writes.
-fn tmp_path(final_path: &Path) -> PathBuf {
+pub fn tmp_path(final_path: &Path) -> PathBuf {
     let mut os = final_path.as_os_str().to_owned();
     os.push(TMP_SUFFIX);
     PathBuf::from(os)
@@ -84,7 +84,7 @@ fn tmp_path(final_path: &Path) -> PathBuf {
 /// and `source()` are intentionally flattened into the message text.
 ///
 /// Public so streaming producers that write through the [`AtomicFile`]
-/// handle themselves (e.g. the SFST builder) can annotate their own
+/// handle themselves (e.g. the SFST writer) can annotate their own
 /// write-phase failures with [`AtomicFile::tmp_path`].
 pub fn annotate(e: io::Error, op: &str, path: &Path) -> io::Error {
     io::Error::new(e.kind(), format!("{op} {}: {e}", path.display()))
@@ -106,7 +106,7 @@ pub fn fsync_dir(dir: &Path) -> io::Result<()> {
 /// the *paths*. [`commit`](AtomicFile::commit) takes the file back and
 /// performs fsync → rename → parent-dir fsync. If the guard drops
 /// uncommitted — any error path between create and commit — the temp
-/// file is reaped best-effort, so a failed build never leaves a
+/// file is reaped best-effort, so a failed write never leaves a
 /// partial temp behind.
 #[must_use = "dropping the guard without commit() discards the write"]
 pub struct AtomicFile {
@@ -316,7 +316,7 @@ mod tests {
         {
             let (_guard, mut file) = AtomicFile::create(&path).unwrap();
             file.write_all(b"partial").unwrap();
-            // No commit: simulate a failed build.
+            // No commit: simulate a failed write.
         }
         assert!(!tmp_path(&path).exists(), "abandoned tmp reaped");
         assert_eq!(std::fs::read(&path).unwrap(), b"old", "final untouched");

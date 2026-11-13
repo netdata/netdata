@@ -1,7 +1,7 @@
 //! Query-time row scan over a WAL file — the second evaluator.
 //!
 //! [`WalScan`] answers a [`LogsQuery`] over WAL-resident data without
-//! building an index: it decodes the file's ng-flatten frames into rows
+//! indexing it: it decodes the file's ng-flatten frames into rows
 //! once ([`scan_flattened`](WalScan::scan_flattened)) and computes the
 //! statistics with plain per-row loops ([`evaluate`](WalScan::evaluate)).
 //! It exists for data the indexer hasn't reached yet — the sub-chunk
@@ -20,13 +20,13 @@
 //! # Semantic equality with the SFST engine
 //!
 //! This is a deliberate second implementation of the query semantics,
-//! and it must agree with [`LogsShard::evaluate`] over an SFST built
-//! from the same frames — the shared guarantees:
+//! and it must agree with [`LogsShard::evaluate`] over an SFST
+//! indexed from the same frames — the shared guarantees:
 //!
 //! - the *rows* are identical by construction: the tail and the sealed
-//!   `ng-index` build render every row from the **same** ng-flatten frame
-//!   through the **same** `ng_flatten::build_kv` renderer, timestamped
-//!   by the **same** stored `Record.ts`;
+//!   `ng-index` indexing render every row from the **same** ng-flatten
+//!   frame through the **same** `ng_flatten::build_kv` renderer,
+//!   timestamped by the **same** stored `Record.ts`;
 //! - filter patterns anchor identically: both compile through
 //!   `sfst::compile_pattern` / `sfst::compile_query`;
 //! - field tables classify identically: same distinct-pair cardinality
@@ -143,9 +143,10 @@ impl WalScan {
     ///
     /// Renders each typed entry to its canonical `key=value` via
     /// `ng_flatten::build_kv` and uses `Record.ts` as the row timestamp,
-    /// mirroring `ng-index`'s sealed build (`build_sfst`) exactly — same
+    /// mirroring `ng-index`'s indexing (`index_logs_dir`) exactly — same
     /// resource→scope→record token assembly, same per-occurrence rendering —
-    /// so a scan and an SFST built from the same frames agree by construction.
+    /// so a scan and an SFST indexed from the same frames agree by
+    /// construction.
     pub fn scan_flattened(path: &Path) -> Result<WalScan, FlattenedScanError> {
         Self::drain_flattened(wal::Reader::open(path)?)
     }
@@ -164,7 +165,7 @@ impl WalScan {
     }
 
     /// Drive the shared [`ScanSink`] from a flattened-frame WAL reader.
-    /// Mirrors `ng_index::build_sfst`'s row construction — per record, the
+    /// Mirrors `ng_index::index_logs_dir`'s row construction — per record, the
     /// resource ++ scope ++ record token assembly with `Record.ts` as the
     /// timestamp — so the rows fed here are the rows the sealed builder
     /// indexes.
@@ -489,7 +490,7 @@ impl ScanSink {
     /// Derive the per-field token lists and the field table, completing
     /// the scan. Cardinality is the number of distinct pairs per field
     /// and tiers use the indexer's default threshold — the same rule
-    /// `KeyValueInterner` applies, so an SFST built from these frames
+    /// `KeyValueInterner` applies, so an SFST indexed from these frames
     /// carries an identical table.
     fn finish(self) -> WalScan {
         let mut field_tokens: HashMap<String, Vec<u32>> = HashMap::new();
@@ -543,8 +544,8 @@ impl ScanSink {
 }
 
 /// Intern a flattened-frame entry slice into [`ScanSink`] tokens, rendering each
-/// entry's `key=value` via `ng_flatten::build_kv` — the same renderer the sealed
-/// `ng-index` builder uses, which is what makes the pair strings (and thus the query
+/// entry's `key=value` via `ng_flatten::build_kv` — the same renderer `ng-index`
+/// indexing uses, which is what makes the pair strings (and thus the query
 /// results) match. [`ScanSink`] dedups by full string, so the entry's pre-computed
 /// hash is not needed here (unlike the builder's `lookup_hash` fast path).
 fn intern_flattened(

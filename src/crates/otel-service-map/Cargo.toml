@@ -1,0 +1,30 @@
+[package]
+name = "otel-service-map"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_service_map"
+path = "src/lib.rs"
+
+[dependencies]
+async-trait = { workspace = true }
+bincode = { workspace = true }
+crc32fast = { workspace = true }
+humantime = { workspace = true }
+otel-bridge = { workspace = true }
+netdata-plugin-types = { workspace = true }
+opentelemetry-proto = { workspace = true }
+serde = { workspace = true, features = ["derive", "rc"] }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+netdata-plugin-protocol = { workspace = true }
+tempfile = { workspace = true }
+tokio-util = { workspace = true }

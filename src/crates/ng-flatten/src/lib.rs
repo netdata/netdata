@@ -5,9 +5,9 @@
 //! here and appends the bincode frame to a WAL — `otel-ingestor` (the production
 //! receiver) and `ng-ingest` (a standalone receiver), both via
 //! [`prepare_log_frame`]/[`prepare_trace_frame`]. Downstream, `ng-index` merges
-//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and seals
-//! it into an SFST index; `sfsq` scans frames straight off the WAL tail for live
-//! queries.
+//! the per-frame trees into one global tree ([`Flattener::merge_tree`]) and
+//! writes it into an SFST index; `sfsq` scans frames straight off the WAL tail
+//! for live queries.
 //!
 //! # Modules
 //!
@@ -248,7 +248,7 @@ mod tests {
         // dual representation: readable label under the clean name, raw int under `_`.
         assert_eq!(at(&leaves, "kind"), [&Value::Str("SERVER".into())]);
         assert_eq!(at(&leaves, "_kind"), [&Value::Int(2)]);
-        assert_eq!(at(&leaves, "status_code"), [&Value::Str("ERROR".into())]);
+        assert_eq!(at(&leaves, "status.code"), [&Value::Str("ERROR".into())]);
         assert_eq!(at(&leaves, "_status_code"), [&Value::Int(2)]);
         assert_eq!(
             at(&leaves, "attributes.http.method"),
@@ -277,10 +277,11 @@ mod tests {
         let l = f.into_tree().resolve(&e.entries);
         assert_eq!(at(&l, "kind"), [&Value::Str("UNSPECIFIED".into())]);
         assert_eq!(at(&l, "_kind"), [&Value::Int(0)]);
-        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "status.code"), [&Value::Str("UNSET".into())]);
         assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
 
-        // Unknown future variant → raw int survives (forward-compat), no label.
+        // Unknown future variant → the label is the decimal number, so the
+        // label field stays total; the raw int survives too.
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             kind: 99,
@@ -291,10 +292,40 @@ mod tests {
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e.entries);
-        assert!(at(&l, "kind").is_empty(), "no label for an unknown kind");
+        assert_eq!(at(&l, "kind"), [&Value::Str("99".into())]);
         assert_eq!(at(&l, "_kind"), [&Value::Int(99)]);
-        assert!(at(&l, "status_code").is_empty());
+        assert_eq!(at(&l, "status.code"), [&Value::Str("42".into())]);
         assert_eq!(at(&l, "_status_code"), [&Value::Int(42)]);
+    }
+
+    #[test]
+    fn span_role_follows_parent_then_kind() {
+        let cases = [
+            // (kind, parent_span_id, role)
+            (2, vec![], "ROOT"),
+            (3, vec![0; 8], "ROOT"),
+            (2, vec![0x01; 8], "INBOUND"),
+            (5, vec![0x01; 8], "INBOUND"),
+            (3, vec![0x01; 8], "OUTBOUND"),
+            (4, vec![0x01; 8], "OUTBOUND"),
+            (1, vec![0x01; 8], "INTERNAL"),
+            (0, vec![0x01; 8], "INTERNAL"),
+            (99, vec![0x01; 8], "INTERNAL"),
+        ];
+        for (kind, parent_span_id, role) in cases {
+            let mut f = Flattener::new();
+            let e = f.flatten_span(Span {
+                kind,
+                parent_span_id: parent_span_id.clone(),
+                ..Default::default()
+            });
+            let l = f.into_tree().resolve(&e.entries);
+            assert_eq!(
+                at(&l, "role"),
+                [&Value::Str(role.into())],
+                "kind {kind}, parent {parent_span_id:?}"
+            );
+        }
     }
 
     /// Wrap one span in a single-resource/single-scope traces request.
@@ -573,13 +604,13 @@ mod tests {
         });
         let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
-        assert_eq!(at(&l, "status_code"), [&Value::Str("UNSET".into())]);
+        assert_eq!(at(&l, "status.code"), [&Value::Str("UNSET".into())]);
         assert_eq!(at(&l, "_status_code"), [&Value::Int(0)]);
         assert_eq!(at(&l, "kind"), [&Value::Str("SERVER".into())]);
     }
 
     #[test]
-    fn span_trace_state_and_status_message_are_facets() {
+    fn span_trace_state_and_status_message_are_entries() {
         let mut f = Flattener::new();
         let e = f.flatten_span(Span {
             trace_state: "ot=th:8".into(),
@@ -591,9 +622,9 @@ mod tests {
         });
         let l = f.into_tree().resolve(&e.entries);
         assert_eq!(at(&l, "trace_state"), [&Value::Str("ot=th:8".into())]);
-        assert_eq!(at(&l, "status_message"), [&Value::Str("boom".into())]);
+        assert_eq!(at(&l, "status.message"), [&Value::Str("boom".into())]);
         assert_eq!(
-            at(&l, "status_code"),
+            at(&l, "status.code"),
             [&Value::Str("UNSET".into())],
             "an UNSET code is stored next to its message"
         );
@@ -603,7 +634,7 @@ mod tests {
         let e = f.flatten_span(Span::default());
         let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "trace_state").is_empty());
-        assert!(at(&l, "status_message").is_empty());
+        assert!(at(&l, "status.message").is_empty());
 
         // OK code + empty message: the code facets emit, the message doesn't —
         // an empty message must never suppress the status code (or vice versa).
@@ -616,9 +647,9 @@ mod tests {
             ..Default::default()
         });
         let l = f.into_tree().resolve(&e.entries);
-        assert_eq!(at(&l, "status_code"), [&Value::Str("OK".into())]);
+        assert_eq!(at(&l, "status.code"), [&Value::Str("OK".into())]);
         assert_eq!(at(&l, "_status_code"), [&Value::Int(1)]);
-        assert!(at(&l, "status_message").is_empty());
+        assert!(at(&l, "status.message").is_empty());
     }
 
     #[test]
@@ -1385,8 +1416,8 @@ mod tests {
     fn flatten_populates_and_dedups_entry_hashes() {
         // Two spans share `http.method=GET`; a resource attr is present too. At
         // flatten time, every entry (resource/scope/span) must carry its hash,
-        // identical key=value must hash the same (enables the seal fast path), and
-        // distinct key=value must differ.
+        // identical key=value must hash the same (enables the indexing fast
+        // path), and distinct key=value must differ.
         let span = |name: &str| Span {
             name: name.into(),
             attributes: vec![kv("http.method", Av::StringValue("GET".into()))],

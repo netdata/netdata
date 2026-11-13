@@ -151,7 +151,6 @@ impl<T> GuardedCell<T> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

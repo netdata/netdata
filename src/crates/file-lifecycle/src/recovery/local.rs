@@ -11,19 +11,18 @@
 //! `build_pipeline` (otel-ledger/src/ledger/pipeline.rs) drives these per
 //! tenant of each signal, in this order:
 //!
-//! 1. [`recover_orphaned_wals`] — delete WALs whose SFST already exists.
-//! 2. [`recover_unindexed`] — index WALs with no SFST yet; an unindexable one
-//!    stays on disk as an untracked orphan (see its doc).
-//! 3. [`drain_wal_deletes`] — drain the WAL-delete responses pass 2 fired at
-//!    the shared cleaner as side effects.
-//! 4. [`seed_from_catalog_files`] — replay local catalog files into the
+//! 1. [`recover_wals`] — the WAL files left by the last run: delete those
+//!    whose SFST already exists, index the others, and take the answers of
+//!    the WAL deletes that the indexing sent. It owns the order of its three
+//!    passes.
+//! 2. [`seed_from_catalog_files`] — replay local catalog files into the
 //!    uploaded / rotated state.
-//! 5. [`recover_retention`] — evict SFSTs and catalogs per retention, SFST
+//! 3. [`recover_retention`] — evict SFSTs and catalogs per retention, SFST
 //!    eviction gated on remote-cataloged confirmation.
 //!
-//! The remote phase queues its uploads fire-and-forget between passes 4 and 5
-//! (never awaited — `recovery/remote.rs`); these three deletion/indexing
-//! passes are recovery's only [`batch_recover`] users.
+//! The remote phase queues its uploads fire-and-forget between passes 2 and 3
+//! (never awaited — `recovery/remote.rs`); the passes of [`recover_wals`] and
+//! [`recover_retention`] are recovery's only [`batch_recover`] users.
 //!
 //! Error semantics (component.rs's contract): a dead worker channel
 //! mid-batch or mid-drain is the fatal `anyhow` error that fails startup;
@@ -35,7 +34,7 @@
 //! splits the per-pipeline ones only after recovery). Consumers
 //! (grep-verified): the `build_pipeline` above and `recovery/tests.rs`.
 
-use file_registry::{ByteSize, SeqKey};
+use file_registry::SeqKey;
 use otel_catalog::Catalog;
 
 use crate::component::{ComponentHandle, batch_recover, drain_pending};
@@ -43,6 +42,31 @@ use crate::ipc::{CleanerRequest, CleanerResponse, IndexerRequest, IndexerRespons
 use crate::registry::Registry;
 
 use super::now_ns;
+
+/// The WAL files that the last run left for a tenant, in three passes:
+///
+/// 1. `recover_orphaned_wals` deletes the WAL files whose SFST exists.
+/// 2. `recover_unindexed` indexes the others. Each success sends a WAL
+///    delete to the cleaner and does not wait for its answer.
+/// 3. `drain_wal_deletes` takes those answers.
+///
+/// The order is a rule of the shared cleaner, and this function is its one
+/// owner. [`batch_recover`] takes exactly as many answers as it sent
+/// requests, whatever they answer; [`drain_pending`] takes every answer that
+/// is still owed. So pass 1 must take its own answers before pass 2 sends
+/// deletes, and pass 3 must take the answers of pass 2 before anything else
+/// uses the cleaner ([`recover_retention`], the ledger's run loop):
+/// otherwise a pass takes an answer that is not its own, a WAL file that is
+/// gone stays tracked, and a pass waits for an answer that another one took.
+pub async fn recover_wals(
+    registry: &mut Registry,
+    indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
+    cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
+) -> anyhow::Result<()> {
+    recover_orphaned_wals(registry, cleaner).await?;
+    recover_unindexed(registry, indexer, cleaner).await?;
+    drain_wal_deletes(registry, cleaner).await
+}
 
 /// Index the tenant's archived WALs that have no SFST entry yet
 /// (`Registry::unindexed_ids`) as one [`batch_recover`] over the per-pipeline
@@ -56,10 +80,10 @@ use super::now_ns;
 /// an SFST counterpart survives — the query planner never sees it), and the
 /// bytes stay on disk. No quarantine, no auto-delete, and startup proceeds.
 /// The next restart re-discovers the file (its header is valid), retries the
-/// seal, and re-orphans it on failure — so a transient cause (e.g. a disk
-/// error) self-heals, while an undecodable file is retried and logged once
-/// per restart, never silently dropped.
-pub async fn recover_unindexed(
+/// indexing operation, and re-orphans it on failure — so a transient cause
+/// (e.g. a disk error) self-heals, while an undecodable file is retried and
+/// logged once per restart, never silently dropped.
+pub(crate) async fn recover_unindexed(
     registry: &mut Registry,
     indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
@@ -74,6 +98,7 @@ pub async fn recover_unindexed(
     let requests: Vec<_> = unindexed
         .iter()
         .map(|&id| IndexerRequest::Index {
+            file_id: id,
             wal_path: registry.wal.file_path(id),
             sfst_path: registry.sfst.file_path(id),
         })
@@ -81,20 +106,12 @@ pub async fn recover_unindexed(
 
     let mut failures: usize = 0;
     batch_recover(requests, indexer, |resp| match resp {
-        IndexerResponse::Indexed { seq, summary, .. } => {
-            // Unreachable in practice: the batch's requests were built from
-            // tracked entries, and the indexer parses the seq back from that
-            // same WAL path. Skipping cleanup leaves the fresh SFST untracked
-            // on disk and the WAL tracked — the next restart recovers the
-            // SFST and re-runs the WAL delete as orphan recovery.
-            let wf = match registry.wal.get(seq) {
-                Some(wf) => wf,
-                None => {
-                    tracing::warn!("recovery: indexed unknown WAL seq={seq}, skipping cleanup");
-                    return;
-                }
-            };
-            let id = wf.id;
+        IndexerResponse::Indexed {
+            file_id: id,
+            summary,
+            size,
+        } => {
+            let seq = id.seq;
 
             // Fire-and-forget delete of the now-redundant WAL; the WAL entry
             // is untracked when `drain_wal_deletes` sees the confirmation.
@@ -122,16 +139,11 @@ pub async fn recover_unindexed(
                 }
                 tracing::warn!("recovery: indexed empty WAL seq={seq}; dropped (no SFST tracked)");
             } else {
-                let index_size = ByteSize(
-                    std::fs::metadata(&index_file_path)
-                        .map(|m| m.len())
-                        .unwrap_or(0),
-                );
-                registry.sfst.track(id, index_size, summary);
+                registry.sfst.track(id, size, summary);
                 tracing::info!("recovery: indexed seq={seq}");
             }
         }
-        IndexerResponse::IndexFailed { path, error } => {
+        IndexerResponse::IndexFailed { file_id, error } => {
             // Orphan policy (see the function doc): untrack the entry so the
             // planner never sees a WAL without an SFST, keep the file on
             // disk, and carry on serving.
@@ -139,22 +151,9 @@ pub async fn recover_unindexed(
             tracing::error!(
                 "recovery: indexing failed path={} error={error}; \
                  kept on disk as an orphan (untracked; retried next restart)",
-                path.display(),
+                registry.wal.file_path(file_id).display(),
             );
-            match file_registry::FileId::parse(&path) {
-                Some(id) => {
-                    registry.wal.remove_by_seq(id.seq);
-                }
-                None => {
-                    // Unreachable in practice: the path came from a tracked
-                    // FileId. Log rather than assume.
-                    tracing::error!(
-                        "recovery: cannot parse FileId from failed WAL path {}; \
-                         entry left tracked",
-                        path.display(),
-                    );
-                }
-            }
+            registry.wal.remove_by_seq(file_id.seq);
         }
     })
     .await?;
@@ -176,13 +175,13 @@ pub async fn recover_unindexed(
 /// are consumed by the wrong handler.
 ///
 /// This is [`drain_pending`]'s production target (per component.rs): the
-/// precondition holds because the earlier cleaner round
-/// ([`recover_orphaned_wals`]) was consumed 1:1 by its own `batch_recover`,
-/// so the pending counter counts only these fire-and-forget sends. A failed
+/// precondition holds because [`recover_wals`] runs it right after the
+/// passes whose answers it must not see, so the pending counter counts only
+/// these fire-and-forget sends. A failed
 /// delete logs and leaves the WAL tracked — it keeps its SFST, so the next
 /// restart's [`recover_orphaned_wals`] retries; a cleaner that dies mid-drain
 /// is the fatal `anyhow` error of [`drain_pending`].
-pub async fn drain_wal_deletes(
+pub(crate) async fn drain_wal_deletes(
     registry: &mut Registry,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
 ) -> anyhow::Result<()> {
@@ -210,7 +209,7 @@ pub async fn drain_wal_deletes(
 /// `sfst::IndexWriter::write_file`), so its presence guarantees a complete
 /// index and the WAL is safe to delete. A failed delete logs and leaves the
 /// WAL tracked; the next restart retries.
-pub async fn recover_orphaned_wals(
+pub(crate) async fn recover_orphaned_wals(
     registry: &mut Registry,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
 ) -> anyhow::Result<()> {
@@ -279,35 +278,23 @@ pub async fn recover_retention(
     registry: &mut Registry,
     pipeline_id: u16,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
-    retention: &bridge::config::RetentionConfig,
+    retention: &otel_bridge::config::RetentionConfig,
     storage_enabled: bool,
 ) -> anyhow::Result<()> {
-    // SFST pass.
-    let to_evict_sfst = registry
-        .sfst
-        .evaluate_retention(&crate::helpers::sfst_retention_policy(retention), now_ns());
-    // The remote-confirmation gate of the function doc, applied per seq: it
-    // keys on the SFST's full identity. The seq came from this scan, so its
-    // entry (and identity) is present; an absent entry (the defensive `None`
-    // arm of `is_some_and`) defers, it is never evicted.
-    let (evictable_sfst, deferred_sfst): (Vec<u64>, Vec<u64>) =
-        to_evict_sfst.into_iter().partition(|&seq| {
-            !storage_enabled
-                || registry
-                    .sfst
-                    .get(seq)
-                    .is_some_and(|e| registry.is_remote_cataloged(SeqKey::from(&e.id)))
-        });
+    // SFST pass, with the remote-confirmation gate of the function doc.
+    let sfst::Evictions {
+        evict: evictable_sfst,
+        deferred: deferred_sfst,
+    } = registry.index_evictions(
+        &crate::helpers::sfst_retention_policy(retention),
+        now_ns(),
+        storage_enabled,
+    );
     for seq in deferred_sfst {
-        // Name the deferral by identity+seq while the entry is tracked; the
-        // bare-seq fallback covers the absent-entry arm of the gate above.
-        match registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
-            Some(key) => tracing::warn!(
+        if let Some(key) = registry.sfst.get(seq).map(|e| SeqKey::from(&e.id)) {
+            tracing::warn!(
                 "recovery: deferring eviction of seq={key} (catalog not yet confirmed on remote)"
-            ),
-            None => tracing::warn!(
-                "recovery: deferring eviction of seq={seq} (catalog not yet confirmed on remote)"
-            ),
+            );
         }
     }
 

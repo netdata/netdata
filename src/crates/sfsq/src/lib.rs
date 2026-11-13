@@ -1,9 +1,9 @@
 //! Query engine over SFST indexes — the read side of the OTLP log/trace
 //! storage stack (`ng-flatten` owns the flattened frames the receivers
-//! append to the WAL, `ng-index` seals SFSTs from it, this crate
+//! append to the WAL, `ng-index` indexes it into SFSTs, this crate
 //! answers the queries). This crate is the query *mechanism*: it
 //! evaluates whatever sources it is handed — sealed SFST files,
-//! in-memory SFSTs built from active-WAL chunks, and WAL tails — and
+//! in-memory SFSTs indexed from active-WAL chunks, and WAL tails — and
 //! owns no storage; which bytes take which form is *policy*, resolved
 //! by the caller (`otel-ledger`'s ledger).
 //!
@@ -29,8 +29,9 @@
 //! [`traces`] — trace queries over the same source kinds, with five
 //! operation surfaces: [`traces::trace_by_id`] (cross-source assembly
 //! through one shared combiner, `sfst::trace_combine`),
-//! [`traces::search()`], [`traces::overview()`], [`traces::slowest()`],
-//! and attribute enumeration. Unlike logs there is no silent
+//! [`traces::search()`], [`traces::overview()`], [`traces::suggest()`]
+//! (search-bar keys and values) and [`traces::explore()`] (the span
+//! view). Unlike logs there is no silent
 //! degradation: a source that fails is an explicit partial
 //! ([`traces::QueryStatus`]), and source identity is validated up
 //! front — duplicate ids and overlapping WAL ranges are rejected.
@@ -49,9 +50,9 @@
 //! - `traces/` — `sources` (validated source identity), `predicate`
 //!   (the shared predicate AST), `status` (the partial-result
 //!   contract), and one module per operation (`by_id`, `search` with
-//!   its `gate` pre-assembly filter, `overview`, `slowest`,
-//!   `attributes`); `fold` merges cross-source aggregates over
-//!   `rollup`'s per-trace shapes; `vocab`/`window`/`wal_scan` are
+//!   its `gate` pre-assembly filter, `overview`, `suggest`, `explore`);
+//!   `fold` merges cross-source aggregates over `rollup`'s per-trace
+//!   shapes; `vocab`/`window`/`wal_scan`/`order`/`duration_hist` are
 //!   shared support.
 //!
 //! Each subsystem module's own docs are the authority for its pieces;

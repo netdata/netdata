@@ -22,7 +22,7 @@ Module: otel
 
 ## Overview
 
-Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab.
+Receive OpenTelemetry metrics, logs, and traces from an OpenTelemetry Collector over OTLP/gRPC or OTLP/HTTP. The plugin converts supported metrics into Netdata charts, indexes logs for exploration in the Logs tab, and indexes traces for exploration in the Traces tab. It also builds a service map from the received spans (the `topology:tracing` Function).
 
 The plugin accepts gauges, sums, explicit-bucket histograms, and summaries. It does not currently ingest exponential histograms. Monotonic cumulative and delta sums are rate-normalized; non-monotonic cumulative sums behave as gauges.
 
@@ -61,7 +61,7 @@ The plugin starts automatically and listens on `127.0.0.1:4317` for OTLP/gRPC co
 
 #### Limits
 
-Each export request is limited to 4 MiB, both as received and after decompression. The plugin rejects a larger request as a whole. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
+Each export request is limited to 4 MiB, both as received and after decompression. The plugin rejects a larger request as a whole. The plugin also rejects as a whole a request with so many records that the plugin cannot store them together: the log records of one service in the request, or all the spans of the request, are more than 32 MiB after the plugin prepares them. Only a request of hundreds of thousands of records that are almost empty is that large. Each export request can create at most 100 new charts by default. This is a per-request throttle, not a total cardinality limit. By default, log timestamps are accepted from up to 24 hours in the past through 10 minutes in the future; records without a timestamp use their arrival time. A span is accepted when it started no more than 24 hours ago and ends no more than 10 minutes in the future. Log and trace retention are each bounded by whichever limit is reached first: retained file count, retained indexed-data size, or age.
 
 
 #### Performance Impact
@@ -122,16 +122,16 @@ Older files configure the OTLP/gRPC listener in an `endpoint:` section: `endpoin
 | [metrics.chart_configs_dir](#option-metrics-chart-configs-dir) | Directory containing user metric mapping YAML files. | /etc/netdata/otel.d/v1/metrics | no |
 | [metrics.interval_secs](#option-metrics-interval-secs) | Default Netdata chart update interval in seconds. | 10 | no |
 | metrics.grace_period_secs | Time after the last data point before the plugin begins filling chart gaps. | 60 | no |
-| metrics.expiry_duration_secs | Time without data after which a chart is removed. | 900 | no |
+| [metrics.expiry_duration_secs](#option-metrics-expiry-duration-secs) | Time without data after which a chart is removed. | 900 | no |
 | [metrics.max_new_charts_per_request](#option-metrics-max-new-charts-per-request) | Maximum number of new charts one OTLP export request can create. | 100 | no |
 | [base_dir](#option-base-dir) | Absolute root directory for locally stored OpenTelemetry logs and traces. | /var/log/netdata/otel/v2 | no |
-| logs.rotation.default.max_file_size | File size at which incoming logs start a new file. | 25MB | no |
-| logs.rotation.default.max_entries | Entry count at which incoming logs start a new file. | 50000 | no |
+| logs.rotation.default.max_file_size | File size at which incoming logs start a new file. The plugin reads a value of 0 as "not set". It then logs a warning when it starts and uses the default value. For a tenant, it uses the value of the `default` entry. | 25MB | no |
+| logs.rotation.default.max_entries | Entry count at which incoming logs start a new file. The plugin reads a value of 0 as "not set". It then logs a warning when it starts and uses the default value. For a tenant, it uses the value of the `default` entry. | 50000 | no |
 | logs.retention.default.max_files | Maximum number of stored log files. | 100000 | no |
 | [logs.retention.default.max_total_size](#option-logs-retention-default-max-total-size) | Maximum total size of stored log files. | 1GB | no |
 | logs.retention.default.max_age | Maximum age of stored log files. | 7 days | no |
-| traces.rotation.default.max_file_size | File size at which incoming spans start a new file. | 25MB | no |
-| traces.rotation.default.max_entries | Span count at which incoming spans start a new file. | 50000 | no |
+| traces.rotation.default.max_file_size | File size at which incoming spans start a new file. The plugin reads a value of 0 as "not set". It then logs a warning when it starts and uses the default value. For a tenant, it uses the value of the `default` entry. | 25MB | no |
+| traces.rotation.default.max_entries | Span count at which incoming spans start a new file. The plugin reads a value of 0 as "not set". It then logs a warning when it starts and uses the default value. For a tenant, it uses the value of the `default` entry. | 50000 | no |
 | traces.retention.default.max_files | Maximum number of stored trace files. | 100000 | no |
 | [traces.retention.default.max_total_size](#option-traces-retention-default-max-total-size) | Maximum total size of stored trace files. | 1GB | no |
 | traces.retention.default.max_age | Maximum age of stored trace files, measured on the start time of the newest span in each file. | 7 days | no |
@@ -181,10 +181,16 @@ User mappings take priority over the stock mappings compiled into the plugin. Fi
 Timing must satisfy `0 < interval <= 3600`, `interval < grace`, and `grace <= expiry`. Because the stock configuration explicitly sets all three values, set compatible values together when changing the global timing. An invalid resolved timing configuration logs a warning and falls back to the plugin's hardcoded chart defaults.
 
 
+<a id="option-metrics-expiry-duration-secs"></a>
+##### metrics.expiry_duration_secs
+
+The plugin also rejects a metric data point when its timestamp is further from the current time than the expiry of its chart, in the past or in the future. The expiry of a chart is this value, unless a per-metric mapping gives the chart a longer grace period.
+
+
 <a id="option-metrics-max-new-charts-per-request"></a>
 ##### metrics.max_new_charts_per_request
 
-This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create.
+This limits a single request's cardinality burst. It does not cap the total number of charts that successive requests can create. The plugin reads a value of 0 as "not set". It then logs a warning when it starts and uses 100.
 
 
 <a id="option-base-dir"></a>
@@ -321,7 +327,100 @@ There are no alerts configured by default for this integration.
 
 ## Metrics
 
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 Metrics are created dynamically from supported OpenTelemetry data. The exact charts depend on the received metric names, attributes, instrumentation scopes, and mapping rules.
+
+The plugin also makes charts about the data it receives, listed below. These charts count the records of an export when the plugin accepts the export, even when it rejects some of its records. When the plugin cannot store the records of an export of logs or spans (a storage error), the records show as `failed`, and the sender sends them again. An export that fails more than one time counts each time. A request that the plugin rejects as a whole because it is too large is on no dimension: the sender gets the error. An export that a stop of the Agent cuts is also on no dimension. An export that fails for another reason does not show on these charts.
+
+The plugin has two worker processes: the ingestor receives the data and writes it, and the ledger indexes it. The ingestor tells the ledger about each file it creates, syncs, and closes. `netdata.otel.wal_events_queued` shows how many of these messages wait to be sent. The number is near zero when the ledger keeps up. When it grows, the ledger is slower than the ingestor, and the memory of the ingestor grows with it.
+
+The charts of the index files (`netdata.otel.index_files`, `netdata.otel.index_size`) are totals of all tenants, and the plugin updates them every 30 seconds. `netdata.otel.tenants` shows how many tenants these totals cover: each tenant has its own files and its own retention limits, so the disk that the plugin needs grows with the number of tenants. The plugin keeps a tenant in this number after the data of the tenant expires. The retention limits are per tenant: compare the totals with the limits that you configured.
+
+Three charts exist only when `remote_storage.enabled` is `true`. `netdata.otel.index_files_waiting_for_remote` shows the files that are over a retention limit while remote storage did not confirm their catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable. `netdata.otel.uploads` and `netdata.otel.uploads_finished` count the uploads of index files and of catalog files together. An upload is `in_progress` from the moment the plugin starts it until it ends; the plugin runs a few uploads at the same time and the others wait for their turn. An upload that fails shows as `failed` each time it fails, and as `waiting_for_retry` until the plugin tries it again.
+
+The plugin also makes charts for each service, from the traces and the logs that it receives: requests, failed requests and request durations from traces, and log records by severity from logs. A service is the `service.namespace` and `service.name` resource attributes, kept apart by tenant and deployment environment. These charts have no settings. They count as follows:
+
+- A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends.
+- Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
+- A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number. A record without a severity number counts as `unspecified`, also when it has a severity text. The sender or the OpenTelemetry Collector must set the severity number.
+- The average request duration is the mean duration of the requests that ended in each second. Over a longer time, the chart shows the mean of these per-second values. This is not the mean duration of all the requests in that time.
+- The charts count only the spans and the log records that the plugin stores. When an SDK or a Collector drops spans by sampling and does not write a sampling threshold, the request rates are lower than the real rates, and the share of failed requests can change.
+- The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Records counted in another time slot or chart set" chart shows these records as `late` and `future`.
+
+At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived charts" and "Services removed after 15 minutes without data" charts count the overflow chart set as one service. The "Records counted in another time slot or chart set" chart shows its records as `overflowed`. Such a record can also count as `late` or `future`.
+
+
+
+### Per OpenTelemetry instance
+
+The plugin itself, with charts of the metric data points, log records and spans that it receives, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
+
+This scope has no labels.
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.otel.metric_data_points | OpenTelemetry metric data points received | accepted, rejected | data points/s |
+| netdata.otel.log_records | OpenTelemetry log records received | accepted, rejected, failed | records/s |
+| netdata.otel.spans | OpenTelemetry spans received | accepted, rejected, failed | spans/s |
+| netdata.otel.wal_events_queued | WAL file events waiting to be sent to the ledger | events | events |
+| netdata.otel.indexing_operations | Indexing operations running and waiting | running, waiting | operations |
+| netdata.otel.indexing_operations_oldest_wait | Longest wait of an indexing operation that has not started | wait | seconds |
+| netdata.otel.indexing_operations_finished | Indexing operations finished | succeeded, failed | operations/s |
+| netdata.otel.index_files | Index files on the local disk | logs, traces | files |
+| netdata.otel.index_size | Size of the index files on the local disk | logs, traces | bytes |
+| netdata.otel.tenants | Tenants known to the plugin | logs, traces | tenants |
+| netdata.otel.index_files_waiting_for_remote | Index files over the retention limits that wait for remote storage | logs, traces | files |
+| netdata.otel.uploads | Uploads to remote storage in progress and waiting for a retry | in_progress, waiting_for_retry | operations |
+| netdata.otel.uploads_finished | Uploads to remote storage finished | succeeded, failed | operations/s |
+
+
+### Per signal
+
+One signal, logs or traces, that the per-service charts are made from.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| signal | The signal that the per-service metrics are made from, `logs` or `traces`. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| netdata.otel.derived_services | Services with derived charts | services | services |
+| netdata.otel.derived_expired_services | Services removed after 15 minutes without data | expired | services/s |
+| netdata.otel.derived_adjusted_records | Records counted in another time slot or chart set | late, future, overflowed | records/s |
+
+
+### Per service
+
+One service, identified by its resource attributes and tenant.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| resource.attributes.service.name | The `service.name` resource attribute, or `unknown_service` when it is not set. Not present on the overflow chart set. |
+| resource.attributes.service.namespace | The `service.namespace` resource attribute. Not present when it is not set, and not on the overflow chart set. |
+| resource.attributes.deployment.environment.name | The `deployment.environment.name` resource attribute, or the older `deployment.environment`. Not present when neither is set, and not on the overflow chart set. |
+| tenant | The tenant of the sender (`default` when tenant authentication is disabled). Not present on the overflow chart set. |
+| otel.metric.overflow | Set to `true` only on the chart set that holds the services over the limit of 500 services. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| otel_service.log_records | Service log records by severity | fatal, error, warn, info, debug, trace, unspecified | records/s |
+| otel_service.requests | Service requests | success, error | requests/s |
+| otel_service.request_duration_avg | Service request duration average | avg | seconds |
+| otel_service.request_duration_max | Service request duration maximum | max | seconds |
+| otel_service.request_duration_histogram | Service request duration histogram | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10, +Inf | requests/s |
 
 
 
@@ -379,12 +478,24 @@ A successful TCP connection proves only that something is listening. Check that 
 
 #### A metric does not create the expected chart
 
-Exponential histograms are not currently ingested. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
+Exponential histograms are not currently ingested. The chart `netdata.otel.metric_data_points` shows the data points that reached a chart on its `accepted` dimension and the data points that the plugin dropped on its `rejected` dimension. A data point without a value is on neither, and so is a gauge or sum data point whose value is not a finite number (NaN, infinity). A histogram or summary data point with such a number in its sum, minimum, maximum or a quantile is charted without that number. For other supported metrics, inspect the Agent journal for rejected user mapping files and verify the metric name, instrumentation scope, and `dimension_attribute_key`. The resulting chart context is `otel.<metric-name>`.
 
 
 #### Large exports are rejected
 
-The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. Make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
+The plugin rejects an export request larger than 4 MiB as a whole, and the Collector drops that batch. The plugin also rejects a request of hundreds of thousands of log records or spans that are almost empty (the answer is `InvalidArgument` or HTTP 400, and its message gives the number of records). In the two cases, make the batches smaller. On the exporter, cap them by size with `sending_queue: { batch: { sizer: bytes, max_size: 3000000 } }`. Alternatively, lower `send_batch_max_size` on the `batch` processor; it counts items (spans, data points, log records), not bytes.
+
+
+#### The Collector reports `Unavailable` or HTTP 503 for logs or traces
+
+The plugin could not store the data: its disk is full, or a write to its disk failed. It answers `UNAVAILABLE` (HTTP 503) with `WAL write error`, `WAL sync error` or `WAL writer creation failed`, and the Agent journal has an error from `otel-plugin/ingestor`. The Collector keeps the batch and sends it again, so no data is lost while its retry settings allow it. The charts `netdata.otel.log_records` and `netdata.otel.spans` show these records on their `failed` dimension. Make room on the disk that holds `base_dir`, or repair it. One failure can refuse more than one batch of the same tenant, and a refused batch can be on the disk in part or in full. When the Collector sends such a batch again, the plugin stores it again, so some records can appear two times. Delivery is at least once: see [OTLP ingestion](https://github.com/netdata/netdata/blob/master/docs/opentelemetry/otlp-ingestion.md#delivery-is-at-least-once) for all the causes of copies.
+
+A different case has the same look in the Collector's log: the Agent stopped or restarted. When it stops, the plugin first answers the exports that are in progress, for up to half a second. An export that it could not answer in that time usually ends with a closed connection and no answer; in rare cases the answer is `UNAVAILABLE` with `the plugin is stopping`. The same happens to an export in progress when the Agent or the host stops suddenly. Exports that come while the plugin is down get a refused connection. This is not a disk problem, and these records are not on the `failed` dimension. The plugin can have the records of an export that was cut on its disk already. When the Collector sends the batch again after the restart, the plugin stores it again, so these records can appear two times.
+
+
+#### Some exported metric data points are missing
+
+The plugin rejects a metric data point when its timestamp is further from the current time than the expiry of its chart (`metrics.expiry_duration_secs`, 15 minutes by default), in the past or in the future. The chart `netdata.otel.metric_data_points` shows these data points on its `rejected` dimension, and the plugin logs a warning in the Agent journal. Check the clock of the host that produced the metrics. The plugin also rejects a data point when the name of its metric or of its dimension is longer than 255 bytes, and when its chart already has 4,096 dimensions. For a histogram or a summary, the plugin leaves out the buckets or quantiles that do not fit and does not reject the data point. A chart keeps at most 1,024 labels. When the attributes of a metric give more labels, the plugin leaves out the rest.
 
 
 #### Some exported logs are missing

@@ -1,16 +1,16 @@
 //! Cross-source TRACE-density overview — the traces UI's default paint
-//! (trace-level numbers, `unit:"traces"`). Consumers: the otel-traces
-//! Function's `overview` mode and the `overview` section embedded in
-//! its `search` view — the ledger's adapter shapes both from one
-//! [`OverviewData`].
+//! (trace-level numbers, `unit:"traces"`). Consumer: the `overview`
+//! section the otel-traces Function's list view embeds — the ledger's
+//! adapter shapes it from one [`OverviewData`].
 //!
 //! Folds per-trace aggregates from BOTH source shapes — sealed files'
 //! `TRSU` rollup rows and WAL tails' decoded-span folds (parity
-//! test-pinned) — into one map keyed by trace id (sealed-file rotation
-//! is content-agnostic: a trace's spans straddle files and tails),
-//! then bins each merged trace into the (time bucket × log-scale
-//! duration bin) grid by its ENVELOPE (min start; saturating max end
-//! − min start).
+//! test-pinned) — per trace id (sealed-file rotation is
+//! content-agnostic: a trace's spans straddle files and tails): a trace
+//! held by one source bins from that source alone, the others merge in
+//! a capped remainder map (`fold` module docs), and each trace bins
+//! into the (time bucket × log-scale duration bin) grid by its ENVELOPE
+//! (min start; saturating max end − min start).
 //!
 //! Pinned semantics:
 //!
@@ -23,36 +23,44 @@
 //!   (legacy) is EXCLUDED and marked
 //!   [`RollupAbsent`](PartialReason::RollupAbsent) — its spans never
 //!   leak into trace-level numbers.
-//! - **Exact percentiles, not interpolated bins**: the per-bucket
-//!   p50/p95/p99 are nearest-rank selections over that bucket's binned
-//!   durations, so every value is an OBSERVED duration. The duration
-//!   bins are decade-wide and stay that way — they serve cell-click
-//!   narrowing, and interpolating a percentile from them would carry up
-//!   to an order-of-magnitude error.
+//! - **Bounded percentiles, not decade bins**: the per-bucket
+//!   p50/p95/p99 come from a fixed-size log-linear histogram of that
+//!   bucket's binned durations (16 sub-bins per power of two), within
+//!   1/32 of the exact nearest-rank duration and never outside the
+//!   bucket's observed range — memory per bucket, not per trace. The
+//!   same histogram gives the heatmap's power-of-two duration rows. The
+//!   duration bins stay decade-wide: they serve the trace-volume view,
+//!   and interpolating a percentile from them would carry up to an
+//!   order-of-magnitude error.
 //! - **Bin-by-envelope-start**: a trace whose MERGED envelope starts
 //!   outside the grid is clipped — excluded from the cells AND the
 //!   totals. The same start-in-window rule the search list applies to
 //!   spans, here applied to the merged envelope, so a long trace
 //!   straddling the window's left edge is invisible here even though
 //!   search returns its in-window spans.
-//! - **Filtered population is a stored-row match**: with an
-//!   [`OverviewQuery::predicate`], a trace is binned when ANY of its
-//!   stored rows that starts inside the grid matches the span-local
-//!   predicate — evaluated by the search engine's per-file plan
-//!   (sealed) and span-side evaluator (tails), never by canonical
-//!   assembly. The filter SELECTS traces, it does not trim them: a
-//!   binned trace still contributes its WHOLE merged envelope and ALL
-//!   its stored spans, matching or not. Trace-level conditions
-//!   (`root_name`, `root_service_name`, `trace_duration`) and
-//!   `trace_id` pins need assembly or the candidate machinery and are
-//!   REJECTED at the request boundary — never silently ignored.
-//! - **Roots are resolved only for the facet lists**: the grid needs
-//!   only envelopes and counts, so the shared fold (one merge, in
-//!   [`super::fold`]) runs roots-free by default — no root-field
-//!   dictionary decodes. Requesting [`OverviewQuery::root_facets`]
-//!   flips the flag and accumulates the top-root lists over the binned
-//!   population, whose size the visited budget already bounds through
-//!   the merge map.
+//! - **Filtered population is a stored-row match**: with
+//!   [`OverviewQuery::tokens`], a span-local token holds for a trace
+//!   when ANY of its stored rows that starts inside the grid matches
+//!   its group (a negated one: when none does) — evaluated by the search
+//!   engine's per-file plans (sealed) and span-side evaluator (tails),
+//!   never by canonical assembly. Root tokens read RECORDED roots: a
+//!   positive one holds when some source's recorded true root satisfies
+//!   it (a sealed file's rollup claim, a tail's earliest unset-parent
+//!   span), so a trace whose sources record different roots can pass
+//!   tokens no single root satisfies. A withheld claim (an ambiguous
+//!   tie) makes the root unknown: the trace passes no negated root
+//!   token, and a positive one only through another source's claim.
+//!   `trace_id` tokens pin or
+//!   exclude. The filter SELECTS traces, it does not trim them: a binned
+//!   trace still contributes its WHOLE merged envelope and ALL its
+//!   stored spans, matching or not. Trace-duration and trace-start tokens
+//!   are REJECTED at the request boundary — they are the grid's own axes
+//!   — never silently ignored.
+//! - **Window files only**: the envelope merges the spans of the grid's
+//!   own sources. A long trace whose early spans sit only in older files
+//!   bins later than it started (the list, reading a wider completion
+//!   range, knows the earlier start) — a known approximation that keeps
+//!   the pass cheap.
 //!
 //! Engine contracts come from the shared fold (`super::fold`): sources
 //! process in `SourceId` order; a failed source is a
@@ -63,19 +71,22 @@
 //! [`OverviewCeiling`](PartialReason::OverviewCeiling). The budget
 //! charges each source its fold cost — rollup rows (sealed) or decoded
 //! spans (tails) — and is checked BETWEEN sources, so one source may
-//! overshoot it by that source's whole cost. It bounds WORK, not
-//! memory — the merge map peaks at the processed prefix's distinct
-//! traces.
+//! overshoot it by that source's whole cost. It bounds WORK; memory is
+//! bounded by the fold's remainder cap (`fold` module docs: traces
+//! held by several files past it count per file, flagged
+//! [`TraceFragments`](PartialReason::TraceFragments)).
 
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::fold::{SourceFoldSpec, SpanFilter, merge_trace_sources};
-use super::predicate::{Predicate, PredicateError};
+use super::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
+use super::fold::{MergedTrace, SourceFoldSpec, TokenFilter, merge_trace_sources};
+use super::predicate::{PredicateError, PredicateTarget, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
+use super::vocab::BuiltinField;
 use super::window::{TimeWindow, WindowError};
 
 /// Number of log-scale duration bins (fixed).
@@ -95,46 +106,33 @@ const DURATION_BIN_EDGES_NS: [i64; DURATION_BIN_COUNT - 1] = [
     10_000_000_000, // 10s
 ];
 
-/// The default visited budget (rollup rows + tail spans examined).
-const VISITED_ROWS_CEILING: u64 = 4_000_000;
+/// The fold budget (rollup rows + tail spans of the prefix): ~1.5 s at
+/// the measured ~0.38 µs per row. The single-source proof's filter
+/// stays accurate at this many ids.
+const FOLD_ROWS_CEILING: u64 = 4_000_000;
+const _: () = assert!(FOLD_ROWS_CEILING <= super::gate::PROOF_IDS_MAX);
+/// The filter's budget (scanned rows, emitted positions, claims, tail
+/// spans): the same ~1.5 s at the measured ~0.11 µs per unit.
+const FILTER_UNITS_CEILING: u64 = 14_000_000;
+/// The most multi-source traces the merge holds (~27 MB at ~105 B per
+/// entry); more are counted per file, flagged.
+const REMAINDER_TRACES_MAX: usize = 262_144;
+/// The filter's dictionary-bytes budget (the search's value and
+/// reasoning: a free-text term over a day of files).
+const DICT_BYTES_CEILING: u64 = 512 << 20;
 
-/// How many values each root-facet list carries (the rest fold into
-/// `other`). Fixed — a UI-default, not a tuning surface.
-pub const FACET_TOP_K: usize = 10;
+/// Whether `target` is one of the grid's axes — the trace's start (time)
+/// or its duration — which the grid draws rather than filters on.
+pub fn is_axis(target: &PredicateTarget) -> bool {
+    matches!(
+        target,
+        PredicateTarget::Builtin(BuiltinField::TraceDuration | BuiltinField::TraceStart)
+    )
+}
 
 /// Which duration bin an envelope duration falls in.
 fn duration_bin(duration_ns: i64) -> usize {
     DURATION_BIN_EDGES_NS.partition_point(|&edge| duration_ns >= edge)
-}
-
-/// One time bucket's envelope-duration percentiles, nanoseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DurationPercentiles {
-    pub p50: i64,
-    pub p95: i64,
-    pub p99: i64,
-}
-
-/// Exact nearest-rank percentiles over one bucket's envelope durations:
-/// rank `ceil(p/100 x n)`, 1-based, so every answer is an observed
-/// duration and a one-trace bucket answers that duration at every rank.
-/// `None` for a bucket that binned nothing — zero would read as an
-/// instantaneous trace.
-///
-/// Selects the ranks from the top down, each within the prefix the
-/// previous selection bounded: O(n) per rank with no full sort, and the
-/// caller's scratch buffer is reordered in place.
-fn percentiles(durations: &mut [i64]) -> Option<DurationPercentiles> {
-    let n = durations.len();
-    if n == 0 {
-        return None;
-    }
-    let rank = |p: usize| (p * n).div_ceil(100) - 1;
-    let (r50, r95, r99) = (rank(50), rank(95), rank(99));
-    let p99 = *durations.select_nth_unstable(r99).1;
-    let p95 = *durations[..=r99].select_nth_unstable(r95).1;
-    let p50 = *durations[..=r95].select_nth_unstable(r50).1;
-    Some(DurationPercentiles { p50, p95, p99 })
 }
 
 /// An overview request: the exact time grid (the CONSUMER owns bucket
@@ -142,46 +140,54 @@ fn percentiles(durations: &mut [i64]) -> Option<DurationPercentiles> {
 #[derive(Debug, Clone)]
 pub struct OverviewQuery {
     grid: sfst::Grid,
-    visited_ceiling: u64,
-    root_facets: bool,
-    predicate: Option<Predicate>,
+    fold_ceiling: u64,
+    filter_ceiling: u64,
+    remainder_cap: usize,
+    tokens: TokenQuery,
 }
 
 impl OverviewQuery {
     pub fn new(grid: sfst::Grid) -> Self {
         Self {
             grid,
-            visited_ceiling: VISITED_ROWS_CEILING,
-            root_facets: false,
-            predicate: None,
+            fold_ceiling: FOLD_ROWS_CEILING,
+            filter_ceiling: FILTER_UNITS_CEILING,
+            remainder_cap: REMAINDER_TRACES_MAX,
+            tokens: TokenQuery::default(),
         }
     }
 
-    /// Bin only the traces owning a stored row that matches `predicate`
-    /// (module docs, "Filtered population"). Span-local conditions
-    /// only — `overview` rejects a trace-level one at request time
-    /// ([`OverviewRequestError::TraceLevelCondition`]); the match-all
-    /// predicate is the unfiltered grid. The filter's scans share the
-    /// visited budget.
-    pub fn predicate(mut self, predicate: Predicate) -> Self {
-        self.predicate = (!predicate.is_all()).then_some(predicate);
+    /// Bin only the traces that pass `tokens` (module docs, "Filtered
+    /// population"); a flat [`Predicate`](super::Predicate) converts with
+    /// its meaning kept. No tokens is the unfiltered grid; a
+    /// trace-duration or trace-start token is rejected at request time
+    /// ([`OverviewRequestError::AxisToken`]). The filter's scans
+    /// have their own budget.
+    pub fn tokens(mut self, tokens: impl Into<TokenQuery>) -> Self {
+        self.tokens = tokens.into();
         self
     }
 
-    /// Also compute the top-root-service/operation facet lists. OFF by
-    /// default: resolving roots makes the sealed path decode the
-    /// root-field dictionaries, so the default paint stays cheap and
-    /// the facet rail opts in.
-    pub fn root_facets(mut self, on: bool) -> Self {
-        self.root_facets = on;
-        self
-    }
-
-    /// Test-only ceiling override — proves ceiling termination without a
-    /// four-million-row corpus. NOT a tuning surface.
+    /// Test-only fold-budget override — proves ceiling termination
+    /// without a four-million-row corpus. NOT a tuning surface.
     #[doc(hidden)]
-    pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
-        self.visited_ceiling = ceiling;
+    pub fn fold_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
+        self.fold_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only filter-budget override. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn filter_units_ceiling_for_tests(mut self, ceiling: u64) -> Self {
+        self.filter_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only remainder cap override — proves the fragment overflow
+    /// without a quarter-million multi-file traces. NOT a tuning surface.
+    #[doc(hidden)]
+    pub fn remainder_traces_for_tests(mut self, cap: usize) -> Self {
+        self.remainder_cap = cap;
         self
     }
 }
@@ -202,34 +208,10 @@ pub enum OverviewRequestError {
     /// contract).
     #[error(transparent)]
     Window(#[from] WindowError),
-    /// A trace-level or trace-id condition: the filtered grid evaluates
-    /// stored rows, never an assembled trace, so it cannot honour one —
-    /// the caller decides (fall back to the unfiltered grid, or refuse).
-    #[error("the overview filter evaluates span-level conditions only; {target} is trace-level")]
-    TraceLevelCondition { target: String },
-}
-
-/// One root-facet dimension's bounded list. The three parts partition
-/// the binned trace population exactly:
-/// `sum(top) + other + unattributed == total_traces`.
-#[derive(Debug, PartialEq, Eq)]
-pub struct FacetList {
-    /// The top [`FACET_TOP_K`] values — count DESC, value ASC.
-    pub top: Vec<(String, u64)>,
-    /// Traces attributed to values beyond the top K.
-    pub other: u64,
-    /// Traces with NO usable value for this dimension: no source
-    /// claims a root (absent, or a multi-root tie abstaining) or the
-    /// claimed root lacks the field. Never attributed to a value.
-    pub unattributed: u64,
-}
-
-/// The trace-level facet lists — present only when
-/// [`OverviewQuery::root_facets`] requested them.
-#[derive(Debug, PartialEq, Eq)]
-pub struct RootFacets {
-    pub services: FacetList,
-    pub operations: FacetList,
+    /// A trace-duration or trace-start token: both are the grid's own
+    /// axes, so the caller drops the token (or refuses the request).
+    #[error("the overview cannot filter on trace duration or trace start, its own axes")]
+    AxisToken,
 }
 
 /// One overview's paint plus everything needed to interpret it honestly.
@@ -239,14 +221,15 @@ pub struct RootFacets {
 pub struct OverviewData {
     /// Per time bucket (grid order), the per-duration-bin TRACE counts.
     /// A trace bins by its merged envelope: bucket of `min_start_ns`,
-    /// duration bin of `max_end − min_start` (saturating). Length =
+    /// duration bin of `max_end − min_start` (saturating) — per file
+    /// under [`TraceFragments`](PartialReason::TraceFragments). Length =
     /// `grid.num_buckets`; each row = [`DURATION_BIN_COUNT`].
     pub cells: Vec<[u64; DURATION_BIN_COUNT]>,
-    /// Per cell, the binned traces' STORED ERROR-status spans —
-    /// index-parallel to `cells` in BOTH dimensions, summing to
-    /// `total_errors`. Sliced by the trace's cell, so a failed span
-    /// counts where its TRACE binned.
-    pub error_cells: Vec<[u64; DURATION_BIN_COUNT]>,
+    /// Per time bucket, the binned traces' STORED ERROR-status spans —
+    /// index-parallel to `cells`'s outer index, summing to
+    /// `total_errors`. A failed span counts in the bucket its TRACE
+    /// binned in.
+    pub error_spans: Vec<u64>,
     /// Distinct traces binned into the grid (= the sum of all cells).
     pub total_traces: u64,
     /// Their STORED spans, summed (resends included). Totals are
@@ -256,30 +239,31 @@ pub struct OverviewData {
     pub total_spans: u64,
     /// Of those spans, ERROR-status ones.
     pub total_errors: u64,
-    /// Per time bucket, the EXACT nearest-rank envelope-duration
-    /// percentiles over the traces binned there — index-parallel to
-    /// `cells`'s outer index, `None` where nothing binned. Not derived
-    /// from `cells`: the duration bins are decade-wide.
+    /// Per time bucket, the nearest-rank envelope-duration percentiles
+    /// over the traces binned there, from a fixed-size histogram (within
+    /// 1/32 of exact; module docs) — index-parallel to `cells`'s outer
+    /// index, `None` where nothing binned. Not derived from `cells`: the
+    /// duration bins are decade-wide.
     pub bucket_percentiles: Vec<Option<DurationPercentiles>>,
-    /// The top-root facet lists over the SAME binned population —
-    /// `None` unless the query requested them.
-    pub root_facets: Option<RootFacets>,
+    /// Per time bucket, the binned traces per heatmap row
+    /// ([`heatmap_row_bounds`](super::heatmap_row_bounds)), from the same
+    /// histogram as the percentiles — the explorer's rows, so both views
+    /// draw one duration scale. Index-parallel to `cells`'s outer index;
+    /// all zeros where nothing binned.
+    pub bucket_duration_rows: Vec<[u64; HEATMAP_ROWS]>,
     pub status: QueryStatus,
 }
 
 impl OverviewData {
-    fn empty(num_buckets: usize, facets_requested: bool, status: QueryStatus) -> Self {
+    fn empty(num_buckets: usize, status: QueryStatus) -> Self {
         Self {
             cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
-            error_cells: vec![[0; DURATION_BIN_COUNT]; num_buckets],
+            error_spans: vec![0; num_buckets],
             total_traces: 0,
             total_spans: 0,
             total_errors: 0,
             bucket_percentiles: vec![None; num_buckets],
-            // A requested facet section stays PRESENT (empty lists) even
-            // on the all-or-empty paths — the response shape follows the
-            // request, not the outcome.
-            root_facets: facets_requested.then(|| FacetCounts::default().finish()),
+            bucket_duration_rows: vec![[0; HEATMAP_ROWS]; num_buckets],
             status,
         }
     }
@@ -313,165 +297,96 @@ pub fn overview(
     let grid = query.grid;
     let grid_start = grid.bucket_start_ns;
 
-    // The filter: validated like a search predicate, then confined to
-    // the span-local subset — the only one stored rows can answer.
-    let filter = match &query.predicate {
-        None => None,
-        Some(predicate) => {
-            predicate.validate()?;
-            predicate.ensure_evaluable()?;
-            if let Some(target) = predicate.trace_level_target() {
-                return Err(OverviewRequestError::TraceLevelCondition {
-                    target: target.to_string(),
-                });
-            }
-            Some(SpanFilter::new(
-                predicate,
-                TimeWindow::new(grid_start, grid_end)?,
-            ))
-        }
-    };
+    // The filter: validated like search tokens, minus the grid's axes.
+    query.tokens.validate()?;
+    if query
+        .tokens
+        .tokens
+        .iter()
+        .any(|t| t.group.conditions.iter().any(|c| is_axis(&c.target)))
+    {
+        return Err(OverviewRequestError::AxisToken);
+    }
+    let filter = TokenFilter::new(&query.tokens, TimeWindow::new(grid_start, grid_end)?);
 
     let mut status = StatusBuilder::new();
     let spec = SourceFoldSpec {
         op: "overview",
-        visited_ceiling: query.visited_ceiling,
+        fold_ceiling: query.fold_ceiling,
+        filter_ceiling: query.filter_ceiling,
+        remainder_cap: query.remainder_cap,
+        dict_ceiling: DICT_BYTES_CEILING,
         ceiling_reason: PartialReason::OverviewCeiling,
-        // Roots only for the facets: resolve_roots=false skips the
-        // sealed root-field dictionary decodes and drops tail roots.
-        resolve_roots: query.root_facets,
         filter,
     };
-    let Some(merged) = merge_trace_sources(sources, &spec, &cancel, &progress, &mut status) else {
-        return Ok(OverviewData::empty(
-            grid.num_buckets,
-            query.root_facets,
-            status.finish(),
-        ));
-    };
 
-    // Bin the merged traces by envelope; totals fold alongside. A
+    // Bin each finished trace by envelope; totals fold alongside. A
     // trace whose envelope START lies outside the grid is clipped —
     // the search engine's start-in-window rule, applied to the
     // envelope.
     let mut cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
-    let mut error_cells = vec![[0u64; DURATION_BIN_COUNT]; grid.num_buckets];
+    let mut error_spans = vec![0u64; grid.num_buckets];
     let mut total_traces = 0u64;
     let mut total_spans = 0u64;
     let mut total_errors = 0u64;
-    // The percentiles' only real cost: 8 bytes per binned trace held
-    // until the fold ends, atop a merge map already costing several
-    // times that per trace.
-    let mut bucket_durations: Vec<Vec<i64>> = vec![Vec::new(); grid.num_buckets];
-    let mut facets = query.root_facets.then(FacetCounts::default);
-    for m in merged.values() {
-        // Unflagged under a filter (no stored row matched), or clipped
-        // by the bin-by-envelope-start rule.
-        if !m.matched || m.min_start_ns < grid_start || m.min_start_ns >= grid_end {
-            continue;
+    // A fixed-size histogram per bucket that binned a trace.
+    let mut bucket_histograms: Vec<Option<DurationHistogram>> = vec![None; grid.num_buckets];
+    let mut bin = |trace_id: sfst::TraceId, m: &MergedTrace| {
+        // Filtered out, or clipped by the bin-by-envelope-start rule.
+        if spec.filter.as_ref().is_some_and(|f| !f.passes(trace_id, m))
+            || m.min_start_ns < grid_start
+            || m.min_start_ns >= grid_end
+        {
+            return;
         }
         let bucket = ((m.min_start_ns - grid_start) / grid.bucket_width_ns) as usize;
         let duration = m.max_end_ns.saturating_sub(m.min_start_ns);
         let bin = duration_bin(duration);
         cells[bucket][bin] += 1;
-        error_cells[bucket][bin] = error_cells[bucket][bin].saturating_add(m.error_count);
+        error_spans[bucket] = error_spans[bucket].saturating_add(m.error_count);
         total_traces = total_traces.saturating_add(1);
         total_spans = total_spans.saturating_add(m.span_count);
         total_errors = total_errors.saturating_add(m.error_count);
-        bucket_durations[bucket].push(duration);
-        if let Some(f) = facets.as_mut() {
-            f.count(m.root.as_ref());
-        }
+        bucket_histograms[bucket]
+            .get_or_insert_with(DurationHistogram::new)
+            .record(duration);
+    };
+    if !merge_trace_sources(sources, &spec, &cancel, &progress, &mut status, &mut bin) {
+        return Ok(OverviewData::empty(grid.num_buckets, status.finish()));
     }
 
     Ok(OverviewData {
         cells,
-        error_cells,
+        error_spans,
         total_traces,
         total_spans,
         total_errors,
-        bucket_percentiles: bucket_durations
-            .iter_mut()
-            .map(|d| percentiles(d))
+        bucket_percentiles: bucket_histograms
+            .iter()
+            .map(|h| h.as_ref().and_then(DurationHistogram::percentiles))
             .collect(),
-        root_facets: facets.map(FacetCounts::finish),
+        bucket_duration_rows: bucket_histograms
+            .iter()
+            .map(|h| {
+                h.as_ref()
+                    .map_or([0; HEATMAP_ROWS], DurationHistogram::heatmap_rows)
+            })
+            .collect(),
         status: status.finish(),
     })
 }
 
-/// The facet accumulation over the binned population: full per-value
-/// count maps (the root service/operation vocabularies are small by
-/// nature), reduced to the bounded lists at the end.
-#[derive(Default)]
-struct FacetCounts {
-    services: std::collections::HashMap<String, u64>,
-    operations: std::collections::HashMap<String, u64>,
-    service_unattributed: u64,
-    operation_unattributed: u64,
-}
-
-impl FacetCounts {
-    fn count(&mut self, root: Option<&super::rollup::TraceRootInfo>) {
-        // Allocate the key only on first sight of a value, not per trace.
-        fn bump(map: &mut std::collections::HashMap<String, u64>, value: &str) {
-            if let Some(c) = map.get_mut(value) {
-                *c += 1;
-            } else {
-                map.insert(value.to_string(), 1);
-            }
-        }
-        match root.and_then(|r| r.service.as_deref()) {
-            Some(svc) => bump(&mut self.services, svc),
-            None => self.service_unattributed = self.service_unattributed.saturating_add(1),
-        }
-        match root.and_then(|r| r.name.as_deref()) {
-            Some(op) => bump(&mut self.operations, op),
-            None => self.operation_unattributed = self.operation_unattributed.saturating_add(1),
-        }
-    }
-
-    fn finish(self) -> RootFacets {
-        RootFacets {
-            services: reduce(self.services, self.service_unattributed),
-            operations: reduce(self.operations, self.operation_unattributed),
-        }
-    }
-}
-
-/// Reduce a full count map to the bounded list: count DESC, value ASC,
-/// the tail folded into `other`.
-fn reduce(counts: std::collections::HashMap<String, u64>, unattributed: u64) -> FacetList {
-    let (top, other) = top_k(counts.into_iter().collect(), FACET_TOP_K);
-    FacetList {
-        top,
-        other: other.count,
-        unattributed,
-    }
-}
-
-/// The entries [`top_k`] folded away.
-#[derive(Debug, Default)]
-pub(crate) struct FoldedTail {
-    /// Their summed counts.
-    pub count: u64,
-    /// How many entries they were.
-    pub entries: usize,
-}
-
 /// Keep the `k` (≥ 1) highest-count entries — count DESC, value ASC —
-/// and fold the rest into a [`FoldedTail`]. Shared by the root facets
-/// and the search rows' service breakdown so both rank identically.
-pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, FoldedTail) {
+/// and sum the counts of the rest. Used by the search rows' service
+/// breakdown.
+pub(crate) fn top_k<V: Ord>(mut entries: Vec<(V, u64)>, k: usize) -> (Vec<(V, u64)>, u64) {
     let rank = |a: &(V, u64), b: &(V, u64)| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0));
-    // Select-then-sort, like the slowest top-K: O(n + K log K).
-    let mut tail = FoldedTail::default();
+    // Select-then-sort: O(n + K log K).
+    let mut folded = 0;
     if entries.len() > k {
         entries.select_nth_unstable_by(k - 1, rank);
-        for (_, n) in entries.drain(k..) {
-            tail.count += n;
-            tail.entries += 1;
-        }
+        folded = entries.drain(k..).map(|(_, n)| n).sum();
     }
     entries.sort_unstable_by(rank);
-    (entries, tail)
+    (entries, folded)
 }

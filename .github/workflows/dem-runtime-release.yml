@@ -22,6 +22,8 @@ concurrency:
   group: dem-runtime-release
   cancel-in-progress: false
 jobs:
+  runtime-wire:
+    uses: ./.github/workflows/dem-runtime-node-tests.yml
   matrix:
     name: Select native runners from the shared distro catalog
     runs-on: ubuntu-latest
@@ -42,7 +44,7 @@ jobs:
 
   build:
     name: Build ${{ matrix.arch }} portable/native runtime and sources
-    needs: matrix
+    needs: [matrix, runtime-wire]
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.matrix) }}

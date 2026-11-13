@@ -1,5 +1,5 @@
 //! Materialization and value-enumeration correctness over whole files.
-//! Files are built with the crate's own writer ([`RowIndex`] +
+//! Files are written with the crate's own writer ([`RowIndex`] +
 //! [`IndexWriter::write_into`]) — not the byte-level `fixture.rs` helpers.
 //!
 //! The recurring hazard: one field name dot-extends another (`a` vs

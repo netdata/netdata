@@ -13,14 +13,14 @@
 //! the scan.
 //!
 //! Both tiers match by partition key — the SFST `Query` carries the stream's
-//! key, and the WAL is matched on its `FileId.part_key` — mirroring the live
-//! planner. Dedup mirrors it too: a WAL whose sequence is already sealed into
-//! an SFST is skipped (SFST wins), but the dedup set is built from the
-//! *windowed* SFST candidates, so an SFST entirely outside the query window
-//! is not added and its WAL twin is scanned as a tail. Results stay correct
-//! — the engine's row-scan filters those rows out by time — at the cost of a
-//! little extra I/O; a full dedup would need a window-independent SFST scan
-//! for no practical gain.
+//! key, and the WAL is matched on its `FileId.partition_key` — mirroring the
+//! live planner. Dedup mirrors it too: a WAL whose sequence is already indexed
+//! into an SFST is skipped (SFST wins), but the dedup set is built from the
+//! *windowed* SFST candidates, so an SFST entirely outside the query window is
+//! not added and its WAL twin is scanned as a tail. Results stay correct — the
+//! engine's row-scan filters those rows out by time — at the cost of a little
+//! extra I/O; a full dedup would need a window-independent SFST scan for no
+//! practical gain.
 //!
 //! The only caller is `run` in `lib.rs`: `sources` go to the engine,
 //! `consulted` feeds `--show-files`.
@@ -99,14 +99,14 @@ pub fn discover(
             // results are unaffected — the engine re-sorts rows by cursor.
             files.sort_by_key(|(id, _)| id.seq);
             for (id, meta) in files {
-                // SFST wins over WAL for the same sequence (already sealed).
+                // SFST wins over WAL for the same sequence (already indexed).
                 if sfst_seqs.contains(&id.seq) {
                     continue;
                 }
                 // Stream filter: a WAL file is single-stream by construction,
-                // identified by the part_key in its FileId.
+                // identified by the partition_key in its FileId.
                 if let Some(hash) = stream_hash {
-                    if id.part_key != hash {
+                    if id.partition_key != hash {
                         continue;
                     }
                 }

@@ -136,8 +136,8 @@ and without debouncing.
 
 The crate depends only on journal-common (the `Seconds` type and the
 collection aliases) and is consumed by journal-core (a `repository`
-re-export shim), journal-index, journal-engine, journal-function, and
-journal-log-writer; netflow-plugin uses the published twin
+re-export shim), journal-index, journal-engine and journal-function.
+netflow-plugin uses the published twin
 `journal-sdk-registry` instead of this crate. The only cargo feature is
 `allocative`, which adds memory-profiling derives. The precise contracts
 live in the module docs: `src/registry/` for the runtime and

@@ -6,9 +6,13 @@
 //! variant):
 //!
 //! - `Io`: only the derived `From<std::io::Error>` — `?` on I/O in the
-//!   writer (file creation, header and frame writes, flushes, fsyncs), the
+//!   writer (file creation, header and frame writes, flushes), the
 //!   reader (opens, reads, seeks), the registry (scans, header reads), and
 //!   the seq allocator (high-water envelope writes).
+//! - Writer-side durability: the writer's one fsync site (`fsync` in
+//!   `writer.rs`) raises `Fsync`, and a failed frame write or flush raises
+//!   `Write`; `Writer::is_durable` and `Writer::finish_sync` raise
+//!   `FramesLost` for frames that either left in doubt.
 //! - Reader-side format rejection: `FileHeader::from_bytes` (`format.rs`)
 //!   raises `InvalidHeader`, `UnsupportedVersion`, `CrcMismatch`, and
 //!   `UnsupportedCompression`; `Reader` and `scan_frame_boundaries`
@@ -16,9 +20,10 @@
 //!   `Deserialization` sanity checks.
 //! - Writer-side admission: `Writer::new` and `Writer::write_frame`
 //!   (`writer.rs`) raise `InvalidHeader` for the reserved `payload_format`
-//!   0 and an oversized `content_meta`.
+//!   0 and an oversized `content_meta`, and `FrameTooLarge` for frame data
+//!   that the reader would refuse.
 //! - Registry event bookkeeping: `Registry::apply_event` (`registry.rs`)
-//!   raises `DuplicateSequence` and `UnknownSequence`.
+//!   raises `DuplicateSequence`, `UnknownSequence` and `AlreadyClosed`.
 //!
 //! Consumers (grep-verified): `sfsq-cli/src/traces.rs` matches
 //! `Error::Io(_)` by name — I/O there is a path-level failure (fatal for the
@@ -36,7 +41,8 @@ use thiserror::Error;
 ///
 /// Only `Io` carries a `source()` — the wrapped `std::io::Error`; every
 /// other variant is message-only, its field already rendered into the
-/// Display text (a cause, where one existed, is dropped at construction).
+/// Display text (a cause, where one existed, is dropped at construction;
+/// `Fsync` keeps its io::Error as a field and renders it).
 /// Every variant has a construction site today. Display text is a fixed
 /// per-variant template with the field interpolated (CRCs as `{:#010x}`
 /// hex); consumers render it into log lines and gRPC error statuses — there
@@ -85,6 +91,18 @@ pub enum Error {
     /// disk but untracked.
     #[error("invalid WAL header: {0}")]
     InvalidHeader(String),
+
+    /// `Writer::write_frame` was given frame data over
+    /// [`MAX_FRAME_DATA`](crate::MAX_FRAME_DATA). The reader would refuse
+    /// such a frame, so nothing is written and no frame is in doubt; the
+    /// caller drops the frame.
+    #[error("frame data of {bytes} bytes is over the limit of {limit} bytes")]
+    FrameTooLarge {
+        /// The size of the refused frame data.
+        bytes: usize,
+        /// [`MAX_FRAME_DATA`](crate::MAX_FRAME_DATA).
+        limit: usize,
+    },
 
     /// A CRC32 failed. `FileHeader::from_bytes` checks the header page's
     /// CRC before the flag/compression/identity fields, so a
@@ -144,7 +162,7 @@ pub enum Error {
 
     /// `Registry::apply_event` got a `Created` whose seq is already
     /// tracked. The seq allocator issues one seq per file creation, so a
-    /// duplicate means a replayed or reordered `Created` event; the
+    /// duplicate means a `Created` applied twice; the
     /// explicit check is the dedup, because the underlying file-registry
     /// would silently replace the entry. otel-ledger logs and drops the
     /// event on it. Message-only.
@@ -152,11 +170,56 @@ pub enum Error {
     DuplicateSequence(u64),
 
     /// `Registry::apply_event` got a `Synced` or `Closed` naming a file the
-    /// registry does not track — its `Created` was lost, or the entry was
-    /// already removed. otel-ledger logs and drops the event, leaving the
+    /// registry does not track — no `Created` was applied for it, or the
+    /// entry was already removed. otel-ledger logs and drops the event, leaving the
     /// file untracked. Message-only.
     #[error("unknown sequence {0}: file not tracked")]
     UnknownSequence(u64),
+
+    /// `Registry::apply_event` got a `Closed` naming a file that is already
+    /// closed. A writer closes a file once, and the ledger starts an
+    /// indexing operation for every `Closed` it applies: a second one must
+    /// not start a second operation on the same file. otel-ledger logs and
+    /// drops the event. Message-only.
+    #[error("sequence {0} is already closed")]
+    AlreadyClosed(u64),
+
+    /// A write to a WAL file failed: a frame's bytes, or the flush of
+    /// buffered ones. A part of the bytes may be in the file. The writer
+    /// closes the file and writes no more to it, and it treats every frame
+    /// that was not durable yet as in doubt (see `FramesLost`): whole frames
+    /// of earlier requests can be among the bytes that never reached the
+    /// file. Message-only: the io::Error is rendered into the text.
+    #[error("write failed: {0}")]
+    Write(std::io::Error),
+
+    /// An fsync of a WAL file failed. The kernel reports a failed
+    /// write-back once per open file: the next fsync of the same file
+    /// succeeds although the data may be gone. So the writer treats every
+    /// frame that was not durable yet as in doubt for good (see
+    /// `FramesLost`), whichever fsync got the error — a sync, a rotation's,
+    /// the idle sweep's — and closes the file, so that no later fsync of it
+    /// can vouch for those frames. Message-only: the io::Error is rendered into the
+    /// text.
+    #[error("fsync failed: {0}")]
+    Fsync(std::io::Error),
+
+    /// The frames asked about were not durable yet when a write or an fsync
+    /// of their writer failed (`Write`, `Fsync`): they may be lost, and no later sync can
+    /// vouch for them. `Writer::is_durable` returns it for such frames, and
+    /// `Writer::finish_sync` for a sync whose frames another fsync's failure
+    /// put in doubt while it was out. The ingestor fails the request, so
+    /// the client sends the records again. Message-only.
+    #[error("a write or an fsync failed before the frames were durable: they may be lost")]
+    FramesLost,
+}
+
+impl Error {
+    /// True for a failed write or fsync of a WAL file: after it, the frames
+    /// of the writer that were not durable yet may be lost (`FramesLost`).
+    pub(crate) fn leaves_frames_in_doubt(&self) -> bool {
+        matches!(self, Error::Write(_) | Error::Fsync(_))
+    }
 }
 
 /// Error side of every fallible WAL API — writer, reader, registry, seq

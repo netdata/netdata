@@ -16,7 +16,7 @@
 //!
 //! # Two planes
 //!
-//! **Build/write** — a producer fills a [`RowIndex`] with interned
+//! **Fill/write** — a producer fills a [`RowIndex`] with interned
 //! `(timestamp, key=value)` rows, and `build` turns them into chunks
 //! through the container-level `ChunkWriter`, wrapped by [`IndexWriter`].
 //! Decoding WAL frames into rows is the producer's concern (`ng-index`
@@ -84,7 +84,6 @@
 //! ```
 
 mod bitset;
-mod build;
 mod error;
 mod index_reader;
 mod index_writer;
@@ -99,15 +98,17 @@ mod trace_bloom;
 pub mod trace_combine;
 mod trace_index;
 mod trace_rollup;
+mod vocab_match;
 mod writer;
 
 pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{
-    BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, NumberCmp,
-    PlanMatcher, PlanTerm, RollupRefOutcome, RollupRootResolver, ScanWork, Trace, TraceEvent,
-    TraceFileSession, TraceLink, TracePlan, TraceSpan, numeric_token_matches,
+    BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, MetaReader,
+    NumberCmp, NumberValue, PartEvidence, PlanMatcher, PlanTerm, RollupEvidence, RollupRefOutcome,
+    RollupRefResolver, ScanLimits, ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink,
+    TracePlan, TraceSpan, numeric_token_matches,
 };
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
@@ -117,24 +118,24 @@ pub use query::{
     compile_pattern, compile_query,
 };
 pub use reader::{read_summary, read_summary_path};
-pub use registry::{File, Registry, RetentionPolicy};
+pub use registry::{Evictions, File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
-pub use schema::join_value_kinds;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
-pub use trace_bloom::TraceIdBloom;
-pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
+pub use trace_bloom::{RepeatFilter, TraceIdBloom};
+pub use trace_combine::{CombineOutcome, LoadedSources, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 pub use trace_rollup::{
-    ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, TraceRollup,
-    TraceRollupRows,
+    ROLLUP_NO_REF, ROOT_CLAIM_NONE, ROOT_CLAIM_TRUE, ROOT_CLAIM_WITHHELD, RollupRow, StatsRow,
+    TraceRollup, TraceRollupRows, TraceRollupStats,
 };
+pub use vocab_match::{ContainsMatcher, MatchClass, ValueMatcher};
 
-/// Deterministic opaque partition key for tests. SFST treats `part_key` as an
-/// opaque `u64` and never decodes it, so tests fabricate distinct keys per
-/// logical stream without depending on the content-plane identity codec —
-/// same label → same key, different label → (almost surely) different key.
+/// Deterministic opaque partition key for tests. SFST treats `partition_key` as
+/// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
+/// logical stream without depending on the content-plane identity codec — same
+/// label → same key, different label → (almost surely) different key.
 #[cfg(test)]
-pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     namespace.hash(&mut h);
@@ -152,9 +153,9 @@ pub use schema::{
     DroppedAttributeCounts, Durations, FieldEntry, FieldTable, FieldTier, Flags, HighField,
     Histogram, IdRanges, KvId, LeafStats, Metadata, NodeId, ObservedTimestamps, ParentSpanIds,
     SchemaEdge, SchemaNode, SchemaTree, SpanId, SpanIds, Step, StreamBatch, Summary, TraceId,
-    TraceIds, ValueKind,
+    TraceIds, ValueKind, ValueKinds,
 };
-// Writer-input-only vocabulary stays crate-internal (the build owns the writer).
+// Writer-input-only vocabulary stays crate-internal (Phase 2 owns the writer).
 pub(crate) use schema::{ALL_COLUMNS, ColumnSpec};
 
 // The chunk-level reader/writer surface, exposed only for test fixtures and
@@ -211,12 +212,14 @@ const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
 const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
 // Optional per-file trace rollup (cold region, after the span structures —
 // matching the writer stage order): one row per distinct set trace id — the
-// trace-level aggregate for overview/slowest/facet folds without assembly.
+// trace-level aggregate for the overview fold and the search gate, without
+// assembly.
 // Same additive TOC-indexed contract as TIDX (see `trace_rollup`).
 const CHUNK_TRACE_ROLLUP: chunk_file::ChunkId = *b"TRSU";
+const CHUNK_TRACE_ROLLUP_STATS: chunk_file::ChunkId = *b"TRSS";
 // Optional per-file trace-id bloom (cold region, after TIDX): a serialized
 // fastbloom filter over the file's distinct set trace ids — "definitely not in
-// this file" for cross-file trace-by-id, at a 5% build-time FP target. Same
+// this file" for cross-file trace-by-id, at a 0.001% write-time FP target. Same
 // additive TOC-indexed contract as TIDX (see `trace_bloom`).
 const CHUNK_TRACE_BLOOM: chunk_file::ChunkId = *b"TBLM";
 

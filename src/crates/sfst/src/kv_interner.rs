@@ -1,14 +1,14 @@
-//! The build-side `key=value` interner: assigns every distinct attribute
+//! The write-side `key=value` interner: assigns every distinct attribute
 //! string a unique [`KvSlot`] ID, so rows reference attributes by cheap
-//! `u32`s, duplicates share one stored string, and the indexer keeps one
-//! bitmap per distinct pair instead of one per row.
+//! `u32`s, duplicates share one stored string, and the row index keeps
+//! one bitmap per distinct pair instead of one per row.
 //!
 //! # Pre-computed hash fast path
 //!
 //! The producer (`ng-flatten`) pre-computes `xxhash64("key=value")` for
 //! every attribute and carries the hash alongside the data (`hash_kv` in
-//! `src/crates/ng-flatten/src/common.rs`). The builder feed
-//! (`src/crates/ng-index/src/sfst_build.rs`) hands it to this interner:
+//! `src/crates/ng-flatten/src/common.rs`). The filling code
+//! (`src/crates/ng-index/src/indexing.rs`) hands it to this interner:
 //!
 //! - [`lookup_hash`](KeyValueInterner::lookup_hash): resolve a hash to a
 //!   slot with no string at all — the fast path.
@@ -42,7 +42,7 @@
 //! orders all slots canonically — low → mid → high, fields by name,
 //! values sorted — and that ordering is the contract the on-disk ID
 //! translation depends on: `build_id_translation` in
-//! `src/crates/sfst/src/build.rs` numbers the concatenated tiers 0.. and
+//! `src/crates/sfst/src/index_writer.rs` numbers the concatenated tiers 0.. and
 //! assigns `table[slot.idx()] = KvId(i)`, recording the cumulative tier
 //! boundaries as `IdRanges`. The tier also routes the on-disk home: low
 //! fields into the primary FST (`PRIM`), mid fields into per-field FST
@@ -50,8 +50,8 @@
 //!
 //! [`KeyValueInterner`] is crate-internal, owned by `RowIndex`
 //! (`src/crates/sfst/src/row_index.rs`); [`KvSlot`] is the module's only
-//! public export. Interned strings are arena-allocated and live as long
-//! as the build.
+//! public export. Interned strings are arena-allocated and live through
+//! filling and writing.
 
 use std::collections::HashMap;
 use std::hash::{BuildHasher, Hasher};
@@ -62,10 +62,10 @@ use bumpalo::Bump;
 use hashbrown::hash_map::Entry;
 use twox_hash::XxHash64;
 
-/// A unique ID the build-side interner assigns to each distinct
+/// A unique ID the write-side interner assigns to each distinct
 /// `key=value` string. Indexes the per-pair bitmap array, appears in the
 /// per-row slot lists, and is held by the span event/link rows and trace
-/// rollup; the build translates every slot to its file `KvId` before
+/// rollup; the writer translates every slot to its file `KvId` before
 /// writing.
 ///
 /// Not to be confused with raw log positions (array indices into the
@@ -255,7 +255,7 @@ impl<'a> KeyValueInterner<'a> {
     /// Returns three vectors of [`KvSlot`]s, one per tier.
     ///
     /// This ordering is the on-disk `KvId` order: `build_id_translation`
-    /// in `src/crates/sfst/src/build.rs` numbers the concatenated tiers.
+    /// in `src/crates/sfst/src/index_writer.rs` numbers the concatenated tiers.
     pub fn tier_assignment(&self) -> [Vec<KvSlot>; 3] {
         // Reusable decorate buffer of (value suffix, slot). Cheaper than
         // sorting the slots directly by `self.strings[idx]`:

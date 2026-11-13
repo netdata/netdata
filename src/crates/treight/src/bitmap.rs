@@ -19,7 +19,7 @@
 //! nothing about inversion; this layer adds the inverted-aware query and
 //! boolean surface instead. Consumers (grep-verified): sfst encodes value
 //! bitmaps with `from_sorted_iter`/`from_sorted_iter_complemented`
-//! (sfst/src/build.rs `remap_one_bitmap`) and `from_range`
+//! (sfst/src/index_writer.rs `remap_one_bitmap`) and `from_range`
 //! (sfst/src/index_reader.rs `PosSet::range`), and persists them as
 //! descriptor + tree bytes (sfst/src/schema.rs `BitmapValue`); sfsq and
 //! otel-ledger touch `Bitmap` from tests only (sfsq/tests/common/mod.rs

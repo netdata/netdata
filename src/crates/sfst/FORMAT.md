@@ -2,8 +2,8 @@
 
 SFST is the on-disk format for one index file. Each file holds the
 indexed contents of one content stream (the producer's partition,
-opaque to this crate) and is built from one WAL file via this crate's
-`IndexWriter`. The container is chunk-based with
+opaque to this crate) and is written from one WAL file by this
+crate's `IndexWriter`. The container is chunk-based with
 a `chunk-file` table of contents; every chunk has a 4-byte id naming
 its role.
 
@@ -15,11 +15,11 @@ scope here.
 Normative sources (the code this document restates): the container
 `src/crates/chunk-file/src/{lib.rs,container.rs}`; the crate constants
 and chunk ids `src/crates/sfst/src/lib.rs`; the writer
-`src/crates/sfst/src/{writer.rs,build.rs}`; the readers
+`src/crates/sfst/src/{writer.rs,index_writer.rs}`; the readers
 `src/crates/sfst/src/{reader.rs,index_reader.rs,index_reader/session.rs}`;
 payload types `src/crates/sfst/src/schema.rs`; the trace chunks
 `src/crates/sfst/src/{trace_index.rs,trace_bloom.rs,span_extras.rs,trace_rollup.rs}`;
-the in-tree producer `src/crates/ng-index/src/sfst_build.rs`.
+the in-tree producer `src/crates/ng-index/src/indexing.rs`.
 
 ---
 
@@ -123,6 +123,7 @@ within its tier in the trailing bytes.
     "EVNB"      EventIndex  (per-row span event structure)    No (optional)
     "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
     "TRSU"      TraceRollup  (per-file trace rollup rows)      No (optional)
+    "TRSS"      TraceRollupStats  (per-row rollup stats)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -133,8 +134,8 @@ the **cold region after `PRIM`**, so a query decodes a column only on demand.
 `PSPN` (parent span id, 8-byte arena like `SPAN`; all-zero = root) and `DURN`
 (span duration in ns) are the **traces** signal's columns, and `OBTS` is
 logs-only (spans have no observed time); `trace_id`/`span_id`/`flags`/`DRAC`
-are written by both signals. In-tree, the logs seal supplies exactly the five
-log columns and the traces seal the six span columns.
+are written by both signals. In-tree, logs indexing supplies exactly the five
+log columns and traces indexing the six span columns.
 A column is present iff the `META` `ColumnsTable` lists it; readers consult the
 manifest (not the chunk table) for presence + type. Each holds exactly one
 value per row, in the same chronological order as `TIMS` and the stream
@@ -159,25 +160,26 @@ trusted-producer invariant, so a crafted file could yield wrong lookups but
 never a panic.
 
 The optional `TBLM` chunk is the **per-file trace-id bloom**: a serialized
-[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that distinct
-count for validation. It answers "is trace X definitely NOT in this file?" so a
-cross-file trace-by-id skips a file with one small chunk read, never touching
-`TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the same pre-check).
-False negatives are impossible; false positives (~5% build-time target,
-≈6.25 bits per distinct id) merely fall through to the exact `TIDX` lookup.
-The payload is self-describing — the filter's bit length, hash count, and
-seeded hasher state all serialize with it — so readers never depend on the
-build-time constants; the build uses a fixed seed, making identical inputs
-seal to identical bytes. It lives in the cold region after `TIDX` and before
-`EVNB`, so a reader that ignores it skips it like any other optional chunk.
-Written only when the file has at least one set (non-zero) trace id, and only
-together with `TIDX` (the bloom is derived from the index's sorted
-permutation; the writer rejects TBLM-without-TIDX at declaration, and the
-reader symmetrically rejects a bloom in a file without the index). Detected
-via the TOC (`IndexReader::has_trace_id_bloom`). The bloom is a skip hint,
-not authoritative: a corrupt one degrades to exact `TIDX` lookups (one
-warning per trace session), so it can never make a findable trace
-unfindable.
+[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that
+distinct count for validation. It answers "is trace X definitely NOT in this
+file?" so a cross-file trace-by-id skips a file with one small chunk read,
+never touching `TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the
+same pre-check). False negatives are impossible; false positives (0.001%
+write-time target, ≈24 bits per distinct id; files sealed earlier carry a 5%
+target, ≈6.25 bits) merely fall through to the exact `TIDX` lookup. The
+payload is self-describing — the filter's bit length, hash count, and seeded
+hasher state all serialize with it — so readers never depend on the write-time
+constants (a reader that looks up many ids in a file with a loose filter
+builds a tighter one at query time); the writer uses a fixed seed, so
+identical inputs write identical bytes. It lives in the cold region after
+`TIDX` and before `EVNB`, so a reader that ignores it skips it like any other
+optional chunk. Written only when the file has at least one set (non-zero)
+trace id, and only together with `TIDX` (the bloom is derived from the index's
+sorted permutation; the writer rejects TBLM-without-TIDX at declaration, and
+the reader symmetrically rejects a bloom in a file without the index).
+Detected via the TOC (`IndexReader::has_trace_id_bloom`). The bloom is a skip
+hint, not authoritative: a corrupt one degrades to exact `TIDX` lookups (one
+warning per trace session), so it can never make a findable trace unfindable.
 
 [`fastbloom`]: https://crates.io/crates/fastbloom
 
@@ -262,11 +264,37 @@ rows, a non-inverted envelope, and `span_count ≥ errors`. Same additive
 TOC-indexed contract as `TIDX`: presence needs no format version bump, and
 pre-rollup readers ignore it.
 
+The optional `TRSS` chunk carries **per-row rollup stats**, index-parallel to
+the `TRSU` rows (same order; trace ids are not repeated), so a consumer can
+build a trace's list row from rollups alone. Struct-of-arrays:
+`max_start_offsets_ns` and `root_start_offsets_ns` (`Vec<u64>`, the latest
+stored span start and the root candidate's start, both minus the row's
+`min_start_ns`; the root start is `0` on rows with claim flag `0` and kept on
+WITHHELD rows), `service_offsets` (`Vec<u32>`, one more than the rows: row
+`i`'s entries are `service_offsets[i]..service_offsets[i + 1]`), and per entry
+`service_refs` (`Vec<u32>`, the file `KvId` of the resource `service.name`
+token, or the `u32::MAX` sentinel for spans without one; strictly increasing
+within a row, so the sentinel sorts last), `service_spans` and
+`service_errors` (`Vec<u32>`, stored spans and ERROR spans of that service).
+Counts are stored-row statistics, like the rollup's.
+
+It follows `TRSU` directly, requires it, and is written with it by
+traces indexing. A reader reaches it only through the decoded rollup, so a
+`TRSS` without a `TRSU` is never read (and not rejected). Readers
+validate it against the decoded rollup
+(`IndexReader::trace_rollup_stats`): one row per rollup row, offsets from 0
+to the entry count with at least one entry per row, parallel entries, refs
+within the id space or the sentinel and strictly increasing per row,
+`spans ≥ 1` and `errors ≤ spans` per entry, per-row sums equal to the
+rollup's counts, `root start ≤ max start ≤ max_end − min_start`, and a zero
+root start on rows without a root candidate. Files sealed before it carry
+`TRSU` alone; consumers fall back for those.
+
 The signal split is producer policy, not format law: the format only fixes
 what each id carries and that everything but `TIMS`/`PRIM`/one `SB{i}` is
-optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU` are written only by
-the traces seal (log trace ids are correlation ids, not a grouping key);
-the logs seal emits none of them.
+optional. In-tree, `TIDX`/`TBLM`/`EVNB`/`LNKB`/`TRSU`/`TRSS` are written only by
+traces indexing (log trace ids are correlation ids, not a grouping key);
+logs indexing emits none of them.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -383,7 +411,7 @@ candidate filtering reads it from there.
 #### Partition-key authority
 
 The partition key in the filename is **authoritative**: every reader
-(WAL, SFST, catalog, query planner) routes a file by `id.part_key`
+(WAL, SFST, catalog, query planner) routes a file by `id.partition_key`
 parsed from its name, and the key is never re-derived from the file's
 contents or cross-checked against them at read time. The producer chain
 guarantees the filename matches the contents — the WAL writer stamps the
@@ -463,10 +491,11 @@ give structure; leaf nodes carry the path's `cardinality` + `tier`. The flat
 the tree at read time (`SchemaTree::derive_field_table`): one `FieldEntry` per
 distinct leaf path, ordered low → mid → high then by name, which yields the count of mid-card and
 high-card fields and thus how many `MF{i}`/`HF{i}` chunks are present. A
-polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`; its single
-coalesced **scalar** type (for typed/UI display) comes from
-`SchemaTree::derive_scalar_kinds` (drop `Null`; empty containers contribute no
-scalar; `Int ⊔ Double = Double`; any other scalar mix → `Str`). A producer with
+polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`;
+`SchemaTree::derive_leaf_kinds` gives every leaf path's *set* of leaf kinds
+(`ValueKinds`), uncoalesced. Stored values are text and the numeric comparators
+parse them, so a path holding any `Int` or `Double` leaf compares as numbers
+whatever else it holds. A producer with
 no typed tree (raw `(ts, key=value)` rows) emits a flat `Str`-typed tree
 (`SchemaTree::flat`) so every file has a valid descriptor. Per-occurrence type
 is not stored anywhere — the tree records the *set* of kinds per path, not which
@@ -490,6 +519,16 @@ panicking the unchecked path walk or hanging on a cyclic edge.
 
 The bitmap records the time-sorted log positions where the
 `key=value` pair appears. Always present.
+
+The serialized `PrefixMap` holds two fields in this order: `fst_bytes`
+(the FST, a bincode length then the raw bytes) and `values` (one
+`BitmapValue` per key, in sorted key order). Each FST output is the
+key's position in sorted key order, which indexes into `values` and
+lets a reader find the key at a position without walking the FST
+(KvId resolution, under Tier-Aligned IDs below). Readers that need only
+the keys (listing them, or resolving `MF{i}` entries) stream the
+decompression and stop after `fst_bytes`, so the order is part of the
+format. `MF{i}` uses the same layout.
 
 ### `MF{i}` — Mid-card field FSTs
 
@@ -604,17 +643,28 @@ IDs are assigned during writing by walking the tiers in order:
 Within every tier, fields are sorted by name and each field's values
 follow the same order that field's dictionary is serialized in (sorted
 by the resolved string). Note the low tier is **not** the primary FST's
-global lexicographic iteration order: ids are assigned per field, and
-the reader resolves low-card ids with per-field prefix scans for the
-same reason (a global FST walk would mislabel families where one field
-name dot-extends another).
+global lexicographic iteration order: ids are assigned per field, and a
+global FST walk would mislabel families where one field name
+dot-extends another (`a.b=` sorts before `a=`, since '.' < '=').
 
 `low_end`, `mid_end`, `high_end` are carried in `Metadata::id_ranges`.
 
-The `SB{i}` chunks store `KvId`s, not strings; resolving a `KvId` back
-to its `key=value` requires checking which range it falls in and
-looking up the corresponding entry in `PRIM`, an `MF{i}` chunk, or an
-`HF{i}` chunk.
+The `SB{i}` chunks store `KvId`s, not strings. To resolve a `KvId` back
+to its `key=value`, the reader locates its field and its offset within
+the field by a running sum of the field table's cardinalities, then
+reads the entry at that position:
+
+- low tier: in `PRIM`, at the field's base position plus the offset. The
+  base is the position of the field's first `field=` key (a range
+  probe); a field's keys are contiguous in `PRIM` because they share
+  that prefix. A key that does not carry the field's prefix means the
+  file is corrupt, and the id stays unresolved;
+- mid tier: in the field's `MF{i}` FST, at the offset;
+- high tier: in the field's `HF{i}` chunk, at the offset.
+
+The FST lookups are reverse lookups (`fst::raw::Fst::get_key`), which
+are only defined because each FST output is the key's sorted position
+(see `PRIM` above).
 
 Tier assignment is stable for a given input: fields are sorted by
 name within each tier, and entries within each per-field structure
@@ -630,7 +680,7 @@ All chunk payloads go through:
     serialized = bincode::serde::encode_to_vec(value, bincode::config::standard())
     payload    = zstd::encode_all(serialized, level)
 
-The packing is internal to the crate: the build hands typed payloads
+The packing is internal to the crate: the writer hands typed payloads
 to `ChunkWriter`, which packs FST chunks (PRIM, `MF{i}`) at an
 elevated zstd level (3) and everything else at the default level (1).
 The format itself does not fix the level — zstd frames are
@@ -661,9 +711,10 @@ A new **optional, TOC-indexed** chunk id is additive: it changes no
 existing chunk's bincode layout, a file without it simply omits it,
 and a reader that does not know it reads the rest unchanged. Adding
 one therefore needs **no version bump**. The optional per-row columns,
-the `TIDX` trace_id index, the `TBLM` trace-id bloom, and the
-`EVNB`/`LNKB` span event/link structures (see [§ Chunk Ids](#chunk-ids))
-follow exactly this rule.
+the `TIDX` trace_id index, the `TBLM` trace-id bloom, the
+`EVNB`/`LNKB` span event/link structures, and the `TRSU`/`TRSS` trace
+rollup and its stats (see [§ Chunk Ids](#chunk-ids)) follow exactly this
+rule.
 
 ### When to bump the version
 

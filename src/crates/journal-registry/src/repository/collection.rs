@@ -43,10 +43,7 @@
 //!
 //! Concurrency and consumers: both types mutate only through `&mut self`;
 //! `Registry` ([`crate::Registry`]) serializes its `Repository` behind
-//! `Arc<parking_lot::RwLock>` and is its only consumer;
-//! journal-log-writer drives a `Chain` inside its `OwnedChain`, reading the
-//! newest file's header through `back` and pruning with `pop_front`/`drain`
-//! (`journal-log-writer/src/log/chain.rs`). Both types are
+//! `Arc<parking_lot::RwLock>` and is its only consumer. Both types are
 //! `#[doc(hidden)]` re-exports reached by full path
 //! ([`crate::repository::Chain`], [`crate::repository::Repository`]) and
 //! through journal-core's repository shim

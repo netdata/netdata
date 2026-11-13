@@ -12,7 +12,6 @@ allocative = ["dep:allocative"]
 [dependencies]
 journal-common = { workspace = true }
 journal-registry = { workspace = true }
-rdp = { workspace = true }
 
 # Core dependencies
 static_assertions = { workspace = true }

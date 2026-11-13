@@ -34,16 +34,39 @@
 //!   — O(1) peak per group however many resends — while an UNSET group
 //!   is held whole, because content-deterministic ordering of its
 //!   distinct members needs them all: the one place peak memory is a
-//!   group. Groups beyond the cap never materialize (the pre-group cap
-//!   check). Examined *refs* are bounded by the trace's total row count
+//!   group. Groups beyond the cap never materialize at their turn (the
+//!   pre-group cap check; read-ahead, below, may have built a bounded
+//!   few). Examined *refs* are bounded by the trace's total row count
 //!   across sources.
 //! - Capping stops at the first unique span BEYOND the cap — an
 //!   exactly-cap trace is `Complete`, and resends of already-kept keys
 //!   (checked before the cap) cannot truncate.
+//! - An optional [`SpanShaper`] shapes each span the merge keeps (after
+//!   canonical selection, so content identity is unaffected) and weighs
+//!   it; the merge stops at the first unique span whose weight would
+//!   pass the shaper's budget, by the cap's rule. The kept spans then
+//!   hold what the caller will send, not full values: a caller's
+//!   response budget bounds the merge's memory, besides the read-ahead
+//!   buffer (below), which holds spans before they are shaped.
+//! - With a [`LoadedSources`], at most its limit of sources hold decoded
+//!   state at once: after each read, the least recently read source beyond
+//!   the limit is released ([`SpanSource::release`]) and decodes again if
+//!   read later. A trace whose spans spread over hundreds of files (a
+//!   long-lived stream) then costs a bounded amount of decoded state, not
+//!   one file's worth per file. A caller that reads the same sources
+//!   between merges (search's plan compiles and trace-level gate) shares
+//!   one tracker, so the limit holds across the query. A source the limit
+//!   released that must decode again to build a span also builds its next
+//!   pending spans (up to 64 per load; at most 512 spans and 4 MiB of
+//!   values held at once): a trace whose spans alternate across more files
+//!   than the limit then decodes each file once per that many spans, not
+//!   per span. A source that never holds decoded state (a WAL tail) never
+//!   reads ahead. Building a span is a pure function of its position, so
+//!   this changes no result.
 //!
 //! [`IndexReader::trace_by_id`]: crate::IndexReader::trace_by_id
 
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet, VecDeque};
 use std::hash::Hasher;
 
 use crate::index_reader::{Trace, TraceSpan};
@@ -90,13 +113,240 @@ pub trait SpanSource {
     /// Materialize the full span at a `position` previously returned by
     /// [`span_refs`](Self::span_refs).
     fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error>;
+
+    /// Whether the source holds decoded state that
+    /// [`release`](Self::release) would free.
+    fn is_loaded(&self) -> bool {
+        false
+    }
+
+    /// Drop the decoded state the source can rebuild; later calls decode
+    /// again and answer the same (positions from an earlier
+    /// [`span_refs`](Self::span_refs) stay valid).
+    fn release(&mut self) {}
+}
+
+impl<S: SpanSource + ?Sized> SpanSource for &mut S {
+    fn span_refs(&mut self, trace_id: TraceId) -> Result<Vec<SpanRef>, crate::Error> {
+        (**self).span_refs(trace_id)
+    }
+
+    fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error> {
+        (**self).materialize(position)
+    }
+
+    fn is_loaded(&self) -> bool {
+        (**self).is_loaded()
+    }
+
+    fn release(&mut self) {
+        (**self).release()
+    }
+}
+
+/// Spans a source builds ahead of their turn when it must decode again to
+/// build one (see the module docs).
+const READ_AHEAD: usize = 64;
+/// Most spans held ahead of their turn across one merge.
+const READ_AHEAD_MAX: usize = 512;
+/// Most payload bytes (see [`span_bytes`]) held ahead of their turn across
+/// one merge: read-ahead spans are not shaped yet, so this, not the
+/// caller's budget, bounds them.
+const READ_AHEAD_MAX_BYTES: usize = 4 << 20;
+
+/// A span's string payload in bytes: what grows with the stored values.
+fn span_bytes(span: &TraceSpan) -> usize {
+    let pairs = |kv: &[(String, String)]| kv.iter().map(|(k, v)| k.len() + v.len()).sum::<usize>();
+    pairs(&span.fields)
+        + span
+            .events
+            .iter()
+            .map(|e| e.name.len() + pairs(&e.attributes))
+            .sum::<usize>()
+        + span
+            .links
+            .iter()
+            .map(|l| l.trace_state.len() + pairs(&l.attributes))
+            .sum::<usize>()
+}
+
+/// The spans a merge built ahead of their turn, by `(source, position)`,
+/// with their payload bytes.
+struct ReadAhead {
+    enabled: bool,
+    /// Per source: it held decoded state after some read of this merge,
+    /// so finding it unloaded means it was released and must decode
+    /// again. A source that never holds state (a WAL tail) never reads
+    /// ahead.
+    held: Vec<bool>,
+    spans: HashMap<(usize, u32), (TraceSpan, usize)>,
+    bytes: usize,
+}
+
+impl ReadAhead {
+    fn new(enabled: bool, sources: usize) -> Self {
+        Self {
+            enabled,
+            held: vec![false; sources],
+            spans: HashMap::new(),
+            bytes: 0,
+        }
+    }
+
+    /// Record whether `source` holds decoded state after a read.
+    fn note(&mut self, source: usize, loaded: bool) {
+        self.held[source] |= loaded;
+    }
+
+    /// Move the spans built ahead for `group`'s members into a map the
+    /// group's materializations draw from; whatever the group does not
+    /// use (a skipped resend, a failed source, a stopped merge) is dropped
+    /// with that map.
+    fn take_group(
+        &mut self,
+        group: &[(usize, usize)],
+        refs: &[Vec<SpanRef>],
+    ) -> HashMap<(usize, u32), TraceSpan> {
+        let mut taken = HashMap::new();
+        if self.spans.is_empty() {
+            return taken;
+        }
+        for &(source, index) in group {
+            let key = (source, refs[source][index].position);
+            if let Some((span, bytes)) = self.spans.remove(&key) {
+                self.bytes -= bytes;
+                taken.insert(key, span);
+            }
+        }
+        taken
+    }
+
+    /// The span at `position` of `source`: built ahead, or built now. A
+    /// source the limit released also builds up to `READ_AHEAD` of its
+    /// `pending` refs (its refs after the current group), within the
+    /// merge's read-ahead bounds. A failure while reading ahead stops the
+    /// read-ahead and surfaces at that span's own turn.
+    fn materialize(
+        &mut self,
+        taken: &mut HashMap<(usize, u32), TraceSpan>,
+        sources: &mut [&mut dyn SpanSource],
+        source: usize,
+        position: u32,
+        pending: &[SpanRef],
+    ) -> Result<TraceSpan, crate::Error> {
+        if let Some(span) = taken.remove(&(source, position)) {
+            return Ok(span);
+        }
+        let reload = self.enabled && self.held[source] && !sources[source].is_loaded();
+        let span = sources[source].materialize(position);
+        self.note(source, sources[source].is_loaded());
+        let span = span?;
+        if reload {
+            for r in pending.iter().take(READ_AHEAD) {
+                if self.spans.len() >= READ_AHEAD_MAX {
+                    break;
+                }
+                let key = (source, r.position);
+                if self.spans.contains_key(&key) {
+                    continue;
+                }
+                let Ok(ahead) = sources[source].materialize(r.position) else {
+                    break;
+                };
+                let bytes = span_bytes(&ahead);
+                if self.bytes + bytes > READ_AHEAD_MAX_BYTES {
+                    break;
+                }
+                self.bytes += bytes;
+                self.spans.insert(key, (ahead, bytes));
+            }
+        }
+        Ok(span)
+    }
+}
+
+/// Keeps at most a limit of sources holding decoded state across the
+/// reads of one query (see the module docs): each read marks its source
+/// the most recent, and the least recently read sources beyond the limit
+/// are released. Indices are the caller's source indices, the same in
+/// every slice passed to [`touch`](Self::touch) and [`combine`]; a
+/// shorter slice (sessions without the merge's tails) treats the sources
+/// it lacks as not loaded.
+pub struct LoadedSources {
+    limit: usize,
+    /// Sources that held decoded state when last read, least recently
+    /// read first.
+    order: VecDeque<usize>,
+}
+
+impl LoadedSources {
+    /// A tracker keeping at most `limit` (non-zero) sources loaded.
+    pub fn new(limit: usize) -> Self {
+        assert_ne!(limit, 0, "a source must stay loaded while it is read");
+        Self {
+            limit,
+            order: VecDeque::new(),
+        }
+    }
+
+    /// Record a read of source `i`, then release the least recently read
+    /// sources while more than the limit hold decoded state.
+    pub fn touch<S: SpanSource>(&mut self, i: usize, sources: &mut [S]) {
+        if let Some(at) = self.order.iter().position(|&j| j == i) {
+            self.order.remove(at);
+        }
+        let loaded_at = |sources: &[S], j: usize| sources.get(j).is_some_and(S::is_loaded);
+        if !loaded_at(sources, i) {
+            return;
+        }
+        self.order.push_back(i);
+        let mut loaded = self
+            .order
+            .iter()
+            .filter(|&&j| loaded_at(sources, j))
+            .count();
+        while loaded > self.limit {
+            // `i` is last and the limit is non-zero, so it is never
+            // reached here.
+            let j = self.order.pop_front().expect("more loaded than listed");
+            if loaded_at(sources, j) {
+                sources[j].release();
+                loaded -= 1;
+            }
+        }
+    }
+}
+
+/// What a [`SpanShaper`] made of one span the merge keeps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Shaped {
+    /// The span's weight against the shaper's budget (e.g. its bytes in
+    /// a response).
+    pub weight: usize,
+    /// The shaper cut part of the span (e.g. capped a value).
+    pub cut: bool,
+}
+
+/// Shapes the spans a merge keeps, in the order it keeps them (the total
+/// order), and bounds their summed weight. See the module docs.
+pub trait SpanShaper {
+    /// Shape `span` in place and weigh it.
+    fn shape(&mut self, span: &mut TraceSpan) -> Shaped;
+    /// The most the kept spans may weigh together.
+    fn budget(&self) -> usize;
 }
 
 /// What [`combine`] produced.
 pub struct CombineOutcome {
     pub trace: Trace,
+    /// Parallel to `trace.spans`: the shaper cut part of the span (all
+    /// `false` without a shaper).
+    pub cut: Vec<bool>,
     /// The span cap was reached AND at least one more unique span exists.
     pub truncated: bool,
+    /// The shaper's budget refused a unique span: the trace is the prefix
+    /// that fits.
+    pub budget_hit: bool,
     /// The merge was cancelled mid-way: the trace is the deterministic
     /// merged prefix assembled so far.
     pub cancelled: bool,
@@ -107,7 +357,7 @@ pub struct CombineOutcome {
     pub failures: Vec<(usize, crate::Error)>,
     /// Input indices of the sources whose spans were RETAINED in the
     /// trace (sorted, deduplicated) — the domain of per-source result
-    /// metadata, e.g. sfsq's coalesced field→schema-kind map: it
+    /// metadata, e.g. sfsq's field→kinds map: it
     /// describes the returned data, not files that merely might contain
     /// the trace.
     pub contributing_sources: Vec<usize>,
@@ -173,8 +423,12 @@ impl PartialOrd for HeapEntry {
 ///
 /// `cap = None` means unbounded; `cap = Some(0)` is a caller error the
 /// engine rejects at its request boundary (asserted here in debug builds).
+/// `loaded`, when given, keeps at most its limit of sources holding
+/// decoded state (see [`LoadedSources`]). `shaper`, when given, shapes and
+/// weighs every kept span (see [`SpanShaper`]).
 ///
-/// `cancel` is polled during head resolution and once per merge group.
+/// `cancel` is polled during head resolution and once per merge group (a
+/// group that reads ahead first builds up to 64 spans).
 /// Once the merge is running, a firing cancel keeps the deterministic
 /// prefix assembled so far ([`cancelled`](CombineOutcome::cancelled) is
 /// set); during head resolution nothing is assembled yet, so the outcome
@@ -183,6 +437,8 @@ pub fn combine(
     sources: &mut [&mut dyn SpanSource],
     trace_id: TraceId,
     cap: Option<usize>,
+    mut loaded: Option<&mut LoadedSources>,
+    mut shaper: Option<&mut dyn SpanShaper>,
     cancel: &dyn Fn() -> bool,
 ) -> CombineOutcome {
     debug_assert!(
@@ -191,6 +447,12 @@ pub fn combine(
     );
 
     let mut failures: Vec<(usize, crate::Error)> = Vec::new();
+    let mut ahead = ReadAhead::new(loaded.is_some(), sources.len());
+    let mut touch = |i: usize, sources: &mut [&mut dyn SpanSource]| {
+        if let Some(loaded) = loaded.as_deref_mut() {
+            loaded.touch(i, sources);
+        }
+    };
 
     // Cancellation during head resolution (this loop) is the "before all
     // source heads are known" phase: no deterministic prefix exists yet,
@@ -202,7 +464,9 @@ pub fn combine(
             roots: Vec::new(),
             children: Vec::new(),
         },
+        cut: Vec::new(),
         truncated: false,
+        budget_hit: false,
         cancelled: true,
         failures,
         contributing_sources: Vec::new(),
@@ -214,11 +478,14 @@ pub fn combine(
     // Per-source candidate lists, sorted by the cheap key (+ position for
     // an in-source total order; same-position duplicates cannot exist).
     let mut refs: Vec<Vec<SpanRef>> = Vec::with_capacity(sources.len());
-    for (i, source) in sources.iter_mut().enumerate() {
+    for i in 0..sources.len() {
         if cancel() {
             return cancelled_empty(failures);
         }
-        match source.span_refs(trace_id) {
+        let found = sources[i].span_refs(trace_id);
+        ahead.note(i, sources[i].is_loaded());
+        touch(i, sources);
+        match found {
             Ok(mut r) => {
                 r.sort_unstable_by_key(|s| (s.cheap_key(), s.position));
                 refs.push(r);
@@ -251,10 +518,14 @@ pub fn combine(
     };
 
     let mut failed: Vec<bool> = vec![false; sources.len()];
+    // Per source: the index of its first ref the merge has not reached.
+    let mut cursor: Vec<usize> = vec![0; sources.len()];
+
     let mut seen: HashSet<(SpanId, i32)> = HashSet::new();
-    let mut spans: Vec<TraceSpan> = Vec::new();
+    let mut kept = Kept::default();
     let mut contributors: Vec<usize> = Vec::new();
     let mut truncated = false;
+    let mut budget_hit = false;
     let mut cancelled = false;
 
     'merge: while let Some(head) = heap.pop() {
@@ -292,7 +563,9 @@ pub fn combine(
                 }
             }
             advance(&mut heap, source, index);
+            cursor[source] = index + 1;
         }
+        let mut taken = ahead.take_group(&group, &refs);
         group.retain(|&(source, _)| !failed[source]);
         if group.is_empty() {
             continue;
@@ -312,7 +585,7 @@ pub fn combine(
         // beyond it — the result is truncated, and the beyond-cap payload
         // is never built.
         if let Some(n) = cap
-            && spans.len() >= n
+            && kept.spans.len() >= n
         {
             truncated = true;
             break 'merge;
@@ -323,10 +596,21 @@ pub fn combine(
         if group.len() == 1 && !is_unset {
             let (source, index) = group[0];
             let r = refs[source][index];
-            match sources[source].materialize(r.position) {
+            let materialized = ahead.materialize(
+                &mut taken,
+                sources,
+                source,
+                r.position,
+                &refs[source][cursor[source]..],
+            );
+            touch(source, sources);
+            match materialized {
                 Ok(span) => {
+                    if !kept.push(span, &mut shaper) {
+                        budget_hit = true;
+                        break 'merge;
+                    }
                     seen.insert((span_id, kind));
-                    spans.push(span);
                     contributors.push(source);
                 }
                 Err(e) => {
@@ -356,7 +640,15 @@ pub fn combine(
                     continue;
                 }
                 let r = refs[source][index];
-                match sources[source].materialize(r.position) {
+                let materialized = ahead.materialize(
+                    &mut taken,
+                    sources,
+                    source,
+                    r.position,
+                    &refs[source][cursor[source]..],
+                );
+                touch(source, sources);
+                match materialized {
                     Ok(span) => {
                         let bytes = canonical_bytes(&span);
                         let hash = content_hash(&bytes);
@@ -384,8 +676,11 @@ pub fn combine(
                 }
             }
             if let Some((_, _, span)) = best {
+                if !kept.push(span, &mut shaper) {
+                    budget_hit = true;
+                    break 'merge;
+                }
                 seen.insert((span_id, kind));
-                spans.push(span);
                 contributors.append(&mut tied_sources);
             }
             continue;
@@ -400,7 +695,15 @@ pub fn combine(
                 continue;
             }
             let r = refs[source][index];
-            match sources[source].materialize(r.position) {
+            let materialized = ahead.materialize(
+                &mut taken,
+                sources,
+                source,
+                r.position,
+                &refs[source][cursor[source]..],
+            );
+            touch(source, sources);
+            match materialized {
                 Ok(span) => {
                     let bytes = canonical_bytes(&span);
                     members.push((content_hash(&bytes), bytes, span, source));
@@ -417,29 +720,62 @@ pub fn combine(
         // nothing beyond it is touched.
         for (_, _, span, source) in members {
             if let Some(n) = cap
-                && spans.len() >= n
+                && kept.spans.len() >= n
             {
                 truncated = true;
                 break 'merge;
             }
-            spans.push(span);
+            if !kept.push(span, &mut shaper) {
+                budget_hit = true;
+                break 'merge;
+            }
             contributors.push(source);
         }
     }
 
     contributors.sort_unstable();
     contributors.dedup();
-    let (roots, children) = build_forest(&spans);
+    let (roots, children) = build_forest(&kept.spans);
     CombineOutcome {
         trace: Trace {
-            spans,
+            spans: kept.spans,
             roots,
             children,
         },
+        cut: kept.cut,
         truncated,
+        budget_hit,
         cancelled,
         failures,
         contributing_sources: contributors,
+    }
+}
+
+/// The spans a merge keeps, shaped and weighed when a shaper is given.
+#[derive(Default)]
+struct Kept {
+    spans: Vec<TraceSpan>,
+    cut: Vec<bool>,
+    weight: usize,
+}
+
+impl Kept {
+    /// Keep `span` unless the shaper's budget refuses it (`false`: the
+    /// caller stops the merge).
+    fn push(&mut self, mut span: TraceSpan, shaper: &mut Option<&mut dyn SpanShaper>) -> bool {
+        let mut cut = false;
+        if let Some(shaper) = shaper.as_deref_mut() {
+            let shaped = shaper.shape(&mut span);
+            let weight = self.weight.saturating_add(shaped.weight);
+            if weight > shaper.budget() {
+                return false;
+            }
+            self.weight = weight;
+            cut = shaped.cut;
+        }
+        self.spans.push(span);
+        self.cut.push(cut);
+        true
     }
 }
 
@@ -589,7 +925,7 @@ mod tests {
     }
 
     fn run(sources: &mut [&mut dyn SpanSource], cap: Option<usize>) -> CombineOutcome {
-        combine(sources, tid(), cap, &|| false)
+        combine(sources, tid(), cap, None, None, &|| false)
     }
 
     #[test]
@@ -814,6 +1150,163 @@ mod tests {
         assert_eq!(count.get(), 2, "only the first UNSET group materialized");
     }
 
+    /// A source that reports decoded state from its first read until the
+    /// limit releases it, counting loads and the most sources holding
+    /// state at once (shared counters across a merge's sources).
+    struct Loading {
+        inner: VecSource,
+        loaded: bool,
+        held: std::rc::Rc<std::cell::Cell<usize>>,
+        peak: std::rc::Rc<std::cell::Cell<usize>>,
+        loads: std::rc::Rc<std::cell::Cell<usize>>,
+    }
+
+    impl Loading {
+        fn enter(&mut self) {
+            if !self.loaded {
+                self.loaded = true;
+                self.held.set(self.held.get() + 1);
+                self.loads.set(self.loads.get() + 1);
+            }
+            self.peak.set(self.peak.get().max(self.held.get()));
+        }
+    }
+
+    impl SpanSource for Loading {
+        fn span_refs(&mut self, id: TraceId) -> Result<Vec<SpanRef>, crate::Error> {
+            self.enter();
+            self.inner.span_refs(id)
+        }
+        fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error> {
+            self.enter();
+            self.inner.materialize(position)
+        }
+        fn is_loaded(&self) -> bool {
+            self.loaded
+        }
+        fn release(&mut self) {
+            assert!(self.loaded, "released only when loaded");
+            self.loaded = false;
+            self.held.set(self.held.get() - 1);
+        }
+    }
+
+    /// Merge `inners` wrapped as [`Loading`] sources under `limit`:
+    /// the outcome, the peak of sources holding state, and the loads.
+    fn merge_loading(
+        inners: Vec<VecSource>,
+        limit: Option<usize>,
+    ) -> (CombineOutcome, usize, usize) {
+        let held = std::rc::Rc::new(std::cell::Cell::new(0));
+        let peak = std::rc::Rc::new(std::cell::Cell::new(0));
+        let loads = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut sources: Vec<Loading> = inners
+            .into_iter()
+            .map(|inner| Loading {
+                inner,
+                loaded: false,
+                held: std::rc::Rc::clone(&held),
+                peak: std::rc::Rc::clone(&peak),
+                loads: std::rc::Rc::clone(&loads),
+            })
+            .collect();
+        let mut tracker = limit.map(LoadedSources::new);
+        let mut set: Vec<&mut dyn SpanSource> = sources
+            .iter_mut()
+            .map(|s| s as &mut dyn SpanSource)
+            .collect();
+        let out = combine(&mut set, tid(), None, tracker.as_mut(), None, &|| false);
+        (out, peak.get(), loads.get())
+    }
+
+    /// `count` spans of source `i` among `of` interleaved sources (source
+    /// `i` holds starts `i`, `i + of`, …), each with `value` as a field.
+    fn interleaved(i: u8, of: u8, count: u8, value: &str) -> VecSource {
+        VecSource::new(
+            (0..count)
+                .map(|k| {
+                    let mut s = span(
+                        [i + 1, k + 1, 0, 0, 0, 0, 0, 0],
+                        [0; 8],
+                        i64::from(k * of + i),
+                        1,
+                        "s",
+                    );
+                    s.fields.push(("v".into(), value.into()));
+                    s
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn a_loaded_limit_bounds_the_sources_holding_state() {
+        // Six sources whose spans interleave in time, so the merge keeps
+        // returning to sources it released: at most `limit` plus the one
+        // being read hold state at any moment, a released source reads
+        // ahead instead of reloading per span, and the trace is the
+        // unlimited one.
+        let sources = || (0..6u8).map(|i| interleaved(i, 6, 3, "x")).collect();
+        let (free, free_peak, _) = merge_loading(sources(), None);
+        let (limited, limited_peak, loads) = merge_loading(sources(), Some(2));
+        assert_eq!(free_peak, 6, "without a limit every source stays loaded");
+        assert!(limited_peak <= 3, "peak {limited_peak} above the limit + 1");
+        assert_eq!(limited.trace.spans, free.trace.spans);
+        assert_eq!(limited.trace.spans.len(), 18);
+        // Six loads for the refs, then each released source loads once
+        // more and reads its two later spans ahead: 12, not 6 + 18.
+        assert_eq!(loads, 12, "loads with read-ahead");
+        assert_eq!(limited.contributing_sources, free.contributing_sources);
+    }
+
+    #[test]
+    fn read_ahead_holds_at_most_its_byte_bound() {
+        // Two interleaved sources of four 1.5 MiB spans under a limit of
+        // one: a reload reads ahead two spans (3 MiB); a third would pass
+        // 4 MiB, so it is built again at its turn. Six loads; without the
+        // byte bound each source would read all three ahead (four).
+        let big = "y".repeat(3 << 19);
+        let sources = || (0..2u8).map(|i| interleaved(i, 2, 4, &big)).collect();
+        let (free, _, _) = merge_loading(sources(), None);
+        let (limited, _, loads) = merge_loading(sources(), Some(1));
+        assert_eq!(limited.trace.spans, free.trace.spans);
+        assert_eq!(loads, 6);
+    }
+
+    #[test]
+    fn a_source_that_never_loads_never_reads_ahead() {
+        // WAL tails hold their spans decoded and never report a loaded
+        // layer: under a limit, each span is built once, at its turn.
+        struct Counting {
+            inner: VecSource,
+            built: std::rc::Rc<std::cell::Cell<usize>>,
+        }
+        impl SpanSource for Counting {
+            fn span_refs(&mut self, id: TraceId) -> Result<Vec<SpanRef>, crate::Error> {
+                self.inner.span_refs(id)
+            }
+            fn materialize(&mut self, position: u32) -> Result<TraceSpan, crate::Error> {
+                self.built.set(self.built.get() + 1);
+                self.inner.materialize(position)
+            }
+        }
+        let built = std::rc::Rc::new(std::cell::Cell::new(0));
+        let mut sources: Vec<Counting> = (0..2u8)
+            .map(|i| Counting {
+                inner: interleaved(i, 2, 4, "x"),
+                built: std::rc::Rc::clone(&built),
+            })
+            .collect();
+        let mut tracker = LoadedSources::new(1);
+        let mut set: Vec<&mut dyn SpanSource> = sources
+            .iter_mut()
+            .map(|s| s as &mut dyn SpanSource)
+            .collect();
+        let out = combine(&mut set, tid(), None, Some(&mut tracker), None, &|| false);
+        assert_eq!(out.trace.spans.len(), 8);
+        assert_eq!(built.get(), 8);
+    }
+
     #[test]
     fn beyond_cap_payloads_are_never_materialized() {
         // The cap bounds WORK, not just output: with cap 1 and three
@@ -868,7 +1361,7 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 2
         };
-        let out = combine(&mut set, tid(), None, &cancel);
+        let out = combine(&mut set, tid(), None, None, None, &cancel);
         assert!(out.cancelled);
         assert!(out.trace.spans.is_empty());
 
@@ -881,15 +1374,102 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() >= 4
         };
-        let out = combine(&mut set, tid(), None, &cancel);
+        let out = combine(&mut set, tid(), None, None, None, &cancel);
         assert!(out.cancelled);
         assert_eq!(out.trace.spans.len(), 1);
         assert_eq!(out.trace.spans[0].fields[0].1, "first");
 
         // Cancelled with ZERO sources: still cancelled, never Complete.
         let mut empty: Vec<&mut dyn SpanSource> = vec![];
-        let out = combine(&mut empty, tid(), None, &|| true);
+        let out = combine(&mut empty, tid(), None, None, None, &|| true);
         assert!(out.cancelled);
+    }
+
+    /// Weighs every span 10 and cuts its name to `cut_to` characters.
+    struct TenEach {
+        budget: usize,
+        cut_to: usize,
+        seen: Vec<String>,
+    }
+
+    impl SpanShaper for TenEach {
+        fn shape(&mut self, span: &mut TraceSpan) -> Shaped {
+            let name = &mut span.fields[0].1;
+            self.seen.push(name.clone());
+            let cut = name.len() > self.cut_to;
+            name.truncate(self.cut_to);
+            Shaped { weight: 10, cut }
+        }
+        fn budget(&self) -> usize {
+            self.budget
+        }
+    }
+
+    fn shaped(spans: Vec<TraceSpan>, budget: usize) -> (CombineOutcome, TenEach) {
+        let mut src = VecSource::new(spans);
+        let mut shaper = TenEach {
+            budget,
+            cut_to: 3,
+            seen: Vec::new(),
+        };
+        let out = combine(
+            &mut [&mut src as &mut dyn SpanSource],
+            tid(),
+            None,
+            None,
+            Some(&mut shaper),
+            &|| false,
+        );
+        (out, shaper)
+    }
+
+    #[test]
+    fn a_shaper_bounds_the_kept_weight_by_the_caps_rule() {
+        let three = || {
+            vec![
+                span([1; 8], [0; 8], 1, 1, "a"),
+                span([2; 8], [1; 8], 2, 1, "b"),
+                span([3; 8], [1; 8], 3, 1, "c"),
+            ]
+        };
+        // 25 holds two spans of 10: the third is the first beyond it.
+        let (out, _) = shaped(three(), 25);
+        assert_eq!(out.trace.spans.len(), 2);
+        assert!(out.budget_hit && !out.truncated);
+        // An exact fit is complete.
+        let (out, _) = shaped(three(), 30);
+        assert_eq!(out.trace.spans.len(), 3);
+        assert!(!out.budget_hit);
+        assert_eq!(out.trace.children.len(), 3);
+    }
+
+    #[test]
+    fn resends_never_spend_the_budget() {
+        // A resend of a kept key is skipped before shaping.
+        let spans = vec![
+            span([1; 8], [0; 8], 1, 1, "a"),
+            span([1; 8], [0; 8], 5, 1, "a"),
+            span([2; 8], [1; 8], 6, 1, "b"),
+        ];
+        let (out, shaper) = shaped(spans, 20);
+        assert_eq!(out.trace.spans.len(), 2);
+        assert!(!out.budget_hit);
+        assert_eq!(shaper.seen, ["a", "b"]);
+    }
+
+    #[test]
+    fn the_shaper_sees_the_canonical_copy_and_flags_its_cuts() {
+        // Two copies of one key: the earlier one is canonical, and only it
+        // is shaped; the kept span carries the shaped content.
+        let spans = vec![
+            span([1; 8], [0; 8], 1, 1, "first"),
+            span([1; 8], [0; 8], 1, 1, "first-other"),
+            span([2; 8], [1; 8], 2, 1, "ok"),
+        ];
+        let (out, shaper) = shaped(spans, 100);
+        assert_eq!(shaper.seen.len(), 2);
+        assert_eq!(out.trace.spans[0].fields[0].1.len(), 3);
+        assert_eq!(out.cut, [true, false]);
     }
 
     #[test]
@@ -903,6 +1483,27 @@ mod tests {
         assert_eq!(out.trace.spans[0].fields[0].1, "good");
         assert_eq!(out.failures.len(), 1);
         assert_eq!(out.failures[0].0, 1);
+    }
+
+    #[test]
+    fn reading_ahead_surfaces_a_failure_at_its_own_turn() {
+        // Two interleaved sources under a limit of one, so each released
+        // source reads ahead; the bad source fails at its third span. The
+        // outcome matches the unlimited merge: the same spans, the same
+        // failure.
+        let sources = || {
+            let mut b = interleaved(1, 2, 4, "b");
+            b.fail_at = Some(2);
+            vec![interleaved(0, 2, 4, "a"), b]
+        };
+        let (free, _, _) = merge_loading(sources(), None);
+        let (limited, _, _) = merge_loading(sources(), Some(1));
+        assert_eq!(limited.trace.spans, free.trace.spans);
+        assert_eq!(free.trace.spans.len(), 6, "four of a, b's first two");
+        let failed =
+            |out: &CombineOutcome| out.failures.iter().map(|(i, _)| *i).collect::<Vec<_>>();
+        assert_eq!(failed(&limited), vec![1]);
+        assert_eq!(failed(&free), vec![1]);
     }
 
     #[test]

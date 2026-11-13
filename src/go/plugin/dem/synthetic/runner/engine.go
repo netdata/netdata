@@ -217,6 +217,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Secrets:    request.Secrets,
 	}
 	if request.Kind == synthetic.Journey {
+		req.Extensions = []string{failureEvidenceFeature}
 		deadline, _ := attempt.Deadline()
 		req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt)
 		if err != nil {
@@ -265,6 +266,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		run.DurationMS = &elapsed
 		drained = result.Drained
 		snapshot := sink.snapshot()
+		run.FailureEvidence = snapshot.evidence
 		run.Events = snapshot.events
 		run.DroppedEvents = snapshot.dropped
 		run.Tests = snapshot.partial

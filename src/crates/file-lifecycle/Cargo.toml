@@ -21,7 +21,7 @@ path = "src/lib.rs"
 # in `tests/` backstops it.
 [dependencies]
 anyhow = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }
@@ -32,6 +32,7 @@ netdata-plugin-protocol = { workspace = true }
 opendal = { workspace = true }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 uuid = { workspace = true }

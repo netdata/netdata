@@ -3,7 +3,7 @@
 //! simple-form UUIDs joined by one dash, 65 bytes total. This module owns
 //! that prefix alone; the tail after it is each artifact's own:
 //!
-//! - data files: `FileId`'s `{pipeline_id:05}-{seq:010}-{part_key:016x}`
+//! - data files: `FileId`'s `{pipeline_id:05}-{seq:010}-{partition_key:016x}`
 //!   (the stem contracts live in the `types` module docs);
 //! - remote catalogs: `otel-catalog/src/registry.rs` appends
 //!   `{max_seq:010}-{min_ts:010}-{max_ts:010}` (max_seq plus a `[min, max]`

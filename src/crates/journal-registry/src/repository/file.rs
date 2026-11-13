@@ -13,9 +13,8 @@
 //! - `.journal` — the live file (`Status::Active`). With an `@` part before
 //!   the suffix it is archived:
 //!   `system@<seqnum_id>-<head_seqnum>-<head_realtime>.journal`, with
-//!   `seqnum_id` a UUID (the writer emits its 32-hex-char simple form) and
-//!   the numbers hex u64s (writer side:
-//!   `journal-log-writer/src/log/chain.rs`).
+//!   `seqnum_id` a UUID (the plugin's former journal writer emitted its
+//!   32-hex-char simple form) and the numbers hex u64s.
 //! - `.journal~` — disposed: `system@<timestamp>-<number>.journal~`, both
 //!   hex u64s; a corrupted file renamed with the `~` suffix (README.md).
 //! - source basename: `system`, `user-<uid>` (u32), `remote-<host>`, or
@@ -47,8 +46,7 @@
 //! Consumers: journal-index (`journal-index/src/file_indexer.rs` —
 //! `is_active` guards the header-state check), journal-engine
 //! (`journal-engine/src/cache.rs`, `journal-engine/src/logs/query.rs`),
-//! journal-log-writer (builds these names and parses them back,
-//! `journal-log-writer/src/log/chain.rs`), the journal-core repository
+//! the journal-core repository
 //! re-export (`journal-core/src/lib.rs`) and journal-function's re-export
 //! (`journal-function/src/lib.rs`).
 //! netflow-plugin runs the same API through the published twin
@@ -339,9 +337,7 @@ impl File {
     }
 
     /// Parses the naming scheme right to left into a `File`; see the module
-    /// docs. Absolute paths only — the journal-log-writer rejects relative
-    /// directories for exactly this reason
-    /// (`journal-log-writer/src/log/mod.rs`). Every mismatch is a
+    /// docs. Absolute paths only. Every mismatch is a
     /// silent `None`; nothing here raises an error.
     //
     // Not `FromStr::from_str` — this parses a path; `from_path` is the

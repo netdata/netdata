@@ -38,11 +38,39 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 		if execution.Run.TerminationReason != "" {
 			outcome += " (" + string(execution.Run.TerminationReason) + ")"
 		}
-		err := fmt.Errorf("rehearsal %s: %s", outcome, execution.Run.Error)
+		err := fmt.Errorf("rehearsal %s: %s", outcome, rehearsalFailureText(execution.Run))
 		if execution.Run.Outcome == synthetic.Timeout {
 			err = errors.Join(err, context.DeadlineExceeded)
 		}
 		return errors.Join(err, cleanupErr)
 	}
 	return cleanupErr
+}
+
+// rehearsalFailureText preserves the core error and adds the same diagnostic
+// summaries shown in run history without assigning them outcome authority.
+func rehearsalFailureText(run synthetic.Run) string {
+	text := run.Error
+	if e := run.FailureEvidence; e != nil && e.FirstFailure != nil && e.FirstFailure.Message == text {
+		text = "" // The same core error is preserved in the contextual failure summary.
+	}
+	if failure := run.FailureEvidence.FailureSummary(); failure != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += "First unexpected failure: " + failure
+	}
+	if step := run.FailureEvidence.LastObservedStepSummary(); step != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += "Last observed running step: " + step
+	}
+	if stop := run.FailureEvidence.StopSummary(); stop != "" {
+		if text != "" {
+			text += "\n"
+		}
+		text += "Pending before cleanup: " + stop
+	}
+	return text
 }

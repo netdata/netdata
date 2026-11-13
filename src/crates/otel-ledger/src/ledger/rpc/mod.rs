@@ -4,7 +4,7 @@
 //!
 //! - `dispatch` — the run-loop's entry points: `handle_supervisor_req`,
 //!   `handle_outbound_resp`, and the per-call `dispatch_function_call`
-//!   that spawns handler tasks driven by the `bridge::function` engine.
+//!   that spawns handler tasks driven by the `otel_bridge::function` engine.
 //!   Signal-neutral: it routes by each pipeline's declared function name.
 //! - `grid` — the shared time-grid derivation behind the otel
 //!   Functions' histogram views: picks a "nice" bucket width and snaps
@@ -31,19 +31,23 @@ mod grid;
 mod logs;
 mod traces;
 
+/// The traces fixtures, for the ledger-level tests that need real WALs.
+#[cfg(test)]
+pub(crate) use traces::fixtures as traces_fixtures;
+
 pub(crate) use logs::OtelLogsHandler;
 pub(crate) use traces::OtelTracesHandler;
 
 /// The logs pipeline's GET shim (its `arg_shim`, installed by
 /// [`build_pipeline`](super::pipeline::build_pipeline)): replicate the
-/// rt-level GET shim (`netdata-plugin/rt/src/lib.rs` `handle_function_call`)
+/// netdata-plugin-rt GET shim (`netdata-plugin/rt/src/lib.rs` `handle_function_call`)
 /// for query-string calls — synthesize a JSON payload with an `info`
 /// flag (true iff the literal token is in the args) plus parsed
 /// `after:`/`before:` windows. Divergence: tokens parse as u32, the
 /// request fields' width ([`after`](logs::wire::OtelLogsRequest::after) /
 /// [`before`](logs::wire::OtelLogsRequest::before)), so an out-of-range
 /// token skips like a non-numeric one instead of synthesizing a number
-/// the deserializer would reject (the rt shim parses u64). Returns
+/// the deserializer would reject (the netdata-plugin-rt shim parses u64). Returns
 /// `None` when there is nothing to synthesize — no args, or the call
 /// already carries a payload (a POST body) — and the caller
 /// (`rpc/dispatch.rs` `dispatch_function_call`) keeps the original.
@@ -85,7 +89,7 @@ pub(crate) fn patch_args_into_payload(args: &[String], payload: Option<&[u8]>) -
 /// PRESENCE of the literal `info` token synthesizes the strict `{"info": {}}`
 /// selector regardless of any other tokens; anything else synthesizes
 /// NOTHING — a traces GET data call reaches the bridge with no payload,
-/// which it deserializes from `{}` (`netdata-plugin/bridge/src/function.rs`
+/// which it deserializes from `{}` (`otel-bridge/src/function.rs`
 /// `HandlerAdapter::handle_raw`) into the selector-less
 /// `TracesMode::Functions` default view (every param has a serde
 /// default, `last` via a custom `default_limit` fn), silently dropping

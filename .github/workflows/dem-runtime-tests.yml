@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-node-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
       - '.github/data/distros.yml'
       - '.github/scripts/package-upload.sh'
@@ -37,6 +38,7 @@ on:
     branches: [master]
     paths:
       - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-node-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
       - '.github/data/distros.yml'
       - '.github/scripts/package-upload.sh'
@@ -72,6 +74,8 @@ concurrency:
   group: dem-runtime-tests-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  runtime-wire:
+    uses: ./.github/workflows/dem-runtime-node-tests.yml
   contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 20

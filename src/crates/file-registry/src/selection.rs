@@ -33,7 +33,7 @@ use crate::{FileId, FileSummary};
 #[derive(Debug, Clone)]
 pub struct SelectedFile {
     /// The file's identity. The partition key lives in
-    /// [`FileId::part_key`] — never in the summary — and the candidate
+    /// [`FileId::partition_key`] — never in the summary — and the candidate
     /// filters read it there (the shared rule is
     /// [`Query::matches_partition`](crate::Query::matches_partition)).
     pub id: FileId,

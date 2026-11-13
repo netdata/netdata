@@ -264,8 +264,8 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     /// # use journal_core::{JournalReader, JournalFile};
     /// # use journal_core::file::Mmap;
     /// # fn example(reader: &mut JournalReader<Mmap>, file: &JournalFile<Mmap>) {
-    /// // Works even when "my.field.name" is stored under an
-    /// // rdp-encoded name:
+    /// // Works even when "my.field.name" is stored under a
+    /// // remapped name:
     /// reader.add_match(b"my.field.name=some_value");
     /// # }
     /// ```
@@ -482,15 +482,15 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     }
 
     /// Rebuilds the reader's remapping registry from this file's
-    /// remapping entries - the read-side mirror of what
-    /// journal-log-writer writes (journal-log-writer/src/log/mod.rs).
+    /// remapping entries - the read-side mirror of what the plugin's
+    /// former journal writer wrote.
     /// Finds the `ND_REMAPPING` field (the name part of
     /// `REMAPPING_MARKER`) through the field hash table, collects the
     /// entries referencing its data objects, and parses each entry's
     /// other payloads as `stored-name=original-name` into the registry.
     ///
-    /// Name-shape gate: only stored names shaped like
-    /// `rdp::encode_full`'s MD5 fallback are accepted (see the body) -
+    /// Name-shape gate: only stored names shaped like the former
+    /// encoder's MD5 fallback are accepted (see the body) -
     /// normal-shape names are silently dropped, while
     /// [`JournalFile::load_fields`] parses the same
     /// entries without any gate and loads both shapes. The two paths
@@ -498,8 +498,7 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
     ///
     /// Skipped without error: the marker payload itself, and every
     /// payload the gate rejects - including the `_BOOT_ID=...` item the
-    /// writer adds to every remapping entry
-    /// (journal-log-writer/src/log/mod.rs). Errors: a failing
+    /// former writer added to every remapping entry. Errors: a failing
     /// marker lookup is swallowed and treated as "no remappings in this
     /// file"; failures while reading marker data objects, entry chains
     /// or payloads propagate. First mapping per original name wins
@@ -616,10 +615,9 @@ impl<'a, M: MemoryMap> JournalReader<'a, M> {
             // first '=').
             if let Some(field_name) = extract_field_name(&payload) {
                 if field_name.starts_with(b"ND_") && field_name.len() == 35 {
-                    // Gate: only rdp::encode_full's MD5-fallback shape
-                    // passes - "ND_" + 32 hex chars = 35 bytes
-                    // (src/crates/rdp/src/lib.rs). Normal-shape names
-                    // (ND<checksum><structure>_<NAME>) never start with
+                    // Gate: only the former encoder's MD5-fallback shape
+                    // passes - "ND_" + 32 hex chars = 35 bytes. Normal-shape
+                    // names (ND<checksum><structure>_<NAME>) never start with
                     // "ND_": the char after "ND" is a checksum char
                     // (A-Z/0-9) or a structure char (a-x, uppercased to
                     // A-X, plus 3-9 run-length digits), never '_' - so

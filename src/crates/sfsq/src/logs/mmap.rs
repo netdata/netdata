@@ -8,11 +8,11 @@
 //! explicit partial-result reason.)
 //!
 //! "Mapping" is an mmap only for file-backed sources — a sealed SFST,
-//! mapped read-only. An in-memory candidate (an SFST built from a chunk
-//! of an active WAL) shares its bytes by refcount and cannot fail, and
-//! WAL tails are never mapped at all — engine.rs row-scans them.
-//! Callers: `engine::run`, which maps every SFST source once per query
-//! and shares each mapping with the stats and page passes, and
+//! mapped read-only. An in-memory candidate (an SFST indexed from a
+//! chunk of an active WAL) shares its bytes by refcount and cannot
+//! fail, and WAL tails are never mapped at all — engine.rs row-scans
+//! them. Callers: `engine::run`, which maps every SFST source once per
+//! query and shares each mapping with the stats and page passes, and
 //! `LogsShard::evaluate` (aggregate.rs), the standalone path.
 
 // The shared plumbing, re-exported so the logs modules import these two

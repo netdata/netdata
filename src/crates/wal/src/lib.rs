@@ -8,12 +8,12 @@
 //! The ingestor owns one [`Writer`] per (tenant, signal), writes
 //! content-plane payloads as frames, and syncs + drains the queued
 //! [`FileEvent`]s at its batch boundary. Events cross the ingestor→ledger
-//! link as [`Message`]s (`frame_seq` + `tenant_id` + event). This crate owns
+//! link as [`Message`]s (`tenant_id` + event). This crate owns
 //! the wire types, not the transport — its only stack dependency is
 //! `file-registry` (no ferryboat): the link is ferryboat framing over
 //! `file_lifecycle::ipc`, accepted on the ledger by
-//! `file_lifecycle::ipc::accept_writer`, where each `frame_seq` is
-//! gap-checked per signal and applied to the owning tenant's [`Registry`]
+//! `file_lifecycle::ipc::accept_writer`, where each event is applied to
+//! the owning tenant's [`Registry`]
 //! (the ledger's per-tenant registries, via file-lifecycle, are the only
 //! production holders). A `FileEvent::Closed` then sends the sealed file to
 //! the indexer, which decodes it back ([`Reader`], via `ng_index`) into an
@@ -58,13 +58,13 @@
 //! - The seq high-water envelope (17-byte `NSEQ`, written through
 //!   `file_registry::durable::write_atomic`): `seq`.
 //!
-//! Opaque to this crate — the content plane assigns and decodes them: the
-//! partition key `part_key`, the per-file identity blob `content_meta`
-//! (capped at [`MAX_CONTENT_META_BYTES`]), and the frame-codec tag
-//! `payload_format` (`0` reserved, rejected at [`Writer::new`]).
+//! Opaque to this crate — the content plane assigns and decodes them:
+//! `partition_key`, the per-file identity blob `content_meta` (capped at
+//! [`MAX_CONTENT_META_BYTES`]), and the frame-codec tag `payload_format`
+//! (`0` reserved, rejected at [`Writer::new`]).
 //! `pipeline_id` is the numeric signal axis: stamped into every `FileId`,
 //! exposed by [`FileEvent::pipeline_id`], and routed on by the ledger; the
-//! id↔signal mapping lives in `bridge::signals`.
+//! id↔signal mapping lives in `otel_bridge::signals`.
 //!
 //! # Concurrency and errors
 //!
@@ -87,9 +87,9 @@
 //! (per-tenant writers, the shared [`SeqAllocator`], the startup seq seed
 //! via [`scan_max_sequence_recursive`], event forwarding), `file-lifecycle`
 //! (per-tenant [`Registry`], event application, seq high-water persistence,
-//! the IPC link), `otel-ledger` (event intake + gap-check, active-WAL
+//! the IPC link), `otel-ledger` (event intake, active-WAL
 //! queries via `prefix`, the indexer), `ng-index` (frame decoding for SFST
-//! builds), `sfsq` (WAL scans backing logs + traces queries), `sfsq-cli`
+//! indexing), `sfsq` (WAL scans backing logs + traces queries), `sfsq-cli`
 //! (offline discovery via [`scan_frame_boundaries`]), and `ng-ingest`
 //! (synthetic ingest writing WALs). Tests across the stack fabricate
 //! fixtures with the writers/readers and the re-exported [`test_identity`].
@@ -117,22 +117,28 @@ pub use format::HEADER_SIZE;
 /// an attacker-reachable oversized identity drops that one frame instead
 /// of failing the batch.
 pub use format::MAX_CONTENT_META_BYTES;
+/// The largest frame data that [`Writer::write_frame`] takes: it refuses
+/// more, because the reader would refuse the frame and the whole file with
+/// it. A frame keeps some bytes for each record, whatever the record holds,
+/// so a producer of frames from network input MUST check its frame against
+/// this before it writes any frame of the same request.
+pub use format::MAX_FRAME_DATA;
 pub use format::{FileEvent, Message};
-pub use reader::{Frame, FrameBoundary, FrameRange, Reader, scan_frame_boundaries};
+pub use reader::{Frame, FrameBoundary, FrameRange, Reader, decoded_size, scan_frame_boundaries};
 pub use registry::{File, Registry};
 pub use seq::{DEFAULT_RESERVE_BATCH, SeqAllocator, read_seq_highwater, write_seq_highwater};
-pub use writer::{FileStamp, FrameMeta, Writer};
+pub use writer::{FileStamp, FileSync, FrameMeta, SyncTicket, WriteMark, Writer};
 // Re-exported so callers of `Writer::new` can name the identity types it takes
 // (and the shared test fixture) without a direct `file-registry` dependency;
 // wal-internal tests reach the fixture as `crate::test_identity()`.
 pub use file_registry::{Identity, InstanceId, MachineId, test_identity};
 
-/// Deterministic opaque partition key for tests. The WAL treats `part_key` as
-/// an opaque `u64` and never decodes it, so tests fabricate distinct keys per
-/// logical stream without depending on the content-plane identity codec —
+/// Deterministic opaque partition key for tests. The WAL treats `partition_key`
+/// as an opaque `u64` and never decodes it, so tests fabricate distinct keys
+/// per logical stream without depending on the content-plane identity codec —
 /// same label → same key, different label → (almost surely) different key.
 #[cfg(test)]
-pub(crate) fn opaque_part_key(namespace: &str, name: &str) -> u64 {
+pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     namespace.hash(&mut h);

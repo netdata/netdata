@@ -1,6 +1,6 @@
 //! The shared query time window: one validated, half-open nanosecond
-//! range serving every windowed trace operation — attribute
-//! enumeration's file-granular pruning, search's candidate pruning and
+//! range serving every windowed trace operation — suggestions'
+//! file-granular pruning, search's candidate pruning and
 //! span-start filtering, the aggregates' scan bounds and envelope-start
 //! rank filter — so the half-open-nanosecond comparisons are written
 //! once and can never fork between operations.
@@ -8,7 +8,8 @@
 //! Windows are built at the boundary — the CLI's paired
 //! `--start-ns`/`--end-ns`, the ledger's canonicalized wire window (the
 //! ledger owns that canonicalization; this is the engine's type) — and
-//! inside the engine by the overview alone, from its grid geometry.
+//! inside the engine by the overview and explore, from their grid
+//! geometry.
 //! Every other windowed operation receives an already-validated
 //! window; how an invalid one surfaces is the [`WindowError`] wrap
 //! below.
@@ -25,10 +26,10 @@ pub struct TimeWindow {
 
 /// An invalid window is a request error on whichever operation received
 /// it: the windowed operations' request-error enums (search, overview,
-/// attributes) wrap this via `#[from]` — the per-op wrap pattern.
-/// Search and attributes never construct a window (only the overview
-/// does, from its grid), so their variant keeps the error surface
-/// uniform; `slowest` takes an already-built window and has none.
+/// explore, suggest) wrap this via `#[from]` — the per-op wrap pattern.
+/// Search and suggest never construct a window (only the overview and
+/// explore do, from their grids), so their variant keeps the error
+/// surface uniform.
 #[derive(Debug, thiserror::Error)]
 pub enum WindowError {
     #[error("invalid time window [{start_ns}, {end_ns}): start must be before end")]
@@ -45,8 +46,7 @@ impl TimeWindow {
 
     /// Whether `t_ns` lies in the window — the span-start test (search
     /// decision 5: a span is in the window iff its START is). Consumed
-    /// per-span by the predicate evaluator and once per merged trace by
-    /// slowest's rank filter (on the envelope start).
+    /// per-span by the predicate evaluator.
     pub(crate) fn contains(&self, t_ns: i64) -> bool {
         self.start_ns <= t_ns && t_ns < self.end_ns
     }
@@ -64,10 +64,10 @@ impl TimeWindow {
     /// time bounding is file-granular): the range expands to the
     /// half-open nanoseconds `[min_s·10⁹, (max_s+1)·10⁹)` (saturating)
     /// and half-open ranges intersect iff each starts before the other
-    /// ends. THE file-pruning comparison — attribute enumeration and
-    /// search call this one method, so their file granularity cannot
-    /// drift. Tails are out of its reach (no summary, never pruned):
-    /// attributes takes a tail wholesale; search filters its spans
+    /// ends. THE file-pruning comparison — suggestions and search call
+    /// this one method, so their file granularity cannot drift. Tails are
+    /// out of its reach (no summary, never pruned): suggest takes a tail
+    /// wholesale; search filters its spans
     /// per-span.
     pub(crate) fn overlaps_summary(&self, min_s: u32, max_s: u32) -> bool {
         const NS: i64 = 1_000_000_000;

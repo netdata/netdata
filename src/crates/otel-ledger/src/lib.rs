@@ -2,11 +2,12 @@
 //! `file-lifecycle` substrate. It owns the `Ledger` coordinator (run-loop,
 //! supervisor/writer IPC, shared workers), the Function-call dispatch and the
 //! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
-//! engines (`ledger::rpc`), and the shared seal component (`indexer`, spawned
-//! per signal with that signal's `ng-index` builder — `build_sfst_file` for
-//! logs, `build_sfst_traces_file` for traces). The reusable machinery
-//! (registry, catalog, upload/download, cache, recovery, the per-signal
-//! `Pipeline` shell) lives in `file-lifecycle`.
+//! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
+//! spawned per signal; its indexing operations run in child processes,
+//! `index_child`, with that signal's `ng-index` indexing function —
+//! `index_logs_file` for logs, `index_traces_file` for traces). The
+//! reusable machinery (registry, catalog, upload/download, cache, recovery,
+//! the per-signal `Pipeline` shell) lives in `file-lifecycle`.
 //!
 //! One ledger worker process per plugin run: the supervisor re-execs the
 //! plugin binary as a `worker ledger` subprocess and its main dispatches to
@@ -15,22 +16,26 @@
 //! alongside the `otel-ingestor` producer that writes the per-tenant WALs and
 //! forwards their events over the writer socket this crate accepts.
 //! `event`/`indexer` are reached only via `crate::` from `ledger/`, and
-//! `Ledger` has no external importer either (grep-verified): [`run_worker`]
-//! is the crate's whole external surface.
+//! `Ledger` has no external importer either (grep-verified): the crate's
+//! external surface is [`run_worker`] and [`index_child`], the body of
+//! `otel-plugin index`.
 
 pub mod event;
+pub mod index_child;
 pub mod indexer;
+mod indexing_charts;
 mod ledger;
+mod storage_charts;
 #[cfg(test)]
 pub(crate) mod test_helpers;
 
 pub use ledger::Ledger;
 
-use bridge::signals::Signal;
+use otel_bridge::signals::Signal;
 
 use anyhow::{Context, Result};
-use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::{Connection, Endpoint};
+use otel_bridge::{LedgerRequest, LedgerResponse};
 
 /// Ledger worker entry point.
 ///
@@ -44,7 +49,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     let mut supervisor: Connection<LedgerResponse, LedgerRequest> =
         Connection::connect(Endpoint::ipc(socket_path))
-            .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+            .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
             .open()
             .await?;
 
@@ -90,7 +95,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
     // fatal (`Supervisor::run` in `otel-plugin/src/supervisor.rs`) and tears
-    // the whole plugin down — graceful `Shutdown` + ≤2s exit wait
+    // the whole plugin down — graceful `Shutdown` + a bounded exit wait
     // (`shutdown_workers`), ChildGuard SIGKILL only as last resort — so an
     // error logged after the drop (e.g. in `main`) races that teardown and
     // may never be recorded.
@@ -99,8 +104,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         tracing::error!("ledger event loop error: {e:#}");
     }
     // Signal shutdown to the cancellation-driven tasks on BOTH exit
-    // paths — an error exit would otherwise leave them to the runtime
-    // teardown, never the graceful drain.
+    // paths. They get no time after it: the caller drops the runtime, and
+    // work that a component still has in flight (an upload) is cut. The
+    // next start recovers it.
     ledger.cancel.cancel();
     result.context("ledger event loop error")?;
 

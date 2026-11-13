@@ -360,7 +360,7 @@ fn stream_required_params_builds_all_default_selected_selector() {
     };
     let stats = vec![
         PartitionStat {
-            part_key: 0x2a,
+            partition_key: 0x2a,
             content_meta: enc("prod", "api"),
             total_size: 2048,
             file_count: 2,
@@ -368,7 +368,7 @@ fn stream_required_params_builds_all_default_selected_selector() {
             max_timestamp_s: Some(160),
         },
         PartitionStat {
-            part_key: 0,
+            partition_key: 0,
             content_meta: enc("", ""),
             total_size: 0,
             file_count: 1,
@@ -385,7 +385,7 @@ fn stream_required_params_builds_all_default_selected_selector() {
             assert_eq!(ms.options.len(), 2);
             // Options are sorted by (namespace, name): the absent-namespace
             // ("","") stream sorts before ("prod","api"). This guards the decode
-            // + sort the adapter performs over the substrate's part_key-ordered fold.
+            // + sort the adapter performs over the substrate's partition_key-ordered fold.
             assert_eq!(ms.options[0].name, "(unattributed)");
             assert_eq!(ms.options[1].name, "prod/api");
             // Every option pre-selected so the default view spans all streams.

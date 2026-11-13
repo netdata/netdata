@@ -6,87 +6,88 @@
 //! shell's `Ledger::new` call in `otel-ledger/src/lib.rs`; the constructor
 //! and the `accept_writer` call both live in `otel-ledger/src/ledger/mod.rs`).
 //!
-//! What crosses is notification, not data: a per-signal `frame_seq`, a tenant
-//! id, and a `wal::FileEvent` (a WAL file was Created/Synced/Closed). The
-//! ledger applies them to its live per-tenant registries — how a sealed file
-//! gets indexed/uploaded promptly — while the WAL files on disk stay the
-//! source of truth: the ledger's startup recovery rebuilds from them
+//! What crosses is notification, not data: a tenant id and a
+//! `wal::FileEvent` (a WAL file was Created/Synced/Closed). The ledger
+//! applies them to its live per-tenant registries — how a sealed file gets
+//! indexed/uploaded promptly — while the WAL files on disk stay the source of
+//! truth: the ledger's startup recovery rebuilds from them
 //! (`file-lifecycle/src/recovery`).
 //!
-//! Delivery is fire-and-forget and lossy by design, so the WAL write path
-//! never waits on the ledger. Connecting retries forever, but a connection
-//! lost once established is never re-established: the task exits and later
-//! events are silently dropped. Nothing recovers in-process — the ledger
-//! exits on the same failure (`Ledger::run` in
+//! The WAL write path never waits on the ledger: an event is queued, and one
+//! task sends the queue over the connection, a reliable ordered stream. While
+//! the connection lives, the ledger gets every event once, and the events of
+//! one file in the file's order (see [`LedgerSender::send_events`]); nothing
+//! orders the events of different files. Connecting retries forever, but a
+//! connection lost once established is never re-established: the task exits
+//! and later events are dropped. Nothing recovers in-process — the ledger
+//! ends its run when the connection ends (`Ledger::run` in
 //! `otel-ledger/src/ledger/mod.rs`) and the supervisor never restarts
 //! workers; the agent restarts the whole plugin (`Supervisor::run` in
-//! `otel-plugin/src/supervisor.rs`), which is what closes the loss window.
-use std::collections::HashMap;
-use std::sync::Mutex;
+//! `otel-plugin/src/supervisor.rs`), and the ledger's startup recovery picks
+//! up the files whose events it did not get.
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use ferryboat::{Connection, Endpoint};
 use file_registry::TenantId;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 /// Sends WAL events to the ledger over that one IPC connection. Shared via a
-/// single `Arc` by both ingestion services and the idle-rotation sweeps —
-/// the ledger accepts a single writer connection, so there is no alternative
+/// single `Arc` by the WAL writers of both signals (`TenantWriters`: their
+/// sync rounds and their idle-rotation sweeps) — the ledger accepts a single
+/// writer connection, so there is no alternative
 /// (`create_shared_writer_state` in `otel-ingestor/src/lib.rs`) — and
-/// sending needs only `&self` and never blocks: a seq bump under a
-/// short-lived `Mutex`, then an unbounded-channel push.
+/// sending needs only `&self` and never blocks: an unbounded-channel push.
 ///
-/// The ledger gap-checks `frame_seq` per signal (`handle_ingestor_msg` in
-/// `otel-ledger/src/ledger/ingestor.rs`), and the one connection carries
-/// both signals, so the counters are keyed by `pipeline_id`: each signal
-/// gets its own monotonic stream, and inter-signal interleaving can neither
-/// trigger nor mask the gap-check.
+/// The queue has no bound: while the ledger is slow, the events wait in this
+/// process's memory. `queued` counts them, for the chart
+/// `netdata.otel.wal_events_queued`.
 pub struct LedgerSender {
     tx: mpsc::UnboundedSender<wal::Message>,
-    frame_seq: Mutex<HashMap<u16, u64>>,
+    queued: Arc<AtomicU64>,
 }
 
 impl LedgerSender {
     /// Creates the sender and spawns its background task, returning before any
     /// connection exists; the task retries the socket indefinitely (1 s
     /// apart), so the ledger does not have to be up yet. Events queued before
-    /// it connects simply wait in the channel.
-    pub fn new(socket_path: &str) -> Self {
+    /// it connects simply wait in the channel. `queued` is the counter of
+    /// the events that wait, kept here and charted by its owner. `stop` is
+    /// the ingestor's stop: once it is cancelled, a link that ends is what
+    /// is expected.
+    pub fn new(socket_path: &str, queued: Arc<AtomicU64>, stop: CancellationToken) -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        tokio::spawn(sender_task(rx, socket_path.to_string()));
-        Self {
-            tx,
-            frame_seq: Mutex::new(HashMap::new()),
-        }
+        tokio::spawn(sender_task(
+            rx,
+            socket_path.to_string(),
+            Arc::clone(&queued),
+            stop,
+        ));
+        Self { tx, queued }
     }
 
     /// Queues every event of a `wal::FileEvent` vec for delivery to the
-    /// ledger, tagged with `tenant_id`. Callers drain their writers with
-    /// `wal::Writer::take_all_events` (`wal/src/writer.rs`) and forward
-    /// while still holding the writer lock, so one file's
-    /// Created→Synced→Closed events are enqueued in lifecycle order. Each
-    /// event's `frame_seq` comes from its own signal's counter
-    /// (`event.pipeline_id()`).
+    /// ledger, tagged with `tenant_id`. The one caller (`tenant_writers.rs`)
+    /// drains a writer with `wal::Writer::take_all_events`
+    /// (`wal/src/writer.rs`) and forwards while still holding the writer
+    /// lock, so one file's Created→Synced→Closed events are enqueued in
+    /// lifecycle order. Two tenants' writers queue at the same time, each
+    /// under its own lock, so the events of different files interleave in
+    /// any order.
     pub fn send_events(&self, tenant_id: TenantId, events: Vec<wal::FileEvent>) {
         for event in events {
             let msg = wal::Message {
-                frame_seq: self.next_frame_seq(event.pipeline_id()),
                 tenant_id: tenant_id.clone(),
                 event,
             };
-            let _ = self.tx.send(msg);
+            // Counted before the push: the sending task, on another thread,
+            // can take the message at once and count it down.
+            self.queued.fetch_add(1, Ordering::Relaxed);
+            if self.tx.send(msg).is_err() {
+                self.queued.fetch_sub(1, Ordering::Relaxed);
+            }
         }
-    }
-
-    /// Next sequence number of a signal's stream. Streams start at 1 — the
-    /// value the ledger seeds its next-expected with (`expected_frame_seq`
-    /// in `Ledger::new`, `otel-ledger/src/ledger/mod.rs`) — so the first
-    /// event checks clean against the gap-check.
-    fn next_frame_seq(&self, pipeline_id: u16) -> u64 {
-        let mut counters = self.frame_seq.lock().unwrap();
-        let counter = counters.entry(pipeline_id).or_insert(1);
-        let seq = *counter;
-        *counter += 1;
-        seq
     }
 }
 
@@ -96,7 +97,12 @@ impl LedgerSender {
 /// supervisor connection, not here. A failed send ends the task for good —
 /// there is no reconnect — and the dropped receiver turns every later
 /// `tx.send` into a silently ignored error.
-async fn sender_task(mut rx: mpsc::UnboundedReceiver<wal::Message>, socket_path: String) {
+async fn sender_task(
+    mut rx: mpsc::UnboundedReceiver<wal::Message>,
+    socket_path: String,
+    queued: Arc<AtomicU64>,
+    stop: CancellationToken,
+) {
     let endpoint = Endpoint::ipc(&socket_path);
 
     let mut conn = match Connection::<wal::Message, ()>::connect(endpoint)
@@ -119,9 +125,23 @@ async fn sender_task(mut rx: mpsc::UnboundedReceiver<wal::Message>, socket_path:
     };
 
     while let Some(msg) = rx.recv().await {
-        if conn.send(msg).await.is_err() {
-            tracing::error!("ledger IPC connection lost");
+        queued.fetch_sub(1, Ordering::Relaxed);
+        if let Err(e) = conn.send(msg).await {
+            // At a stop the ledger leaves at once, while this worker still
+            // answers the exports in progress: the link ends first, and that
+            // is no fault. When the ledger died, the supervisor says so and
+            // stops the plugin. Either way the next start recovers the files
+            // whose events were not sent.
+            if stop.is_cancelled() {
+                tracing::info!("the event link to the ledger ended with the stop: {e}");
+            } else {
+                tracing::warn!(
+                    "the event link to the ledger ended, no more file events are sent: {e}"
+                );
+            }
             break;
         }
     }
+    // Nothing is sent any more, and what is left in the queue goes with it.
+    queued.store(0, Ordering::Relaxed);
 }

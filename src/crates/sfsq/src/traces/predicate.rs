@@ -24,30 +24,43 @@
 
 use sfst::{PlanTerm, TracePlan, TraceSpan};
 
-use super::vocab::{AttributeOwner, BuiltinField};
+use super::vocab::{AttributeKey, AttributeOwner, BuiltinField};
 use super::window::TimeWindow;
 
 /// What a condition tests. Attribute keys carry an [`AttributeOwner`]
 /// ([`AttributeOwner::Builtin`] is not an attribute owner — request
-/// error); [`AttributeOwner::Any`] is the owner-agnostic attribute
-/// (the resource ∪ span disjunction); builtins are the full fixed
-/// [`BuiltinField`] set, colon forms included (`span:id` =
-/// [`BuiltinField::SpanId`], …).
+/// error); builtins are the full fixed [`BuiltinField`] set. A
+/// vocabulary key names its target through [`PredicateTarget::from_key`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PredicateTarget {
     Attribute(AttributeOwner, String),
     Builtin(BuiltinField),
+    /// Free text: a case-insensitive substring of any VALUE of the span
+    /// name, the status message, event names, or any attribute
+    /// (resource, span, scope, event, link) — never of a field name.
+    /// Takes [`CompareOp::Contains`] and one text value of at least
+    /// [`TEXT_MIN_CHARS`] characters and at most [`TEXT_MAX_BYTES`].
+    FreeText,
+}
+
+impl PredicateTarget {
+    /// The target a parsed vocabulary key names
+    /// ([`super::vocab::parse_key`]).
+    pub fn from_key(owner: AttributeOwner, key: AttributeKey) -> Self {
+        match key {
+            AttributeKey::Builtin(b) => PredicateTarget::Builtin(b),
+            AttributeKey::Attribute(a) => PredicateTarget::Attribute(owner, a),
+        }
+    }
 }
 
 impl std::fmt::Display for PredicateTarget {
-    /// Diagnostic rendering (error messages only — no wire grammar).
+    /// Diagnostic rendering (error messages only).
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PredicateTarget::Attribute(AttributeOwner::Any, key) => {
-                write!(f, "any-owner attribute {key:?}")
-            }
             PredicateTarget::Attribute(owner, key) => write!(f, "{owner:?} attribute {key:?}"),
             PredicateTarget::Builtin(i) => write!(f, "builtin field {i:?}"),
+            PredicateTarget::FreeText => write!(f, "free text"),
         }
     }
 }
@@ -66,6 +79,9 @@ pub enum CompareOp {
     Regex,
     /// Negated full-value-anchored regex (`!~`).
     NotRegex,
+    /// Case-insensitive substring, free text only (the rule of
+    /// suggest's contains class, [`sfst::ContainsMatcher`]).
+    Contains,
 }
 
 impl CompareOp {
@@ -79,6 +95,13 @@ impl CompareOp {
     fn is_regex(self) -> bool {
         matches!(self, CompareOp::Regex | CompareOp::NotRegex)
     }
+}
+
+/// The [`CompareOp::Regex`] pattern of "starts with `text`": the escaped
+/// text, then anything, line breaks included (regex conditions match the
+/// whole value).
+pub fn starts_with_pattern(text: &str) -> String {
+    format!("{}(?s:.*)", regex::escape(text))
 }
 
 /// One comparison value. Duration comparisons take
@@ -125,6 +148,135 @@ impl Predicate {
     }
 }
 
+/// One search-bar token: conditions one span must satisfy together (a
+/// span-local group — free text included), exactly one trace-level
+/// condition, or exactly one `trace_id` condition. A query's tokens AND
+/// at trace level: different tokens may match different spans.
+///
+/// `negated` is NOT EXISTS over the group: no span of the trace
+/// satisfies it (for a trace-level or `trace_id` token, the trace does
+/// not). It differs from an in-group `!=`, which keeps the condition's
+/// presence ∩ complement meaning on one span.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Token {
+    pub group: Predicate,
+    pub negated: bool,
+}
+
+/// What a validated [`Token`] constrains.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TokenKind {
+    SpanLocal,
+    TraceLevel,
+    TraceId,
+}
+
+impl Token {
+    /// The token's kind. Meaningful after [`TokenQuery::validate`]: a
+    /// trace-level or `trace_id` condition is then its token's only one.
+    pub(crate) fn kind(&self) -> TokenKind {
+        use BuiltinField::*;
+        match self.group.conditions.first().map(|c| &c.target) {
+            Some(PredicateTarget::Builtin(
+                RootName | RootServiceName | TraceDuration | TraceStart,
+            )) => TokenKind::TraceLevel,
+            Some(PredicateTarget::Builtin(TraceId)) => TokenKind::TraceId,
+            _ => TokenKind::SpanLocal,
+        }
+    }
+
+    /// A token matched by any trace one of whose spans satisfies `group`.
+    pub fn positive(group: Predicate) -> Self {
+        Self {
+            group,
+            negated: false,
+        }
+    }
+
+    /// A token matched by any trace none of whose spans satisfies
+    /// `group`.
+    pub fn negated(group: Predicate) -> Self {
+        Self {
+            group,
+            negated: true,
+        }
+    }
+}
+
+/// A search-bar query: the conjunction of its tokens (none = match
+/// everything). Holds at most [`TOKENS_MAX`] tokens.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct TokenQuery {
+    pub tokens: Vec<Token>,
+}
+
+impl TokenQuery {
+    /// Request validation, runnable before any source opens (a wire can
+    /// reject a bad request before admission): the token count, every
+    /// token non-empty with a trace-level or `trace_id` condition alone
+    /// in its token, and every condition structurally valid and
+    /// evaluable.
+    pub fn validate(&self) -> Result<(), PredicateError> {
+        if self.tokens.len() > TOKENS_MAX {
+            return Err(PredicateError::TooManyTokens {
+                max: TOKENS_MAX,
+                got: self.tokens.len(),
+            });
+        }
+        for token in &self.tokens {
+            let conditions = &token.group.conditions;
+            if conditions.is_empty() {
+                return Err(PredicateError::EmptyToken);
+            }
+            token.group.validate()?;
+            token.group.ensure_evaluable()?;
+            if conditions.len() > 1
+                && let Some(target) = token.group.trace_level_target()
+            {
+                return Err(PredicateError::TokenNotAlone {
+                    target: target.to_string(),
+                });
+            }
+        }
+        Ok(())
+    }
+}
+
+impl From<Predicate> for TokenQuery {
+    /// A flat predicate as tokens with its meaning kept: its span-local
+    /// conditions as ONE positive group (same span), and each
+    /// trace-level and `trace_id` condition as its own positive token,
+    /// in-group polarity unchanged.
+    fn from(predicate: Predicate) -> Self {
+        let (rest, alone): (Vec<Condition>, Vec<Condition>) =
+            predicate.conditions.into_iter().partition(|c| {
+                let single = Predicate {
+                    conditions: vec![c.clone()],
+                };
+                single.trace_level_target().is_none()
+            });
+        let mut tokens = Vec::with_capacity(alone.len() + 1);
+        if !rest.is_empty() {
+            tokens.push(Token::positive(Predicate { conditions: rest }));
+        }
+        for condition in alone {
+            tokens.push(Token::positive(Predicate {
+                conditions: vec![condition],
+            }));
+        }
+        Self { tokens }
+    }
+}
+
+/// The most tokens one [`TokenQuery`] carries (the engine keeps one
+/// match bit per token in a `u32`).
+pub const TOKENS_MAX: usize = 32;
+/// The shortest free-text term, in characters (Unicode scalar values):
+/// shorter terms match too much to be useful.
+pub const TEXT_MIN_CHARS: usize = 3;
+/// The longest free-text term, in bytes.
+pub const TEXT_MAX_BYTES: usize = 1024;
+
 /// A predicate request error — the caller built an invalid predicate (or
 /// one this build cannot evaluate yet); nothing was queried.
 #[derive(Debug, thiserror::Error)]
@@ -132,7 +284,7 @@ pub enum PredicateError {
     #[error("a condition on {target} carries no values")]
     NoValues { target: String },
     #[error("{op:?} takes exactly one value, got {got}")]
-    OrderingArity { op: CompareOp, got: usize },
+    SingleValueArity { op: CompareOp, got: usize },
     #[error("attribute {key:?} cannot live under the Builtin owner")]
     AttributeUnderBuiltinOwner { key: String },
     #[error("{op:?} is not a valid comparison on {target}")]
@@ -141,7 +293,7 @@ pub enum PredicateError {
     TextValueRequired { op: CompareOp, target: String },
     #[error("{op:?} on {target} requires numeric values")]
     NumericValueRequired { op: CompareOp, target: String },
-    #[error("duration comparisons take integer nanoseconds")]
+    #[error("duration and time comparisons take integer nanoseconds")]
     NonIntegerDuration,
     #[error("invalid regex pattern {pattern:?}: {msg}")]
     InvalidPattern { pattern: String, msg: String },
@@ -161,13 +313,23 @@ pub enum PredicateError {
     /// wrong result.
     #[error("not yet evaluable: {construct}")]
     NotYetEvaluable { construct: String },
+    #[error("free text needs at least {min} characters, got {got}")]
+    TextTooShort { min: usize, got: usize },
+    #[error("free text is {got} bytes, over the limit of {max}")]
+    TextTooLong { max: usize, got: usize },
+    #[error("{got} tokens exceed the limit of {max}")]
+    TooManyTokens { max: usize, got: usize },
+    #[error("a token carries no conditions")]
+    EmptyToken,
+    #[error("{target} must be the only condition of its token")]
+    TokenNotAlone { target: String },
 }
 
 /// The builtin's comparison class — which operators and value types
 /// are structurally valid on it (full grammar, both stages).
 enum BuiltinClass {
     /// String-valued (free-form names/messages AND the closed kind/
-    /// status label sets — regex over labels is valid grammar, pin 26A):
+    /// role/status label sets — regex over labels is valid grammar, pin 26A):
     /// `= != =~ !~` with text values.
     Text,
     /// Nanosecond quantity: `= != > < >= <=` with integer values.
@@ -181,6 +343,7 @@ fn builtin_class(i: BuiltinField) -> BuiltinClass {
     match i {
         Name
         | Kind
+        | Role
         | Status
         | StatusMessage
         | InstrumentationName
@@ -188,7 +351,7 @@ fn builtin_class(i: BuiltinField) -> BuiltinClass {
         | EventName
         | RootName
         | RootServiceName => BuiltinClass::Text,
-        Duration | TraceDuration | EventTimeSinceStart => BuiltinClass::Nanos,
+        Duration | TraceDuration | TraceStart | EventTimeSinceStart => BuiltinClass::Nanos,
         SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => BuiltinClass::Id,
     }
 }
@@ -202,8 +365,8 @@ impl Condition {
         if self.values.is_empty() {
             return Err(PredicateError::NoValues { target });
         }
-        if self.op.is_ordering() && self.values.len() != 1 {
-            return Err(PredicateError::OrderingArity {
+        if (self.op.is_ordering() || self.op == CompareOp::Contains) && self.values.len() != 1 {
+            return Err(PredicateError::SingleValueArity {
                 op: self.op,
                 got: self.values.len(),
             });
@@ -235,7 +398,43 @@ impl Condition {
             return Err(PredicateError::NanValue { target });
         }
 
+        // Contains is the free-text operator, and free text takes nothing
+        // else.
+        if (self.op == CompareOp::Contains) != (self.target == PredicateTarget::FreeText) {
+            return Err(PredicateError::InvalidOpForTarget {
+                op: self.op,
+                target,
+            });
+        }
         match &self.target {
+            PredicateTarget::FreeText => {
+                let [PredicateValue::Text(term)] = self.values.as_slice() else {
+                    return Err(PredicateError::TextValueRequired {
+                        op: self.op,
+                        target,
+                    });
+                };
+                let chars = term.chars().count();
+                if chars < TEXT_MIN_CHARS {
+                    return Err(PredicateError::TextTooShort {
+                        min: TEXT_MIN_CHARS,
+                        got: chars,
+                    });
+                }
+                if term.len() > TEXT_MAX_BYTES {
+                    return Err(PredicateError::TextTooLong {
+                        max: TEXT_MAX_BYTES,
+                        got: term.len(),
+                    });
+                }
+                // Built once here so the evaluators' builds cannot fail.
+                if sfst::ContainsMatcher::new(term).is_none() {
+                    return Err(PredicateError::InvalidPattern {
+                        pattern: term.clone(),
+                        msg: "the free-text matcher does not compile".to_string(),
+                    });
+                }
+            }
             PredicateTarget::Attribute(AttributeOwner::Builtin, key) => {
                 return Err(PredicateError::AttributeUnderBuiltinOwner { key: key.clone() });
             }
@@ -335,12 +534,12 @@ impl Condition {
     /// Whether this build evaluates this condition — see the module
     /// docs. `None` = evaluable; `Some(construct)` names the
     /// not-yet-evaluable construct. Evaluable: everything span-local —
-    /// attributes (any owner incl. `Any`, every op), the dictionary
+    /// attributes (every owner, every op), the dictionary
     /// builtins, duration bounds/equality, and the span/parent/trace
     /// ids (both polarities) — plus the POSITIVE event/link subgroup
     /// forms and the trace-level builtins. The gaps are the NEGATED
-    /// subgroup forms — link ids, `event:name`, event/link attributes,
-    /// `event:timeSinceStart` — which sit on the recorded open
+    /// subgroup forms — link ids, `events.name`, event/link attributes,
+    /// `events.time_since_start` — which sit on the recorded open
     /// subgroup-semantics question. Assumes structural validity
     /// ([`Condition::validate`] runs first).
     fn unevaluable_construct(&self) -> Option<String> {
@@ -353,24 +552,24 @@ impl Condition {
             {
                 None
             }
-            // Attribute owners (incl. the any-owner disjunction): every
-            // op — tokens for text, the dictionary-numeric path for
-            // numbers, presence ∩ complement for negation.
+            // Attribute owners: every op — tokens for text, the
+            // dictionary-numeric path for numbers, presence ∩ complement
+            // for negation.
             (
                 PredicateTarget::Attribute(
                     AttributeOwner::Resource
                     | AttributeOwner::Span
-                    | AttributeOwner::Instrumentation
-                    | AttributeOwner::Any,
+                    | AttributeOwner::Instrumentation,
                     _,
                 ),
                 _,
             ) => None,
-            // Dictionary-backed builtins except event:name (refine).
+            // Dictionary-backed builtins except events.name (refine).
             (
                 PredicateTarget::Builtin(
                     Name
                     | Kind
+                    | Role
                     | Status
                     | StatusMessage
                     | InstrumentationName
@@ -378,8 +577,8 @@ impl Condition {
                 ),
                 CompareOp::Eq | CompareOp::Regex | CompareOp::NotEq | CompareOp::NotRegex,
             ) => None,
-            // The colon-set ids: span/parent by column scan (both
-            // polarities — single-valued, no subgroup fork); trace:id
+            // The id keys: span/parent by column scan (both
+            // polarities — single-valued, no subgroup fork); trace_id
             // pins/filters the candidate set; link ids POSITIVE only
             // (the negated subgroup semantics are an open design
             // question for the refine step).
@@ -391,7 +590,7 @@ impl Condition {
             (PredicateTarget::Builtin(LinkSpanId | LinkTraceId), CompareOp::NotEq) => Some(
                 format!("negated {} (subgroup semantics, refine step)", self.target),
             ),
-            // event:name POSITIVE forms evaluate through the event
+            // events.name POSITIVE forms evaluate through the event
             // subgroup (any number of conditions — a single event must
             // satisfy them all); negated forms wait for the
             // subgroup-semantics decision.
@@ -418,7 +617,7 @@ impl Condition {
                     self.target
                 ))
             }
-            // event:timeSinceStart computes in the refine; != would be a
+            // events.time_since_start computes in the refine; != would be a
             // negated per-event condition — deferred with the fork for a
             // uniform rule.
             (PredicateTarget::Builtin(EventTimeSinceStart), op)
@@ -437,11 +636,13 @@ impl Condition {
                 PredicateTarget::Builtin(RootName | RootServiceName),
                 CompareOp::Eq | CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex,
             ) => None,
-            (PredicateTarget::Builtin(TraceDuration), op)
+            (PredicateTarget::Builtin(TraceDuration | TraceStart), op)
                 if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
             {
                 None
             }
+            // Free text resolves per file over the text scope.
+            (PredicateTarget::FreeText, CompareOp::Contains) => None,
             (target, op) => Some(format!("{op:?} on {target}")),
         }
     }
@@ -469,53 +670,33 @@ impl Predicate {
         Ok(())
     }
 
-    /// The first condition stored rows cannot answer — a trace-level
-    /// builtin (`root_name`, `root_service_name`, `trace_duration`) or a
+    /// The first condition that is not span-local — a trace-level
+    /// builtin (`root_name`, `root_service_name`, `trace_duration`,
+    /// `trace_start`) or a
     /// `trace_id` constraint — or `None` when every condition is
-    /// span-local. The overview's filter and its callers decide policy
-    /// on this (refuse, or fall back to the unfiltered grid); the list
-    /// of fields is owned HERE so a wire cannot drift from the engine.
+    /// span-local. Such a condition must be its token's only one; the
+    /// list of fields is owned HERE so a wire cannot drift from the
+    /// engine.
     pub fn trace_level_target(&self) -> Option<&PredicateTarget> {
         use BuiltinField::*;
         self.conditions.iter().map(|c| &c.target).find(|t| {
             matches!(
                 t,
-                PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration | TraceId)
+                PredicateTarget::Builtin(
+                    RootName | RootServiceName | TraceDuration | TraceStart | TraceId
+                )
             )
         })
     }
 
-    /// Split into `(span_local, trace_level)` (pin R3-2): trace-level
-    /// builtins (`RootName`, `RootServiceName`, `TraceDuration`)
-    /// evaluate post-assembly as tri-state (decision 15); EVERYTHING the
-    /// span-side evaluator and the file plans see — and everything
-    /// `matched_count`/`spans_per_trace` are defined over — is the span-local part.
-    pub(crate) fn partition(&self) -> (Predicate, Predicate) {
-        use BuiltinField::*;
-        let (trace_level, span_local): (Vec<Condition>, Vec<Condition>) =
-            self.conditions.iter().cloned().partition(|c| {
-                matches!(
-                    c.target,
-                    PredicateTarget::Builtin(RootName | RootServiceName | TraceDuration)
-                )
-            });
-        (
-            Predicate {
-                conditions: span_local,
-            },
-            Predicate {
-                conditions: trace_level,
-            },
-        )
-    }
-
-    /// Strip `trace:id` conditions out of the predicate — they are
+    /// Strip `trace_id` conditions out of the predicate — they are
     /// neither span-local (a `TraceSpan` carries no trace id) nor
     /// trace-level builtins; they constrain the ENGINE's candidate
     /// set: `=` values intersect into a PIN set (phase-1 discovery is
     /// skipped — pins go straight to assembly), `!=` values union into
-    /// an exclusion filter at pool admission. Run BEFORE the R3-2
-    /// partition. Hex parsing is infallible post-validation.
+    /// an exclusion filter at pool admission ([`LoweredTokens`] folds
+    /// each `trace_id` token's constraints across the query). Hex
+    /// parsing is infallible post-validation.
     pub(crate) fn split_trace_id_conditions(&self) -> (Predicate, TraceIdConstraints) {
         let mut rest = Vec::with_capacity(self.conditions.len());
         let mut pins: Option<std::collections::BTreeSet<sfst::TraceId>> = None;
@@ -544,7 +725,7 @@ impl Predicate {
                     });
                 }
                 CompareOp::NotEq => excluded.extend(ids),
-                _ => unreachable!("validated: trace:id takes = / !="),
+                _ => unreachable!("validated: trace_id takes = / !="),
             }
         }
         (
@@ -690,30 +871,25 @@ impl Predicate {
                     });
                 }
                 (PredicateTarget::Builtin(BuiltinField::TraceId), _) => {
-                    unreachable!("trace:id conditions are split out before lowering")
+                    unreachable!("trace_id conditions are split out before lowering")
+                }
+                (PredicateTarget::FreeText, _) => {
+                    let PredicateValue::Text(term) = &condition.values[0] else {
+                        unreachable!("validated: free text takes one text value");
+                    };
+                    let scope = super::vocab::text_scope();
+                    terms.push(PlanTerm::FieldsIn {
+                        exact: scope.exact,
+                        prefixes: scope.prefixes,
+                        matcher: sfst::PlanMatcher::Contains(term.clone()),
+                    });
                 }
                 (target, op) => {
                     let fields: Vec<String> = match target {
-                        // The any-owner attribute is the pinned
-                        // resource ∪ span disjunction.
-                        PredicateTarget::Attribute(AttributeOwner::Any, key) => vec![
-                            format!(
-                                "{}{key}",
-                                AttributeOwner::Resource
-                                    .attribute_prefix()
-                                    .expect("attribute owner")
-                            ),
-                            format!(
-                                "{}{key}",
-                                AttributeOwner::Span
-                                    .attribute_prefix()
-                                    .expect("attribute owner")
-                            ),
-                        ],
                         PredicateTarget::Attribute(owner, key) => {
-                            let prefix = owner.attribute_prefix().expect(
-                                "validated: a concrete attribute owner (not Builtin or Any)",
-                            );
+                            let prefix = owner
+                                .attribute_prefix()
+                                .expect("validated: an attribute owner (not Builtin)");
                             vec![format!("{prefix}{key}")]
                         }
                         PredicateTarget::Builtin(i) => vec![
@@ -721,6 +897,7 @@ impl Predicate {
                                 .expect("evaluable builtins are dictionary-backed")
                                 .to_string(),
                         ],
+                        PredicateTarget::FreeText => unreachable!("lowered above"),
                     };
                     let negated = matches!(op, CompareOp::NotEq | CompareOp::NotRegex);
                     terms.push(PlanTerm::Fields {
@@ -756,11 +933,12 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
         .iter()
         .any(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
     if numeric {
-        let values: Vec<f64> = values
+        // Integers stay integers: the comparator compares them exactly.
+        let values: Vec<sfst::NumberValue> = values
             .iter()
             .map(|v| match v {
-                PredicateValue::Integer(n) => *n as f64,
-                PredicateValue::Float(f) => *f,
+                PredicateValue::Integer(n) => sfst::NumberValue::Int(*n),
+                PredicateValue::Float(f) => sfst::NumberValue::Float(*f),
                 PredicateValue::Text(_) => unreachable!("validated: values are homogeneous"),
             })
             .collect();
@@ -773,6 +951,7 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
             CompareOp::Regex | CompareOp::NotRegex => {
                 unreachable!("validated: regex takes text patterns")
             }
+            CompareOp::Contains => unreachable!("validated: contains is free text only"),
         };
         sfst::PlanMatcher::Number { cmp, values }
     } else {
@@ -792,14 +971,45 @@ fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatc
     }
 }
 
-/// The engine-level candidate constraints of `trace:id` conditions
+/// The engine-level candidate constraints of `trace_id` conditions
 /// (see [`Predicate::split_trace_id_conditions`]).
+#[derive(Default)]
 pub(crate) struct TraceIdConstraints {
     /// `Some` = the candidate set is EXACTLY these ids (already the
-    /// intersection of every `trace:id =` condition; may be empty).
+    /// intersection of every `trace_id =` condition; may be empty).
     pub(crate) pins: Option<std::collections::BTreeSet<sfst::TraceId>>,
-    /// Ids excluded by `trace:id !=` conditions.
+    /// Ids excluded by `trace_id !=` conditions.
     pub(crate) excluded: std::collections::BTreeSet<sfst::TraceId>,
+}
+
+impl TraceIdConstraints {
+    /// Fold one validated `trace_id` token in: pins intersect,
+    /// exclusions union. The id is single-valued per trace, so a negated
+    /// token swaps the two: NOT (id ∈ S) is id ∉ S and NOT (id ∉ S) is
+    /// id ∈ S.
+    pub(crate) fn add_token(&mut self, token: &Token) {
+        let (_, mut c) = token.group.split_trace_id_conditions();
+        if token.negated {
+            let pins = (!c.excluded.is_empty()).then(|| std::mem::take(&mut c.excluded));
+            c.excluded = c.pins.take().unwrap_or_default();
+            c.pins = pins;
+        }
+        if let Some(pins) = c.pins {
+            self.pins = Some(match self.pins.take() {
+                None => pins,
+                Some(prev) => prev.intersection(&pins).copied().collect(),
+            });
+        }
+        self.excluded.extend(c.excluded);
+    }
+
+    /// Whether a trace id passes the constraints.
+    pub(crate) fn admits(&self, trace_id: sfst::TraceId) -> bool {
+        self.pins
+            .as_ref()
+            .is_none_or(|pins| pins.contains(&trace_id))
+            && !self.excluded.contains(&trace_id)
+    }
 }
 
 /// Parse a validated fixed-width hex id (validation guarantees length
@@ -845,7 +1055,7 @@ fn duration_bounds(op: CompareOp, v: i64) -> (Option<i64>, Option<i64>) {
             None => EMPTY,
         },
         CompareOp::Lte => (None, Some(v)),
-        CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex => {
+        CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex | CompareOp::Contains => {
             unreachable!("not a duration bound op (validated)")
         }
     }
@@ -862,8 +1072,10 @@ pub(crate) enum EvalMatcher {
     },
     Number {
         cmp: sfst::NumberCmp,
-        values: Vec<f64>,
+        values: Vec<sfst::NumberValue>,
     },
+    /// `None`: the empty term, which matches nothing (the plan's rule).
+    Contains(Option<sfst::ContainsMatcher>),
 }
 
 impl EvalMatcher {
@@ -880,6 +1092,9 @@ impl EvalMatcher {
             EvalMatcher::Number { cmp, values } => values
                 .iter()
                 .any(|&rhs| sfst::numeric_token_matches(value, *cmp, rhs)),
+            EvalMatcher::Contains(matcher) => matcher
+                .as_ref()
+                .is_some_and(|m| m.is_match(value.as_bytes())),
         }
     }
 }
@@ -901,6 +1116,11 @@ enum EvalTerm {
         column: sfst::IdColumnKind,
         ids: Vec<sfst::SpanId>,
         negated: bool,
+    },
+    FieldsIn {
+        exact: Vec<String>,
+        prefixes: Vec<String>,
+        matcher: EvalMatcher,
     },
     EventGroup {
         conditions: Vec<EvalGroupCondition>,
@@ -927,7 +1147,8 @@ enum EvalGroupCondition {
 /// The span-side predicate evaluator — the single source of truth for
 /// what a span-local predicate MEANS (pin R2-9): the tail's phase 1
 /// evaluates it per decoded span, phase 2 re-evaluates it per retained
-/// canonical span, and `matched_count`/`spans_per_trace` are defined by it.
+/// canonical span, and a trace's rank (its newest matching span) is
+/// defined by it.
 pub(crate) struct EvalPredicate {
     terms: Vec<EvalTerm>,
 }
@@ -968,6 +1189,15 @@ impl EvalPredicate {
                 PlanTerm::LinkGroup { conditions } => EvalTerm::LinkGroup {
                     conditions: conditions.iter().map(eval_group_condition).collect(),
                 },
+                PlanTerm::FieldsIn {
+                    exact,
+                    prefixes,
+                    matcher,
+                } => EvalTerm::FieldsIn {
+                    exact: exact.clone(),
+                    prefixes: prefixes.clone(),
+                    matcher: eval_matcher(matcher),
+                },
             })
             .collect();
         Self { terms }
@@ -987,8 +1217,8 @@ impl EvalPredicate {
                 matcher,
                 negated,
             } => {
-                // Values gathered across the term's fields (several for
-                // the any-owner disjunction; multi-valued fields yield
+                // Values gathered across the term's fields (one storage
+                // field per attribute or builtin; multi-valued fields yield
                 // several entries; event/link names and attributes live
                 // in the subgroup terms, never here). Negation is the
                 // pinned presence ∩ complement: present with NO matching
@@ -1010,6 +1240,40 @@ impl EvalPredicate {
                     any_match
                 }
             }
+            EvalTerm::FieldsIn {
+                exact,
+                prefixes,
+                matcher,
+            } => {
+                // Storage names: row facets as stored; event names and
+                // event/link attributes under their storage spellings
+                // (spans carry them structured and prefix-stripped when
+                // the file has the structure, as row facets otherwise).
+                let in_scope = |head: &str, tail: &str| scope_has(exact, prefixes, head, tail);
+                let event_name = BuiltinField::EventName
+                    .dictionary_field()
+                    .expect("dictionary-backed");
+                let event_attr = AttributeOwner::Event
+                    .attribute_prefix()
+                    .expect("attribute owner");
+                let link_attr = AttributeOwner::Link
+                    .attribute_prefix()
+                    .expect("attribute owner");
+                span.fields
+                    .iter()
+                    .any(|(k, v)| in_scope(k, "") && matcher.value_matches(v))
+                    || span.events.iter().any(|e| {
+                        (in_scope(event_name, "") && matcher.value_matches(&e.name))
+                            || e.attributes
+                                .iter()
+                                .any(|(k, v)| in_scope(event_attr, k) && matcher.value_matches(v))
+                    })
+                    || span.links.iter().any(|l| {
+                        l.attributes
+                            .iter()
+                            .any(|(k, v)| in_scope(link_attr, k) && matcher.value_matches(v))
+                    })
+            }
             EvalTerm::Duration { intervals, negated } => {
                 let in_any = intervals.iter().any(|&(lo, hi)| {
                     lo.is_none_or(|lo| span.duration_ns >= lo)
@@ -1027,7 +1291,7 @@ impl EvalPredicate {
                     sfst::IdColumnKind::ParentSpanId => span.parent_span_id,
                 };
                 // The UNSET sentinel is ABSENT for both polarities: a
-                // root span never satisfies `span:parentID != x`.
+                // root span never satisfies `parent_span_id != x`.
                 if id.is_unset() {
                     return false;
                 }
@@ -1068,6 +1332,23 @@ impl EvalPredicate {
     }
 }
 
+/// Whether the storage name `head` + `tail` is in a free-text scope —
+/// equal to an `exact` name or under one of `prefixes` — without
+/// building the name.
+fn scope_has(exact: &[String], prefixes: &[String], head: &str, tail: &str) -> bool {
+    let len = head.len() + tail.len();
+    let equals =
+        |name: &str| name.len() == len && name.starts_with(head) && &name[head.len()..] == tail;
+    let under = |prefix: &str| {
+        if prefix.len() <= head.len() {
+            head.starts_with(prefix)
+        } else {
+            prefix.starts_with(head) && tail.starts_with(&prefix[head.len()..])
+        }
+    };
+    exact.iter().any(|e| equals(e)) || prefixes.iter().any(|p| under(p))
+}
+
 /// Compile one plan matcher for span-side use (patterns validated at
 /// the request boundary).
 fn eval_matcher(matcher: &sfst::PlanMatcher) -> EvalMatcher {
@@ -1085,6 +1366,9 @@ fn eval_matcher(matcher: &sfst::PlanMatcher) -> EvalMatcher {
             cmp: *cmp,
             values: values.clone(),
         },
+        sfst::PlanMatcher::Contains(term) => EvalMatcher::Contains((!term.is_empty()).then(|| {
+            sfst::ContainsMatcher::new(term).expect("text terms validated at the request boundary")
+        })),
     }
 }
 
@@ -1115,8 +1399,143 @@ fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
     }
 }
 
-/// The post-assembly evaluator of the TRACE-LEVEL partition half
-/// (decision 15 / pin R3-2): boolean over the assembled trace's root
+/// One span-local token lowered once: the per-file plan and its
+/// span-side twin (one lowering, module docs).
+pub(crate) struct SpanToken {
+    pub(crate) plan: TracePlan,
+    pub(crate) eval: EvalPredicate,
+}
+
+impl SpanToken {
+    pub(crate) fn new(group: &Predicate) -> Self {
+        let plan = group.to_trace_plan();
+        let eval = EvalPredicate::new(&plan);
+        Self { plan, eval }
+    }
+}
+
+/// A validated [`TokenQuery`] lowered for the engines: span-local tokens
+/// as [`SpanToken`]s by polarity, trace-level tokens as evaluators, and
+/// `trace_id` tokens folded into candidate constraints.
+pub(crate) struct LoweredTokens {
+    /// Positive span-local tokens, in token order.
+    pub(crate) positive: Vec<SpanToken>,
+    /// Negated span-local tokens' positive forms.
+    pub(crate) negated: Vec<SpanToken>,
+    /// The positive trace-level tokens' conditions, AND-combined.
+    pub(crate) trace_level: Option<TraceLevelEval>,
+    /// One evaluator per negated trace-level token.
+    trace_level_negated: Vec<TraceLevelEval>,
+    pub(crate) trace_ids: TraceIdConstraints,
+}
+
+impl LoweredTokens {
+    pub(crate) fn new(query: &TokenQuery) -> Self {
+        let mut positive = Vec::new();
+        let mut negated = Vec::new();
+        let mut trace_level = Vec::new();
+        let mut trace_level_negated = Vec::new();
+        let mut trace_ids = TraceIdConstraints::default();
+        for token in &query.tokens {
+            match token.kind() {
+                TokenKind::SpanLocal if token.negated => negated.push(SpanToken::new(&token.group)),
+                TokenKind::SpanLocal => positive.push(SpanToken::new(&token.group)),
+                TokenKind::TraceLevel if token.negated => {
+                    trace_level_negated.push(TraceLevelEval::new(&token.group));
+                }
+                TokenKind::TraceLevel => trace_level.extend(token.group.conditions.iter().cloned()),
+                TokenKind::TraceId => trace_ids.add_token(token),
+            }
+        }
+        Self {
+            positive,
+            negated,
+            trace_level: (!trace_level.is_empty()).then(|| {
+                TraceLevelEval::new(&Predicate {
+                    conditions: trace_level,
+                })
+            }),
+            trace_level_negated,
+            trace_ids,
+        }
+    }
+
+    /// Whether any trace-level token (either polarity) applies.
+    pub(crate) fn has_trace_level(&self) -> bool {
+        self.trace_level.is_some() || !self.trace_level_negated.is_empty()
+    }
+
+    /// Whether a verdict needs every span of the trace: a trace-level
+    /// token reads its root and envelope, a negated span-local token
+    /// holds only if NO span matches. An inexact assembly is then
+    /// indeterminate and excluded (decision 15). Positive span-local
+    /// tokens need no such care: a match found is a match.
+    pub(crate) fn needs_whole_trace(&self) -> bool {
+        self.has_trace_level() || !self.negated.is_empty()
+    }
+
+    /// Whether a trace-level token reads the root: an unknown root
+    /// (a withheld claim) is then indeterminate, either polarity.
+    pub(crate) fn reads_root(&self) -> bool {
+        self.trace_level
+            .as_ref()
+            .is_some_and(TraceLevelEval::reads_root)
+            || self
+                .trace_level_negated
+                .iter()
+                .any(TraceLevelEval::reads_root)
+    }
+
+    /// The trace-level verdict on an exact assembled trace's TRUE-root
+    /// values and envelope (duration and start): every positive trace-level token
+    /// holds and no negated one does (a rootless trace satisfies no
+    /// root condition, so it passes a negated one).
+    pub(crate) fn trace_level_matches(
+        &self,
+        root_name: Option<&str>,
+        root_service: Option<&str>,
+        trace_duration_ns: i64,
+        trace_start_ns: i64,
+    ) -> bool {
+        let matches = |tl: &TraceLevelEval| {
+            tl.matches(root_name, root_service, trace_duration_ns, trace_start_ns)
+        };
+        self.trace_level.as_ref().is_none_or(matches)
+            && !self.trace_level_negated.iter().any(matches)
+    }
+
+    /// The rank of an assembled trace (spans in ascending start order)
+    /// under the span-local tokens, over spans starting in `window`:
+    /// the OLDEST of each positive token's newest matching span start
+    /// (the trace is as recent as its least recent required match), or
+    /// the newest in-window span start without positive tokens. `None`
+    /// when a positive token matches no span, a negated token matches
+    /// one, or no span starts in the window.
+    pub(crate) fn span_rank(&self, spans: &[TraceSpan], window: Option<TimeWindow>) -> Option<i64> {
+        if self
+            .negated
+            .iter()
+            .any(|t| spans.iter().any(|s| t.eval.matches(s, window)))
+        {
+            return None;
+        }
+        if self.positive.is_empty() {
+            let newest = spans
+                .iter()
+                .rposition(|s| window.is_none_or(|w| w.contains(s.start_ns)))?;
+            return Some(spans[newest].start_ns);
+        }
+        let mut rank = i64::MAX;
+        for token in &self.positive {
+            let newest = spans.iter().rposition(|s| token.eval.matches(s, window))?;
+            rank = rank.min(spans[newest].start_ns);
+        }
+        Some(rank)
+    }
+}
+
+/// The post-assembly evaluator of trace-level conditions (decision 15
+/// / pin R3-2): boolean over the assembled trace's root
 /// name, root service, and envelope duration. The ENGINE owns the
 /// tri-state — an assembled trace with unreliable (capped or degraded)
 /// values is excluded as indeterminate before this evaluator runs. The
@@ -1139,6 +1558,22 @@ pub(crate) enum GateRootField {
     Name,
 }
 
+/// The intervals of a nanosecond trace-level condition, one per value; a
+/// negated condition's values are points (its negation applies to the
+/// whole condition).
+fn nanos_intervals(condition: &Condition, negated: bool) -> Vec<(Option<i64>, Option<i64>)> {
+    condition
+        .values
+        .iter()
+        .map(|v| {
+            let PredicateValue::Integer(n) = v else {
+                unreachable!("validated: nanos values are integers");
+            };
+            duration_bounds(if negated { CompareOp::Eq } else { condition.op }, *n)
+        })
+        .collect()
+}
+
 enum TraceLevelCondition {
     RootName {
         matcher: EvalMatcher,
@@ -1152,9 +1587,24 @@ enum TraceLevelCondition {
         intervals: Vec<(Option<i64>, Option<i64>)>,
         negated: bool,
     },
+    /// The trace's start (its earliest span's start), unix nanoseconds.
+    Start {
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+        negated: bool,
+    },
 }
 
 impl TraceLevelEval {
+    /// Whether a condition reads the root (name or service).
+    pub(crate) fn reads_root(&self) -> bool {
+        self.conditions.iter().any(|c| {
+            !matches!(
+                c,
+                TraceLevelCondition::Duration { .. } | TraceLevelCondition::Start { .. }
+            )
+        })
+    }
+
     /// Compile the trace-level predicate half (validated, evaluable).
     pub(crate) fn new(trace_level: &Predicate) -> Self {
         let conditions = trace_level
@@ -1182,20 +1632,16 @@ impl TraceLevelEval {
                         }
                     }
                     PredicateTarget::Builtin(BuiltinField::TraceDuration) => {
-                        let intervals = condition
-                            .values
-                            .iter()
-                            .map(|v| {
-                                let PredicateValue::Integer(n) = v else {
-                                    unreachable!("validated: nanos values are integers");
-                                };
-                                duration_bounds(
-                                    if negated { CompareOp::Eq } else { condition.op },
-                                    *n,
-                                )
-                            })
-                            .collect();
-                        TraceLevelCondition::Duration { intervals, negated }
+                        TraceLevelCondition::Duration {
+                            intervals: nanos_intervals(condition, negated),
+                            negated,
+                        }
+                    }
+                    PredicateTarget::Builtin(BuiltinField::TraceStart) => {
+                        TraceLevelCondition::Start {
+                            intervals: nanos_intervals(condition, negated),
+                            negated,
+                        }
                     }
                     other => unreachable!("not a trace-level target: {other}"),
                 }
@@ -1296,7 +1742,13 @@ impl TraceLevelEval {
         root_name: Option<&str>,
         root_service: Option<&str>,
         trace_duration_ns: i64,
+        trace_start_ns: i64,
     ) -> bool {
+        let within = |intervals: &[(Option<i64>, Option<i64>)], value: i64| {
+            intervals
+                .iter()
+                .any(|&(lo, hi)| lo.is_none_or(|lo| value >= lo) && hi.is_none_or(|hi| value <= hi))
+        };
         let text = |value: Option<&str>, matcher: &EvalMatcher, negated: bool| match value {
             None => false, // absent never satisfies, negated included
             Some(v) => matcher.value_matches(v) != negated,
@@ -1309,11 +1761,10 @@ impl TraceLevelEval {
                 text(root_service, matcher, *negated)
             }
             TraceLevelCondition::Duration { intervals, negated } => {
-                let in_any = intervals.iter().any(|&(lo, hi)| {
-                    lo.is_none_or(|lo| trace_duration_ns >= lo)
-                        && hi.is_none_or(|hi| trace_duration_ns <= hi)
-                });
-                in_any != *negated
+                within(intervals, trace_duration_ns) != *negated
+            }
+            TraceLevelCondition::Start { intervals, negated } => {
+                within(intervals, trace_start_ns) != *negated
             }
         })
     }
@@ -1379,11 +1830,6 @@ mod tests {
             vec![PredicateValue::Float(1.5)],
         ));
         ok(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::Regex,
-            vec![text("a|b")],
-        ));
-        ok(cond(
             PredicateTarget::Builtin(BuiltinField::TraceDuration),
             CompareOp::Gte,
             vec![PredicateValue::Integer(5)],
@@ -1404,7 +1850,7 @@ mod tests {
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(1), PredicateValue::Integer(2)],
             )),
-            PredicateError::OrderingArity { got: 2, .. }
+            PredicateError::SingleValueArity { got: 2, .. }
         ));
         assert!(matches!(
             err(cond(
@@ -1485,7 +1931,7 @@ mod tests {
             }
         };
 
-        // Attribute owners and the any-owner disjunction: every op.
+        // Attribute owners: every op.
         evaluable(cond(
             span_attr("x"),
             CompareOp::Eq,
@@ -1503,16 +1949,6 @@ mod tests {
             CompareOp::Eq,
             vec![text("v")],
         ));
-        evaluable(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::Eq,
-            vec![text("v")],
-        ));
-        evaluable(cond(
-            PredicateTarget::Attribute(AttributeOwner::Any, "x".into()),
-            CompareOp::NotRegex,
-            vec![text("v.*")],
-        ));
         // Dictionary numerics on attributes.
         evaluable(cond(
             span_attr("x"),
@@ -1524,10 +1960,11 @@ mod tests {
             CompareOp::Eq,
             vec![PredicateValue::Integer(5), PredicateValue::Float(1.5)],
         ));
-        // Dictionary-backed builtins except event:name: all four ops.
+        // Dictionary-backed builtins except events.name: all four ops.
         for i in [
             BuiltinField::Name,
             BuiltinField::Kind,
+            BuiltinField::Role,
             BuiltinField::Status,
             BuiltinField::StatusMessage,
             BuiltinField::InstrumentationName,
@@ -1600,8 +2037,8 @@ mod tests {
             ))
             .contains("subgroup")
         );
-        // The colon set: span/parent/trace ids both polarities; link
-        // ids and event:name positive-only (the negated subgroup
+        // The id keys: span/parent/trace ids both polarities; link
+        // ids and events.name positive-only (the negated subgroup
         // semantics are the recorded open question).
         for i in [BuiltinField::SpanId, BuiltinField::ParentSpanId] {
             for op in [CompareOp::Eq, CompareOp::NotEq] {
@@ -1655,7 +2092,7 @@ mod tests {
             ))
             .contains("subgroup")
         );
-        // TWO event:name conditions form a single-event subgroup —
+        // TWO events.name conditions form a single-event subgroup —
         // well-defined (one event named both = unsatisfiable) and
         // evaluable through the refine.
         let two = Predicate {
@@ -1710,54 +2147,6 @@ mod tests {
         ));
     }
 
-    /// Partition (R3-2): trace-level builtins split out; everything
-    /// else stays span-local, order preserved within each part.
-    #[test]
-    fn partition_splits_trace_level_conditions() {
-        let p = Predicate {
-            conditions: vec![
-                cond(span_attr("x"), CompareOp::Eq, vec![text("v")]),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::TraceDuration),
-                    CompareOp::Gt,
-                    vec![PredicateValue::Integer(5)],
-                ),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::Duration),
-                    CompareOp::Gt,
-                    vec![PredicateValue::Integer(5)],
-                ),
-                cond(
-                    PredicateTarget::Builtin(BuiltinField::RootName),
-                    CompareOp::Eq,
-                    vec![text("r")],
-                ),
-            ],
-        };
-        let (span_local, trace_level) = p.partition();
-        assert_eq!(span_local.conditions.len(), 2);
-        assert_eq!(trace_level.conditions.len(), 2);
-        assert!(span_local.conditions.iter().all(|c| !matches!(
-            c.target,
-            PredicateTarget::Builtin(
-                BuiltinField::RootName
-                    | BuiltinField::RootServiceName
-                    | BuiltinField::TraceDuration
-            )
-        )));
-        // All-trace-level → span-local is the empty form (C-4: phase-1
-        // candidates come from `All` over the window).
-        let only_trace = Predicate {
-            conditions: vec![cond(
-                PredicateTarget::Builtin(BuiltinField::TraceDuration),
-                CompareOp::Gt,
-                vec![PredicateValue::Integer(5)],
-            )],
-        };
-        let (span_local, _) = only_trace.partition();
-        assert!(span_local.is_all());
-    }
-
     /// The lowering constructs storage names only through the vocabulary
     /// and converts duration exclusivity to inclusive integer bounds.
     #[test]
@@ -1800,7 +2189,7 @@ mod tests {
                     vec!["svc".into()],
                     vec![],
                 ),
-                PlanTerm::tokens("status_code", vec!["ERROR".into()], vec![]),
+                PlanTerm::tokens("status.code", vec!["ERROR".into()], vec![]),
                 PlanTerm::tokens("attributes.http.method", vec![], vec!["GET|PUT".into()]),
                 // Both duration bounds intersect into ONE interval term.
                 PlanTerm::duration(Some(101), Some(500)),
@@ -1826,13 +2215,13 @@ mod tests {
             contradictory.to_trace_plan().terms,
             vec![PlanTerm::duration(Some(501), Some(99))]
         );
-        // Stage-B lowerings: negation, any-owner disjunction, numerics,
+        // Stage-B lowerings: negation, a resource attribute, numerics,
         // multi-value and negated duration equality.
         let stage_b = Predicate {
             conditions: vec![
                 cond(span_attr("x"), CompareOp::NotEq, vec![text("a"), text("b")]),
                 cond(
-                    PredicateTarget::Attribute(AttributeOwner::Any, "env".into()),
+                    PredicateTarget::Attribute(AttributeOwner::Resource, "env".into()),
                     CompareOp::Eq,
                     vec![text("prod")],
                 ),
@@ -1870,7 +2259,7 @@ mod tests {
                     negated: true,
                 },
                 PlanTerm::Fields {
-                    fields: vec!["resource.attributes.env".into(), "attributes.env".into(),],
+                    fields: vec!["resource.attributes.env".into()],
                     matcher: sfst::PlanMatcher::Tokens {
                         exact: vec!["prod".into()],
                         patterns: vec![],
@@ -1881,7 +2270,7 @@ mod tests {
                     fields: vec!["attributes.code".into()],
                     matcher: sfst::PlanMatcher::Number {
                         cmp: sfst::NumberCmp::Gte,
-                        values: vec![500.0],
+                        values: vec![sfst::NumberValue::Int(500)],
                     },
                     negated: false,
                 },
@@ -1889,7 +2278,7 @@ mod tests {
                     fields: vec!["attributes.ratio".into()],
                     matcher: sfst::PlanMatcher::Number {
                         cmp: sfst::NumberCmp::Eq,
-                        values: vec![0.5, 2.0],
+                        values: vec![sfst::NumberValue::Float(0.5), sfst::NumberValue::Int(2)],
                     },
                     negated: false,
                 },
@@ -1923,7 +2312,7 @@ mod tests {
                 ("resource.attributes.service.name".into(), "svc".into()),
                 ("name".into(), "GET /".into()),
                 ("kind".into(), "SERVER".into()),
-                ("status_code".into(), "ERROR".into()),
+                ("status.code".into(), "ERROR".into()),
                 ("attributes.team".into(), "a".into()),
                 ("attributes.team".into(), "b".into()),
             ],
@@ -2068,31 +2457,6 @@ mod tests {
             )],
             None
         ));
-        // ── Stage B: the any-owner disjunction gathers both owners ──
-        assert!(matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "service.name".into()),
-                CompareOp::Eq,
-                vec![text("svc")],
-            )],
-            None
-        ));
-        assert!(matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "team".into()),
-                CompareOp::Eq,
-                vec![text("b")],
-            )],
-            None
-        ));
-        assert!(!matches(
-            vec![cond(
-                PredicateTarget::Attribute(AttributeOwner::Any, "nowhere".into()),
-                CompareOp::NotEq,
-                vec![text("v")],
-            )],
-            None
-        ));
         // ── Stage B: numerics via the shared comparator ─────────────
         let span2 = TraceSpan {
             fields: vec![
@@ -2138,7 +2502,7 @@ mod tests {
             CompareOp::NotEq,
             vec![PredicateValue::Integer(5)],
         )));
-        // event:timeSinceStart saturates far-future event times (a
+        // events.time_since_start saturates far-future event times (a
         // wrapping cast would flip them negative and fail `> 0`).
         let mut far = span.clone();
         far.events = vec![sfst::TraceEvent {
@@ -2169,5 +2533,283 @@ mod tests {
             CompareOp::NotEq,
             vec![PredicateValue::Integer(250)],
         )));
+    }
+
+    fn free_text(term: &str) -> Condition {
+        cond(
+            PredicateTarget::FreeText,
+            CompareOp::Contains,
+            vec![text(term)],
+        )
+    }
+
+    fn group(conditions: Vec<Condition>) -> Predicate {
+        Predicate { conditions }
+    }
+
+    /// Token validation: the token cap, empty tokens, trace-level and
+    /// `trace_id` conditions alone in their token, the free-text rules
+    /// (operator, one text value, length in characters and bytes), and
+    /// every condition checked as in a predicate.
+    #[test]
+    fn token_validation_matrix() {
+        let root = cond(
+            PredicateTarget::Builtin(BuiltinField::RootServiceName),
+            CompareOp::Eq,
+            vec![text("svc")],
+        );
+        let trace_id = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceId),
+            CompareOp::Eq,
+            vec![text(&"ab".repeat(16))],
+        );
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(5)],
+        );
+        let attr = cond(span_attr("x"), CompareOp::Eq, vec![text("v")]);
+        let check = |tokens: Vec<Token>| TokenQuery { tokens }.validate();
+        let alone = |c: &Condition| Token::positive(group(vec![c.clone()]));
+
+        // Valid: no tokens; free text in a same-span group; negated
+        // tokens of every kind; three characters of any width; the byte
+        // limit; the token limit.
+        check(vec![]).unwrap();
+        check(vec![Token::positive(group(vec![
+            attr.clone(),
+            free_text("abc"),
+        ]))])
+        .unwrap();
+        check(vec![
+            Token::negated(group(vec![attr.clone()])),
+            Token::negated(group(vec![root.clone()])),
+            Token::negated(group(vec![trace_id.clone()])),
+            alone(&duration),
+        ])
+        .unwrap();
+        check(vec![alone(&free_text("日本語"))]).unwrap();
+        check(vec![alone(&free_text(&"a".repeat(TEXT_MAX_BYTES)))]).unwrap();
+        check((0..TOKENS_MAX).map(|_| alone(&attr)).collect()).unwrap();
+
+        let err = |tokens: Vec<Token>| check(tokens).unwrap_err();
+        assert!(matches!(
+            err((0..=TOKENS_MAX).map(|_| alone(&attr)).collect()),
+            PredicateError::TooManyTokens { max: 32, got: 33 }
+        ));
+        assert!(matches!(
+            err(vec![Token::negated(Predicate::all())]),
+            PredicateError::EmptyToken
+        ));
+        for single in [&root, &trace_id, &duration] {
+            assert!(matches!(
+                err(vec![Token::positive(group(vec![
+                    attr.clone(),
+                    single.clone()
+                ]))]),
+                PredicateError::TokenNotAlone { .. }
+            ));
+        }
+        assert!(matches!(
+            err(vec![alone(&free_text("éé"))]),
+            PredicateError::TextTooShort { min: 3, got: 2 }
+        ));
+        assert!(matches!(
+            err(vec![alone(&free_text(&"a".repeat(TEXT_MAX_BYTES + 1)))]),
+            PredicateError::TextTooLong {
+                max: 1024,
+                got: 1025
+            }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Eq,
+                vec![text("abc")]
+            ))]),
+            PredicateError::InvalidOpForTarget { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                span_attr("x"),
+                CompareOp::Contains,
+                vec![text("abc")]
+            ))]),
+            PredicateError::InvalidOpForTarget { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![text("abc"), text("def")]
+            ))]),
+            PredicateError::SingleValueArity { got: 2, .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::FreeText,
+                CompareOp::Contains,
+                vec![PredicateValue::Integer(123)]
+            ))]),
+            PredicateError::TextValueRequired { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                span_attr("x"),
+                CompareOp::Regex,
+                vec![text("(")]
+            ))]),
+            PredicateError::InvalidPattern { .. }
+        ));
+        assert!(matches!(
+            err(vec![alone(&cond(
+                PredicateTarget::Builtin(BuiltinField::EventName),
+                CompareOp::NotEq,
+                vec![text("e")]
+            ))]),
+            PredicateError::NotYetEvaluable { .. }
+        ));
+    }
+
+    /// A flat predicate keeps its meaning as tokens: its span-local
+    /// conditions (free text included) as one positive group, each
+    /// trace-level and `trace_id` condition as its own positive token.
+    #[test]
+    fn a_predicate_becomes_tokens_with_its_meaning() {
+        let root = cond(
+            PredicateTarget::Builtin(BuiltinField::RootName),
+            CompareOp::NotEq,
+            vec![text("r")],
+        );
+        let trace_id = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceId),
+            CompareOp::Eq,
+            vec![text(&"ab".repeat(16))],
+        );
+        let attr = cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]);
+        let words = free_text("abc");
+        let tokens = TokenQuery::from(group(vec![
+            attr.clone(),
+            root.clone(),
+            words.clone(),
+            trace_id.clone(),
+        ]));
+        assert_eq!(
+            tokens.tokens,
+            vec![
+                Token::positive(group(vec![attr, words])),
+                Token::positive(group(vec![root])),
+                Token::positive(group(vec![trace_id])),
+            ]
+        );
+        assert!(TokenQuery::from(Predicate::all()).tokens.is_empty());
+        // Trace-level only: no span-local token, so discovery runs on the
+        // empty plan (C-4).
+        let duration = cond(
+            PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(5)],
+        );
+        assert_eq!(
+            TokenQuery::from(group(vec![duration.clone()])).tokens,
+            vec![Token::positive(group(vec![duration]))]
+        );
+    }
+
+    /// "Starts with" is a literal prefix of the whole value: regex
+    /// metacharacters stay literal and the rest may span lines.
+    #[test]
+    fn starts_with_pattern_is_a_literal_prefix() {
+        let span = TraceSpan {
+            span_id: sfst::SpanId::from([1u8; 8]),
+            parent_span_id: sfst::SpanId::from([0u8; 8]),
+            start_ns: 1_000,
+            duration_ns: 250,
+            kind: 2,
+            flags: 0,
+            dropped_attributes_count: 0,
+            dropped_events_count: 0,
+            dropped_links_count: 0,
+            fields: vec![
+                ("name".into(), "a.b(c)\nrest".into()),
+                ("attributes.k".into(), "axb(c)".into()),
+            ],
+            events: vec![],
+            links: vec![],
+        };
+        for (target, prefix, want) in [
+            (PredicateTarget::Builtin(BuiltinField::Name), "a.b(", true),
+            (
+                PredicateTarget::Builtin(BuiltinField::Name),
+                "a.b(c)\nrest",
+                true,
+            ),
+            (
+                PredicateTarget::Builtin(BuiltinField::Name),
+                "a.b(c)\nrest!",
+                false,
+            ),
+            (PredicateTarget::Builtin(BuiltinField::Name), "b(c)", false),
+            (span_attr("k"), "a.b", false),
+            (span_attr("k"), "axb(", true),
+        ] {
+            let predicate = Predicate {
+                conditions: vec![cond(
+                    target.clone(),
+                    CompareOp::Regex,
+                    vec![text(&starts_with_pattern(prefix))],
+                )],
+            };
+            assert_eq!(
+                span_matches(&span, &predicate, None),
+                want,
+                "{target} ^= {prefix:?}"
+            );
+        }
+    }
+
+    /// Free text lowers to one field-set term over the text scope: the
+    /// name, status message and event names, and every attribute
+    /// owner's fields — not `kind`, `status.code` or the scope name.
+    #[test]
+    fn free_text_lowers_to_the_text_scope() {
+        let plan = group(vec![free_text("Abc")]).to_trace_plan();
+        let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            plan.terms,
+            vec![PlanTerm::FieldsIn {
+                exact: strings(&["name", "status.message", "events.name"]),
+                prefixes: strings(&[
+                    "resource.attributes.",
+                    "attributes.",
+                    "scope.attributes.",
+                    "events.attributes.",
+                    "links.attributes.",
+                ]),
+                matcher: sfst::PlanMatcher::Contains("Abc".to_string()),
+            }]
+        );
+        // The span-side scope test, without building names.
+        let (exact, prefixes) = match &plan.terms[0] {
+            PlanTerm::FieldsIn {
+                exact, prefixes, ..
+            } => (exact, prefixes),
+            _ => unreachable!(),
+        };
+        for (head, tail, want) in [
+            ("name", "", true),
+            ("events.name", "", true),
+            ("events.attributes.", "k", true),
+            ("links.attributes.", "a.b", true),
+            ("attributes.http.url", "", true),
+            ("kind", "", false),
+            ("status.code", "", false),
+            ("scope.name", "", false),
+            ("events.", "name", true),
+            ("events.", "names", false),
+            ("links.", "attributes.x", true),
+        ] {
+            assert_eq!(scope_has(exact, prefixes, head, tail), want, "{head}{tail}");
+        }
     }
 }

@@ -143,7 +143,7 @@ impl Decoder for MessageParser {
 /// variants encode to nothing.
 ///
 /// Current senders exercise only the declaration, result and progress arms:
-/// `rt`'s event loop and `otel-plugin`'s supervisor send them through
+/// `netdata-plugin-rt`'s event loop and `otel-plugin`'s supervisor send them through
 /// `MessageWriter`, while the bridge emits progress over in-process channels
 /// whose drivers translate it into their own progress responses; see the
 /// per-variant comments for which arms have an agent-side consumer at all.

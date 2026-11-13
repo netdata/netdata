@@ -211,6 +211,23 @@ vSphere:
 - tests validate the payload with `topologyv1.ValidateDecodedData` and the JSON
   Schema.
 
+`topology:tracing`:
+
+- producer path: `src/crates/otel-service-map/` (Rust), served by the
+  otel-plugin's ingestor worker;
+- the Function emits `netdata.topology.v1` directly and never emitted an
+  earlier schema; it is single-node (no correlation, overlays or
+  notifications) and windowed by `after`/`before`;
+- actor types are `service`, `peer_database`, `peer_messaging`,
+  `peer_external`, `peer_other` and `unknown_caller`; link types are `call`,
+  `call_to_peer` and `call_from_unknown` (the developer guide's Tracing Shape
+  section);
+- there is no Rust topology builder or validator: the payload's static part
+  is a template, and a Rust golden test keeps the builder's output equal to
+  the fixture `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json`,
+  which the Go fixture test validates against the JSON Schema and the
+  semantic validator.
+
 ### Cloud Frontend
 
 The Cloud frontend compatibility work is outside this repository, but the

@@ -8,10 +8,10 @@
 //! - Event application ([`Registry::apply_event`]): every event re-reports
 //!   the writer's current accumulator state (not a delta), so applying one
 //!   is an overwrite; `Closed` is authoritative and final — a late `Synced`
-//!   is ignored. The per-signal `frame_seq` gap-check runs upstream
-//!   (otel-ledger's ingestor), so a genuinely lost event leaves an entry
-//!   stale or untracked; it cannot corrupt one. Field semantics are
-//!   `format.rs`'s.
+//!   is ignored. The link delivers a file's events once and in order
+//!   (`format.rs`, [`Message`](crate::Message)); an event that never comes,
+//!   as when the ingestor stops, leaves an entry stale or untracked and
+//!   cannot corrupt one. Field semantics are `format.rs`'s.
 //! - Candidate filtering ([`Registry::candidates`]): the pure in-memory
 //!   time + partition filter the live query planner and the stream selector
 //!   drive. It scales the seconds-based `Query` to the registry's
@@ -112,8 +112,8 @@ pub struct File {
     /// page size, so `ZERO` never stands for a known-empty file. `Closed`
     /// reports the durable prefix alongside `size`; the two are equal
     /// whenever the seal follows a sync (the writer's rotation, idle-sweep,
-    /// and shutdown paths), but its unsynced-`Drop` close path syncs
-    /// nothing, so a sealed file can carry `valid_up_to < size`.
+    /// and shutdown paths); a file that the writer closed after a failed
+    /// write or fsync can carry `valid_up_to < size`.
     pub valid_up_to: ByteSize,
     /// Number of log records in the durable prefix, as reported by the
     /// latest `Synced` or `Closed` event; `0` when unknown (recovered from
@@ -157,12 +157,12 @@ impl Registry {
 
     /// Rebuild the registry from the directory's files: scan it, then read
     /// each file's header. Identity comes from the filename (`FileId`,
-    /// including the `part_key` the header does not store); `created_at_ns`,
-    /// `size`, and `content_meta` come from the header. The log-data range
-    /// and durable prefix stay unknown (see [`File`]'s recovery note), and
-    /// every entry lands as `Archived` — whether the file was mid-write at
-    /// the last crash is unknowable from the header, so startup recovery
-    /// re-indexes every recovered WAL that has no SFST yet.
+    /// including the `partition_key` the header does not store);
+    /// `created_at_ns`, `size`, and `content_meta` come from the header. The
+    /// log-data range and durable prefix stay unknown (see [`File`]'s recovery
+    /// note), and every entry lands as `Archived` — whether the file was
+    /// mid-write at the last crash is unknowable from the header, so startup
+    /// recovery re-indexes every recovered WAL that has no SFST yet.
     ///
     /// Failure policy: an unreadable file (I/O, or a header format
     /// rejection) is logged and skipped — it stays on disk but untracked. A
@@ -238,18 +238,22 @@ impl Registry {
     ///   the writer's current accumulator state — every event re-reports
     ///   the totals, not a delta, so a direct overwrite is correct. Ignored
     ///   (reported as success) for an `Archived` file: `Closed` is
-    ///   authoritative and final, and a late or reordered `Synced` must not
+    ///   authoritative and final, and a `Synced` applied after it must not
     ///   regress a sealed file's prefix.
     /// - `Closed`: seal — set `Archived` and write the final size, range,
     ///   and durable prefix. The event carries the durable prefix itself,
-    ///   so the sealed entry is correct even if the final `Synced` was
-    ///   reordered or lost in flight.
+    ///   so the sealed entry does not depend on a `Synced` before it (no
+    ///   seal of the writer sends one). `Error::AlreadyClosed` for a file that
+    ///   is `Archived` already: a file is closed once, and the caller starts
+    ///   an indexing operation for every `Closed` that is applied.
     ///
     /// Errors: `Error::UnknownSequence` when `Synced`/`Closed` names a file
-    /// the registry does not track (its `Created` was lost, or the entry
-    /// was already removed). otel-ledger logs and drops the event on either
-    /// error. The `frame_count` field is informational; the registry
-    /// ignores it.
+    /// the registry does not track (no `Created` was applied for it, or the
+    /// entry was already removed). otel-ledger logs and drops the event on
+    /// any of the three errors. The event link delivers a file's events once
+    /// and in order ([`Message`](crate::Message)), so a ledger does not meet
+    /// them: they are the registry's own rules, whoever feeds it. The
+    /// `frame_count` field is informational; the registry ignores it.
     pub fn apply_event(&mut self, event: &FileEvent) -> Result<()> {
         match event {
             FileEvent::Created {
@@ -307,6 +311,9 @@ impl Registry {
                     .files
                     .get_mut(file_id.seq)
                     .ok_or(Error::UnknownSequence(file_id.seq))?;
+                if entry.status == FileStatus::Archived {
+                    return Err(Error::AlreadyClosed(file_id.seq));
+                }
                 entry.status = FileStatus::Archived;
                 entry.size = *size;
                 entry.min_timestamp_ns = *min_timestamp_ns;
@@ -362,7 +369,7 @@ impl Registry {
     /// half-open `[start, end)` window; a degenerate window matches
     /// nothing).
     ///
-    /// Partition filter: membership over the opaque `id.part_key` — an
+    /// Partition filter: membership over the opaque `id.partition_key` — an
     /// empty `partition_keys` matches every partition. One key per stream
     /// identity per tenant (the ingestor's collision table keeps it so),
     /// so key equality is stream equality.
@@ -388,7 +395,9 @@ impl Registry {
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
-            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
+            .filter(move |f| {
+                partition_keys.is_empty() || partition_keys.contains(&f.id.partition_key)
+            })
     }
 
     pub fn len(&self) -> usize {
@@ -464,7 +473,7 @@ mod tests {
             for i in 0..count {
                 writer
                     .write_frame(
-                        crate::opaque_part_key("ns", "svc"),
+                        crate::opaque_partition_key("ns", "svc"),
                         &[],
                         &(i as u32).to_le_bytes(),
                         crate::FrameMeta {
@@ -518,11 +527,11 @@ mod tests {
         assert_eq!(seqs, vec![1, 2]);
 
         // Recovery reads the partition key from the filename (FileId), not the
-        // header — the header stores no part_key.
+        // header — the header stores no partition_key.
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.id.part_key == crate::opaque_part_key("ns", "svc")),
+                .all(|f| f.id.partition_key == crate::opaque_partition_key("ns", "svc")),
             "recovery must recover each file's partition key from its filename (FileId)"
         );
     }
@@ -769,9 +778,9 @@ mod tests {
 
     // ── candidates() tests ───────────────────────────────────────
 
-    fn fid_with(seq: u64, part_key: u64) -> FileId {
+    fn fid_with(seq: u64, partition_key: u64) -> FileId {
         let identity = crate::test_identity();
-        FileId::new(identity, 0, seq, part_key)
+        FileId::new(identity, 0, seq, partition_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range
@@ -779,12 +788,12 @@ mod tests {
     fn track(
         reg: &mut Registry,
         seq: u64,
-        part_key: u64,
+        partition_key: u64,
         min_ns: u64,
         max_ns: u64,
         status: FileStatus,
     ) -> FileId {
-        let id = fid_with(seq, part_key);
+        let id = fid_with(seq, partition_key);
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
@@ -879,15 +888,15 @@ mod tests {
     }
 
     #[test]
-    fn candidates_filter_by_part_key() {
-        // The WAL filter matches files by their opaque `part_key` (the content
-        // plane's stream-hash collapse — absent vs empty namespace — is the
-        // content plane's concern, covered by otel-logs-identity's tests).
+    fn candidates_filter_by_partition_key() {
+        // The WAL filter matches files by their opaque `partition_key` (the
+        // content plane's stream-hash collapse — absent vs empty namespace — is
+        // the content plane's concern, covered by otel-logs-identity's tests).
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let api = crate::opaque_part_key("prod", "api");
-        let worker = crate::opaque_part_key("prod", "worker");
+        let api = crate::opaque_partition_key("prod", "api");
+        let worker = crate::opaque_partition_key("prod", "worker");
         track(&mut reg, 1, api, 100 * NS, 200 * NS, FileStatus::Archived);
         track(
             &mut reg,
@@ -956,6 +965,37 @@ mod tests {
             partition_keys: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
+    }
+
+    /// A file is closed once. The ledger starts an indexing operation for
+    /// every `Closed` it applies, so a second one must not be applied.
+    #[test]
+    fn a_second_closed_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = test_file_id(1);
+        let closed = FileEvent::Closed {
+            file_id: id,
+            frame_count: 2,
+            min_timestamp_ns: TimestampNs(150),
+            max_timestamp_ns: TimestampNs(400),
+            size: ByteSize(200),
+            valid_up_to: ByteSize(200),
+            entry_count: 2,
+        };
+
+        let mut registry = Registry::new(dir.path());
+        registry.recover().unwrap();
+        registry
+            .apply_event(&FileEvent::Created {
+                file_id: id,
+                created_at_ns: TimestampNs(1_000_000_000),
+                content_meta: Vec::new(),
+            })
+            .unwrap();
+        registry.apply_event(&closed).unwrap();
+
+        let err = registry.apply_event(&closed).unwrap_err();
+        assert!(matches!(err, Error::AlreadyClosed(1)), "{err}");
     }
 
     #[test]

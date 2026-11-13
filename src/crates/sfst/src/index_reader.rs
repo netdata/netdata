@@ -5,6 +5,9 @@
 //! that follow the access pattern described in `sfst/FORMAT.md`:
 //!
 //! 1. Decode `SUMR` + `META` + `PRIM` eagerly on open (always needed).
+//!    [`MetaReader`] stops after `SUMR` and decodes `META` lazily, for
+//!    callers that need only the summary, metadata, field table or one
+//!    field's values (dictionary keys only, no position bitmaps).
 //! 2. Look up low-card `key=value` pairs in the primary FST → position bitmap.
 //! 3. Load secondary chunks on demand (mid-card `MF{hi}{lo}` FST or
 //!    high-card `HF{hi}{lo}` columnar chunk).
@@ -17,25 +20,162 @@
 //! (src/crates/sfsq/src/traces/search.rs).
 
 use std::collections::HashMap;
+use std::ops::ControlFlow;
 
 use crate::PrefixMap;
 use crate::reader::ChunkReader;
 
+mod kv_resolver;
 mod rollup_resolver;
 mod session;
 mod trace_plan;
 
-pub use rollup_resolver::{RollupRefOutcome, RollupRootResolver};
-pub use session::TraceFileSession;
+use kv_resolver::KvResolver;
+
+use rollup_resolver::RollupRefMemo;
+pub use rollup_resolver::{RollupRefOutcome, RollupRefResolver};
+pub use session::{PartEvidence, RollupEvidence, TraceFileSession};
 pub use trace_plan::{
-    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, PlanMatcher, PlanTerm, ScanWork,
-    TracePlan, numeric_token_matches,
+    CompiledTracePlan, GroupCondition, IdColumnKind, NumberCmp, NumberValue, PlanMatcher, PlanTerm,
+    ScanLimits, ScanWork, TracePlan, numeric_token_matches,
 };
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
     KvId, Matcher, Metadata, SpanId, Summary, Timeline, Timestamps, TraceId,
 };
+
+/// The metadata view of an `.sfst` file: `SUMR` on open, `META` and the
+/// field table on first use, and never `PRIM`'s position bitmaps.
+/// Listing a file's keys needs only the field table; listing one field's
+/// values decodes only that field's dictionary keys
+/// ([`for_each_field_value`](Self::for_each_field_value)). `PRIM` (the
+/// low-card dictionary plus its position bitmaps) dominates the cost of a
+/// full open.
+/// [`into_index_reader`](Self::into_index_reader) upgrades to the full
+/// reader without decoding `META` again.
+pub struct MetaReader<'a> {
+    sfst: ChunkReader<'a>,
+    summary: Summary,
+}
+
+impl<'a> MetaReader<'a> {
+    /// Open a split-FST index from a byte slice, decoding the summary only.
+    pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
+        let sfst = ChunkReader::open(data)?;
+        let summary = sfst.summary()?;
+        Ok(Self { sfst, summary })
+    }
+
+    /// The cheap summary fields (see [`IndexReader::summary`]).
+    pub fn summary(&self) -> &Summary {
+        &self.summary
+    }
+
+    /// The heavy index metadata, decoded on first use.
+    pub fn metadata(&self) -> Result<&Metadata, crate::Error> {
+        self.sfst.metadata()
+    }
+
+    /// The field table derived from the schema tree, on first use.
+    pub fn field_table(&self) -> Result<&crate::FieldTable, crate::Error> {
+        self.sfst.fields()
+    }
+
+    /// Visit the values of `field` in this file's dictionary byte order
+    /// (the bytes after `field=`), decoding only what lists them: the
+    /// low tier from the primary FST and the mid tier from its field FST,
+    /// neither with its position bitmaps, and the high tier from its
+    /// sorted arena. `visit` breaks to stop early. `Ok(false)` when the
+    /// file has no such field.
+    pub fn for_each_field_value(
+        &self,
+        field: &str,
+        mut visit: impl FnMut(&[u8]) -> ControlFlow<()>,
+    ) -> Result<bool, crate::Error> {
+        use fst::{IntoStreamer, Streamer};
+        let Some((entry, idx)) =
+            field_table_tiered(self.field_table()?).find(|(f, _)| f.name == field)
+        else {
+            return Ok(false);
+        };
+        let prefix = format!("{field}=");
+        match entry.tier {
+            FieldTier::Low => {
+                // Field names hold no '=' (flattener invariant), so the
+                // field's keys are exactly the range [`field=`, `field>`).
+                let map = self.sfst.primary_fst()?;
+                let mut end = prefix.clone().into_bytes();
+                *end.last_mut().expect("non-empty") += 1;
+                let mut keys = map.range().ge(prefix.as_bytes()).lt(&end).into_stream();
+                while let Some((key, _)) = keys.next() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+            FieldTier::Mid => {
+                let map = self.sfst.mid_field_fst(idx)?;
+                let mut keys = map.stream();
+                while let Some((key, _)) = keys.next() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+            FieldTier::High => {
+                let hf = self.sfst.high_field(idx)?;
+                for key in hf.keys() {
+                    if visit(dictionary_value(key, &prefix)?).is_break() {
+                        break;
+                    }
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    /// Whether the file carries the optional per-file trace rollup (`TRSU`).
+    pub fn has_trace_rollup(&self) -> bool {
+        self.sfst.has_trace_rollup()
+    }
+
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.sfst.has_trace_rollup_stats()
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`), validated against the
+    /// file's decoded `rollup`.
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, crate::Error> {
+        self.sfst.trace_rollup_stats(rollup)
+    }
+
+    /// Decode and validate the per-file trace rollup (`TRSU`), as
+    /// [`IndexReader::trace_rollup`] does: the unfiltered trace overview
+    /// needs nothing else.
+    pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
+        self.sfst.trace_rollup()
+    }
+
+    /// The full reader: decodes `PRIM`, reusing the cached `META` and
+    /// field table.
+    pub fn into_index_reader(self) -> Result<IndexReader<'a>, crate::Error> {
+        // Force the metadata + derived-field-table caches so the full
+        // reader's accessors are infallible.
+        self.sfst.metadata()?;
+        self.sfst.fields()?;
+        let primary = self.sfst.primary()?;
+        Ok(IndexReader {
+            sfst: self.sfst,
+            summary: self.summary,
+            primary,
+        })
+    }
+}
 
 /// A successfully opened split-FST index.
 ///
@@ -50,8 +190,8 @@ pub struct IndexReader<'a> {
 }
 
 /// One materialized span of a reconstructed trace: its ids, timing, per-row
-/// scalars, attribute facets (`name`, `kind`, `status_code`, `trace_state`,
-/// `status_message`, `attributes.*`) as flat `(key, value)` pairs, and its
+/// scalars, attribute facets (`name`, `kind`, `status.code`, `trace_state`,
+/// `status.message`, `attributes.*`) as flat `(key, value)` pairs, and its
 /// structured events/links (from the `EVNB`/`LNKB` chunks; empty when the
 /// file predates them or the span has none). Built by
 /// [`IndexReader::trace_by_id`] and the cross-source combiner alike.
@@ -171,8 +311,9 @@ impl Trace {
 
 /// The value half of a resolved `key=value` token (split on the FIRST `=`, so
 /// value-embedded `=` bytes are preserved — e.g. `trace_state=ot=th:8` yields
-/// `ot=th:8`), or empty for an unresolvable ref (corrupt file — the row path
-/// renders those empty too rather than failing the trace).
+/// `ot=th:8`), or empty for an unresolvable event or link ref (corrupt file:
+/// consumers drop the empty name). A row facet token that does not resolve
+/// to `key=value` fails its source instead (`session.rs`, `field_pair`).
 fn kv_value(strings: &HashMap<u32, String>, id: crate::KvId) -> String {
     strings
         .get(&id.0)
@@ -201,18 +342,18 @@ impl<'a> IndexReader<'a> {
     /// Everything else (timestamps, per-row columns, trace structures,
     /// stream batches) decodes lazily, on the accessor that needs it.
     pub fn open(data: &'a [u8]) -> Result<Self, crate::Error> {
-        let sfst = ChunkReader::open(data)?;
-        let summary = sfst.summary()?;
-        // Force the metadata + derived-field-table caches so subsequent
-        // accessors are infallible.
-        sfst.metadata()?;
-        sfst.fields()?;
-        let primary = sfst.primary()?;
-        Ok(Self {
-            sfst,
-            summary,
-            primary,
-        })
+        MetaReader::open(data)?.into_index_reader()
+    }
+
+    /// Drop the primary dictionary and keep the metadata view (summary
+    /// and the cached metadata): the downgrade of
+    /// [`MetaReader::into_index_reader`], for a caller that holds many
+    /// files and keeps few of them fully open.
+    pub fn into_meta_reader(self) -> MetaReader<'a> {
+        MetaReader {
+            sfst: self.sfst,
+            summary: self.summary,
+        }
     }
 
     /// The cheap summary fields (timestamps, record count, opaque
@@ -392,6 +533,20 @@ impl<'a> IndexReader<'a> {
         self.sfst.has_trace_rollup()
     }
 
+    /// Whether the file carries the optional per-row rollup stats (`TRSS`).
+    pub fn has_trace_rollup_stats(&self) -> bool {
+        self.sfst.has_trace_rollup_stats()
+    }
+
+    /// Decode the per-row rollup stats (`TRSS`), validated against the
+    /// file's decoded `rollup`.
+    pub fn trace_rollup_stats(
+        &self,
+        rollup: &crate::TraceRollup,
+    ) -> Result<crate::TraceRollupStats, crate::Error> {
+        self.sfst.trace_rollup_stats(rollup)
+    }
+
     /// Decode and validate the per-file trace rollup (`TRSU`).
     pub fn trace_rollup(&self) -> Result<crate::TraceRollup, crate::Error> {
         self.sfst.trace_rollup()
@@ -568,83 +723,6 @@ impl<'a> IndexReader<'a> {
         Ok(out)
     }
 
-    /// Resolve sorted, deduplicated KvIds to their `key=value` strings,
-    /// decoding only the chunks whose fields the ids touch.
-    ///
-    /// A running cardinality sum over the field table locates each id's
-    /// field — KvIds are assigned per field in field-table order, so an id's
-    /// offset within its field indexes that field's value order directly.
-    /// Resolution deliberately walks PER FIELD: the primary FST's global sort
-    /// order diverges from the assignment order when one field name
-    /// dot-extends another ('.' sorts before '='), so a whole-FST walk cannot
-    /// label KvIds. An id no chunk covers (corrupt file) is left unresolved;
-    /// the caller renders it empty rather than failing the page.
-    fn resolve_kv_strings(&self, ids: &[u32]) -> Result<HashMap<u32, String>, crate::Error> {
-        debug_assert!(
-            ids.windows(2).all(|w| w[0] < w[1]),
-            "ids must be sorted+deduped"
-        );
-        let mut out = HashMap::with_capacity(ids.len());
-        let mut next = 0usize; // cursor into `ids`
-        let mut start = 0u32; // current field's first KvId
-        for (field, ti) in field_table_tiered(self.field_table()) {
-            if next >= ids.len() {
-                break;
-            }
-            let end = start + field.cardinality;
-            if ids[next] >= end {
-                start = end;
-                continue;
-            }
-            let lo = next;
-            while next < ids.len() && ids[next] < end {
-                next += 1;
-            }
-            let wanted = &ids[lo..next];
-            match field.tier {
-                FieldTier::Low => {
-                    let pairs = self
-                        .primary
-                        .prefix_pairs(format!("{}=", field.name).as_bytes());
-                    let mut w = 0usize;
-                    for (off, (key, _)) in pairs.iter().enumerate() {
-                        if w >= wanted.len() {
-                            break;
-                        }
-                        let id = start + off as u32;
-                        if wanted[w] == id {
-                            out.insert(id, String::from_utf8_lossy(key).into_owned());
-                            w += 1;
-                        }
-                    }
-                }
-                FieldTier::Mid => {
-                    let fst = self.sfst.mid_field(ti)?;
-                    let mut w = 0usize;
-                    let mut off = 0u32;
-                    fst.for_each(|key, _| {
-                        if w < wanted.len() && wanted[w] == start + off {
-                            out.insert(start + off, String::from_utf8_lossy(key).into_owned());
-                            w += 1;
-                        }
-                        off += 1;
-                    });
-                }
-                FieldTier::High => {
-                    let hf = self.sfst.high_field(ti)?;
-                    for &id in wanted {
-                        let off = (id - start) as usize;
-                        if off < hf.len() {
-                            out.insert(id, String::from_utf8_lossy(hf.key(off)).into_owned());
-                        }
-                    }
-                }
-            }
-            start = end;
-        }
-        Ok(out)
-    }
-
     /// Materialize full log rows for the given positions.
     ///
     /// For each position: its timestamp plus every attribute, resolved
@@ -658,9 +736,11 @@ impl<'a> IndexReader<'a> {
     ///
     /// Decodes the timestamps chunk, only the stream batches the positions
     /// fall in, and only the field chunks the rows' KvIds actually reference
-    /// (resolved per touched field, not via the whole table) — cost scales
-    /// with the page's content, not the file's attribute space. Callers
-    /// should still batch a page's worth of positions into one call.
+    /// (mid-tier ones without their position bitmaps); each KvId is then a
+    /// position lookup (`KvResolver`), so cost scales with the page's
+    /// content, not the file's attribute space. Callers should still batch
+    /// a page's worth of positions into one call: each touched chunk then
+    /// decodes once, and is freed before the next one decodes.
     pub fn materialize_rows(
         &self,
         positions: &[u32],
@@ -695,7 +775,7 @@ impl<'a> IndexReader<'a> {
         }
         ids.sort_unstable();
         ids.dedup();
-        let strings = self.resolve_kv_strings(&ids)?;
+        let strings = KvResolver::new().strings(self, &ids)?;
 
         let mut rows = Vec::with_capacity(positions.len());
         for &pos in positions {
@@ -770,7 +850,8 @@ impl<'a> IndexReader<'a> {
             return Ok(Trace::empty());
         }
         let mut sources: [&mut dyn crate::trace_combine::SpanSource; 1] = [&mut session];
-        let mut outcome = crate::trace_combine::combine(&mut sources, trace_id, None, &|| false);
+        let mut outcome =
+            crate::trace_combine::combine(&mut sources, trace_id, None, None, None, &|| false);
         // Single source: any failure IS the result — propagate (the
         // cross-source engine instead reports failures as a partial
         // status; with one file there is nothing left to serve).
@@ -1207,11 +1288,7 @@ impl<'a> IndexReader<'a> {
     fn locate_field(&self, field_name: &str) -> Option<FieldLocation> {
         field_table_tiered(self.field_table())
             .find(|(field, _)| field.name == field_name)
-            .map(|(field, ti)| match field.tier {
-                FieldTier::Low => FieldLocation::Low,
-                FieldTier::Mid => FieldLocation::Mid(ti),
-                FieldTier::High => FieldLocation::High(ti),
-            })
+            .map(|(field, ti)| FieldLocation::of(field, ti))
     }
 
     /// Compute the on-disk `KvId` for the `local`-th value of high-card
@@ -1632,6 +1709,18 @@ enum FieldLocation {
     High(u16),
 }
 
+impl FieldLocation {
+    /// The location of `field` given its tier-relative index (from
+    /// [`field_table_tiered`]).
+    fn of(field: &FieldEntry, tier_index: u16) -> Self {
+        match field.tier {
+            FieldTier::Low => FieldLocation::Low,
+            FieldTier::Mid => FieldLocation::Mid(tier_index),
+            FieldTier::High => FieldLocation::High(tier_index),
+        }
+    }
+}
+
 /// A [`Filter`] compiled against one file: each filter
 /// field's value-OR bitmap, plus their AND (the full scope). Built by
 /// [`IndexReader::compile_filter`] so the statistics methods resolve the
@@ -1749,7 +1838,7 @@ impl PosSet {
     /// `Copy`; only the tree bytes are cloned.
     ///
     /// Invariant: the writer builds every value bitmap at the same
-    /// `universe_size` (`== record_count`; build.rs remaps insertion-order
+    /// `universe_size` (`== record_count`; index_writer.rs remaps insertion-order
     /// rows to chronological positions), which is what lets the resulting
     /// set combine with `range`/`full`/other values via `and`/`or`. Treight
     /// enforces the match: a `debug_assert` on the `Bitmap` wrapper
@@ -1815,6 +1904,11 @@ impl PosSet {
         self.bitmap.range_cardinality(&self.data, lo..hi)
     }
 
+    /// Whether `pos` is set (false past the universe).
+    fn contains(&self, pos: u32) -> bool {
+        self.bitmap.contains(&self.data, pos)
+    }
+
     /// Set positions in ascending order.
     fn iter(&self) -> impl Iterator<Item = u32> + '_ {
         self.bitmap.iter(&self.data)
@@ -1870,6 +1964,13 @@ impl KvIdSet {
     fn is_empty(&self) -> bool {
         self.bits.iter().all(|&word| word == 0)
     }
+}
+
+/// The value bytes of a `field=value` dictionary key, given `field=`.
+fn dictionary_value<'k>(key: &'k [u8], prefix: &str) -> Result<&'k [u8], crate::Error> {
+    key.strip_prefix(prefix.as_bytes()).ok_or_else(|| {
+        crate::Error::CorruptIndex(format!("dictionary key outside the field `{prefix}`"))
+    })
 }
 
 /// Pair each field with its **tier-relative** index (0-based within its own

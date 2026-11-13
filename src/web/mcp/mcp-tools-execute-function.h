@@ -15,5 +15,6 @@ MCP_RETURN_CODE mcp_tool_execute_function_execute(MCP_CLIENT *mcpc, struct json_
 // metadata (GHSA-6628-vxm3-4g8g). Requires a prepared RRD (localhost). Returns the
 // number of failures (0 = pass).
 int mcp_execute_function_access_unittest(void);
+int mcp_execute_function_payload_unittest(void);
 
 #endif // NETDATA_MCP_TOOLS_EXECUTE_FUNCTION_H

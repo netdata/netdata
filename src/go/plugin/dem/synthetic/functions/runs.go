@@ -38,6 +38,10 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 				timestamp(run.ScheduledUS),
 				timestamp(run.QueuedUS),
 				run.TerminationReason,
+				run.FailureEvidence.ReportingStatus(),
+				run.FailureEvidence.FailureSummary(),
+				run.FailureEvidence.LastObservedStepSummary(),
+				run.FailureEvidence.StopSummary(),
 			},
 		)
 	}
@@ -78,5 +82,9 @@ var runsMethod = method{
 		column{"scheduled_us", "Selected due time", funcapi.FieldTypeTimestamp, ""},
 		column{"queued_us", "Original admission queue time", funcapi.FieldTypeTimestamp, ""},
 		column{"termination_reason", "Termination reason", funcapi.FieldTypeString, ""},
+		column{"failure_evidence_status", "Evidence reporting", funcapi.FieldTypeString, ""},
+		column{"first_failure", "First unexpected failure", funcapi.FieldTypeString, ""},
+		column{"last_observed_step", "Last observed running step", funcapi.FieldTypeString, ""},
+		column{"stop_context", "Pending before cleanup", funcapi.FieldTypeString, ""},
 	),
 }

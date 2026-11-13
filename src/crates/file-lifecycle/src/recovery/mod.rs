@@ -4,7 +4,7 @@
 //! (`otel-ledger/src/ledger/pipeline.rs`, which also fixes the order):
 //!
 //! 1. `startup` — with storage enabled, before tenant discovery: the
-//!    fail-closed catalog diff-sync (`startup::startup_catalog_sync`, P7)
+//!    required catalog diff-sync (`startup::startup_catalog_sync`, P7)
 //!    makes the local catalog set complete — LIST the remote, raise the WAL
 //!    seq high-water to the remote max, download every own-machine catalog
 //!    missing locally — and returns the remote-discovered tenant set.
@@ -33,8 +33,9 @@
 //!   contract; `tests` is its only reader (see the comment above it).
 //!
 //! Error semantics are per phase: a closed worker channel during component
-//! replay is a fatal `anyhow` error that fails startup; the diff-sync is
-//! fail-closed by its own contract; the remote reconciles return typed
+//! replay is a fatal `anyhow` error that fails startup; the diff-sync
+//! repeats until the remote answers and fails startup only on a local error
+//! (its own contract); the remote reconciles return typed
 //! [`crate::storage::StorageError`] under a caller-side startup budget that
 //! skips remote-dependent recovery on failure while local replay and upload
 //! queueing still run. Each submodule doc carries its phase's full contract.

@@ -120,10 +120,11 @@ pub struct Entry {
     pub value: Value,
     /// Pre-computed `xxhash64` of this entry's `key=value` rendering, filled at
     /// emit time by the [`Flattener`] (an invariant, not a later fill pass).
-    /// Lets the SFST build's interner resolve a repeat pair via `lookup_hash`
-    /// without re-hashing the string; the build still re-renders the pair and
-    /// string-verifies each hit, so a collision falls through to the
-    /// string-path `intern` (feed at `src/crates/ng-index/src/sfst_build.rs`).
+    /// Lets the interner used in SFST indexing resolve a repeat pair via
+    /// `lookup_hash` without re-hashing the string; indexing still re-renders
+    /// the pair and string-verifies each hit, so a collision falls through to
+    /// the string-path `intern` (feed at
+    /// `src/crates/ng-index/src/indexing.rs`).
     pub hash: u64,
 }
 
@@ -577,26 +578,36 @@ impl Flattener {
     }
 
     /// Flatten a span's own fields — the queryable scalar facets (`name`, `kind`,
-    /// `status_code`, `trace_state`, `status_message`), `attributes.*`, and the
-    /// structured `events[]` / `links[]` lists. Identifier/timing fields
-    /// (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`, the
-    /// dropped counts) are carried as per-row scalars on
+    /// `role`, `status.code`, `status.message`, `trace_state`), `attributes.*`, and the
+    /// structured `events[]` / `links[]` lists. Facet names are OTLP field paths
+    /// (the status lives under a `status` node, as in OTLP). Identifier/timing
+    /// fields (`trace_id`, `span_id`, `parent_span_id`, start/duration, `flags`,
+    /// the dropped counts) are carried as per-row scalars on
     /// [`crate::traces::SpanRecord`], not as entries — same split as
     /// [`Flattener::flatten_record`] for logs.
     ///
-    /// Enum facets (`kind`, `status_code`) store **both** representations:
-    /// - the clean name (`kind`, `status_code`) carries the user-facing **label**
-    ///   (`SERVER`, `ERROR`, …) — what an operator queries;
-    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int** —
-    ///   lossless and forward-compatible when unknown future variants appear.
+    /// Enum facets (`kind`, `status.code`) store **both** representations:
+    /// - the clean name (`kind`, `status.code`) carries the user-facing **label**
+    ///   (`SERVER`, `ERROR`, …) — what an operator queries; a variant unknown to
+    ///   this build is labelled with its decimal number, so the label is total;
+    /// - the `_`-prefixed name (`_kind`, `_status_code`) carries the raw **int**
+    ///   for internal use (indexing's rollup reads `_kind`, and takes the status
+    ///   from the `status.code` label); it never surfaces as a key.
     ///
-    /// The raw int is always emitted; the label only for a known variant.
     /// Defaults are stored too (`UNSPECIFIED` kind; `UNSET` status — also what
     /// an absent status object means), so they stay filterable and enumerable.
     /// This dual form is span-specific: `SpanKind`/`StatusCode` are closed enums
     /// whose labels are worth indexing, unlike the open numeric
-    /// `severity_number`. `trace_state` is carried **verbatim** (it can carry the
-    /// OpenTelemetry sampling threshold, `ot=th:`); `status_message` is emitted
+    /// `severity_number`.
+    ///
+    /// `role` is derived from the span alone, so every reader sees the same
+    /// value (WAL entries, chunk images, sealed files): `ROOT` when the span has
+    /// no parent, else `INBOUND` (SERVER/CONSUMER: work received from a caller),
+    /// `OUTBOUND` (CLIENT/PRODUCER: work sent to another service) or `INTERNAL`
+    /// (everything else, UNSPECIFIED and unknown kinds included).
+    ///
+    /// `trace_state` is carried **verbatim** (it can carry the
+    /// OpenTelemetry sampling threshold, `ot=th:`); `status.message` is emitted
     /// whenever non-empty, independent of the status code.
     pub fn flatten_span(&mut self, span: Span) -> FlattenedSpan {
         let mut out = Vec::new();
@@ -606,10 +617,12 @@ impl Flattener {
         }
 
         // UNSPECIFIED (0) is stored as itself, never rewritten to INTERNAL.
-        if let Some(label) = span_kind_label(span.kind) {
-            self.scalar("kind", Value::Str(label.to_string()), &mut out);
-        }
+        self.scalar("kind", Value::Str(span_kind_label(span.kind)), &mut out);
         self.scalar("_kind", Value::Int(span.kind as i64), &mut out);
+        // Normalization already cleared a wrong-length parent id to empty.
+        let has_parent = span.parent_span_id.iter().any(|&b| b != 0);
+        let role = span_role_label(span.kind, has_parent);
+        self.scalar("role", Value::Str(role.to_string()), &mut out);
 
         if !span.trace_state.is_empty() {
             self.scalar("trace_state", Value::Str(span.trace_state), &mut out);
@@ -617,12 +630,21 @@ impl Flattener {
 
         // An absent status object is the OTel default: UNSET.
         let status = span.status.unwrap_or_default();
-        if let Some(label) = status_code_label(status.code) {
-            self.scalar("status_code", Value::Str(label.to_string()), &mut out);
-        }
+        let status_node = self.descend(ROOT, &["status"]);
+        self.emit(
+            status_node,
+            StepRef::Field("code"),
+            Value::Str(status_code_label(status.code)),
+            &mut out,
+        );
         self.scalar("_status_code", Value::Int(status.code as i64), &mut out);
         if !status.message.is_empty() {
-            self.scalar("status_message", Value::Str(status.message), &mut out);
+            self.emit(
+                status_node,
+                StepRef::Field("message"),
+                Value::Str(status.message),
+                &mut out,
+            );
         }
 
         if !span.attributes.is_empty() {
@@ -697,28 +719,41 @@ impl Flattener {
     }
 }
 
-/// Readable label for an OTLP `SpanKind`, or `None` for an unknown (future)
-/// variant — the caller still stores the raw int for those.
-fn span_kind_label(kind: i32) -> Option<&'static str> {
+/// Label for an OTLP `SpanKind`: the proto value name without its
+/// `SPAN_KIND_` prefix, or the decimal number for a variant this build does
+/// not know, so the label field stays total and filterable.
+fn span_kind_label(kind: i32) -> String {
     match kind {
-        0 => Some("UNSPECIFIED"),
-        1 => Some("INTERNAL"),
-        2 => Some("SERVER"),
-        3 => Some("CLIENT"),
-        4 => Some("PRODUCER"),
-        5 => Some("CONSUMER"),
-        _ => None,
+        0 => "UNSPECIFIED".to_string(),
+        1 => "INTERNAL".to_string(),
+        2 => "SERVER".to_string(),
+        3 => "CLIENT".to_string(),
+        4 => "PRODUCER".to_string(),
+        5 => "CONSUMER".to_string(),
+        other => other.to_string(),
     }
 }
 
-/// Readable label for an OTLP `Status.StatusCode`, or `None` for an unknown
-/// variant — the caller still stores the raw int for those.
-fn status_code_label(code: i32) -> Option<&'static str> {
+/// A span's role in its trace: `ROOT` without a parent, else by kind.
+fn span_role_label(kind: i32, has_parent: bool) -> &'static str {
+    if !has_parent {
+        return "ROOT";
+    }
+    match kind {
+        2 | 5 => "INBOUND",
+        3 | 4 => "OUTBOUND",
+        _ => "INTERNAL",
+    }
+}
+
+/// Label for an OTLP `Status.StatusCode`: the proto value name without its
+/// `STATUS_CODE_` prefix, or the decimal number for an unknown variant.
+fn status_code_label(code: i32) -> String {
     match code {
-        0 => Some("UNSET"),
-        1 => Some("OK"),
-        2 => Some("ERROR"),
-        _ => None,
+        0 => "UNSET".to_string(),
+        1 => "OK".to_string(),
+        2 => "ERROR".to_string(),
+        other => other.to_string(),
     }
 }
 
@@ -833,7 +868,7 @@ pub struct TimeBounds {
 /// `out`: strings raw, ints/doubles decimal, bools `true`/`false`, bytes
 /// lowercase hex, `Null` nothing, the flatten-only empties structurally
 /// (`[]`/`{}`). This is the single canonical rendering shared by the
-/// flattener's emit-time hash and the SFST build, so both agree on the exact
+/// flattener's emit-time hash and SFST indexing, so both agree on the exact
 /// `key=value` bytes.
 pub fn append_value(value: &Value, out: &mut String) {
     use std::fmt::Write as _;

@@ -352,21 +352,21 @@ Journal rotation size is not user-configured. The plugin derives it per tier:
 
 The plugin exposes lightweight production health charts by default:
 
-- `netflow.open_tiers`
+- `netdata.netflow.open_tiers`
   - currently open rollup rows by tier
-- `netflow.decoder_scopes`
+- `netdata.netflow.decoder_scopes`
   - NetFlow v9 parser scopes
   - IPFIX parser scopes
   - legacy parser scopes
   - persisted decoder namespaces
   - hydrated namespace-source mappings
-- `netflow.facet_values`
+- `netdata.netflow.facet_values`
   - total published facet values
   - exposed facet values
-- `netflow.facet_fields`
+- `netdata.netflow.facet_fields`
   - populated facet fields
   - autocomplete-backed facet fields
-- `netflow.tier_index_entries`
+- `netdata.netflow.tier_index_entries`
   - indexed hours
   - indexed rollup flows
 
@@ -381,16 +381,16 @@ charts:
     interval: 10s
 ```
 
-These charts refresh on the configured interval. With the default `10s`
-interval, short-lived memory spikes may be missed or appear stale between
-samples.
+These charts refresh on the configured interval, rounded up to whole
+seconds. With the default `10s` interval, short-lived memory spikes may be
+missed or appear stale between samples.
 
 When enabled, the plugin also exposes:
 
-- `netflow.memory_resident_bytes`
+- `netdata.netflow.memory_resident_bytes`
   - `rss`, `hwm`
   - `rss_anon`, `rss_file`, `rss_shmem`, `anon_huge_pages`
-- `netflow.memory_resident_mapping_bytes`
+- `netdata.netflow.memory_resident_mapping_bytes`
   - resident heap bytes
   - anonymous non-heap mappings
   - raw journal mmap bytes
@@ -401,17 +401,17 @@ When enabled, the plugin also exposes:
   - GeoIP geo/country MMDB resident bytes
   - other file-backed mappings
   - shmem mappings
-- `netflow.memory_allocator_bytes`
+- `netdata.netflow.memory_allocator_bytes`
   - `heap_in_use`, `heap_free`, `heap_arena`
   - `mmap_in_use`, `releasable`
-- `netflow.memory_accounted_bytes`
+- `netdata.netflow.memory_accounted_bytes`
   - facet runtime archived/active/contribution/published/path buckets
   - materialized tier indexes
   - open tier rows
   - GeoIP ASN MMDB resident bytes
   - GeoIP geo/country MMDB resident bytes
   - unaccounted process RSS remainder
-- `netflow.memory_tier_index_bytes`
+- `netdata.netflow.memory_tier_index_bytes`
   - tier row storage
   - tier field dictionaries
   - tier lookup tables

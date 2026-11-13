@@ -1,10 +1,12 @@
 //! The registry of locally-present catalog files.
 //!
-//! A catalog file is an immutable snapshot the catalog builder rotates once
-//! per `(tenant, date, machine, instance)` scope (file-lifecycle
-//! `catalog_builder.rs`). One [`Registry`] per tenant tracks the files of
-//! one signal's catalog dir; it is the third registry of file-lifecycle's
-//! per-tenant composition, beside `wal::Registry` and `sfst::Registry`.
+//! A catalog file is a snapshot that the catalog builder rotates once per
+//! `(tenant, date, machine, instance)` scope (file-lifecycle
+//! `catalog_builder.rs`). It is written whole and never changed in place; a
+//! rotation that gives the name of an existing file replaces it. One
+//! [`Registry`] per tenant tracks the files of one signal's catalog dir; it
+//! is the third registry of file-lifecycle's per-tenant composition, beside
+//! `wal::Registry` and `sfst::Registry`.
 //!
 //! Path and filename contract, owned here:
 //! `{base}/{YYYY-MM-DD}/{tenant}/{machine:32}-{instance:32}-{max_seq:010}-{min_ts:010}-{max_ts:010}.catalog`.
@@ -145,7 +147,8 @@ pub struct Registry {
     tenant_id: TenantId,
     /// Keyed by on-disk path. The path encodes the file's full
     /// `(date, machine, instance, max_seq, min_ts, max_ts)` identity, and
-    /// catalog files are immutable — a file's tracked key never changes.
+    /// a catalog file is never changed in place (a rotation writes a whole
+    /// file) — a file's tracked key never changes.
     files: BTreeMap<PathBuf, File>,
 }
 
@@ -869,7 +872,7 @@ mod tests {
 
     // ── files_overlapping() / read_entries() tests ───────────────
 
-    use crate::entry::opaque_part_key;
+    use crate::entry::opaque_partition_key;
 
     /// Write a catalog file containing `entries` to disk and return the
     /// path. Also tracks it in the registry under the canonical
@@ -897,9 +900,9 @@ mod tests {
     }
 
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
-        let part_key = opaque_part_key(ns, name);
+        let partition_key = opaque_partition_key(ns, name);
         CatalogEntry {
-            id: file_registry::FileId::new(ident(), 0, seq, part_key),
+            id: file_registry::FileId::new(ident(), 0, seq, partition_key),
             remote_key: format!("k{seq}"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
@@ -949,7 +952,7 @@ mod tests {
         assert_eq!(seqs(in_window), vec![1, 3]);
         let api_only = Query {
             time_range: 0..1000,
-            partition_keys: vec![opaque_part_key("prod", "api")],
+            partition_keys: vec![opaque_partition_key("prod", "api")],
         };
         assert_eq!(
             seqs(read_entries(&path, &api_only).unwrap().unwrap()),

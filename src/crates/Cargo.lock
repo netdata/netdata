@@ -462,32 +462,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bridge"
-version = "0.1.3"
-dependencies = [
- "async-trait",
- "bincode 2.0.1",
- "bytesize",
- "console-subscriber",
- "file-registry",
- "futures",
- "humantime-serde",
- "netdata-plugin-error",
- "netdata-plugin-protocol",
- "netdata-plugin-schema",
- "netdata-plugin-types",
- "schemars",
- "serde",
- "serde_json",
- "serde_yaml",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "bstr"
 version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1286,7 +1260,6 @@ name = "file-lifecycle"
 version = "0.1.3"
 dependencies = [
  "anyhow",
- "bridge",
  "bytesize",
  "chrono",
  "chunk-file",
@@ -1297,10 +1270,12 @@ dependencies = [
  "moka",
  "netdata-plugin-protocol",
  "opendal",
+ "otel-bridge",
  "otel-catalog",
  "reqwest",
  "sfst",
  "tempfile",
+ "thiserror 2.0.20",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1343,15 +1318,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "flatten-serde-json"
-version = "1.22.1"
-source = "git+https://github.com/meilisearch/meilisearch?tag=v1.22.1#077ec2ab11bb4daefcb57f89eab9cff16e075fdc"
-dependencies = [
- "serde_json",
-]
-
-[[package]]
-name = "flatten_otel"
+name = "flatten-otel"
 version = "0.1.3"
 dependencies = [
  "base64 0.22.1",
@@ -1359,6 +1326,14 @@ dependencies = [
  "opentelemetry-proto",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "flatten-serde-json"
+version = "1.22.1"
+source = "git+https://github.com/meilisearch/meilisearch?tag=v1.22.1#077ec2ab11bb4daefcb57f89eab9cff16e075fdc"
+dependencies = [
+ "serde_json",
 ]
 
 [[package]]
@@ -2513,7 +2488,6 @@ dependencies = [
  "parking_lot",
  "rand 0.9.5",
  "rayon",
- "rdp",
  "regex",
  "rustc-hash",
  "ruzstd",
@@ -2572,8 +2546,6 @@ dependencies = [
  "journal-index",
  "journal-registry",
  "nix",
- "rt",
- "schemars",
  "serde",
  "serde_json",
  "thiserror 2.0.20",
@@ -2593,25 +2565,6 @@ dependencies = [
  "roaring 0.11.2",
  "serde",
  "static_assertions",
- "tempfile",
- "thiserror 2.0.20",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "journal-log-writer"
-version = "0.1.3"
-dependencies = [
- "flatten-serde-json",
- "itoa",
- "journal-common",
- "journal-core",
- "journal-registry",
- "nix",
- "rdp",
- "serde",
- "serde_json",
  "tempfile",
  "thiserror 2.0.20",
  "tracing",
@@ -3041,18 +2994,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "netdata-plugin-charts-derive"
-version = "0.1.3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
 name = "netdata-plugin-error"
 version = "0.1.3"
 dependencies = [
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "netdata-plugin-metrics"
+version = "0.1.3"
+dependencies = [
+ "indexmap",
+ "netdata-plugin-protocol",
  "thiserror 2.0.20",
 ]
 
@@ -3064,6 +3017,7 @@ dependencies = [
  "bytes",
  "futures",
  "futures-util",
+ "itoa",
  "netdata-plugin-error",
  "netdata-plugin-types",
  "phf",
@@ -3073,6 +3027,23 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+]
+
+[[package]]
+name = "netdata-plugin-rt"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "futures",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-journald",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -3127,7 +3098,9 @@ dependencies = [
  "memchr",
  "memmap2",
  "netdata-plugin-error",
+ "netdata-plugin-metrics",
  "netdata-plugin-protocol",
+ "netdata-plugin-rt",
  "netflow_parser",
  "netgauze-bgp-pkt",
  "netgauze-bmp-pkt",
@@ -3140,9 +3113,7 @@ dependencies = [
  "reqwest",
  "rmp-serde",
  "roaring 0.11.2",
- "rt",
  "rustc-hash",
- "schemars",
  "serde",
  "serde_json",
  "serde_yaml",
@@ -3655,6 +3626,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-bridge"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "bincode 2.0.1",
+ "bytesize",
+ "console-subscriber",
+ "file-registry",
+ "futures",
+ "humantime-serde",
+ "netdata-plugin-error",
+ "netdata-plugin-protocol",
+ "netdata-plugin-schema",
+ "netdata-plugin-types",
+ "schemars",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "otel-catalog"
 version = "0.1.3"
 dependencies = [
@@ -3670,24 +3667,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-derived-metrics"
+version = "0.1.3"
+dependencies = [
+ "anyhow",
+ "netdata-plugin-metrics",
+ "netdata-plugin-protocol",
+ "opentelemetry-proto",
+ "otel-bridge",
+]
+
+[[package]]
 name = "otel-ingestor"
 version = "0.1.3"
 dependencies = [
  "anyhow",
  "axum",
- "bridge",
  "bytesize",
  "ferryboat",
  "file-registry",
  "flate2",
- "flatten_otel",
+ "flatten-otel",
  "http",
  "http-body-util",
+ "netdata-plugin-protocol",
  "netdata-plugin-types",
  "ng-flatten",
  "opentelemetry-proto",
+ "otel-bridge",
  "otel-catalog",
+ "otel-derived-metrics",
  "otel-logs-identity",
+ "otel-service-map",
  "prost",
  "rcgen",
  "regex",
@@ -3700,6 +3711,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-rustls",
+ "tokio-util",
  "tonic",
  "tower",
  "tracing",
@@ -3709,12 +3721,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "otel-job-scheduler"
+version = "0.1.3"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+]
+
+[[package]]
 name = "otel-ledger"
 version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
- "bridge",
+ "bincode 2.0.1",
  "bytesize",
  "chrono",
  "ferryboat",
@@ -3723,12 +3744,15 @@ dependencies = [
  "file-registry",
  "libc",
  "netdata-plugin-error",
+ "netdata-plugin-metrics",
  "netdata-plugin-protocol",
  "netdata-plugin-types",
  "ng-flatten",
  "ng-index",
  "opentelemetry-proto",
+ "otel-bridge",
  "otel-catalog",
+ "otel-job-scheduler",
  "otel-logs-identity",
  "serde",
  "serde_json",
@@ -3749,7 +3773,6 @@ version = "0.1.3"
 dependencies = [
  "anyhow",
  "async-trait",
- "bridge",
  "ferryboat",
  "journal-function",
  "journal-index",
@@ -3757,6 +3780,7 @@ dependencies = [
  "netdata-plugin-protocol",
  "netdata-plugin-schema",
  "netdata-plugin-types",
+ "otel-bridge",
  "serde_json",
  "tempfile",
  "tokio",
@@ -3778,18 +3802,18 @@ name = "otel-plugin"
 version = "0.1.3"
 dependencies = [
  "anyhow",
- "bridge",
  "bytesize",
  "clap",
  "ferryboat",
  "file-registry",
  "humantime",
  "netdata-plugin-protocol",
+ "netdata-plugin-rt",
  "netdata-plugin-types",
+ "otel-bridge",
  "otel-ingestor",
  "otel-ledger",
  "otel-legacy-logs",
- "rt",
  "rustls",
  "serde",
  "serde_json",
@@ -3800,6 +3824,26 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "otel-service-map"
+version = "0.1.3"
+dependencies = [
+ "async-trait",
+ "bincode 2.0.1",
+ "crc32fast",
+ "humantime",
+ "netdata-plugin-protocol",
+ "netdata-plugin-types",
+ "opentelemetry-proto",
+ "otel-bridge",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -4475,13 +4519,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rdp"
-version = "0.1.3"
-dependencies = [
- "md5",
-]
-
-[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4710,31 +4747,6 @@ dependencies = [
  "bytemuck",
  "byteorder",
  "serde",
-]
-
-[[package]]
-name = "rt"
-version = "0.1.3"
-dependencies = [
- "async-trait",
- "bytes",
- "console-subscriber",
- "futures",
- "itoa",
- "netdata-plugin-charts-derive",
- "netdata-plugin-error",
- "netdata-plugin-protocol",
- "netdata-plugin-schema",
- "parking_lot",
- "schemars",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tracing",
- "tracing-futures",
- "tracing-journald",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -5112,6 +5124,7 @@ dependencies = [
  "thiserror 2.0.20",
  "tokio-util",
  "tracing",
+ "tracing-subscriber",
  "treight",
  "uuid",
  "wal",
@@ -5781,6 +5794,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "libc",
  "pin-project-lite",
  "tokio",
@@ -5975,16 +5989,6 @@ checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "pin-project",
- "tracing",
 ]
 
 [[package]]

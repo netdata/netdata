@@ -52,8 +52,8 @@ fn ident() -> file_registry::Identity {
     file_registry::Identity::new(machine(), instance())
 }
 /// A `FileId` under `ident()` with pipeline id `0`.
-fn fid(seq: u64, part_key: u64) -> FileId {
-    FileId::new(ident(), 0, seq, part_key)
+fn fid(seq: u64, partition_key: u64) -> FileId {
+    FileId::new(ident(), 0, seq, partition_key)
 }
 
 fn make_registry() -> Registry {
@@ -76,8 +76,8 @@ fn make_registry() -> Registry {
 /// identity.
 fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
     const NS: u64 = 1_000_000_000;
-    let (part_key, content_meta) = crate::test_helpers::identity_for("ns", "svc");
-    let id = fid(seq, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("ns", "svc");
+    let id = fid(seq, partition_key);
     reg.wal
         .apply_event(&FileEvent::Created {
             file_id: id,
@@ -100,7 +100,7 @@ fn track_wal(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 
 /// Track an SFST file for the fixed `("ns", "a")` stream with the given range.
 fn track_sfst(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
-    let id = fid(seq, crate::test_helpers::opaque_part_key("ns", "a"));
+    let id = fid(seq, crate::test_helpers::opaque_partition_key("ns", "a"));
     reg.sfst.track(
         id,
         ByteSize(1),
@@ -116,15 +116,15 @@ fn track_remote(reg: &mut Registry, seq: u64, min_s: u32, max_s: u32) {
 }
 
 /// Like [`track_remote`] but with a caller-chosen stream. The entry's
-/// `id.part_key` matches the stream's key, as production `build_catalog_entry`
-/// guarantees (it copies the `id` and the summary's `content_meta` from the
-/// same SFST).
+/// `id.partition_key` matches the stream's key, as production
+/// `build_catalog_entry` guarantees (it copies the `id` and the summary's
+/// `content_meta` from the same SFST).
 fn track_remote_as(reg: &mut Registry, seq: u64, ns: &str, name: &str, min_s: u32, max_s: u32) {
     use chrono::NaiveDate;
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
-    let (part_key, content_meta) = crate::test_helpers::identity_for(ns, name);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for(ns, name);
     let entry = otel_catalog::CatalogEntry {
-        id: fid(seq, part_key),
+        id: fid(seq, partition_key),
         remote_key: format!("k{seq}"),
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,
@@ -209,7 +209,12 @@ fn remote_only_not_masked_by_different_identity_local_file() {
         file_registry::InstanceId::new(Uuid::from_u128(0x9999_8888_7777_6666_5555_4444_3333_2222))
             .unwrap(),
     );
-    let id = FileId::new(other, 0, 5, crate::test_helpers::opaque_part_key("ns", "a"));
+    let id = FileId::new(
+        other,
+        0,
+        5,
+        crate::test_helpers::opaque_partition_key("ns", "a"),
+    );
     reg.sfst.track(
         id,
         ByteSize(1),
@@ -270,7 +275,7 @@ fn remote_only_empty_registry() {
 /// Drive the selector the way the logs handler does: the local half from the
 /// registry, the remote-only half from a plan over the same window, then decode +
 /// sort by `(namespace, name)` the way the rpc adapter does for display (the
-/// substrate orders by `part_key`).
+/// substrate orders by `partition_key`).
 fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::PartitionStat> {
     let mut parts = reg.local_streams(q).with_catalog(&remote_only(reg, q));
     parts.sort_by_key(|p| crate::test_helpers::decode_opaque(&p.content_meta));
@@ -362,9 +367,9 @@ fn remote_entry(
     max_s: u32,
     size: u64,
 ) -> otel_catalog::CatalogEntry {
-    let (part_key, content_meta) = crate::test_helpers::identity_for("ns", "a");
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("ns", "a");
     otel_catalog::CatalogEntry {
-        id: FileId::new(identity, 0, seq, part_key),
+        id: FileId::new(identity, 0, seq, partition_key),
         remote_key: format!("k{seq}"),
         min_timestamp_s: min_s,
         max_timestamp_s: max_s,

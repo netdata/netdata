@@ -41,7 +41,7 @@ use super::wal_scan::WalScan;
 pub use crate::source::Source;
 
 /// A query candidate: an SFST whose time range overlaps the request
-/// window — either a sealed on-disk file or an in-memory chunk built
+/// window — either a sealed on-disk file or an in-memory chunk indexed
 /// from an active WAL's durable prefix. Owned, so the caller can release
 /// any lock on the file source before the query does I/O.
 ///

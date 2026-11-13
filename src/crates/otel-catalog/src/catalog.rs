@@ -121,8 +121,8 @@ impl Catalog {
     /// intersects the query's `[start, end)` window (half-open) — the shared
     /// [`file_registry::range_overlaps`] rule, the same convention as
     /// `sfst::Registry::candidates` and `wal::Registry::candidates` — and
-    /// whose `id.part_key` passes the query's partition filter (an empty set
-    /// matches every partition). Yields in `FileId` (map) order; the query
+    /// whose `id.partition_key` passes the query's partition filter (an empty
+    /// set matches every partition). Yields in `FileId` (map) order; the query
     /// path consumes it through `read_entries` (sibling `registry.rs`).
     pub fn find<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a CatalogEntry> + 'a {
         // Extract q's contents upfront so the filter closures don't borrow
@@ -133,7 +133,9 @@ impl Catalog {
         self.entries
             .values()
             .filter(move |e| range_overlaps(e, &q_range))
-            .filter(move |e| partition_keys.is_empty() || partition_keys.contains(&e.id.part_key))
+            .filter(move |e| {
+                partition_keys.is_empty() || partition_keys.contains(&e.id.partition_key)
+            })
     }
 
     /// Serialize to the on-disk container: magic `NCAT` + framing
@@ -232,7 +234,7 @@ struct Envelope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::entry::opaque_part_key;
+    use crate::entry::opaque_partition_key;
     use file_registry::{ByteSize, TimestampNs};
     use uuid::Uuid;
 
@@ -253,9 +255,9 @@ mod tests {
     }
 
     fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
-        let part_key = opaque_part_key(ns, name);
+        let partition_key = opaque_partition_key(ns, name);
         CatalogEntry {
-            id: FileId::new(ident(), 0, seq, part_key),
+            id: FileId::new(ident(), 0, seq, partition_key),
             remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
             min_timestamp_s: min_s,
             max_timestamp_s: max_s,
@@ -401,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn find_with_part_key_filter_matches_only_that_partition() {
+    fn find_with_partition_key_filter_matches_only_that_partition() {
         let mut c = test_catalog();
         // Two entries on one partition, one on another.
         c.add(entry_at(1, 100, 200, "prod", "api"));
@@ -410,23 +412,23 @@ mod tests {
 
         let q = Query {
             time_range: 0..1000,
-            partition_keys: vec![opaque_part_key("prod", "api")],
+            partition_keys: vec![opaque_partition_key("prod", "api")],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1, 3]);
     }
 
     #[test]
-    fn find_with_part_key_filter_excludes_non_matching_entries() {
+    fn find_with_partition_key_filter_excludes_non_matching_entries() {
         let mut c = test_catalog();
         c.add(entry_at(1, 100, 200, "", ""));
         c.add(entry_at(2, 100, 200, "prod", "api"));
 
-        // The catalog compares `part_key` as an opaque u64: only the entry
+        // The catalog compares `partition_key` as an opaque u64: only the entry
         // whose key equals the query's is kept (entry 2 has a different key).
         let q = Query {
             time_range: 0..1000,
-            partition_keys: vec![opaque_part_key("", "")],
+            partition_keys: vec![opaque_partition_key("", "")],
         };
         let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
         assert_eq!(hits, vec![1]);

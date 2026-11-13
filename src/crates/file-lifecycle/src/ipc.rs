@@ -17,12 +17,12 @@
 //!   carrying `wal::Message`. Those wire types live in the `wal` crate;
 //!   this module owns only the accept plumbing, and the connecting side is
 //!   otel-ingestor's `LedgerSender`. The supervisor↔worker links are
-//!   `bridge`'s — its documented lib.rs records the carve-out that keeps
-//!   this socket's types here rather than in the bridge enums.
+//!   `otel-bridge`'s — its documented lib.rs records the carve-out that keeps
+//!   this socket's types here rather than in the `otel-bridge` enums.
 //!
 //! The WAL-event link runs at ferryboat's 8 MiB default size limit with no
 //! compression: neither end sets an override, so
-//! `bridge::IPC_MAX_MESSAGE_SIZE` (the supervisor↔worker ceiling) does not
+//! `otel_bridge::IPC_MAX_MESSAGE_SIZE` (the supervisor↔worker ceiling) does not
 //! apply. Framing, size-limit enforcement and link error semantics are
 //! ferryboat's (see its documented lib.rs); what the ledger does with a
 //! received event is otel-ledger's `handle_ingestor_msg`.
@@ -30,7 +30,7 @@
 use std::path::PathBuf;
 
 use ferryboat::{Connection, Endpoint, Listener};
-use file_registry::{Identity, SeqKey, TenantId};
+use file_registry::{FileId, Identity, SeqKey, TenantId};
 
 /// Socket path for the writer → ledger link — a default, not the value
 /// production uses: nothing in-tree references this constant. The
@@ -107,14 +107,17 @@ pub enum CleanerResponse {
 }
 
 /// Requests sent from the ledger to the indexer: one component per signal
-/// pipeline, spawned by otel-ledger with that signal's seal function (the
-/// indexer itself lives in otel-ledger because sealing is content-aware).
+/// pipeline, spawned by otel-ledger with that signal (the indexer itself
+/// lives in otel-ledger because indexing is content-aware).
 /// Sent on a `Closed` WAL event at runtime, and for unindexed WALs during
 /// recovery (`recovery/local.rs`, via `batch_recover`).
 #[derive(Debug, Clone)]
 pub enum IndexerRequest {
-    /// Build an SFST index for the given WAL file.
+    /// Index the given WAL file into an SFST.
     Index {
+        /// The file's identity; the response carries it back, so neither
+        /// side reads it out of a path.
+        file_id: FileId,
         /// Path to the `.wal` file to index.
         wal_path: PathBuf,
         /// Path where the `.sfst` index should be written.
@@ -125,15 +128,10 @@ pub enum IndexerRequest {
 /// Responses sent from the indexer back to the ledger.
 #[derive(Debug, Clone)]
 pub enum IndexerResponse {
-    /// The SFST has been written successfully.
+    /// The SFST has been written successfully, at the request's `sfst_path`.
     Indexed {
-        /// Seq of the indexed WAL file, parsed from its filename (`0` if the
-        /// name doesn't decode).
-        seq: u64,
-        /// Path the SFST was written to. Informational only: both consumers
-        /// (otel-ledger's response handler and recovery) recompute the path
-        /// from the registry, so nothing reads this field today.
-        path: PathBuf,
+        /// The indexed WAL file, as in the request.
+        file_id: FileId,
         /// Cheap summary fields (min/max timestamp, record count, opaque content_meta).
         /// Stored on the registry entry on `track`; used by the uploader
         /// response handler to build the catalog entry directly from the
@@ -144,8 +142,12 @@ pub enum IndexerResponse {
     },
     /// Indexing failed for a file. Nothing is retried at runtime: the file
     /// stays WAL-tracked (still queryable) until the next restart's recovery
-    /// retries the seal and otherwise orphans it.
-    IndexFailed { path: PathBuf, error: String },
+    /// retries the indexing operation and otherwise orphans it.
+    IndexFailed {
+        /// The WAL file that was not indexed, as in the request.
+        file_id: FileId,
+        error: String,
+    },
 }
 
 /// Requests sent from the ledger to the uploader.
@@ -269,8 +271,9 @@ pub enum CatalogBuilderResponse {
     /// The entry joined the accumulator; no rotation was triggered (the
     /// ledger only logs it).
     EntryAccepted { seq: u64 },
-    /// A scope's accumulator rotated and a new catalog file was written to
-    /// `path` (count, time, or `Flush` trigger). The accumulator for this
+    /// A scope's accumulator rotated and a catalog file with its entries was
+    /// written to `path` (count, time, or `Flush` trigger), in the place of
+    /// a file with the same name if there was one. The accumulator for this
     /// scope is now empty. The ledger is responsible for registering the file
     /// and sending it to the uploader.
     Rotated {
@@ -320,13 +323,14 @@ pub enum CatalogBuilderResponse {
 /// (`max_retries(None)`, 1 s interval), so an `Err` here means the bind
 /// failed, not that no writer showed up yet. While this call waits, the
 /// ledger reads no supervisor traffic, so a graceful `Shutdown` sent in that
-/// window is not honored (deliberate ordering; see the supervisor's
-/// configure-before-bind comment and `Ledger::new`'s doc).
+/// window is not honored (deliberate ordering; see `Ledger::new`'s doc).
 ///
 /// On success the connection is stored on the `Ledger` and driven by the run
-/// loop's `select!`; a `recv` error there is fatal (exits `run`, dropping the
-/// supervisor connection so the supervisor reaps the workers). The ingestor
-/// side treats the same loss as fire-and-forget (`ledger_sender.rs`).
+/// loop's `select!`. When the ingestor closes the connection, the run ends
+/// as it does on a `Shutdown`; any other `recv` error there is fatal (exits
+/// `run`, dropping the supervisor connection so the supervisor reaps the
+/// workers). The ingestor side treats the loss of the connection as
+/// fire-and-forget (`ledger_sender.rs`).
 ///
 /// Exactly one writer connection is served: the function accepts once and
 /// returns, dropping the listener — which also unlinks the Unix socket path

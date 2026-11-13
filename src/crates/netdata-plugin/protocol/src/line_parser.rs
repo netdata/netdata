@@ -138,7 +138,7 @@ impl From<std::io::Error> for Error {
 /// per command. The enum covers the whole framing-layer vocabulary, but
 /// `MessageParser::process_command` consumes only the function/payload/quit
 /// subset and drops the rest: chart commands are recognized here and ignored
-/// there (rt emits chart text as raw bytes via
+/// there (plugins write chart text as raw bytes via
 /// `transport::MessageWriter::write_raw`, and the agent parses it — see
 /// `src/plugins.d/pluginsd_parser.c`).
 pub enum Command<'a> {
@@ -340,9 +340,10 @@ pub struct ParsedLine<'a> {
 /// keyword is parsed and closes when `parse` finds the matching end-marker
 /// line; while open, the body bypasses keyword lookup entirely and is
 /// returned as one payload command.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ParserState {
     /// Normal line-by-line parsing mode
+    #[default]
     Normal,
     /// Inside a FUNCTION_RESULT block, looking for FUNCTION_RESULT_END
     FunctionResult,
@@ -350,12 +351,6 @@ pub enum ParserState {
     FunctionPayload,
     /// Inside a JSON block, looking for JSON_PAYLOAD_END
     JsonPayload,
-}
-
-impl Default for ParserState {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 /// Low-level line parser. Stateful across calls: it must always be fed

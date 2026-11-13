@@ -862,11 +862,17 @@ data collection is defined as a series of `BEGIN` -> `SET` -> `END` lines
 
 -   `value`
 
-    is the collected value, only integer values are collected. If you want to push fractional values, multiply this value by 100 or 1000 and set the `DIMENSION` divider to 1000.
+    is the collected value. A dimension declared with the `type=float` option accepts decimal values, or the exact bits of the double: `@` followed by its IEEE 754 representation in base64 (digits `A-Z`, `a-z`, `0-9`, `+`, `/`, most significant first, without padding), for example `@D/4AAAAAAAA` for 1.5. A plugin that writes the base64 form skips the conversion to decimal digits. A `type=int` dimension (the default) accepts integers only: to push fractional values to it, multiply the value by 100 or 1000 and set the `DIMENSION` divider to 1000. An empty value (`SET id =`) stores a gap for this commit.
 
-> END
+> END [seconds [microseconds [pending]]]
 
-  END does not take any parameters, it commits the collected values for all dimensions to the chart. If a dimensions was not `SET`, its value will be empty for this commit.
+  END commits the collected values for all dimensions to the chart. If a dimension was not `SET`, its value will be empty for this commit.
+
+  -   `seconds` and `microseconds` are the collection time. When not given, or 0, Netdata uses its own clock.
+
+      Netdata uses this time to place the first update of the chart. For later updates, Netdata uses the `BEGIN` microseconds, and it aligns the chart to its own clock again when the chart is defined again.
+
+  -   `pending` is any non-empty word, for example `1`. With it, Netdata calculates the time since the previous update from `seconds` and `microseconds`, as for its internal collectors. Use it when updates are for past times, for example data that is aggregated and sent some seconds later: `END 1700000010 0 1`. Times must increase for each chart. Use it together with the chart option `store_first`: this aligns the chart to whole seconds and keeps the first update, so that each update is stored at its time.
 
 More `SET` lines may appear to update all the dimensions of the chart.
 All of them in one `BEGIN` -> `END` block.

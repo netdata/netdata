@@ -2,8 +2,8 @@
 //! single `tokio::select!` in [`crate::Ledger::run`] wakes on; its dispatch
 //! match in the same function routes each variant to a `handle_*` method.
 //! `PipelineResp` is the per-pipeline worker response `LedgerEvent` carries.
-use bridge::signals::Signal;
-use bridge::{LedgerRequest, LedgerResponse};
+use otel_bridge::signals::Signal;
+use otel_bridge::{LedgerRequest, LedgerResponse};
 
 use file_lifecycle::ipc::{
     CatalogBuilderResponse, CleanerResponse, IndexerResponse, UploaderResponse,
@@ -16,10 +16,14 @@ pub enum LedgerEvent {
     /// notification that a WAL file was Created/Synced/Closed, not payload
     /// (`wal/src/format.rs` `FileEvent`). Routed to its pipeline by the
     /// event's `pipeline_id()`, decoded to a `Signal` in
-    /// `Ledger::handle_ingestor_msg` (unknown ids dropped). A failed recv
-    /// here is fatal — the writer connection is never re-established — so
-    /// the arm `?`s [`crate::Ledger::run`] out.
+    /// `Ledger::handle_ingestor_msg` (unknown ids dropped). The writer
+    /// connection is never re-established: its end is
+    /// [`Self::WriterLinkClosed`], and any other failed recv is an error
+    /// that ends [`crate::Ledger::run`].
     WalMsg(wal::Message),
+    /// The ingestor closed its end of the writer link: it stopped, or it is
+    /// gone.
+    WriterLinkClosed,
     /// A response from a per-pipeline worker (indexer or catalog builder),
     /// tagged with the owning `Signal` by its `spawn_forwarder` task
     /// (`ledger/pipeline.rs`). The shared workers (cleaner, uploader)
@@ -39,10 +43,11 @@ pub enum LedgerEvent {
     /// run-loop exclusively owns `self.supervisor`, so handlers funnel
     /// through this arm.
     OutboundResp(LedgerResponse),
-    /// The shared upload-retry timer fired (the 30 s `retry_timer` interval
+    /// The ledger's periodic timer fired (the 30 s `periodic_timer` interval
     /// built in `Ledger::new`): re-issue any failed uploads whose backoff has
-    /// elapsed (`Ledger::handle_retry_tick`).
-    RetryTick,
+    /// elapsed (`Ledger::handle_retry_tick`), and run retention for every
+    /// tenant (`Ledger::evaluate_retention_of_all_tenants`).
+    PeriodicTick,
 }
 
 /// A response funneled from one pipeline's per-signal workers into the
@@ -55,7 +60,7 @@ pub enum LedgerEvent {
 /// selects on in [`crate::Ledger::run`]. The shared cleaner/uploader keep
 /// their own channels because there is exactly one of each.
 pub enum PipelineResp {
-    /// A response from a pipeline's seal/index worker.
+    /// A response from a pipeline's indexer.
     Indexer(IndexerResponse),
     /// A response from a pipeline's catalog builder.
     CatalogBuilder(CatalogBuilderResponse),

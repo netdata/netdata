@@ -15,17 +15,23 @@ path = "src/lib.rs"
 otel-logs-identity = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-bridge = { workspace = true }
+bincode = { workspace = true }
+otel-bridge = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-cache = { workspace = true }
 file-lifecycle = { workspace = true }
 file-registry = { workspace = true }
+# `setpriority` for the index child. Tests also use `mkfifo`: the test that
+# proves the logs query reads catalogs off the registry lock needs a FIFO.
+libc = { workspace = true }
 netdata-plugin-error = { workspace = true }
+netdata-plugin-metrics = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 netdata-plugin-types = { workspace = true }
 otel-catalog = { workspace = true }
+otel-job-scheduler = { workspace = true }
 sfst = { workspace = true }
 ng-index = { workspace = true }
 sfsq = { workspace = true }
@@ -42,9 +48,8 @@ wal = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-# `mkfifo` for the test that proves the logs query reads catalogs off the
-# registry lock (a FIFO catalog blocks its reader until the test writes it).
-libc = { workspace = true }
+# test-support: the readable form of the chart text in the chart tests.
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }
 # test-util exposes the chunk-level writer for the hand-built SFST fixtures in
 # ledger/rpc/handler/tests.rs.
 sfst = { workspace = true, features = ["test-util"] }

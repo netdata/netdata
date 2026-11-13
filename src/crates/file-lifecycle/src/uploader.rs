@@ -9,8 +9,10 @@
 //! spawning, so a recovery backlog can't fan out into thousands of
 //! simultaneous file reads + PUTs. Each task buffers its whole file in
 //! memory, so the permit count also caps peak upload memory. In-flight tasks
-//! are tracked in a [`JoinSet`] so a shutdown drains them briefly instead of
-//! abandoning detached uploads mid-PUT.
+//! are tracked in a [`JoinSet`], so they end with the component: at a stop
+//! the uploads in flight are cut. An upload is idempotent (a deterministic
+//! remote key, and `storage.write` overwrites), and the next start uploads
+//! again whatever the remote does not have.
 //!
 //! Failure handling: a failed read/write is logged and returned as a
 //! `*Failed` response carrying the error string — there is no retry here.
@@ -29,7 +31,6 @@
 use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
@@ -39,12 +40,6 @@ use tokio_util::sync::CancellationToken;
 use crate::component::Component;
 use crate::ipc::{UploaderRequest, UploaderResponse};
 use crate::storage::{Storage, WriteMeta};
-
-/// How long a graceful shutdown waits for in-flight uploads to finish before
-/// abandoning them. Abandoned uploads are idempotently re-driven on the next
-/// restart (deterministic remote key, `storage.write` overwrites), so this is a
-/// best-effort courtesy, not a correctness requirement.
-const SHUTDOWN_DRAIN: Duration = Duration::from_secs(5);
 
 /// Construction args for the uploader. The `Storage` bound lives on the
 /// `Component` impl — the only place the backend is used — so this struct
@@ -114,14 +109,6 @@ impl<S: Storage> Component for Uploader<S> {
                     });
                 }
             }
-        }
-
-        // Give in-flight uploads a brief window to finish (so their responses
-        // land and PUTs aren't cut mid-flight), then drop `tasks`, aborting the
-        // rest — those are re-driven idempotently on the next restart.
-        let drain = async { while tasks.join_next().await.is_some() {} };
-        if tokio::time::timeout(SHUTDOWN_DRAIN, drain).await.is_err() {
-            tracing::warn!("uploader shutdown: abandoning in-flight uploads after drain timeout");
         }
     }
 }
