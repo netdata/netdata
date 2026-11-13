@@ -30,6 +30,38 @@ func TestFormsRejectInvalidWorkflowInputs(t *testing.T) {
 	c.ScriptPath = file
 	require.NoError(t, c.Init(context.Background()))
 	for _, tc := range []struct {
+		name        string
+		trace       any
+		screenshots bool
+		form, valid bool
+	}{
+		{"off", false, false, true, true},
+		{"enabled", true, true, true, true},
+		{"needs screenshots", true, false, false, false},
+		// Like other scalar booleans, null leaves the Go default off but is not a form value.
+		{"null", nil, false, false, true},
+	} {
+		t.Run("trace/"+tc.name, func(t *testing.T) {
+			c := configured()
+			c.ScreenshotOnFailure = tc.screenshots
+			raw, err := json.Marshal(c.Configuration())
+			require.NoError(t, err)
+			var input map[string]any
+			require.NoError(t, json.Unmarshal(raw, &input))
+			input["trace_on_failure"] = tc.trace
+			require.Equal(t, tc.form, schema.Validate(input) == nil)
+			raw, err = json.Marshal(input)
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(raw, c))
+			copy := New(Dependencies{})
+			serialized, err := json.Marshal(c.Configuration()) // Before Init.
+			require.NoError(t, err)
+			require.NoError(t, json.Unmarshal(serialized, copy))
+			require.Equal(t, c.TraceOnFailure, copy.TraceOnFailure)
+			require.Equal(t, tc.valid, c.Init(context.Background()) == nil)
+		})
+	}
+	for _, tc := range []struct {
 		field string
 		value any
 		valid bool

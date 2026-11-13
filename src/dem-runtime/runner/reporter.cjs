@@ -5,12 +5,13 @@ const {
   event,
   write,
   captureState,
-  screenshotCandidate,
+  captureCandidate,
   secretStream,
 } = require("./protocol.cjs");
 const FailureEvidence = require("./failure-evidence.cjs");
 const BrowserSummary = require("./browser-summary.cjs");
 const CaptureDetails = require("./capture-details.cjs");
+const { FAILURE_TRACE } = require("./extensions.cjs");
 
 module.exports = class DEMReporter {
   constructor(options) {
@@ -175,25 +176,29 @@ module.exports = class DEMReporter {
       const first = artifacts.length;
       let unaccepted = 0;
       for (const attachment of result.attachments) {
-        if (
-          attachment.name !== "screenshot" ||
-          attachment.contentType !== "image/png"
-        )
-          continue;
+        const screenshot =
+          attachment.name === "screenshot" &&
+          attachment.contentType === "image/png";
+        const trace =
+          this.options.extensions?.includes(FAILURE_TRACE) &&
+          attachment.name === "trace" &&
+          attachment.contentType === "application/zip";
+        if (!screenshot && !trace) continue;
         if (!attachment.path) {
-          unaccepted++;
+          if (screenshot) unaccepted++;
           continue;
         }
         try {
-          const candidate = screenshotCandidate(
+          const candidate = captureCandidate(
             attachment.path,
             this.options.workDir,
             this.artifacts.length + this.interruptedArtifacts.length + 1,
+            screenshot ? "screenshot" : "trace",
           );
           if (candidate) artifacts.push(candidate);
-          else unaccepted++;
+          else if (screenshot) unaccepted++;
         } catch {
-          unaccepted++;
+          if (screenshot) unaccepted++;
           /* Go also validates candidates; a missing capture does not hide the test result. */
         }
       }

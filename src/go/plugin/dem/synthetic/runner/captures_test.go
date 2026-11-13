@@ -34,7 +34,7 @@ func consumeCaptures(t *testing.T, lines ...string) sinkSnapshot {
 	r.CaptureState = "not_needed"
 	terminal, err := json.Marshal(frame{Type: "result", Result: &r})
 	require.NoError(t, err)
-	s := newSink(synthetic.Journey, true, newRedactor(map[string]string{"token": "synthetic-secret"}), true)
+	s := newSink(synthetic.Journey, true, newRedactor(map[string]string{"token": "synthetic-secret"}), true, false)
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(append(lines, string(terminal)), "\n"))))
 	snap := s.snapshot()
 	require.NoError(t, snap.err)
@@ -128,7 +128,7 @@ func TestCaptureDetailLimitNeverLimitsCandidateAuthority(t *testing.T) {
 }
 
 func TestCaptureMetadataCannotWidenCoreWire(t *testing.T) {
-	s := newSink(synthetic.Journey, true, newRedactor(nil), false)
+	s := newSink(synthetic.Journey, true, newRedactor(nil), false, false)
 	err := s.consume(strings.NewReader(`{"type":"result","result":{"status":"failed","capture_state":"available","artifacts":[{"id":"s1","kind":"screenshot","path":"output/x.png","mime":"image/png","test":{"id":"t1"}}]}}`))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown field "test"`)
@@ -140,5 +140,83 @@ func TestCaptureCountsMustBeObservedRatherThanDefaulted(t *testing.T) {
 		s := consumeCaptures(t, captureInit, line)
 		assert.Equal(t, "invalid", s.captures.Reporting)
 		assert.Empty(t, s.captures.Tests, "missing counts are not observations of zero")
+	}
+}
+
+func TestTraceSupportReporting(t *testing.T) {
+	selected := `{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1","browser_summary.v1","capture_details.v1","failure_trace.v1"]}}`
+	for name, tc := range map[string]struct {
+		trace bool
+		lines []string
+		want  string
+	}{
+		"disabled":                {},
+		"old runtime":             {trace: true, want: "negotiation_not_reported"},
+		"old selection":           {trace: true, lines: []string{captureInit}, want: "unsupported"},
+		"selected":                {trace: true, lines: []string{selected}, want: "supported"},
+		"invalid init":            {trace: true, lines: []string{`{"type":"extension_init","extension_init":{"selected":null}}`}, want: "invalid"},
+		"duplicate selection":     {trace: true, lines: []string{`{"type":"extension_init","extension_init":{"selected":["failure_trace.v1","failure_trace.v1"]}}`}, want: "invalid"},
+		"duplicate init":          {trace: true, lines: []string{selected, selected}, want: "invalid"},
+		"invalid envelope":        {trace: true, lines: []string{selected, `{"type":"extension","extension":{"data":{}}}`}, want: "invalid"},
+		"invalid capture details": {trace: true, lines: []string{selected, captureRecord(map[string]any{"record": "future"})}, want: "supported"},
+		"unrequested selection":   {lines: []string{selected}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := newSink(synthetic.Journey, true, newRedactor(nil), true, tc.trace)
+			r := success()
+			r.CaptureState = "not_needed"
+			terminal, err := json.Marshal(frame{Type: "result", Result: &r})
+			require.NoError(t, err)
+			require.NoError(t, s.consume(strings.NewReader(strings.Join(append(tc.lines, string(terminal)), "\n"))))
+			snap := s.snapshot()
+			require.NotNil(t, snap.captures)
+			assert.Equal(t, tc.want, snap.captures.Trace)
+			if !tc.trace {
+				raw, err := json.Marshal(snap.captures)
+				require.NoError(t, err)
+				assert.NotContains(t, string(raw), `"trace"`)
+			}
+			if name == "invalid capture details" {
+				assert.Equal(t, "invalid", snap.captures.Reporting)
+			}
+			if name == "unrequested selection" {
+				assert.Equal(t, "invalid", snap.captures.Reporting)
+			}
+		})
+	}
+}
+
+func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
+	for _, trace := range []bool{false, true} {
+		for _, interrupted := range []bool{false, true} {
+			for name, init := range map[string]string{
+				"old peer":  "",
+				"selected":  `{"type":"extension_init","extension_init":{"selected":["failure_trace.v1"]}}`,
+				"declined":  `{"type":"extension_init","extension_init":{"selected":[]}}`,
+				"malformed": `{"type":"extension_init","extension_init":{"selected":null}}`,
+			} {
+				t.Run(fmt.Sprintf("trace=%t/interrupted=%t/%s", trace, interrupted, name), func(t *testing.T) {
+					candidate := synthetic.Capture{ID: "trace1", Kind: "trace", MIME: "application/zip", Path: "output/trace.zip"}
+					r := reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, CaptureState: "available", Artifacts: []synthetic.Capture{candidate}}
+					if interrupted {
+						r.Status = synthetic.Timeout
+						r.TerminationReason = synthetic.ExecutionBudget
+						r.Artifacts = nil
+						r.InterruptedArtifacts = []synthetic.Capture{candidate}
+					}
+					raw, err := json.Marshal(frame{Type: "result", Result: &r})
+					require.NoError(t, err)
+					s := newSink(synthetic.Journey, true, newRedactor(nil), false, trace)
+					err = s.consume(strings.NewReader(strings.TrimSpace(init + "\n" + string(raw))))
+					if trace {
+						require.NoError(t, err)
+						require.NotNil(t, s.snapshot().result)
+					} else {
+						require.Error(t, err)
+						assert.Contains(t, err.Error(), "unsupported")
+					}
+				})
+			}
+		}
 	}
 }

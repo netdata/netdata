@@ -120,7 +120,7 @@ func (s *Store) readManifest(id string) (manifest, error) {
 	ids := make(map[string]bool)
 	for _, a := range m.Artifacts {
 		if !artifactIDPattern.MatchString(a.ID) || ids[a.ID] || a.Bytes < 0 || len(a.SHA256) != 64 ||
-			!((a.Kind == "screenshot" && a.MIME == "image/png") || (a.Kind == "report" && a.MIME == "text/html")) {
+			!validCaptureKind(a.Kind, a.MIME) {
 			return manifest{}, fmt.Errorf("invalid artifact manifest entry")
 		}
 		ids[a.ID] = true

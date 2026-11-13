@@ -24,6 +24,7 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 		return fmt.Errorf("prepare rehearsal workspace: %w", err)
 	}
 	request.Capture = false
+	request.Trace = false
 	execution := e.unrecordedView(e.source, captures).Execute(ctx, request, nil)
 	if !execution.Drained {
 		// The shared fatal owner stops the process; uncertain live work must remain.

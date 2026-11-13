@@ -102,7 +102,7 @@ func (s *Store) Finalize(
 			return nil, fmt.Errorf("%w: duplicate or invalid ID", ErrInvalidCapture)
 		}
 		ids[capture.ID] = true
-		if !((capture.Kind == "screenshot" && capture.MIME == "image/png") || (capture.Kind == "report" && capture.MIME == "text/html")) {
+		if !validCaptureKind(capture.Kind, capture.MIME) {
 			return nil, fmt.Errorf("%w: unsupported kind or MIME", ErrInvalidCapture)
 		}
 		if !strings.HasPrefix(capture.Path, "output/") || path.Clean(capture.Path) != capture.Path ||
@@ -117,10 +117,10 @@ func (s *Store) Finalize(
 		if err != nil {
 			return nil, errors.Join(err, source.Close())
 		}
-		if capture.Kind == "screenshot" {
-			var header [8]byte
-			_, err = io.ReadFull(source, header[:])
-			if err == nil && string(header[:]) != "\x89PNG\r\n\x1a\n" {
+		if signature := captureSignature(capture.Kind); signature != "" {
+			header := make([]byte, len(signature))
+			_, err = io.ReadFull(source, header)
+			if err == nil && string(header) != signature {
 				err = ErrInvalidCapture
 			}
 			if err == nil {
@@ -128,7 +128,7 @@ func (s *Store) Finalize(
 			}
 			if err != nil {
 				_ = source.Close()
-				return nil, fmt.Errorf("%w: invalid PNG", ErrInvalidCapture)
+				return nil, fmt.Errorf("%w: invalid %s signature", ErrInvalidCapture, capture.Kind)
 			}
 		}
 		if info.Size() > FetchMaxBytes {
@@ -208,4 +208,21 @@ func (s *Store) Finalize(
 		s.recordCleanupError(err)
 	}
 	return m.Artifacts, nil
+}
+
+func validCaptureKind(kind, mime string) bool {
+	return kind == "screenshot" && mime == "image/png" ||
+		kind == "report" && mime == "text/html" ||
+		kind == "trace" && mime == "application/zip"
+}
+
+func captureSignature(kind string) string {
+	switch kind {
+	case "screenshot":
+		return "\x89PNG\r\n\x1a\n"
+	case "trace":
+		return "PK\x03\x04"
+	default:
+		return ""
+	}
 }

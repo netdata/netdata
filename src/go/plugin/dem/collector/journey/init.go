@@ -23,6 +23,9 @@ func (c *Collector) Init(ctx context.Context) error {
 	if c.UpdateEvery <= 0 {
 		return errors.New("update_every must be positive")
 	}
+	if c.TraceOnFailure && !c.ScreenshotOnFailure {
+		return errors.New("trace_on_failure requires screenshot_on_failure")
+	}
 	secrets := make(map[string]string, len(c.Secrets))
 	for _, secret := range c.Secrets {
 		if _, exists := secrets[secret.Name]; exists {
@@ -39,6 +42,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		Secrets:             secrets,
 		Timeout:             time.Duration(c.Timeout),
 		Capture:             c.ScreenshotOnFailure,
+		Trace:               c.TraceOnFailure,
 		BrowserErrorSummary: c.BrowserErrorSummary,
 	}
 	if err := model.ValidateRequest(request); err != nil {

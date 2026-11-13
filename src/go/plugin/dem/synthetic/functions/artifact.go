@@ -13,7 +13,7 @@ import (
 var artifactMethod = method{
 	id:     "synthetics-artifact",
 	title:  "Synthetic artifacts",
-	help:   "Retained capture metadata for one run; file bytes are verified when fetched. Test identifies the associated test, not a page, failing step or screenshot time. Missing-capture observations and publication decisions are in synthetics-run while history remains. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.",
+	help:   "Retained capture metadata for one run; file bytes are verified when fetched. Test identifies the associated test, not a page, failing step or screenshot time. Missing-capture observations and publication decisions are in synthetics-run while history remains. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots, traces and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.",
 	sort:   "artifact_id",
 	params: []string{"job_id", "run_id", "artifact_id"},
 	columns: columns(
@@ -57,8 +57,13 @@ func (h *Handler) artifact(
 		label, title := "Screenshot", item.Test.Title
 		if item.Kind == "report" {
 			label = "Lighthouse report"
-		} else if item.Test.ID == "" {
-			title = "Test not recorded"
+		} else {
+			if item.Kind == "trace" {
+				label = "Trace"
+			}
+			if item.Test.ID == "" {
+				title = "Test not recorded"
+			}
 		}
 		rows = append(rows, []any{item.ID, item.Kind, item.MIME, item.Bytes, item.SHA256, item.Availability, title, label})
 	}

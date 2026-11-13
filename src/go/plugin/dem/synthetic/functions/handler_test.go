@@ -558,7 +558,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	validate(t, got)
 }
 
-func TestScreenshotLabelsThroughRealStore(t *testing.T) {
+func TestCaptureLabelsThroughRealStore(t *testing.T) {
 	store, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	defer store.Close()
@@ -570,7 +570,10 @@ func TestScreenshotLabelsThroughRealStore(t *testing.T) {
 		id    string
 		test  model.ArtifactTest
 		title string
+		trace bool
 	}{
+		{id: "trace-associated", trace: true, test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
+		{id: "trace-unassociated", trace: true, title: "Test not recorded"},
 		{id: "associated", test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
 		{id: "unassociated", title: "Test not recorded"},
 	}
@@ -578,7 +581,12 @@ func TestScreenshotLabelsThroughRealStore(t *testing.T) {
 	for _, tc := range cases {
 		path := "output/" + tc.id + ".png"
 		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("\x89PNG\r\n\x1a\nfixture"), 0600))
-		candidates = append(candidates, model.Capture{ID: tc.id, Kind: "screenshot", MIME: "image/png", Path: path, Test: tc.test})
+		c := model.Capture{ID: tc.id, Kind: "screenshot", MIME: "image/png", Path: path, Test: tc.test}
+		if tc.trace {
+			c.Kind, c.MIME = "trace", "application/zip"
+			require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("PK\x03\x04fixture"), 0600))
+		}
+		candidates = append(candidates, c)
 	}
 	_, err = store.Finalize(t.Context(), runID, candidates)
 	require.NoError(t, err)
@@ -589,7 +597,11 @@ func TestScreenshotLabelsThroughRealStore(t *testing.T) {
 	for i, tc := range cases {
 		row := rowValues(t, got, rows[i])
 		assert.Equal(t, tc.id, row["artifact_id"])
-		assert.Equal(t, "Screenshot", row["label"])
+		label := "Screenshot"
+		if tc.trace {
+			label = "Trace"
+		}
+		assert.Equal(t, label, row["label"])
 		assert.Equal(t, tc.title, row["test"])
 	}
 	validate(t, got)

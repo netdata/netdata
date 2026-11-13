@@ -7,6 +7,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
+const failureTraceFeature = "failure_trace.v1"
+
 const browserSummaryFeature = "browser_summary.v1"
 
 // extensions owns the shared negotiation and envelope boundary. Feature bodies
@@ -18,10 +20,13 @@ type extensions struct {
 	initialized, coreStarted bool
 }
 
-func newExtensions(kind synthetic.Kind, browser, capture bool) *extensions {
+func newExtensions(kind synthetic.Kind, browser, capture, trace bool) *extensions {
 	e := &extensions{evidence: newEvidenceState(kind)}
 	if kind == synthetic.Journey && capture {
 		e.captures = newCaptureState()
+		if trace {
+			e.captures.value.Trace = "negotiation_not_reported"
+		}
 	}
 	if kind == synthetic.Journey && browser {
 		e.browser = &browserState{value: &synthetic.BrowserSummary{Availability: "unavailable", Reason: "negotiation_not_reported", Coverage: "fixture_context"}}
@@ -33,6 +38,9 @@ func (e *extensions) invalid(reason string) {
 	e.evidence.invalid(reason)
 	e.browser.invalid(reason)
 	e.captures.invalid()
+	if e.captures != nil && e.captures.value.Trace != "" {
+		e.captures.value.Trace = "invalid"
+	}
 }
 func (e *extensions) init(raw json.RawMessage) {
 	if e.evidence == nil {
@@ -46,11 +54,11 @@ func (e *extensions) init(raw json.RawMessage) {
 	var body struct {
 		Selected []string `json:"selected"`
 	}
-	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 3 {
+	if len(raw) > evidencePayloadLimit || decodeCore(raw, &body) != nil || body.Selected == nil || len(body.Selected) > 4 {
 		e.invalid("invalid_init")
 		return
 	}
-	fe, bs, cd := false, false, false
+	fe, bs, cd, ft := false, false, false, false
 	for _, f := range body.Selected {
 		switch f {
 		case failureEvidenceFeature:
@@ -65,6 +73,12 @@ func (e *extensions) init(raw json.RawMessage) {
 				return
 			}
 			bs = true
+		case failureTraceFeature:
+			if ft || e.captures == nil || e.captures.value.Trace == "" {
+				e.invalid("unrequested_selection")
+				return
+			}
+			ft = true
 		case captureDetailsFeature:
 			if cd || e.captures == nil {
 				e.invalid("unrequested_selection")
@@ -92,6 +106,12 @@ func (e *extensions) init(raw json.RawMessage) {
 		} else {
 			e.browser.value.Availability = "unsupported"
 			e.browser.value.Reason = "runtime_declined"
+		}
+	}
+	if e.captures != nil && e.captures.value.Trace != "" && e.captures.value.Trace != "invalid" {
+		e.captures.value.Trace = "unsupported"
+		if ft {
+			e.captures.value.Trace = "supported"
 		}
 	}
 	if e.captures != nil && e.captures.value.Reporting != "invalid" {

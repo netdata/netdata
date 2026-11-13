@@ -24,6 +24,7 @@ func TestRehearseIsolatesOutputsAndUsesResolvedRequest(t *testing.T) {
 	e, history, captures := testEngine(t)
 	request := journey()
 	request.Capture = true
+	request.Trace = true
 	request.Secrets = map[string]string{"DEM_SECRET_TOKEN": "synthetic-secret"}
 	var work string
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
@@ -33,12 +34,14 @@ func TestRehearseIsolatesOutputsAndUsesResolvedRequest(t *testing.T) {
 		}
 		work = wire.WorkDir
 		assert.False(t, wire.Capture)
+		assert.NotContains(t, wire.Extensions, failureTraceFeature)
 		assert.Equal(t, request.Script, wire.Script)
 		assert.Equal(t, request.Secrets, wire.Secrets)
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	require.NoError(t, e.Rehearse(t.Context(), request))
 	assert.True(t, request.Capture, "rehearsal must not mutate the monitor request")
+	assert.True(t, request.Trace)
 	require.NotEmpty(t, work)
 	_, err := os.Stat(work)
 	assert.ErrorIs(t, err, os.ErrNotExist)

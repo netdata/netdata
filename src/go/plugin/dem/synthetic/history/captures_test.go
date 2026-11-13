@@ -18,7 +18,7 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	require.NoError(t, err)
 	test := synthetic.ArtifactTest{ID: "t1", Title: "Checkout"}
 	run := synthetic.Run{ID: "capture-run", JobID: "journey:test", Kind: synthetic.Journey, Name: "test", StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Failed, CaptureState: "unavailable",
-		Captures: &synthetic.CaptureReport{Reporting: "complete", Tests: []synthetic.CaptureTest{{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1}}, Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}}, Unpublished: []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}}},
+		Captures: &synthetic.CaptureReport{Reporting: "complete", Trace: "supported", Tests: []synthetic.CaptureTest{{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1}}, Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}, {ID: "trace1", TestID: "t1"}}, Unpublished: []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}}},
 	}
 	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
 	require.NoError(t, err)

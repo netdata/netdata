@@ -165,74 +165,82 @@ func TestPNGCapture(t *testing.T) {
 	assert.Equal(t, png, got)
 }
 func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
-	for _, tc := range []struct {
-		name  string
-		order []string
-		want  []string
-	}{
-		{name: "small first", order: []string{"small", "large"}, want: []string{"small"}},
-		{name: "large first", order: []string{"large", "small"}, want: []string{"small"}},
-		{name: "several", order: []string{"large", "small", "large2", "small2"}, want: []string{"small", "small2"}},
-		{name: "all omitted", order: []string{"large", "large2"}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			s, root := store(t)
-			work, err := s.Begin(run1, "journey:test", "")
-			require.NoError(t, err)
-			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
-			label := synthetic.ArtifactTest{ID: "test", Title: "Checkout"}
-			var candidates []synthetic.Capture
-			for _, id := range tc.order {
-				name := "output/" + id + ".png"
-				require.NoError(t, os.WriteFile(filepath.Join(work, name), png, 0600))
-				if strings.HasPrefix(id, "large") {
-					require.NoError(t, os.Truncate(filepath.Join(work, name), artifacts.FetchMaxBytes+1))
-				}
-				candidates = append(candidates, synthetic.Capture{ID: id, Kind: "screenshot", MIME: "image/png", Path: name, Test: label})
-			}
-			published, err := s.Finalize(t.Context(), run1, candidates)
-			require.NoError(t, err)
-			var ids []string
-			for _, a := range published {
-				ids = append(ids, a.ID)
-			}
-			assert.Equal(t, tc.want, ids)
-			for _, dir := range []string{"work", "staging", "drained"} {
-				_, err = os.Lstat(filepath.Join(root, dir, run1))
-				assert.ErrorIs(t, err, os.ErrNotExist, dir)
-			}
-			_, err = os.Lstat(work)
-			assert.ErrorIs(t, err, os.ErrNotExist, "work alias removed")
-			assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
-			require.NoError(t, s.Close())
-			reopened, err := artifacts.Open(root)
-			require.NoError(t, err)
-			defer reopened.Close()
-			m, err := reopened.Manifest(t.Context(), "journey:test", run1)
-			if len(tc.want) == 0 {
-				assert.ErrorIs(t, err, artifacts.ErrNotFound)
-				_, err = os.Lstat(filepath.Join(root, "runs", run1))
-				assert.ErrorIs(t, err, os.ErrNotExist, "no empty manifest")
-			} else {
-				require.NoError(t, err)
-				assert.Equal(t, published, m.Artifacts)
-			}
-			for _, id := range tc.order {
-				a, body, err := reopened.Fetch(t.Context(), "journey:test", run1, id)
-				if strings.HasPrefix(id, "large") {
-					assert.ErrorIs(t, err, artifacts.ErrNotFound)
-				} else {
+	for _, trace := range []bool{false, true} {
+		kind, mime, payload := "screenshot", "image/png", png
+		if trace {
+			kind, mime, payload = "trace", "application/zip", []byte("PK\x03\x04fixture")
+		}
+		t.Run(kind, func(t *testing.T) {
+			for _, tc := range []struct {
+				name  string
+				order []string
+				want  []string
+			}{
+				{name: "small first", order: []string{"small", "large"}, want: []string{"small"}},
+				{name: "large first", order: []string{"large", "small"}, want: []string{"small"}},
+				{name: "several", order: []string{"large", "small", "large2", "small2"}, want: []string{"small", "small2"}},
+				{name: "all omitted", order: []string{"large", "large2"}},
+			} {
+				t.Run(tc.name, func(t *testing.T) {
+					s, root := store(t)
+					work, err := s.Begin(run1, "journey:test", "")
 					require.NoError(t, err)
-					assert.Equal(t, png, body)
-					assert.Equal(t, label, a.Test)
-				}
+					require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+					label := synthetic.ArtifactTest{ID: "test", Title: "Checkout"}
+					var candidates []synthetic.Capture
+					for _, id := range tc.order {
+						name := "output/" + id + ".png"
+						require.NoError(t, os.WriteFile(filepath.Join(work, name), payload, 0600))
+						if strings.HasPrefix(id, "large") {
+							require.NoError(t, os.Truncate(filepath.Join(work, name), artifacts.FetchMaxBytes+1))
+						}
+						candidates = append(candidates, synthetic.Capture{ID: id, Kind: kind, MIME: mime, Path: name, Test: label})
+					}
+					published, err := s.Finalize(t.Context(), run1, candidates)
+					require.NoError(t, err)
+					var ids []string
+					for _, a := range published {
+						ids = append(ids, a.ID)
+					}
+					assert.Equal(t, tc.want, ids)
+					for _, dir := range []string{"work", "staging", "drained"} {
+						_, err = os.Lstat(filepath.Join(root, dir, run1))
+						assert.ErrorIs(t, err, os.ErrNotExist, dir)
+					}
+					_, err = os.Lstat(work)
+					assert.ErrorIs(t, err, os.ErrNotExist, "work alias removed")
+					assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
+					require.NoError(t, s.Close())
+					reopened, err := artifacts.Open(root)
+					require.NoError(t, err)
+					defer reopened.Close()
+					m, err := reopened.Manifest(t.Context(), "journey:test", run1)
+					if len(tc.want) == 0 {
+						assert.ErrorIs(t, err, artifacts.ErrNotFound)
+						_, err = os.Lstat(filepath.Join(root, "runs", run1))
+						assert.ErrorIs(t, err, os.ErrNotExist, "no empty manifest")
+					} else {
+						require.NoError(t, err)
+						assert.Equal(t, published, m.Artifacts)
+					}
+					for _, id := range tc.order {
+						a, body, err := reopened.Fetch(t.Context(), "journey:test", run1, id)
+						if strings.HasPrefix(id, "large") {
+							assert.ErrorIs(t, err, artifacts.ErrNotFound)
+						} else {
+							require.NoError(t, err)
+							assert.Equal(t, payload, body)
+							assert.Equal(t, label, a.Test)
+						}
+					}
+				})
 			}
 		})
 	}
 }
 
 func TestOversizeDoesNotHideInvalidCaptures(t *testing.T) {
-	for _, which := range []string{"large invalid PNG", "duplicate skipped ID", "missing file"} {
+	for _, which := range []string{"large invalid PNG", "large invalid ZIP", "short ZIP", "wrong trace MIME", "duplicate skipped ID", "missing file"} {
 		t.Run(which, func(t *testing.T) {
 			s, root := store(t)
 			work, err := s.Begin(run1, "journey:test", "")
@@ -249,6 +257,20 @@ func TestOversizeDoesNotHideInvalidCaptures(t *testing.T) {
 				bad.Path = "output/bad.png"
 				require.NoError(t, os.WriteFile(filepath.Join(work, bad.Path), []byte("not a PNG"), 0600))
 				require.NoError(t, os.Truncate(filepath.Join(work, bad.Path), artifacts.FetchMaxBytes+1))
+			case "large invalid ZIP", "short ZIP", "wrong trace MIME":
+				bad.Kind, bad.MIME, bad.Path = "trace", "application/zip", "output/trace.zip"
+				body := []byte("PK\x05\x06not a local header")
+				if which == "short ZIP" {
+					body = []byte("PK")
+				}
+				if which == "wrong trace MIME" {
+					bad.MIME = "image/png"
+					body = []byte("PK\x03\x04fixture")
+				}
+				require.NoError(t, os.WriteFile(filepath.Join(work, bad.Path), body, 0600))
+				if which == "large invalid ZIP" {
+					require.NoError(t, os.Truncate(filepath.Join(work, bad.Path), artifacts.FetchMaxBytes+1))
+				}
 			case "duplicate skipped ID":
 				bad = large
 			}
@@ -432,14 +454,25 @@ func TestInvalidDrainMarkerCannotAuthorizeCleanup(t *testing.T) {
 	assert.NoError(t, err)
 }
 func TestFetchExactSizeBoundary(t *testing.T) {
-	s, _ := store(t)
-	payload := []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)))
-	_, c := captured(t, s, run1, payload)
-	_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
-	require.NoError(t, err)
-	_, got, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
-	require.NoError(t, err)
-	assert.Equal(t, payload, got)
+	for _, trace := range []bool{false, true} {
+		name, signature := "report", ""
+		if trace {
+			name, signature = "trace", "PK\x03\x04"
+		}
+		t.Run(name, func(t *testing.T) {
+			s, _ := store(t)
+			payload := append([]byte(signature), []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...)
+			_, c := captured(t, s, run1, payload)
+			if trace {
+				c.Kind, c.MIME = "trace", "application/zip"
+			}
+			_, err := s.Finalize(context.Background(), run1, []synthetic.Capture{c})
+			require.NoError(t, err)
+			_, got, err := s.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
+			require.NoError(t, err)
+			assert.Equal(t, payload, got)
+		})
+	}
 }
 
 func TestShortAliasKeepsLongPrivateWork(t *testing.T) {
@@ -578,25 +611,36 @@ func (c *growBeforeReadContext) Err() error {
 }
 
 func TestCaptureGrowingPastFetchLimitIsNotPublished(t *testing.T) {
-	s, root := store(t)
-	work, c := captured(t, s, run1, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes))))
-	ctx := &growBeforeReadContext{
-		Context: context.Background(),
-		grow: func() {
-			file, err := os.OpenFile(filepath.Join(work, c.Path), os.O_APPEND|os.O_WRONLY, 0600)
-			require.NoError(t, err)
-			_, err = file.Write([]byte("extra"))
-			require.NoError(t, err)
-			require.NoError(t, file.Close())
-		},
+	for _, trace := range []bool{false, true} {
+		name, signature := "report", ""
+		if trace {
+			name, signature = "trace", "PK\x03\x04"
+		}
+		t.Run(name, func(t *testing.T) {
+			s, root := store(t)
+			work, c := captured(t, s, run1, append([]byte(signature), []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...))
+			if trace {
+				c.Kind, c.MIME = "trace", "application/zip"
+			}
+			ctx := &growBeforeReadContext{
+				Context: context.Background(),
+				grow: func() {
+					file, err := os.OpenFile(filepath.Join(work, c.Path), os.O_APPEND|os.O_WRONLY, 0600)
+					require.NoError(t, err)
+					_, err = file.Write([]byte("extra"))
+					require.NoError(t, err)
+					require.NoError(t, file.Close())
+				},
+			}
+			_, err := s.Finalize(ctx, run1, []synthetic.Capture{c})
+			require.ErrorIs(t, err, artifacts.ErrTooLarge)
+			for _, dir := range []string{"work", "staging", "drained", "runs"} {
+				_, err = os.Lstat(filepath.Join(root, dir, run1))
+				assert.ErrorIs(t, err, os.ErrNotExist, dir)
+			}
+			assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
+		})
 	}
-	_, err := s.Finalize(ctx, run1, []synthetic.Capture{c})
-	require.ErrorIs(t, err, artifacts.ErrTooLarge)
-	for _, dir := range []string{"work", "staging", "drained", "runs"} {
-		_, err = os.Lstat(filepath.Join(root, dir, run1))
-		assert.ErrorIs(t, err, os.ErrNotExist, dir)
-	}
-	assert.Zero(t, *observedStatus(t, s).Inventory.Workspace.Bytes)
 }
 
 // Return the admission result, then cancel: a deadline can expire immediately

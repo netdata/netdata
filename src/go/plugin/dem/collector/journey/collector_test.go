@@ -44,16 +44,16 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false,"browser_error_summary":true}`,
+		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":true,"trace_on_failure":true,"browser_error_summary":true}`,
 	)
 	cfgYAML := []byte(
-		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\nbrowser_error_summary: true\n",
+		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: true\ntrace_on_failure: true\nbrowser_error_summary: true\n",
 	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 		t.Run(format, func(t *testing.T) {
 			c := New(Dependencies{})
-			input := []byte(`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false}`)
+			input := []byte(`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false,"trace_on_failure":false}`)
 			require.NoError(t, decode(input, c))
 			want := Config{
 				Name:        "login",
@@ -65,6 +65,7 @@ func TestConfiguration(t *testing.T) {
 			assert.Equal(t, want, c.Configuration())
 			raw, err := json.Marshal(c.Configuration())
 			require.NoError(t, err)
+			assert.Contains(t, string(raw), `"trace_on_failure":false`)
 			copy := New(Dependencies{})
 			require.NoError(t, json.Unmarshal(raw, copy))
 			assert.Equal(t, c.Configuration(), copy.Configuration())
@@ -83,6 +84,8 @@ func TestInitValidation(t *testing.T) {
 		change func(*Collector)
 		valid  bool
 	}{
+		"trace needs screenshot":  {func(c *Collector) { c.TraceOnFailure = true }, false},
+		"trace enabled":           {func(c *Collector) { c.TraceOnFailure = true; c.ScreenshotOnFailure = true }, true},
 		"inline":                  {func(*Collector) {}, true},
 		"file":                    {func(c *Collector) { c.Script = ""; c.ScriptPath = file }, true},
 		"missing source":          {func(c *Collector) { c.Script = "" }, false},
@@ -213,4 +216,15 @@ func TestBrowserErrorSummaryOption(t *testing.T) {
 	c := configured()
 	require.NoError(t, c.Init(context.Background()))
 	assert.False(t, c.request.BrowserErrorSummary)
+}
+
+func TestTraceRequestAndDependency(t *testing.T) {
+	c := configured()
+	assert.False(t, c.TraceOnFailure)
+	c.TraceOnFailure = true
+	require.EqualError(t, c.Init(t.Context()), "trace_on_failure requires screenshot_on_failure")
+	c.ScreenshotOnFailure = true
+	require.NoError(t, c.Init(t.Context()))
+	assert.True(t, c.request.Trace)
+	assert.True(t, c.request.Capture)
 }

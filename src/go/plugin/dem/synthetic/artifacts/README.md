@@ -16,7 +16,7 @@ supervised process tree has drained. Reporter completion or an old PID is not
 permission to finalize or remove working files.
 
 Finalization records and syncs a drainage marker outside the child work folder,
-copies approved PNG screenshots and HTML reports from `output/`, computes size
+copies approved PNG screenshots, trace ZIPs and HTML reports from `output/`, computes size
 and SHA-256, and syncs an immutable manifest before publishing the run directory.
 Capture paths must be clean relative paths below `output/`, with regular files
 and no symbolic-link components. Content remains potentially sensitive.
@@ -86,7 +86,7 @@ against its manifest, caps returned content at 5 MiB and serializes with expiry.
 Missing records return `ErrNotFound`; retained run evidence can explain these as
 expired or unavailable. No tombstones grow independently of retention.
 Publication skips valid candidates whose initial size exceeds the same 5 MiB limit,
-after checking paths, types and PNG signatures. Exactly 5 MiB is allowed. The retained
+after checking paths, types and PNG/ZIP signatures. Exactly 5 MiB is allowed. The retained
 subset publishes atomically; no truncated artifact or empty manifest is published.
 Successful finalization returns retained candidates in input order. The runner uses
 candidate ID membership to record absent candidates as `too_large` without adding
@@ -100,3 +100,23 @@ The copy remains bounded: growth past the limit is a hard `ErrTooLarge`.
 Hard size failures carry the offending candidate ID, reported as `too_large`; other
 candidates in the failed set are `publication_failed`, including earlier size skips.
 Fetch retains its size guard for existing oversized captures.
+
+## Journey trace ZIPs
+
+`trace_on_failure` is off by default and requires `screenshot_on_failure`. The runtime negotiates `failure_trace.v1`
+and supplies `trace` / `application/zip` candidates through the same normal/interrupted terminal lists. Go admits
+this kind only when requested; optional negotiation status cannot grant or remove candidate authority. A ZIP local
+file header (`PK\x03\x04`) is checked before the initial-size decision. This is a format signature check, not archive
+extraction or proof of every ZIP member. The store never rewrites or sanitizes ZIP content.
+
+The existing 5 MiB limit, per-item omissions and atomic set publication apply. Recording/export cost is paid before
+publication, including on passing runs whose trace is discarded. Trace export can consume timeout reporting reserve
+and lose terminal authority, including screenshots. No deadline extension or early recovery is provided.
+
+Traces can contain raw resolved DEM secrets, cookies, form values, headers and request/response bodies. Disabling
+source files and attachments does not remove all credentials or source fragments. Existing administrator-equivalent
+byte access and shared retention apply; text redaction does not sanitize this artifact.
+
+Manifest version stays 2. Readers without trace support reject the entire mixed set, so its PNGs cannot be fetched
+on downgrade either. These sets become unclassified and are outside age/size retention; they remain on disk and are
+readable again after re-upgrade if preserved. Trace-aware readers still read older PNG/HTML sets.

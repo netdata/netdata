@@ -41,6 +41,7 @@ type Request struct {
 	Timeout             time.Duration
 	BrowserErrorSummary bool
 	Capture             bool
+	Trace               bool
 }
 
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
@@ -55,6 +56,9 @@ func ValidateRequest(r Request) error {
 	}
 	if strings.TrimSpace(r.Name) == "" {
 		return errors.New("synthetic job name is required")
+	}
+	if r.Trace && (r.Kind != Journey || !r.Capture) {
+		return errors.New("trace requires a journey with capture enabled")
 	}
 	switch r.Kind {
 	case Journey:
