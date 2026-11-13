@@ -20,6 +20,8 @@ The rest of this document shows how the design delivers that.
 
 **Every Netdata metric arrives with a correct, ready-made chart, because Netdata gives metrics meaning when they are collected, not when they are visualized.**
 
+This works because most infrastructure is built from the same finite set of components: operating systems, databases, web servers, message brokers, containers, storage and network devices, plus a few custom applications. Netdata's collectors carry the knowledge of each one.
+
 Every collector decides, for each chart, what is being monitored, the units, the title, the best chart type, which time-series belong together, which labels describe each instance, and which rollups provide higher-level views. Prometheus and OpenTelemetry metrics get the same treatment through collection profiles. So dashboards build themselves: every metric arrives with a correct, ready-made chart, and teams adjust the default grouping and slicing per space, room or person.
 
 Other monitoring tools rely on a query language so experts can build dashboards by hand. Netdata removes that work, and with it the errors hand-written queries introduce: rates applied to gauges, averages of averages, series silently missing from a sum. In Netdata, a wrong chart is a bug we fix, not a mistake you made.
@@ -159,7 +161,8 @@ Higher tiers keep min, max, average and anomaly rate for every point. The tiers 
 - **Collection is tuned so it does not disturb what it monitors.** Most metrics are collected per second when the source updates frequently, slower metrics every 5-10 seconds, and expensive metrics are disabled by default. All frequencies are configurable, and any collector can be disabled. The [Netdata resource footprint](/docs/netdata-agent/sizing-netdata-agents/README.md) lists what this costs.
 - **Everything, because crises are unexpected.** A crisis happens when something breaks that nobody predicted, so nobody knows in advance which data they will need. Selective monitoring asks you to predict what will break; complete coverage removes the guess.
 - **Structure keeps everything usable.** Metrics are organized hierarchically (disks stay in the disk section, containers in the container view), so more metrics never make finding one slower. A new metric adds very little memory and about 0.6 bytes per sample on disk.
-- **Machine learning runs on every metric.** Netdata trains 18 models per metric on different time windows and flags a sample as anomalous only when all of them agree, which keeps false positives very rare. The result is stored as one bit with every sample, so anomaly rates are available for any metric, any time window and any tier. See [ML accuracy, reliability and sensitivity](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
+- **Machine learning runs on every metric.** Netdata trains 18 models per metric on different time windows and flags a sample as anomalous only when all of them agree, which keeps false positives very rare. Detection uses only past data, so it is not influenced by later events. The result is stored as one bit with every sample, so anomaly rates are available for any metric, any time window and any tier. See [ML accuracy, reliability and sensitivity](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).
+- **Machine learning tells you what is wrong, not when to wake up.** Anomaly detection is not used for paging by default. During an incident, anomalies appear together across the components a problem affects. Because every sample carries its anomaly bit, Netdata finds the metrics that became anomalous together in the same time window, ranks them, and gives these clusters to Netdata AI as context, so the AI reasons from what actually changed together. The most likely culprits usually appear within the first 30-50 ranked metrics. The clusters reveal how infrastructure components depend on each other, and they are the basis of automated root-cause analysis.
 
 ## Edge architecture with no separate database to operate
 
@@ -168,7 +171,8 @@ Higher tiers keep min, max, average and anomaly rate for every point. The tiers 
 Centralized systems need database administration, capacity planning for central storage, pipeline scaling and maintenance windows. Netdata's edge architecture has none of these:
 
 - **No separate database to run.** The time-series database is part of the Agent and Parent process; there are no separate database processes to tune, compact or back up.
-- **No big-bang upgrades.** Each Agent updates independently, and new data formats are readable before they are written.
+- **No big-bang upgrades.** Each Agent updates independently, and new data formats are readable before they are written, so you can often downgrade without data loss.
+- **Corruption-resistant storage.** Data files are written once and never rewritten, so storage keeps working even with partial disk corruption.
 - **Fixed relationships.** A Parent-Child connection is configured once, and Netdata alerts on disconnections.
 - **Cardinality protection.** Automated protections clean up archived, ephemeral instances so short-lived containers do not accumulate. They never touch collected metrics. See [extreme cardinality protection](/docs/extreme-cardinality-protection.md).
 - **Isolated failures.** An issue affects one Parent, not the whole monitoring foundation.

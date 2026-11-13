@@ -32,13 +32,15 @@ At 3 a.m., you search for a metric, find it already charted, and see which metri
 
 Per-second data shows spikes, saturation and the order of cascading failures that minute-level averages hide. Netdata collects on a beat: when a sample is late, the system is usually under stress, and the chart shows the gap instead of hiding it.
 
+You also see the effect of every change as you make it: a fix, a configuration change or a scaling step shows its impact within seconds.
+
 Because Netdata evaluates every metric every second, anomalies such as traffic floods and DDoS patterns show up in the data within seconds of starting.
 
 ### Your metrics, logs and traces stay in your own infrastructure
 
 **Data is stored where it is created: on your Agents and Parents.**
 
-Your metrics, logs and traces leave your servers only when someone views them. Netdata Cloud routes queries to the nodes that hold the data and merges the answers, and it is not in the data path. Every Agent keeps working without Cloud and without internet access. Netdata meets data-sovereignty and residency requirements by design.
+Your metrics, logs and traces leave your servers only when someone views them. Netdata Cloud routes queries to the nodes that hold the data and merges the answers, and it is not in the data path. Every Agent keeps working without Cloud and without internet access. Netdata meets data-sovereignty and residency requirements by design, and keeping data at the edge means no egress charges for monitoring data.
 
 ### Troubleshooting starts from data that is already explained
 
@@ -103,7 +105,7 @@ Alerts are templates that apply to each database, web server, container and serv
 - **Logs monitoring** queries system logs in place, without moving them: systemd journal on Linux, event logs on Windows and the unified log on macOS, with every field filterable and live counters, in the same dashboard as the metrics.
 - **Logs ingestion** takes OpenTelemetry logs from any source and stores them locally, or offloads them to S3-compatible object storage. Every field is indexed and searchable.
 
-**Netdata indexes every log field and stores logs in a fraction of their raw size.**
+**Netdata indexes every log field, and stores ingested logs in a fraction of their raw size.**
 
 Log systems usually trade search power for storage. Indexing only streams keeps storage small but limits filtering. Indexing every word allows any search but needs several times the raw size. Netdata indexes every field, balancing storage cost and search efficiency.
 
@@ -187,7 +189,12 @@ flowchart TB
 
 **Netdata is for operations teams, sysadmins, DevOps and platform engineers and SREs, from a single team to an enterprise, who want complete visibility without having to build it.**
 
-It is opinionated: it collects everything, visualizes everything and runs machine learning on everything, so large teams get the same views across a very large fleet, and lean teams get complete visibility without specialized skills.
+**Netdata does what experienced engineers often consider impractical, because it is designed for it.**
+
+- **It collects everything, every second.** Collecting everything is usually too expensive, so teams have to choose what to watch, and during a crisis the data they need is often missing. Netdata stores data as close as possible to the systems that produce it, in compact databases, so complete coverage costs a small fraction of the compute and gives you the most complete picture when it matters most.
+- **It visualizes everything.** Usually every chart is built and maintained by hand, so dashboards cover only what someone thought of in advance, and large setups drift into hundreds of inconsistent dashboards nobody trusts. Netdata gives every metric its meaning at collection time and builds the dashboards from it, so every metric has a correct chart, organized the same way across the infrastructure, and nothing is missing when you go looking for it.
+- **It runs machine learning on every metric.** ML-based alerting has a reputation for floods of false alarms and endless tuning, so many teams have given up on it. Netdata does not use machine learning to page you, but to tell you what is wrong. During an incident, anomalies appear in clusters across related components, revealing how they depend on each other. Netdata uses these clusters to rank what changed and gives them to its AI as context to reason about the cause. This is the basis of its automated root-cause analysis.
+- **It needs no specialized skills.** Observability usually depends on query languages and dashboard engineering, so troubleshooting waits for the few experts who know them. In Netdata, senior and junior engineers work with the same views and the same tools, with no extra skills. Junior engineers can investigate incidents on their own, and they learn the infrastructure by seeing the whole picture.
 
 Netdata is infrastructure and application observability. It is not a business-intelligence, SIEM, ITSM or data-warehouse platform; it can export metrics and forward logs and traces to the systems that are.
 
