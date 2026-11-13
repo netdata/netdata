@@ -1,1 +1,0 @@
-integrations/ebpf_socket.md

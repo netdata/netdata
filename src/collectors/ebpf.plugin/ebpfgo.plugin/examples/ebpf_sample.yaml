@@ -1,0 +1,33 @@
+# Netdata eBPF Plugin Configuration
+#
+# Enable/disable collectors and configure their behavior
+# Location: /etc/netdata/ebpf.d/*.conf or /etc/netdata/ebpf.d/*.yaml
+
+# Cachestat: Page cache hit ratio and dirty page tracking
+jobs:
+  cachestat:
+    enabled: yes
+    update_every: 1
+    # Uncomment to enable per-app and per-cgroup metrics (requires more CPU)
+    # apps: yes
+    # cgroups: yes
+
+  dcstat:
+    enabled: yes
+    update_every: 1
+    # apps: yes
+    # cgroups: yes
+
+  fd:
+    enabled: yes
+    update_every: 1
+    # apps: yes
+    # cgroups: yes
+
+  socket:
+    enabled: yes
+    update_every: 1
+
+  dns:
+    enabled: yes
+    update_every: 1

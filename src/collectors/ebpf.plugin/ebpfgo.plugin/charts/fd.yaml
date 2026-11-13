@@ -1,0 +1,30 @@
+version: v1
+context_namespace: fd
+groups:
+  - family: fd
+    metrics:
+      - open
+      - close
+      - open_error
+      - close_error
+    charts:
+      - id: file_descriptor
+        title: Open and close calls
+        context: filesystem.file_descriptor
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: open
+            name: open
+          - selector: close
+            name: close
+      - id: file_error
+        title: Open fails
+        context: filesystem.file_error
+        units: "ops/s"
+        type: area
+        dimensions:
+          - selector: open_error
+            name: open
+          - selector: close_error
+            name: close
