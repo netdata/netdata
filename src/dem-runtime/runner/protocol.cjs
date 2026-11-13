@@ -32,7 +32,7 @@ function configureSecrets(values = {}) {
 configureSecrets(
   Object.fromEntries(
     Object.entries(process.env).filter(([name]) =>
-      /^DEM_SECRET_[A-Za-z0-9_]+$/.test(name),
+      /^DEM_SECRET_\w+$/.test(name),
     ),
   ),
 );

@@ -45,7 +45,7 @@ function validate(r) {
       throw new Error("script must be source text");
     if (r.script_path) {
       absolute(r.script_path, "script_path");
-      if (!/\.(?:[cm]?[jt]s)$/.test(r.script_path))
+      if (!/\.[cm]?[jt]s$/.test(r.script_path))
         throw new Error("script_path must be a JS or TS file");
     }
   } else if (
@@ -55,7 +55,7 @@ function validate(r) {
     throw new Error("url must use HTTP or HTTPS");
   for (const [name, value] of Object.entries(r.secrets || {})) {
     if (
-      !/^DEM_SECRET_[A-Za-z0-9_]+$/.test(name) ||
+      !/^DEM_SECRET_\w+$/.test(name) ||
       typeof value !== "string" ||
       value.includes("\0")
     )
