@@ -1,19 +1,5 @@
 //! Tests for [`ChunkCache`]: the real cache driven by canned async
-//! indexing futures, pinning the parent module's contract.
-//!
-//! - Indexing singleflight (moka `try_get_with`): concurrent requests
-//!   for one `(wal_seq, chunk_index)` run the indexing exactly once,
-//!   and every waiter gets the indexed bytes.
-//! - Memoization is keyed `(wal_seq, chunk_index)`: different seqs and
-//!   chunk indices are indexed independently; a repeat of an indexed
-//!   key never runs the fresh future and serves the originally indexed
-//!   bytes.
-//! - An indexing error is not cached: each failed request re-runs the
-//!   indexing, and a later success populates the key normally.
-//! - `drop_seq` is a no-op for a seq with no indexed chunk; for a
-//!   seq with indexed chunks it invalidates immediately — the dropped
-//!   WAL's chunk is re-indexed on the next request, other WALs' chunks
-//!   stay cached.
+//! indexing futures.
 //!
 //! Not pinned here: LRU eviction (the 64 MiB test budget dwarfs the
 //! few-byte chunks) and `Arc<E>` error sharing across concurrent
@@ -24,7 +10,7 @@ use std::time::Duration;
 
 use super::{ChunkCache, IndexedChunk};
 
-// ── ChunkCache (async, fake indexing) ─────────────────────────────
+// ChunkCache (async, fake indexing)
 
 #[derive(Debug, PartialEq, Eq)]
 struct IndexErr;

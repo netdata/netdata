@@ -1,35 +1,6 @@
-//! Tests for remote read-back, pinning the parent module's contract:
-//! [`RemoteRead::fetch`] driven over the in-memory `MockStorage`, the
-//! `download_deadline` formula and its enforcement on a paused tokio
-//! clock, the `read_error_to_anyhow` redaction MUST, and
-//! [`migrate_read_cache`]'s relocation of the logs-only cache to the shared
-//! one.
-//!
-//! - `fetch` materializes entries in the download cache as
-//!   `file_registry::SelectedFile`s: name = the `FileId`'s `.sfst`
-//!   filename, content = the remote object's bytes, summary = the entry's
-//!   stored one, `files` in request order, one pin per file.
-//! - `progress` ticks once per download, completed or failed; a cache hit
-//!   downloads nothing and does not tick, and entries naming the same file
-//!   are fetched once.
-//! - Per-object failure isolation: a failed, timed-out, or wrong-size object
-//!   lands in [`RemoteFetch::failed`] and costs only itself — the remaining
-//!   objects are still fetched, every object is attempted, and each download
-//!   runs under its own size-derived deadline (30 s base + size at 1 MiB/s,
-//!   capped at 5 min).
-//! - The query-wide conditions surface as errors: a plan over the cache
-//!   capacity is `CacheError::TooLarge`, a cancelled token
-//!   `CacheError::Cancelled`.
-//! - `read_error_to_anyhow` MUST flatten through `StorageError`'s redacted
-//!   `Display`: the file-cache logs the anyhow chain verbatim with `{e:#}`,
-//!   so a raw inner chain would put the STS web-identity JWT (carried in the
-//!   URL query) into the journal.
-//! - [`migrate_read_cache`]: an absent old cache is a no-op; plain
-//!   directories rename `old` to `new`; `new` present or a failed rename
-//!   removes the old cache's own files and torn writes, then the directory,
-//!   leaving anything else; a directory symlink is re-pointed at its target
-//!   (Unix), any other symlink only unlinked, a non-directory left; and a
-//!   moved cache reopens with its surviving files.
+//! Tests for remote read-back: [`RemoteRead::fetch`] is driven over the
+//! in-memory `MockStorage`, and the deadline enforcement runs on a paused
+//! tokio clock.
 //!
 //! Not pinned here: `CacheError::EvictionFailed`, single-flight,
 //! retry-on-vanish, and pin lifetime (file-cache's own tests); the
@@ -310,7 +281,7 @@ fn read_errors_reach_the_cache_log_redacted() {
     assert!(format!("{nf:#}").contains("remote object not found"));
 }
 
-// ── migrate_read_cache ──────────────────────────────────────────────
+// migrate_read_cache
 
 /// A base dir with the old (`logs/remote-read`) and new (`remote-read`)
 /// cache locations; neither exists yet.

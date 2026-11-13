@@ -7,48 +7,24 @@
 //! [`crate::query::RemotePlan`] has selected, downloads their objects into
 //! the process's shared download cache (`file_cache::FileCache`) and
 //! returns them as `file_registry::SelectedFile`s (path = the cache pin's
-//! path; summary = the catalog's stored one — `file-registry`'s
-//! `selection.rs` documents the type), the entries it could not obtain, and
-//! the pins that keep the downloaded files from being evicted while a query
-//! reads them.
+//! path; summary = the catalog's stored one), the entries it could not
+//! obtain, and the pins that keep the downloaded files from being evicted
+//! while a query reads them.
 //!
-//! One download cache serves every signal; otel-ledger opens it at
-//! `{base_dir}/remote-read` and hands a clone to each signal's query
-//! handler. Its contracts — whole-object fetches, all-or-nothing admission,
-//! single flight, pin lifetime, degrade-on-failure — belong to the
-//! file-cache crate (`file-cache/src/lib.rs`) and are not restated here.
-//!
-//! Lock discipline: callers snapshot under the registry read lock
-//! (`Registry::remote_plan_input`), drop it, then plan and call
-//! [`RemoteRead::fetch`] off it — the drop-the-lock-before-file-I/O model
-//! the registry module docs carry. `fetch` itself holds no lock and touches
-//! no registry state.
+//! The download cache's contracts — whole-object fetches, all-or-nothing
+//! admission, single flight, pin lifetime, degrade-on-failure — belong to
+//! the file-cache crate (`file-cache/src/lib.rs`) and are not restated here.
 //!
 //! Async context: [`RemoteRead::fetch`] runs on the async runtime; each
-//! download is awaited network I/O, not a blocking call, and the cache's
-//! durable write runs under `spawn_blocking` inside file-cache.
+//! download is awaited network I/O, not a blocking call.
 //! [`migrate_read_cache`] is blocking std-fs work, run once at startup.
 //!
-//! Downloads are sequential (the cache fetches one reserved object at a
-//! time) and each runs under its own deadline (`download_deadline`): the
+//! Each download runs under its own deadline (`download_deadline`): the
 //! storage client's retry layer alone can spend minutes on one object, and
 //! a query should not wait that out. Every object gets its own attempt: a
 //! failure of any kind — missing object, storage error, timeout, size
 //! mismatch, failed cache write — costs only that object, so the query
-//! still answers from the others. An object another query is already
-//! downloading is awaited until that query finishes with it; if it
-//! vanishes, the awaiter retries it as a fresh download, bounded by the
-//! cache's retry limit, each attempt under its own deadline.
-//!
-//! Consumers (grep-verified, all `otel-ledger/src/ledger/`): `pipeline.rs`
-//! and `traces_pipeline.rs` build each signal's handler a `RemoteRead` when
-//! remote storage is enabled; `rpc/logs/handler.rs` and
-//! `rpc/traces/sources.rs` call [`RemoteRead::fetch`] — the traces capture
-//! also reads [`RemoteRead::cache`]'s capacity to bound planning via
-//! `RemotePlanInput::plan_within` — and hold the returned pins across their
-//! blocking query runs; `mod.rs` runs [`migrate_read_cache`] before opening
-//! the cache; `rpc/traces/fixtures.rs` builds one over an `fs://` backend
-//! in tests.
+//! still answers from the others.
 
 use std::collections::{HashMap, HashSet};
 use std::io;
@@ -83,8 +59,7 @@ pub(crate) fn download_deadline(size: u64) -> Duration {
 pub struct RemoteFetch {
     /// The entries obtained, in request order, as
     /// `file_registry::SelectedFile`s: identity and summary from the
-    /// catalog entry, path = the cache pin's path (that type's remote-origin
-    /// contract, documented in `file-registry`'s `selection.rs`).
+    /// catalog entry, path = the cache pin's path.
     pub files: Vec<SelectedFile>,
     /// The requested entries that could not be obtained: the download
     /// failed or timed out, the object's size mismatched its catalog entry,
@@ -112,9 +87,9 @@ impl<S: Storage> RemoteRead<S> {
         Self { storage, cache }
     }
 
-    /// The download cache (its capacity is the largest remote footprint one
-    /// query can have — all-or-nothing admission — which the traces caller
-    /// reads to bound planning via `RemotePlanInput::plan_within`).
+    /// The download cache. Its capacity is the largest remote footprint one
+    /// query can have (admission is all-or-nothing), so a caller can bound
+    /// planning with `RemotePlanInput::plan_within`.
     pub fn cache(&self) -> &FileCache {
         &self.cache
     }
@@ -135,11 +110,9 @@ impl<S: Storage> RemoteRead<S> {
     /// total size exceeds the cache), `CacheError::EvictionFailed` (the
     /// cache directory cannot free room) and `CacheError::Cancelled`.
     ///
-    /// Called off the registry read lock: the entries come from a remote
-    /// plan built after the snapshot dropped the lock
-    /// (`Registry::remote_plan_input` → `RemotePlan`, per the registry
-    /// module docs' lock model). `fetch` itself holds no lock and touches
-    /// no registry state.
+    /// Call it off the registry read lock: build the remote plan after the
+    /// snapshot (`Registry::remote_plan_input`) has dropped the lock. `fetch`
+    /// itself holds no lock and touches no registry state.
     pub async fn fetch(
         &self,
         entries: Vec<CatalogEntry>,

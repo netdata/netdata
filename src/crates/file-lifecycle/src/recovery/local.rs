@@ -1,38 +1,18 @@
 //! The local-disk half of startup recovery: the per-tenant passes that replay
-//! work interrupted by the previous shutdown, sent through the workers' normal
-//! request path ([`crate::component::batch_recover`] /
-//! [`crate::component::drain_pending`]) so recovery and steady state share one
-//! code path. [`super::remote`] owns the object-storage half of the same
-//! phase; [`super::startup`] the catalog diff-sync that runs before tenant
-//! discovery. Local-only, with one exception: [`seed_from_catalog_files`]
-//! heals a corrupt catalog by re-fetching it from remote (D-P8.1) via
-//! [`super::startup::heal_corrupt_catalog`].
+//! work interrupted by the previous shutdown. They send their work through
+//! the workers' normal request path ([`crate::component::batch_recover`] /
+//! [`crate::component::drain_pending`]), so recovery and steady state share
+//! one code path. The passes do no remote I/O, with one exception:
+//! [`seed_from_catalog_files`] heals a corrupt catalog by fetching it again
+//! from the remote ([`super::startup::heal_corrupt_catalog`]).
 //!
-//! `build_pipeline` (otel-ledger/src/ledger/pipeline.rs) drives these per
-//! tenant of each signal, in this order:
+//! Errors: a dead worker channel in the middle of a batch or a drain is the
+//! fatal `anyhow` error that fails startup. Per-file failures are logged and
+//! left to the next pass or restart. [`seed_from_catalog_files`] reports
+//! nothing at all: it logs and skips every failure, and boot continues.
 //!
-//! 1. [`recover_wals`] — the WAL files left by the last run: delete those
-//!    whose SFST already exists, index the others, and take the answers of
-//!    the WAL deletes that the indexing sent. It owns the order of its three
-//!    passes.
-//! 2. [`seed_from_catalog_files`] — replay local catalog files into the
-//!    uploaded / rotated state.
-//! 3. [`recover_retention`] — evict SFSTs and catalogs per retention, SFST
-//!    eviction gated on remote-cataloged confirmation.
-//!
-//! The remote phase queues its uploads fire-and-forget between passes 2 and 3
-//! (never awaited — `recovery/remote.rs`); the passes of [`recover_wals`] and
-//! [`recover_retention`] are recovery's only [`batch_recover`] users.
-//!
-//! Error semantics (component.rs's contract): a dead worker channel
-//! mid-batch or mid-drain is the fatal `anyhow` error that fails startup;
-//! per-file failures are logged and left to the next pass or restart, and
-//! [`seed_from_catalog_files`] reports nothing at all (every failure logged
-//! and skipped, boot continues). Context: startup-only, one driving task,
-//! before the ledger event loop starts — the blocking `std::fs` calls are
-//! deliberate, and every handle here is still whole ([`ComponentHandle::into_parts`]
-//! splits the per-pipeline ones only after recovery). Consumers
-//! (grep-verified): the `build_pipeline` above and `recovery/tests.rs`.
+//! The passes run at startup only, on one task, before the ledger event loop
+//! starts, so the blocking `std::fs` calls are deliberate.
 
 use file_registry::SeqKey;
 use otel_catalog::Catalog;
@@ -70,19 +50,19 @@ pub async fn recover_wals(
 
 /// Index the tenant's archived WALs that have no SFST entry yet
 /// (`Registry::unindexed_ids`) as one [`batch_recover`] over the per-pipeline
-/// indexer. A success tracks the SFST in the registry and fires a
-/// fire-and-forget `DeleteWalFile` at the shared cleaner — [`drain_wal_deletes`]
-/// drains it, and its confirmation is what untracks the WAL entry. An empty
-/// WAL tracks nothing and drops both files (see below).
+/// indexer. A success tracks the SFST in the registry and sends a
+/// `DeleteWalFile` to the shared cleaner without waiting for the answer.
+/// [`drain_wal_deletes`] takes the answer, and that answer untracks the WAL
+/// entry. An empty WAL tracks nothing and drops both files.
 ///
-/// A WAL that cannot be indexed is **skipped as an orphan**: the failure is
-/// logged, the file's registry entry is removed (so no tracked entry without
-/// an SFST counterpart survives — the query planner never sees it), and the
-/// bytes stay on disk. No quarantine, no auto-delete, and startup proceeds.
-/// The next restart re-discovers the file (its header is valid), retries the
-/// indexing operation, and re-orphans it on failure — so a transient cause
-/// (e.g. a disk error) self-heals, while an undecodable file is retried and
-/// logged once per restart, never silently dropped.
+/// A WAL that cannot be indexed is skipped as an orphan. The failure is
+/// logged, the file's registry entry is removed, and the bytes stay on disk.
+/// So no tracked WAL entry without an SFST survives. There is no quarantine
+/// and no automatic delete, and startup proceeds. The next restart finds the
+/// file again, tries the indexing operation again, and skips it again on
+/// failure. So a transient cause, such as a disk error, heals by itself,
+/// while an undecodable file is logged once per restart, never silently
+/// dropped.
 pub(crate) async fn recover_unindexed(
     registry: &mut Registry,
     indexer: &mut ComponentHandle<IndexerRequest, IndexerResponse>,
@@ -131,9 +111,7 @@ pub(crate) async fn recover_unindexed(
                 // Empty WAL → empty SFST: track nothing. The empty index file
                 // is removed directly (not via the cleaner) so the extra
                 // response cannot interleave with the WAL-delete drain that
-                // follows this pass; steady state instead sends
-                // `DeleteIndexFile` through the run loop
-                // (`handle_indexer_resp`).
+                // follows this pass.
                 if let Err(e) = std::fs::remove_file(&index_file_path) {
                     tracing::warn!("recovery: failed to remove empty index seq={seq}: {e}");
                 }
@@ -144,9 +122,7 @@ pub(crate) async fn recover_unindexed(
             }
         }
         IndexerResponse::IndexFailed { file_id, error } => {
-            // Orphan policy (see the function doc): untrack the entry so the
-            // planner never sees a WAL without an SFST, keep the file on
-            // disk, and carry on serving.
+            // Orphan policy: see the function doc.
             failures += 1;
             tracing::error!(
                 "recovery: indexing failed path={} error={error}; \
@@ -169,18 +145,17 @@ pub(crate) async fn recover_unindexed(
 }
 
 /// Drain the WAL-delete responses `recover_unindexed` fired at the shared
-/// cleaner as side effects of its indexer batch; each `WalFileDeleted`
+/// cleaner as side effects of its indexer batch. Each `WalFileDeleted`
 /// untracks the WAL entry (`wal::Registry::remove_by_seq`). They must be
 /// drained before any later `batch_recover` on the cleaner, or the responses
 /// are consumed by the wrong handler.
 ///
-/// This is [`drain_pending`]'s production target (per component.rs): the
-/// precondition holds because [`recover_wals`] runs it right after the
-/// passes whose answers it must not see, so the pending counter counts only
-/// these fire-and-forget sends. A failed
-/// delete logs and leaves the WAL tracked — it keeps its SFST, so the next
-/// restart's [`recover_orphaned_wals`] retries; a cleaner that dies mid-drain
-/// is the fatal `anyhow` error of [`drain_pending`].
+/// [`recover_wals`] runs it right after `recover_unindexed`, so the pending
+/// counter of [`drain_pending`] counts only these deletes. A failed delete is
+/// logged and leaves the WAL tracked. The WAL keeps its SFST, so
+/// [`recover_orphaned_wals`] tries again at the next restart. A cleaner that
+/// dies in the middle of the drain is the fatal `anyhow` error of
+/// [`drain_pending`].
 pub(crate) async fn drain_wal_deletes(
     registry: &mut Registry,
     cleaner: &mut ComponentHandle<CleanerRequest, CleanerResponse>,
@@ -249,31 +224,28 @@ pub(crate) async fn recover_orphaned_wals(
 /// Evict SFST and catalog files that exceed their retention policies, in one
 /// [`batch_recover`] over the shared cleaner.
 ///
-/// - SFSTs: `sfst::Registry::evaluate_retention` under the three-knob
-///   policy (`max_files` / `max_total_size` / `max_age`, lowered by
-///   [`crate::helpers::sfst_retention_policy`]). With storage enabled, a seq
-///   is deferred until its catalog entry is confirmed present on the remote
-///   (`is_remote_cataloged`) — deleting the local SFST while the catalog
-///   upload could still fail would orphan the remote copy; the same gate
-///   guards the steady-state pass (otel-ledger's `ledger/retention.rs`). With
-///   storage disabled, everything the policy picks is evicted.
-/// - Catalogs: files dated strictly older than `today - horizon_days` — the
-///   window [`crate::helpers::catalog_retention_days`] derives from the
-///   tenant's remote-archive `horizon` (decoupled from SFST `max_age`), fed
-///   to `otel_catalog::Registry::evaluate_retention`.
+/// - SFSTs: `sfst::Registry::evaluate_retention` under the policy of
+///   [`crate::helpers::sfst_retention_policy`] (`max_files`,
+///   `max_total_size`, `max_age`). With storage enabled, a seq is deferred
+///   until its catalog entry is confirmed present on the remote
+///   (`is_remote_cataloged`). Deleting the local SFST while the catalog
+///   upload could still fail would orphan the remote copy. With storage
+///   disabled, everything the policy picks is evicted.
+/// - Catalogs: files dated strictly older than `today - days`, where `days`
+///   comes from [`crate::helpers::catalog_retention_days`] (the tenant's
+///   remote-archive `horizon`, not the SFST `max_age`), fed to
+///   `otel_catalog::Registry::evaluate_retention`.
 ///
-/// The index-delete confirmation drives [`Registry::evict_seq`] (both the
-/// SFST entry and its identity-keyed lifecycle state); a catalog delete
-/// confirms by path. `pipeline_id` is the calling signal's axis, carried on
-/// the path-keyed catalog deletes (catalog files carry no signal axis —
-/// `crate::ipc`).
+/// An index-delete confirmation calls [`Registry::evict_seq`], which drops
+/// the SFST entry and its per-seq state. A catalog delete is confirmed by
+/// path. `pipeline_id` names the calling signal. Only the catalog deletes use
+/// it, because catalog files carry no signal of their own.
 ///
-/// Unlike the steady-state pass, nothing is `mark_pending_deletion`ed here:
-/// [`batch_recover`] drains every response before returning and the ledger
-/// event loop has not started yet, so no concurrent retention pass can
-/// double-schedule a delete. A failed eviction logs and leaves the entry
-/// tracked; the next retention pass (steady state or the next restart)
-/// retries.
+/// Nothing is marked pending deletion here. [`batch_recover`] takes every
+/// answer before it returns, and the ledger event loop has not started yet,
+/// so no other retention pass can schedule the same delete twice. A failed
+/// eviction is logged and leaves the entry tracked. The next retention pass,
+/// in steady state or at the next restart, tries again.
 pub async fn recover_retention(
     registry: &mut Registry,
     pipeline_id: u16,
@@ -358,19 +330,18 @@ pub async fn recover_retention(
     .await
 }
 
-/// Replay the tenant's local catalog files (discovered by the tenant
-/// registry's `recover`) into the in-memory uploaded / rotated state. Every
-/// parsed entry is marked uploaded (no re-upload of an already-uploaded
-/// SFST) and rotated (remote reconciliation skips re-`AddEntry`ing it), keyed
-/// by the entry's own identity+seq — a local catalog may hold a prior
-/// instance's entries. This seeding alone never makes an SFST evictable:
-/// eviction waits on `is_remote_cataloged`, seeded by
-/// `reconcile_local_catalog_uploads` (`recovery/remote.rs`) once the
-/// catalog's remote presence is confirmed.
+/// Replay the tenant's local catalog files into the in-memory uploaded and
+/// rotated state. Every parsed entry is marked uploaded, so its SFST is not
+/// uploaded again, and rotated, so `reconcile_remote_uploads` does not send
+/// it as an `AddEntry` again. The marks are keyed by the entry's own identity
+/// and seq, because a local catalog may hold a prior instance's entries.
+/// This seeding alone never makes an SFST evictable: eviction waits for
+/// `is_remote_cataloged`, which `reconcile_local_catalog_uploads` sets once
+/// the catalog's remote presence is confirmed.
 ///
-/// `storage`/`own_machine`/`signal`/`op_timeout` exist for the corrupt-catalog
-/// startup-heal (D-P8.1), the file's only remote I/O. Per-file error policy —
-/// boot always continues (the function returns `()`):
+/// `storage`, `own_machine`, `signal` and `op_timeout` exist for the
+/// corrupt-catalog heal, the file's only remote I/O. Per-file error policy
+/// (boot always continues):
 ///
 /// - body-parse failure, storage enabled: corruption of an immutable,
 ///   atomically-written file; quarantine and re-fetch from remote (see
@@ -422,10 +393,6 @@ pub async fn seed_from_catalog_files<S: crate::storage::Storage>(
         let catalog = match std::fs::read(&path) {
             Ok(bytes) => match Catalog::from_container_bytes(&bytes) {
                 Ok(c) => Some(c),
-                // A newer, unsupported FORMAT version is NOT corruption (e.g. a
-                // downgrade reading a catalog a newer build wrote). Re-fetching
-                // would return the same future-version bytes AND destroy the local
-                // copy a re-upgrade could read — so leave it in place, untouched.
                 Err(otel_catalog::Error::UnsupportedVersion(v)) => {
                     tracing::error!(
                         path = %path.display(),
@@ -436,8 +403,8 @@ pub async fn seed_from_catalog_files<S: crate::storage::Storage>(
                 }
                 Err(e) => {
                     // A body-parse failure on an immutable, atomically-written
-                    // file signals corruption — ERROR (loud by design) and heal
-                    // from remote (D-P8.1).
+                    // file signals corruption. Log it at error level on
+                    // purpose, and heal it from the remote.
                     tracing::error!(path = %path.display(), "corrupt catalog body: {e}");
                     super::startup::heal_corrupt_catalog(
                         storage,

@@ -4,25 +4,6 @@
 //! share `SCHEMA_VERSION`, so the strings a caller builds and parses cannot
 //! drift apart.
 //!
-//! - `sfst`/`catalog` stamp the v2 shapes (version, signal, umbrella, date,
-//!   tenant segments; `.sfst`/`.catalog` extensions) and `sfst_prefix` carries
-//!   the trailing `/` a LIST needs; the `{signal}` segment scopes both shapes
-//!   at the root, so two signals never share a prefix.
-//! - `parse_catalog_key`/`parse_sfst_key` reject any shape deviation with
-//!   `None` (the caller warns and skips): segment count, the literal
-//!   version/umbrella/signal segments — the signal must match the
-//!   `expected_signal` the caller LISTed — a parseable date, and a tenant
-//!   through `validate_path_segment`, whose charset excludes `/`, rejects
-//!   `.`/`..`, and admits the stored auth-off `default` tenant (the
-//!   auth-off restore blackout regression). `parse_sfst_date` checks only
-//!   the version/`tenants`/`sfst` literals and the date.
-//! - The extension guard is pinned from both sides: an `.sfst` key never
-//!   parses as a catalog and a `.catalog` key never as an SFST (stem parsing
-//!   strips any extension, so the explicit check does the work).
-//! - A built key parses back to its stored fields: date via
-//!   `parse_sfst_date`, `(FileId, tenant, date)` via `parse_sfst_key`,
-//!   tenant/identity/max_seq via `parse_catalog_key`.
-//!
 //! Not pinned here: `catalog_prefix` (exercised only through recovery's
 //! `startup_catalog_sync` tests); `parse_sfst_date` accepts any signal and
 //! tenant segment (it checks neither) and ignores trailing content after the
@@ -109,8 +90,7 @@ fn parse_sfst_date_rejects_unknown_shapes() {
     assert!(parse_sfst_date("v1/logs/tenants/tenant1/sfst/2026-04-17/x").is_none());
     // Missing tenants umbrella (signal present, but no `tenants` segment).
     assert!(parse_sfst_date("v2/logs/tenant1/sfst/2026-04-17/x").is_none());
-    // Old segment-less v1 layout (the former plugin's, pre-signal-segment):
-    // rejected at the version check now that the schema is v2.
+    // Old segment-less v1 layout: rejected at the version check.
     assert!(parse_sfst_date("v1/tenants/tenant1/sfst/2026-04-17/x.sfst").is_none());
     // Catalog key shape (not an SFST key).
     assert!(parse_sfst_date("v2/logs/catalog/2026-04-17/tenant1/x").is_none());
@@ -151,7 +131,7 @@ fn parse_catalog_key_shape_table() {
         ("dot (.) tenant", valid.replace("/tenant1/", "/./"), false),
         // The auth-off "default" tenant is a legitimate stored segment (this is
         // the auth-off restore blackout regression: `validate_path_segment`
-        // admits what ingest validation rejects, so it MUST parse).
+        // admits what ingest validation rejects, so it must parse).
         (
             "default tenant",
             catalog(
