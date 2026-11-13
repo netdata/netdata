@@ -18,6 +18,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step_end", Title: "legacy event"}}}
 			if rich {
+				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
 				run.FailureEvidence = &model.FailureEvidence{
 					Availability: "supported", Truncated: []string{"user_steps"},
 					Steps:        []model.EvidenceStep{{ID: "s1", TestID: "t", Title: "pending submit", State: "running"}},
@@ -45,6 +46,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				"capture_state": "", "artifacts": []model.Artifact(nil), "history_error": "",
 				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
 				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,
+				"browser_summary": run.BrowserSummary, "browser_summary_status": status,
 			}, detail)
 			validate(t, detailResponse)
 			listResponse := call(h, "synthetics-runs")
@@ -58,12 +60,16 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			}
 			assert.Equal(t, run.FailureEvidence.LastObservedStepSummary(), values["last_observed_step"])
 			assert.Equal(t, run.FailureEvidence.StopSummary(), values["stop_context"])
+			assert.Equal(t, run.BrowserSummary.ReportingStatus(), values["browser_summary_status"])
+			assert.Equal(t, run.BrowserSummary.Summary(), values["browser_errors"])
 			columns := listResponse.RawResponse["columns"].(map[string]any)
 			assert.Equal(t, 15, columns["termination_reason"].(map[string]any)["index"])
 			assert.Equal(t, 16, columns["failure_evidence_status"].(map[string]any)["index"])
 			assert.Equal(t, 17, columns["first_failure"].(map[string]any)["index"])
 			assert.Equal(t, 18, columns["last_observed_step"].(map[string]any)["index"])
 			assert.Equal(t, 19, columns["stop_context"].(map[string]any)["index"])
+			assert.Equal(t, 20, columns["browser_summary_status"].(map[string]any)["index"])
+			assert.Equal(t, 21, columns["browser_errors"].(map[string]any)["index"])
 			validate(t, listResponse)
 		})
 	}

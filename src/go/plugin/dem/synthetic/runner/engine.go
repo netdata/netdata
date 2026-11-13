@@ -218,6 +218,9 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	}
 	if request.Kind == synthetic.Journey {
 		req.Extensions = []string{failureEvidenceFeature}
+		if request.BrowserErrorSummary {
+			req.Extensions = append(req.Extensions, browserSummaryFeature)
+		}
 		deadline, _ := attempt.Deadline()
 		req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt)
 		if err != nil {
@@ -238,7 +241,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 			Drained: true,
 		}
 	}
-	sink := newSink(request.Kind, request.Capture, redact)
+	sink := newSink(request.Kind, request.Capture, redact, request.BrowserErrorSummary)
 	started := time.Now()
 	if state != nil {
 		state("running")
@@ -267,6 +270,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		drained = result.Drained
 		snapshot := sink.snapshot()
 		run.FailureEvidence = snapshot.evidence
+		run.BrowserSummary = snapshot.browser
 		run.Events = snapshot.events
 		run.DroppedEvents = snapshot.dropped
 		run.Tests = snapshot.partial

@@ -9,10 +9,12 @@ const {
   secretStream,
 } = require("./protocol.cjs");
 const FailureEvidence = require("./failure-evidence.cjs");
+const BrowserSummary = require("./browser-summary.cjs");
 
 module.exports = class DEMReporter {
   constructor(options) {
     this.options = options;
+    this.stepView = require("./step-view.cjs")(options.observerFile);
     this.tests = new Map();
     this.artifacts = [];
     this.interruptedArtifacts = [];
@@ -21,7 +23,10 @@ module.exports = class DEMReporter {
     this.confirmedFailure = false;
     this.finished = false;
     this.evidence = options.extensions?.includes(FailureEvidence.FEATURE)
-      ? new FailureEvidence(options, (record) => write(3, record))
+      ? new FailureEvidence({...options, stepView: this.stepView}, (record) => write(3, record))
+      : undefined;
+    this.browserSummary = options.extensions?.includes(BrowserSummary.FEATURE)
+      ? new BrowserSummary((record) => write(3, record))
       : undefined;
     this.stdio = Object.fromEntries(
       ["stdout", "stderr"].map((kind) => [
@@ -73,10 +78,12 @@ module.exports = class DEMReporter {
     });
   }
   onStepBegin(test, result, step) {
+    if (!this.stepView.visible(step)) return;
     this.evidence?.beforeCleanup(test, result, step);
     this.evidence?.step(test, step);
   }
   onStepEnd(test, result, step) {
+    if (!this.stepView.visible(step)) return;
     this.evidence?.step(test, step, true);
     this.emit("step", {
       test_id: test.id,
@@ -102,13 +109,14 @@ module.exports = class DEMReporter {
     this.emit("error", { phase: "execution", status: "error", message });
   }
   onTestEnd(test, result) {
+    this.browserSummary?.test(test);
     this.evidence?.test(test, result);
     this.evidence?.firstFailure(test, result);
     this.evidence?.stopContext(test, result);
     this.tests.set(test.id, { test, result });
     const failureSteps = [];
     const visit = (steps) => {
-      for (const step of steps) {
+      for (const step of this.stepView.children(steps)) {
         if (step.error) failureSteps.push(step);
         visit(step.steps || []);
       }
@@ -223,6 +231,7 @@ module.exports = class DEMReporter {
     )
       status = "success";
     this.evidence?.complete();
+    this.browserSummary?.complete();
     write(3, {
       type: "result",
       result: {

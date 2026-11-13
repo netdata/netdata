@@ -203,8 +203,8 @@ baseline error event/result and does not authorize replay with weaker settings.
 
 Output extensions MUST be explicitly requested by an Agent that understands
 them and selected by the runtime for that attempt. The neutral `extensions` request
-member and `extension_init` acknowledgement implement this gate; `failure_evidence.v1`
-is its first consumer. The execution contract remains 2.
+member and `extension_init` acknowledgement implement this gate for `failure_evidence.v1`
+and the opt-in `browser_summary.v1`. The execution contract remains 2.
 
 | Change | Compatible evolution rule |
 |---|---|
@@ -234,7 +234,7 @@ version 3 is currently unsupported. Introduce and validate it with the first rea
 required control, not as unused compatibility machinery. Never retry an unsupported
 control as an advisory field or infer enforcement from optional output selection.
 
-The extension mechanism ships with its first typed consumer, Failure-evidence.
+The extension owner directly routes the two typed consumers, Failure-evidence and browser summary.
 There is no generic registry, version-range solver, capability cache or extra probe
 process in this design. Producer emission, parsing and retention must be bounded:
 optional traffic shares the result stream and must be measured near execution
@@ -332,11 +332,88 @@ a contradictory update removes its disputed item. Raw extension JSON is never pe
 The typed snapshot is copied before outcome branching, including hard-stop and core-error paths.
 Process drainage, capture validation and persistence remain the execution owners' responsibilities.
 
+## Optional browser-error summary
+
+The journey job option `browser_error_summary` defaults to false. When enabled,
+the Agent requests `browser_summary.v1` alongside Failure-evidence. Both use the
+same selection acknowledgement and 32 KiB envelope limit; malformed feature data
+invalidates only that feature. Malformed shared framing/initialization affects
+both. Missing support is explicit and never triggers a replay.
+
+The selected runtime maps both canonical Playwright test imports to one boxed
+context-fixture wrapper. It observes public context console, web-error, response
+and failed-request events. Coverage is `fixture_context`: fixture pages and popups
+are observed; manually created/replaced contexts and workers have no general
+coverage guarantee. Tests without the fixture report `no_summary`. An open
+annotation at test end is incomplete; missing test-end callbacks remain unknown.
+Reporter completion means reporting ended, not that every browser scope was seen.
+
+Only `console.error`, uncaught errors, failed transport and HTTP status >=400 are
+counted. Counts continue after sampling stops. Each test has three permanent
+candidate opportunities per category, at most three public sampler evaluations,
+and at most four handles per evaluation. Duplicate/rejected/pending samples do
+not refill slots. Console values are finite JSON primitives or explicit omissions:
+`object`, `symbol`, `function`, `unrepresentable`, `non_finite`, `too_long`.
+`unrepresentable` covers undefined and provider conversion loss, including BigInt
+on Playwright 1.63. No object rendering, request bodies, headers or cookies are
+captured. Primitive strings are whole values or omitted, never prefixes.
+
+Sampling starts eagerly; fixture teardown takes a synchronous snapshot without
+waiting for evaluations. Pending/unavailable states are explicit and late
+callbacks cannot change it. Whole browser-text omission uses `text_omitted: too_long`
+on an unavailable sample, without inventing arguments. The sampler has one canonical
+file; the shared step view excludes only its `pw:api` operations from core diagnosis and every
+Failure-evidence reader. Original provider step objects remain untouched and raw
+Playwright steps can contain those operations. User steps/API calls remain visible.
+This is a supported-script boundary, not isolation against direct private imports.
+
+Secrets are redacted before bounding text. Structured URLs lose credentials, query
+and fragment; an oversized URL is omitted whole and an unusable URL is empty.
+Recognized embedded HTTP(S) URLs receive best-effort stripping. Arbitrary
+application text is not guaranteed anonymous. The renderer guards strings at 512
+UTF-16 units; worker/Go retention requires <=512 Go-encoded JSON bytes, including
+quotes. Metadata fields may clip with an explicit marker. Method/URL/transport
+error limits are 16/256/128 encoded bytes.
+
+The worker sends one `netdata.dem.browser_summary` annotation (`v:1`) with state
+`open`, `observed`, or `invalid`. Observed annotations contain counts, candidates,
+omission flags and `rpc_calls`; the description boundary is 16 KiB. Counter
+arithmetic uses nonnegative safe integers. Overflow terminates this feature with
+`counter_overflow`; an oversized producer annotation uses `annotation_limit`.
+
+The reporter retains at most 64 interesting test rows and four distinct samples
+per category (16 total). Clean observed tests contribute only to aggregates.
+Samples are stored once with their first test owner; later duplicates cannot claim
+that attribution. After row exhaustion, at most four `late_sample` records can
+introduce one representative of a category absent from that same pool. The records
+are `test`, `late_sample`, `truncated` (once per tests/samples/text scope), and one
+`complete` or `invalid`. Every ordinary record carries a cumulative `run` aggregate;
+terminal invalid preserves earlier evidence without replacing its counts.
+
+Omission flags describe limits, not lost-event counts: `args_limit`, `rpc_budget`,
+`candidate_limit`, `pending`, `unavailable`, `too_long`, `pool_full`, `row_limit`,
+`identity_limit`. Only `args_omitted` counts omitted arguments. No count-minus-sample
+loss estimate is made. Actual published clipping controls text truncation.
+Test/sample identities are never clipped. Known fields are validated atomically;
+additive fields are discarded, and conflicting identities or terminal ordering
+invalidate this feature. Missing aggregates are not zeros; absent counters inside
+a validated aggregate are zero.
+
+Structural tests prove <=16 KiB generated record data, <=33 KiB escaped annotation
+contribution, <=72 KiB generated feature traffic per run and <=40 KiB retained
+JSON. Those are derived guarantees, not extra byte ledgers or cumulative raw-input
+policies. The annotation/envelope boundaries and field/collection quotas enforce
+the bounds. Provider dispatch/handles and all other Playwright IPC are outside
+these owned-state guarantees. See the DEM `PERFORMANCE.md` for measured opt-in cost.
+No summary event changes test outcomes, deadlines, retries, process drainage or
+artifact publication.
+
 ## Tests
 
 Run `npm ci --ignore-scripts` and `npm test` in this source directory, or set
 DEM_TEST_DEPENDENCIES to an absolute, separately prepared dependency root before running
-`node --test tests/*.test.mjs`. Tests use real non-browser Playwright execution
+`node --test tests/*.test.mjs`. Set DEM_TEST_BROWSER to the pinned sandbox browser
+for the real-browser summary case. Tests use real non-browser Playwright execution
 and synthetic fixture runtimes, without adding component path overrides to the
 execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation

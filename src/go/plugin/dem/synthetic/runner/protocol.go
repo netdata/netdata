@@ -92,7 +92,7 @@ type wireEnvelope struct {
 }
 
 type sink struct {
-	evidence     *evidenceState
+	extensions   *extensions
 	streams      map[string]*diagnosticStream
 	streamEvents map[string]synthetic.Event
 	mu           sync.Mutex
@@ -107,6 +107,7 @@ type sink struct {
 	tests        map[string]synthetic.Event
 }
 type sinkSnapshot struct {
+	browser  *synthetic.BrowserSummary
 	evidence *synthetic.FailureEvidence
 	events   []synthetic.Event
 	dropped  int
@@ -115,9 +116,9 @@ type sinkSnapshot struct {
 	partial  *synthetic.TestCounts
 }
 
-func newSink(kind synthetic.Kind, capture bool, redact *textRedactor) *sink {
+func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser bool) *sink {
 	return &sink{
-		evidence:     newEvidenceState(kind),
+		extensions:   newExtensions(kind, browser),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
 		kind:         kind,
@@ -170,7 +171,7 @@ func (s *sink) consume(reader io.Reader) error {
 			} else if err := validateEvent(event); err != nil {
 				protocolErr = err
 			} else {
-				s.evidence.core()
+				s.extensions.core()
 				s.add(event)
 			}
 		case "result":
@@ -184,7 +185,7 @@ func (s *sink) consume(reader io.Reader) error {
 			} else if err := validateResult(s.kind, s.capture, &result); err != nil {
 				protocolErr = err
 			} else {
-				s.evidence.core()
+				s.extensions.core()
 				result.Error = s.redact.text(result.Error)
 				s.result = &result
 			}
@@ -196,9 +197,9 @@ func (s *sink) consume(reader io.Reader) error {
 				break
 			}
 			if record.Type == "extension_init" {
-				s.evidence.init(record.ExtensionInit)
+				s.extensions.init(record.ExtensionInit)
 			} else {
-				s.evidence.accept(record.Extension, s.redact)
+				s.extensions.accept(record.Extension, s.redact)
 			}
 		default:
 			protocolErr = errors.New("unsupported runner frame type")
@@ -329,7 +330,8 @@ func (s *sink) snapshot() sinkSnapshot {
 		partial = &counts
 	}
 	return sinkSnapshot{
-		evidence: s.evidence.snapshot(),
+		evidence: s.extensions.evidence.snapshot(),
+		browser:  s.extensions.browser.snapshot(),
 		events:   append([]synthetic.Event{}, s.events...),
 		dropped:  s.dropped,
 		result:   s.result,

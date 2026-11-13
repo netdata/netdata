@@ -5,6 +5,7 @@ package journey
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -43,10 +44,10 @@ func configured() *Collector {
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
-		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false}`,
+		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":false,"browser_error_summary":true}`,
 	)
 	cfgYAML := []byte(
-		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\n",
+		"vnode: storefront\nname: login\nupdate_every: 10\ncheck_every: 900\ntimeout: 120\nscript: test('login', async () => {});\nsecrets:\n  - name: DEM_SECRET_PASSWORD\n    value: ${env:TEST_PASSWORD}\nscreenshot_on_failure: false\nbrowser_error_summary: true\n",
 	)
 	collecttest.TestConfigurationSerialize(t, New(Dependencies{}), cfgJSON, cfgYAML)
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
@@ -179,4 +180,37 @@ func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {
 	require.NoError(t, yaml.Unmarshal([]byte("vnode: null\n"), c))
 	require.NoError(t, c.Init(context.Background()))
 	assert.Empty(t, c.Vnode)
+}
+
+func TestBrowserErrorSummaryOption(t *testing.T) {
+	for _, enabled := range []bool{false, true} {
+		t.Run(fmt.Sprint(enabled), func(t *testing.T) {
+			for format, codec := range map[string]struct {
+				encode func(any) ([]byte, error)
+				decode func([]byte, any) error
+			}{
+				"json": {json.Marshal, json.Unmarshal},
+				"yaml": {yaml.Marshal, yaml.Unmarshal},
+			} {
+				t.Run(format, func(t *testing.T) {
+					c := configured()
+					assert.False(t, c.BrowserErrorSummary)
+					raw, err := codec.encode(map[string]any{"browser_error_summary": enabled})
+					require.NoError(t, err)
+					require.NoError(t, codec.decode(raw, c))
+					require.NoError(t, c.Init(context.Background()))
+					assert.Equal(t, enabled, c.request.BrowserErrorSummary)
+					raw, err = codec.encode(c.Configuration())
+					require.NoError(t, err)
+					copy := configured()
+					require.NoError(t, codec.decode(raw, copy))
+					require.NoError(t, copy.Init(context.Background()))
+					assert.Equal(t, enabled, copy.request.BrowserErrorSummary)
+				})
+			}
+		})
+	}
+	c := configured()
+	require.NoError(t, c.Init(context.Background()))
+	assert.False(t, c.request.BrowserErrorSummary)
 }

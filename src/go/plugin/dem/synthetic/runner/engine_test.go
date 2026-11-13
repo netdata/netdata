@@ -539,7 +539,7 @@ func TestDiscoveryCountIsTypedAndValidated(t *testing.T) {
 		{"other event", `{"type":"event","event":{"kind":"step","declared_tests":1}}`, false, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			s := newSink(synthetic.Journey, false, newRedactor(nil))
+			s := newSink(synthetic.Journey, false, newRedactor(nil), false)
 			err := s.consume(strings.NewReader(tc.raw + "\n"))
 			if tc.valid {
 				require.NoError(t, err)

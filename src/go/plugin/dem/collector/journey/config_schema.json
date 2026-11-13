@@ -60,6 +60,12 @@
         "type": "boolean",
         "default": false
       },
+      "browser_error_summary": {
+        "title": "Collect browser error summary",
+        "description": "Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text.",
+        "type": "boolean",
+        "default": false
+      },
       "update_every": {
         "title": "Update every",
         "description": "Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.",
@@ -142,7 +148,8 @@
         {
           "title": "Diagnosis",
           "fields": [
-            "screenshot_on_failure"
+            "screenshot_on_failure",
+            "browser_error_summary"
           ]
         },
         {

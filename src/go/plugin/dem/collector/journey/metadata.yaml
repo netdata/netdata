@@ -23,7 +23,8 @@ modules:
     overview:
       data_collection:
         metrics_description: Monitor whether browser workflow checks execute and pass with real Playwright
-          Test. Inspect test outcomes, attempt durations and retained failure details.
+          Test. Inspect test outcomes, attempt durations and retained failure details. Optionally collect bounded browser
+          error counts and primitive samples, including passing tests.
         method_description: Runs the configured Playwright Test entry with sandboxed Chromium at the native
           check_every interval, using one worker without retries. Workflows can perform the actions their scripts request
           on the target website. Configuration Test executes the submitted draft, including resolved secrets,
@@ -52,12 +53,15 @@ modules:
           description: Empty suites, skipped tests and expected failures cannot establish successful coverage.
             A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the
             prior result for diagnosis; that observation becomes stale after two check intervals and does
-            not imply recovery. Failure screenshots are disabled unless requested. Configuration Test returns
+            not imply recovery. Failure screenshots and browser error summaries are disabled unless requested.
+            Browser summaries cover only fixture contexts; missing evidence does not mean zero browser errors. Configuration Test returns
             pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
         performance_impact:
           description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
             Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
             due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space.
+            Enabling browser_error_summary can add substantial CPU and memory cost on console-heavy pages, even without
+            console errors; sample limits do not bound browser event-dispatch cost.
     setup:
       prerequisites:
         list:
@@ -133,6 +137,11 @@ modules:
             - name: screenshot_on_failure
               description: Save a screenshot when a workflow check fails. Screenshots can contain sensitive
                 page content; timeout capture is best effort.
+              default_value: false
+              required: false
+              group: Diagnosis
+            - name: browser_error_summary
+              description: Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text.
               default_value: false
               required: false
               group: Diagnosis
@@ -596,6 +605,14 @@ modules:
                 unit: ''
                 description: Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop.
                   Source locations identify the displayed step or the test declaration when no step is known, not the timeout location.
+              - name: browser_summary_status
+                type: string
+                unit: ''
+                description: Optional journey browser summary reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); completion does not imply complete browser coverage.
+              - name: browser_errors
+                type: string
+                unit: ''
+                description: Observed browser error counts by category, with sampling limitations when reported; missing evidence is not zero errors.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
@@ -630,7 +647,9 @@ modules:
           returns:
             description: One row per retained reporter event, preserving actual and expected status and failure
               phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact
-              metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure,
+              metadata and history errors. Journey browser_summary adds typed fixture-context coverage, observed counts,
+              bounded primitive samples and explicit omissions when enabled; missing evidence is not zero errors.
+              Journey failure_evidence adds test and step observations, the first unexpected failure,
               reporting completeness and separate truncation flags; absent evidence is not a report of zero failures.
               dropped_events discloses omitted generic event detail. The run.vnode_guid field
               contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.

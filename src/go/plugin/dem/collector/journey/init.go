@@ -31,14 +31,15 @@ func (c *Collector) Init(ctx context.Context) error {
 		secrets[secret.Name] = secret.Value
 	}
 	request := model.Request{
-		Kind:       model.Journey,
-		VnodeGUID:  c.vnodeGUID,
-		Name:       c.Name,
-		Script:     c.Script,
-		ScriptPath: c.ScriptPath,
-		Secrets:    secrets,
-		Timeout:    time.Duration(c.Timeout),
-		Capture:    c.ScreenshotOnFailure,
+		Kind:                model.Journey,
+		VnodeGUID:           c.vnodeGUID,
+		Name:                c.Name,
+		Script:              c.Script,
+		ScriptPath:          c.ScriptPath,
+		Secrets:             secrets,
+		Timeout:             time.Duration(c.Timeout),
+		Capture:             c.ScreenshotOnFailure,
+		BrowserErrorSummary: c.BrowserErrorSummary,
 	}
 	if err := model.ValidateRequest(request); err != nil {
 		return err
