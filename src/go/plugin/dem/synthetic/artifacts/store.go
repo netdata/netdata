@@ -20,7 +20,9 @@ import (
 
 const FetchMaxBytes int64 = 5 << 20
 
-// CaptureError identifies an item that prevented publication of the entire set.
+// CaptureError identifies a hard size failure (copy growth or failure to close an
+// oversized source) that prevented publication of the entire set. Initial oversize
+// alone is skipped.
 type CaptureError struct {
 	ID  string
 	Err error

@@ -179,6 +179,22 @@ func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture
 	}
 }
 
+func capturePublicationSucceeded(run *synthetic.Run, candidates []synthetic.Capture) {
+	if run.Captures == nil || len(candidates) == len(run.Artifacts) {
+		return
+	}
+	// Successful Finalize omits only candidates above its initial-size limit.
+	published := make(map[string]bool, len(run.Artifacts))
+	for _, a := range run.Artifacts {
+		published[a.ID] = true
+	}
+	for _, c := range candidates {
+		if !published[c.ID] {
+			run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{ID: c.ID, Reason: "too_large"})
+		}
+	}
+}
+
 func capturePublicationFailed(run *synthetic.Run, candidates []synthetic.Capture, err error) {
 	if run.Captures == nil {
 		return

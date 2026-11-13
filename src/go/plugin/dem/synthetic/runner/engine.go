@@ -372,8 +372,12 @@ func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, reda
 			}
 		} else {
 			run.Artifacts = artifacts
-			if run.CaptureState != "disabled" && len(artifacts) > 0 {
-				run.CaptureState = "available"
+			capturePublicationSucceeded(run, captures)
+			if run.CaptureState != "disabled" && len(captures) > 0 {
+				run.CaptureState = "unavailable"
+				if len(artifacts) > 0 {
+					run.CaptureState = "available"
+				}
 			}
 		}
 	}

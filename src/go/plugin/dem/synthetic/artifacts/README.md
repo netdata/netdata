@@ -85,9 +85,18 @@ check inventory do not recursively scan storage.
 against its manifest, caps returned content at 5 MiB and serializes with expiry.
 Missing records return `ErrNotFound`; retained run evidence can explain these as
 expired or unavailable. No tombstones grow independently of retention.
-Publication rejects captures exceeding the same 5 MiB limit with `ErrTooLarge`,
-without publishing a partial run or truncated artifact. The copy is bounded even
-if a source grows after its initial size check. Fetch retains its size guard for
-existing oversized captures.
-Size failures carry the offending candidate ID for run diagnostics. Other candidates
-in the rejected set are reported as `publication_failed`; this is not partial publication.
+Publication skips valid candidates whose initial size exceeds the same 5 MiB limit,
+after checking paths, types and PNG signatures. Exactly 5 MiB is allowed. The retained
+subset publishes atomically; no truncated artifact or empty manifest is published.
+Successful finalization returns retained candidates in input order. The runner uses
+candidate ID membership to record absent candidates as `too_large` without adding
+a general run error.
+If every candidate is omitted, drained cleanup runs and capture state is `unavailable`.
+
+Invalid candidates and copy/close/sync errors still fail the whole publication.
+Cancellation observed before publication starts also aborts it. Once the rename into
+`runs/` starts, finalization finishes its durability checks even if cancellation races it.
+The copy remains bounded: growth past the limit is a hard `ErrTooLarge`.
+Hard size failures carry the offending candidate ID, reported as `too_large`; other
+candidates in the failed set are `publication_failed`, including earlier size skips.
+Fetch retains its size guard for existing oversized captures.

@@ -945,8 +945,9 @@ Capture discovery and downloads remain available after run history expires and a
 Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive
 its files; absent recorded files mean “expired or unavailable”. Metadata presence alone does not verify file integrity;
 fetch verifies size and digest. Capture metadata requires member-equivalent permissions. Downloads require
-administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. A capture exceeding
-5 MiB makes that run's capture publication unavailable; no partial set or truncated file is published.
+administrator-equivalent permissions and are limited to 5 MiB; HTML is returned as base64 data. Valid captures initially
+larger than 5 MiB are omitted; the remaining files publish atomically without truncation. If all are omitted, capture
+state is unavailable. Invalid files, copy growth and I/O failures still fail publication of the whole set.
 
 `synthetics-artifact` adds a kind-derived label and the associated test title for screenshots reported by a supporting
 runtime. The association identifies a test, not a page, failing step or exact screenshot time. Test labels remain with
@@ -957,8 +958,10 @@ belong to their run and have no test.
 counts, candidate-to-test links, reporting status/truncation, and unpublished-candidate reasons. Zero accepted means
 no usable screenshot was reported; a positive unaccepted count means screenshot attachments were reported but could
 not be used, including when other screenshots succeeded. It does not establish page closure or a screenshot timeout.
-Go reports `too_large` for an offending size-limit candidate, `publication_failed` for the rejected set's other
-candidates, `not_eligible` for an interrupted candidate rejected by stop policy, and `not_in_final_report` for metadata
+On successful publication, Go reports `too_large` for each size omission without adding general run-error text.
+On a hard publication failure, it reports `publication_failed` for the set, except an identified size-error offender
+remains `too_large`; earlier size skips are not separately preserved. It reports `not_eligible` for an interrupted
+candidate rejected by stop policy, and `not_in_final_report` for metadata
 without an accepted final candidate. Without a final candidate report, earlier screenshots are not recovered.
 These are historical decisions, separate from current artifact availability. An absent `run.captures` means reporting
 was not recorded, not zero captures. Metadata may be partial, unsupported,
