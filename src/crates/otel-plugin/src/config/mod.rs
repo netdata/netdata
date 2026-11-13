@@ -5,11 +5,10 @@
 //! 2. User config file (`$NETDATA_USER_CONFIG_DIR/otel.yaml`)
 //! 3. Stock config file (`$NETDATA_STOCK_CONFIG_DIR/otel.yaml`)
 //!
-//! [`load_config`] wires the layers together; the supervisor calls it once at
-//! startup (`supervisor.rs` `run`) and sends the effective config to the workers
-//! over IPC. Only the stock file is parsed directly into the full
-//! [`PluginConfig`]: the other two layers produce a [`ConfigOverride`] applied
-//! on top. The submodules hold the override parsers this file merges:
+//! [`load_config`] wires the layers together. Only the stock file is parsed
+//! directly into the full [`PluginConfig`]: the other two layers produce a
+//! [`ConfigOverride`] applied on top. The submodules hold the override parsers
+//! this file merges:
 //!
 //! - `env`: collects and maps the `NETDATA_OTEL_CFG_*` variables
 //! - `receivers`, `metrics`, `signal`: per-section override types
@@ -357,9 +356,8 @@ fn validate_tls_pairing(prefix: &str, tls: &TlsServerConfig) -> Result<()> {
     Ok(())
 }
 
-/// Shape and TLS checks for one ENABLED listener: `endpoint` must be
-/// `host:port` — a shape check only, the ingestor does the full `SocketAddr`
-/// parse when it binds — and the TLS block must pair up
+/// Shape and TLS checks for one enabled listener: `endpoint` must be
+/// `host:port` (a shape check only), and the TLS block must pair up
 /// ([`validate_tls_pairing`]).
 fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
     if !listener.endpoint.contains(':') {
@@ -387,7 +385,7 @@ fn validate(config: &PluginConfig) -> Result<()> {
     }
     // Derived per-signal dirs join onto base_dir; a relative base_dir would make
     // the on-disk layout depend on the process CWD (which the agent does not
-    // pin). Match the journal-writer contract: storage roots must be absolute.
+    // pin).
     if !config.base_dir.is_absolute() {
         anyhow::bail!(
             "base_dir must be an absolute path, got: {}",
@@ -1280,11 +1278,10 @@ logs:
 
     // -- Strict parsing: unknown keys refuse startup (in every section) --
     //
-    // Deliberate contract flip: unknown keys used to be silently ignored for
-    // forward compatibility. A silently dropped typo means defaults apply
-    // where the operator configured otherwise (e.g. leaner retention wiping
-    // data they meant to keep), so the file must be fully understood or the
-    // plugin does not run — consistent with how syntax errors already behave.
+    // A silently dropped typo means defaults apply where the operator
+    // configured otherwise (e.g. leaner retention wiping data they meant to
+    // keep), so the file must be fully understood or the plugin does not run —
+    // consistent with how syntax errors already behave.
 
     #[test]
     fn unknown_keys_rejected_per_section() {
@@ -1330,7 +1327,7 @@ logs:
             ByteSize::mb(10)
         );
 
-        // A typo INSIDE a tenant entry is schema and is rejected.
+        // A typo inside a tenant entry is schema and is rejected.
         let err =
             resolve_with_user("logs:\n  rotation:\n    default:\n      max_filesize: \"10MB\"\n")
                 .unwrap_err();
@@ -1394,8 +1391,8 @@ logs:
 
     #[test]
     fn tempo_key_is_rejected() {
-        // The Tempo shim was removed; strict parsing refuses its former key
-        // so a stale config fails loudly instead of silently not listening.
+        // Strict parsing refuses the former Tempo shim key so a stale config
+        // fails loudly instead of silently not listening.
         let err = resolve_with_user("traces:\n  tempo:\n    enabled: true\n").unwrap_err();
         assert!(
             format!("{err:#}").contains("unknown field `tempo`"),
@@ -2055,8 +2052,7 @@ logs:
     }
 
     // The UTF-8 check on env values is deliberately lazy (only when a variable is
-    // consumed), mirroring the former per-variable `std::env::var`. These pin that
-    // so a future refactor can't silently regress it.
+    // consumed).
 
     #[cfg(unix)]
     #[test]
@@ -2292,7 +2288,7 @@ logs:
 
     // -- The shipped stock file --
     //
-    // `STOCK_YAML` above is a lookalike fixture; this parses the REAL shipped
+    // `STOCK_YAML` above is a lookalike fixture; this parses the real shipped
     // `configs/otel.yaml.in` (with the CMake placeholders substituted the way
     // `configure_file` does at install), so drift between the shipped file,
     // the schema, and the code defaults it relies on is caught at test time.
@@ -2356,7 +2352,7 @@ logs:
         assert!(!substituted.contains("ingest:"));
 
         for signal in [&config.logs, &config.traces] {
-            // crc/compression are intentionally NOT in the shipped file; the
+            // crc/compression are intentionally not in the shipped file; the
             // schema's defaults (true) must cover them.
             assert!(signal.crc_enabled);
             assert!(signal.compression_enabled);
@@ -2376,7 +2372,7 @@ logs:
             assert_eq!(retention.max_total_size, ByteSize::gb(1));
             assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
             // Hidden knob: humantime "10 years" = 10 × 365.25 days, from the
-            // code default (the stock file no longer sets horizon).
+            // code default.
             assert_eq!(retention.horizon, Duration::from_secs(10 * 31_557_600));
             assert_eq!(signal.catalog.rotation_count, 10);
             assert_eq!(signal.catalog.rotation_period, Duration::from_secs(15 * 60));

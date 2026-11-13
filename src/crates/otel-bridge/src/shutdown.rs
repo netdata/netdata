@@ -28,23 +28,14 @@
 //! - On `QUIT` the supervisor sends `Shutdown` to every worker and waits
 //!   [`WORKERS_EXIT_WAIT`] for all of them together. A worker that is still
 //!   there after that is killed.
-//! - A worker's work after `Shutdown` (the ingestor takes no new export,
-//!   answers the exports in progress and then writes the open minutes of
-//!   the service map; the ledger writes its catalog entries to local
-//!   catalog files) has [`WORKER_STOP_BUDGET`]. In by-hand runs under load
-//!   the ingestor's answers took a few milliseconds; a peer that holds a
-//!   connection open costs the ingestor half of the budget, the most that
-//!   the answers get.
+//! - A worker's work after `Shutdown` has [`WORKER_STOP_BUDGET`].
 //!
 //! A stop while the plugin starts, before the ingestor's `Ready`, has no
 //! stop work and none of these budgets: the supervisor ends its workers at
 //! once (`otel_bridge`, "Handshake protocol").
 //!
 //! What a stop does not finish, for any of these reasons, the next start
-//! recovers: stop work is never needed for what the plugin acknowledged. An
-//! export that a stop cuts gets no answer while its frames can be on the
-//! disk: its sender sends it again, and those records are then stored
-//! twice. Answering the exports in progress first is what keeps that rare.
+//! recovers: stop work is never needed for what the plugin acknowledged.
 //!
 //! Not bounded by these: after its stop work a worker drops its runtime,
 //! which waits for the blocking calls that still run (an fsync). The kill

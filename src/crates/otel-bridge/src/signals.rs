@@ -5,15 +5,14 @@
 //! frames, and used by the ledger to route events to the owning pipeline) and a
 //! remote-key segment
 //! (`v2/{segment}/...`). [`Signal`] is the one place that maps
-//! a signal to that pair, so the two cannot drift apart; downstream layers carry
-//! `Signal` (or its opaque [`SignalSpec`]) instead of loose `(u16, &str)` pairs.
+//! a signal to that pair, so the two cannot drift apart.
 //!
 //! The numeric axis is the wire/disk format: it is encoded as `u16` and MUST stay
-//! byte-compatible. `Signal` itself is never serialized — filenames, WAL frames,
-//! and substrate IPC carry the raw `u16`, and signal-aware code re-derives the
-//! enum with [`Signal::try_from`] at that boundary (the handlers live in
-//! `otel-ledger`). An id with no known signal is a runtime error (it can come
-//! from a persisted file or another process), never a panic.
+//! byte-compatible. `Signal` itself is never serialized. Filenames, WAL frames,
+//! and `file-lifecycle` IPC carry the raw `u16`, and signal-aware code
+//! re-derives the enum with [`Signal::try_from`] at that boundary. An id with
+//! no known signal is a runtime error (it can come from a persisted file or
+//! another process), never a panic.
 
 use std::fmt;
 
@@ -48,7 +47,7 @@ impl Signal {
         }
     }
 
-    /// The opaque [`SignalSpec`] handed down to the content-agnostic substrate.
+    /// The opaque [`SignalSpec`] of this signal.
     pub const fn spec(self) -> SignalSpec {
         SignalSpec {
             pipeline_id: self.pipeline_id(),
@@ -82,11 +81,9 @@ impl TryFrom<u16> for Signal {
     }
 }
 
-/// The opaque identity of a signal as seen by the content-agnostic substrate: the
-/// numeric routing axis plus the remote-key segment, bundled so they cannot be
-/// mismatched. Constructible only via [`Signal::spec`]; the substrate
-/// (`file-lifecycle`'s `Pipeline`) stores and echoes it without knowing the
-/// signal set (it never names "logs"/"traces").
+/// The opaque identity of a signal for code that does not know the signal
+/// set: the numeric routing axis plus the remote-key segment, bundled so they
+/// cannot be mismatched. Constructible only via [`Signal::spec`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SignalSpec {
     pipeline_id: u16,

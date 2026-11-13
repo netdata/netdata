@@ -1,8 +1,7 @@
 //! Override types for the per-signal tuning sections (`logs`, `traces`) and the
 //! global `remote_storage`/`auth` sections of otel.yaml — the shapes both
 //! override layers fill: the user YAML (parsed in `mod.rs`) and the
-//! `NETDATA_OTEL_CFG_*` environment (built in `env.rs`). The target types come
-//! from `otel_bridge::config`, the `otel-bridge` crate.
+//! `NETDATA_OTEL_CFG_*` environment (built in `env.rs`).
 //!
 //! Per-signal sections carry tuning only — no dirs (derived from `base_dir`) and
 //! no storage (global) — and there is no per-signal on/off. The same
@@ -86,8 +85,7 @@ fn opt_humantime<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Durati
 }
 
 /// Partial form of the process-global [`RemoteStorageConfig`] — one backend and
-/// one download cache for the whole process. `mod.rs` validation requires a
-/// non-empty `uri` when `enabled` is true.
+/// one download cache for the whole process.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(super) struct RemoteStorageOverride {
@@ -159,9 +157,8 @@ impl IngestOverride {
 }
 
 /// Merge `o` into `config` field-wise: a `Some` replaces the current value,
-/// `None` keeps whatever stock or an earlier layer supplied. `apply_overrides`
-/// (`mod.rs`) calls this once per layer for each signal — user first, env last,
-/// so env wins. `journal_dir` is never merged (see its field doc).
+/// `None` keeps whatever stock or an earlier layer supplied. `journal_dir` is
+/// never merged (see its field doc).
 pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
     if let Some(v) = o.crc_enabled {
         config.crc_enabled = v;
@@ -194,7 +191,7 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
 }
 
 /// Merge the global remote-storage override onto [`RemoteStorageConfig`], with
-/// the same field-wise semantics as [`apply_signal`] (user first, env last).
+/// the same field-wise semantics as [`apply_signal`].
 pub(super) fn apply_remote_storage(config: &mut RemoteStorageConfig, o: &RemoteStorageOverride) {
     if let Some(v) = o.enabled {
         config.enabled = v;
@@ -211,8 +208,8 @@ pub(super) fn apply_remote_storage(config: &mut RemoteStorageConfig, o: &RemoteS
 }
 
 /// Merge the global auth override onto [`AuthConfig`], with the same field-wise
-/// semantics as [`apply_signal`] (user first, env last). A single on/off: when
-/// off, all data routes to the `default` tenant.
+/// semantics as [`apply_signal`]. A single on/off: when off, all data routes
+/// to the `default` tenant.
 pub(super) fn apply_auth(config: &mut AuthConfig, o: &AuthOverride) {
     if let Some(v) = o.enabled {
         config.enabled = v;

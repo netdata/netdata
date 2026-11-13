@@ -1,15 +1,13 @@
 //! Partial overrides for the OTLP listeners (`receivers.otlp.protocols.grpc`
 //! and `.http`): enable flag, bind address and server TLS material for each
-//! (`otel-ingestor` serves them; not the ferryboat IPC sockets between
-//! supervisor and workers).
+//! (not the ferryboat IPC sockets between supervisor and workers).
 //!
 //! Two of the layers `ConfigResolver` merges with stock < user < env
 //! precedence surface these types: the user YAML's `receivers:` section
 //! (parsed here) and the `NETDATA_OTEL_CFG_RECEIVERS_*` env vars (built in
 //! `env.rs`). [`apply`] merges one layer into the effective
 //! [`ReceiversConfig`]; the merged result is validated in `mod.rs`
-//! (`validate`: at least one listener enabled, host:port shape, TLS
-//! cert/key pairing, non-overlapping listener sockets).
+//! (`validate`).
 //!
 //! The user file may still carry the gRPC-only `endpoint:` section of the
 //! first release ([`DeprecatedEndpointOverride`]); its keys fold onto the
@@ -20,8 +18,7 @@ use serde::Deserialize;
 /// The first release's `endpoint.*` keys, each paired with the
 /// `receivers.*` key that replaced it. An old key still works with a
 /// deprecation warning; when a layer sets both names, the new one wins, also
-/// with a warning. `env.rs` derives the old and new env var names from this
-/// table.
+/// with a warning.
 pub(super) const DEPRECATED_ENDPOINT_KEYS: [(&str, &str); 4] = [
     ("endpoint.path", "receivers.otlp.protocols.grpc.endpoint"),
     (
@@ -149,8 +146,7 @@ impl ProtocolOverride {
 
 impl ReceiversOverride {
     /// Build an override from per-listener parts, or `None` when neither
-    /// sets anything. `env.rs` uses this so an env snapshot without receiver
-    /// variables leaves the section untouched.
+    /// sets anything.
     pub(super) fn from_protocols(grpc: ProtocolOverride, http: ProtocolOverride) -> Option<Self> {
         if grpc.is_empty() && http.is_empty() {
             return None;
@@ -229,9 +225,8 @@ pub(super) fn fold_deprecated_endpoint(
 
 /// Merge `o` into `config` field-wise: a `Some` field replaces the current
 /// value, `None` keeps whatever the stock file or an earlier layer supplied.
-/// `apply_overrides` in `mod.rs` calls this once per layer, user first and
-/// env last, so env vars win. A TLS path can be set or replaced but never
-/// cleared (`null` means "no override").
+/// A TLS path can be set or replaced but never cleared (`null` means "no
+/// override").
 pub(super) fn apply(config: &mut ReceiversConfig, o: &ReceiversOverride) {
     let Some(protocols) = o.otlp.as_ref().and_then(|otlp| otlp.protocols.as_ref()) else {
         return;

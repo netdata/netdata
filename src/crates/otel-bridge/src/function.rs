@@ -9,24 +9,9 @@
 //! a `FunctionResult` (status/format mapping documented on
 //! `HandlerAdapter::handle_raw`).
 //!
-//! The engine is protocol-agnostic. Its drivers are the run loops that receive
-//! function calls: the `otel-ledger` worker (`LedgerRequest::Call`, dispatched
-//! in its `rpc::dispatch`), the `otel-legacy-logs` worker
-//! (`LegacyLogsRequest::Call`, dispatched in its own run loop) and the
-//! `otel-ingestor` worker (through the shared [`crate::driver::CallDriver`]).
-//! Each builds a
-//! [`FunctionContext`] per call with the transaction id, a fresh
-//! [`CancellationToken`], and a per-call `mpsc::UnboundedSender<Message>` the
-//! ticker writes `FunctionProgressResponse` into; each translates those
-//! messages into its own `Progress` response, and the supervisor forwards
-//! results and progress to the agent's pluginsd channel
-//! (`FUNCTION_RESULT_BEGIN`/`FUNCTION_RESULT_END` blocks and `FUNCTION_PROGRESS`
-//! lines). Cancellation is keyed on the same transaction id via the drivers'
-//! per-transaction token maps.
-//!
-//! The `netdata-plugin-rt` crate carries an independent copy of this engine for plugins that
-//! speak pluginsd directly on stdin/stdout (the netflow plugin); the two are
-//! not wired together.
+//! The engine is protocol-agnostic. A driver is the run loop that receives
+//! function calls. It builds a [`FunctionContext`] per call and translates
+//! the progress messages into its own `Progress` response.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -46,13 +31,11 @@ use tokio_util::task::AbortOnDropHandle;
 use tracing::{error, info};
 
 /// Progress-emission cadence: 250ms wall-clock, matching the 250ms
-/// `ND_SD_JOURNAL_PROGRESS_EVERY_UT` of the systemd-journal reference plugin
-/// (which instead fires after 250ms of accumulated per-file query work).
+/// `ND_SD_JOURNAL_PROGRESS_EVERY_UT` of the systemd-journal reference plugin.
 ///
-/// Progress also keeps a call alive: every progress update pushes the
-/// function's deadline out so at least 10s remain (`functions_evloop.h`'s
-/// `FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT`, applied on both the plugin and
-/// nrpc paths), keeping steady progress from timing the call out.
+/// Progress also keeps a call alive: the agent pushes the function's
+/// deadline out on every progress update so at least 10s remain
+/// (`FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT`).
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 
 /// The fixed denominator progress always travels with: the wire carries
@@ -64,13 +47,13 @@ const PROGRESS_DENOMINATOR: usize = 100;
 /// always in `[1, 99]`.
 ///
 /// Both bounds protect the polling loop:
-/// - **Never 0 and never absent.** The agent drops zero-valued progress
-///   updates (`query_progress_functions_update` in `libnetdata/query_progress`)
-///   and the UI reads a zero or missing progress as already complete and stops
-///   polling; a truthy percent with the fixed denominator keeps `done`/`all`
-///   nonzero for the whole call.
-/// - **Never 100 while running.** Completion is signaled by the function
-///   RESULT, not by progress reaching 100, so `done == total` (and any torn
+/// - Never 0 and never absent. The agent drops zero-valued progress
+///   updates (`query_progress_functions_update`). The UI reads a zero or
+///   missing progress as already complete and stops polling. A nonzero
+///   percent with the fixed denominator keeps `done`/`all` nonzero for the
+///   whole call.
+/// - Never 100 while running. Completion is signaled by the function
+///   result, not by progress reaching 100, so `done == total` (and any torn
 ///   `done > total`) caps at 99.
 ///
 /// During the indeterminate phase (`total == 0`, before the handler calls
@@ -200,9 +183,7 @@ impl FunctionCallContext {
     }
 }
 
-/// Per-call input the driver hands to [`RawFunctionHandler::handle_raw`],
-/// built by the run loops that receive function calls (the ledger's
-/// `rpc::dispatch`, the legacy-logs worker's dispatcher).
+/// Per-call input the driver hands to [`RawFunctionHandler::handle_raw`].
 pub struct FunctionContext {
     /// The routed call; `timeout` is not enforced by the engine (see
     /// [`RawFunctionHandler::handle_raw`]).
@@ -255,9 +236,9 @@ pub trait FunctionHandler: Send + Sync + 'static {
     fn declaration(&self) -> FunctionDeclaration;
 }
 
-/// The erased, wire-level counterpart of [`FunctionHandler`], so drivers and
-/// `file-lifecycle`'s per-signal `Pipeline` can hold heterogeneous handlers as
-/// `Arc<dyn RawFunctionHandler>` and dispatch by declaration name.
+/// The erased, wire-level counterpart of [`FunctionHandler`], so drivers can
+/// hold heterogeneous handlers as `Arc<dyn RawFunctionHandler>` and dispatch
+/// by declaration name.
 ///
 /// [`HandlerAdapter`] is the standard implementor, bridging a typed
 /// [`FunctionHandler`] to the raw `FunctionCall` / `FunctionResult` variants.
@@ -334,16 +315,15 @@ impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
         let ticker_tx = ctx.outbound_tx.clone();
         let ticker_transaction = transaction.clone();
 
-        // The progress ticker: emits a percent on every 250ms tick, from call
-        // start until it is aborted right after the select below — so even a
-        // slow pre-`set_total` phase (e.g. WAL/source resolution) keeps the UI
-        // polling instead of reading the call as stalled. The percent model is
-        // `progress_percent`'s (`(pct, 100)`, always `[1, 99]`). The first tick
-        // is delayed one full interval, so a call that finishes inside 250ms
-        // emits no spurious progress. `MissedTickBehavior::Skip` drops missed
-        // ticks rather than burst-emitting stale progress after a stall.
-        // Dropping the handle aborts the ticker, so a handler that panics past
-        // the select stops it too.
+        // The progress ticker emits a percent on every 250ms tick, from call
+        // start until it is aborted right after the select below. So even a
+        // slow phase before `set_total` keeps the UI polling instead of
+        // reading the call as stalled. The first tick is delayed one full
+        // interval, so a call that finishes inside 250ms emits no spurious
+        // progress. `MissedTickBehavior::Skip` drops missed ticks rather than
+        // burst-emitting stale progress after a stall. Dropping the handle
+        // aborts the ticker, so a handler that panics past the select stops
+        // it too.
         let first = tokio::time::Instant::now() + PROGRESS_INTERVAL;
         let ticker = AbortOnDropHandle::new(tokio::spawn(async move {
             let mut interval = tokio::time::interval_at(first, PROGRESS_INTERVAL);

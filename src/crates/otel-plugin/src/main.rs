@@ -141,10 +141,10 @@ struct Cli {
 /// Shutdown over the connection.
 async fn run_worker(kind: WorkerKind) -> anyhow::Result<()> {
     // Shutdown is negotiated over IPC (supervisor sends Shutdown, then waits),
-    // so SIGINT/SIGTERM must not preempt it. Registering these handlers stops
-    // them from killing the worker — it stays in the plugin's process group, so
-    // a cgroup-wide or terminal-group signal reaches it — and a worker that
-    // never exits is SIGKILLed by the supervisor's `ChildGuard`.
+    // so SIGINT/SIGTERM must not preempt it. The worker stays in the plugin's
+    // process group, so a cgroup-wide or terminal-group signal reaches it.
+    // Registering these handlers stops such a signal from killing the worker.
+    // A worker that never exits is SIGKILLed by the supervisor's `ChildGuard`.
     let _sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt());
     let _sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate());
 
@@ -322,7 +322,6 @@ mod tests {
         assert!(matches!(cli.command, Some(CliCommand::Logs(_))));
     }
 
-    // Regression: adding `logs` must not break the supervisor's worker re-exec.
     #[test]
     fn worker_subcommand_still_routes() {
         let cli = parse(&["otel-plugin", "worker", "ingestor", "--socket", "/s"]).unwrap();
@@ -454,8 +453,6 @@ mod tests {
 
     // The lib's tenant validation must still fire when `Args` arrives via the
     // flattened `logs` subcommand, not only via the standalone `sfsq-cli` binary.
-    // (`validate_tenant` runs before discovery; explicit dir flags resolve without
-    // touching disk, so the bogus paths are inert here.)
     #[test]
     fn logs_rejects_tenant_traversal_through_flattened_path() {
         let cli = parse(&[

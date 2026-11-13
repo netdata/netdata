@@ -2,17 +2,12 @@
 //! the partial (all-`Option`) mirror of `otel_bridge::config::MetricsConfig`
 //! used to patch the effective metrics config from the user `otel.yaml` and
 //! the `NETDATA_OTEL_CFG_METRICS_*` environment variables. Layering lives in
-//! `mod.rs` (stock file → user file → env; later layers win per field); this
-//! module serves it (`mod.rs`) and the env parser (`env.rs`) — hence
-//! `pub(super)` throughout.
+//! `mod.rs` (stock file → user file → env; later layers win per field).
 //!
 //! Nothing defaults or validates here. Defaults come from the shipped stock
 //! `otel.yaml` (`configs/otel.yaml.in`), which must carry the whole section
 //! because `PluginConfig.metrics` has no serde default and only the stock
-//! file is parsed directly into `otel_bridge::config::MetricsConfig`. Semantic
-//! validation of the resulting timing happens downstream in the ingestor's
-//! `ChartConfigManager` (`otel-ingestor/src/chart_config.rs`), the consumer
-//! of the resolved config sent to workers over IPC.
+//! file is parsed directly into `otel_bridge::config::MetricsConfig`.
 use otel_bridge::config::MetricsConfig;
 use serde::Deserialize;
 
@@ -45,9 +40,7 @@ pub(super) struct MetricsOverride {
 }
 
 impl MetricsOverride {
-    /// Whether any field is set. The env layer (`env.rs`) collapses an
-    /// all-empty override to `None` instead of storing it; on the YAML path
-    /// an empty `metrics:` section stays `Some` and is a harmless no-op.
+    /// Whether any field is set.
     pub(super) fn has_any(&self) -> bool {
         self.chart_configs_dir.is_some()
             || self.interval_secs.is_some()
@@ -58,8 +51,7 @@ impl MetricsOverride {
 }
 
 /// Copy every `Some` field of `o` onto `config`, leaving `None` fields (and
-/// therefore the previous layer's values) untouched. `apply_overrides` in
-/// `mod.rs` calls this once per layer, so env vars override the user file.
+/// therefore the previous layer's values) untouched.
 pub(super) fn apply(config: &mut MetricsConfig, o: &MetricsOverride) {
     if let Some(v) = &o.chart_configs_dir {
         config.chart_configs_dir = Some(v.clone());

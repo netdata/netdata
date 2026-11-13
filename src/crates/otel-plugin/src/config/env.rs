@@ -11,11 +11,7 @@
 //! [`ConfigOverride::from_map`] resolves the snapshot, and a
 //! `NETDATA_OTEL_CFG_*` name no consumer recognizes aborts startup — the same
 //! deny-unknown contract as the YAML parser, so a typo cannot silently leave
-//! a setting at its stock default. Only `load_config` (`mod.rs`) consumes
-//! this module; the workers receive the merged effective config over IPC.
-//!
-//! `otel_bridge::config` here is the `otel-bridge` crate, whose
-//! `RotationEntry`/`RetentionEntry` shapes the per-signal values fill.
+//! a setting at its stock default.
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::ffi::OsString;
@@ -41,10 +37,7 @@ use super::signal::{
 /// matters.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
-/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the one
-/// full-environment scan in the plugin. Every other env read elsewhere in the
-/// crate (config dirs in `mod.rs`, identity via `netdata_plugin_rt::NetdataEnv` in
-/// `supervisor.rs`) targets a single named variable.
+/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`].
 pub(super) fn otel_env_from_process() -> EnvMap {
     otel_env_from_iter(std::env::vars_os())
 }
@@ -116,7 +109,7 @@ impl<'a> EnvReader<'a> {
 }
 
 /// Look up a variable, erroring only if the value we actually consume is not
-/// valid UTF-8 (matching the former `std::env::var` semantics).
+/// valid UTF-8.
 fn get_env<'a>(env: &EnvReader<'a>, name: &str) -> Result<Option<&'a str>> {
     match env.get(name) {
         None => Ok(None),
