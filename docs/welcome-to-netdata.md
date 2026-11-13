@@ -2,7 +2,7 @@
 
 **Netdata is an observability platform for systems, networks, clouds and applications, designed to simplify and automate operations and troubleshooting, with high-fidelity, real-time insights, and with your metrics, logs and traces kept in your own infrastructure.**
 
-Install it, and every system and application you run is already collected, charted, scored for anomalies and covered by alerts. You build no dashboards and write no queries, and the alerts are pre-configured: you choose which ones notify you, and tune the ones that matter to you. The same is true on your first node and on a very large fleet.
+Install it, and every system and application you run is collected, charted, scored for anomalies and watched by alerts from the first minute. You start with working dashboards and alerts, not a blank page, and shape them from there: add your own, tune the ones that matter, and choose which ones notify you. It works the same on your first node and on a very large fleet.
 
 This page explains what working with Netdata is like and the principles behind it. [Netdata Design](/docs/netdata-design.md), the [Complete Product Description](/docs/netdata-complete-product-description.md) and the [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) go deeper on each part.
 
@@ -89,9 +89,9 @@ The same rule holds across the fleet: when a node does not answer a query, the d
 
 **Pre-configured alerts watch every individual instance of the systems and applications Netdata detects.**
 
-Alerts are templates that apply to each database, web server, container and service as it appears, so new instances are covered automatically and an alert tells you which instance is failing. Conditions that matter but should not wake anyone are visible on the dashboard but do not send notifications by default. See [notifications](/docs/alerts-and-notifications/notifications/README.md) for the channels your team uses.
+Alerts are templates that apply to each database, web server, container and service as it appears, so new instances are covered automatically and an alert tells you which instance is failing. Conditions that matter but should not wake anyone are visible on the dashboard but do not send notifications by default. Every stock alert can be edited or disabled, and you can add your own, from the dashboard or in configuration files. See [notifications](/docs/alerts-and-notifications/notifications/README.md) for the channels your team uses.
 
-- **Coverage without writing alerts.**
+- **Coverage from the start**, plus your own alerts where you need them.
 - **Early detection** of component failures before they become service outages.
 
 ### Logs in place, or ingested efficiently
