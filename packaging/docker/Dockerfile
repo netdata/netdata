@@ -84,7 +84,6 @@ RUN mkdir -p /app/usr/sbin/ \
                 ndsudo \
                 slabinfo.plugin \
                 network-viewer.plugin \
-                otel-plugin \
                 systemd-journal.plugin; do \
         [ -f "/app/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/app/usr/libexec/netdata/plugins.d/$name"; \
     done && \
@@ -171,7 +170,6 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 ndsudo \
                 slabinfo.plugin \
                 network-viewer.plugin \
-                otel-plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && test $(stat -c %a "/usr/libexec/netdata/plugins.d/$name") = "4755"; \
     done && \
