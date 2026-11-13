@@ -62,8 +62,8 @@ pub(crate) struct IngestOutcomes {
     log_records: Counter<Storing>,
     spans: Counter<Storing>,
     wal_events_queued: Gauge<Queued>,
-    /// The length of the ingestor's queue of WAL file events to the ledger:
-    /// the sender of those events keeps it ([`Self::wal_events_queued`]).
+    /// The length of the queue of WAL file events to the ledger. The holder
+    /// of the counter from [`Self::wal_events_queued`] keeps it current.
     wal_events_queued_now: Arc<AtomicU64>,
 }
 
@@ -115,9 +115,8 @@ impl IngestOutcomes {
         })
     }
 
-    /// The counter that `netdata.otel.wal_events_queued` charts. The queue
-    /// has no bound: when the ledger is slow, the events wait in the
-    /// ingestor's memory, and this chart is where it shows.
+    /// The counter that `netdata.otel.wal_events_queued` charts. The caller
+    /// keeps it equal to the length of the queue of WAL file events.
     pub(crate) fn wal_events_queued(&self) -> Arc<AtomicU64> {
         Arc::clone(&self.wal_events_queued_now)
     }

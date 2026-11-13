@@ -16,9 +16,7 @@ pub struct OtelConfig {
     pub batch_size: usize,
     pub flush_interval: Duration,
     pub tenant_id: Option<String>,
-    // Runtime (not &'static): synth sets service_name/namespace from CLI to vary
-    // the (namespace, name) stream identity per invocation. Live sources pass
-    // their static SERVICE_NAME and no namespace.
+    // Runtime strings (not &'static), so a caller can set them from its arguments.
     pub service_name: String,
     pub service_namespace: Option<String>,
     pub scope_name: &'static str,
@@ -41,7 +39,7 @@ pub struct Sender {
 impl Sender {
     /// Build the sender. Connection failures are retried forever with
     /// exponential backoff (1s doubling to a 30s cap) — right for live
-    /// sources; one-shot callers (synth) wrap this in a timeout.
+    /// sources; one-shot callers wrap this in a timeout.
     pub async fn new(config: OtelConfig, rx: mpsc::Receiver<LogRecord>) -> anyhow::Result<Self> {
         let tenant_header = match config.tenant_id {
             Some(ref id) => Some(
@@ -92,9 +90,7 @@ impl Sender {
     }
 
     /// Drain the channel, flushing on batch-size/timer and once more on close.
-    /// Returns the number of batches that failed to export — live sources ignore
-    /// it (transient errors against a long stream are fine), but a one-shot
-    /// verification tool (synth) uses it to avoid reporting false success.
+    /// Returns the number of batches that failed to export.
     pub async fn run(&mut self) -> u64 {
         let mut failures = 0u64;
         let mut flush_timer = time::interval(self.flush_interval);

@@ -33,8 +33,8 @@ async fn next_tick(timer: &mut Option<tokio::time::Interval>) {
 ///
 /// If `subscribe` is `Some`, the text frame is sent once immediately after the
 /// connection opens — required by sources that only start streaming after an
-/// application-level subscribe message (e.g. RIS Live). Sources that stream on
-/// connect (jetstream, certstream) pass `None`.
+/// application-level subscribe message. Sources that stream on connect pass
+/// `None`.
 ///
 /// If `ping` is `Some`, sends WebSocket pings at that interval to keep the
 /// connection alive.
@@ -167,8 +167,7 @@ mod tests {
         let addr = listener.local_addr().unwrap();
 
         // Frames spaced well inside IDLE but spanning more than IDLE in total;
-        // then the peer goes silent but keeps the socket open, like the
-        // stalled RIS feed.
+        // then the peer goes silent but keeps the socket open.
         tokio::spawn(async move {
             let (tcp, _) = listener.accept().await.unwrap();
             let mut ws = tokio_tungstenite::accept_async(tcp).await.unwrap();

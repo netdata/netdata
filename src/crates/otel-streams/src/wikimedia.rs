@@ -81,7 +81,7 @@ pub async fn connect(
 pub struct Wikimedia;
 
 /// Top-level keys promoted to attributes; stripped from the body to avoid
-/// duplicating them (jetstream-style mapping).
+/// duplicating them.
 const PROMOTED_KEYS: &[&str] = &[
     "type",
     "wiki",
@@ -134,9 +134,8 @@ impl Source for Wikimedia {
             attributes.push(kv("wiki.log_action", str_val(log_action)));
         }
 
-        // Change time (epoch seconds) as the record time; now for observed —
-        // matching the other live sources. Fall back to now if absent or
-        // non-positive.
+        // Change time (epoch seconds) as the record time; now for observed.
+        // Fall back to now if absent or non-positive.
         let time_unix_nano = match event.timestamp {
             Some(ts) if ts > 0 => ts as u64 * 1_000_000_000,
             _ => now_unix_nanos(),

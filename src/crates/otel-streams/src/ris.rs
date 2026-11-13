@@ -96,7 +96,7 @@ pub async fn connect(
 pub struct RisLive;
 
 /// Data-object keys promoted to attributes; stripped from the body to avoid
-/// duplicating them (jetstream-style mapping).
+/// duplicating them.
 const PROMOTED_DATA_KEYS: &[&str] = &["host", "peer_asn", "type", "origin"];
 
 fn strip_promoted_keys(raw_json: &serde_json::Value) -> serde_json::Value {
@@ -127,7 +127,7 @@ impl Source for RisLive {
         }
 
         // The stream carries the collector-observed time; fall back to now for
-        // any frame missing it (e.g. malformed), like the other live sources.
+        // any frame missing it (e.g. malformed).
         let time_unix_nano = if data.timestamp > 0.0 {
             (data.timestamp * 1e9) as u64
         } else {
