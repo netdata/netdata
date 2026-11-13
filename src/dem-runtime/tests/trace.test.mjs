@@ -243,15 +243,16 @@ test(
       .map((r) => r.extension.data);
     const tests = detail.filter((r) => r.record === "test").map((r) => r.test);
     const links = detail.filter((r) => r.record === "capture");
-    for (const a of traces) {
-      const linked = tests.find(
-        (test) => test.id === links.find((l) => l.id === a.id)?.test_id,
-      );
-      assert(
-        linked.title.endsWith("two contexts") ||
-          linked.title.endsWith("later failure"),
-      );
-    }
+    const failingTests = tests.filter(
+      (test) =>
+        test.title.endsWith("two contexts") ||
+        test.title.endsWith("later failure"),
+    );
+    assert.equal(failingTests.length, 2);
+    assert.deepEqual(
+      new Set(traces.map((a) => links.find((l) => l.id === a.id)?.test_id)),
+      new Set(failingTests.map((test) => test.id)),
+    );
     assert.equal(
       tests.reduce((n, t) => n + t.accepted, 0),
       actual.result.artifacts.filter((a) => a.kind === "screenshot").length,

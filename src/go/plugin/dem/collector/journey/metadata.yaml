@@ -148,7 +148,7 @@ modules:
               group: Diagnosis
               detailed_description: |
                 Requires `screenshot_on_failure: true`. DEM configures traces with DOM snapshots, network data and a visual
-                timeline, with source files and attachments off. Scripts can override this with `test.use({ trace })`,
+                timeline, with source files and attachments off. Scripts can override this with `test.use({ trace: 'on' })`,
                 invoke tracing APIs or supply their own trace attachments. Credentials and source fragments can remain
                 even without overrides. Download the ZIP through `synthetics-artifact` and open it locally with the
                 Playwright Trace Viewer.
@@ -876,7 +876,7 @@ modules:
               - name: label
                 type: string
                 unit: ''
-                description: Screenshot or Lighthouse report.
+                description: Screenshot, Trace or Lighthouse report.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require

@@ -925,8 +925,9 @@ with dropped-event counts. Stdout/stderr use bounded stream redaction: lines lon
 with a marker, and forced termination can lose buffered text. Structured test/step/error evidence remains incremental.
 Browser error summaries are separately opt-in with `browser_error_summary`; scripts can also forward diagnostics with
 Playwright APIs. Optional failure PNG screenshots, trace ZIPs and Lighthouse HTML reports are disabled by default.
-Enable `screenshot_on_failure`, its `trace_on_failure` sub-option or `save_report` before an incident if these captures
-are needed. Forced browser termination can prevent capture. HAR, video and filmstrip are not supported.
+Enable `screenshot_on_failure` or `save_report` before an incident; retaining traces requires both
+`trace_on_failure` and `screenshot_on_failure`. Forced browser termination can prevent capture. HAR, video and
+filmstrip are not supported.
 
 Captures live under `${NETDATA_LIB_DIR}/dem/artifacts` with one shared default allowance of seven days and 2 GiB
 for retained capture sets. Each set contains the screenshots, traces or reports published for one run. The newest eligible
@@ -980,14 +981,17 @@ use private storage; verified completed work is cleaned after joined shutdown, w
 Enable `trace_on_failure` together with `screenshot_on_failure` to retain native Playwright trace ZIPs for failing
 journeys. It is disabled by default. Traces add DOM snapshots, network data and a visual action timeline. They record
 on passing attempts too, although those ZIPs are discarded; enabling adds CPU, memory and temporary disk use.
+Under DEM's configured defaults, eligible unexpected failures, timeouts and interruptions can retain traces;
+expected failures produce no automatic trace, and DEM does not retain traces for unexpected passes.
 
 ZIPs can contain raw passwords from resolved `DEM_SECRET_*` values, cookies, form input, headers and request/response
 bodies. Text-summary redaction does not apply to ZIPs. DEM configures dedicated source files and attachments off;
-scripts can override this with `test.use({ trace })`, invoke tracing APIs or supply their own trace attachments.
+scripts can override this with `test.use({ trace: 'on' })`, invoke tracing APIs or supply their own trace attachments.
 Even without overrides, source fragments and credentials can remain. Treat downloaded or shared ZIPs as
 credential-bearing data.
 
-The same 5 MiB per-file limit applies: an oversized ZIP is omitted with `too_large`, and valid screenshots remain.
+The same 5 MiB per-file limit applies: a valid ZIP already over the limit when publication starts is omitted with
+`too_large`, and valid screenshots remain. A hard publication error aborts the entire set, including its screenshots.
 Timeout capture is best effort; trace export can consume the reporting reserve and lose both the terminal report
 and screenshots. Traces do not extend the deadline or trigger retries. Configuration Test does not enable tracing
 or publish captures; the script can still direct its own recording.

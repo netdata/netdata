@@ -414,7 +414,7 @@ artifact publication.
 Run `npm ci --ignore-scripts` and `npm test` in this source directory, or set
 DEM_TEST_DEPENDENCIES to an absolute, separately prepared dependency root before running
 `node --test tests/*.test.mjs`. Set DEM_TEST_BROWSER to the pinned sandbox browser
-for the real-browser summary case. Tests use real non-browser Playwright execution
+for the real-browser summary and native trace cases. Tests also use real non-browser Playwright execution
 and synthetic fixture runtimes, without adding component path overrides to the
 execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation
@@ -489,9 +489,9 @@ Core trace-kind admission depends on the Agent's
 request, never on optional `extension_init` validity.
 
 DEM configures `retain-on-failure`, snapshots/screenshots enabled, sources/attachments disabled. Trusted scripts can
-override these settings with `test.use({ trace })`, invoke tracing APIs or supply their own trace attachments.
-Script-directed recording can occur even when DEM tracing is off or Configuration Test is used; DEM still publishes
-only requested, eligible captures.
+override these settings with `test.use({ trace: 'on' })`, invoke tracing APIs or supply their own trace attachments.
+Script-directed recording can occur even when DEM tracing is off or Configuration Test is used. Configuration Test
+never publishes captures; monitoring attempts publish only requested, eligible captures.
 
 Existing failed/timedOut/interrupted attachment eligibility applies. Under the configured defaults, expected failures
 produce no automatic trace; unexpected passes may write a ZIP that DEM does not offer and drained workspace cleanup
@@ -514,8 +514,10 @@ and source fragments. Text/step redaction does not rewrite ZIPs. Source and atta
 Recording costs CPU, memory and temporary space even on passing tests. Export precedes the terminal report and can
 exhaust its existing timeout reserve; captures remain best effort with no deadline extension, retry or early salvage.
 
-The shared 5 MiB publication/fetch limit applies after recording: oversized ZIPs are omitted with `too_large` while
-valid PNG siblings remain. Existing administrator-equivalent byte access and atomic set retention apply. Download
+The shared 5 MiB publication/fetch limit applies after recording: valid ZIPs over the limit at the initial size check
+are omitted with `too_large` while valid PNG siblings remain. Growth beyond the limit during copying is a hard error
+that aborts the entire set, as do other hard publication errors. Existing administrator-equivalent byte access and
+atomic set retention apply. Download
 and base64-decode `synthetics-artifact` bytes to a ZIP, then use the standard local Playwright Trace Viewer.
 
 Manifest version remains 2. An Agent without trace-kind support rejects mixed sets, including their PNGs, and reports

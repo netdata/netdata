@@ -226,24 +226,29 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 					_, err := fmt.Fprintln(out, selection)
 					assert.NoError(t, err)
 				}
-				_, err := fmt.Fprintln(out, captureRecord(captureTest("t1", 1, 0)), "\n"+captureRecord(captureLink("screen", "t1")), "\n"+captureRecord(captureLink("trace1", "t1")))
-				assert.NoError(t, err)
-				if mode == "invalid capture details" {
-					_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "future"}))
+				if mode != "old runtime" {
+					_, err := fmt.Fprintln(out, captureRecord(captureTest("t1", 1, 0)), "\n"+captureRecord(captureLink("screen", "t1")), "\n"+captureRecord(captureLink("trace1", "t1")))
+					assert.NoError(t, err)
+					if mode == "invalid capture details" {
+						_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "future"}))
+						assert.NoError(t, err)
+					}
+					_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "complete"}))
 					assert.NoError(t, err)
 				}
-				_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "complete"}))
-				assert.NoError(t, err)
 				for path, body := range map[string][]byte{"output/screen.png": []byte("\x89PNG\r\n\x1a\nfixture"), "output/trace.zip": []byte("PK\x03\x04fixture")} {
 					if err := os.WriteFile(filepath.Join(req.WorkDir, path), body, 0600); !assert.NoError(t, err) {
 						return ndexec.TreeResult{Drained: true, Err: err}
 					}
 				}
 				if mode == "oversize" {
-					err = os.Truncate(filepath.Join(req.WorkDir, "output/trace.zip"), artifacts.FetchMaxBytes+1)
+					err := os.Truncate(filepath.Join(req.WorkDir, "output/trace.zip"), artifacts.FetchMaxBytes+1)
 					assert.NoError(t, err)
 				}
 				r := reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, CaptureState: "available", Artifacts: []synthetic.Capture{{ID: "screen", Kind: "screenshot", MIME: "image/png", Path: "output/screen.png"}, {ID: "trace1", Kind: "trace", MIME: "application/zip", Path: "output/trace.zip"}}}
+				if mode == "old runtime" {
+					r.Artifacts = r.Artifacts[:1]
+				}
 				return resultPayload(r)(ctx, args, raw, out, stderr)
 			})
 			req := journey()
@@ -266,11 +271,20 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			assert.Equal(t, want, ex.Run.Captures.Trace)
 			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
 			count := 2
+			if mode == "old runtime" {
+				count = 1
+				assert.Equal(t, "negotiation_not_reported", ex.Run.Captures.Reporting)
+				assert.Empty(t, ex.Run.Captures.Tests)
+			}
 			if mode == "oversize" {
 				count = 1
 				assert.Equal(t, []synthetic.CaptureOmission{{ID: "trace1", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
 			}
 			require.Len(t, ex.Run.Artifacts, count)
+			if mode == "old runtime" {
+				assert.Equal(t, "screenshot", ex.Run.Artifacts[0].Kind)
+				assert.Empty(t, ex.Run.Artifacts[0].Test)
+			}
 			if mode != "old runtime" && mode != "malformed init" {
 				assert.Equal(t, int64(1), ex.Run.Captures.Tests[0].Accepted)
 				assert.Equal(t, "t1", ex.Run.Artifacts[0].Test.ID)

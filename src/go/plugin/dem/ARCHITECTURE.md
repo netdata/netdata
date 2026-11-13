@@ -36,7 +36,7 @@ relative to `src/go/`.
 - Both run on the shared Go plugin framework (`plugin/agent`, `plugin/framework`): four native collector modules,
   configured through DynCfg, scheduled by the framework, publishing charts. Stock alerts cover RUM Web Vitals (LCP,
   INP, CLS), OTLP export failures and loss, and journey failures.
-- Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/reports on disk. Process
+- Beyond charts, DEM keeps sampled investigation detail in a journal and optional screenshots/traces/reports on disk. Process
   Functions expose both when a corresponding job is active or retained data has been observed. Retained-data access
   works with every collector disabled; already-announced Functions remain callable for that framework generation.
   An empty fresh installation announces only `dem-history-status`.
@@ -60,7 +60,7 @@ A few words used throughout this guide:
 | Measurement | Rolling-window populations and counts (Web Vitals, timings, errors) published as charts. |
 | Investigation detail | Sampled per-event entries saved to the journal and read back by Functions. |
 | Run | One journey or Lighthouse execution. Once it pins the browser runtime, it saves a start record before launch and a completion record when it finishes. |
-| Capture | A screenshot or HTML report published for one run. |
+| Capture | A screenshot, trace ZIP or HTML report published for one run. |
 | Browser runtime | The Node + Chromium bundle that executes synthetic runs. RUM never needs it. |
 | Job generation | One admitted instance of a job's runtime state. Replacing or restarting a job starts a new generation. |
 | Framework generation | One run of the framework inside the process. A framework restart (for example on SIGHUP) starts a new one while the command keeps the stores open. |
@@ -90,7 +90,7 @@ flowchart LR
     Sites -.->|"event logs · spans"| OTLP
     Sites -->|"sampled detail"| Journal
     Runner -->|"run records"| Journal
-    Runner -->|"screenshots · reports"| Captures
+    Runner -->|"screenshots · traces · reports"| Captures
     Journal --> Funcs
     Captures --> Funcs
     Funcs --> UI

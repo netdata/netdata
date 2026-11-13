@@ -832,7 +832,7 @@ modules:
               - name: label
                 type: string
                 unit: ''
-                description: Screenshot or Lighthouse report.
+                description: Screenshot, Trace or Lighthouse report.
           performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
             browser admission. Artifact fetch reads at most 5 MiB.
           security: Requires member-equivalent access for observations and retained text; artifact bytes require
