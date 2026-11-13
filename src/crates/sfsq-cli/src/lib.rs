@@ -6,7 +6,7 @@
 //! disk ([`mod@discover`]), builds a neutral query ([`query`]), runs the engine,
 //! and formats the result ([`output`]). No running agent is required. The
 //! [`traces`] module is the front door of `sfsq::traces`, powering the
-//! `trace`/`attributes`/`attribute-values`/`search` subcommands, which take
+//! `trace`/`suggest`/`overview`/`search`/`explore` subcommands, which take
 //! explicit file flags rather than directories.
 //!
 //! [`Args`] and [`run`] live here (not in the binary) so both front doors —

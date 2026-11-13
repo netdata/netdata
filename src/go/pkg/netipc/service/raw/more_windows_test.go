@@ -100,12 +100,14 @@ func TestWinClientRefreshFromReadyNoop(t *testing.T) {
 
 func TestWinClientCallTimeoutOnWedgedPeer(t *testing.T) {
 	svc := uniqueWinService("go_win_call_timeout")
+	// The peer holds the request unanswered until the client has timed out.
+	timedOut := make(chan struct{})
 	srv := startRawWinSessionServer(t, svc, testWinServerConfig(),
 		func(session *windows.Session, hdr protocol.Header, payload []byte) error {
 			_ = session
 			_ = hdr
 			_ = payload
-			time.Sleep(150 * time.Millisecond)
+			<-timedOut
 			return nil
 		})
 
@@ -116,6 +118,7 @@ func TestWinClientCallTimeoutOnWedgedPeer(t *testing.T) {
 	start := time.Now()
 	_, err := client.CallIncrementWithTimeout(41, 30)
 	elapsed := time.Since(start)
+	close(timedOut)
 	if !errors.Is(err, protocol.ErrTimeout) {
 		t.Fatalf("CallIncrementWithTimeout error = %v, want %v", err, protocol.ErrTimeout)
 	}
@@ -190,11 +193,9 @@ func TestWinServerStopWhileIdle(t *testing.T) {
 		done <- server.Run()
 	}()
 
-	deadline := time.Now().Add(2 * time.Second)
-	for server.listener == nil && time.Now().Before(deadline) {
-		time.Sleep(10 * time.Millisecond)
-	}
-	if server.listener == nil {
+	select {
+	case <-server.Listening():
+	case <-time.After(testWaitLimit):
 		t.Fatal("server listener did not start")
 	}
 
@@ -381,12 +382,12 @@ func TestWinClientTransportWithoutSession(t *testing.T) {
 		TransportStatus: protocol.StatusOK,
 	}
 
-	if err := client.transportSend(&hdr, nil); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportSend without session = %v, want ErrTruncated", err)
+	if err := client.transportSend(&hdr, nil, 0); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("transportSend without session = %v, want ErrTransport", err)
 	}
 
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportReceive without session = %v, want ErrTruncated", err)
+	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("transportReceive without session = %v, want ErrTransport", err)
 	}
 }
 
@@ -397,8 +398,8 @@ func TestWinClientTransportReceiveWinShmError(t *testing.T) {
 	client.state = StateReady
 	client.shm = &windows.WinShmContext{}
 
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportReceive with invalid WinSHM context = %v, want %v", err, protocol.ErrTruncated)
+	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("transportReceive with invalid WinSHM context = %v, want %v", err, protocol.ErrTransport)
 	}
 }
 
@@ -772,7 +773,7 @@ func TestWinCallWithRetryStopsWhenOverflowCannotGrowCapacity(t *testing.T) {
 	waitWinClientReady(t, client)
 
 	attempts := 0
-	err := client.callWithRetry(func() error {
+	err := client.callWithRetry(0, func() error {
 		attempts++
 		return protocol.ErrOverflow
 	})
@@ -798,7 +799,7 @@ func TestWinCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
 	client.config.MaxRequestPayloadBytes = protocol.MaxPayloadDefault
 
 	attempts := 0
-	err := client.callWithRetry(func() error {
+	err := client.callWithRetry(0, func() error {
 		attempts++
 		client.config.MaxRequestPayloadBytes++
 		return protocol.ErrOverflow
@@ -1130,7 +1131,8 @@ func TestWinIsErrorHelpers(t *testing.T) {
 		t.Fatal("non-connect errors should not match connect classification")
 	}
 
-	if !isAuthError(windows.ErrAuthFailed) || isAuthError(windows.ErrConnect) || isAuthError(nil) {
+	if !isAuthError(windows.ErrAuthFailed) || !isAuthError(windows.ErrUntrustedServer) ||
+		isAuthError(windows.ErrConnect) || isAuthError(nil) {
 		t.Fatal("auth error classification mismatch")
 	}
 
@@ -1162,7 +1164,8 @@ func TestWinNonRequestTerminatesSession(t *testing.T) {
 		t.Fatalf("send non-request failed: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
+	// The server ends the session on the bad message, so the receive below
+	// fails instead of returning a response.
 
 	req := protocol.CgroupsRequest{LayoutVersion: 1, Flags: 0}
 	var reqBuf [4]byte
@@ -1203,8 +1206,13 @@ func TestWinNonRequestTerminatesSession(t *testing.T) {
 
 func TestWinPeerDisconnectDuringResponseKeepsServerHealthy(t *testing.T) {
 	svc := uniqueWinService("go_win_send_fail")
+	// The first request is answered only after its client has gone, so the
+	// response send fails.
+	clientGone := make(chan struct{})
 	ts := startTestServerWinWithConfig(svc, testWinServerConfig(), protocol.MethodIncrement, IncrementDispatch(func(v uint64) (uint64, bool) {
-		time.Sleep(100 * time.Millisecond)
+		if v == 41 {
+			<-clientGone
+		}
 		return v + 1, true
 	}))
 	defer ts.stop()
@@ -1230,8 +1238,8 @@ func TestWinPeerDisconnectDuringResponseKeepsServerHealthy(t *testing.T) {
 		t.Fatalf("send increment request failed: %v", err)
 	}
 	session.Close()
-
-	time.Sleep(250 * time.Millisecond)
+	close(clientGone)
+	waitSessionExits(ts.server, 1)
 
 	verify := NewIncrementClient(winTestRunDir, svc, testWinClientConfig())
 	defer verify.Close()

@@ -162,6 +162,10 @@ Likely homes:
 - the Function handler snapshots cached SNMP topology state, applies SNMP-owned
   shape/enrichment passes, and renders `netdata.topology.v1` through
   `src/go/plugin/go.d/collector/snmp_topology/internal/topologyv1`;
+- cached info exposes managed-device choices without building a graph. Full
+  responses carry same-generation actor bindings and declarative focus policy;
+  CTS must correlate complete contributions before applying focus, as defined in
+  [Aggregate-First Focus](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus);
 - the old method-level Go presentation adapter has been retired; presentation
   metadata is emitted in the v1 payload type registry and `data.presentation`;
 - SNMP-owned logical enrichment now adds L3 subnet, OSPF adjacency, and BGP
@@ -178,7 +182,9 @@ vSphere:
 
 - producer path: `src/go/plugin/go.d/collector/vsphere/`;
 - the Function emits `netdata.topology.v1` directly from the Go collector;
-- actor identity uses the vSphere managed-object type plus managed-object id;
+- known vCenter instance UUID qualifies actor/merge/containment identity with
+  managed-object type and id. Missing UUID retains local identity, omits merge
+  identity and warns; consumers must keep those contributions source-isolated;
 - inventory containment is modeled as hierarchical ownership links;
 - VM-to-host and host/VM-to-network relationships are graph links with typed
   evidence.
@@ -189,15 +195,38 @@ vSphere:
   `catofunc/topology.go`);
 - the Function emits `netdata.topology.v1` directly from the Go collector and
   never emitted an earlier schema;
-- actor types are `cato_site`, `cato_pop`, `cato_device`, and `bgp_peer`
+- actor types are `cato_site`, `cato_pop`, `cato_device`, `bgp_peer`, and
+  source-local `bgp_peer_observation`
   (`catofunc/topology.go`); the aggregation scopes are `site`, `pop`, and
   `network`; actor identity is a producer-composed `id`, with per-type merge
   identities declared in `catofunc/presentation.go` (`account_id` and `site_id`
   for sites, plus `device_id` for devices, `account_id` and `pop_name` for
-  PoPs, `remote_ip` and `remote_asn` for BGP peers; devices and BGP peers
-  declare `site_id` as `parent_identity`);
+  PoPs, and `account_id`, `remote_ip`, `remote_asn` for qualified BGP peers).
+  Unqualified peer observations omit merge identity and warn; neither peer type
+  declares a singleton site parent. Devices retain `site_id` as parent identity;
+- incident BGP links own site/session facts. Retained scalar peer attributes are
+  source-report observations, not global peer state; coordinated CTS coherent
+  conflict handling remains required. See
+  [Cato Networks Shape](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#cato-networks-shape);
 - tests validate the payload with `topologyv1.ValidateDecodedData` and the JSON
   Schema.
+
+`topology:tracing`:
+
+- producer path: `src/crates/otel-service-map/` (Rust), served by the
+  otel-plugin's ingestor worker;
+- the Function emits `netdata.topology.v1` directly and never emitted an
+  earlier schema; it is single-node (no correlation, overlays or
+  notifications) and windowed by `after`/`before`;
+- actor types are `service`, `peer_database`, `peer_messaging`,
+  `peer_external`, `peer_other` and `unknown_caller`; link types are `call`,
+  `call_to_peer` and `call_from_unknown` (the developer guide's Tracing Shape
+  section);
+- there is no Rust topology builder or validator: the payload's static part
+  is a template, and a Rust golden test keeps the builder's output equal to
+  the fixture `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json`,
+  which the Go fixture test validates against the JSON Schema and the
+  semantic validator.
 
 ### Cloud Frontend
 

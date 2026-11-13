@@ -40,16 +40,17 @@ func NewHandler(root string) *Handler {
 
 func LogsFunctionConfig(available func() bool) funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
-		ID:           LogsMethodID,
-		FunctionName: FunctionName,
-		Name:         "SNMP Trap Logs",
-		UpdateEvery:  1,
-		Help:         "Query SNMP trap journal entries received by SNMP trap listener jobs",
-		RequireCloud: true,
-		Tags:         "logs",
-		ResponseType: "logs",
-		Available:    available,
-		RawRequest:   true,
+		ID:                LogsMethodID,
+		FunctionName:      FunctionName,
+		Name:              "SNMP Trap Logs",
+		UpdateEvery:       1,
+		Help:              "Query SNMP trap journal entries received by SNMP trap listener jobs",
+		RequireCloud:      true,
+		RequireCommercial: true,
+		Tags:              "logs",
+		ResponseType:      "logs",
+		Available:         available,
+		RawRequest:        true,
 	}
 }
 

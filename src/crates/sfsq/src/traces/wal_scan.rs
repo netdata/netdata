@@ -5,8 +5,8 @@
 //! (`ng_flatten::FlattenedTraceRequest`, payload format 3) into spans
 //! once and serves them from memory — to the shared combiner as a
 //! `sfst::SpanSource` (trace-by-id) and directly to the
-//! other operations: the cross-source aggregates fold, search, and the
-//! attribute enumerations. It exists for data the indexer hasn't
+//! other operations: the cross-source aggregates fold, search, and
+//! suggestions. It exists for data the indexer hasn't
 //! reached yet — the bounded, un-indexed *tail* of an active WAL — so a
 //! whole-range decode per query is affordable (the same rationale as
 //! the logs [`WalScan`](crate::logs::WalScan)). The WAL itself carries
@@ -24,7 +24,7 @@
 //! # Semantic equality with the sealed path
 //!
 //! A span served from the tail must equal the same span served from an
-//! SFST sealed over the same frames (the split-many-ways acceptance
+//! SFST indexed over the same frames (the split-many-ways acceptance
 //! criterion). The shared guarantees:
 //!
 //! - fields render through the same `ng_flatten::build_kv` in the same
@@ -33,10 +33,10 @@
 //!   structure exists, and here the event/link entries are never mixed
 //!   into fields at all — same net result;
 //! - events/links come from the frame's structured records, exactly what
-//!   the seal stores in `EVNB`/`LNKB` (attribute keys prefix-stripped the
+//!   indexing stores in `EVNB`/`LNKB` (attribute keys prefix-stripped the
 //!   same way);
 //! - `kind` parses from the same `_kind` entry; ids convert by the same
-//!   byte copy the seal uses; `ts`/`duration` are the same frame scalars.
+//!   byte copy indexing uses; `ts`/`duration` are the same frame scalars.
 //!
 //! # Failure and trust model
 //!
@@ -47,11 +47,11 @@
 //! durable bound, so a torn tail just ends the stream (the expected
 //! active-WAL case, not a failure). Structural validation of
 //! successfully DECODED frames follows the platform-wide trust model
-//! shared with the logs scanner and both seal paths: WAL frames are
-//! CRC-protected and written by this same binary's ingest, so decoded
-//! trees/node-ids are trusted; hardening against CRC-valid crafted
-//! frames is the deferred DoS-hardening follow-up (tracked in the
-//! traces plan repo).
+//! shared with the logs scanner and both indexing paths: WAL frames
+//! are CRC-protected and written by this same binary's ingest, so
+//! decoded trees/node-ids are trusted; hardening against CRC-valid
+//! crafted frames is the deferred DoS-hardening follow-up (tracked in
+//! the traces plan repo).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
@@ -94,14 +94,14 @@ struct DecodedSpan {
 /// plus the accessors below).
 pub struct TraceWalScan {
     spans: Vec<DecodedSpan>,
-    /// Field → coalesced scalar kind over the scanned frames, derived
-    /// through the SAME converter/lattice as the sealed path
-    /// (`ng_index::to_sfst_tree` + `derive_scalar_kinds`), so tail and
+    /// Field → the leaf kinds it holds over the scanned frames, derived
+    /// through the SAME converter as the sealed path
+    /// (`ng_index::to_sfst_tree` + `derive_leaf_kinds`), so tail and
     /// sealed kinds agree by construction.
-    field_kinds: Vec<(String, sfst::ValueKind)>,
+    field_kinds: BTreeMap<String, sfst::ValueKinds>,
     /// Storage field → distinct rendered values over the scanned frames —
     /// the tail's counterpart of a sealed file's value dictionaries, for
-    /// key/value enumeration. Built from EXACTLY the entry set the seal
+    /// key/value suggestions. Built from EXACTLY the entry set indexing
     /// interns: resource ∪ scope ∪ span entries (including
     /// `_kind`/`_status_code`/`trace_state`; the mapping layer filters,
     /// same as for sealed field tables) PLUS the structured
@@ -123,7 +123,7 @@ impl TraceWalScan {
     }
 
     /// Whole-file counterpart of [`scan_range`](Self::scan_range) (the
-    /// tail/seal parity tests use it: `tests/traces_rollup_tail.rs`).
+    /// tail/file parity tests use it: `tests/traces_rollup_tail.rs`).
     pub fn scan(path: &Path) -> Result<TraceWalScan, TraceScanError> {
         Self::drain(wal::Reader::open(path)?)
     }
@@ -150,8 +150,8 @@ impl TraceWalScan {
             }
         }
         // Accumulates the frames' typed schema trees — the source of the
-        // field-kind map, exactly as the seal accumulates its on-disk
-        // tree (`src/crates/ng-index/src/sfst_build.rs`).
+        // field-kind map, exactly as indexing accumulates its on-disk
+        // tree (`src/crates/ng-index/src/indexing.rs`).
         let mut flattener = ng_flatten::Flattener::new();
         while let Some(frame) = reader.next_frame()? {
             frame_no += 1;
@@ -292,10 +292,10 @@ impl TraceWalScan {
         if spans.len() > u32::MAX as usize {
             return Err(TraceScanError::TooManySpans(spans.len()));
         }
-        let field_kinds = ng_index::to_sfst_tree(&flattener.into_tree()).derive_scalar_kinds();
+        let tree = ng_index::to_sfst_tree(&flattener.into_tree());
         Ok(TraceWalScan {
             spans,
-            field_kinds,
+            field_kinds: tree.derive_leaf_kinds().into_iter().collect(),
             pair_table,
         })
     }
@@ -314,9 +314,9 @@ impl TraceWalScan {
         self.spans.iter().map(|d| (d.trace_id, &d.span))
     }
 
-    /// Field → coalesced scalar kind over the scanned frames (see the
+    /// Field → the leaf kinds it holds over the scanned frames (see the
     /// struct field's doc).
-    pub fn field_kinds(&self) -> &[(String, sfst::ValueKind)] {
+    pub fn field_kinds(&self) -> &BTreeMap<String, sfst::ValueKinds> {
         &self.field_kinds
     }
 

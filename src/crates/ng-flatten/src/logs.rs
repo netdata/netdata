@@ -3,8 +3,8 @@
 //! substrate they build on (the [`Flattener`], [`SchemaTree`], ids, rendering,
 //! bincode codec) lives in [`crate::common`]; the span analog is [`crate::traces`].
 //!
-//! One record → one SFST row. What becomes what at seal time (the builder is
-//! `src/crates/ng-index/src/sfst_build.rs::populate_row_index`):
+//! One record → one SFST row. What becomes what at index time (the filler is
+//! `src/crates/ng-index/src/indexing.rs::populate_row_index`):
 //! - interned facets: `severity_number`, `severity_text`, `event_name`,
 //!   `body.*` (a JSON-object string body arrives pre-parsed into a kvlist, so
 //!   its keys explode into typed leaves), `attributes.*`, plus the per-group
@@ -25,8 +25,8 @@
 //! [`prepare_log_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_request` (no bounds) and the `otel-ingestor`
 //! logs service (with ingestion bounds). Readers decode via [`decode_log_frame`]:
-//! `ng-index::sfst_build` (seal-time index build) and `sfsq::logs` (unindexed
-//! WAL-tail scan).
+//! `ng-index::indexing` (the indexing of a closed WAL file) and `sfsq::logs`
+//! (unindexed WAL-tail scan).
 
 use serde::{Deserialize, Serialize};
 
@@ -75,7 +75,7 @@ pub struct LogScopeGroup {
 /// (resolves timestamps, clears malformed ids, replaces a JSON-object string
 /// body with its parsed structure), so the frame stores the post-normalization
 /// record, not the original wire bytes. What the SFST keeps of each field is
-/// decided later, at index time (`build_sfst`).
+/// decided later, at index time (`index_logs_dir`).
 ///
 /// Columns — identifiers/scalars retrieved per row, deliberately NOT FST facets:
 /// - `ts` / `observed_ts`: the resolved `time_unix_nano` and the raw
@@ -411,9 +411,22 @@ pub struct PreparedLogFrame {
 /// sanitized keys) — one owner for the message text too; the counts are still
 /// returned for callers that want them.
 pub fn prepare_log_frame(
+    req: ExportLogsServiceRequest,
+    fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
+) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
+    prepare_log_frame_with(req, fallback_base_ns, bounds, |_| {})
+}
+
+/// [`prepare_log_frame`] that also shows the request to `visit` once, after
+/// normalization and before flattening, when at least one record was kept:
+/// `visit` sees exactly the stored population with resolved timestamps
+/// (out-of-window records removed). The OTel ingestor derives its metrics here.
+pub fn prepare_log_frame_with(
     mut req: ExportLogsServiceRequest,
     fallback_base_ns: u64,
     bounds: Option<TimeBounds>,
+    visit: impl FnOnce(&ExportLogsServiceRequest),
 ) -> Result<PreparedLogFrame, bincode::error::EncodeError> {
     let norm = normalize_log_request(&mut req, fallback_base_ns, bounds);
     // Nothing to flatten or encode without kept records; callers skip writing
@@ -431,6 +444,7 @@ pub fn prepare_log_frame(
             rejected: norm.rejected,
         });
     }
+    visit(&req);
     if norm.bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = norm.bad_ids.trace,

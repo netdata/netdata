@@ -647,12 +647,13 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 **[Traces](/docs/opentelemetry/trace-storage-and-retention.md)**
 - Span storage with field-level indexing, trace-ID index and bloom filter, span events and links; retention and offload as for logs
 - **Traces explorer** (Netdata Cloud; users turn it on in the Early Access panel):
-  - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter, slowest traces
+  - Trace list: heatmap (trace count × duration band, with errors), volume, error and percentile charts over time, trace duration scatter
   - Trace detail: waterfall, span tree, span details, missing-span markers
   - Filters: service, operation, status, duration range, any resource, span, scope, event or link attribute
 - **RED analysis at query time:** the explorer computes rate, errors and duration (p50/p95/p99) directly from the stored spans of every matching trace in the selected time range, for any combination of attribute values and duration range. No metrics need to be pre-defined: any slice of the traffic can be analyzed after the fact, without cardinality limits or pre-declared dimensions.
+- **[Service map](/docs/opentelemetry/trace-storage-and-retention.md#service-map)** (`topology:tracing`): services, the calls between them and the databases, queues and external endpoints they call, with calls, errors and p50/p95/p99 latency per call direction, client side and server side apart, built from the spans each Agent receives
 - **RED metrics at collection time:** the collection stage (`spanmetrics`, with `transform` for percentiles) produces persistent RED metrics per service and operation, which Netdata stores long-term with per-second charts, machine learning anomaly detection and alerting.
-- Function `otel-traces`, also available to AI assistants through Netdata's MCP server
+- Functions `otel-traces` and `topology:tracing`, also available to AI assistants through Netdata's MCP server
 
 **Collector configurations in Netdata documentation**
 - Metrics: host metrics, Prometheus, Redis, nginx, PostgreSQL
@@ -1024,7 +1025,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 - **Not billed:** metrics volume, System Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
 - **Netdata AI:** Business includes AI conversations for every user, subject to fair use. AI Investigations are bought pay as you go or as an annual subscription bundle (see Business products).
 - **Windows:** Windows Agents count as nodes like any other Agent; their local dashboard follows the same plan rules as on Linux.
-- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow) and Traces (the Traces explorer over OpenTelemetry traces) requires a paid plan or an active trial; collection and storage on the Agent are not restricted. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
+- **Plan-gated features:** exploring Network Flows (NetFlow, IPFIX, sFlow), Traces (the Traces explorer over OpenTelemetry traces), Logs Management logs (the `otel-logs` and `legacy-otel-logs` Functions), SNMP traps, topology maps (SNMP network, application dependencies, vSphere and Cato Networks), Real User Monitoring, synthetic browser tests (Playwright journeys and Lighthouse audits) and DEM history status requires a paid plan or an active trial; collection and storage on the Agent are not restricted by plan. SNMP trap local storage and viewing require journal output. SNMP device metrics, System Logs Monitoring (including BMC event logs), the streaming topology and API, uptime and other checks are available on every plan. Netdata Cloud MCP, enterprise notification integrations (all Cloud integrations except Discord, personal email and the mobile app), additional roles, SSO and SCIM require a paid plan.
 
 ### Support
 

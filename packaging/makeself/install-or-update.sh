@@ -50,6 +50,10 @@ while [ "${1}" ]; do
       RELEASE_CHANNEL="stable"
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
+    "--preview-channel")
+      RELEASE_CHANNEL="preview"
+      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
+      ;;
     "--nightly-channel")
       RELEASE_CHANNEL="nightly"
       REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"

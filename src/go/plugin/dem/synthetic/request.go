@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 )
 
 var secretName = regexp.MustCompile(`^DEM_SECRET_[A-Za-z0-9_]+$`)
@@ -21,22 +23,33 @@ const (
 	Lighthouse Kind = "lighthouse"
 )
 
+// Schedule identifies the selected occurrence and its original admission queue time.
+type Schedule struct {
+	DueUS    int64
+	QueuedUS int64
+}
+
 // Request is ephemeral. Script and resolved secrets never enter history.
 type Request struct {
-	Kind       Kind
-	Name       string
-	Script     string
-	ScriptPath string
-	URL        string
-	Secrets    map[string]string
-	Timeout    time.Duration
-	Capture    bool
+	Kind                Kind
+	Name                string
+	VnodeGUID           string
+	Script              string
+	ScriptPath          string
+	URL                 string
+	Secrets             map[string]string
+	Timeout             time.Duration
+	BrowserErrorSummary bool
+	Capture             bool
 }
 
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
 
 // ValidateRequest checks the execution contract without acquiring resources or reading files.
 func ValidateRequest(r Request) error {
+	if err := vnodeguid.Validate(r.VnodeGUID); err != nil {
+		return err
+	}
 	if r.Timeout < time.Millisecond {
 		return errors.New("synthetic timeout must be at least one millisecond")
 	}

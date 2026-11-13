@@ -292,35 +292,27 @@ fn retrieve_log_entries(
     // bounds (see find_log_entries).
     let anchor_usec = match params.anchor() {
         Anchor::Timestamp(ts) => ts.get(),
-        Anchor::Head => {
-            file_indexes
-                .iter()
-                .map(|fi| fi.start_time().to_microseconds().get())
-                .min()
-                .unwrap_or(0)
-        }
-        Anchor::Tail => {
-            file_indexes
-                .iter()
-                .map(|fi| fi.end_time().to_microseconds().get())
-                .max()
-                .unwrap_or(0)
-        }
+        Anchor::Head => file_indexes
+            .iter()
+            .map(|fi| fi.start_time().to_microseconds().get())
+            .min()
+            .unwrap_or(0),
+        Anchor::Tail => file_indexes
+            .iter()
+            .map(|fi| fi.end_time().to_microseconds().get())
+            .max()
+            .unwrap_or(0),
     };
 
     let mut relevant_indexes: Vec<&FileIndex> = match params.direction() {
-        Direction::Forward => {
-            file_indexes
-                .iter()
-                .filter(|fi| fi.end_time().to_microseconds().get() >= anchor_usec)
-                .collect()
-        }
-        Direction::Backward => {
-            file_indexes
-                .iter()
-                .filter(|fi| fi.start_time().to_microseconds().get() <= anchor_usec)
-                .collect()
-        }
+        Direction::Forward => file_indexes
+            .iter()
+            .filter(|fi| fi.end_time().to_microseconds().get() >= anchor_usec)
+            .collect(),
+        Direction::Backward => file_indexes
+            .iter()
+            .filter(|fi| fi.start_time().to_microseconds().get() <= anchor_usec)
+            .collect(),
     };
 
     // Files excluded by the anchor pre-filter still count as done for
@@ -624,8 +616,8 @@ fn extract_entry_data(
 
             // Extract all field=value pairs, skipping field remapping entries.
             // A remapping entry holds the file's field-name mappings as
-            // "ND_<md5>=otel.name" pairs plus an ND_REMAPPING=1 marker
-            // (`journal-log-writer/src/log/mod.rs` `write_remapping_entry`). Converted as log
+            // "ND_<md5>=otel.name" pairs plus an ND_REMAPPING=1 marker,
+            // written by the plugin's former journal writer. Converted as log
             // data, each OTEL name would surface as a cell value — a
             // column name masquerading as data — so the whole entry is
             // dropped as soon as its marker pair is seen.

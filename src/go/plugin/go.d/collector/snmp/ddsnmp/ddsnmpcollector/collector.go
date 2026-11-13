@@ -21,6 +21,9 @@ import (
 )
 
 type Config struct {
+	// LogKeyPrefix isolates warning budgets when collectors share a logger.
+	// Callers must keep it stable across refreshes and exclude credentials.
+	LogKeyPrefix        string
 	SnmpClient          gosnmp.Handler
 	Profiles            []*ddsnmp.Profile
 	Log                 *logger.Logger
@@ -31,6 +34,7 @@ type Config struct {
 
 func New(cfg Config) *Collector {
 	coll := &Collector{
+		logKeyPrefix:              cfg.LogKeyPrefix,
 		log:                       cfg.Log.With(slog.String("ddsnmp", "collector")),
 		profiles:                  make(map[string]*profileState),
 		missingOIDs:               make(map[string]bool),
@@ -57,6 +61,7 @@ func New(cfg Config) *Collector {
 	coll.deviceMetadataCollector = newDeviceMetadataCollector(cfg.SnmpClient, coll.missingOIDs, coll.log, cfg.SysObjectID)
 	coll.scalarCollector = newScalarCollector(cfg.SnmpClient, coll.missingOIDs, coll.log)
 	coll.tableCollector = newTableCollector(cfg.SnmpClient, coll.missingOIDs, coll.tableCache, coll.log, cfg.DisableBulkWalk)
+	coll.tableCollector.logKeyPrefix = cfg.LogKeyPrefix
 	coll.vmetricsCollector = newVirtualMetricsCollector(coll.log)
 
 	return coll
@@ -67,6 +72,7 @@ type (
 		failures                  ddsnmp.CollectionFailures
 		requests                  snmpRequestState
 		log                       *logger.Logger
+		logKeyPrefix              string
 		profiles                  map[string]*profileState
 		missingOIDs               map[string]bool
 		negative                  negativeEvidence
@@ -74,6 +80,7 @@ type (
 		tableCache                *tableCache
 		tableIdentity             *tableIdentity
 		acquisitionObserver       AcquisitionObserver
+		profileInputRevision      uint64
 
 		globalTagsCollector     *globalTagsCollector
 		deviceMetadataCollector *deviceMetadataCollector
@@ -210,7 +217,16 @@ func (c *Collector) Collect() ([]*ddsnmp.ProfileMetrics, error) {
 	// A no-op profile can survive after all requests fail. Do not let its local
 	// statistics turn that failed poll into vnode activity.
 	if !c.requests.responded && c.requests.err != nil {
-		return nil, fmt.Errorf("all SNMP requests failed: %w", c.requests.err)
+		err := c.requests.err
+		if len(errs) > 0 {
+			// Profile preparation adds operation context absent from raw transport errors.
+			err = errors.Join(errs...)
+			if !errors.Is(err, c.requests.err) {
+				// A failed cache GET can be replaced by a failed WALK in profile errors.
+				err = snmputils.WithFailureDetail(errors.Join(err, c.requests.err), snmputils.ClassifyFailure(err))
+			}
+		}
+		return nil, fmt.Errorf("all SNMP requests failed: %w", err)
 	}
 	if len(metrics) == 0 && len(errs) > 0 {
 		return nil, errors.Join(errs...)
@@ -310,6 +326,22 @@ func (c *Collector) SetSNMPClient(snmpClient gosnmp.Handler) {
 	}
 }
 
+// PreparedDeviceMetadata returns an owned copy of the metadata prepared so far,
+// without acquiring data. Like Collect, only the synchronous owner calls it.
+func (c *Collector) PreparedDeviceMetadata() map[string]ddsnmp.MetaTag {
+	metadata := make(map[string]ddsnmp.MetaTag)
+	for _, state := range c.sortedProfileStates() {
+		if state.initialized {
+			ddsnmp.MergeMetaTags(metadata, state.cache.deviceMetadata)
+		}
+	}
+	return metadata
+}
+
+// ProfileInputRevision changes whenever a profile's tags and metadata become
+// prepared, so the owner can publish them without acquiring them twice.
+func (c *Collector) ProfileInputRevision() uint64 { return c.profileInputRevision }
+
 func (c *Collector) prepareProfileCollection(ps *profileState, ordinal uint32) (*preparedProfileCollection, error) {
 	pm := &ddsnmp.ProfileMetrics{Source: ps.profile.SourceFile}
 	prepared := &preparedProfileCollection{
@@ -388,27 +420,33 @@ func (c *Collector) prepareProfileInputs(prepared *preparedProfileCollection) er
 	if ps.initialized {
 		prepared.acquisition.restoreInputRoutes(ps.cache.inputRoutes)
 	} else {
+		// Install the cache only when every input is prepared, so a failed
+		// attempt leaves no partial tags or evidence behind.
+		cache := ps.cache
 		recorder := sourceRecorder(c.globalTagsCollector.snmpClient)
 		cursor := recorder.Cursor()
 		globalTags, err := c.globalTagsCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
 			return fmt.Errorf("failed to collect global tags: %w", err)
 		}
-		ps.cache.globalTags = globalTags
+		cache.globalTags = globalTags
 		if recorder != nil {
-			ps.cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
+			cache.tagEvidence = &AcquisitionCacheInput{Kind: "profile_tags", CreatedAt: time.Now().UTC(), Tags: globalTags, Sources: recorder.operationsSince(cursor)}
 		}
 		cursor = recorder.Cursor()
 		metadata, err := c.deviceMetadataCollector.collectObserved(ps.profile, &pm.Stats, prepared.acquisition)
 		if err != nil {
+			err = snmputils.WithFailure(err, "metadata", "")
 			return fmt.Errorf("failed to collect device metadata: %w", err)
 		}
-		ps.cache.deviceMetadata = metadata
+		cache.deviceMetadata = metadata
 		if recorder != nil {
-			ps.cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
+			cache.metadataEvidence = &AcquisitionCacheInput{Kind: "profile_metadata", CreatedAt: time.Now().UTC(), Metadata: metadata, Sources: recorder.operationsSince(cursor)}
 		}
+		cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
+		ps.cache = cache
 		ps.initialized = true
-		ps.cache.inputRoutes = prepared.acquisition.retainInputRoutes(recorder)
+		c.profileInputRevision++
 	}
 	pm.Tags = maps.Clone(ps.cache.globalTags)
 	pm.DeviceMetadata = maps.Clone(ps.cache.deviceMetadata)
@@ -449,7 +487,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	now := time.Now()
 	licenseRows, err := c.collectLicenseRowsObserved(ps.profile, &pm.Stats, profile.acquisition)
 	if err != nil {
-		c.log.Limit(licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+licenseRowsFailedLogKey+ps.profile.SourceFile, 1, licenseRowsErrorLogEvery).
 			Warningf("failed to collect licensing rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.LicenseRows = append(pm.LicenseRows, licenseRows...)
@@ -465,7 +503,7 @@ func (c *Collector) collectPreparedProfileRows(profile *preparedProfileCollectio
 	}
 	if err != nil {
 		pm.BGPCollectError = err
-		c.log.Limit(bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
+		c.log.Limit(c.logKeyPrefix+bgpRowsFailedLogKey+ps.profile.SourceFile, 1, bgpRowsErrorLogEvery).
 			Warningf("failed to collect BGP rows for profile %q: %v", ps.profile.SourceFile, err)
 	}
 	pm.BGPRows = append(pm.BGPRows, bgpRows...)
@@ -501,39 +539,20 @@ func sanitizeMetricMetadata(m *ddsnmp.Metric) {
 	m.Description = metricMetaReplacer.Replace(m.Description)
 	m.Family = metricMetaReplacer.Replace(m.Family)
 	m.Unit = metricMetaReplacer.Replace(m.Unit)
-	for k, v := range m.Tags {
-		// Remove tags prefixed with "rm:", which are intended for temporary use during transforms
-		// and should not appear in the final exported metric.
-		if strings.HasPrefix(k, "rm:") {
-			delete(m.Tags, k)
-			continue
-		}
-		m.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(m.Tags)
 }
 
 func sanitizeLicenseRow(row *ddsnmp.LicenseRow) {
-	row.ID = metricMetaReplacer.Replace(row.ID)
 	row.Name = metricMetaReplacer.Replace(row.Name)
 	row.Feature = metricMetaReplacer.Replace(row.Feature)
 	row.Component = metricMetaReplacer.Replace(row.Component)
 	row.Type = metricMetaReplacer.Replace(row.Type)
 	row.Impact = metricMetaReplacer.Replace(row.Impact)
 	row.State.Raw = metricMetaReplacer.Replace(row.State.Raw)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
-		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
-	}
+	removeTemporaryTags(row.Tags)
 }
 
 func sanitizeBGPRow(row *ddsnmp.BGPRow) {
-	row.RowKey = metricMetaReplacer.Replace(row.RowKey)
-	row.Identity.RoutingInstance = metricMetaReplacer.Replace(row.Identity.RoutingInstance)
-	row.Identity.Neighbor = metricMetaReplacer.Replace(row.Identity.Neighbor)
-	row.Identity.RemoteAS = metricMetaReplacer.Replace(row.Identity.RemoteAS)
 	row.Descriptors.LocalAddress = metricMetaReplacer.Replace(row.Descriptors.LocalAddress)
 	row.Descriptors.LocalAS = metricMetaReplacer.Replace(row.Descriptors.LocalAS)
 	row.Descriptors.LocalIdentifier = metricMetaReplacer.Replace(row.Descriptors.LocalIdentifier)
@@ -573,12 +592,17 @@ func sanitizeBGPRow(row *ddsnmp.BGPRow) {
 	sanitizeBGPInt64(&row.Device.Peers)
 	sanitizeBGPInt64(&row.Device.InternalPeers)
 	sanitizeBGPInt64(&row.Device.ExternalPeers)
-	for k, v := range row.Tags {
-		if strings.HasPrefix(k, "rm:") {
-			delete(row.Tags, k)
-			continue
+	removeTemporaryTags(row.Tags)
+}
+
+// Semantic tags and typed IDs must retain their exact bytes until machine identity
+// is built. The chart renderer owns wire sanitation; only transform-local tags
+// are removed here.
+func removeTemporaryTags(tags map[string]string) {
+	for key := range tags {
+		if strings.HasPrefix(key, "rm:") {
+			delete(tags, key)
 		}
-		row.Tags[k] = metricMetaReplacer.Replace(v)
 	}
 }
 

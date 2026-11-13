@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -76,13 +77,13 @@ func (s *source) Fetch(ctx context.Context, jobID, runID, artifactID string) (mo
 }
 func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
-		return syntheticfunctions.New(nil)
+		return syntheticfunctions.New(nil, nil)
 	}
 	var active query.Observations
 	if s.hub != nil {
 		active = s.hub
 	}
-	return syntheticfunctions.New(query.New(active, s, s, nil))
+	return syntheticfunctions.New(query.New(active, s, s, nil), nil)
 }
 
 func ptr(n float64) *float64 { return &n }
@@ -255,6 +256,17 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 		HistoryError: "history write failed",
 	}
 	registration.Complete(evidence)
+	registration.SetSchedule(
+		monitor.Status{
+			Scheduled:       12,
+			Admitted:        2,
+			Coalesced:       9,
+			Pending:         true,
+			Active:          true,
+			AdmittedUS:      completed,
+			SchedulingDelay: 3 * time.Second,
+		},
+	)
 	registration.SetState("running")
 	h := newHandler(&source{
 		hub: hub,
@@ -265,20 +277,28 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 	assert.Equal(
 		t,
 		map[string]any{
-			"job_id":          "journey:checkout",
-			"kind":            model.Journey,
-			"name":            "checkout",
-			"target":          "",
-			"state":           "running",
-			"fresh":           false,
-			"run_id":          "r",
-			"outcome":         "failed",
-			"completed_us":    completed,
-			"duration_ms":     500.25,
-			"last_success_us": nil,
-			"last_failure_us": completed,
-			"error":           "afterAll failed",
-			"history_error":   "history write failed",
+			"job_id":           "journey:checkout",
+			"vnode_guid":       "",
+			"kind":             model.Journey,
+			"name":             "checkout",
+			"target":           "",
+			"state":            "running",
+			"fresh":            false,
+			"run_id":           "r",
+			"outcome":          "failed",
+			"completed_us":     completed,
+			"duration_ms":      500.25,
+			"last_success_us":  nil,
+			"last_failure_us":  completed,
+			"error":            "afterAll failed",
+			"history_error":    "history write failed",
+			"check_every":      1,
+			"scheduled":        uint64(12),
+			"admitted":         uint64(2),
+			"coalesced":        uint64(9),
+			"pending":          true,
+			"queue_age":        nil,
+			"scheduling_delay": 3.0,
 		},
 		rowValues(t, got, rows[0]),
 	)
@@ -382,7 +402,11 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 
 func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	run := model.Run{
-		Runtime:     &model.RuntimeIdentity{Version: "release-a", SHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Contract: 1},
+		Runtime: &model.RuntimeIdentity{
+			Version:  "release-a",
+			SHA256:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Contract: 1,
+		},
 		ID:          "r",
 		JobID:       "journey:a",
 		Name:        "a",
@@ -473,7 +497,7 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NoError(t, err)
 	defer store.Close()
 	runID := fixtureRunID()
-	dir, err := store.Begin(runID, "lighthouse:home")
+	dir, err := store.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
 	html := []byte("<html><script>privateReport()</script></html>")
@@ -507,6 +531,8 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 		},
 	)
 	assert.Equal(t, "available", rowValues(t, index, responseData(t, index)[0])["availability"])
+	assert.Equal(t, "Lighthouse report", rowValues(t, index, responseData(t, index)[0])["label"])
+	assert.Empty(t, rowValues(t, index, responseData(t, index)[0])["test"])
 	validate(t, index)
 	got := call(h, "synthetics-artifact", append(args, "artifact_id:report")...)
 	require.Len(t, responseData(t, got), 1)
@@ -529,6 +555,43 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	require.NotNil(t, got.RawResponse)
 	assert.Equal(t, 404, got.RawResponse["status"])
 	assert.Equal(t, "expired_or_unavailable", got.RawResponse["capture_state"])
+	validate(t, got)
+}
+
+func TestScreenshotLabelsThroughRealStore(t *testing.T) {
+	store, err := artifacts.Open(t.TempDir())
+	require.NoError(t, err)
+	defer store.Close()
+	runID := fixtureRunID()
+	dir, err := store.Begin(runID, "journey:checkout", "")
+	require.NoError(t, err)
+	require.NoError(t, os.Mkdir(filepath.Join(dir, "output"), 0700))
+	cases := []struct {
+		id    string
+		test  model.ArtifactTest
+		title string
+	}{
+		{id: "associated", test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
+		{id: "unassociated", title: "Test not recorded"},
+	}
+	var candidates []model.Capture
+	for _, tc := range cases {
+		path := "output/" + tc.id + ".png"
+		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("\x89PNG\r\n\x1a\nfixture"), 0600))
+		candidates = append(candidates, model.Capture{ID: tc.id, Kind: "screenshot", MIME: "image/png", Path: path, Test: tc.test})
+	}
+	_, err = store.Finalize(t.Context(), runID, candidates)
+	require.NoError(t, err)
+	h := newHandler(&source{artifacts: store})
+	got := call(h, "synthetics-artifact", "job_id:journey:checkout", "run_id:"+runID)
+	rows := responseData(t, got)
+	require.Len(t, rows, len(cases))
+	for i, tc := range cases {
+		row := rowValues(t, got, rows[i])
+		assert.Equal(t, tc.id, row["artifact_id"])
+		assert.Equal(t, "Screenshot", row["label"])
+		assert.Equal(t, tc.title, row["test"])
+	}
 	validate(t, got)
 }
 
@@ -561,7 +624,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil))
+	h := syntheticfunctions.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil), nil)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -587,7 +650,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	}
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
-	h := syntheticfunctions.New(query.New(nil, retained, nil, nil))
+	h := syntheticfunctions.New(query.New(nil, retained, nil, nil), nil)
 	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)
@@ -611,4 +674,14 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	require.NotNil(t, detail.RawResponse)
 	assert.Equal(t, run.CompletedUS, detail.RawResponse["run"].(map[string]any)["completed_us"])
 	validate(t, detail)
+}
+
+func TestTerminationReasonIsIndependentOfFirstError(t *testing.T) {
+	run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout,
+		TerminationReason: model.ExecutionBudget, Error: "earlier assertion failed"}
+	src := &source{history: map[string]model.Run{"journey:a/r": run}}
+	got := call(newHandler(src), "synthetics-run", "job_id:journey:a", "run_id:r")
+	detail := got.RawResponse["run"].(map[string]any)
+	assert.Equal(t, run.TerminationReason, detail["termination_reason"])
+	assert.Equal(t, run.Error, detail["error"])
 }

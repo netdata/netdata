@@ -2,15 +2,95 @@
 #define _GNU_SOURCE
 #endif
 
+/* Run-directory scans and stats must survive 64-bit inode numbers and
+ * directory offsets; 32-bit glibc builds without LFS fail them with
+ * EOVERFLOW. Only file-local types are affected (no off_t/stat in headers). */
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
+#endif
+
 /*
- * netipc_shm.c - L1 POSIX SHM transport (Linux only).
+ * netipc_shm.c - L1 POSIX SHM transport (Linux and FreeBSD).
  *
- * Shared memory data plane with spin+futex synchronization.
+ * Shared memory data plane with spin+futex synchronization (FreeBSD:
+ * _umtx_op wait/wake on the same signal words).
  * Uses the same wire envelope as UDS -- higher levels are unaware
  * of the underlying transport.
  */
 
 #include "netipc/netipc_shm.h"
+
+#if !defined(__linux__) && !defined(__FreeBSD__)
+
+/* POSIX SHM needs a futex-style wait/wake (Linux futex, FreeBSD _umtx_op).
+ * The handshake never selects an SHM profile on other systems, so these
+ * entry points only report that. */
+
+nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
+                                        const char *service_name,
+                                        uint64_t session_id,
+                                        uint32_t req_capacity,
+                                        uint32_t resp_capacity,
+                                        nipc_shm_ctx_t *out) {
+  (void)run_dir;
+  (void)service_name;
+  (void)session_id;
+  (void)req_capacity;
+  (void)resp_capacity;
+  (void)out;
+  return NIPC_SHM_ERR_UNSUPPORTED;
+}
+
+void nipc_shm_destroy(nipc_shm_ctx_t *ctx) { (void)ctx; }
+
+nipc_shm_error_t nipc_shm_client_attach(const char *run_dir,
+                                        const char *service_name,
+                                        uint64_t session_id,
+                                        nipc_shm_ctx_t *out) {
+  (void)run_dir;
+  (void)service_name;
+  (void)session_id;
+  (void)out;
+  return NIPC_SHM_ERR_UNSUPPORTED;
+}
+
+void nipc_shm_close(nipc_shm_ctx_t *ctx) { (void)ctx; }
+
+nipc_shm_error_t nipc_shm_send(nipc_shm_ctx_t *ctx, const void *msg,
+                               size_t msg_len) {
+  (void)ctx;
+  (void)msg;
+  (void)msg_len;
+  return NIPC_SHM_ERR_UNSUPPORTED;
+}
+
+nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx, void *buf,
+                                  size_t buf_size, size_t *msg_len_out,
+                                  uint32_t timeout_ms) {
+  (void)ctx;
+  (void)buf;
+  (void)buf_size;
+  (void)msg_len_out;
+  (void)timeout_ms;
+  return NIPC_SHM_ERR_UNSUPPORTED;
+}
+
+void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name) {
+  (void)run_dir;
+  (void)service_name;
+}
+
+#ifdef NIPC_INTERNAL_TESTING
+void nipc_shm_test_fault_set(nipc_shm_test_fault_site_t site,
+                             int error_number) {
+  (void)site;
+  (void)error_number;
+}
+
+void nipc_shm_test_fault_clear(void) {}
+#endif
+
+#else /* __linux__ || __FreeBSD__ */
 
 #include <dirent.h>
 #include <errno.h>
@@ -27,7 +107,11 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#if defined(__linux__)
 #include <linux/futex.h>
+#else
+#include <sys/umtx.h>
+#endif
 
 /* ------------------------------------------------------------------ */
 /*  Internal helpers                                                   */
@@ -93,6 +177,9 @@ static int build_shm_path(char *dst, size_t dst_len,
                            const char *run_dir, const char *service_name,
                            uint64_t session_id)
 {
+    if (!run_dir || run_dir[0] == '\0')
+        return -2;
+
     char shm_name[256];
     int name_rc = build_shm_name(shm_name, sizeof(shm_name), service_name,
                                  session_id);
@@ -115,12 +202,14 @@ static bool stale_check_unavailable(int err)
     return err == EMFILE || err == ENFILE;
 }
 
-/* Remove a junk entry at an endpoint name; directories are junk too. */
+/* Remove a junk entry at an endpoint name; directories are junk too.
+ * Unlinking a directory fails with EISDIR on Linux and EPERM on FreeBSD. */
 static int unlink_stale_name(int dir_fd, const char *name)
 {
     if (unlinkat(dir_fd, name, 0) == 0 || errno == ENOENT)
         return 0;
-    if (errno == EISDIR && unlinkat(dir_fd, name, AT_REMOVEDIR) == 0)
+    if ((errno == EISDIR || errno == EPERM) &&
+        unlinkat(dir_fd, name, AT_REMOVEDIR) == 0)
         return 0;
     return -1;
 }
@@ -137,6 +226,7 @@ static int open_run_dir_fd(const char *run_dir)
     return fd;
 }
 
+#if defined(__linux__)
 /* Use the kernel ABI, not libc's timespec (which can use time64 on a
  * legacy 32-bit syscall ABI). All receive budgets are uint32_t milliseconds,
  * so their relative seconds fit even the legacy signed 32-bit field.
@@ -164,6 +254,46 @@ static int futex_wait(uint32_t *addr, uint32_t expected,
     return (int)syscall(NIPC_SYS_FUTEX, addr, FUTEX_WAIT, expected,
                        timeout ? kernel_timeout : NULL, NULL, 0);
 }
+
+/* Reserve the whole region; 0 on success, -1 with errno on failure. */
+static int shm_allocate(int fd, off_t size)
+{
+    return fallocate(fd, 0, 0, size);
+}
+#else
+/* The shared (not _PRIVATE) operations key on the mapped object, so they
+ * cross processes. A wait whose expected value is already stale returns 0,
+ * where a Linux futex returns EAGAIN; callers re-check either way. */
+static int futex_wake(uint32_t *addr, int count)
+{
+    return _umtx_op(addr, UMTX_OP_WAKE, count, NULL, NULL);
+}
+
+static int futex_wait(uint32_t *addr, uint32_t expected,
+                      const struct timespec *timeout)
+{
+    struct _umtx_time t;
+    if (!timeout)
+        return _umtx_op(addr, UMTX_OP_WAIT_UINT, expected, NULL, NULL);
+    memset(&t, 0, sizeof(t));
+    t._timeout = *timeout;
+    t._clockid = CLOCK_MONOTONIC;
+    return _umtx_op(addr, UMTX_OP_WAIT_UINT, expected,
+                    (void *)(uintptr_t)sizeof(t), &t);
+}
+
+/* Reserve the whole region; 0 on success, -1 with errno on failure.
+ * posix_fallocate returns the error instead of setting errno. ZFS rejects
+ * it with EINVAL: SHM preparation fails and the session uses baseline. */
+static int shm_allocate(int fd, off_t size)
+{
+    int rc = posix_fallocate(fd, 0, size);
+    if (rc == 0)
+        return 0;
+    errno = rc;
+    return -1;
+}
+#endif
 
 /* CPU pause hint for spin loops. */
 static inline void cpu_relax(void)
@@ -371,10 +501,25 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
         close(dir_fd);
         return NIPC_SHM_ERR_OPEN;
     }
+    /* The file takes 0600 & ~umask; a umask without owner read or write
+     * would stop the client from attaching read-write. A region the client
+     * cannot attach is not created: the session then drops SHM. */
+    int chmod_rc;
+    do {
+        chmod_rc = fchmod(fd, S_IRUSR | S_IWUSR);
+    } while (chmod_rc < 0 && errno == EINTR);
+    if (chmod_rc < 0) {
+        int chmod_errno = errno;
+        close(fd);
+        unlinkat(dir_fd, shm_name, 0);
+        close(dir_fd);
+        errno = chmod_errno;
+        return NIPC_SHM_ERR_OPEN;
+    }
 
     int allocate_rc;
     do {
-        allocate_rc = fallocate(fd, 0, 0, (off_t)region_size);
+        allocate_rc = shm_allocate(fd, (off_t)region_size);
     } while (allocate_rc < 0 && errno == EINTR);
 
     if (allocate_rc < 0) {
@@ -431,7 +576,6 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
     out->local_req_seq     = 0;
     out->local_resp_seq    = 0;
     out->spin_tries        = NIPC_SHM_DEFAULT_SPIN;
-    out->owner_generation  = hdr->owner_generation;
     if (copy_cstr_checked(out->path, sizeof(out->path), path) != 0) {
         munmap(map, region_size);
         close(fd);
@@ -586,6 +730,14 @@ nipc_shm_error_t nipc_shm_client_attach(const char *run_dir,
         return NIPC_SHM_ERR_BAD_SIZE;
     }
 
+    /* Guard against uint32 overflow in response_offset + response_capacity:
+     * a 32-bit size_t would wrap and let the file-size check pass. */
+    if (hdr->response_offset > UINT32_MAX - hdr->response_capacity) {
+        munmap(map, file_size);
+        close(fd);
+        return NIPC_SHM_ERR_BAD_SIZE;
+    }
+
     /* Validate region is large enough for the declared areas. */
     size_t needed = 0;
     size_t req_end  = (size_t)hdr->request_offset + hdr->request_capacity;
@@ -618,7 +770,6 @@ nipc_shm_error_t nipc_shm_client_attach(const char *run_dir,
     out->local_req_seq     = cur_req_seq;
     out->local_resp_seq    = cur_resp_seq;
     out->spin_tries        = NIPC_SHM_DEFAULT_SPIN;
-    out->owner_generation  = hdr->owner_generation;
     if (copy_cstr_checked(out->path, sizeof(out->path), path) != 0) {
         munmap(map, file_size);
         close(fd);
@@ -868,30 +1019,6 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
 }
 
 /* ------------------------------------------------------------------ */
-/*  Utility                                                            */
-/* ------------------------------------------------------------------ */
-
-bool nipc_shm_owner_alive(const nipc_shm_ctx_t *ctx)
-{
-    if (!ctx || !ctx->base)
-        return false;
-
-    const nipc_shm_region_header_t *hdr =
-        (const nipc_shm_region_header_t *)ctx->base;
-
-    if (!pid_alive((pid_t)hdr->owner_pid))
-        return false;
-
-    /* PID is alive; verify generation matches to detect PID reuse.
-     * If owner_generation is 0, skip the check (legacy region). */
-    if (ctx->owner_generation != 0 &&
-        hdr->owner_generation != ctx->owner_generation)
-        return false;
-
-    return true;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Stale cleanup on server startup                                    */
 /* ------------------------------------------------------------------ */
 
@@ -942,3 +1069,5 @@ void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name)
 
     closedir(dir);
 }
+
+#endif /* __linux__ || __FreeBSD__ */

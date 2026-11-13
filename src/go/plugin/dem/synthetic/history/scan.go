@@ -41,6 +41,9 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 		if runID == "" && (run.StartedUS/1000000 < f.After || run.StartedUS/1000000 > before) {
 			return nil
 		}
+		if f.VnodeGUID != "" && run.VnodeGUID != f.VnodeGUID {
+			return nil
+		}
 		if f.Kind != "" && run.Kind != f.Kind {
 			return nil
 		}
@@ -62,7 +65,11 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 // a retained completion even when it was written after the selected interval.
 func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, error) {
 	var envelope demjournal.Envelope
-	values := make(map[string]string, 4)
+	var phase, jobID, runID string
+	var run synthetic.Run
+	var seen uint8
+	var hasData bool
+	var dataErr error
 	err := entry.VisitPayloads(func(payload []byte) error {
 		key, value, ok := bytes.Cut(payload, []byte{'='})
 		if !ok {
@@ -71,12 +78,31 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 		if err := envelope.Observe(key, value); err != nil {
 			return err
 		}
-		switch name := string(key); name {
-		case "DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA":
-			if _, exists := values[name]; exists {
-				return fmt.Errorf("duplicate synthetic history field %s", name)
-			}
-			values[name] = string(value)
+		var bit uint8
+		var target *string
+		switch string(key) {
+		case "DEM_PHASE":
+			bit, target = 1, &phase
+		case "DEM_JOB_ID":
+			bit, target = 2, &jobID
+		case "DEM_RUN_ID":
+			bit, target = 4, &runID
+		case "DEM_DATA":
+			bit = 8
+		default:
+			return nil
+		}
+		if seen&bit != 0 {
+			return fmt.Errorf("duplicate synthetic history field %s", key)
+		}
+		seen |= bit
+		if target != nil {
+			*target = string(value)
+		} else {
+			// Payload bytes are borrowed only for this callback. Decode directly;
+			// the run owns the resulting strings, including its captured vnode GUID.
+			hasData = len(value) != 0
+			dataErr = json.Unmarshal(value, &run)
 		}
 		return nil
 	})
@@ -87,17 +113,20 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 	if err != nil || kind != "synthetic" {
 		return "", synthetic.Run{}, false, err
 	}
-	for _, name := range []string{"DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA"} {
-		if values[name] == "" {
-			return "", synthetic.Run{}, false, fmt.Errorf("missing synthetic history field %s", name)
+	for _, field := range []struct{ name, value string }{
+		{"DEM_PHASE", phase}, {"DEM_JOB_ID", jobID}, {"DEM_RUN_ID", runID},
+	} {
+		if field.value == "" {
+			return "", synthetic.Run{}, false, fmt.Errorf("missing synthetic history field %s", field.name)
 		}
 	}
-	var run synthetic.Run
-	if err := json.Unmarshal([]byte(values["DEM_DATA"]), &run); err != nil {
-		return "", run, false, fmt.Errorf("decode synthetic history: %w", err)
+	if !hasData {
+		return "", synthetic.Run{}, false, fmt.Errorf("missing synthetic history field DEM_DATA")
 	}
-	phase := values["DEM_PHASE"]
-	if (phase != "start" && phase != "complete") || run.ID != values["DEM_RUN_ID"] || run.JobID != values["DEM_JOB_ID"] || run.StartedUS != started {
+	if dataErr != nil {
+		return "", run, false, fmt.Errorf("decode synthetic history: %w", dataErr)
+	}
+	if (phase != "start" && phase != "complete") || run.ID != runID || run.JobID != jobID || run.StartedUS != started {
 		return "", run, false, fmt.Errorf("invalid synthetic journal identity or start time")
 	}
 	if phase == "complete" && run.CompletedUS <= 0 {

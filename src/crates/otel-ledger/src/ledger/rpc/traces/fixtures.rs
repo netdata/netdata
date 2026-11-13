@@ -1,9 +1,10 @@
 //! Shared fixtures for the traces rpc test suites (sources/tests.rs,
 //! handler/tests.rs, handler/remote_tests.rs): OTLP request builders,
 //! registry installers, REAL trace-WAL bytes (OTLP → ng-flatten trace
-//! frames) so engine chunk builds run the actual traces seal, REAL
-//! sealed-SFST bytes built by that same seal, and the remote-storage
-//! [`TestRemote`]. Test-only (`#[cfg(test)]` at the module decl).
+//! frames) so engine chunk indexing runs the actual traces indexing,
+//! REAL sealed-SFST bytes written by that same indexing, and the
+//! remote-storage [`TestRemote`]. Test-only (`#[cfg(test)]` at the
+//! module decl).
 
 use std::sync::Arc;
 
@@ -39,7 +40,7 @@ pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summar
 }
 
 /// The id every registry-installed fixture file of sequence `seq`
-/// carries: one shared test identity, pipeline 1, part_key 7.
+/// carries: one shared test identity, pipeline 1, partition_key 7.
 pub(crate) fn test_file_id(seq: u64) -> FileId {
     FileId::new(test_identity(), 1, seq, 7)
 }
@@ -69,7 +70,7 @@ pub(crate) async fn install_sfst(
 /// One OTLP request holding `span_count` spans of one synthetic trace:
 /// trace id `trace_byte` repeated, span i starting `i` µs after
 /// `base_ns` and lasting 500ns. Span 1 is the root (unset parent);
-/// spans 2.. parent to span 1. Just enough shape for the seal to index.
+/// spans 2.. parent to span 1. Just enough shape for indexing.
 pub(crate) fn otlp_req(trace_byte: u8, span_count: u8, base_ns: u64) -> ExportTraceServiceRequest {
     otlp_req_svc(trace_byte, span_count, base_ns, "svc")
 }
@@ -161,7 +162,7 @@ pub(crate) fn otlp_req_at(
 /// `b"test-meta"` content meta — and return the produced file's path.
 /// Mirrors the sfsq integration suites' `write_wal` fixture recipe
 /// (`sfsq/tests/common/mod.rs`).
-fn write_traces_wal(
+pub(crate) fn write_traces_wal(
     dir: &std::path::Path,
     reqs: Vec<ExportTraceServiceRequest>,
 ) -> std::path::PathBuf {
@@ -220,20 +221,19 @@ fn write_traces_wal(
         .expect("a wal file was written")
 }
 
-/// Seal `reqs` into real traces SFST bytes:
-/// `ng_index::build_sfst_traces_range` — the same call the engine's
-/// on-query chunk build makes — over a fresh WAL holding one frame per
-/// request. Returns the seal's own summary alongside the bytes.
-pub(crate) fn sealed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
+/// Index `reqs` into real traces SFST bytes:
+/// `ng_index::index_traces_range` — the same call the engine's
+/// on-query chunk indexing makes — over a fresh WAL holding one frame per
+/// request. Returns the indexing's own summary alongside the bytes.
+pub(crate) fn indexed_traces(reqs: Vec<ExportTraceServiceRequest>) -> (sfst::Summary, Vec<u8>) {
     let staging = tempfile::tempdir().unwrap();
     let wal = write_traces_wal(staging.path(), reqs);
     let len = std::fs::metadata(&wal).unwrap().len();
-    ng_index::build_sfst_traces_range(&wal, wal::FrameRange::new(wal::HEADER_SIZE as u64, len))
-        .unwrap()
+    ng_index::index_traces_range(&wal, wal::FrameRange::new(wal::HEADER_SIZE as u64, len)).unwrap()
 }
 
-/// Install `reqs` sealed as `tenant`'s local SFST of sequence `seq`: the
-/// real bytes at the registry path, tracked with the seal's summary.
+/// Install `reqs` indexed as `tenant`'s local SFST of sequence `seq`: the
+/// real bytes at the registry path, tracked with the indexing's summary.
 /// Returns the path.
 pub(crate) async fn install_sealed(
     registries: &Arc<RwLock<TenantRegistries>>,
@@ -241,7 +241,7 @@ pub(crate) async fn install_sealed(
     seq: u64,
     reqs: Vec<ExportTraceServiceRequest>,
 ) -> std::path::PathBuf {
-    let (summary, bytes) = sealed_traces(reqs);
+    let (summary, bytes) = indexed_traces(reqs);
     let id = test_file_id(seq);
     let mut guard = registries.write().await;
     let reg = guard.get_or_create(&TenantId::from(tenant));
@@ -335,7 +335,7 @@ impl TestRemote {
         file_lifecycle::remote_read::RemoteRead::new(storage, self.cache.clone())
     }
 
-    /// Seal `reqs` as `identity`'s file of sequence `seq`, store the bytes as
+    /// Index `reqs` as `identity`'s file of sequence `seq`, store the bytes as
     /// an object and catalog it for `tenant` — a file local retention has
     /// evicted.
     pub(crate) async fn evicted(
@@ -374,7 +374,7 @@ impl TestRemote {
         reqs: Vec<ExportTraceServiceRequest>,
         readable: bool,
     ) -> Evicted {
-        let (summary, bytes) = sealed_traces(reqs);
+        let (summary, bytes) = indexed_traces(reqs);
         let id = FileId::new(identity, 1, seq, 7);
         let remote_key = if readable {
             let key = format!("traces/{}", id.to_filename("sfst"));

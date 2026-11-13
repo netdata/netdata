@@ -378,8 +378,8 @@ pub enum HeaderCompatibleFlags {
 /// `InvalidJournalFileState`; [`Display`](std::fmt::Display) prints the
 /// uppercase names. Set to Online at create
 /// ([`JournalFile::create`](crate::file::JournalFile::create));
-/// journal-log-writer sets Archived on rotation
-/// (journal-log-writer/src/log/mod.rs) and journal-index reads it
+/// the plugin's former journal writer set Archived on rotation, and
+/// journal-index reads it
 /// when opening a file for indexing
 /// (journal-index/src/file_indexer.rs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

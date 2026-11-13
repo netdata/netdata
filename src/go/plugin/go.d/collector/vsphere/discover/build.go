@@ -16,6 +16,7 @@ func (d Discoverer) build(raw *resources) *rs.Resources {
 	t := time.Now()
 
 	var res rs.Resources
+	res.VCenterInstanceUUID = d.vCenterInstanceUUID
 	res.DataCenters = d.buildDatacenters(raw.dcs)
 	res.Folders = d.buildFolders(raw.folders)
 	res.Clusters = d.buildClusters(raw.clusters)

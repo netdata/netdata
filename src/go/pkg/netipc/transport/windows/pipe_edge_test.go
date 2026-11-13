@@ -7,6 +7,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"strings"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -16,6 +17,16 @@ import (
 
 func rawPipePair(t *testing.T) (syscall.Handle, syscall.Handle) {
 	t.Helper()
+	clientHandle, serverHandle, _, _ := rawPipePairWithClosers(t)
+	return clientHandle, serverHandle
+}
+
+// rawPipePairWithClosers also returns closers for tests that close an end
+// early. Closing a handle again in cleanup could close a value Windows has
+// since reused, such as a Go runtime event, and crash the test binary.
+func rawPipePairWithClosers(t *testing.T) (syscall.Handle, syscall.Handle, func() error, func() error) {
+	t.Helper()
+	var clientClosed, serverClosed atomic.Bool
 
 	service := uniquePipeService(t)
 	pipeName, err := BuildPipeName(testPipeRunDir, service)
@@ -28,7 +39,7 @@ func rawPipePair(t *testing.T) (syscall.Handle, syscall.Handle) {
 		t.Fatalf("createPipeInstance failed: %v", err)
 	}
 	t.Cleanup(func() {
-		if serverHandle != syscall.InvalidHandle && serverHandle != 0 {
+		if !serverClosed.Load() && serverHandle != syscall.InvalidHandle && serverHandle != 0 {
 			disconnectNamedPipe(serverHandle)
 			syscall.CloseHandle(serverHandle)
 		}
@@ -52,7 +63,7 @@ func rawPipePair(t *testing.T) (syscall.Handle, syscall.Handle) {
 		t.Fatalf("CreateFile failed: %v", err)
 	}
 	t.Cleanup(func() {
-		if clientHandle != syscall.InvalidHandle && clientHandle != 0 {
+		if !clientClosed.Load() && clientHandle != syscall.InvalidHandle && clientHandle != 0 {
 			syscall.CloseHandle(clientHandle)
 		}
 	})
@@ -66,7 +77,15 @@ func rawPipePair(t *testing.T) (syscall.Handle, syscall.Handle) {
 		t.Fatalf("connectNamedPipe failed: %v", err)
 	}
 
-	return clientHandle, serverHandle
+	closeClient := func() error {
+		clientClosed.Store(true)
+		return syscall.CloseHandle(clientHandle)
+	}
+	closeServer := func() error {
+		serverClosed.Store(true)
+		return syscall.CloseHandle(serverHandle)
+	}
+	return clientHandle, serverHandle, closeClient, closeServer
 }
 
 func sessionPair(t *testing.T, sCfg ServerConfig, cCfg ClientConfig) (*Session, *Session) {
@@ -195,49 +214,30 @@ func TestPipeAcceptUnblocksWhenListenerClosed(t *testing.T) {
 	}
 }
 
-func TestRawRecvMoreData(t *testing.T) {
+// A message larger than the receive buffer fails, as in C and Rust, instead
+// of returning its first part as a whole message.
+func TestRawRecvMoreDataFails(t *testing.T) {
 	clientHandle, serverHandle := rawPipePair(t)
 
-	msg := make([]byte, 96)
-	for i := range msg {
-		msg[i] = byte(i)
-	}
-	if err := rawWrite(clientHandle, msg); err != nil {
+	if err := rawWrite(clientHandle, make([]byte, 96)); err != nil {
 		t.Fatalf("rawWrite failed: %v", err)
 	}
-
-	small := make([]byte, 16)
-	n, err := rawRecv(serverHandle, small)
-	if err != nil {
-		t.Fatalf("rawRecv(small) failed: %v", err)
-	}
-	if n != len(small) {
-		t.Fatalf("rawRecv(small) len=%d, want %d", n, len(small))
-	}
-
-	rest := make([]byte, 96)
-	n, err = rawRecv(serverHandle, rest)
-	if err != nil {
-		t.Fatalf("rawRecv(rest) failed: %v", err)
-	}
-	if n != len(msg)-len(small) {
-		t.Fatalf("rawRecv(rest) len=%d, want %d", n, len(msg)-len(small))
+	if _, err := rawRecv(serverHandle, make([]byte, 16)); !errors.Is(err, ErrRecv) {
+		t.Fatalf("rawRecv into a short buffer = %v, want ErrRecv", err)
 	}
 }
 
 func TestRawPipeDisconnectErrors(t *testing.T) {
-	clientHandle, serverHandle := rawPipePair(t)
+	clientHandle, _, _, closeServer := rawPipePairWithClosers(t)
 
-	syscall.CloseHandle(serverHandle)
-	serverHandle = syscall.InvalidHandle
+	closeServer()
 
 	if err := rawWrite(clientHandle, []byte("x")); !errors.Is(err, ErrDisconnected) {
 		t.Fatalf("rawWrite after peer close = %v, want ErrDisconnected", err)
 	}
 
-	clientHandle2, serverHandle2 := rawPipePair(t)
-	syscall.CloseHandle(clientHandle2)
-	clientHandle2 = syscall.InvalidHandle
+	_, serverHandle2, closeClient2, _ := rawPipePairWithClosers(t)
+	closeClient2()
 
 	buf := make([]byte, 32)
 	if _, err := rawRecv(serverHandle2, buf); !errors.Is(err, ErrDisconnected) {
@@ -375,7 +375,7 @@ func TestClientHandshakeRejectsMalformedAck(t *testing.T) {
 				t.Fatalf("setNamedPipeHandleState failed: %v", err)
 			}
 
-			session, err := clientHandshake(clientHandle, defaultClientConfigPtr())
+			session, err := clientHandshake(clientHandle, nil, defaultClientConfigPtr(), newReceiveWait(0, nil))
 			if err == nil {
 				session.Close()
 				t.Fatal("clientHandshake should fail")
@@ -396,13 +396,13 @@ func TestClientHandshakeRejectsMalformedAck(t *testing.T) {
 
 func TestClientHandshakeTransportErrors(t *testing.T) {
 	t.Run("hello send disconnected", func(t *testing.T) {
-		clientHandle, serverHandle := rawPipePair(t)
+		clientHandle, _, _, closeServer := rawPipePairWithClosers(t)
 
-		if err := syscall.CloseHandle(serverHandle); err != nil {
+		if err := closeServer(); err != nil {
 			t.Fatalf("CloseHandle(server) failed: %v", err)
 		}
 
-		_, err := clientHandshake(clientHandle, defaultClientConfigPtr())
+		_, err := clientHandshake(clientHandle, nil, defaultClientConfigPtr(), newReceiveWait(0, nil))
 		if err == nil {
 			t.Fatal("clientHandshake should fail")
 		}
@@ -415,19 +415,19 @@ func TestClientHandshakeTransportErrors(t *testing.T) {
 	})
 
 	t.Run("hello ack recv disconnected", func(t *testing.T) {
-		clientHandle, serverHandle := rawPipePair(t)
+		clientHandle, serverHandle, _, closeServer := rawPipePairWithClosers(t)
 
 		serverDone := make(chan error, 1)
 		go func() {
 			var helloBuf [128]byte
 			_, err := rawRecv(serverHandle, helloBuf[:])
 			if err == nil {
-				err = syscall.CloseHandle(serverHandle)
+				err = closeServer()
 			}
 			serverDone <- err
 		}()
 
-		_, err := clientHandshake(clientHandle, defaultClientConfigPtr())
+		_, err := clientHandshake(clientHandle, nil, defaultClientConfigPtr(), newReceiveWait(0, nil))
 		if err == nil {
 			t.Fatal("clientHandshake should fail")
 		}
@@ -510,12 +510,12 @@ func TestServerHandshakeRejectsMalformedHello(t *testing.T) {
 }
 
 func TestServerHandshakeHelloAckSendFailure(t *testing.T) {
-	clientHandle, serverHandle := rawPipePair(t)
+	clientHandle, serverHandle, closeClient, _ := rawPipePairWithClosers(t)
 
 	if err := rawWrite(clientHandle, validHelloPacket()); err != nil {
 		t.Fatalf("rawWrite(hello) failed: %v", err)
 	}
-	if err := syscall.CloseHandle(clientHandle); err != nil {
+	if err := closeClient(); err != nil {
 		t.Fatalf("CloseHandle(client) failed: %v", err)
 	}
 
@@ -906,6 +906,50 @@ func TestSessionReceiveRejectsMalformedChunks(t *testing.T) {
 	}
 }
 
+func TestSessionReceiveRejectsMoreChunksThanDeclared(t *testing.T) {
+	client, server := sessionPair(t, defaultServerConfig(), defaultClientConfig())
+
+	first := encodePacket(protocol.Header{
+		Kind:      protocol.KindRequest,
+		Code:      protocol.MethodIncrement,
+		ItemCount: 1,
+		MessageID: 7,
+	}, []byte("0123456789"))
+	hdr, err := protocol.DecodeHeader(first[:protocol.HeaderSize])
+	if err != nil {
+		t.Fatalf("DecodeHeader failed: %v", err)
+	}
+	hdr.PayloadLen = 20
+	hdr.Encode(first[:protocol.HeaderSize])
+	if err := rawWrite(client.handle, first); err != nil {
+		t.Fatalf("rawWrite(first) failed: %v", err)
+	}
+	// The 10 remaining bytes fit one continuation; two half-size ones follow.
+	for i, part := range []string{"abcde", "fghij"} {
+		pkt := encodeChunkPacket(protocol.ChunkHeader{
+			Magic:           protocol.MagicChunk,
+			Version:         protocol.Version,
+			MessageID:       7,
+			TotalMessageLen: uint32(protocol.HeaderSize + 20),
+			ChunkIndex:      uint32(i + 1),
+			ChunkCount:      2,
+			ChunkPayloadLen: uint32(len(part)),
+		}, []byte(part))
+		if err := rawWrite(client.handle, pkt); err != nil {
+			t.Fatalf("rawWrite(continuation %d) failed: %v", i+1, err)
+		}
+	}
+
+	buf := make([]byte, 4096)
+	_, _, err = server.Receive(buf)
+	if !errors.Is(err, ErrChunk) {
+		t.Fatalf("Receive error = %v, want ErrChunk", err)
+	}
+	if !strings.Contains(err.Error(), "beyond chunk_count") {
+		t.Fatalf("Receive error = %v, want text %q", err, "beyond chunk_count")
+	}
+}
+
 func TestSessionReceiveRejectsMalformedChunkedBatchMessages(t *testing.T) {
 	type batchCase struct {
 		name         string
@@ -1131,5 +1175,27 @@ func TestSessionSendRejectsTooSmallPacketSize(t *testing.T) {
 	sr := <-acceptCh
 	if !errors.Is(sr.err, ErrIncompatible) {
 		t.Fatalf("server expected ErrIncompatible, got %v", sr.err)
+	}
+}
+
+// A server whose client never sends HELLO reports the wait's own error,
+// as C and Rust do, not a generic receive failure.
+func TestServerHandshakeWaitKeepsTimeoutAndAbort(t *testing.T) {
+	aborted := make(chan struct{})
+	close(aborted)
+	cases := []struct {
+		name string
+		wait receiveWait
+		want error
+	}{
+		{"deadline", newReceiveWait(20, nil), ErrTimeout},
+		{"abort", newReceiveWait(0, aborted), ErrAborted},
+	}
+	for _, tc := range cases {
+		_, serverHandle := rawPipePair(t)
+		cfg := defaultServerConfig()
+		if _, err := serverHandshakeWait(serverHandle, &cfg, 1, tc.wait, nil); !errors.Is(err, tc.want) {
+			t.Errorf("%s: %v, want %v", tc.name, err, tc.want)
+		}
 	}
 }

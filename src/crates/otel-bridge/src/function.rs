@@ -1,0 +1,722 @@
+//! The plugin Functions engine: typed handler traits plus the adapter that
+//! runs one routed function call to completion.
+//!
+//! Plugin authors implement [`FunctionHandler`] (a typed request/response pair
+//! plus a declaration). [`HandlerAdapter`] wraps it behind
+//! [`RawFunctionHandler`], the erased wire-level surface: it deserializes the
+//! request from the call's JSON payload, runs the handler under a 250ms
+//! progress ticker and the call's cancellation token, and maps the outcome to
+//! a `FunctionResult` (status/format mapping documented on
+//! `HandlerAdapter::handle_raw`).
+//!
+//! The engine is protocol-agnostic. Its drivers are the run loops that receive
+//! function calls: the `otel-ledger` worker (`LedgerRequest::Call`, dispatched
+//! in its `rpc::dispatch`), the `otel-legacy-logs` worker
+//! (`LegacyLogsRequest::Call`, dispatched in its own run loop) and the
+//! `otel-ingestor` worker (through the shared [`crate::driver::CallDriver`]).
+//! Each builds a
+//! [`FunctionContext`] per call with the transaction id, a fresh
+//! [`CancellationToken`], and a per-call `mpsc::UnboundedSender<Message>` the
+//! ticker writes `FunctionProgressResponse` into; each translates those
+//! messages into its own `Progress` response, and the supervisor forwards
+//! results and progress to the agent's pluginsd channel
+//! (`FUNCTION_RESULT_BEGIN`/`FUNCTION_RESULT_END` blocks and `FUNCTION_PROGRESS`
+//! lines). Cancellation is keyed on the same transaction id via the drivers'
+//! per-transaction token maps.
+//!
+//! The `netdata-plugin-rt` crate carries an independent copy of this engine for plugins that
+//! speak pluginsd directly on stdin/stdout (the netflow plugin); the two are
+//! not wired together.
+
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::time::Duration;
+
+use async_trait::async_trait;
+use netdata_plugin_error::Result;
+use netdata_plugin_protocol::{
+    FunctionCall, FunctionDeclaration, FunctionProgressResponse, FunctionResult, Message,
+};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use serde_json::json;
+use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::AbortOnDropHandle;
+use tracing::{error, info};
+
+/// Progress-emission cadence: 250ms wall-clock, matching the 250ms
+/// `ND_SD_JOURNAL_PROGRESS_EVERY_UT` of the systemd-journal reference plugin
+/// (which instead fires after 250ms of accumulated per-file query work).
+///
+/// Progress also keeps a call alive: every progress update pushes the
+/// function's deadline out so at least 10s remain (`functions_evloop.h`'s
+/// `FUNCTIONS_EXTENDED_TIME_ON_PROGRESS_UT`, applied on both the plugin and
+/// nrpc paths), keeping steady progress from timing the call out.
+const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
+
+/// The fixed denominator progress always travels with: the wire carries
+/// `done = <percent>`, `all = 100`, so the agent reports the percent directly.
+/// Raw work-unit totals never leave the handler (see `ProgressState`).
+const PROGRESS_DENOMINATOR: usize = 100;
+
+/// The progress percent to put on the wire for `(done, total)` work units,
+/// always in `[1, 99]`.
+///
+/// Both bounds protect the polling loop:
+/// - **Never 0 and never absent.** The agent drops zero-valued progress
+///   updates (`query_progress_functions_update` in `libnetdata/query_progress`)
+///   and the UI reads a zero or missing progress as already complete and stops
+///   polling; a truthy percent with the fixed denominator keeps `done`/`all`
+///   nonzero for the whole call.
+/// - **Never 100 while running.** Completion is signaled by the function
+///   RESULT, not by progress reaching 100, so `done == total` (and any torn
+///   `done > total`) caps at 99.
+///
+/// During the indeterminate phase (`total == 0`, before the handler calls
+/// `set_total`) the percent is 1: nothing real is computable yet, and an early
+/// or torn-read `done` must not surface as near-complete.
+///
+/// The agent assigns whatever nonzero `done`/`all` arrive (an unconditional
+/// set, no monotonicity check), so the producer is the only guardrail against
+/// a backwards or >100 reading. `saturating_mul` keeps `done * 100` from
+/// wrapping on byte-scale totals.
+fn progress_percent(done: usize, total: usize) -> usize {
+    if total == 0 {
+        return 1;
+    }
+    (done.saturating_mul(100) / total).clamp(1, 99)
+}
+
+/// Raw work-unit counters (`done`, `total`) shared between a handler and the
+/// adapter's progress ticker.
+///
+/// Handlers store real work units from any thread (async, `spawn_blocking`,
+/// rayon); the ticker reads them every `PROGRESS_INTERVAL` (250ms) and converts
+/// them to the percent/denominator pair that goes on the wire (see
+/// `progress_percent`) — the raw counters never leave the worker.
+///
+/// # Example
+///
+/// ```ignore
+/// // Set total work items before handing the counter to workers.
+/// ctx.progress.set_total(files.len());
+///
+/// // Give the done counter to a rayon/blocking worker.
+/// let counter = ctx.progress.done_counter();
+/// rayon::spawn(move || {
+///     // ... process item ...
+///     counter.fetch_add(1, Ordering::Relaxed);
+/// });
+///
+/// // Or update both at once from async code.
+/// ctx.progress.update(done, total);
+/// ```
+#[derive(Clone)]
+pub struct ProgressState {
+    done: Arc<AtomicUsize>,
+    total: Arc<AtomicUsize>,
+}
+
+impl ProgressState {
+    pub fn new() -> Self {
+        Self {
+            done: Arc::new(AtomicUsize::new(0)),
+            total: Arc::new(AtomicUsize::new(0)),
+        }
+    }
+
+    /// Update both counters; safe from any thread or context.
+    pub fn update(&self, done: usize, total: usize) {
+        self.done.store(done, Ordering::Relaxed);
+        self.total.store(total, Ordering::Relaxed);
+    }
+
+    /// Set the total work items (e.g. before handing `done_counter` to workers).
+    pub fn set_total(&self, total: usize) {
+        self.total.store(total, Ordering::Relaxed);
+    }
+
+    /// Get a clone of the done counter for sharing with worker threads.
+    /// Workers call `counter.fetch_add(1, Ordering::Relaxed)` directly.
+    pub fn done_counter(&self) -> Arc<AtomicUsize> {
+        self.done.clone()
+    }
+
+    /// Read the current `(done, total)` snapshot. The two loads are not atomic
+    /// as a pair, so a concurrent `update` can be observed half-applied (see
+    /// `progress_percent` for why that must stay harmless).
+    pub fn load(&self) -> (usize, usize) {
+        (
+            self.done.load(Ordering::Relaxed),
+            self.total.load(Ordering::Relaxed),
+        )
+    }
+}
+
+impl Default for ProgressState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Per-call context handed to a [`FunctionHandler::on_call`].
+///
+/// Carries the transaction id, the call's progress counters, and the
+/// cancellation token the driver armed for this call: cancelling it aborts the
+/// handler and ends the call with an error result.
+pub struct FunctionCallContext {
+    /// Transaction id echoed verbatim on every progress report and result
+    /// for this call; the engine never interprets it.
+    transaction: String,
+    /// Atomic progress state. The adapter's ticker reads these counters every
+    /// `PROGRESS_INTERVAL` (250ms) and reports progress to the agent
+    /// automatically; the handler only sets the counters.
+    pub progress: ProgressState,
+    /// Token that signals when the function should stop.
+    /// Check `is_cancelled()` in sync code, or `await cancelled()` in async code.
+    pub cancellation: CancellationToken,
+}
+
+impl FunctionCallContext {
+    /// Build a context from its parts. The engine builds these
+    /// internally; this constructor exists for tests and any caller
+    /// that drives `FunctionHandler::on_call` directly.
+    pub fn new(
+        transaction: String,
+        progress: ProgressState,
+        cancellation: CancellationToken,
+    ) -> Self {
+        Self {
+            transaction,
+            progress,
+            cancellation,
+        }
+    }
+
+    /// The transaction id this call was dispatched with.
+    pub fn transaction(&self) -> &str {
+        &self.transaction
+    }
+}
+
+/// Per-call input the driver hands to [`RawFunctionHandler::handle_raw`],
+/// built by the run loops that receive function calls (the ledger's
+/// `rpc::dispatch`, the legacy-logs worker's dispatcher).
+pub struct FunctionContext {
+    /// The routed call; `timeout` is not enforced by the engine (see
+    /// [`RawFunctionHandler::handle_raw`]).
+    pub function_call: Box<FunctionCall>,
+    /// The driver's per-call token: cancelling it drops the handler future and
+    /// makes the call end with an error result.
+    pub cancellation_token: CancellationToken,
+    /// Per-call channel the progress ticker writes
+    /// `Message::FunctionProgressResponse` into; the driver translates them
+    /// into its own `Progress` responses. The final result is `handle_raw`'s
+    /// return value, never a channel message.
+    pub outbound_tx: mpsc::UnboundedSender<Message>,
+}
+
+/// A typed function handler: one implementor per servable function.
+///
+/// [`HandlerAdapter`] supplies everything else — the JSON round-trip,
+/// cancellation, and progress reporting — so the implementor provides only the
+/// request/response types and the logic.
+///
+/// One handler instance serves every call: each call runs on its own task
+/// through the same `Arc<H>`, so implementors must be thread-safe and either
+/// stateless or internally synchronized across concurrent calls.
+#[async_trait]
+pub trait FunctionHandler: Send + Sync + 'static {
+    /// Request payload, deserialized from the call's JSON payload (an absent
+    /// payload is deserialized from `{}`).
+    type Request: DeserializeOwned + Send;
+
+    /// Response payload, serialized as compact `application/json` into the
+    /// result (the handlers' byte budgets count compact JSON).
+    type Response: Serialize + Send;
+
+    /// Execute the call.
+    ///
+    /// The future is selected against the cancellation token: once the driver
+    /// cancels, the handler future is dropped where it is currently parked.
+    /// Check `ctx.cancellation.is_cancelled()` in synchronous stretches that
+    /// never await. An `Err` is surfaced to the caller as a 400 result for
+    /// `NetdataPluginError::BadRequest` and a 500 result otherwise (mapping
+    /// on `HandlerAdapter::handle_raw`).
+    async fn on_call(
+        &self,
+        ctx: FunctionCallContext,
+        request: Self::Request,
+    ) -> Result<Self::Response>;
+
+    /// The function's declaration, advertised to the supervisor at `Ready`;
+    /// its `name` is the key drivers dispatch calls by.
+    fn declaration(&self) -> FunctionDeclaration;
+}
+
+/// The erased, wire-level counterpart of [`FunctionHandler`], so drivers and
+/// `file-lifecycle`'s per-signal `Pipeline` can hold heterogeneous handlers as
+/// `Arc<dyn RawFunctionHandler>` and dispatch by declaration name.
+///
+/// [`HandlerAdapter`] is the standard implementor, bridging a typed
+/// [`FunctionHandler`] to the raw `FunctionCall` / `FunctionResult` variants.
+#[async_trait]
+pub trait RawFunctionHandler: Send + Sync {
+    /// Run one function call to completion and return its `FunctionResult`.
+    ///
+    /// Progress is emitted as `Message::FunctionProgressResponse` on
+    /// `ctx.outbound_tx` every 250ms until the call ends; the result itself
+    /// is the return value, never a channel message. `ctx.function_call.timeout`
+    /// is not enforced here: a call ends when the handler returns or the
+    /// driver cancels its token.
+    async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult;
+
+    /// The function declaration; its `name` is the drivers' routing key.
+    fn declaration(&self) -> FunctionDeclaration;
+}
+
+/// [`RawFunctionHandler`] adapter around a typed [`FunctionHandler`]:
+/// deserializes `H::Request` from the call payload, runs `H::on_call` under
+/// the 250ms progress ticker and the cancellation select, and maps the outcome
+/// to a `FunctionResult`: 200 `application/json`; 400 `application/json`
+/// `{"status": 400, "errorMessage": …}` for a payload that fails to
+/// deserialize and for [`NetdataPluginError::BadRequest`]; 500 for any other
+/// handler error.
+///
+/// [`NetdataPluginError::BadRequest`]: netdata_plugin_error::NetdataPluginError::BadRequest
+pub struct HandlerAdapter<H: FunctionHandler> {
+    /// The wrapped handler, shared by every concurrent call.
+    pub handler: Arc<H>,
+}
+
+impl<H: FunctionHandler> HandlerAdapter<H> {
+    pub fn new(handler: H) -> Self {
+        Self {
+            handler: Arc::new(handler),
+        }
+    }
+}
+
+#[async_trait]
+impl<H: FunctionHandler> RawFunctionHandler for HandlerAdapter<H> {
+    async fn handle_raw(&self, ctx: Arc<FunctionContext>) -> FunctionResult {
+        let transaction = ctx.function_call.transaction.clone();
+
+        // Deserialize the request from the call's JSON payload; an absent
+        // payload is deserialized from `{}` so request types whose fields all
+        // default still work. Either failure becomes a 400 result.
+        let payload: H::Request = match &ctx.function_call.payload {
+            Some(bytes) => match serde_json::from_slice(bytes) {
+                Ok(p) => p,
+                Err(e) => {
+                    info!("rejected a request that does not deserialize: {}", e);
+                    return bad_request(transaction, &format!("Invalid request: {e}"));
+                }
+            },
+            None => match serde_json::from_slice(b"{}") {
+                Ok(p) => p,
+                Err(e) => {
+                    info!("rejected a request without a payload: {}", e);
+                    return bad_request(transaction, "Request payload is empty");
+                }
+            },
+        };
+
+        let call_ctx = FunctionCallContext {
+            transaction: transaction.clone(),
+            progress: ProgressState::new(),
+            cancellation: ctx.cancellation_token.clone(),
+        };
+
+        // Clone the progress handle + outbound channel for the background ticker.
+        let progress = call_ctx.progress.clone();
+        let ticker_tx = ctx.outbound_tx.clone();
+        let ticker_transaction = transaction.clone();
+
+        // The progress ticker: emits a percent on every 250ms tick, from call
+        // start until it is aborted right after the select below — so even a
+        // slow pre-`set_total` phase (e.g. WAL/source resolution) keeps the UI
+        // polling instead of reading the call as stalled. The percent model is
+        // `progress_percent`'s (`(pct, 100)`, always `[1, 99]`). The first tick
+        // is delayed one full interval, so a call that finishes inside 250ms
+        // emits no spurious progress. `MissedTickBehavior::Skip` drops missed
+        // ticks rather than burst-emitting stale progress after a stall.
+        // Dropping the handle aborts the ticker, so a handler that panics past
+        // the select stops it too.
+        let first = tokio::time::Instant::now() + PROGRESS_INTERVAL;
+        let ticker = AbortOnDropHandle::new(tokio::spawn(async move {
+            let mut interval = tokio::time::interval_at(first, PROGRESS_INTERVAL);
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            loop {
+                interval.tick().await;
+                let (done, total) = progress.load();
+                let pct = progress_percent(done, total);
+                let msg = Message::FunctionProgressResponse(Box::new(FunctionProgressResponse {
+                    transaction: ticker_transaction.clone(),
+                    done: pct,
+                    all: PROGRESS_DENOMINATOR,
+                }));
+                tracing::trace!("[{}] progress {}%", ticker_transaction, pct);
+                if ticker_tx.send(msg).is_err() {
+                    tracing::error!(
+                        "[{}] outbound channel closed, stopping progress ticker",
+                        ticker_transaction
+                    );
+                    break;
+                }
+            }
+        }));
+
+        let handler = self.handler.clone();
+
+        let result = tokio::select! {
+            result = handler.on_call(call_ctx, payload) => result,
+            _ = ctx.cancellation_token.cancelled() => {
+                Err(netdata_plugin_error::NetdataPluginError::Other {
+                    message: "Function cancelled".to_string(),
+                })
+            }
+        };
+
+        drop(ticker);
+
+        // `expires` is the epoch-seconds expiry the agent puts on the proxied
+        // response (its HTTP `Expires` header): success grants a short 2s TTL,
+        // error results carry 0. Fall back to epoch 0 if the system clock is
+        // somehow before the epoch — losing the cache TTL is preferable to
+        // crashing the worker on a clock adjustment.
+        let current_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+
+        let expires: u64 = current_timestamp + 2;
+
+        match result {
+            Ok(response) => match serde_json::to_vec(&response) {
+                Ok(payload) => FunctionResult {
+                    transaction,
+                    status: 200,
+                    expires,
+                    format: "application/json".to_string(),
+                    payload,
+                },
+                Err(e) => {
+                    error!("failed to serialize response: {}", e);
+                    FunctionResult {
+                        transaction,
+                        status: 500,
+                        expires: 0,
+                        format: "text/plain".to_string(),
+                        payload: format!("Serialization error: {e}").into_bytes(),
+                    }
+                }
+            },
+            Err(netdata_plugin_error::NetdataPluginError::BadRequest { message }) => {
+                // The caller's mistake, not a handler failure, like the
+                // deserialization rejections above.
+                info!("function handler rejected the request: {}", message);
+                bad_request(transaction, &message)
+            }
+            Err(e) => {
+                // A cancellation is the driver's normal teardown (e.g. the
+                // user closed the query), so log it as info; anything else is
+                // a real handler failure. Either way the caller gets a 500
+                // result with a JSON error body — cancellation does not get a
+                // distinct status here.
+                if ctx.cancellation_token.is_cancelled() {
+                    info!("function handler cancelled: {}", e);
+                } else {
+                    error!("function handler error: {}", e);
+                }
+                let error_json = json!({
+                    "error": format!("{e}"),
+                    "status": 500
+                });
+                FunctionResult {
+                    transaction,
+                    status: 500,
+                    expires: 0,
+                    format: "application/json".to_string(),
+                    payload: serde_json::to_vec(&error_json).unwrap_or_else(|_| {
+                        r#"{"error": "Failed to serialize error response"}"#
+                            .as_bytes()
+                            .to_vec()
+                    }),
+                }
+            }
+        }
+    }
+
+    fn declaration(&self) -> FunctionDeclaration {
+        self.handler.declaration()
+    }
+}
+
+/// A 400 result in the published `error_response` shape, so callers read
+/// the message as `errorMessage`.
+fn bad_request(transaction: String, message: &str) -> FunctionResult {
+    let body = json!({ "status": 400, "errorMessage": message });
+    FunctionResult {
+        transaction,
+        status: 400,
+        expires: 0,
+        format: "application/json".to_string(),
+        payload: serde_json::to_vec(&body).expect("serializing a json value to work"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn progress_percent_indeterminate_is_one() {
+        // total==0 (pre-set_total): always 1%. Never 0 (the UI reads 0/absent as
+        // 100% complete and stops polling), and a premature/torn `done` must not
+        // surface as near-complete.
+        assert_eq!(progress_percent(0, 0), 1);
+        assert_eq!(progress_percent(5, 0), 1);
+    }
+
+    #[test]
+    fn progress_percent_floors_at_one_and_caps_at_99() {
+        // Floor: a tiny real fraction still reports 1%, never 0%.
+        assert_eq!(progress_percent(1, 1000), 1);
+        assert_eq!(progress_percent(0, 50), 1);
+        // Cap: done==total (or a torn done>total) reads as 99%, never 100% —
+        // completion is signaled by the RESULT, not by progress.
+        assert_eq!(progress_percent(50, 50), 99);
+        assert_eq!(progress_percent(80, 50), 99);
+    }
+
+    #[test]
+    fn progress_percent_passes_through_mid_range() {
+        assert_eq!(progress_percent(3, 50), 6);
+        assert_eq!(progress_percent(30, 100), 30);
+    }
+
+    #[test]
+    fn progress_percent_does_not_overflow() {
+        // done * 100 saturates instead of wrapping on byte-scale totals.
+        assert_eq!(progress_percent(usize::MAX, 1000), 99);
+    }
+
+    // A handler that stays in the indeterminate phase (never calls set_total)
+    // long enough for the 250ms ticker to fire at least once before it returns.
+    struct SlowIndeterminateHandler;
+
+    #[async_trait]
+    impl FunctionHandler for SlowIndeterminateHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            Ok(serde_json::json!({ "ok": true }))
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-slow", "test slow indeterminate handler")
+        }
+    }
+
+    struct PanickingHandler;
+
+    #[async_trait]
+    impl FunctionHandler for PanickingHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            _request: Self::Request,
+        ) -> Result<Self::Response> {
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            panic!("a handler bug");
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-panic", "test panicking handler")
+        }
+    }
+
+    // A handler that panics must not leave its progress ticker running: the
+    // agent logs an error for every progress of a transaction it closed.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_panicking_handler_stops_its_progress_ticker() {
+        let adapter = HandlerAdapter::new(PanickingHandler);
+        let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-panic".to_string(),
+                timeout: 60,
+                name: "test-panic".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: None,
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+
+        let task = tokio::spawn(async move { adapter.handle_raw(ctx).await });
+        assert!(task.await.expect_err("the handler panics").is_panic());
+        while let Ok(Message::FunctionProgressResponse(_)) = outbound_rx.try_recv() {}
+
+        tokio::time::sleep(Duration::from_millis(800)).await;
+        assert!(
+            outbound_rx.try_recv().is_err(),
+            "the progress ticker outlived its call"
+        );
+    }
+
+    // The ticker must emit during the indeterminate (pre-set_total) phase, and
+    // report 1/100 (1%) — never all==0 and never done==0 (the UI reads either as
+    // 100% complete and stops polling). Regression guard for the percent model.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn ticker_emits_indeterminate_progress_before_set_total() {
+        let adapter = HandlerAdapter::new(SlowIndeterminateHandler);
+        let (outbound_tx, mut outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-slow".to_string(),
+                timeout: 60,
+                name: "test-slow".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload: None,
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+
+        let task = tokio::spawn({
+            let ctx = Arc::clone(&ctx);
+            async move { adapter.handle_raw(ctx).await }
+        });
+
+        let progress = tokio::time::timeout(Duration::from_secs(3), async {
+            loop {
+                match outbound_rx.recv().await {
+                    Some(Message::FunctionProgressResponse(p)) => break p,
+                    Some(_) => continue,
+                    None => panic!("outbound channel closed before progress"),
+                }
+            }
+        })
+        .await
+        .expect("timed out waiting for indeterminate progress");
+
+        assert_eq!(progress.transaction, "tx-slow");
+        assert_eq!(progress.done, 1); // 1%, not 0 (0 would read as complete)
+        assert_eq!(progress.all, 100);
+
+        let result = task.await.expect("handler task panicked");
+        assert_eq!(result.status, 200);
+    }
+
+    // Echoes its request, or fails when the request carries `fail`.
+    struct EchoHandler;
+
+    #[async_trait]
+    impl FunctionHandler for EchoHandler {
+        type Request = serde_json::Value;
+        type Response = serde_json::Value;
+
+        async fn on_call(
+            &self,
+            _ctx: FunctionCallContext,
+            request: Self::Request,
+        ) -> Result<Self::Response> {
+            if request.get("fail").is_some() {
+                return Err(netdata_plugin_error::NetdataPluginError::Other {
+                    message: "failed".to_string(),
+                });
+            }
+            if request.get("reject").is_some() {
+                return Err(netdata_plugin_error::NetdataPluginError::BadRequest {
+                    message: "rejected".to_string(),
+                });
+            }
+            Ok(request)
+        }
+
+        fn declaration(&self) -> FunctionDeclaration {
+            FunctionDeclaration::new("test-echo", "test echo handler")
+        }
+    }
+
+    async fn echo(payload: serde_json::Value) -> FunctionResult {
+        echo_raw(Some(serde_json::to_vec(&payload).unwrap())).await
+    }
+
+    async fn echo_raw(payload: Option<Vec<u8>>) -> FunctionResult {
+        let (outbound_tx, _outbound_rx) = mpsc::unbounded_channel();
+        let ctx = Arc::new(FunctionContext {
+            function_call: Box::new(FunctionCall {
+                transaction: "tx-echo".to_string(),
+                timeout: 60,
+                name: "test-echo".to_string(),
+                args: Vec::new(),
+                access: None,
+                source: None,
+                payload,
+            }),
+            cancellation_token: CancellationToken::new(),
+            outbound_tx,
+        });
+        HandlerAdapter::new(EchoHandler).handle_raw(ctx).await
+    }
+
+    // Responses and error bodies are compact JSON: the bytes a handler's
+    // budget counts are the bytes sent.
+    #[tokio::test]
+    async fn results_are_compact_json() {
+        let request = serde_json::json!({"a": [1, 2], "b": {"c": "d"}});
+        let ok = echo(request.clone()).await;
+        assert_eq!(ok.status, 200);
+        assert_eq!(ok.payload, serde_json::to_vec(&request).unwrap());
+
+        let failed = echo(serde_json::json!({"fail": true})).await;
+        assert_eq!(failed.status, 500);
+        assert!(!failed.payload.contains(&b'\n'));
+        let body: serde_json::Value = serde_json::from_slice(&failed.payload).unwrap();
+        assert_eq!(body["status"], 500);
+    }
+
+    // Every 400 carries the published `error_response` shape: a rejected
+    // request and a payload that fails to deserialize alike.
+    #[tokio::test]
+    async fn bad_requests_answer_400_with_an_error_message() {
+        let body = |result: &FunctionResult| -> serde_json::Value {
+            serde_json::from_slice(&result.payload).unwrap()
+        };
+
+        let rejected = echo(serde_json::json!({"reject": true})).await;
+        assert_eq!(rejected.status, 400);
+        assert_eq!(rejected.format, "application/json");
+        assert_eq!(
+            body(&rejected),
+            serde_json::json!({"status": 400, "errorMessage": "rejected"})
+        );
+
+        let malformed = echo_raw(Some(b"{".to_vec())).await;
+        assert_eq!(malformed.status, 400);
+        assert_eq!(malformed.format, "application/json");
+        assert_eq!(body(&malformed)["status"], 400);
+        let message = body(&malformed)["errorMessage"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(message.starts_with("Invalid request: "), "{message}");
+    }
+}

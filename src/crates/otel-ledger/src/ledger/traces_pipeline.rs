@@ -1,10 +1,10 @@
 //! The traces binding — the twin of the logs binding in
 //! [`super::pipeline`]. It pre-spawns the shared
-//! [`crate::indexer::Indexer`] seal worker with the **traces** seal
-//! ([`ng_index::build_sfst_traces_file`]: full span columns, `TIDX`
-//! trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
-//! chunks) and delegates the rest to [`super::pipeline::build_pipeline`].
-//! Only the seal function, the handler, and the GET shim differ from logs.
+//! [`crate::indexer::Indexer`] for the **traces** signal, whose indexing
+//! operations run [`ng_index::index_traces_file`] (full span columns,
+//! `TIDX` trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
+//! chunks), and delegates the rest to [`super::pipeline::build_pipeline`].
+//! Only the signal, the handler, and the GET shim differ from logs.
 //!
 //! The handler is [`OtelTracesHandler`] (`rpc/traces/`), the `otel-traces`
 //! Function. It shares the logs pipeline's chunk cache (seqs are
@@ -22,15 +22,15 @@
 //! logs one; the registry/catalog/recovery machinery is
 //! [`super::pipeline::build_pipeline`]'s, reused unchanged.
 
-use bridge::config::LifecycleConfig;
-use bridge::function::{HandlerAdapter, RawFunctionHandler};
-use bridge::signals::Signal;
+use otel_bridge::config::LifecycleConfig;
+use otel_bridge::function::{HandlerAdapter, RawFunctionHandler};
+use otel_bridge::signals::Signal;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 
 use crate::event::PipelineResp;
-use crate::indexer::Indexer;
+use crate::indexer::{Indexer, IndexingOperations};
 use file_lifecycle::ArgShim;
 use file_lifecycle::Pipeline;
 use file_lifecycle::chunk::ChunkCache;
@@ -39,11 +39,18 @@ use file_lifecycle::ipc::{CleanerRequest, CleanerResponse, UploaderRequest, Uplo
 use file_lifecycle::remote_read::RemoteRead;
 use file_lifecycle::storage::OpendalStorage;
 
-use super::pipeline::CHUNK_MIN_ENTRIES;
 use super::rpc::OtelTracesHandler;
 
-/// Build the traces pipeline: spawn the shared [`Indexer`] with the traces
-/// seal, then delegate to [`super::pipeline::build_pipeline`] with a closure
+/// Minimum spans per chunk when indexing an active traces WAL's prefix at
+/// query time. Every query decodes the un-chunked tail (up to this many
+/// spans) from scratch, at roughly 12 µs per span (measured with
+/// `sfsq-cli` on a 5,000-span live WAL tail, 20-run average), so the
+/// threshold bounds that per-request cost; the price is more, smaller
+/// chunks, each indexed once and cached.
+pub(crate) const TRACES_CHUNK_MIN_ENTRIES: u64 = 4_096;
+
+/// Build the traces pipeline: spawn the shared [`Indexer`] for the traces
+/// signal, then delegate to [`super::pipeline::build_pipeline`] with a closure
 /// that wires the [`OtelTracesHandler`] (the `otel-traces` Function) and the
 /// traces GET shim, with the remote-read cache when storage is enabled.
 #[allow(clippy::too_many_arguments)]
@@ -59,12 +66,15 @@ pub(crate) async fn build_traces_pipeline(
     storage: Option<&OpendalStorage>,
     read_cache: Option<&file_cache::FileCache>,
     chunk_cache: Arc<ChunkCache>,
+    prefixes: Arc<super::wal_prefix::WalPrefixes>,
+    indexing_operations: &IndexingOperations,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The traces seal: decode ng-flatten trace frames (payload format 3)
-    // into a trace SFST (full span columns + TIDX + TBLM + EVNB/LNKB).
+    // The traces indexer: its indexing operations decode ng-flatten trace
+    // frames (payload format 3) into a trace SFST (full span columns + TIDX +
+    // TBLM + EVNB/LNKB).
     let indexer = ComponentHandle::spawn::<Indexer>(
-        ng_index::build_sfst_traces_file as crate::indexer::SealFn,
+        (signal, indexing_operations.clone()),
         cancel.child_token(),
     );
 
@@ -89,8 +99,7 @@ pub(crate) async fn build_traces_pipeline(
         indexer,
         pipeline_tx,
         move |registries| {
-            let traces_handler =
-                OtelTracesHandler::new(registries, chunk_cache, CHUNK_MIN_ENTRIES, remote);
+            let traces_handler = OtelTracesHandler::new(registries, chunk_cache, prefixes, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
             // The traces-own GET shim: the literal `info` token →

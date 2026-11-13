@@ -1,4 +1,4 @@
-//! Buffer-all fixture builder for reader tests.
+//! Buffer-all fixture writer for reader tests.
 //!
 //! Accumulate packed chunks via the setters, then emit the container
 //! with [`FixtureWriter::write_to`]. Deliberately looser than the
@@ -97,7 +97,7 @@ impl FixtureWriter {
     /// and stream batches by index — skipping unset optional chunks.
     /// PRIM, TIMS, and at least one stream batch are mandatory
     /// (expect/assert panics otherwise); a fixture below that bar must
-    /// build the container via `chunk_file` directly.
+    /// write the container via `chunk_file` directly.
     pub fn write_to<W: Write>(&self, w: &mut W) -> Result<(), Error> {
         let primary = self
             .primary

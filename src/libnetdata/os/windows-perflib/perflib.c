@@ -770,16 +770,146 @@ BOOL ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     return pObjectType && pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0 ? TRUE : FALSE;
 }
 
+// ----------------------------------------------------------------------------
+// Counter layout check.
+//
+// Windows gives several counters the same data on purpose in some objects (PhysicalDisk "% Disk Time" and
+// "Avg. Disk Queue Length", Processor Information "% Processor Time" and "% Idle Time"), but the registry view of
+// some manifest-based (V2) counter sets does it by mistake, so values read by name belong to other counters
+// (issue #24660, "SMB Server Shares"; PDH is not affected). Layout alone cannot tell the two apart, so this is a
+// debug aid, logged once per object.
+
+// Marks key in *dict; returns true only for the first caller. Used for once-per-key logging.
+static bool perflib_key_mark_once(SPINLOCK *spinlock, DICTIONARY **dict, const char *key) {
+    // dictionary_get() cannot tell a NULL value from an absent key, so a non-NULL marker is stored.
+    static const uint8_t marker = 1;
+    bool first = false;
+    spinlock_lock(spinlock);
+    if(unlikely(!*dict))
+        *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(!dictionary_get(*dict, key)) {
+        dictionary_set(*dict, key, (void *)&marker, sizeof(marker));
+        first = true;
+    }
+    spinlock_unlock(spinlock);
+    return first;
+}
+
+static SPINLOCK perflib_layout_spinlock = SPINLOCK_INITIALIZER;
+static DICTIONARY *perflib_layout_checked = NULL;
+
+struct perflib_counter_span {
+    DWORD offset;
+    DWORD size;
+    DWORD name_id;
+};
+
+static int perflib_counter_span_compare(const void *a, const void *b) {
+    const struct perflib_counter_span *x = a, *y = b;
+    if(x->offset != y->offset)
+        return x->offset < y->offset ? -1 : 1;
+    return 0;
+}
+
+static void perflib_check_counter_layout(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, const char *object) {
+    if(pObjectType->NumCounters < 2 ||
+       !perflib_key_mark_once(&perflib_layout_spinlock, &perflib_layout_checked, object))
+        return;
+
+    // NumCounters comes from the provider; bound it by the definitions that fit in the definition area.
+    size_t max_counters = pObjectType->DefinitionLength > pObjectType->HeaderLength ?
+        (pObjectType->DefinitionLength - pObjectType->HeaderLength) / sizeof(PERF_COUNTER_DEFINITION) : 0;
+    size_t counters = MIN((size_t)pObjectType->NumCounters, max_counters);
+    if(counters < 2)
+        return;
+
+    struct perflib_counter_span *spans = mallocz(counters * sizeof(*spans));
+    size_t used = 0;
+
+    PERF_COUNTER_DEFINITION *pCounter = NULL;
+    for(size_t c = 0; c < counters; c++) {
+        pCounter = getCounterDefinition(pDataBlock, pObjectType, pCounter);
+        if(!pCounter)
+            break;
+
+        // Base counters are read as denominators (getCounterData), at these widths; unsupported types are not read.
+        size_t size = getCounterDataSize(pCounter);
+        if(!size) {
+            switch(pCounter->CounterType) {
+                case PERF_SAMPLE_BASE:
+                case PERF_AVERAGE_BASE:
+                case PERF_RAW_BASE:
+                    size = sizeof(DWORD);
+                    break;
+
+                case PERF_LARGE_RAW_BASE:
+                    size = sizeof(ULONGLONG);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        if(!size)
+            continue;
+
+        spans[used++] = (struct perflib_counter_span){
+            .offset = pCounter->CounterOffset,
+            .size = (DWORD)size,
+            .name_id = pCounter->CounterNameTitleIndex,
+        };
+    }
+
+    qsort(spans, used, sizeof(*spans), perflib_counter_span_compare);
+
+    size_t overlaps = 0;
+    struct perflib_counter_span first_a = { 0 }, first_b = { 0 };
+    ULONGLONG end = 0;
+    size_t end_index = 0;
+    for(size_t i = 0; i < used; i++) {
+        if(i && spans[i].offset < end) {
+            if(!overlaps) {
+                first_a = spans[end_index];
+                first_b = spans[i];
+            }
+            overlaps++;
+        }
+
+        ULONGLONG span_end = (ULONGLONG)spans[i].offset + spans[i].size;
+        if(span_end > end) {
+            end = span_end;
+            end_index = i;
+        }
+    }
+
+    if(overlaps)
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+               "WINDOWS: PERFLIB: object '%s' has %zu counter(s) that share data with another counter "
+               "(first: '%s' at offset %u and '%s' at offset %u). Windows does this on purpose for some objects; "
+               "if these values disagree with Get-Counter, which reads through PDH, the registry view is wrong.",
+               object, overlaps,
+               RegistryFindNameByID(first_a.name_id), (unsigned)first_a.offset,
+               RegistryFindNameByID(first_b.name_id), (unsigned)first_b.offset);
+
+    freez(spans);
+}
+
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name) {
     PERF_OBJECT_TYPE* pObjectType = NULL;
     for(DWORD o = 0; o < pDataBlock->NumObjectTypes; o++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
         if(!pObjectType) break;
-        if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0)
+        if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0) {
+            perflib_check_counter_layout(pDataBlock, pObjectType, name);
             return pObjectType;
+        }
     }
 
     return NULL;
+}
+
+PERF_COUNTER_DEFINITION *perflibForEachCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
+    return getCounterDefinition(pDataBlock, pObjectType, lastCounterDefinition);
 }
 
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance) {
@@ -800,19 +930,7 @@ static SPINLOCK perflib_giveup_spinlock = SPINLOCK_INITIALIZER;
 static DICTIONARY *perflib_giveup_logged = NULL;
 
 static bool perflib_giveup_log_should(const char *key) {
-    // A non-NULL marker value is required: dictionary_set(..., NULL, 0) stores a
-    // NULL value, which dictionary_get() cannot distinguish from "absent".
-    static const uint8_t marker = 1;
-    bool should = false;
-    spinlock_lock(&perflib_giveup_spinlock);
-    if(unlikely(!perflib_giveup_logged))
-        perflib_giveup_logged = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    if(!dictionary_get(perflib_giveup_logged, key)) {
-        dictionary_set(perflib_giveup_logged, key, (void *)&marker, sizeof(marker));
-        should = true;
-    }
-    spinlock_unlock(&perflib_giveup_spinlock);
-    return should;
+    return perflib_key_mark_once(&perflib_giveup_spinlock, &perflib_giveup_logged, key);
 }
 
 // Returns true only for the first caller that clears the key, so the recovery

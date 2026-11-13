@@ -169,6 +169,7 @@ func (c BGPConfig) Clone() BGPConfig {
 }
 
 type BGPIdentityConfig struct {
+	ProcessID               BGPValueConfig                        `yaml:"process_id,omitempty" json:"process_id"`
 	RoutingInstance         BGPValueConfig                        `yaml:"routing_instance,omitempty"          json:"routing_instance"`
 	Neighbor                BGPValueConfig                        `yaml:"neighbor,omitempty"                  json:"neighbor"`
 	RemoteAS                BGPValueConfig                        `yaml:"remote_as,omitempty"                 json:"remote_as"`
@@ -178,6 +179,7 @@ type BGPIdentityConfig struct {
 
 func (c BGPIdentityConfig) Clone() BGPIdentityConfig {
 	return BGPIdentityConfig{
+		ProcessID:               c.ProcessID.Clone(),
 		RoutingInstance:         c.RoutingInstance.Clone(),
 		Neighbor:                c.Neighbor.Clone(),
 		RemoteAS:                c.RemoteAS.Clone(),

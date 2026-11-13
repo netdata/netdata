@@ -1,5 +1,5 @@
 //! The `metrics:` override section of the plugin's layered configuration:
-//! the partial (all-`Option`) mirror of `bridge::config::MetricsConfig`
+//! the partial (all-`Option`) mirror of `otel_bridge::config::MetricsConfig`
 //! used to patch the effective metrics config from the user `otel.yaml` and
 //! the `NETDATA_OTEL_CFG_METRICS_*` environment variables. Layering lives in
 //! `mod.rs` (stock file → user file → env; later layers win per field); this
@@ -9,16 +9,16 @@
 //! Nothing defaults or validates here. Defaults come from the shipped stock
 //! `otel.yaml` (`configs/otel.yaml.in`), which must carry the whole section
 //! because `PluginConfig.metrics` has no serde default and only the stock
-//! file is parsed directly into `bridge::config::MetricsConfig`. Semantic
+//! file is parsed directly into `otel_bridge::config::MetricsConfig`. Semantic
 //! validation of the resulting timing happens downstream in the ingestor's
 //! `ChartConfigManager` (`otel-ingestor/src/chart_config.rs`), the consumer
 //! of the resolved config sent to workers over IPC.
-use bridge::config::MetricsConfig;
+use otel_bridge::config::MetricsConfig;
 use serde::Deserialize;
 
 /// The user-layer `metrics:` section: every field optional, with `None`
 /// meaning "keep the value from the previous layer". Field names and units
-/// mirror `bridge::config::MetricsConfig`; unknown keys are rejected, not
+/// mirror `otel_bridge::config::MetricsConfig`; unknown keys are rejected, not
 /// ignored.
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]

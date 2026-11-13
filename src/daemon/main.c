@@ -216,6 +216,7 @@ int help(int exitcode) {
 int buffer_unittest(void);
 int url_unittest(void);
 int ringbuffer_unittest(void);
+int nd_work_queue_unittest(void);
 int onewayalloc_unittest(void);
 int log_stack_unittest(void);
 int clocks_unittest(void);
@@ -254,6 +255,7 @@ int pluginsd_functions_unittest(void);
 int nrpc_catalog_unittest(void);
 int mcp_execute_function_access_unittest(void);
 int mcp_jsonrpc_batch_unittest(void);
+int mcp_execute_function_payload_unittest(void);
 int eval_unittest(void);
 int duration_unittest(void);
 int statistical_unittest(void);
@@ -541,6 +543,7 @@ int netdata_main(int argc, char **argv) {
                             if (exporting_opentsdb_http_unittest()) return 1;
                             if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
+                            if (nd_work_queue_unittest()) return 1;
                             if (onewayalloc_unittest()) return 1;
                             if (timezone_windows_mapping_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
@@ -593,6 +596,7 @@ int netdata_main(int argc, char **argv) {
                             if (nrpc_catalog_unittest()) return 1;
                             if (mcp_execute_function_access_unittest()) return 1;
                             if (mcp_jsonrpc_batch_unittest()) return 1;
+                            if (mcp_execute_function_payload_unittest()) return 1;
                             if (eval_unittest()) return 1;
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
@@ -713,6 +717,10 @@ int netdata_main(int argc, char **argv) {
                         else if(strcmp(optarg, "ringbuffertest") == 0) {
                             unittest_running = true;
                             return ringbuffer_unittest();
+                        }
+                        else if(strcmp(optarg, "workqueuetest") == 0) {
+                            unittest_running = true;
+                            return nd_work_queue_unittest();
                         }
                         else if(strcmp(optarg, "owatest") == 0) {
                             unittest_running = true;
@@ -886,6 +894,8 @@ int netdata_main(int argc, char **argv) {
                             return unittest_run_with_rrd(nrpc_catalog_unittest);
                         else if(strcmp(optarg, "mcpfunctionaccesstest") == 0)
                             return unittest_run_with_rrd(mcp_execute_function_access_unittest);
+                        else if(strcmp(optarg, "mcpfunctionpayloadtest") == 0)
+                            return unittest_run_with_rrd(mcp_execute_function_payload_unittest);
                         else if(strncmp(optarg, createdataset_string, strlen(createdataset_string)) == 0) {
                             optarg += strlen(createdataset_string);
                             unsigned history_seconds = strtoul(optarg, NULL, 0);

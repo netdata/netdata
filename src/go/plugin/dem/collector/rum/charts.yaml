@@ -21,8 +21,6 @@ groups:
             selector: lcp_needs_improvement
           - name: poor
             selector: lcp_poor
-          - name: lost_reports
-            selector: lcp_lost_reports
         title: Largest Contentful Paint observed population
         units: observations
       - context: fcp
@@ -45,8 +43,6 @@ groups:
             selector: fcp_needs_improvement
           - name: poor
             selector: fcp_poor
-          - name: lost_reports
-            selector: fcp_lost_reports
         title: First Contentful Paint observed population
         units: observations
       - context: ttfb
@@ -69,8 +65,6 @@ groups:
             selector: ttfb_needs_improvement
           - name: poor
             selector: ttfb_poor
-          - name: lost_reports
-            selector: ttfb_lost_reports
         title: Time to First Byte observed population
         units: observations
       - context: inp
@@ -93,8 +87,6 @@ groups:
             selector: inp_needs_improvement
           - name: poor
             selector: inp_poor
-          - name: lost_reports
-            selector: inp_lost_reports
         title: Interaction to Next Paint observed population
         units: observations
       - context: cls
@@ -117,8 +109,6 @@ groups:
             selector: cls_needs_improvement
           - name: poor
             selector: cls_poor
-          - name: lost_reports
-            selector: cls_lost_reports
         title: Cumulative Layout Shift observed population
         units: observations
     family: Web Vitals
@@ -130,7 +120,6 @@ groups:
       - lcp_good
       - lcp_needs_improvement
       - lcp_poor
-      - lcp_lost_reports
       - fcp_p50
       - fcp_p75
       - fcp_p95
@@ -138,7 +127,6 @@ groups:
       - fcp_good
       - fcp_needs_improvement
       - fcp_poor
-      - fcp_lost_reports
       - ttfb_p50
       - ttfb_p75
       - ttfb_p95
@@ -146,7 +134,6 @@ groups:
       - ttfb_good
       - ttfb_needs_improvement
       - ttfb_poor
-      - ttfb_lost_reports
       - inp_p50
       - inp_p75
       - inp_p95
@@ -154,7 +141,6 @@ groups:
       - inp_good
       - inp_needs_improvement
       - inp_poor
-      - inp_lost_reports
       - cls_p50
       - cls_p75
       - cls_p95
@@ -162,7 +148,6 @@ groups:
       - cls_good
       - cls_needs_improvement
       - cls_poor
-      - cls_lost_reports
   - charts:
       - context: load
         dimensions:
@@ -200,24 +185,18 @@ groups:
         dimensions:
           - name: observed
             selector: load_observations
-          - name: lost_reports
-            selector: load_lost_reports
       - context: dom_content_loaded_handler_population
         title: DOMContentLoaded handler duration observation population
         units: observations
         dimensions:
           - name: observed
             selector: dom_content_loaded_handler_observations
-          - name: lost_reports
-            selector: dom_content_loaded_handler_lost_reports
       - context: same_site_fetch_population
         title: Same-site fetch and XHR duration observation population
         units: observations
         dimensions:
           - name: observed
             selector: same_site_fetch_observations
-          - name: lost_reports
-            selector: same_site_fetch_lost_reports
     family: Navigation
     metrics:
       - load_p50
@@ -230,11 +209,8 @@ groups:
       - same_site_fetch_p75
       - same_site_fetch_p95
       - load_observations
-      - load_lost_reports
       - dom_content_loaded_handler_observations
-      - dom_content_loaded_handler_lost_reports
       - same_site_fetch_observations
-      - same_site_fetch_lost_reports
   - charts:
       - context: document_views
         dimensions:
@@ -281,14 +257,6 @@ groups:
         dimensions:
           - name: views
             selector: application_views
-      - context: measurement_loss
-        title: Retained capacity-loss evidence for window summaries
-        units: reports
-        dimensions:
-          - name: activity
-            selector: window_lost_reports
-          - name: sessions
-            selector: sessions_lost_reports
     family: Traffic
     metrics:
       - document_views
@@ -301,8 +269,6 @@ groups:
       - dead_clicks
       - error_clicks
       - application_views
-      - window_lost_reports
-      - sessions_lost_reports
   - charts:
       - context: resources
         dimensions:
@@ -341,18 +307,6 @@ groups:
         dimensions:
           - name: observed
             selector: resource_host_observations
-          - name: lost_reports
-            selector: resource_host_duration_lost_reports
-        instances:
-          by_labels:
-            - host
-            - bucket
-      - context: resource_host_loss
-        title: Retained capacity-loss evidence for resource counts by host
-        units: reports
-        dimensions:
-          - name: lost_reports
-            selector: resource_host_lost_reports
         instances:
           by_labels:
             - host
@@ -365,8 +319,6 @@ groups:
       - resource_host_p75
       - resource_host_count
       - resource_host_observations
-      - resource_host_duration_lost_reports
-      - resource_host_lost_reports
   - charts:
       - context: error_groups
         dimensions:
@@ -378,20 +330,9 @@ groups:
             - bucket
         title: JavaScript error reports by fingerprint in the window
         units: reports
-      - context: error_group_loss
-        title: Retained capacity-loss evidence for error fingerprints
-        units: reports
-        dimensions:
-          - name: lost_reports
-            selector: error_group_lost_reports
-        instances:
-          by_labels:
-            - fingerprint
-            - bucket
     family: Errors
     metrics:
       - error_group_count
-      - error_group_lost_reports
   - charts:
       - context: browser_lcp
         dimensions:
@@ -481,26 +422,6 @@ groups:
           by_labels:
             - browser
             - bucket
-      - context: browser_loss
-        title: Retained capacity-loss evidence by browser
-        units: reports
-        dimensions:
-          - name: activity
-            selector: breakdown_browser_lost_reports
-          - name: lcp
-            selector: breakdown_browser_lcp_lost_reports
-          - name: fcp
-            selector: breakdown_browser_fcp_lost_reports
-          - name: ttfb
-            selector: breakdown_browser_ttfb_lost_reports
-          - name: inp
-            selector: breakdown_browser_inp_lost_reports
-          - name: cls
-            selector: breakdown_browser_cls_lost_reports
-        instances:
-          by_labels:
-            - browser
-            - bucket
     family: Breakdowns/Browser
     metrics:
       - breakdown_browser_lcp
@@ -515,12 +436,6 @@ groups:
       - breakdown_browser_ttfb_observations
       - breakdown_browser_inp_observations
       - breakdown_browser_cls_observations
-      - breakdown_browser_lost_reports
-      - breakdown_browser_lcp_lost_reports
-      - breakdown_browser_fcp_lost_reports
-      - breakdown_browser_ttfb_lost_reports
-      - breakdown_browser_inp_lost_reports
-      - breakdown_browser_cls_lost_reports
   - charts:
       - context: device_lcp
         dimensions:
@@ -610,26 +525,6 @@ groups:
           by_labels:
             - device
             - bucket
-      - context: device_loss
-        title: Retained capacity-loss evidence by device
-        units: reports
-        dimensions:
-          - name: activity
-            selector: breakdown_device_lost_reports
-          - name: lcp
-            selector: breakdown_device_lcp_lost_reports
-          - name: fcp
-            selector: breakdown_device_fcp_lost_reports
-          - name: ttfb
-            selector: breakdown_device_ttfb_lost_reports
-          - name: inp
-            selector: breakdown_device_inp_lost_reports
-          - name: cls
-            selector: breakdown_device_cls_lost_reports
-        instances:
-          by_labels:
-            - device
-            - bucket
     family: Breakdowns/Device
     metrics:
       - breakdown_device_lcp
@@ -644,12 +539,6 @@ groups:
       - breakdown_device_ttfb_observations
       - breakdown_device_inp_observations
       - breakdown_device_cls_observations
-      - breakdown_device_lost_reports
-      - breakdown_device_lcp_lost_reports
-      - breakdown_device_fcp_lost_reports
-      - breakdown_device_ttfb_lost_reports
-      - breakdown_device_inp_lost_reports
-      - breakdown_device_cls_lost_reports
   - charts:
       - context: country_lcp
         dimensions:
@@ -739,26 +628,6 @@ groups:
           by_labels:
             - country
             - bucket
-      - context: country_loss
-        title: Retained capacity-loss evidence by country
-        units: reports
-        dimensions:
-          - name: activity
-            selector: breakdown_country_lost_reports
-          - name: lcp
-            selector: breakdown_country_lcp_lost_reports
-          - name: fcp
-            selector: breakdown_country_fcp_lost_reports
-          - name: ttfb
-            selector: breakdown_country_ttfb_lost_reports
-          - name: inp
-            selector: breakdown_country_inp_lost_reports
-          - name: cls
-            selector: breakdown_country_cls_lost_reports
-        instances:
-          by_labels:
-            - country
-            - bucket
     family: Breakdowns/Country
     metrics:
       - breakdown_country_lcp
@@ -773,12 +642,6 @@ groups:
       - breakdown_country_ttfb_observations
       - breakdown_country_inp_observations
       - breakdown_country_cls_observations
-      - breakdown_country_lost_reports
-      - breakdown_country_lcp_lost_reports
-      - breakdown_country_fcp_lost_reports
-      - breakdown_country_ttfb_lost_reports
-      - breakdown_country_inp_lost_reports
-      - breakdown_country_cls_lost_reports
   - charts:
       - context: page_lcp
         dimensions:
@@ -868,26 +731,6 @@ groups:
           by_labels:
             - page
             - bucket
-      - context: page_loss
-        title: Retained capacity-loss evidence by page
-        units: reports
-        dimensions:
-          - name: activity
-            selector: breakdown_page_lost_reports
-          - name: lcp
-            selector: breakdown_page_lcp_lost_reports
-          - name: fcp
-            selector: breakdown_page_fcp_lost_reports
-          - name: ttfb
-            selector: breakdown_page_ttfb_lost_reports
-          - name: inp
-            selector: breakdown_page_inp_lost_reports
-          - name: cls
-            selector: breakdown_page_cls_lost_reports
-        instances:
-          by_labels:
-            - page
-            - bucket
     family: Breakdowns/Page
     metrics:
       - breakdown_page_lcp
@@ -902,12 +745,6 @@ groups:
       - breakdown_page_ttfb_observations
       - breakdown_page_inp_observations
       - breakdown_page_cls_observations
-      - breakdown_page_lost_reports
-      - breakdown_page_lcp_lost_reports
-      - breakdown_page_fcp_lost_reports
-      - breakdown_page_ttfb_lost_reports
-      - breakdown_page_inp_lost_reports
-      - breakdown_page_cls_lost_reports
   - charts:
       - context: version_lcp
         dimensions:
@@ -997,26 +834,6 @@ groups:
           by_labels:
             - version
             - bucket
-      - context: version_loss
-        title: Retained capacity-loss evidence by version
-        units: reports
-        dimensions:
-          - name: activity
-            selector: breakdown_version_lost_reports
-          - name: lcp
-            selector: breakdown_version_lcp_lost_reports
-          - name: fcp
-            selector: breakdown_version_fcp_lost_reports
-          - name: ttfb
-            selector: breakdown_version_ttfb_lost_reports
-          - name: inp
-            selector: breakdown_version_inp_lost_reports
-          - name: cls
-            selector: breakdown_version_cls_lost_reports
-        instances:
-          by_labels:
-            - version
-            - bucket
     family: Breakdowns/Version
     metrics:
       - breakdown_version_lcp
@@ -1031,12 +848,6 @@ groups:
       - breakdown_version_ttfb_observations
       - breakdown_version_inp_observations
       - breakdown_version_cls_observations
-      - breakdown_version_lost_reports
-      - breakdown_version_lcp_lost_reports
-      - breakdown_version_fcp_lost_reports
-      - breakdown_version_ttfb_lost_reports
-      - breakdown_version_inp_lost_reports
-      - breakdown_version_cls_lost_reports
   - family: Breakdowns/Application View
     charts:
       - context: view_activity
@@ -1051,20 +862,9 @@ groups:
           by_labels:
             - view
             - bucket
-      - context: view_loss
-        title: Retained capacity-loss evidence by application view
-        units: reports
-        dimensions:
-          - name: lost_reports
-            selector: breakdown_view_lost_reports
-        instances:
-          by_labels:
-            - view
-            - bucket
     metrics:
       - breakdown_view_application_views
       - breakdown_view_js_errors
-      - breakdown_view_lost_reports
   - charts:
       - context: beacons
         dimensions:
@@ -1114,12 +914,6 @@ groups:
         title: Browser span export outcomes
         type: stacked
         units: spans/s
-      - context: samples_dropped
-        dimensions:
-          - name: dropped
-            selector: samples_dropped
-        title: Reports lost from bounded measurement state
-        units: reports/s
       - context: ingress_state
         dimensions:
           - selector: ingress_state
@@ -1148,7 +942,6 @@ groups:
       - spans_sent
       - spans_dropped
       - spans_errors
-      - samples_dropped
       - ingress_state
       - invalid_measurements
 version: v1

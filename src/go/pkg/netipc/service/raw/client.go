@@ -4,11 +4,20 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
 const clientShmAttachRetryInterval = 5 * time.Millisecond
+
+// clientShmAttachRetryTimeout is the default Client.shmAttachTimeout.
 const clientShmAttachRetryTimeout = 5 * time.Second
+
+// clientShmCallBoundFailureLimit: a call deadline that ends an SHM attach
+// wait is not the region's fault once; the second time in a row on a live
+// session, SHM is dropped like on any attach failure, so a region that never
+// becomes attachable cannot make every call end at its deadline.
+const clientShmCallBoundFailureLimit = 2
 
 func nextPowerOf2U32(n uint32) uint32 {
 	if n < 16 {
@@ -38,6 +47,45 @@ func (c *Client) resolvedCallTimeout(timeoutMs uint32) uint32 {
 		return c.callTimeoutMs
 	}
 	return ClientCallTimeoutDefaultMs
+}
+
+// beginOp starts a call or refresh: one deadline, timeoutMs resolved as for
+// calls, bounds every connect, handshake, attach and retry inside it.
+func (c *Client) beginOp(timeoutMs uint32) {
+	c.opDeadline = monotime.After(time.Duration(c.resolvedCallTimeout(timeoutMs)) * time.Millisecond)
+}
+
+func (c *Client) endOp() {
+	c.opDeadline = 0
+}
+
+// opRemainingMs returns the time left before the current deadline, 0 once it
+// passed. It rounds up, so a wait given this time never ends before the
+// deadline itself. Outside a call or refresh it is the resolved call timeout.
+func (c *Client) opRemainingMs() uint32 {
+	if c.opDeadline == 0 {
+		return c.resolvedCallTimeout(0)
+	}
+	left := time.Duration(c.opDeadline - monotime.Now())
+	if left <= 0 {
+		return 0
+	}
+	ms := (left.Microseconds() + 999) / 1000
+	if ms > int64(^uint32(0)) {
+		return ^uint32(0)
+	}
+	return uint32(ms) // #nosec G115 -- ms is positive and bounded by uint32 max above.
+}
+
+// callReconnectFailure reports why a call ended when its reconnect failed.
+func (c *Client) callReconnectFailure(err error) error {
+	if c.abortRequested.Load() {
+		return protocol.ErrAborted
+	}
+	if c.opRemainingMs() == 0 {
+		return protocol.ErrTimeout
+	}
+	return err
 }
 
 func (c *Client) abortSignal() <-chan struct{} {
@@ -83,6 +131,13 @@ func (c *Client) ClearAbort() {
 // Returns true if the state changed.
 func (c *Client) Refresh() bool {
 	oldState := c.state
+
+	// A pending abort keeps the client offline until it is cleared.
+	if c.abortRequested.Load() {
+		return false
+	}
+	c.beginOp(0)
+	defer c.endOp()
 
 	switch c.state {
 	case StateDisconnected, StateNotFound:
@@ -154,17 +209,20 @@ func (c *Client) noteResponseCapacity(payloadLen uint32) {
 
 // callWithRetry manages reconnect-driven recovery for a typed call.
 // Ordinary failures retry once. Overflow-driven resize recovery may
-// reconnect more than once while negotiated capacities grow.
-func (c *Client) callWithRetry(attempt func() error) error {
+// reconnect more than once while negotiated capacities grow. One deadline,
+// from timeoutMs, bounds the attempts and every reconnect.
+func (c *Client) callWithRetry(timeoutMs uint32, attempt func() error) error {
 	// Fail fast if not READY
 	if c.state != StateReady {
 		c.errorCount++
-		return protocol.ErrBadLayout
+		return protocol.ErrNotReady
 	}
 	if c.abortRequested.Load() {
 		c.errorCount++
 		return protocol.ErrAborted
 	}
+	c.beginOp(timeoutMs)
+	defer c.endOp()
 
 	// Cap overflow-driven retries: payloads grow by powers of 2, so 8
 	// retries allows ~256x growth from the initial negotiated size.
@@ -195,7 +253,7 @@ func (c *Client) callWithRetry(attempt func() error) error {
 			c.state = c.tryConnect()
 			if c.state != StateReady {
 				c.errorCount++
-				return firstErr
+				return c.callReconnectFailure(firstErr)
 			}
 			c.reconnectCount++
 
@@ -217,7 +275,7 @@ func (c *Client) callWithRetry(attempt func() error) error {
 		c.state = c.tryConnect()
 		if c.state != StateReady {
 			c.errorCount++
-			return firstErr
+			return c.callReconnectFailure(firstErr)
 		}
 		c.reconnectCount++
 
@@ -247,8 +305,18 @@ func (c *Client) doRawCall(methodCode uint16, reqPayload []byte) (protocol.Heade
 	return c.doRawCallWithTimeout(methodCode, reqPayload, 0)
 }
 
+// doRawCallWithTimeout makes one attempt. Inside a call it waits only for
+// the time left before the call deadline; timeoutMs applies outside one.
 func (c *Client) doRawCallWithTimeout(methodCode uint16, reqPayload []byte, timeoutMs uint32) (protocol.Header, []byte, error) {
-	hdr := protocol.Header{
+	waitMs := c.resolvedCallTimeout(timeoutMs)
+	if c.opDeadline != 0 {
+		waitMs = c.opRemainingMs()
+		if waitMs == 0 {
+			return protocol.Header{}, nil, protocol.ErrTimeout
+		}
+	}
+
+	c.requestHdr = protocol.Header{
 		Kind:            protocol.KindRequest,
 		Code:            methodCode,
 		Flags:           0,
@@ -256,12 +324,22 @@ func (c *Client) doRawCallWithTimeout(methodCode uint16, reqPayload []byte, time
 		MessageID:       uint64(c.callCount) + 1,
 		TransportStatus: protocol.StatusOK,
 	}
+	hdr := &c.requestHdr
 
-	if err := c.transportSend(&hdr, reqPayload); err != nil {
+	attemptDeadline := monotime.After(time.Duration(waitMs) * time.Millisecond)
+	if err := c.transportSend(hdr, reqPayload, waitMs); err != nil {
 		return protocol.Header{}, nil, err
 	}
 
-	respHdr, payload, err := c.transportReceiveWithControl(c.resolvedCallTimeout(timeoutMs), c.abortSignal())
+	// The send may have waited for buffer space: the receive gets what is
+	// left of this attempt's budget.
+	left := time.Duration(attemptDeadline - monotime.Now())
+	if left <= 0 {
+		return protocol.Header{}, nil, protocol.ErrTimeout
+	}
+	waitMs = uint32((left + time.Millisecond - 1) / time.Millisecond) // #nosec G115 -- left is below the uint32 budget it started from.
+
+	respHdr, payload, err := c.transportReceiveWithControl(waitMs, c.abortSignal())
 	if err != nil {
 		return protocol.Header{}, nil, err
 	}

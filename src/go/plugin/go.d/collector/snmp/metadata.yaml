@@ -249,6 +249,12 @@ modules:
           1. Reads standard system OIDs (e.g. `sysObjectID`, `sysDescr`) to identify the device
           2. Picks the best matching vendor/model profile(s)
           3. Collects exactly the metrics those profiles define
+
+          Jobs collecting SNMP metrics check standard system information once per minute. When the name, description,
+          contact, location or `sysObjectID` changes, the job identifies the device again: it reselects profiles and
+          rebuilds device-specific collection state. The vnode GUID and history stay the same, and configured hostname
+          and label overrides keep precedence. A device swapped for hardware reporting the same five values is not
+          detected until the job restarts. `ping_only` jobs retain their setup-only SNMP probe.
       supported_platforms:
         include: []
         exclude: []
@@ -796,6 +802,10 @@ modules:
                 type: string
                 unit: ""
                 description: Whether the row represents a peer or a peer-family.
+              - name: Process ID
+                type: string
+                unit: ""
+                description: BGP process identifier when exposed by the source MIB; blank when unavailable.
               - name: Routing Instance
                 type: string
                 unit: ""
@@ -811,7 +821,7 @@ modules:
               - name: Remote AS
                 type: string
                 unit: ""
-                description: Remote Autonomous System number.
+                description: Remote Autonomous System number when its association with the peer is known.
               - name: Peer Description
                 type: string
                 unit: ""
@@ -1164,6 +1174,7 @@ modules:
         - `snmp.bgp.devices.peer_counts` for device-level peer/session counts
         - `snmp.bgp.devices.peer_states` for device-level peer-state summaries where the source MIB exposes canonical peer rows
         - Rich peer diagnostics live in the Live function `snmp:bgp-peers`, not in charted time-series
+        - Process-scoped rows retain the BGP process and routing instance. AS, BGP version and description remain blank when their association cannot be proved.
 
         **BGP capability notes**
 

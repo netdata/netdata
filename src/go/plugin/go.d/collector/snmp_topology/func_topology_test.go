@@ -1167,7 +1167,7 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 	require.NotNil(t, bgpSection.OwnerFilter)
 	assert.Equal(t, "actor_column", bgpSection.OwnerFilter.Mode)
 	assert.Equal(t, "actor", bgpSection.OwnerFilter.ActorColumn)
-	require.Len(t, bgpSection.Columns, 16)
+	require.Len(t, bgpSection.Columns, 17)
 	assert.Equal(t, "remote_actor", bgpSection.Columns[3].ID)
 	assert.Equal(t, "actor_link", bgpSection.Columns[3].Cell)
 	assert.Empty(t, bgpSection.Columns[3].Visibility)

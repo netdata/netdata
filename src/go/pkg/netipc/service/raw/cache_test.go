@@ -123,7 +123,6 @@ func TestCacheRefreshFailurePreserves(t *testing.T) {
 	// Kill server
 	ts.stop()
 	cleanupAll(svc)
-	time.Sleep(50 * time.Millisecond)
 
 	// Refresh fails, old cache preserved
 	updated := cache.Refresh()
@@ -275,7 +274,6 @@ func TestCacheReconnectRebuilds(t *testing.T) {
 	// Kill and restart server
 	ts1.stop()
 	cleanupAll(svc)
-	time.Sleep(50 * time.Millisecond)
 
 	ts2 := startTestServer(svc, testSnapshotDispatch())
 	defer ts2.stop()
@@ -373,11 +371,13 @@ func TestCacheOverflowGuards(t *testing.T) {
 		t.Skip("oversized slice-header guard requires 64-bit int")
 	}
 
-	if _, err := cacheBucketMaskForLen(int(uint64(^uint32(0)) + 2)); !errors.Is(err, protocol.ErrOverflow) {
+	// Non-constant so 32-bit builds compile; the skip above keeps it from running there.
+	maxU32 := uint64(^uint32(0))
+	if _, err := cacheBucketMaskForLen(int(maxU32 + 2)); !errors.Is(err, protocol.ErrOverflow) {
 		t.Fatalf("unrepresentable bucket count error = %v, want ErrOverflow", err)
 	}
 
-	if got := cacheStatusItemCountForLen(int(uint64(^uint32(0)) + 1)); got != ^uint32(0) {
+	if got := cacheStatusItemCountForLen(int(maxU32 + 1)); got != ^uint32(0) {
 		t.Fatalf("overflow status item count = %d, want uint32 max", got)
 	}
 }
@@ -418,12 +418,7 @@ func TestCacheLargeDataset(t *testing.T) {
 	cfg.MaxResponsePayloadBytes = 256 * N
 
 	s := NewServer(testRunDir, svc, cfg, protocol.MethodCgroupsSnapshot, largeHandler)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-	time.Sleep(100 * time.Millisecond)
+	doneCh := runServerForTest(s)
 
 	defer func() {
 		s.Stop()

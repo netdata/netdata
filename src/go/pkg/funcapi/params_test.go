@@ -74,6 +74,48 @@ func TestBuildParamOptions_DefaultFallback(t *testing.T) {
 	assert.False(t, hasDefault)
 }
 
+func TestParamConfigAcceptedFormsMetadata(t *testing.T) {
+	for name, test := range map[string]struct {
+		config ParamConfig
+		want   map[string]any
+	}{
+		"existing metadata is unchanged": {
+			config: ParamConfig{ID: "jobs", Name: "Jobs", Options: []ParamOption{{ID: "beta rack,1", Name: "Beta"}}},
+			want: map[string]any{
+				"id": "jobs", "name": "Jobs", "type": "select",
+				"options": []map[string]any{{"id": "beta rack,1", "name": "Beta", "defaultSelected": true}},
+			},
+		},
+		"declared accepted forms": {
+			config: ParamConfig{
+				ID: "protocols", Name: "Protocols", Selection: ParamMultiSelect, ValueSeparator: ",",
+				Options: []ParamOption{{ID: "ipv4_tcp", Name: "IPv4 TCP", Aliases: []string{"ipv4-tcp"}}},
+			},
+			want: map[string]any{
+				"id": "protocols", "name": "Protocols", "type": "multiselect", "value_separator": ",",
+				"options": []map[string]any{{
+					"id": "ipv4_tcp", "name": "IPv4 TCP", "defaultSelected": true, "aliases": []string{"ipv4-tcp"},
+				}},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.want, test.config.RequiredParam())
+		})
+	}
+}
+
+func TestParamOptionAliasesMetadataOwnsItsValues(t *testing.T) {
+	config := ParamConfig{
+		ID: "group_by", Name: "Group By",
+		Options: []ParamOption{{ID: "container", Name: "Container", Aliases: []string{"container_name"}}},
+	}
+	wire := config.RequiredParam()
+	options := wire["options"].([]map[string]any)
+	options[0]["aliases"].([]string)[0] = "changed"
+	assert.Equal(t, []string{"container_name"}, config.Options[0].Aliases)
+}
+
 func TestResolveParam_Select(t *testing.T) {
 	cfg := ParamConfig{
 		ID:        "db",

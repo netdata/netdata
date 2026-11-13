@@ -2,8 +2,9 @@
 //! version — checked in that order by the shared container helper) and
 //! `read_summary`'s handling of summary-only files.
 //!
-//! Fixtures are built with the crate's own writer (`write_summary_only`)
-//! and patched byte-wise, so each test isolates one header field.
+//! Fixtures are written with the crate's own writer
+//! (`write_summary_only`) and patched byte-wise, so each test isolates
+//! one header field.
 //!
 //! Pins:
 //!

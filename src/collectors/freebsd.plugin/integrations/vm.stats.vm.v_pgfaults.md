@@ -112,7 +112,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 
 ### Per vm.stats.vm.v_pgfaults instance
 
-The number of page faults happened on host.
+The number of page faults happened on host. Linux and Windows chart the same context with `minor` and `major` dimensions: FreeBSD `memory` counts every fault (as Linux `minor` does) and `io_requiring` counts major faults that needed I/O.
 
 This scope has no labels.
 

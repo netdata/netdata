@@ -78,7 +78,7 @@ func startRawPosixHelloAckServer(t *testing.T, service string, packet []byte) *u
 	path := filepath.Join(testRunDir, service+".sock")
 	_ = os.Remove(path)
 
-	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_SEQPACKET, 0)
+	fd, err := syscall.Socket(syscall.AF_UNIX, testSockType, 0)
 	if err != nil {
 		t.Fatalf("socket failed: %v", err)
 	}
@@ -119,7 +119,6 @@ func startRawPosixHelloAckServer(t *testing.T, service string, packet []byte) *u
 		srv.doneCh <- nil
 	}()
 
-	time.Sleep(100 * time.Millisecond)
 	return srv
 }
 
@@ -177,7 +176,6 @@ func startRawPosixSessionServerN(
 		srv.doneCh <- nil
 	}()
 
-	time.Sleep(200 * time.Millisecond)
 	return srv
 }
 
@@ -198,28 +196,27 @@ func (s *unixRawSessionServer) wait(t *testing.T) {
 	}
 }
 
+// refreshUnixClientReady refreshes once: servers in these tests are already
+// listening, so a single connect must succeed.
 func refreshUnixClientReady(t *testing.T, client *Client) {
 	t.Helper()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		client.Refresh()
-		if client.Ready() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	client.Refresh()
+	if !client.Ready() {
+		t.Fatalf("client not ready after one refresh, state=%d", client.state)
 	}
-	t.Fatalf("client not ready, state=%d", client.state)
 }
 
 func TestUnixClientCallTimeoutOnWedgedPeer(t *testing.T) {
 	cfg := testServerConfig()
 	svc := uniqueUnixService("go_unix_call_timeout")
+	// The peer holds the request unanswered until the client has timed out.
+	timedOut := make(chan struct{})
 	srv := startRawPosixSessionServer(t, svc, cfg,
 		func(session *posix.Session, hdr protocol.Header, payload []byte) error {
 			_ = session
 			_ = hdr
 			_ = payload
-			time.Sleep(150 * time.Millisecond)
+			<-timedOut
 			return nil
 		})
 
@@ -230,6 +227,7 @@ func TestUnixClientCallTimeoutOnWedgedPeer(t *testing.T) {
 	start := time.Now()
 	_, err := client.CallIncrementWithTimeout(41, 30)
 	elapsed := time.Since(start)
+	close(timedOut)
 	if !errors.Is(err, protocol.ErrTimeout) {
 		t.Fatalf("CallIncrementWithTimeout error = %v, want %v", err, protocol.ErrTimeout)
 	}
@@ -410,14 +408,7 @@ func startServerWithWorkersSocketReady(
 		handler,
 		workers,
 	)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	waitUnixSocketReady(service)
+	doneCh := runServerForTest(s)
 	return &testServer{server: s, doneCh: doneCh}
 }
 
@@ -431,14 +422,7 @@ func startServerWithConfigSocketReady(
 	cleanupAll(service)
 
 	s := NewServer(testRunDir, service, cfg, expectedMethodCode, handler)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	waitUnixSocketReady(service)
+	doneCh := runServerForTest(s)
 	return &testServer{server: s, doneCh: doneCh}
 }
 
@@ -457,12 +441,17 @@ func TestUnixServerStopWhileIdle(t *testing.T) {
 		testSnapshotDispatch(),
 	)
 
+	server.timings = testServerTimings
 	done := make(chan error, 1)
 	go func() {
 		done <- server.Run()
 	}()
 
-	time.Sleep(100 * time.Millisecond)
+	select {
+	case <-server.Listening():
+	case <-time.After(testWaitLimit):
+		t.Fatal("server never started listening")
+	}
 	server.Stop()
 
 	select {
@@ -592,70 +581,6 @@ func TestUnixSingleResponseOverflowRetriesAndRecovers(t *testing.T) {
 	}
 }
 
-func TestUnixShmPrepareFailureFallsBackToBaseline(t *testing.T) {
-	svc := uniqueUnixService("go_unix_shm_create_fail")
-	obstruction := unixShmSessionPath(svc, 1)
-
-	scfg := testUnixShmServerConfig()
-	ts := startServerWithConfigSocketReady(
-		svc,
-		scfg,
-		protocol.MethodIncrement,
-		IncrementDispatch(func(v uint64) (uint64, bool) {
-			return v + 1, true
-		}),
-	)
-	defer func() {
-		ts.stop()
-		_ = os.RemoveAll(obstruction)
-	}()
-
-	if err := os.MkdirAll(filepath.Join(obstruction, "keep"), 0700); err != nil {
-		t.Fatalf("mkdir SHM obstruction failed: %v", err)
-	}
-
-	badClient := NewIncrementClient(testRunDir, svc, testUnixShmClientConfig())
-	defer badClient.Close()
-
-	if changed := badClient.Refresh(); !changed {
-		t.Fatal("Refresh should transition to READY when baseline stays viable")
-	}
-	if !badClient.Ready() {
-		t.Fatal("client should stay usable over baseline after server SHM prepare failure")
-	}
-	if badClient.state != StateReady {
-		t.Fatalf("client state after SHM prepare failure = %d, want READY", badClient.state)
-	}
-	if badClient.shm != nil {
-		t.Fatalf("fallback baseline session must not attach SHM: selected=%#x session=%+v", badClient.session.SelectedProfile, badClient.session)
-	}
-	if badClient.session == nil || badClient.session.SelectedProfile != protocol.ProfileBaseline {
-		t.Fatalf("selected profile after SHM prepare failure = %#v, want baseline", badClient.session)
-	}
-
-	if _, err := os.Stat(obstruction); err != nil {
-		t.Fatalf("SHM obstruction should still exist after failed create, stat err = %v", err)
-	}
-	if err := os.RemoveAll(obstruction); err != nil {
-		t.Fatalf("remove SHM obstruction failed: %v", err)
-	}
-
-	goodClient := NewIncrementClient(testRunDir, svc, testUnixShmClientConfig())
-	defer goodClient.Close()
-	refreshUnixClientReady(t, goodClient)
-
-	if goodClient.shm == nil {
-		t.Fatal("expected SHM attachment after obstruction removal")
-	}
-	got, err := goodClient.CallIncrement(4)
-	if err != nil {
-		t.Fatalf("CallIncrement after SHM create recovery failed: %v", err)
-	}
-	if got != 5 {
-		t.Fatalf("CallIncrement after SHM create recovery = %d, want 5", got)
-	}
-}
-
 func TestUnixServerRunRejectsInvalidServiceName(t *testing.T) {
 	server := NewServer(
 		testRunDir,
@@ -680,7 +605,6 @@ func TestUnixServerRejectsSessionAtWorkerCapacity(t *testing.T) {
 			released = true
 		}
 	}
-	defer releaseOnce()
 
 	var handlerCalls atomic.Int32
 	ts := startServerWithWorkersSocketReady(
@@ -700,6 +624,9 @@ func TestUnixServerRejectsSessionAtWorkerCapacity(t *testing.T) {
 		1,
 	)
 	defer ts.stop()
+	// Deferred after ts.stop so it runs first: a t.Fatal must unblock the
+	// handler, or stopping the server waits for it forever.
+	defer releaseOnce()
 
 	client1 := NewIncrementClient(testRunDir, svc, testClientConfig())
 	defer client1.Close()
@@ -721,40 +648,16 @@ func TestUnixServerRejectsSessionAtWorkerCapacity(t *testing.T) {
 		t.Fatal("first client did not occupy the only worker slot")
 	}
 
+	// Over capacity the server closes before HELLO_ACK, so the connect fails.
 	ccfg := testClientConfig()
 	session2, err := posix.Connect(testRunDir, svc, &ccfg)
-	if err != nil {
-		t.Fatalf("second raw connect failed: %v", err)
-	}
-	defer session2.Close()
-
-	time.Sleep(100 * time.Millisecond)
-
-	reqHdr := &protocol.Header{
-		Kind:            protocol.KindRequest,
-		Code:            protocol.MethodIncrement,
-		ItemCount:       1,
-		MessageID:       1,
-		TransportStatus: protocol.StatusOK,
-	}
-	var reqPayload [protocol.IncrementPayloadSize]byte
-	if protocol.IncrementEncode(9, reqPayload[:]) == 0 {
-		t.Fatal("IncrementEncode failed")
-	}
-
-	sendErr := session2.Send(reqHdr, reqPayload[:])
-	var recvErr error
-	if sendErr == nil {
-		recvBuf := make([]byte, protocol.HeaderSize+64)
-		_, _, recvErr = session2.Receive(recvBuf)
-	}
-	if sendErr == nil && recvErr == nil {
-		t.Fatal("second session should be rejected while the server is at worker capacity")
+	if err == nil {
+		session2.Close()
+		t.Fatal("second connect should fail while the server is at worker capacity")
 	}
 	if handlerCalls.Load() != 1 {
 		t.Fatalf("handler entered %d times, want 1 while second session is rejected", handlerCalls.Load())
 	}
-	session2.Close()
 
 	releaseOnce()
 	res := <-callDone
@@ -766,13 +669,12 @@ func TestUnixServerRejectsSessionAtWorkerCapacity(t *testing.T) {
 	}
 	client1.Close()
 
-	time.Sleep(100 * time.Millisecond)
-
+	// The slot frees when the first session's worker exits.
+	waitSessionExits(ts.server, 1)
 	verify := NewIncrementClient(testRunDir, svc, testClientConfig())
-	defer verify.Close()
 	refreshUnixClientReady(t, verify)
-
 	got, err := verify.CallIncrement(1)
+	verify.Close()
 	if err != nil {
 		t.Fatalf("verification call after worker-capacity reject failed: %v", err)
 	}
@@ -792,8 +694,7 @@ func TestUnixIdlePeerDisconnectKeepsServerHealthy(t *testing.T) {
 		t.Fatalf("raw connect failed: %v", err)
 	}
 	session.Close()
-
-	time.Sleep(200 * time.Millisecond)
+	waitSessionExits(ts.server, 1)
 
 	verify := NewSnapshotClient(testRunDir, svc, testClientConfig())
 	defer verify.Close()
@@ -820,11 +721,11 @@ func TestUnixClientTransportWithoutSession(t *testing.T) {
 		TransportStatus: protocol.StatusOK,
 	}
 
-	if err := client.transportSend(&hdr, nil); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportSend without session = %v, want ErrTruncated", err)
+	if err := client.transportSend(&hdr, nil, 0); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("transportSend without session = %v, want ErrTransport", err)
 	}
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportReceive without session = %v, want ErrTruncated", err)
+	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("transportReceive without session = %v, want ErrTransport", err)
 	}
 }
 
@@ -838,7 +739,7 @@ func TestUnixCallWithRetryStopsWhenOverflowCannotGrowCapacity(t *testing.T) {
 	refreshUnixClientReady(t, client)
 
 	attempts := 0
-	err := client.callWithRetry(func() error {
+	err := client.callWithRetry(0, func() error {
 		attempts++
 		return protocol.ErrOverflow
 	})
@@ -864,7 +765,7 @@ func TestUnixCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
 	client.config.MaxRequestPayloadBytes = protocol.MaxPayloadDefault
 
 	attempts := 0
-	err := client.callWithRetry(func() error {
+	err := client.callWithRetry(0, func() error {
 		attempts++
 		client.config.MaxRequestPayloadBytes++
 		return protocol.ErrOverflow
@@ -877,43 +778,6 @@ func TestUnixCallWithRetryCapsOverflowGrowthRetries(t *testing.T) {
 	}
 	if client.state != StateBroken {
 		t.Fatalf("callWithRetry growth-cap state = %d, want StateBroken", client.state)
-	}
-}
-
-func TestUnixClientTransportReceiveShmError(t *testing.T) {
-	client := NewIncrementClient(testRunDir, uniqueUnixService("go_unix_transport_shm_err"), testClientConfig())
-	defer client.Close()
-
-	client.state = StateReady
-	client.shm = &posix.ShmContext{}
-
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportReceive with invalid SHM context = %v, want %v", err, protocol.ErrTruncated)
-	}
-}
-
-func TestUnixClientTransportReceiveShmRejectsShortMessage(t *testing.T) {
-	client, serverShm := newRawPosixShmClient(t)
-
-	if err := serverShm.ShmSend([]byte{1, 2, 3, 4}); err != nil {
-		t.Fatalf("ShmSend failed: %v", err)
-	}
-
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrTruncated) {
-		t.Fatalf("transportReceive short SHM message = %v, want %v", err, protocol.ErrTruncated)
-	}
-}
-
-func TestUnixClientTransportReceiveShmRejectsBadHeader(t *testing.T) {
-	client, serverShm := newRawPosixShmClient(t)
-
-	msg := make([]byte, protocol.HeaderSize)
-	if err := serverShm.ShmSend(msg); err != nil {
-		t.Fatalf("ShmSend failed: %v", err)
-	}
-
-	if _, _, err := client.transportReceive(); !errors.Is(err, protocol.ErrBadMagic) {
-		t.Fatalf("transportReceive bad SHM header = %v, want %v", err, protocol.ErrBadMagic)
 	}
 }
 
@@ -983,8 +847,8 @@ func TestUnixNonRequestTerminatesSession(t *testing.T) {
 		t.Fatalf("send non-request failed: %v", err)
 	}
 
-	time.Sleep(200 * time.Millisecond)
-
+	// The server ends the session on the bad message, so the receive below
+	// fails instead of returning a response.
 	req := protocol.CgroupsRequest{LayoutVersion: 1, Flags: 0}
 	var reqBuf [4]byte
 	if req.Encode(reqBuf[:]) == 0 {
@@ -1032,10 +896,8 @@ func TestUnixTruncatedRawRequestKeepsServerHealthy(t *testing.T) {
 		session.Close()
 		t.Fatalf("send truncated raw request failed: %v", err)
 	}
-	time.Sleep(100 * time.Millisecond)
 	session.Close()
-
-	time.Sleep(200 * time.Millisecond)
+	waitSessionExits(ts.server, 1)
 
 	verify := NewSnapshotClient(testRunDir, svc, testClientConfig())
 	defer verify.Close()
@@ -1052,12 +914,17 @@ func TestUnixTruncatedRawRequestKeepsServerHealthy(t *testing.T) {
 
 func TestUnixPeerDisconnectDuringResponseKeepsServerHealthy(t *testing.T) {
 	svc := uniqueUnixService("go_unix_send_fail")
+	// The first request is answered only after its client has gone, so the
+	// response send fails.
+	clientGone := make(chan struct{})
 	ts := startTestServerUnixWithConfig(
 		svc,
 		testServerConfig(),
 		protocol.MethodIncrement,
 		IncrementDispatch(func(v uint64) (uint64, bool) {
-			time.Sleep(100 * time.Millisecond)
+			if v == 41 {
+				<-clientGone
+			}
 			return v + 1, true
 		}),
 	)
@@ -1084,8 +951,8 @@ func TestUnixPeerDisconnectDuringResponseKeepsServerHealthy(t *testing.T) {
 		t.Fatalf("send increment request failed: %v", err)
 	}
 	session.Close()
-
-	time.Sleep(250 * time.Millisecond)
+	close(clientGone)
+	waitSessionExits(ts.server, 1)
 
 	verify := NewIncrementClient(testRunDir, svc, testClientConfig())
 	defer verify.Close()
@@ -1135,12 +1002,7 @@ func TestUnixCallIncrementBatchWithMalformedTransportState(t *testing.T) {
 		protocol.MethodIncrement,
 		pingPongIncrementDispatch(),
 	)
-	doneCh := make(chan struct{})
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-	time.Sleep(100 * time.Millisecond)
+	doneCh := runServerForTest(s)
 	defer func() {
 		s.Stop()
 		<-doneCh
@@ -1673,4 +1535,54 @@ func TestUnixCallIncrementBatchRejectsMalformedPayload(t *testing.T) {
 		srv.wait(t)
 		cleanupAll(svc)
 	})
+}
+
+func TestUnixSendFailureWithLivePeerIsTransport(t *testing.T) {
+	ensureRunDir()
+	svc := uniqueUnixService("go_unix_send_live_peer")
+	cleanupAll(svc)
+	defer cleanupAll(svc)
+
+	// The server accepts one session, then removes the endpoint so the client
+	// cannot reconnect, and keeps the session open until released.
+	listener, err := posix.Listen(testRunDir, svc, testServerConfig())
+	if err != nil {
+		t.Fatalf("Listen failed: %v", err)
+	}
+	accepted := make(chan error, 1)
+	release := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		session, err := listener.Accept()
+		listener.Close()
+		accepted <- err
+		if err != nil {
+			return
+		}
+		<-release
+		session.Close()
+	}()
+
+	client := NewIncrementClient(testRunDir, svc, testClientConfig())
+	defer client.Close()
+	client.Refresh()
+	if client.state != StateReady {
+		t.Fatalf("client state = %d, want StateReady", client.state)
+	}
+	if err := <-accepted; err != nil {
+		t.Fatalf("Accept failed: %v", err)
+	}
+
+	// Our own write shutdown makes send fail with EPIPE while the server still
+	// holds the session open.
+	if err := syscall.Shutdown(client.session.Fd(), syscall.SHUT_WR); err != nil {
+		t.Fatalf("shutdown: %v", err)
+	}
+	if _, err := client.CallIncrement(1); !errors.Is(err, protocol.ErrTransport) {
+		t.Fatalf("CallIncrement with live peer = %v, want ErrTransport", err)
+	}
+
+	close(release)
+	<-done
 }

@@ -112,6 +112,7 @@ func (c *Collector) collect() (map[string]int64, error) {
 			return nil, err
 		}
 	}
+	c.refreshRelations(now)
 	if err := c.doQueryTablesMetrics(); err != nil {
 		return nil, err
 	}
@@ -247,38 +248,6 @@ func (c *Collector) getDBMetrics(name string) *dbMetrics {
 		c.mx.dbs[name] = db
 	}
 	return db
-}
-
-func (c *Collector) getTableMetrics(name, db, schema string) *tableMetrics {
-	key := name + "_" + db + "_" + schema
-	m, ok := c.mx.tables[key]
-	if !ok {
-		m = &tableMetrics{db: db, schema: schema, name: name}
-		c.mx.tables[key] = m
-	}
-	return m
-}
-
-func (c *Collector) hasTableMetrics(name, db, schema string) bool {
-	key := name + "_" + db + "_" + schema
-	_, ok := c.mx.tables[key]
-	return ok
-}
-
-func (c *Collector) getIndexMetrics(name, table, db, schema string) *indexMetrics {
-	key := name + "_" + table + "_" + db + "_" + schema
-	m, ok := c.mx.indexes[key]
-	if !ok {
-		m = &indexMetrics{name: name, db: db, schema: schema, table: table}
-		c.mx.indexes[key] = m
-	}
-	return m
-}
-
-func (c *Collector) hasIndexMetrics(name, table, db, schema string) bool {
-	key := name + "_" + table + "_" + db + "_" + schema
-	_, ok := c.mx.indexes[key]
-	return ok
 }
 
 func (c *Collector) getReplAppMetrics(name string) *replStandbyAppMetrics {

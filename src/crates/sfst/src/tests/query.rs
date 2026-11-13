@@ -8,8 +8,8 @@
 //!
 //! Every fixture is synthetic SFST bytes written in memory by the
 //! production [`ChunkWriter`] — no on-disk fixtures; the small
-//! hand-built layouts pin KvId assignment, tier placement, and bucket
-//! arithmetic exactly.
+//! hand-written layouts pin KvId assignment, tier placement, and
+//! bucket arithmetic exactly.
 
 use crate::writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 use crate::*;
@@ -29,7 +29,7 @@ fn bfq(reader: &IndexReader<'_>, filter: Filter, query: &str) -> BitmapFilter {
 ///
 /// `level` (low-card): `info` at positions 0, 2, 4; `error` at 1, 3, 5.
 /// `service` (low-card): `api` at 0, 1, 2; `worker` at 3, 4, 5.
-fn build_query_fixture() -> Vec<u8> {
+fn query_fixture() -> Vec<u8> {
     let mut data = Vec::new();
     let lvl_info = treight::Bitmap::from_sorted_iter([0, 2, 4].into_iter(), 6, &mut data);
     let lvl_info_data = std::mem::take(&mut data);
@@ -127,6 +127,7 @@ fn build_query_fixture() -> Vec<u8> {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -149,7 +150,7 @@ const FULL_WINDOW: std::ops::Range<i64> = FILE_MIN_NS..(FILE_MIN_NS + 6 * 1_000_
 
 #[test]
 fn matched_empty_filter_matches_all() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let count = reader
         .matched_count(&bf(&reader, Filter::new()), FULL_WINDOW)
@@ -159,7 +160,7 @@ fn matched_empty_filter_matches_all() {
 
 #[test]
 fn matched_single_selection() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let positions = reader
         .matched_positions(
@@ -172,7 +173,7 @@ fn matched_single_selection() {
 
 #[test]
 fn matched_or_within_field() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // level=info OR level=error → all positions.
     let filter = bf(
@@ -187,7 +188,7 @@ fn matched_or_within_field() {
 
 #[test]
 fn matched_and_across_fields() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // level=info AND service=worker → only position 4.
     let filter = bf(
@@ -202,7 +203,7 @@ fn matched_and_across_fields() {
 
 #[test]
 fn matched_unknown_field_yields_empty() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Unknown field → empty set, not an error. The filter-side half of
     // the absent-field asymmetry: facets errors, timeline routes to unset.
@@ -217,7 +218,7 @@ fn matched_unknown_field_yields_empty() {
 
 #[test]
 fn facets_show_all_values_with_self_exclusion() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Selecting `level=info` should NOT hide `level=error` from the
     // `level` facet — that's the whole point of self-exclusion.
@@ -248,7 +249,7 @@ fn facets_show_all_values_with_self_exclusion() {
 
 #[test]
 fn facets_unknown_field_errors() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let err = reader
         .facets(
@@ -262,7 +263,7 @@ fn facets_unknown_field_errors() {
 
 #[test]
 fn facets_clip_to_window() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Window covers only positions 2 and 3 (logs at file_min + 2s and
     // + 3s). The fixture has level=info at 2 / error at 3, and
@@ -302,7 +303,7 @@ const FILE_MIN_NS: i64 = 1_700_000_000 * 1_000_000_000;
 
 #[test]
 fn timeline_buckets_match_filter() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // 6 logs spread across 6 seconds. Bucket width = 2 seconds.
     // Grid anchored at file_min, 3 buckets covering positions {0,1},
@@ -327,7 +328,7 @@ fn timeline_buckets_match_filter() {
 
 #[test]
 fn timeline_unset_counts_match_logs_missing_the_field() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Every log in the fixture has `level` set, so the unset
     // dimension should be zero across every bucket.
@@ -350,7 +351,7 @@ fn timeline_unset_counts_match_logs_missing_the_field() {
 
 #[test]
 fn timeline_applies_the_full_filter_including_its_own_field() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Unlike facets, the timeline honors the histogram field's own
     // selection: the chart shows exactly the matched logs (the legacy
@@ -375,7 +376,7 @@ fn timeline_applies_the_full_filter_including_its_own_field() {
 
 #[test]
 fn timeline_invalid_bucket_width_errors() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let err = reader
         .timeline(
@@ -389,7 +390,7 @@ fn timeline_invalid_bucket_width_errors() {
 
 #[test]
 fn timeline_grid_before_file_yields_leading_zero_buckets() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Request grid starts 4 seconds before the file's first log and
     // runs 10 buckets of 1 second — so buckets 0..=3 cover times the
@@ -438,7 +439,7 @@ fn timeline_grid_before_file_yields_leading_zero_buckets() {
 /// `lang` (low-card, multi-valued): log 0 carries BOTH `en` and `fr`,
 /// log 1 carries `en`, log 2 has no `lang` at all.
 /// `svc` (low-card): `a` at positions 0, 2; `b` at 1.
-fn build_multivalued_fixture() -> Vec<u8> {
+fn multivalued_fixture() -> Vec<u8> {
     let mut data = Vec::new();
     let lang_en = treight::Bitmap::from_sorted_iter([0, 1].into_iter(), 3, &mut data);
     let lang_en_data = std::mem::take(&mut data);
@@ -531,6 +532,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -551,7 +553,7 @@ fn build_multivalued_fixture() -> Vec<u8> {
 /// silently eats the unset count (saturating at zero).
 #[test]
 fn timeline_unset_with_multivalued_field() {
-    let data = build_multivalued_fixture();
+    let data = multivalued_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let window_ns = 3 * 1_000_000_000;
 
@@ -584,11 +586,11 @@ fn timeline_unset_with_multivalued_field() {
 
 #[test]
 fn materialize_rows_resolves_timestamp_and_attributes() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Fixture positions: 0 = (info, api), 3 = (error, worker); 1s apart
-    // starting at FILE_MIN_NS. Stream KvIds resolve per-field via
-    // `resolve_kv_strings` to "level=…"/"service=…" pairs.
+    // starting at FILE_MIN_NS. Stream KvIds resolve per field (the KvId
+    // resolver) to "level=…"/"service=…" pairs.
     let rows = reader.materialize_rows(&[0, 3]).unwrap();
     assert_eq!(rows.len(), 2);
 
@@ -615,7 +617,7 @@ fn materialize_rows_resolves_timestamp_and_attributes() {
 fn materialize_field_matches_materialize_rows() {
     // Column-direct resolution must yield exactly the values the row-major
     // path extracts for the same field, across every position.
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let positions: Vec<u32> = (0..reader.summary().record_count).collect();
     let rows = reader.materialize_rows(&positions).unwrap();
@@ -641,7 +643,7 @@ fn materialize_field_matches_materialize_rows() {
 #[test]
 fn materialize_field_multivalued() {
     // A multi-valued field returns every value at a position; absence is empty.
-    let data = build_multivalued_fixture();
+    let data = multivalued_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let got = reader.materialize_field("lang", &[0, 1, 2]).unwrap();
     // FST iteration is sorted, so en precedes fr.
@@ -653,7 +655,7 @@ fn materialize_field_multivalued() {
 #[test]
 fn timeline_totals_counts_per_bucket() {
     // 6 logs at FILE_MIN_NS + {0..5}s.
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     let all = bf(&reader, Filter::new());
 
@@ -689,7 +691,7 @@ fn timeline_totals_counts_per_bucket() {
 
 #[test]
 fn materialize_rows_preserves_position_order() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Requested order is honored: one row per position, in order.
     let rows = reader.materialize_rows(&[5, 1]).unwrap();
@@ -709,7 +711,7 @@ fn materialize_rows_preserves_position_order() {
 
 #[test]
 fn materialize_rows_errors_on_out_of_range_position() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // An out-of-range position (99 >= 6 logs) means the index is corrupt;
     // it must error, not silently skip — a skip would shorten the result
@@ -727,14 +729,14 @@ fn materialize_rows_errors_on_out_of_range_position() {
 
 #[test]
 fn materialize_rows_empty_input_yields_empty() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     assert!(reader.materialize_rows(&[]).unwrap().is_empty());
 }
 
 #[test]
 fn timeline_absent_field_routes_all_logs_to_unset() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // A field not present in this file: no dimensions, and every
     // matching log falls into `unset`. 6 logs over 3 two-second
@@ -756,13 +758,13 @@ fn timeline_absent_field_routes_all_logs_to_unset() {
 }
 
 /// Fixture with a value dense enough to be stored *complemented* (inverted
-/// treight bitmap), mirroring what the index builder's `remap_one_bitmap`
-/// (`src/build.rs`) does for dense values. 6 logs:
+/// treight bitmap), mirroring what the writer's `remap_one_bitmap`
+/// (`src/index_writer.rs`) does for dense values. 6 logs:
 ///
 /// `lvl` (low-card): `hi` at positions 0..=4 (5/6 → stored as the
 /// complement `{5}`, inverted), `lo` at position 5.
 /// `svc` (low-card): `a` at 0,1,2; `b` at 3,4,5.
-fn build_complemented_fixture() -> Vec<u8> {
+fn complemented_fixture() -> Vec<u8> {
     let mut data = Vec::new();
     // `lvl=hi` covers 5 of 6 → store the complement {5} as an inverted bitmap.
     let lvl_hi = treight::Bitmap::from_sorted_iter_complemented([5].into_iter(), 6, &mut data);
@@ -858,6 +860,7 @@ fn build_complemented_fixture() -> Vec<u8> {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -875,7 +878,7 @@ fn build_complemented_fixture() -> Vec<u8> {
 
 #[test]
 fn complemented_value_bitmap_counts_correctly() {
-    let data = build_complemented_fixture();
+    let data = complemented_fixture();
     let reader = IndexReader::open(&data).unwrap();
 
     // `lvl=hi` is stored complemented (inverted). Exercise it through every
@@ -992,13 +995,13 @@ fn bitmap_value(positions: &[u32], universe: u32) -> BitmapValue {
 }
 
 /// Synthetic SFST exercising all three tiers, for pattern-resolution tests.
-/// 6 logs, 1s apart, same time base as [`build_query_fixture`] (so
+/// 6 logs, 1s apart, same time base as [`query_fixture`] (so
 /// [`FULL_WINDOW`] applies).
 ///
 /// - `level` (Low):  info @ {0,2,4}, error @ {1,3,5}.
 /// - `host`  (Mid):  web1 @ {0,1}, web2 @ {2,3}, db1 @ {4,5}.
 /// - `trace` (High): aaa @ {0,1}, bbb @ {2,3}, ccc @ {4,5} (via stream batch).
-fn build_tiered_fixture() -> Vec<u8> {
+fn tiered_fixture() -> Vec<u8> {
     const N: u32 = 6;
 
     let primary_entries = vec![
@@ -1079,6 +1082,7 @@ fn build_tiered_fixture() -> Vec<u8> {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 1,
         high_fields: 1,
         stream_batches: 1,
@@ -1098,7 +1102,7 @@ fn build_tiered_fixture() -> Vec<u8> {
 
 #[test]
 fn pattern_low_card_is_full_value_anchored() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // `/info/` matches the whole value "info" (3 logs).
     assert_eq!(
@@ -1134,7 +1138,7 @@ fn pattern_low_card_is_full_value_anchored() {
 
 #[test]
 fn pattern_anchored_not_substring_at_tail() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // `/rror/` must NOT match "error".
     assert_eq!(
@@ -1160,7 +1164,7 @@ fn pattern_anchored_not_substring_at_tail() {
 
 #[test]
 fn pattern_mid_card_resolves_via_chunk() {
-    let data = build_tiered_fixture();
+    let data = tiered_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // host ~ /web.*/ → web1{0,1} ∪ web2{2,3}.
     let positions = reader
@@ -1174,7 +1178,7 @@ fn pattern_mid_card_resolves_via_chunk() {
 
 #[test]
 fn pattern_high_card_resolves_via_stream_batches() {
-    let data = build_tiered_fixture();
+    let data = tiered_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // trace ~ /a.*/ → aaa{0,1}.
     assert_eq!(
@@ -1201,7 +1205,7 @@ fn pattern_high_card_resolves_via_stream_batches() {
 
 #[test]
 fn pattern_mixed_with_exact_ors() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // level = "info" OR level ~ /err.*/ → all 6 logs. Exercises the
     // exact-lookup + pattern-enumeration paths combined on one field.
@@ -1218,7 +1222,7 @@ fn pattern_mixed_with_exact_ors() {
 
 #[test]
 fn pattern_no_match_is_empty() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     assert_eq!(
         reader
@@ -1233,7 +1237,7 @@ fn pattern_no_match_is_empty() {
 
 #[test]
 fn invalid_pattern_is_hard_error() {
-    let data = build_query_fixture();
+    let data = query_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // A malformed regex is a hard error at compile time — not a
     // match-nothing set like pattern_no_match_is_empty.
@@ -1266,7 +1270,7 @@ fn validate_catches_bad_pattern_without_a_file() {
 
 #[test]
 fn query_full_text_matches_key_value_across_tiers() {
-    let data = build_tiered_fixture();
+    let data = tiered_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Unanchored over whole `key=value`: "web" lives only in the mid-card
     // host values (host=web1 @ {0,1}, host=web2 @ {2,3}).
@@ -1294,7 +1298,7 @@ fn query_full_text_matches_key_value_across_tiers() {
 
 #[test]
 fn query_ands_with_the_field_filter() {
-    let data = build_tiered_fixture();
+    let data = tiered_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // level=info {0,2,4} AND query "web" {0,1,2,3} = {0,2}.
     let bf = bfq(&reader, Filter::new().select("level", "info"), "web");
@@ -1307,7 +1311,7 @@ fn query_ands_with_the_field_filter() {
 
 #[test]
 fn query_narrows_facet_counts() {
-    let data = build_tiered_fixture();
+    let data = tiered_fixture();
     let reader = IndexReader::open(&data).unwrap();
     // Query "web" restricts the scope to host=web* logs {0,1,2,3}; the
     // `level` facet over that scope is error:2 (pos 1,3), info:2 (pos 0,2).
@@ -1325,7 +1329,7 @@ fn query_narrows_facet_counts() {
 /// SFST with **two fields per mid/high tier**, so the tier-relative chunk index
 /// advances past 0 — exercises `field_table_tiered`, `high_kv_id`, and the
 /// high-card scan at index 1 (the single-field-per-tier fixtures never do).
-/// 4 logs, same time base as [`build_query_fixture`].
+/// 4 logs, same time base as [`query_fixture`].
 ///
 /// Within a tier the derived field table is name-ordered, so the chunk /
 /// KvId layout follows `host < region` (mid) and `req < trace` (high):
@@ -1335,7 +1339,7 @@ fn query_narrows_facet_counts() {
 /// - `region` (Mid 1):  r1 @ {0,2},  r2 @ {1,3}
 /// - `req`    (High 0): q1 @ {0,1},  q2 @ {2,3}
 /// - `trace`  (High 1): t1 @ {0,2},  t2 @ {1,3}
-fn build_two_per_tier_fixture() -> Vec<u8> {
+fn two_per_tier_fixture() -> Vec<u8> {
     const N: u32 = 4;
 
     let primary_entries = vec![
@@ -1409,6 +1413,7 @@ fn build_two_per_tier_fixture() -> Vec<u8> {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 2,
         high_fields: 2,
         stream_batches: 1,
@@ -1430,7 +1435,7 @@ fn build_two_per_tier_fixture() -> Vec<u8> {
 
 #[test]
 fn second_chunk_per_tier_resolves() {
-    let data = build_two_per_tier_fixture();
+    let data = two_per_tier_fixture();
     let reader = IndexReader::open(&data).unwrap();
 
     // Second MID field (region): locate_field must return Mid(1) → loads mid_field(1).
@@ -1470,9 +1475,9 @@ fn second_chunk_per_tier_resolves() {
         vec![0, 2]
     );
 
-    // materialize_rows → resolve_kv_strings walks the field table, decoding
-    // all four secondary chunks; row 3 carries the second value of every
-    // field (tier index 1 for region and trace).
+    // materialize_rows resolves through every tier, decoding all four
+    // secondary chunks; row 3 carries the second value of every field
+    // (tier index 1 for region and trace).
     let rows = reader.materialize_rows(&[3]).unwrap();
     let fields: std::collections::HashMap<String, String> =
         rows[0].fields.iter().cloned().collect();
@@ -1480,4 +1485,66 @@ fn second_chunk_per_tier_resolves() {
     assert_eq!(fields.get("region").map(String::as_str), Some("r2"));
     assert_eq!(fields.get("req").map(String::as_str), Some("q2"));
     assert_eq!(fields.get("trace").map(String::as_str), Some("t2"));
+}
+
+#[test]
+fn field_values_stream_from_the_dictionaries_alone() {
+    let data = two_per_tier_fixture();
+    let full = IndexReader::open(&data).unwrap();
+    let meta = MetaReader::open(&data).unwrap();
+    for field in ["level", "host", "region", "req", "trace"] {
+        let mut got = Vec::new();
+        let present = meta
+            .for_each_field_value(field, |v| {
+                got.push(String::from_utf8(v.to_vec()).unwrap());
+                std::ops::ControlFlow::Continue(())
+            })
+            .unwrap();
+        assert!(present, "{field}");
+        assert_eq!(got, full.field_values(field).unwrap(), "{field}");
+    }
+    assert!(
+        !meta
+            .for_each_field_value("absent", |_| std::ops::ControlFlow::Continue(()))
+            .unwrap()
+    );
+    let mut seen = 0;
+    meta.for_each_field_value("host", |_| {
+        seen += 1;
+        std::ops::ControlFlow::Break(())
+    })
+    .unwrap();
+    assert_eq!(seen, 1, "a break stops the walk");
+}
+
+#[test]
+fn dictionary_fsts_decode_alone_with_the_full_decodes_keys() {
+    // The FST-only decode relies on the payload's field order (FST bytes
+    // first); a reorder would break it, and this pins it.
+    use fst::{IntoStreamer, Streamer};
+    let data = two_per_tier_fixture();
+    let reader = crate::reader::ChunkReader::open(&data).unwrap();
+    let fst_keys = |map: fst::Map<Vec<u8>>| {
+        let mut keys = Vec::new();
+        let mut stream = map.into_stream();
+        while let Some((k, _)) = stream.next() {
+            keys.push(k.to_vec());
+        }
+        keys
+    };
+    let map_keys = |map: crate::PrefixMap<BitmapValue>| {
+        let mut keys = Vec::new();
+        map.for_each(|k, _| keys.push(k.to_vec()));
+        keys
+    };
+    assert_eq!(
+        fst_keys(reader.primary_fst().unwrap()),
+        map_keys(reader.primary().unwrap())
+    );
+    for idx in 0..2 {
+        assert_eq!(
+            fst_keys(reader.mid_field_fst(idx).unwrap()),
+            map_keys(reader.mid_field(idx).unwrap())
+        );
+    }
 }

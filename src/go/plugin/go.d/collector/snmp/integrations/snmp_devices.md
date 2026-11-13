@@ -102,6 +102,12 @@ A **profile** defines:
 2. Picks the best matching vendor/model profile(s)
 3. Collects exactly the metrics those profiles define
 
+Jobs collecting SNMP metrics check standard system information once per minute. When the name, description,
+contact, location or `sysObjectID` changes, the job identifies the device again: it reselects profiles and
+rebuilds device-specific collection state. The vnode GUID and history stay the same, and configured hostname
+and label overrides keep precedence. A device swapped for hardware reporting the same five values is not
+detected until the job restarts. `ping_only` jobs retain their setup-only SNMP probe.
+
 
 This collector is supported on all platforms.
 
@@ -552,6 +558,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 - `snmp.bgp.devices.peer_counts` for device-level peer/session counts
 - `snmp.bgp.devices.peer_states` for device-level peer-state summaries where the source MIB exposes canonical peer rows
 - Rich peer diagnostics live in the Live function `snmp:bgp-peers`, not in charted time-series
+- Process-scoped rows retain the BGP process and routing instance. AS, BGP version and description remain blank when their association cannot be proved.
 
 **BGP capability notes**
 
@@ -699,10 +706,11 @@ Current BGP peer and peer-family details from cached normalized SNMP data. Each 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Scope | string |  |  | Whether the row represents a peer or a peer-family. |
+| Process ID | string |  |  | BGP process identifier when exposed by the source MIB; blank when unavailable. |
 | Routing Instance | string |  |  | Routing-instance / VRF identifier when exposed by the source MIB. |
 | Neighbor | string |  |  | Remote peer address. |
 | Local Address | string |  |  | Local address used for the BGP session when exposed by the source MIB. |
-| Remote AS | string |  |  | Remote Autonomous System number. |
+| Remote AS | string |  |  | Remote Autonomous System number when its association with the peer is known. |
 | Peer Description | string |  |  | Peer description or label when exposed by the source MIB. |
 | Family | string |  |  | Address-family / SAFI scope for peer-family rows. |
 | Admin Status | string |  |  | Whether the peer is administratively enabled. |

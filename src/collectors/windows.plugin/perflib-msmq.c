@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "windows_plugin.h"
-#include "libnetdata/sanitizers/chart_id_and_name.h"
-
-#include <ctype.h>
 
 #define CONFIG_SECTION_PERFLIB_MSMQ "plugin:windows:PerflibMSMQ"
 #define MSMQ_DEFAULT_INDIVIDUAL_QUEUES 100
@@ -44,66 +41,6 @@ static int msmq_sample_compare(const void *a, const void *b)
     return cmp ? cmp : strcmp(name_a, name_b);
 }
 
-static char *msmq_normalize_patterns(const char *input)
-{
-    char *source = strdupz(input);
-    char *patterns = mallocz((strlen(source) * 2) + 1);
-    char *read = source, *write = patterns;
-    bool first = true;
-
-    while (*read) {
-        char *start = read;
-        while (*read && *read != ',' && *read != '|') {
-            if (*read == '\\' && read[1])
-                read += 2;
-            else
-                read++;
-        }
-
-        char *end = read;
-        while (start < end && isspace((unsigned char)*start))
-            start++;
-        while (end > start && isspace((unsigned char)end[-1]))
-            end--;
-
-        if (start < end) {
-            if (!first)
-                *write++ = ',';
-            bool token_start = true;
-            while (start < end) {
-                if (*start == '\\' && start + 1 < end) {
-                    char next = start[1];
-                    if (next == ',' || next == '|' || (next == '!' && token_start)) {
-                        *write++ = *start++;
-                        *write++ = *start++;
-                        token_start = false;
-                    } else {
-                        *write++ = '\\';
-                        *write++ = '\\';
-                        start++;
-                        token_start = false;
-                    }
-                } else if (*start == '\\') {
-                    *write++ = '\\';
-                    *write++ = '\\';
-                    start++;
-                    token_start = false;
-                } else {
-                    *write++ = *start++;
-                    token_start = false;
-                }
-            }
-            first = false;
-        }
-        if (*read)
-            read++;
-    }
-
-    *write = '\0';
-    freez(source);
-    return patterns;
-}
-
 static DICTIONARY *msmq_queues = NULL;
 static SIMPLE_PATTERN *queues_to_chart = NULL;
 static long long max_individual_queues = MSMQ_DEFAULT_INDIVIDUAL_QUEUES;
@@ -142,7 +79,7 @@ static void msmq_queue_insert_cb(const DICTIONARY_ITEM *item __maybe_unused, voi
 
 static void initialize(void)
 {
-    char *patterns = msmq_normalize_patterns(
+    char *patterns = windows_plugin_normalize_patterns(
         inicfg_get(&netdata_config, CONFIG_SECTION_PERFLIB_MSMQ, "queues to chart individually", "*"));
     queues_to_chart = simple_pattern_create(patterns, ",|", SIMPLE_PATTERN_EXACT, false);
     freez(patterns);
@@ -156,34 +93,6 @@ static void initialize(void)
 
     dictionary_register_insert_callback(msmq_queues, msmq_queue_insert_cb, NULL);
     dictionary_register_delete_callback(msmq_queues, msmq_queue_delete_cb, NULL);
-}
-
-static void msmq_queue_chart_id(
-    char *dst,
-    size_t size,
-    size_t chart_type_length,
-    const char *instance,
-    const char *suffix,
-    size_t suffix_length)
-{
-    const size_t instance_length = strnlen(instance, sizeof(windows_shared_buffer));
-    XXH64_hash_t hash = XXH3_64bits(instance, instance_length);
-    const size_t fixed_length = sizeof("msmq_queue_") - 1 + 1 + 16 + 1 + suffix_length;
-    const size_t full_id_limit = RRD_ID_LENGTH_MAX - 1;
-    const size_t type_prefix_length = chart_type_length + 1;
-    size_t chart_id_limit = full_id_limit > type_prefix_length ? full_id_limit - type_prefix_length : 0;
-    if (size && chart_id_limit >= size)
-        chart_id_limit = size - 1;
-    size_t visible_instance_length = chart_id_limit > fixed_length ? chart_id_limit - fixed_length : 0;
-    snprintfz(
-        dst,
-        size,
-        "msmq_queue_%.*s_%016llx_%s",
-        (int)visible_instance_length,
-        instance,
-        (unsigned long long)hash,
-        suffix);
-    netdata_fix_chart_name(dst);
 }
 
 static void msmq_chart(
@@ -207,7 +116,8 @@ static void msmq_chart(
     if (unlikely(!*st)) {
         char dynamic_id[RRD_ID_LENGTH_MAX + 1];
         if (queue_name) {
-            msmq_queue_chart_id(dynamic_id, sizeof(dynamic_id), chart_type_length, queue_name, suffix, suffix_length);
+            windows_plugin_instance_chart_id(
+                dynamic_id, sizeof(dynamic_id), chart_type_length, "msmq_queue_", queue_name, suffix, suffix_length);
             chart_id = dynamic_id;
         }
 

@@ -753,6 +753,7 @@ set(FREEBSD_PLUGIN_FILES
         src/collectors/freebsd.plugin/freebsd_devstat.c
         src/collectors/freebsd.plugin/freebsd_kstat_zfs.c
         src/collectors/freebsd.plugin/freebsd_ipfw.c
+        src/collectors/freebsd.plugin/freebsd_acpi_battery.c
         src/collectors/proc.plugin/zfs_common.c
         src/collectors/proc.plugin/zfs_common.h
 )
@@ -767,6 +768,8 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/GetServicesStatus.c
         src/collectors/windows.plugin/GetSensors.c
         src/collectors/windows.plugin/GetHardwareInfo.c
+        src/collectors/windows.plugin/GetPrinters.c
+        src/collectors/windows.plugin/GetFSRMQuota.c
         src/collectors/windows.plugin/perflib-adcs.c
         src/collectors/windows.plugin/perflib-adfs.c
         src/collectors/windows.plugin/perflib-rrd.c
@@ -778,6 +781,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-objects.c
         src/collectors/windows.plugin/perflib-network.c
         src/collectors/windows.plugin/perflib-smb.c
+        src/collectors/windows.plugin/perflib-smb-client.c
         src/collectors/windows.plugin/perflib-terminal-services.c
         src/collectors/windows.plugin/perflib-dns.c
         src/collectors/windows.plugin/perflib-netframework.c
@@ -790,6 +794,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-msmq.c
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
+        src/collectors/windows.plugin/perflib-pagefile.c
         src/collectors/windows.plugin/perflib-nps.c
 )
 

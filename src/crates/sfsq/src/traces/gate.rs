@@ -2,8 +2,13 @@
 //! filter that spares [`search`](super::search::search) an assembly
 //! per provably non-matching candidate.
 //!
-//! Trace-level predicates (`trace:root_service_name` / `trace:root_name`
-//! selections, `trace:duration` lower bounds) are decided
+//! Since the rows path (decision 49) the gates run only for the
+//! candidates it leaves to assembly — mostly traces held by files
+//! indexed before `TRSS` — and as rollup discovery's
+//! single-source pre-filter.
+//!
+//! Trace-level predicates (`root_service_name` / `root_name`
+//! selections, `trace_duration` lower bounds) are decided
 //! post-assembly; without a gate every candidate in the window is
 //! assembled just to be discarded, and rare predicates burn the
 //! assembled ceiling on discards. The per-file `TRSU` rollup already
@@ -21,9 +26,12 @@
 //! by explicit ruling as recall-miss only.
 //!
 //! The caller engages the gate only when every completion source
-//! opened at setup: a source that failed or was unavailable holds
-//! spans the gate cannot see, so every assembly is already degraded
-//! and nothing may be pruned toward.
+//! opened at setup (its metadata view): a source that failed or was
+//! unavailable holds spans the gate cannot see, so every assembly is
+//! already degraded and nothing may be pruned toward. A file that opens
+//! but later fails to open fully (a corrupt dictionary found at a plan
+//! compile or a merge) degrades every assembly from that point on, the
+//! same point-of-discovery rule as a corrupt rollup below.
 //!
 //! # Prune rules
 //!
@@ -34,7 +42,8 @@
 //!   unprunable (tails have no rollup; a tail span could change the
 //!   root or extend the envelope).
 //! - **Coverage-complete**: every surviving completion file is either
-//!   bloom-proven absent for the candidate or has a decoded rollup
+//!   screened out for the candidate (its bloom, or the session's tight
+//!   screen) or has a decoded rollup
 //!   (a present row is evidence; a missing row in a validly decoded
 //!   rollup proves the trace absent from that file). A file with no
 //!   rollup chunk (pre-rollup retention) is Uncovered and blocks
@@ -61,7 +70,7 @@
 //! A file that proves itself corrupt in ANY way — an undecodable TBLM
 //! or TRSU chunk, or a rollup ref the resolver cannot map to a proven
 //! value in its field (the closed rule; see
-//! [`sfst::RollupRootResolver`]) — becomes a FAILED SOURCE from the
+//! [`sfst::RollupRefResolver`]) — becomes a FAILED SOURCE from the
 //! point of discovery:
 //!
 //! - the gate stops consulting it and queues the discovery for the
@@ -87,19 +96,70 @@
 //! (and gate-off queries never read TRSU, so laziness of discovery
 //! cuts both ways).
 //!
+//! # The single-source proof
+//!
+//! Almost every trace lives in exactly one file (99.4% of a day's
+//! traces). When a gate engages, setup records every completion
+//! source's trace ids once per source in a fixed-size
+//! [`sfst::RepeatFilter`] ([`single_source_proof`]): every file's
+//! rollup ids and every tail's distinct ids. A candidate the filter
+//! proves single-source, emitted by a window file, lives in that file
+//! alone: the trace-level rules read that one rollup row (coverage is
+//! complete by the proof), and the token gate ([`tokens_prune`]) reads
+//! that one file's rows. Rollup discovery applies the same row rules
+//! while it reads a window file's rollup ([`TraceGate::check_row`]), so
+//! such a trace never enters the candidate pool. Other candidates (straddling traces and the
+//! filter's false positives) take the all-file path above. A file
+//! without a rollup, or one that fails to decode it, disables the proof
+//! for the query: its ids are unknown. So does passing
+//! [`PROOF_IDS_MAX`]: the proof is an accelerator with its own budget,
+//! never a cut-short filter (an unrecorded id would look single-source).
+//!
+//! # The token gate
+//!
+//! With two or more positive span-local tokens, discovery follows one
+//! (the driver) and the others are checked at assembly. For a
+//! single-source candidate, every other positive token's compiled set
+//! for its file is probed at the candidate's rows: a token matching
+//! none of them prunes. Raw rows over-approximate the canonical spans
+//! and the sets hold in-window rows only, so no raw match proves no
+//! canonical in-window match. Negated tokens never prune (a raw match
+//! may be a losing resend).
+//!
 //! # Cost accounting
 //!
 //! Pruned pops deliberately do NOT charge the assembled ceiling (that
-//! is the point) and the gate's probes are uncharged — the trade for
-//! the assemblies they replace. Termination is by pool drain; refills
-//! stay bounded by the visited-rows ceiling. Probes and decodes are
-//! counted in [`GateStats`] and logged once per query via
-//! `tracing::debug!` by the caller.
+//! is the point). The proof's recorded ids count against its own
+//! [`PROOF_IDS_MAX`], so the setup never eats the discovery budget.
+//! Every other read is charged to the visited ceiling, one unit each: a
+//! tail span collected for the gates, a screen, a rollup row, a
+//! root-ref resolution, a candidate's rows and each membership probe. Once the ceiling is breached the caller stops
+//! consulting the gates (assembling is always sound), so their work
+//! overshoots by at most one check. Probes and decodes are also counted
+//! in [`GateStats`] and logged once per query via `tracing::debug!` by
+//! the caller.
+//!
+//! # Memory
+//!
+//! The gate keeps no decoded file state of its own: a file's rollup and
+//! root-value dictionaries live in the caller's session (its loaded
+//! layer), every read reports to the query's
+//! [`LoadedSources`](sfst::LoadedSources) — so a candidate held by
+//! hundreds of files still keeps few loaded — and a file is screened
+//! before its rollup is read, so only files that hold the candidate
+//! decode one.
 
 use std::collections::HashSet;
 
+use sfst::ScanWork;
+
 use super::predicate::{EvalMatcher, GateRootField, TraceLevelEval};
 use super::vocab::{BuiltinField, resource_service_field};
+
+/// The single-source proof's budget in recorded ids (one per trace per
+/// completion source): about three days of the measured demo load (a
+/// day's completion range held ~2.3 M). Past it the proof is off.
+pub(crate) const PROOF_IDS_MAX: u64 = 8_000_000;
 
 /// The `name` dictionary spelling, from the shared vocabulary — the
 /// same source the truth path reads, never hand-written (a divergent
@@ -123,51 +183,22 @@ pub(crate) enum GateDecision {
 #[derive(Debug, Default)]
 pub(crate) struct GateStats {
     pub checks: u64,
+    pub single_source: u64,
+    pub rows_decided: u64,
     pub prunes: u64,
     pub no_root_prunes: u64,
     pub tail_unprunable: u64,
     pub uncovered_unprunable: u64,
-    pub bloom_probes: u64,
-    pub bloom_decodes: u64,
-    pub rollup_decodes: u64,
+    pub screens: u64,
+    pub rollup_rows: u64,
     pub corrupt_files: u64,
 }
 
-/// Per-file bloom state, resolved once per file.
-enum BloomState {
-    Unprobed,
-    /// No TBLM chunk: might-contain for every candidate (absence is a
-    /// version fact — mirrors the session's `BloomGate::Pass`).
-    PassAll,
-    Ready(sfst::TraceIdBloom),
-}
-
-/// Per-file rollup state, resolved once per file.
-enum RollupState {
-    Undecoded,
-    /// No TRSU chunk (pre-rollup file): blocks pruning for every
-    /// candidate the file might contain.
-    Uncovered,
-    Ready(Box<sfst::TraceRollup>),
-}
-
-/// One completion file's gate state, indexed in reader order.
-struct GateFile<'r, 'a> {
-    reader: &'r sfst::IndexReader<'a>,
-    bloom: BloomState,
-    rollup: RollupState,
-    resolver: Option<sfst::RollupRootResolver<'r, 'a>>,
-    /// Proven corrupt: out of the evidence set (the caller also removes
-    /// it from the truth by marking the source failed).
-    failed: bool,
-}
-
 /// One rollup row of evidence for the candidate under test.
+#[derive(Clone, Copy)]
 struct RowEvidence {
     file: usize,
-    row: usize,
-    /// The row's root-claim tri-state (`sfst::ROOT_CLAIM_*`).
-    claim: u8,
+    row: sfst::RollupRow,
 }
 
 /// One claiming row's verdict against one root condition.
@@ -180,10 +211,12 @@ enum RowVerdict {
 }
 
 /// The trace-level pre-assembly gate over one query's completion
-/// readers: per-file evidence caches plus the compiled prune rules,
-/// consulted per popped candidate.
-pub(crate) struct TraceGate<'r, 'a, 'e> {
-    files: Vec<GateFile<'r, 'a>>,
+/// sessions: the compiled prune rules, consulted per popped candidate.
+pub(crate) struct TraceGate<'e> {
+    /// Per completion session: proven corrupt, so out of the evidence
+    /// set (the caller also removes it from the truth by marking the
+    /// source failed).
+    failed: Vec<bool>,
     /// Trace ids with ANY tail presence — unprunable wholesale.
     tail_ids: HashSet<sfst::TraceId>,
     /// Positive root conditions; matchers borrow the compiled eval.
@@ -199,26 +232,17 @@ pub(crate) struct TraceGate<'r, 'a, 'e> {
     pub(crate) stats: GateStats,
 }
 
-impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
-    /// Build the gate over the completion readers (indices align with
-    /// the caller's reader/session/origin order) and the eagerly
-    /// collected tail provenance ids.
+impl<'e> TraceGate<'e> {
+    /// Build the gate over `files` completion sessions (indices align
+    /// with the caller's session/origin order; each check lends them)
+    /// and the eagerly collected tail provenance ids.
     pub(crate) fn new(
-        readers: Vec<&'r sfst::IndexReader<'a>>,
+        files: usize,
         tail_ids: HashSet<sfst::TraceId>,
         eval: &'e TraceLevelEval,
     ) -> Self {
         Self {
-            files: readers
-                .into_iter()
-                .map(|reader| GateFile {
-                    reader,
-                    bloom: BloomState::Unprobed,
-                    rollup: RollupState::Undecoded,
-                    resolver: None,
-                    failed: false,
-                })
-                .collect(),
+            failed: vec![false; files],
             tail_ids,
             root_conditions: eval.prunable_root_conditions().collect(),
             has_root_conditions: eval.has_root_conditions(),
@@ -236,58 +260,119 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         std::mem::take(&mut self.new_failures)
     }
 
-    /// Decide one popped candidate. Always sound to ignore (assembling
-    /// a prunable candidate is never wrong — only slower).
-    pub(crate) fn check(&mut self, trace_id: sfst::TraceId) -> GateDecision {
+    /// Decide one popped candidate. `single_file` names the candidate's
+    /// only source when the single-source proof holds (module docs);
+    /// every read is charged to `work`. Always sound to ignore
+    /// (assembling a prunable candidate is never wrong — only slower).
+    pub(crate) fn check(
+        &mut self,
+        trace_id: sfst::TraceId,
+        single_file: Option<usize>,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+        loaded: &mut sfst::LoadedSources,
+        work: &mut ScanWork,
+    ) -> GateDecision {
         self.stats.checks += 1;
-        if self.tail_ids.contains(&trace_id) {
-            self.stats.tail_unprunable += 1;
-            return GateDecision::Assemble;
-        }
-
-        // ── Evidence collection: bloom probe, then rollup row ────────
         let mut rows: Vec<RowEvidence> = Vec::new();
-        for idx in 0..self.files.len() {
-            if self.files[idx].failed {
-                continue;
+        if let Some(idx) = single_file {
+            // ── The proof: this file alone holds the candidate ────────
+            self.stats.single_source += 1;
+            if self.failed[idx] {
+                return GateDecision::Assemble;
             }
-            if !self.probe_bloom(idx, trace_id) {
-                continue; // proven absent from this file, or file failed
-            }
-            match self.decode_rollup(idx) {
-                RollupProbe::Uncovered => {
-                    // Short-circuit: one uncovered bloom-present file
-                    // already forces UNPRUNABLE.
-                    self.stats.uncovered_unprunable += 1;
+            work.rows_visited += 1;
+            self.stats.rollup_rows += 1;
+            let evidence = sessions[idx].rollup_row(trace_id);
+            loaded.touch(idx, sessions);
+            match evidence {
+                Ok(sfst::RollupEvidence::Row(row)) => rows.push(RowEvidence { file: idx, row }),
+                // The proof recorded this file's rollup ids, so a row
+                // must exist; without one there is nothing to decide on.
+                Ok(_) => return GateDecision::Assemble,
+                Err(e) => {
+                    tracing::warn!("sfsq traces gate: trace rollup failed to decode: {e}");
+                    self.mark_failed(idx);
                     return GateDecision::Assemble;
                 }
-                RollupProbe::Failed => continue,
-                RollupProbe::Ready => {
-                    let RollupState::Ready(rollup) = &self.files[idx].rollup else {
-                        unreachable!("probe said Ready")
-                    };
-                    if let Some(row) = rollup.find(trace_id) {
-                        rows.push(RowEvidence {
-                            file: idx,
-                            row,
-                            claim: rollup.root_is_true_root[row],
-                        });
+            }
+        } else {
+            if self.tail_ids.contains(&trace_id) {
+                self.stats.tail_unprunable += 1;
+                return GateDecision::Assemble;
+            }
+
+            // ── Evidence collection: screen, then rollup row ─────────
+            for idx in 0..self.failed.len() {
+                if self.failed[idx] {
+                    continue;
+                }
+                work.rows_visited += 1;
+                if !self.screen(idx, trace_id, sessions) {
+                    continue; // proven absent from this file, or file failed
+                }
+                work.rows_visited += 1;
+                self.stats.rollup_rows += 1;
+                let evidence = sessions[idx].rollup_row(trace_id);
+                loaded.touch(idx, sessions);
+                match evidence {
+                    Ok(sfst::RollupEvidence::NoRollup) => {
+                        // Short-circuit: one uncovered screened-in file
+                        // already forces UNPRUNABLE.
+                        self.stats.uncovered_unprunable += 1;
+                        return GateDecision::Assemble;
                     }
                     // A missing row in a valid rollup proves the trace
                     // absent from this file — nothing to collect.
+                    Ok(sfst::RollupEvidence::Absent) => {}
+                    Ok(sfst::RollupEvidence::Row(row)) => {
+                        rows.push(RowEvidence { file: idx, row });
+                    }
+                    Err(e) => {
+                        tracing::warn!("sfsq traces gate: trace rollup failed to decode: {e}");
+                        self.mark_failed(idx);
+                    }
                 }
             }
         }
         // Coverage-complete now holds over the surviving files.
+        self.decide(&rows, sessions, loaded, work)
+    }
 
+    /// Decide a candidate from ONE rollup row of a file the single-source
+    /// proof says holds it alone (rollup discovery's local verdict) —
+    /// the same rules as [`check`](Self::check), on that row.
+    pub(crate) fn check_row(
+        &mut self,
+        file: usize,
+        row: sfst::RollupRow,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+        loaded: &mut sfst::LoadedSources,
+        work: &mut ScanWork,
+    ) -> GateDecision {
+        if self.failed[file] {
+            return GateDecision::Assemble;
+        }
+        self.stats.rows_decided += 1;
+        self.decide(&[RowEvidence { file, row }], sessions, loaded, work)
+    }
+
+    /// The prune rules over the candidate's covering rows (every file
+    /// that may hold it, coverage complete).
+    fn decide(
+        &mut self,
+        rows: &[RowEvidence],
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+        loaded: &mut sfst::LoadedSources,
+        work: &mut ScanWork,
+    ) -> GateDecision {
         // ── Root claim census (decision 1D) ──────────────────────────
         let mut any_claim = false;
         let mut any_withheld = false;
-        for r in &rows {
-            if self.files[r.file].failed {
+        for r in rows {
+            if self.failed[r.file] {
                 continue;
             }
-            match r.claim {
+            match r.row.root_claim {
                 sfst::ROOT_CLAIM_TRUE => any_claim = true,
                 sfst::ROOT_CLAIM_WITHHELD => any_withheld = true,
                 _ => {}
@@ -316,25 +401,25 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         'condition: for ci in 0..positive_conditions {
             let (field, matcher) = self.root_conditions[ci];
             let mut claiming = 0usize;
-            for &RowEvidence { file, row, claim } in &rows {
-                if self.files[file].failed {
+            for &RowEvidence { file, row } in rows {
+                if self.failed[file] {
                     continue; // defensive: never read evidence from a failed file
                 }
-                let RollupState::Ready(rollup) = &self.files[file].rollup else {
-                    unreachable!("evidence rows come from Ready rollups")
-                };
-                if claim != sfst::ROOT_CLAIM_TRUE {
+                if row.root_claim != sfst::ROOT_CLAIM_TRUE {
                     continue;
                 }
                 claiming += 1;
                 let kv_ref = match field {
-                    GateRootField::Service => rollup.root_service_refs[row],
-                    GateRootField::Name => rollup.root_name_refs[row],
+                    GateRootField::Service => row.root_service_ref,
+                    GateRootField::Name => row.root_name_ref,
                 };
                 if kv_ref == sfst::ROLLUP_NO_REF {
                     continue; // absent never satisfies: this row fails
                 }
-                match self.resolve_row(file, field, kv_ref, matcher) {
+                work.rows_visited += 1;
+                let verdict = self.resolve_row(file, field, kv_ref, matcher, sessions);
+                loaded.touch(file, sessions);
+                match verdict {
                     RowVerdict::Matches => continue 'condition,
                     RowVerdict::Fails => {}
                     RowVerdict::Corrupt => {
@@ -359,14 +444,11 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
         // ── Duration rule: merged envelope below the lower bound ─────
         if let Some(bound) = self.duration_lower_bound {
             let mut envelope: Option<(i64, i64)> = None;
-            for &RowEvidence { file, row, .. } in &rows {
-                if self.files[file].failed {
+            for &RowEvidence { file, row } in rows {
+                if self.failed[file] {
                     continue;
                 }
-                let RollupState::Ready(rollup) = &self.files[file].rollup else {
-                    unreachable!("evidence rows come from Ready rollups")
-                };
-                let (min_start, max_end) = (rollup.min_start_ns[row], rollup.max_end_ns[row]);
+                let (min_start, max_end) = (row.min_start_ns, row.max_end_ns);
                 envelope = Some(match envelope {
                     None => (min_start, max_end),
                     Some((lo, hi)) => (lo.min(min_start), hi.max(max_end)),
@@ -386,105 +468,128 @@ impl<'r, 'a, 'e> TraceGate<'r, 'a, 'e> {
 
     /// Resolve one claiming row's ref and apply the condition matcher.
     fn resolve_row(
-        &mut self,
+        &self,
         file: usize,
         field: GateRootField,
         kv_ref: u32,
         matcher: &EvalMatcher,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
     ) -> RowVerdict {
         let field_name: &str = match field {
             GateRootField::Service => &self.service_field,
             GateRootField::Name => name_field(),
         };
-        let entry = &mut self.files[file];
-        let reader = entry.reader;
-        let resolver = entry
-            .resolver
-            .get_or_insert_with(|| sfst::RollupRootResolver::new(reader));
-        match resolver.resolve(field_name, kv_ref) {
-            sfst::RollupRefOutcome::Value(value) => {
+        // Resolving a value needs the full reader (the dictionaries);
+        // a file that cannot open fully cannot prove its claim.
+        match sessions[file].resolve_rollup_ref(field_name, kv_ref) {
+            Ok(sfst::RollupRefOutcome::Value(value)) => {
                 if matcher.value_matches(value) {
                     RowVerdict::Matches
                 } else {
                     RowVerdict::Fails
                 }
             }
-            sfst::RollupRefOutcome::Corrupt => RowVerdict::Corrupt,
+            Ok(sfst::RollupRefOutcome::Corrupt) | Err(_) => RowVerdict::Corrupt,
         }
     }
 
-    /// Whether the candidate MIGHT be in file `idx` (bloom semantics).
-    /// A bloom decode failure fails the file (corrupt) and returns
-    /// `false` — the file is no longer evidence OR truth.
-    fn probe_bloom(&mut self, idx: usize, trace_id: sfst::TraceId) -> bool {
-        if matches!(self.files[idx].bloom, BloomState::Unprobed) {
-            let reader = self.files[idx].reader;
-            self.files[idx].bloom = if !reader.has_trace_id_bloom() {
-                BloomState::PassAll
-            } else {
-                self.stats.bloom_decodes += 1;
-                match reader.trace_id_bloom() {
-                    Ok(bloom) => BloomState::Ready(bloom),
-                    Err(e) => {
-                        tracing::warn!("sfsq traces gate: trace-id bloom failed to decode: {e}");
-                        self.mark_failed(idx);
-                        return false;
-                    }
-                }
-            };
+    /// Whether the candidate MIGHT be in file `idx` (the session's
+    /// bloom, then its screen). An unreadable bloom fails the file
+    /// (corrupt) and returns `false` — the file is no longer evidence OR
+    /// truth.
+    fn screen(
+        &mut self,
+        idx: usize,
+        trace_id: sfst::TraceId,
+        sessions: &mut [sfst::TraceFileSession<'_, '_>],
+    ) -> bool {
+        if sessions[idx].bloom_unreadable() {
+            self.mark_failed(idx);
+            return false;
         }
-        self.stats.bloom_probes += 1;
-        match &self.files[idx].bloom {
-            BloomState::PassAll => true,
-            BloomState::Ready(bloom) => bloom.might_contain(trace_id),
-            BloomState::Unprobed => unreachable!("resolved above"),
-        }
-    }
-
-    /// Decode (once) and report the file's rollup state. A decode
-    /// failure marks the file corrupt and reports
-    /// [`RollupProbe::Failed`].
-    fn decode_rollup(&mut self, idx: usize) -> RollupProbe {
-        if matches!(self.files[idx].rollup, RollupState::Undecoded) {
-            let reader = self.files[idx].reader;
-            self.files[idx].rollup = if !reader.has_trace_rollup() {
-                RollupState::Uncovered
-            } else {
-                self.stats.rollup_decodes += 1;
-                match reader.trace_rollup() {
-                    Ok(rollup) => RollupState::Ready(Box::new(rollup)),
-                    Err(e) => {
-                        tracing::warn!("sfsq traces gate: trace rollup failed to decode: {e}");
-                        self.mark_failed(idx);
-                        return RollupProbe::Failed;
-                    }
-                }
-            };
-        }
-        match &self.files[idx].rollup {
-            RollupState::Uncovered => RollupProbe::Uncovered,
-            RollupState::Ready(_) => RollupProbe::Ready,
-            RollupState::Undecoded => unreachable!("resolved above"),
-        }
+        self.stats.screens += 1;
+        sessions[idx].screen(trace_id)
     }
 
     /// Record the file as proven corrupt: out of the evidence set from
     /// now on, queued for the caller to surface.
     fn mark_failed(&mut self, idx: usize) {
-        if !self.files[idx].failed {
-            self.files[idx].failed = true;
+        if !self.failed[idx] {
+            self.failed[idx] = true;
             self.new_failures.push(idx);
             self.stats.corrupt_files += 1;
         }
     }
 }
 
-/// One file's rollup readiness during evidence collection.
-enum RollupProbe {
-    /// No TRSU chunk: Uncovered — forces UNPRUNABLE for this candidate.
-    Uncovered,
-    /// Decode failed: the file was marked corrupt; skip it.
-    Failed,
-    /// Decoded; its rows join the evidence set.
-    Ready,
+/// The single-source proof (module docs): record every completion
+/// source's trace ids once per source — each file's rollup ids, then
+/// each tail's distinct ids — stopping once more than `max_ids` are
+/// recorded. `Ok(None)` when a file has no rollup (its ids are unknown,
+/// so no id is provably single-source), the budget ran out, or
+/// `cancelled` fired. `Err((file, error))` when a file's rollup fails
+/// to decode: a corrupt source the caller surfaces (module docs).
+pub(crate) fn single_source_proof(
+    sessions: &mut [sfst::TraceFileSession<'_, '_>],
+    tail_ids: &[HashSet<sfst::TraceId>],
+    loaded: &mut sfst::LoadedSources,
+    max_ids: u64,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<Option<sfst::RepeatFilter>, (usize, sfst::Error)> {
+    let mut filter = sfst::RepeatFilter::new();
+    let mut recorded = 0u64;
+    for idx in 0..sessions.len() {
+        if cancelled() {
+            return Ok(None);
+        }
+        let visited = sessions[idx].for_each_rollup_row(|id, _| filter.record(id));
+        loaded.touch(idx, sessions);
+        match visited {
+            Ok(Some(n)) => recorded += n as u64,
+            Ok(None) => return Ok(None),
+            Err(e) => return Err((idx, e)),
+        }
+        if recorded > max_ids {
+            return Ok(None);
+        }
+    }
+    for ids in tail_ids {
+        for &id in ids {
+            filter.record(id);
+        }
+        recorded += ids.len() as u64;
+        if recorded > max_ids {
+            return Ok(None);
+        }
+    }
+    Ok(Some(filter))
+}
+
+/// The token gate (module docs) for a candidate held by `session`'s
+/// file alone: `true` (prune) when one of `others` — the file's compiled
+/// sets of the positive span-local tokens other than the driver —
+/// matches none of the candidate's rows. Charged: one unit for the row
+/// lookup, then one per row and per probe. A lookup the file cannot
+/// answer prunes nothing (the assembly reads the same rows and surfaces
+/// the failure).
+pub(crate) fn tokens_prune(
+    trace_id: sfst::TraceId,
+    session: &mut sfst::TraceFileSession<'_, '_>,
+    sets: &[sfst::CompiledTracePlan],
+    driver: usize,
+    work: &mut ScanWork,
+) -> bool {
+    work.rows_visited += 1;
+    let Ok(positions) = session.positions(trace_id) else {
+        return false;
+    };
+    work.rows_visited += positions.len() as u64;
+    // The driver's set emitted the candidate: it matches by construction.
+    for (_, plan) in sets.iter().enumerate().filter(|&(i, _)| i != driver) {
+        work.rows_visited += positions.len() as u64;
+        if !positions.iter().any(|&pos| plan.contains(pos)) {
+            return true;
+        }
+    }
+    false
 }

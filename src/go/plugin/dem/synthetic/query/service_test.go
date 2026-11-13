@@ -84,7 +84,7 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, captures.Close()) })
 	runID := fixtureRunID()
-	work, err := captures.Begin(runID, "lighthouse:home")
+	work, err := captures.Begin(runID, "lighthouse:home", "")
 	require.NoError(t, err)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	content := []byte("<html>private report</html>")
@@ -144,7 +144,7 @@ func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {
 		require.NoError(t, err)
 		runID := fixtureRunID()
 		const jobID = "lighthouse:retired"
-		work, err := captures.Begin(runID, jobID)
+		work, err := captures.Begin(runID, jobID, "")
 		require.NoError(t, err)
 		body := []byte("<html>retained report</html>")
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
@@ -203,6 +203,33 @@ func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {
 	})
 }
 
+func TestScreenshotAssociationWithoutHistoryOrActiveJob(t *testing.T) {
+	root := t.TempDir()
+	store, err := artifacts.Open(root)
+	require.NoError(t, err)
+	id := fixtureRunID()
+	work, err := store.Begin(id, "journey:retired", "")
+	require.NoError(t, err)
+	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+	body := []byte("\x89PNG\r\n\x1a\nfixture")
+	require.NoError(t, os.WriteFile(filepath.Join(work, "output/screenshot.png"), body, 0600))
+	test := synthetic.ArtifactTest{ID: "test1", Title: "Checkout"}
+	_, err = store.Finalize(t.Context(), id, []synthetic.Capture{{ID: "s1", Kind: "screenshot", MIME: "image/png", Path: "output/screenshot.png", Test: test}})
+	require.NoError(t, err)
+	require.NoError(t, store.Close())
+	store, err = artifacts.Open(root)
+	require.NoError(t, err)
+	defer store.Close()
+	service := query.New(registry.New(), nil, store, nil)
+	evidence, err := service.Evidence(t.Context(), "journey:retired", id, "s1")
+	require.NoError(t, err)
+	require.Len(t, evidence.Artifacts, 1)
+	assert.Equal(t, test, evidence.Artifacts[0].Test)
+	assert.Equal(t, body, evidence.Body)
+	_, err = service.Evidence(t.Context(), "journey:other", id, "s1")
+	require.ErrorIs(t, err, query.ErrNotFound)
+}
+
 func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 	for _, damage := range []string{"corrupt", "missing", "wrong owner"} {
 		t.Run(damage, func(t *testing.T) {
@@ -212,7 +239,7 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 			require.NoError(t, err)
 			defer captures.Close()
 			runID := fixtureRunID()
-			work, err := captures.Begin(runID, "lighthouse:owner")
+			work, err := captures.Begin(runID, "lighthouse:owner", "")
 			require.NoError(t, err)
 			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 			require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("report"), 0600))

@@ -49,13 +49,18 @@ func newRedactor(values map[string]string) *textRedactor {
 	}
 }
 func (r *textRedactor) text(value string) string {
+	return clip(r.redacted(value))
+}
+
+// redacted leaves clipping to typed consumers that must disclose it.
+func (r *textRedactor) redacted(value string) string {
 	value = r.patterns.Apply(r.exact.Replace(value))
 	// An upstream text cap or cancellation may remove a PEM closing marker.
 	// Retain no suffix of an unfinished block just because it no longer matches.
 	if start := strings.Index(strings.ToLower(value), "-----begin "); start >= 0 {
 		value = value[:start] + "[REDACTED]"
 	}
-	return clip(value)
+	return value
 }
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= TextLimit {
@@ -66,20 +71,28 @@ func clip(s string) string {
 
 // result is terminal reporter evidence, not process-tree completion evidence.
 type reporterResult struct {
-	Status       synthetic.Outcome     `json:"status"`
-	Error        string                `json:"error,omitempty"`
-	Tests        *synthetic.TestCounts `json:"tests,omitempty"`
-	Metrics      *synthetic.LabMetrics `json:"metrics,omitempty"`
-	Artifacts    []synthetic.Capture   `json:"artifacts,omitempty"`
-	CaptureState string                `json:"capture_state"`
+	Status               synthetic.Outcome           `json:"status"`
+	TerminationReason    synthetic.TerminationReason `json:"termination_reason,omitempty"`
+	InterruptedArtifacts []synthetic.Capture         `json:"interrupted_artifacts,omitempty"`
+	Error                string                      `json:"error,omitempty"`
+	Tests                *synthetic.TestCounts       `json:"tests,omitempty"`
+	Metrics              *synthetic.LabMetrics       `json:"metrics,omitempty"`
+	Artifacts            []synthetic.Capture         `json:"artifacts,omitempty"`
+	CaptureState         string                      `json:"capture_state"`
 }
 
-type frame struct {
-	Type   string           `json:"type"`
-	Event  *synthetic.Event `json:"event,omitempty"`
-	Result *reporterResult  `json:"result,omitempty"`
+// wireEnvelope separates strict core decoding from optional-body validation.
+// Raw optional data never crosses the sink boundary.
+type wireEnvelope struct {
+	Type          string          `json:"type"`
+	Event         json.RawMessage `json:"event,omitempty"`
+	Result        json.RawMessage `json:"result,omitempty"`
+	ExtensionInit json.RawMessage `json:"extension_init,omitempty"`
+	Extension     json.RawMessage `json:"extension,omitempty"`
 }
+
 type sink struct {
+	extensions   *extensions
 	streams      map[string]*diagnosticStream
 	streamEvents map[string]synthetic.Event
 	mu           sync.Mutex
@@ -94,15 +107,19 @@ type sink struct {
 	tests        map[string]synthetic.Event
 }
 type sinkSnapshot struct {
-	events  []synthetic.Event
-	dropped int
-	result  *reporterResult
-	err     error
-	partial *synthetic.TestCounts
+	captures *synthetic.CaptureReport
+	browser  *synthetic.BrowserSummary
+	evidence *synthetic.FailureEvidence
+	events   []synthetic.Event
+	dropped  int
+	result   *reporterResult
+	err      error
+	partial  *synthetic.TestCounts
 }
 
-func newSink(kind synthetic.Kind, capture bool, redact *textRedactor) *sink {
+func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser bool) *sink {
 	return &sink{
+		extensions:   newExtensions(kind, browser, capture),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
 		kind:         kind,
@@ -129,7 +146,7 @@ func (s *sink) consume(reader io.Reader) error {
 		}
 		decoder := json.NewDecoder(strings.NewReader(string(raw)))
 		decoder.DisallowUnknownFields()
-		var record frame
+		var record wireEnvelope
 		if err := decoder.Decode(&record); err != nil {
 			return s.fail(fmt.Errorf("invalid runner protocol frame: %w", err))
 		}
@@ -142,31 +159,55 @@ func (s *sink) consume(reader io.Reader) error {
 			s.mu.Unlock()
 			return s.fail(errors.New("runner sent a frame after its terminal result"))
 		}
+		var protocolErr error
 		switch record.Type {
 		case "event":
-			if record.Event == nil || record.Result != nil {
-				s.mu.Unlock()
-				return s.fail(errors.New("invalid runner event envelope"))
+			if record.Result != nil || record.ExtensionInit != nil || record.Extension != nil {
+				protocolErr = errors.New("invalid runner event envelope")
+				break
 			}
-			if err := validateEvent(*record.Event); err != nil {
-				s.mu.Unlock()
-				return s.fail(err)
+			var event synthetic.Event
+			if err := decodeCore(record.Event, &event); err != nil {
+				protocolErr = err
+			} else if err := validateEvent(event); err != nil {
+				protocolErr = err
+			} else {
+				s.extensions.core()
+				s.add(event)
 			}
-			s.add(*record.Event)
 		case "result":
-			if record.Result == nil || record.Event != nil {
-				s.mu.Unlock()
-				return s.fail(errors.New("invalid runner result envelope"))
+			if record.Event != nil || record.ExtensionInit != nil || record.Extension != nil {
+				protocolErr = errors.New("invalid runner result envelope")
+				break
 			}
-			if err := validateResult(s.kind, s.capture, record.Result); err != nil {
-				s.mu.Unlock()
-				return s.fail(err)
+			var result reporterResult
+			if err := decodeCore(record.Result, &result); err != nil {
+				protocolErr = err
+			} else if err := validateResult(s.kind, s.capture, &result); err != nil {
+				protocolErr = err
+			} else {
+				s.extensions.core()
+				result.Error = s.redact.text(result.Error)
+				s.result = &result
 			}
-			record.Result.Error = s.redact.text(record.Result.Error)
-			s.result = record.Result
+		case "extension_init", "extension":
+			if record.Event != nil || record.Result != nil ||
+				record.Type == "extension_init" && record.Extension != nil ||
+				record.Type == "extension" && record.ExtensionInit != nil {
+				protocolErr = errors.New("mixed runner extension envelope")
+				break
+			}
+			if record.Type == "extension_init" {
+				s.extensions.init(record.ExtensionInit)
+			} else {
+				s.extensions.accept(record.Extension, s.redact)
+			}
 		default:
+			protocolErr = errors.New("unsupported runner frame type")
+		}
+		if protocolErr != nil {
 			s.mu.Unlock()
-			return s.fail(errors.New("unsupported runner frame type"))
+			return s.fail(protocolErr)
 		}
 		s.mu.Unlock()
 	}
@@ -175,6 +216,18 @@ func (s *sink) consume(reader io.Reader) error {
 	}
 	return nil
 }
+func decodeCore(raw json.RawMessage, value any) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return errors.New("missing runner core body")
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(value); err != nil {
+		return fmt.Errorf("invalid runner core body: %w", err)
+	}
+	return nil
+}
+
 func (s *sink) fail(err error) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -278,11 +331,14 @@ func (s *sink) snapshot() sinkSnapshot {
 		partial = &counts
 	}
 	return sinkSnapshot{
-		events:  append([]synthetic.Event{}, s.events...),
-		dropped: s.dropped,
-		result:  s.result,
-		err:     s.err,
-		partial: partial,
+		captures: s.extensions.captures.snapshot(),
+		evidence: s.extensions.evidence.snapshot(),
+		browser:  s.extensions.browser.snapshot(),
+		events:   append([]synthetic.Event{}, s.events...),
+		dropped:  s.dropped,
+		result:   s.result,
+		err:      s.err,
+		partial:  partial,
 	}
 }
 func validateEvent(event synthetic.Event) error {
@@ -314,7 +370,8 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 	default:
 		return errors.New("invalid terminal outcome")
 	}
-	if !capture && (result.CaptureState != "disabled" || len(result.Artifacts) != 0) {
+	candidateCount := len(result.Artifacts) + len(result.InterruptedArtifacts)
+	if !capture && (result.CaptureState != "disabled" || candidateCount != 0) {
 		return errors.New("runner captured content while capture was disabled")
 	}
 	if capture {
@@ -323,9 +380,25 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 		default:
 			return errors.New("invalid capture state")
 		}
-		if (result.CaptureState == "available") != (len(result.Artifacts) > 0) {
+		if (result.CaptureState == "available") != (candidateCount > 0) {
 			return errors.New("capture state contradicts artifact candidates")
 		}
+	}
+	switch result.TerminationReason {
+	case "":
+	case synthetic.ExecutionBudget, synthetic.TestTimeout, synthetic.SuiteTimeout:
+		if kind != synthetic.Journey || result.Status != synthetic.Timeout {
+			return errors.New("journey timeout reason contradicts terminal outcome")
+		}
+	case synthetic.CallerCancelled:
+		if result.Status != synthetic.Cancelled {
+			return errors.New("cancellation reason contradicts terminal outcome")
+		}
+	default:
+		return errors.New("unsupported runner termination reason")
+	}
+	if len(result.InterruptedArtifacts) > 0 && (kind != synthetic.Journey || result.TerminationReason != synthetic.ExecutionBudget) {
+		return errors.New("interrupted captures require a journey budget stop")
 	}
 	if kind == synthetic.Journey {
 		if result.Metrics != nil {
@@ -380,6 +453,11 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 			}
 		}
 	}
+	for _, a := range result.InterruptedArtifacts {
+		if a.Kind != "screenshot" || a.MIME != "image/png" {
+			return errors.New("unsupported interrupted journey capture")
+		}
+	}
 	for _, a := range result.Artifacts {
 		if kind == synthetic.Journey && (a.Kind != "screenshot" || a.MIME != "image/png") {
 			return errors.New("unsupported journey capture")
@@ -393,14 +471,16 @@ func validateResult(kind synthetic.Kind, capture bool, result *reporterResult) e
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 
 type wireRequest struct {
-	Version    int               `json:"version"`
-	Kind       synthetic.Kind    `json:"kind"`
-	RunID      string            `json:"run_id"`
-	WorkDir    string            `json:"work_dir"`
-	Script     string            `json:"script,omitempty"`
-	ScriptPath string            `json:"script_path,omitempty"`
-	URL        string            `json:"url,omitempty"`
-	TimeoutMS  int64             `json:"timeout_ms"`
-	Capture    bool              `json:"capture"`
-	Secrets    map[string]string `json:"secrets,omitempty"`
+	Extensions        []string          `json:"extensions,omitempty"`
+	Version           int               `json:"version"`
+	Kind              synthetic.Kind    `json:"kind"`
+	RunID             string            `json:"run_id"`
+	WorkDir           string            `json:"work_dir"`
+	Script            string            `json:"script,omitempty"`
+	ScriptPath        string            `json:"script_path,omitempty"`
+	URL               string            `json:"url,omitempty"`
+	TimeoutMS         int64             `json:"timeout_ms"`
+	StopAtMonotonicMS int64             `json:"stop_at_monotonic_ms,omitempty"`
+	Capture           bool              `json:"capture"`
+	Secrets           map[string]string `json:"secrets,omitempty"`
 }

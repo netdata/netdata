@@ -2,18 +2,19 @@
 //! passes documented in `recovery/{mod,local,remote,startup}.rs`, at the seams
 //! where those passes meet the components and remote storage:
 //!
-//! - `startup` (P7 fail-closed diff-sync): `startup_sync_*` pins the recursive
+//! - `startup` (P7 required diff-sync): `startup_sync_*` pins the recursive
 //!   LIST → parse/sanitize + own-machine (D6) filter → high-water seed →
 //!   bounded, short-circuiting diff-download-and-install pipeline: restore
 //!   after a wipe (incl. the auth-off `default` tenant), zero downloads when
 //!   everything is local, filename-only high-water seeding, hostile-key and
-//!   invalid-body skipping, and `Err` on every LIST/transport/timeout failure
-//!   (never a partial high-water write). The `validate_catalog_*` tests pin
+//!   invalid-body skipping, a failed attempt on every LIST/transport/timeout
+//!   failure (never a partial high-water write), and the repeat of the
+//!   attempt until the remote answers. The `validate_catalog_*` tests pin
 //!   the install oracle's per-entry arm priority;
 //!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
 //!   round-trip.
 //! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
-//!   on a failed seal plus the `holds_seq` routing predicate;
+//!   on a failed indexing operation plus the `holds_seq` routing predicate;
 //!   `recover_retention_*` pins SFST eviction gated on `is_remote_cataloged`
 //!   (ungated with storage disabled); `seed_*` pins replay of local catalogs
 //!   into uploaded/rotated state and the D-P8.1 corrupt-catalog matrix
@@ -27,8 +28,10 @@
 //!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
 //!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
 //!
-//! Not pinned here: `recover_orphaned_wals`, `drain_wal_deletes` and
-//! `recover_unuploaded` have no direct test, and the caller wiring
+//! `recover_wals_*` runs the three WAL passes with the real cleaner and
+//! pins their end state (it does not tell every wrong order apart).
+//!
+//! Not pinned here: `recover_unuploaded` has no direct test, and the caller wiring
 //! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
 //! remote_ok skip policy) is exercised only through the Err/skip contracts the
 //! passes themselves expose.
@@ -59,8 +62,8 @@ fn sk(seq: u64) -> file_registry::SeqKey {
 use crate::test_helpers::empty_summary;
 
 fn make_entry(seq: u64) -> otel_catalog::CatalogEntry {
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, seq, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, seq, partition_key);
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     otel_catalog::CatalogEntry {
         id,
@@ -400,8 +403,8 @@ fn validate_catalog_rejects_cross_date_entry() {
 
     // Entry whose remote_key is well-formed on the right machine/tenant/signal
     // and FileId, but on a DIFFERENT date (d18 != the catalog's d17).
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, partition_key);
     let mut catalog = Catalog::new(tenant.clone(), cat_date, ident());
     catalog.add(otel_catalog::CatalogEntry {
         id,
@@ -438,8 +441,8 @@ fn validate_catalog_rejects_cross_date_entry() {
 fn validate_one_entry_key(remote_key: String) -> Result<(), String> {
     let tenant = TenantId::from("tenant1");
     let date = d(17);
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, partition_key);
     let mut catalog = Catalog::new(tenant.clone(), date, ident());
     catalog.add(otel_catalog::CatalogEntry {
         id,
@@ -543,7 +546,7 @@ fn validate_catalog_rejection_arm_priority() {
 /// cancellation token, then cancel the token to stop the cleaner.
 async fn run_recover_retention(
     registry: &mut Registry,
-    retention: &bridge::config::RetentionConfig,
+    retention: &otel_bridge::config::RetentionConfig,
     storage_enabled: bool,
 ) {
     use crate::cleaner::Cleaner;
@@ -560,8 +563,8 @@ async fn run_recover_retention(
 
 /// Retention whose `max_files: 0` makes every tracked file evictable; the
 /// size/age knobs are set so they do not fire.
-fn evict_all_retention() -> bridge::config::RetentionConfig {
-    bridge::config::RetentionConfig {
+fn evict_all_retention() -> otel_bridge::config::RetentionConfig {
+    otel_bridge::config::RetentionConfig {
         max_files: 0,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(u64::MAX / 2),
@@ -609,6 +612,35 @@ async fn recover_retention_evicts_only_remote_cataloged() {
 }
 
 #[tokio::test]
+async fn recover_retention_keeps_its_limit_with_the_files_it_may_evict() {
+    // Three files where two may stay. The oldest is not on the remote yet,
+    // so it cannot go: it still takes one of the two places, and the next
+    // oldest, which is on the remote, goes instead.
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    for seq in [1u64, 2, 3] {
+        let id = file_registry::FileId::new(ident(), 0, seq, 0);
+        reg.sfst.track(id, ByteSize(1), empty_summary());
+    }
+    for seq in [2, 3] {
+        reg.mark_rotated(sk(seq));
+        reg.mark_remote_cataloged([sk(seq)]);
+    }
+    let two_files = otel_bridge::config::RetentionConfig {
+        max_files: 2,
+        ..evict_all_retention()
+    };
+
+    run_recover_retention(&mut reg, &two_files, true).await;
+
+    let kept: Vec<u64> = [1, 2, 3]
+        .into_iter()
+        .filter(|&seq| reg.sfst.get(seq).is_some())
+        .collect();
+    assert_eq!(kept, [1, 3]);
+}
+
+#[tokio::test]
 async fn recover_retention_evicts_all_when_storage_disabled() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
@@ -635,7 +667,7 @@ fn fs_operator() -> (opendal::Operator, tempfile::TempDir) {
     let tmp = tempfile::tempdir().unwrap();
     let mut builder = opendal::services::Fs::default();
     builder = builder.root(tmp.path().to_str().unwrap());
-    let op = opendal::Operator::new(builder).unwrap().finish();
+    let op = opendal::Operator::new(builder).unwrap();
     (op, tmp)
 }
 
@@ -650,15 +682,29 @@ fn place_local_catalog(
     min_ts: u32,
     max_ts: u32,
 ) -> std::path::PathBuf {
+    place_local_catalog_of(reg, date, &[max_seq], min_ts, max_ts)
+}
+
+/// A local catalog file with one entry per seq of `seqs` (the last is the
+/// largest), tracked in `reg`.
+fn place_local_catalog_of(
+    reg: &mut Registry,
+    date: NaiveDate,
+    seqs: &[u64],
+    min_ts: u32,
+    max_ts: u32,
+) -> std::path::PathBuf {
+    let max_seq = *seqs.last().unwrap();
     let path = reg
         .catalog_files
         .file_path(date, ident(), max_seq, min_ts, max_ts);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
 
-    // Write a real catalog container so reconcile can read its SFST seqs; the
-    // single entry's seq is `max_seq`.
+    // Write a real catalog container so reconcile can read its SFST seqs.
     let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, ident());
-    catalog.add(make_entry(max_seq));
+    for seq in seqs {
+        catalog.add(make_entry(*seq));
+    }
     let bytes = catalog.to_container_bytes().unwrap();
     std::fs::write(&path, &bytes).unwrap();
 
@@ -670,9 +716,171 @@ fn place_local_catalog(
     path
 }
 
+/// The remote is not the one the local catalog was written for (the
+/// operator moved `remote_storage.uri` to an empty bucket): the catalog is
+/// missing there, and so is the index file it names. The catalog must not be
+/// uploaded as it is: once it lands, its files count as being on the remote
+/// and retention may delete the only copy. The index file is to be uploaded
+/// again instead, through the normal path.
+#[tokio::test]
+async fn a_catalog_whose_index_file_is_not_on_the_remote_does_not_vouch_for_it() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    place_local_catalog(&mut reg, date, 10, 100, 200);
+    let id = make_entry(10).id;
+    reg.sfst.track(id, ByteSize(1), empty_summary());
+    // What seeding from the local catalog files marked.
+    reg.mark_uploaded(sk(10));
+    reg.mark_rotated(sk(10));
+
+    let (op, _op_tmp) = fs_operator();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    // Nothing was queued for upload, and the index file is one that still
+    // has to be uploaded.
+    assert_eq!(uploader.pending(), 0);
+    assert_eq!(reg.unuploaded_ids(), vec![id]);
+    assert!(!reg.is_rotated(sk(10)));
+    assert!(!reg.is_remote_cataloged(sk(10)));
+
+    cancel.cancel();
+}
+
+/// A catalog names two local index files; the remote has one of them. The
+/// catalog is not uploaded, and only the missing file loses its marks: the
+/// other one is on the remote, as the catalog said.
+#[tokio::test]
+async fn only_the_index_files_that_the_remote_lacks_lose_their_marks() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    place_local_catalog_of(&mut reg, date, &[9, 10], 100, 200);
+    for seq in [9, 10] {
+        reg.sfst
+            .track(make_entry(seq).id, ByteSize(1), empty_summary());
+        reg.mark_uploaded(sk(seq));
+        reg.mark_rotated(sk(seq));
+    }
+
+    let (op, _op_tmp) = fs_operator();
+    op.write(&make_entry(9).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(uploader.pending(), 0);
+    assert_eq!(reg.unuploaded_ids(), vec![make_entry(10).id]);
+    assert!(reg.is_uploaded(sk(9)) && reg.is_rotated(sk(9)));
+    assert!(!reg.is_remote_cataloged(sk(9)));
+
+    cancel.cancel();
+}
+
+/// Only an index file that is still local can be lost by a catalog that
+/// vouches for it. An index file that is neither local nor on the remote
+/// (it was evicted before the remote changed) does not hold the catalog
+/// back: else the catalog would be refused at every start, and its local
+/// files uploaded again every time.
+#[tokio::test]
+async fn an_index_file_that_is_not_local_does_not_hold_its_catalog_back() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
+    place_local_catalog_of(&mut reg, date, &[9, 10], 100, 200);
+    // Seq 9 is gone from the local disk and was never on this remote; seq
+    // 10 is local and on the remote.
+    reg.sfst
+        .track(make_entry(10).id, ByteSize(1), empty_summary());
+    reg.mark_uploaded(sk(10));
+    reg.mark_rotated(sk(10));
+
+    let (op, _op_tmp) = fs_operator();
+    op.write(&make_entry(10).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    let resp = tokio::time::timeout(std::time::Duration::from_secs(5), uploader.recv())
+        .await
+        .expect("the catalog must be uploaded")
+        .unwrap();
+    assert!(matches!(resp, UploaderResponse::CatalogUploaded { .. }));
+    assert!(reg.is_uploaded(sk(10)));
+
+    cancel.cancel();
+}
+
 /// The only test that drives a real `UploadCatalog` through the `Uploader`:
-/// a catalog missing from the remote is re-uploaded, its response is
-/// `CatalogUploaded`, and the remote bytes match the local file.
+/// a catalog missing from the remote, whose index file is there (its upload
+/// was cut by a stop), is re-uploaded, its response is `CatalogUploaded`,
+/// and the remote bytes match the local file.
 #[tokio::test]
 async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -680,9 +888,8 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let local_path = place_local_catalog(&mut reg, date, 10, 100, 200);
-    // The catalog's SFST is still local (a catalog missing from remote implies
-    // its SFSTs were never remote-cataloged, so they can't have been evicted) —
-    // the reconcile only considers catalogs that can gate a local SFST.
+    // The catalog's SFST is still local: the reconcile only considers
+    // catalogs that can gate a local SFST.
     reg.sfst.track(
         file_registry::FileId::new(ident(), 0, 10, 0),
         ByteSize(1),
@@ -690,6 +897,10 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     );
 
     let (op, _op_tmp) = fs_operator();
+    // The index file that the catalog names is on the remote.
+    op.write(&make_entry(10).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     let cancel = tokio_util::sync::CancellationToken::new();
     let mut uploader = crate::component::ComponentHandle::spawn::<
@@ -914,7 +1125,7 @@ async fn reconcile_confirms_old_catalog_of_still_local_sfst_so_it_can_evict() {
     );
 
     // Realistic production shape: horizon (2y) >> max_age (7d).
-    let retention = bridge::config::RetentionConfig {
+    let retention = otel_bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(7 * 86_400),
@@ -964,6 +1175,11 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
     reg.catalog_files.mark_pending_deletion(&path);
 
     let (op, _op_tmp) = fs_operator();
+    // The index file is on the remote: only the pending-deletion filter
+    // keeps this catalog from being uploaded.
+    op.write(&make_entry(10).remote_key, b"index file".to_vec())
+        .await
+        .unwrap();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
     let cancel = tokio_util::sync::CancellationToken::new();
     let mut uploader = crate::component::ComponentHandle::spawn::<
@@ -1127,8 +1343,8 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 /// single-day tests focused on one prefix. (`reconcile_remote_uploads` bounds
 /// its LIST window by the horizon-derived `catalog_retention_days`, clamped by
 /// `ingest.reconcile_days`.)
-fn today_window_retention() -> bridge::config::RetentionConfig {
-    bridge::config::RetentionConfig {
+fn today_window_retention() -> otel_bridge::config::RetentionConfig {
+    otel_bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(0),
@@ -1193,7 +1409,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1235,7 +1451,7 @@ async fn reconcile_remote_uploads_skips_already_rotated() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1274,7 +1490,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1315,7 +1531,7 @@ async fn reconcile_remote_uploads_propagates_list_error() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await;
 
@@ -1359,7 +1575,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1373,7 +1589,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     cancel.cancel();
 }
 
-// ── recover_unindexed: skip-and-orphan on seal failure ──────────────────
+// ── recover_unindexed: skip-and-orphan on indexing failure ──────────────
 
 /// Indexer mock that fails every request — drives the skip-and-orphan path
 /// without needing an undecodable fixture.
@@ -1391,9 +1607,9 @@ impl crate::component::Component for FailingIndexer {
         _cancel: tokio_util::sync::CancellationToken,
     ) {
         while let Some(req) = rx.recv().await {
-            let crate::ipc::IndexerRequest::Index { wal_path, .. } = req;
+            let crate::ipc::IndexerRequest::Index { file_id, .. } = req;
             let _ = tx.send(crate::ipc::IndexerResponse::IndexFailed {
-                path: wal_path,
+                file_id,
                 error: "mock: undecodable".into(),
             });
         }
@@ -1421,12 +1637,112 @@ impl crate::component::Component for IdleCleaner {
     }
 }
 
+/// Indexer mock that answers every request with a one-record index (it
+/// writes no file).
+struct IndexingStub;
+
+impl crate::component::Component for IndexingStub {
+    type Request = crate::ipc::IndexerRequest;
+    type Response = crate::ipc::IndexerResponse;
+    type Args = ();
+
+    async fn run(
+        _args: (),
+        mut rx: tokio::sync::mpsc::UnboundedReceiver<Self::Request>,
+        tx: tokio::sync::mpsc::UnboundedSender<Self::Response>,
+        _cancel: tokio_util::sync::CancellationToken,
+    ) {
+        while let Some(req) = rx.recv().await {
+            let crate::ipc::IndexerRequest::Index { file_id, .. } = req;
+            let _ = tx.send(crate::ipc::IndexerResponse::Indexed {
+                file_id,
+                summary: crate::test_helpers::summary_for("", "", 1, 0, 0),
+                size: file_registry::ByteSize(4242),
+            });
+        }
+    }
+}
+
 #[tokio::test]
-async fn recover_unindexed_orphans_unsealable_wals() {
-    // Pins `recover_unindexed`'s orphan policy on a failed seal: the pass
-    // returns Ok (not fatal), the WAL entry is untracked (the planner never
-    // sees it), the seq is not routable (`holds_seq`), the bytes stay on
-    // disk, and the next restart re-discovers and re-orphans the file.
+async fn recover_wals_deletes_the_indexed_wal_indexes_the_other_and_owes_the_cleaner_nothing() {
+    // Two WAL files of the last run: the first already has its index (a
+    // stop between the index and the WAL delete), the second has none.
+    let wal_dir = tempfile::tempdir().unwrap();
+    let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
+    let mut writer = wal::Writer::new(
+        wal_dir.path(),
+        wal::Config::default(),
+        seq_alloc,
+        wal::FileStamp {
+            pipeline_id: 0,
+            payload_format: 7,
+        },
+        ident(),
+    )
+    .unwrap();
+    for partition_key in [1, 2] {
+        let meta = wal::FrameMeta {
+            entry_count: 1,
+            ingestion_ns: file_registry::TimestampNs(partition_key),
+            log_ts_range: None,
+        };
+        writer
+            .write_frame(partition_key, &[], b"frame", meta)
+            .unwrap();
+    }
+    writer.shutdown_all().unwrap();
+
+    let mut wal_reg = wal::Registry::new(wal_dir.path());
+    wal_reg.recover().unwrap();
+    let sfst_dir = tempfile::tempdir().unwrap();
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut registry = Registry::new(
+        wal_reg,
+        sfst::Registry::new(sfst_dir.path()),
+        otel_catalog::Registry::new(catalog_dir.path(), TenantId::from("tenant1")),
+    );
+    let ids = registry.unindexed_ids();
+    assert_eq!(ids.len(), 2);
+    let (indexed, unindexed) = (ids[0], ids[1]);
+    registry.sfst.track(
+        indexed,
+        file_registry::ByteSize(1),
+        crate::test_helpers::summary_for("", "", 1, 0, 0),
+    );
+    let wal_paths = [
+        registry.wal.file_path(indexed),
+        registry.wal.file_path(unindexed),
+    ];
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut indexer = crate::component::ComponentHandle::spawn::<IndexingStub>((), cancel.clone());
+    let mut cleaner =
+        crate::component::ComponentHandle::spawn::<crate::cleaner::Cleaner>((), cancel.clone());
+
+    recover_wals(&mut registry, &mut indexer, &mut cleaner)
+        .await
+        .unwrap();
+
+    // Every answer of the cleaner was taken by the pass that asked for it.
+    assert_eq!(cleaner.pending(), 0);
+    for (id, path) in [indexed, unindexed].iter().zip(&wal_paths) {
+        assert!(registry.wal.get(id.seq).is_none(), "WAL entry untracked");
+        assert!(!path.exists(), "WAL file deleted");
+    }
+    // The new index is tracked, with the size that the indexer gave.
+    let tracked = registry.sfst.get(unindexed.seq).unwrap();
+    assert_eq!(tracked.size, file_registry::ByteSize(4242));
+
+    cancel.cancel();
+}
+
+#[tokio::test]
+async fn recover_unindexed_orphans_unindexable_wals() {
+    // Pins `recover_unindexed`'s orphan policy on a failed indexing
+    // operation: the pass returns Ok (not fatal), the WAL entry is
+    // untracked (the planner never sees it), the seq is not routable
+    // (`holds_seq`), the bytes stay on disk, and the next restart
+    // re-discovers and re-orphans the file.
     //
     // Setup: a real archived WAL file, tracked by directory recovery.
     let wal_dir = tempfile::tempdir().unwrap();
@@ -1476,11 +1792,11 @@ async fn recover_unindexed_orphans_unsealable_wals() {
         crate::component::ComponentHandle::spawn::<FailingIndexer>((), cancel.clone());
     let mut cleaner = crate::component::ComponentHandle::spawn::<IdleCleaner>((), cancel.clone());
 
-    // A seal failure must not fail recovery: the pass skips the file and
-    // startup proceeds.
+    // An indexing failure must not fail recovery: the pass skips the
+    // file and startup proceeds.
     recover_unindexed(&mut registry, &mut indexer, &mut cleaner)
         .await
-        .expect("seal failures are skipped, not fatal");
+        .expect("indexing failures are skipped, not fatal");
 
     // The entry is untracked (the planner never sees it)...
     assert!(registry.wal.get(seq).is_none(), "WAL entry untracked");
@@ -1491,8 +1807,8 @@ async fn recover_unindexed_orphans_unsealable_wals() {
     assert!(wal_path.exists(), "orphan file kept on disk");
 
     // Second restart: the orphan is re-discovered (its header is valid),
-    // the seal is retried, and it re-orphans — the self-healing loop the
-    // policy promises, not a one-shot skip.
+    // the indexing operation is retried, and it re-orphans — the
+    // self-healing loop the policy promises, not a one-shot skip.
     let mut wal_reg2 = wal::Registry::new(wal_dir.path());
     wal_reg2.recover().unwrap();
     let sfst_dir2 = tempfile::tempdir().unwrap();
@@ -1591,9 +1907,9 @@ fn place_local_catalog_for(
         .file_path(date, identity, max_seq, min_ts, max_ts);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     let mut catalog = otel_catalog::Catalog::new(TenantId::from("tenant1"), date, identity);
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     catalog.add(otel_catalog::CatalogEntry {
-        id: file_registry::FileId::new(identity, 0, max_seq, part_key),
+        id: file_registry::FileId::new(identity, 0, max_seq, partition_key),
         remote_key: String::new(),
         min_timestamp_s: min_ts,
         max_timestamp_s: max_ts,
@@ -1670,7 +1986,7 @@ async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1719,7 +2035,7 @@ async fn reconcile_remote_ignores_foreign_machine_objects() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1770,7 +2086,7 @@ async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
         &storage,
         &TenantId::from("tenant1"),
         &today_window_retention(),
-        &bridge::config::IngestConfig::default(),
+        &otel_bridge::config::IngestConfig::default(),
     )
     .await
     .unwrap();
@@ -1915,6 +2231,40 @@ impl crate::storage::Storage for HangingStorage {
     }
 }
 
+/// A `Storage` whose first `list_failures` LISTs fail and whose later ones
+/// answer with an empty listing: an outage of the remote that ends.
+struct RecoveringStorage {
+    list_failures: usize,
+    list_calls: std::sync::atomic::AtomicUsize,
+}
+
+impl crate::storage::Storage for RecoveringStorage {
+    async fn write(
+        &self,
+        _key: &str,
+        _data: Vec<u8>,
+    ) -> Result<crate::storage::WriteMeta, crate::storage::StorageError> {
+        unreachable!("the start-up sync writes nothing to the remote")
+    }
+    async fn list(&self, _prefix: &str) -> Result<Vec<String>, crate::storage::StorageError> {
+        let call = self
+            .list_calls
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        if call < self.list_failures {
+            return Err(crate::storage::StorageError::Other(anyhow::anyhow!(
+                "connection refused"
+            )));
+        }
+        Ok(Vec::new())
+    }
+    async fn read(&self, _key: &str) -> Result<Vec<u8>, crate::storage::StorageError> {
+        unreachable!("an empty listing has nothing to download")
+    }
+    async fn stat(&self, _key: &str) -> Result<(), crate::storage::StorageError> {
+        unreachable!("the start-up sync probes nothing")
+    }
+}
+
 /// An op_timeout no test operation can hit; the hang test passes its own
 /// short timeout instead.
 fn long_timeout() -> std::time::Duration {
@@ -1932,8 +2282,8 @@ fn catalog_object(
 ) -> (String, Vec<u8>) {
     let mut catalog = otel_catalog::Catalog::new(tenant.clone(), date, identity);
     for &seq in seqs {
-        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-        let id = file_registry::FileId::new(identity, 0, seq, part_key);
+        let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(identity, 0, seq, partition_key);
         catalog.add(otel_catalog::CatalogEntry {
             id,
             remote_key: crate::remote_keys::sfst("logs", tenant, date, id),
@@ -2068,7 +2418,7 @@ async fn startup_sync_restores_after_wipe() {
 }
 
 /// Acceptance 7 — fail-closed: LIST error, download transport error, and a hang
-/// each surface as an Err out of the phase (not a warn/skip).
+/// each fail the attempt as a remote error (not a warn/skip).
 #[tokio::test]
 async fn startup_sync_fails_closed_on_list_error() {
     let catalog_base = tempfile::tempdir().unwrap();
@@ -2078,17 +2428,19 @@ async fn startup_sync_fails_closed_on_list_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
-            &storage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            long_timeout()
-        )
-        .await
-        .is_err(),
-        "LIST error must fail closed"
+        matches!(
+            sync_once(
+                &storage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                long_timeout()
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
+        "a LIST error fails the attempt as a remote error"
     );
 }
 
@@ -2104,17 +2456,19 @@ async fn startup_sync_fails_closed_on_transport_error() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
-            &storage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            long_timeout()
-        )
-        .await
-        .is_err(),
-        "download transport error must fail closed"
+        matches!(
+            sync_once(
+                &storage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                long_timeout()
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
+        "a download transport error fails the attempt as a remote error"
     );
 }
 
@@ -2124,18 +2478,85 @@ async fn startup_sync_fails_closed_on_hang() {
     let hw = tempfile::tempdir().unwrap();
     // Every op pends; a short op_timeout must turn it into an Err, not a hang.
     assert!(
-        startup_catalog_sync(
-            &HangingStorage,
-            "logs",
-            machine(),
-            catalog_base.path(),
-            &hw.path().join("hw"),
-            std::time::Duration::from_millis(50),
-        )
-        .await
-        .is_err(),
+        matches!(
+            sync_once(
+                &HangingStorage,
+                "logs",
+                machine(),
+                catalog_base.path(),
+                &hw.path().join("hw"),
+                std::time::Duration::from_millis(50),
+            )
+            .await,
+            Err(SyncError::Remote(_))
+        ),
         "a hung backend must time out, not hang"
     );
+}
+
+/// A remote that does not answer does not end the start: the sync tries
+/// again after a pause, as often as it takes, and completes when the remote
+/// answers.
+#[tokio::test(start_paused = true)]
+async fn startup_sync_repeats_until_the_remote_answers() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    let storage = RecoveringStorage {
+        list_failures: 3,
+        list_calls: std::sync::atomic::AtomicUsize::new(0),
+    };
+    let started = tokio::time::Instant::now();
+
+    let tenants = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &hw.path().join("hw"),
+        long_timeout(),
+    )
+    .await
+    .unwrap();
+
+    assert!(tenants.is_empty());
+    assert_eq!(
+        storage
+            .list_calls
+            .load(std::sync::atomic::Ordering::Relaxed),
+        4
+    );
+    // Three failures, one pause after each.
+    assert_eq!(started.elapsed(), std::time::Duration::from_secs(3 * 30));
+}
+
+/// A local error ends the start at once: another attempt would not change
+/// what the local disk does.
+#[tokio::test(start_paused = true)]
+async fn startup_sync_ends_on_a_local_error() {
+    let catalog_base = tempfile::tempdir().unwrap();
+    let hw = tempfile::tempdir().unwrap();
+    // The high-water file cannot be written: its directory is a file.
+    let not_a_dir = hw.path().join("file");
+    std::fs::write(&not_a_dir, b"").unwrap();
+    let (key, _bytes) = catalog_object(&TenantId::from("t1"), d(17), ident(), &[5]);
+    let storage = crate::storage::MockStorage {
+        list_response: vec![key],
+        ..crate::storage::MockStorage::default()
+    };
+    let started = tokio::time::Instant::now();
+
+    let result = startup_catalog_sync(
+        &storage,
+        "logs",
+        machine(),
+        catalog_base.path(),
+        &not_a_dir.join("hw"),
+        long_timeout(),
+    )
+    .await;
+
+    assert!(result.is_err());
+    assert_eq!(started.elapsed(), std::time::Duration::ZERO);
 }
 
 /// Normal boot: all listed catalogs already local ⇒ zero downloads, and the
@@ -2371,7 +2792,7 @@ async fn startup_sync_short_circuits_on_first_download_error() {
     let catalog_base = tempfile::tempdir().unwrap();
     let hw = tempfile::tempdir().unwrap();
 
-    let res = startup_catalog_sync(
+    let res = sync_once(
         &storage,
         "logs",
         machine(),
@@ -2381,7 +2802,10 @@ async fn startup_sync_short_circuits_on_first_download_error() {
     )
     .await;
 
-    assert!(res.is_err(), "first download error must fail the phase");
+    assert!(
+        matches!(res, Err(SyncError::Remote(_))),
+        "the first download error fails the attempt"
+    );
     let attempted = read_calls.load(std::sync::atomic::Ordering::Relaxed);
     // `buffer_unordered` eagerly polls at most one concurrency window before the
     // first error short-circuits `try_collect`, so no more than
@@ -2423,8 +2847,8 @@ async fn rotated_catalog_passes_validate_catalog() {
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let mut last = None;
     for seq in 1..=3u64 {
-        let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
-        let id = file_registry::FileId::new(ident(), 0, seq, part_key);
+        let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+        let id = file_registry::FileId::new(ident(), 0, seq, partition_key);
         let entry = otel_catalog::CatalogEntry {
             id,
             remote_key: crate::remote_keys::sfst("logs", &tenant, date, id),
@@ -2543,7 +2967,7 @@ async fn startup_sync_list_error_leaves_highwater_untouched() {
         ..crate::storage::MockStorage::default()
     };
     assert!(
-        startup_catalog_sync(
+        sync_once(
             &storage,
             "logs",
             machine(),

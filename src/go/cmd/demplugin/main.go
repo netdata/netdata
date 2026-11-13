@@ -122,7 +122,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
 	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
-	executor := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures)
+	executor, err := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures, cfg.Browser.Concurrency)
+	if err != nil {
+		_ = history.Close()
+		fmt.Fprintf(os.Stderr, "initializing DEM browser execution: %v\n", err)
+		os.Exit(1)
+	}
 	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
 		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
 	}

@@ -18,6 +18,136 @@
     { "$ref": "#/definitions/not_modified_response" }
   ],
   "definitions": {
+    "focus_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "option_column",
+        "actor_column"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "option_column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_column": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_type",
+        "link_type"
+      ],
+      "properties": {
+        "actor_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "link_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_traversal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connect_roots"
+      ],
+      "properties": {
+        "connector_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "boundary_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "connect_roots": {
+          "type": "boolean"
+        },
+        "prune_leaf_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "protected_memberships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/focus_membership"
+          }
+        }
+      }
+    },
+    "focus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unfocused_option",
+            "bindings",
+            "traversal"
+          ],
+          "properties": {
+            "role": {
+              "const": "roots"
+            },
+            "unfocused_option": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bindings": {
+              "$ref": "#/definitions/focus_bindings"
+            },
+            "traversal": {
+              "$ref": "#/definitions/focus_traversal"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unlimited_option"
+          ],
+          "properties": {
+            "role": {
+              "const": "depth"
+            },
+            "unlimited_option": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
     "field_type": {
       "type": "string",
       "enum": [
@@ -158,24 +288,41 @@
         "name": { "type": "string" },
         "defaultSelected": { "type": "boolean" },
         "disabled": { "type": "boolean" },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "description": "Alternate option IDs accepted by the producer. Canonical IDs take precedence; aliases are not global normalization rules."
+        },
         "sort": { "$ref": "#/definitions/field_sort" }
       },
       "additionalProperties": true
     },
     "required_param": {
       "type": "object",
-      "required": ["id", "name", "type", "options"],
+      "required": ["id", "name", "type"],
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
-        "type": { "enum": ["select", "multiselect"] },
+        "type": { "enum": ["select", "multiselect", "text"] },
         "options": {
           "type": "array",
           "items": { "$ref": "#/definitions/required_param_option" }
         },
         "help": { "type": "string" },
-        "unique_view": { "type": "boolean" }
+        "unique_view": { "type": "boolean" },
+        "focus": { "$ref": "#/definitions/focus" },
+        "value_separator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Separator accepted by the producer for multiple values encoded in one string. Consumers normalizing values against this metadata must match exact option IDs before splitting. This declaration does not change transport parsing."
+        }
       },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "enum": ["select", "multiselect"] } } },
+          "then": { "required": ["options"] }
+        }
+      ],
       "additionalProperties": true
     },
     "accepted_params": {
@@ -658,8 +805,15 @@
                   "cancelled",
                   "overview_ceiling",
                   "rollup_absent",
-                  "slowest_ceiling",
-                  "remote_unavailable"
+                  "remote_unavailable",
+                  "byte_budget",
+                  "busy",
+                  "file_budget",
+                  "deadline",
+                  "no_new_matches",
+                  "trace_fragments",
+                  "dropped_fields",
+                  "stack_field_high_card"
                 ]
               }
             }
@@ -677,108 +831,6 @@
       },
       "additionalProperties": false
     },
-    "traces_string_pair": {
-      "type": "array",
-      "minItems": 2,
-      "maxItems": 2,
-      "items": { "type": "string" }
-    },
-    "traces_field_kinds": {
-      "type": "object",
-      "required": ["fields", "event_attributes", "link_attributes"],
-      "properties": {
-        "fields": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "event_attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "link_attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_event": {
-      "type": "object",
-      "required": ["time_unix_nano", "name", "dropped_attributes_count", "attributes"],
-      "properties": {
-        "time_unix_nano": { "type": "integer", "minimum": 0 },
-        "name": { "type": "string" },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_link": {
-      "type": "object",
-      "required": [
-        "trace_id",
-        "span_id",
-        "trace_state",
-        "flags",
-        "dropped_attributes_count",
-        "attributes"
-      ],
-      "properties": {
-        "trace_id": { "type": "string" },
-        "span_id": { "type": "string" },
-        "trace_state": { "type": "string" },
-        "flags": { "type": "integer", "minimum": 0 },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "attributes": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        }
-      },
-      "additionalProperties": true
-    },
-    "traces_span": {
-      "type": "object",
-      "required": [
-        "span_id",
-        "start_ns",
-        "duration_ns",
-        "kind",
-        "flags",
-        "dropped_attributes_count",
-        "dropped_events_count",
-        "dropped_links_count",
-        "fields",
-        "events",
-        "links"
-      ],
-      "properties": {
-        "span_id": { "type": "string" },
-        "parent_span_id": { "type": "string" },
-        "start_ns": { "type": "integer" },
-        "duration_ns": { "type": "integer" },
-        "kind": { "type": "integer" },
-        "flags": { "type": "integer", "minimum": 0 },
-        "dropped_attributes_count": { "type": "integer", "minimum": 0 },
-        "dropped_events_count": { "type": "integer", "minimum": 0 },
-        "dropped_links_count": { "type": "integer", "minimum": 0 },
-        "fields": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_string_pair" }
-        },
-        "events": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_event" }
-        },
-        "links": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_link" }
-        }
-      },
-      "additionalProperties": true
-    },
     "traces_search_item": {
       "type": "object",
       "required": [
@@ -789,9 +841,7 @@
         "span_count",
         "error_count",
         "service_breakdown",
-        "matched_count",
-        "exact",
-        "matched_spans"
+        "exact"
       ],
       "properties": {
         "trace_id": { "type": "string" },
@@ -803,12 +853,8 @@
         "span_count": { "type": "integer", "minimum": 0 },
         "error_count": { "type": "integer", "minimum": 0 },
         "service_breakdown": { "$ref": "#/definitions/traces_service_breakdown" },
-        "matched_count": { "type": "integer", "minimum": 0 },
         "exact": { "type": "boolean" },
-        "matched_spans": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_span" }
-        }
+        "truncated": { "type": "boolean" }
       },
       "additionalProperties": true
     },
@@ -823,14 +869,13 @@
     },
     "traces_service_breakdown": {
       "type": "object",
-      "required": ["top", "other", "other_services", "unattributed"],
+      "required": ["top", "other", "unattributed"],
       "properties": {
         "top": {
           "type": "array",
           "items": { "$ref": "#/definitions/traces_service_spans" }
         },
         "other": { "type": "integer", "minimum": 0 },
-        "other_services": { "type": "integer", "minimum": 0 },
         "unattributed": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": true
@@ -841,16 +886,13 @@
         "mode",
         "version",
         "status",
-        "completion_coverage",
         "items",
-        "traces",
-        "field_kinds"
+        "traces"
       ],
       "properties": {
         "mode": { "const": "search" },
         "version": { "type": "integer", "minimum": 1 },
         "status": { "$ref": "#/definitions/traces_status" },
-        "completion_coverage": { "$ref": "#/definitions/traces_coverage" },
         "items": {
           "type": "object",
           "required": ["returned", "max_to_return"],
@@ -864,7 +906,6 @@
           "type": "array",
           "items": { "$ref": "#/definitions/traces_search_item" }
         },
-        "field_kinds": { "$ref": "#/definitions/traces_field_kinds" },
         "anchor": {
           "type": "object",
           "required": ["next"],
@@ -877,41 +918,18 @@
       },
       "additionalProperties": true
     },
-    "traces_facet_value": {
-      "type": "object",
-      "required": ["value", "traces"],
-      "properties": {
-        "value": { "type": "string" },
-        "traces": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": true
-    },
-    "traces_facet_list": {
-      "type": "object",
-      "required": ["top", "other", "unattributed"],
-      "properties": {
-        "top": {
-          "type": "array",
-          "items": { "$ref": "#/definitions/traces_facet_value" }
-        },
-        "other": { "type": "integer", "minimum": 0 },
-        "unattributed": { "type": "integer", "minimum": 0 }
-      },
-      "additionalProperties": true
-    },
     "traces_percentile_series": {
       "type": "array",
       "items": { "type": ["integer", "null"], "minimum": 0 }
     },
     "traces_overview": {
       "type": "object",
-      "required": ["version", "unit", "status", "coverage", "scope", "grid", "totals"],
+      "required": ["version", "unit", "status", "coverage", "grid", "totals"],
       "properties": {
         "version": { "type": "integer", "minimum": 1 },
         "unit": { "type": "string" },
         "status": { "$ref": "#/definitions/traces_status" },
         "coverage": { "$ref": "#/definitions/traces_coverage" },
-        "scope": { "type": "string", "enum": ["window", "selection"] },
         "grid": {
           "type": "object",
           "required": [
@@ -919,8 +937,10 @@
             "bucket_width_s",
             "duration_bins",
             "cells",
-            "error_cells",
-            "duration_percentiles_ns"
+            "error_spans",
+            "duration_percentiles_ns",
+            "duration_rows",
+            "durations"
           ],
           "properties": {
             "bucket_start_s": { "type": "integer", "minimum": 0, "maximum": 4294967295 },
@@ -936,7 +956,15 @@
                 "items": { "type": "integer", "minimum": 0 }
               }
             },
-            "error_cells": {
+            "error_spans": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 0 }
+            },
+            "duration_rows": {
+              "type": "array",
+              "items": { "type": ["integer", "null"], "minimum": 1 }
+            },
+            "durations": {
               "type": "array",
               "items": {
                 "type": "array",
@@ -958,16 +986,12 @@
         },
         "totals": {
           "type": "object",
-          "required": ["traces", "spans", "errors"],
+          "required": ["traces"],
           "properties": {
-            "traces": { "type": "integer", "minimum": 0 },
-            "spans": { "type": "integer", "minimum": 0 },
-            "errors": { "type": "integer", "minimum": 0 }
+            "traces": { "type": "integer", "minimum": 0 }
           },
           "additionalProperties": true
-        },
-        "top_root_services": { "$ref": "#/definitions/traces_facet_list" },
-        "top_root_operations": { "$ref": "#/definitions/traces_facet_list" }
+        }
       },
       "additionalProperties": true
     },

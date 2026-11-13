@@ -401,8 +401,8 @@ metrics:
     metric_tags:
       - tag: conn_stat_id
         symbol:
-          OID: 1.3.6.1.4.1.9.9.147.1.2.2.2.1.1
           name: cfwConnectionStatService
+        index: 1
         mapping:
           1: otherFWService
           2: fileXferFtp
@@ -445,6 +445,10 @@ metrics:
           39: protoUdp
           40: protoIp
           41: protoSnmp
+      - tag: conn_stat_type
+        symbol:
+          name: cfwConnectionStatType
+        index: 2
 
   - MIB: CISCO-FIREWALL-MIB
     table:

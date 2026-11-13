@@ -24,7 +24,7 @@ Module: lighthouse
 
 Monitor desktop lab performance for a web page with Lighthouse. Inspect the performance category score, individual lab timings, layout shift and audit execution outcomes.
 
-Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and sandboxed Chromium at the native job interval. Configuration Test validates preparation without running an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
+Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and sandboxed Chromium at the check_every interval. Configuration Test validates preparation without running an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
 
 This collector is only supported on the following platforms:
 
@@ -46,11 +46,11 @@ Jobs require explicit configuration; no websites or scripts are discovered autom
 
 #### Limits
 
-Missing scores or timings produce measurement gaps; a measured zero remains zero. Running and waiting attempts do not refresh the prior observation, which becomes stale after two collection intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert is configured.
+Missing scores or timings produce measurement gaps; a measured zero remains zero. Running and waiting attempts do not refresh the prior observation, which becomes stale after two check intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert is configured.
 
 #### Performance Impact
 
-Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing update_every reduces frequency. Jobs share one browser admission slot, so concurrent due jobs can wait. Optional captures consume local disk space.
+Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent due jobs can wait. Optional captures consume local disk space.
 
 ## Setup
 
@@ -108,8 +108,15 @@ Options apply independently to each native job.
 | **Target** | name | Native job name used to identify this monitor and its history. Renaming creates a separate monitor. |  | yes |
 |  | url | Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted. |  | yes |
 | **Diagnosis** | save_report | Save the full Lighthouse HTML report. Reports can contain sensitive URLs and page content. | no | no |
-| **Collection** | update_every | Data collection interval, in seconds. | 1800 | no |
+| **Collection** | check_every | Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check. | 1800 | no |
+|  | update_every | Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`. | 10 | no |
 |  | timeout | Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded. | 180 | no |
+| **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
+
+<a id="option-virtual-node-vnode"></a>
+##### vnode
+
+Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent. Retained runs and captures keep the GUID resolved when the attempt entered the execution queue, even if the vnode changes before execution starts. Changing the vnode clears the latest observation without relabeling retained evidence; records without a GUID remain unassigned.
 
 
 </details>
@@ -133,13 +140,14 @@ sudo ./edit-config dem/lighthouse.conf
 
 ###### Monitor a home page
 
-Create one native browser monitor after preparing the runtime.
+Create one native browser monitor after preparing the runtime and defining the `example-site` vnode.
 
 <details open><summary>Examples</summary>
 
 ```yaml
 jobs:
   - name: home
+    vnode: example-site
     url: https://example.org/
 
 ```
@@ -159,7 +167,7 @@ Metrics grouped by *scope*.
 
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
-Each native job has its own chart identity. Attempt duration excludes waiting for admission. Missing observations are omitted.
+Charts repeat the latest completed observation until a new check finishes. Observation age and stale state retain its actual freshness; measurements older than two check intervals are omitted. Attempt and occurrence counters count each event once and reset when the native job restarts. These job diagnostics continue across vnode changes; the latest observation, age and last success/failure reset until a check for the new association completes. Coalesced occurrences never ran and do not represent website failures. Queue age tracks the oldest admission wait; scheduling delay describes the selected occurrence at the latest admission. The first check is eligible immediately, followed by a spread first interval of one to two check_every periods and then a fixed cadence. Each native job has its own chart identity. Attempt duration excludes admission waiting.
 
 
 ### Per job
@@ -172,17 +180,23 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| dem_synthetic.execution_state | Synthetic attempt outcome | unknown, success, failed, timeout, inconclusive, error, cancelled | state |
-| dem_synthetic.duration | Synthetic attempt duration | duration | milliseconds |
-| dem_synthetic.lighthouse.performance | Lighthouse performance score | performance | points |
-| dem_synthetic.lighthouse.timings | Lighthouse lab timings | fcp, lcp, tbt, speed_index | milliseconds |
-| dem_synthetic.lighthouse.cls | Lighthouse cumulative layout shift | cls | ratio |
+| dem_synthetic.execution_state | Latest synthetic observation state | unknown, success, failed, timeout, inconclusive, error, cancelled, stale | state |
+| dem_synthetic.duration | Latest synthetic attempt duration | duration | milliseconds |
+| dem_synthetic.observation_age | Age of latest synthetic observation | age | seconds |
+| dem_synthetic.attempts | Completed synthetic attempts | success, failed, timeout, inconclusive, error, cancelled, unknown | attempts/s |
+| dem_synthetic.occurrences | Synthetic scheduled occurrences | scheduled, admitted, coalesced | occurrences/s |
+| dem_synthetic.scheduler_state | Synthetic active and pending attempts | active, pending | attempts |
+| dem_synthetic.queue_age | Oldest synthetic admission wait | age | seconds |
+| dem_synthetic.scheduling_delay | Latest synthetic admission delay from selected due time | delay | seconds |
+| dem_synthetic.lighthouse.performance | Latest Lighthouse performance score | performance | points |
+| dem_synthetic.lighthouse.timings | Latest Lighthouse lab timings | fcp, lcp, tbt, speed_index | milliseconds |
+| dem_synthetic.lighthouse.cls | Latest Lighthouse cumulative layout shift | cls | ratio |
 
 
 
 ## Live Data
 
-Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse jobs. Invoke their public synthetics-* names with the documented filters; no job selector or active browser is required.
+Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs; renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain Agent-level access and do not provide per-site authorization; no active browser is required. Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; journeys and audits run and their history is stored on every plan.
 
 ### Synthetic monitors
 
@@ -191,7 +205,7 @@ Invoke `synthetics-checks`. Active native monitors and their latest observation.
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Synthetics-checks` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local active snapshots and retained evidence without starting a browser or acquiring browser admission. Artifact fetch reads at most 5 MiB. |
 | Security | Requires member-equivalent access for observations and retained text; artifact bytes require administrator-equivalent access. Captures and reports may contain sensitive URLs, page content and user input; they are not universally redacted. |
 | Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs. Individual retained evidence may be absent or expired. |
@@ -204,13 +218,15 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| Virtual node name (`vnode`) | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| Virtual node GUID (`vnode_guid`) | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs. | no |  |  |
 | Monitor (`job_id`) | string | Native module and job name, such as journey:checkout. Leave empty to include all monitors when listing. | no |  |  |
 | Kind (`kind`) | string | Filter by journey or lighthouse. Leave empty to include both kinds. | no |  |  |
 | Maximum rows (`limit`) | string | Maximum returned rows, from 1 to 2000. Defaults to 2000; truncated indicates additional matching rows. | no | 2000 |  |
 
 #### Returns
 
-At most limit active jobs, with independent current-attempt state and last-observation freshness. Disabled and failed-startup jobs are visible through native configuration status.
+At most limit active jobs, with independent current-attempt state and last-observation freshness, execution cadence, occurrence counts and queue/admission delays. Counters reset on native activation and continue across vnode changes; latest observations and last success/failure reset on reassignment. Coalesced occurrences never ran. Disabled and failed-startup jobs are visible through native configuration status.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -224,10 +240,18 @@ At most limit active jobs, with independent current-attempt state and last-obser
 | outcome | string |  |  | Last outcome. |
 | completed_us | timestamp |  |  | Last completion. Unix microseconds; null when unavailable. |
 | duration_ms | float | ms |  | Attempt duration. |
-| last_success_us | timestamp |  |  | Last success in this activation. Unix microseconds; null when unavailable. |
-| last_failure_us | timestamp |  |  | Last failure in this activation. Unix microseconds; null when unavailable. |
+| last_success_us | timestamp |  |  | Last success in the current vnode association. Unix microseconds; null when unavailable. |
+| last_failure_us | timestamp |  |  | Last failure in the current vnode association. Unix microseconds; null when unavailable. |
 | error | string |  |  | Last error. |
 | history_error | string |  |  | History error. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID. Empty means unassigned. |
+| check_every | integer | s |  | Check interval. |
+| scheduled | integer |  |  | Scheduled occurrences. |
+| admitted | integer |  |  | Admitted attempts. |
+| coalesced | integer |  |  | Coalesced occurrences. |
+| pending | boolean |  |  | Pending occurrence. |
+| queue_age | float | s |  | Oldest admission wait. |
+| scheduling_delay | float | s |  | Latest admission delay. |
 
 ### Synthetic runs
 
@@ -236,7 +260,7 @@ Invoke `synthetics-runs`. Retained attempts selected by start time, with their l
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Synthetics-runs` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local active snapshots and retained evidence without starting a browser or acquiring browser admission. Artifact fetch reads at most 5 MiB. |
 | Security | Requires member-equivalent access for observations and retained text; artifact bytes require administrator-equivalent access. Captures and reports may contain sensitive URLs, page content and user input; they are not universally redacted. |
 | Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs. Individual retained evidence may be absent or expired. |
@@ -249,6 +273,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| Virtual node name (`vnode`) | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| Virtual node GUID (`vnode_guid`) | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs. | no |  |  |
 | Monitor (`job_id`) | string | Native module and job name, such as journey:checkout. Leave empty to include all monitors when listing. | no |  |  |
 | Kind (`kind`) | string | Filter by journey or lighthouse. Leave empty to include both kinds. | no |  |  |
 | Outcome (`outcome`) | string | Filter by unknown, success, failed, timeout, inconclusive, error or cancelled. Leave empty for all outcomes. | no |  |  |
@@ -274,6 +300,14 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | capture_state | string |  |  | Capture state. |
 | error | string |  |  | Error. |
 | history_error | string |  |  | History error. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID. Empty means unassigned. |
+| scheduled_us | timestamp |  |  | Selected due time. |
+| queued_us | timestamp |  |  | Original admission queue time. |
+| termination_reason | string |  |  | Reason execution stopped, separate from the first reported error. |
+| failure_evidence_status | string |  |  | Journey evidence reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); detail truncation is reported separately. |
+| first_failure | string |  |  | First unexpected journey test failure, with retained step path, source location and error excerpt when available. |
+| last_observed_step | string |  |  | Last retained running step observation; this does not imply the browser is still executing it. |
+| stop_context | string |  |  | Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop. Source locations identify the displayed step or the test declaration when no step is known, not the timeout location. |
 
 ### Synthetic run detail
 
@@ -282,7 +316,7 @@ Invoke `synthetics-run`. One retained or latest active attempt, independent of p
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Synthetics-run` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local active snapshots and retained evidence without starting a browser or acquiring browser admission. Artifact fetch reads at most 5 MiB. |
 | Security | Requires member-equivalent access for observations and retained text; artifact bytes require administrator-equivalent access. Captures and reports may contain sensitive URLs, page content and user input; they are not universally redacted. |
 | Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs. Individual retained evidence may be absent or expired. |
@@ -300,7 +334,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -321,7 +355,7 @@ Invoke `synthetics-artifacts` to find retained screenshot and report sets, newes
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Synthetics-artifacts` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local capture metadata and file sizes without reading capture contents or starting a browser. |
 | Security | Requires member-equivalent access. Exposes monitor identities and capture metadata, not capture contents. |
 | Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs and retained run history. Captures can expire under age or size limits. |
@@ -334,6 +368,8 @@ No additional configuration is required.
 
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
+| Virtual node name (`vnode`) | string | Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown names are rejected. Omit this parameter when not selecting by name. Supply either vnode or vnode_guid, never both, even with empty values. | no | Not supplied |  |
+| Virtual node GUID (`vnode_guid`) | string | Filter by canonical vnode GUID. No configured name is required. Do not also supply vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs. | no |  |  |
 | Monitor (`job_id`) | string | Exact native module and job name to filter captures, such as journey:checkout. Leave empty for all monitors. Storage totals remain global. | no |  |  |
 | Previous page cursor (`before`) | string | The next cursor returned by the previous page. Leave empty for the newest captures. | no |  |  |
 | Maximum rows (`limit`) | string | Maximum returned sets, from 1 to 2000. Use next as before to continue when truncated is true. Captures may expire between pages. | no | 2000 |  |
@@ -349,6 +385,7 @@ One row per retained capture set. The storage object reports global effective po
 | published_us | timestamp |  |  | Publication time in Unix microseconds. |
 | bytes | integer | bytes |  | Capture set size, including its manifest. |
 | artifact_count | integer |  |  | Number of captures in the set. |
+| vnode_guid | string |  |  | Recorded canonical vnode GUID. Empty means unassigned. |
 
 ### Synthetic capture detail
 
@@ -357,7 +394,7 @@ Invoke `synthetics-artifact`. Retained capture metadata for one run, independent
 | Aspect | Description |
 |:-------|:------------|
 | Name | `Synthetics-artifact` |
-| Require Cloud | no |
+| Require Cloud | yes |
 | Performance | Reads local active snapshots and retained evidence without starting a browser or acquiring browser admission. Artifact fetch reads at most 5 MiB. |
 | Security | Requires member-equivalent access for observations and retained text; artifact bytes require administrator-equivalent access. Captures and reports may contain sensitive URLs, page content and user input; they are not universally redacted. |
 | Availability | Available while dem.plugin is running, independently of active journey or Lighthouse jobs. Individual retained evidence may be absent or expired. |
@@ -376,7 +413,7 @@ No additional configuration is required.
 
 #### Returns
 
-Retained capture metadata remains available after run history expires. Fetch verifies content and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture returns expired_or_unavailable, which does not prove why the file is absent.
+Retained capture metadata remains available after run history expires. Fetch verifies content and returns encoding=base64 and data_base64 without rendering HTML. A missing recorded capture returns expired_or_unavailable, which does not prove why the file is absent. The top-level vnode_guid field contains the recorded canonical vnode GUID; an empty value means unassigned.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|

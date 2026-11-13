@@ -157,7 +157,6 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 
 	peers := map[string]struct {
 		neighbor         string
-		remoteAS         string
 		peerType         string
 		establishedTrans int64
 		downTrans        int64
@@ -169,7 +168,6 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 	}{
 		"IPv4 peer": {
 			neighbor:         "10.45.2.2",
-			remoteAS:         "26479",
 			peerType:         "ipv4",
 			establishedTrans: 2,
 			downTrans:        1,
@@ -181,7 +179,6 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 		},
 		"IPv6 peer": {
 			neighbor:         "2001:12f8::223:253",
-			remoteAS:         "26162",
 			peerType:         "ipv6",
 			updatesReceived:  3318661,
 			updatesSent:      6,
@@ -193,8 +190,11 @@ func TestCollector_Collect_HuaweiBGP_FromLibreNMSFixture(t *testing.T) {
 	for name, tc := range peers {
 		t.Run(name, func(t *testing.T) {
 			row := requireHuaweiPeerRow(t, results[0].BGPRows, tc.neighbor)
+			assert.Equal(t, "0", row.Identity.ProcessID)
 			assert.Equal(t, "0", row.Identity.RoutingInstance)
-			assert.Equal(t, tc.remoteAS, row.Identity.RemoteAS)
+			assert.Empty(t, row.Identity.RemoteAS)
+			assert.Empty(t, row.Descriptors.BGPVersion)
+			assert.Empty(t, row.Descriptors.Description)
 			assert.Equal(t, tc.peerType, row.Descriptors.PeerType)
 			if tc.wantTransitions {
 				assert.EqualValues(t, tc.establishedTrans, row.Transitions.Established.Value)

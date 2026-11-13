@@ -8,27 +8,32 @@
 # Schema v1 is closed: unknown core keys fail validation (extension keys must
 # be prefixed `x_`); taxonomy_version, plugin_name and module_name are
 # required, and a file declares either `placements` or `taxonomy_optout`,
-# never both. This collector has no statically placeable charts, so it opts
-# out.
+# never both. Most of this collector's charts cannot be placed statically, so
+# it opts out.
 taxonomy_version: 1
 # Collector identity; must match src/crates/otel-plugin/metadata.yaml —
 # gen_taxonomy.py keys collectors on the (plugin_name, module_name) pair.
 plugin_name: otel.plugin
 module_name: otel
-# No `placements`: the plugin authors no static charts. Every chart it serves
-# is created at ingest from incoming OTLP data, with the chart id embedding an
-# identity hash of the metric and its attributes; histograms and summaries are
-# further decomposed into `.bucket`, `.count`, `.sum`, `.minmax` and
-# `.quantiles` charts (exponential histograms are dropped). Each chart's
-# Netdata context is `otel.` plus the OTLP metric name, with the
-# decomposition suffix appended for histogram/summary charts
-# (src/crates/otel-ingestor/src/chart.rs,
-# src/crates/otel-ingestor/src/metrics_service.rs), so the
-# served context set is decided entirely by the user's instrumentation and
-# cannot be pre-declared here. The reason below is republished in
-# integrations/taxonomy.json under `opted_out_collectors`.
+# No `placements`: most charts the plugin serves are created at ingest from
+# incoming OTLP data, with the chart id embedding an identity hash of the
+# metric and its attributes; histograms and summaries are further decomposed
+# into `.bucket`, `.count`, `.sum`, `.minmax` and `.quantiles` charts
+# (exponential histograms are dropped). Each such chart's Netdata context is
+# `otel.` plus the OTLP metric name, with the decomposition suffix appended for
+# histogram/summary charts (src/crates/otel-ingestor/src/chart.rs,
+# src/crates/otel-ingestor/src/metrics_service.rs), so that context set is
+# decided entirely by the user's instrumentation and cannot be pre-declared
+# here. The plugin also has fixed contexts: the per-service charts derived from
+# traces and logs (`otel.derived_metrics.*`) and its own operation charts
+# (`netdata.otel.*`), both listed in metadata.yaml. They are not placed here
+# because a file declares either `placements` or `taxonomy_optout`, and the
+# dynamic charts need the opt-out; the dashboard places them by context. The
+# reason below is republished in integrations/taxonomy.json under
+# `opted_out_collectors`.
 taxonomy_optout:
   reason: >-
-    otel.plugin creates metric charts dynamically from incoming OTLP data;
-    the set of contexts depends entirely on the user's instrumentation and
-    cannot be statically placed in the dashboard taxonomy.
+    otel.plugin creates most metric charts dynamically from incoming OTLP
+    data; that set of contexts depends entirely on the user's instrumentation
+    and cannot be statically placed in the dashboard taxonomy. Its fixed
+    contexts (otel.derived_metrics.* and netdata.otel.*) are placed by the dashboard.

@@ -18,10 +18,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bridge::function::{FunctionCallContext, FunctionHandler};
 use file_registry::TenantId;
 use netdata_plugin_protocol::FunctionDeclaration;
 use netdata_plugin_types::HttpAccess;
+use otel_bridge::function::{FunctionCallContext, FunctionHandler};
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
@@ -33,7 +33,7 @@ use super::wire::{
     CatalogFileEntry, FilesResponse, InfoResponse, OtelLogsRequest, OtelLogsResponse,
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
-use file_lifecycle::chunk::ChunkCache;
+use file_lifecycle::chunk::{ChunkCache, IndexedChunk};
 use file_lifecycle::registry::{TenantRegistries, WalDesc};
 use wal::prefix::{chunk_boundaries, tail_start};
 use wal::registry::FileStatus;
@@ -64,7 +64,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                 .values()
                 .map(|f| WalFileEntry {
                     seq: f.id.seq,
-                    ns_hash: format!("{:016x}", f.id.part_key),
+                    ns_hash: format!("{:016x}", f.id.partition_key),
                     stream: stream_id_from_content_meta(&f.content_meta),
                     status: match f.status {
                         FileStatus::Active => "active",
@@ -85,7 +85,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
                     let key = file_registry::SeqKey::from(&f.id);
                     SfstFileEntry {
                         seq: f.id.seq,
-                        ns_hash: format!("{:016x}", f.id.part_key),
+                        ns_hash: format!("{:016x}", f.id.partition_key),
                         stream: stream_id_from_content_meta(&f.summary.content_meta),
                         size: f.size.as_u64(),
                         total_logs: f.summary.record_count,
@@ -163,19 +163,19 @@ impl OtelLogsHandler {
     /// Resolve one active-WAL descriptor into in-memory chunk SFST
     /// candidates plus the byte range to row-scan as its tail. Runs off
     /// the registry lock, over the descriptor's `valid_up_to` durable
-    /// bound. Polls `cancel` between chunk builds (each build is one
+    /// bound. Polls `cancel` between chunks (indexing each chunk is one
     /// `spawn_blocking`); a cancelled call returns empty — the caller is
     /// about to discard the result anyway.
     ///
     /// Scans the durable prefix's frame boundaries, groups them into
-    /// chunks of at least `min_entries` records, and builds each through
+    /// chunks of at least `min_entries` records, and indexes each through
     /// the chunk cache (singleflight per `(seq, index)`). Failure policy:
-    /// a chunk that fails to build or parse makes the **whole WAL**
+    /// a chunk that fails to index or parse makes the **whole WAL**
     /// un-queryable for this query — no candidates and no tails — rather
     /// than silently dropping only the broken range. The WAL's data
     /// reappears once it rotates into a sealed SFST — or, for a transient
     /// failure (e.g. a count mismatch on an actively-written WAL), on a
-    /// later query, since build errors are not cached. The same empty
+    /// later query, since indexing errors are not cached. The same empty
     /// result covers a WAL that can't be read at all (rotated/deleted
     /// under us).
     ///
@@ -217,12 +217,12 @@ impl OtelLogsHandler {
             let seq = wal.id.seq;
             let path = wal.path.clone();
             let (range, expected) = (chunk.range, chunk.entry_count);
-            // The build future: index the byte range on a blocking
+            // The indexing future: index the byte range on a blocking
             // thread and cross-check the record count (the truncation
             // check wal::Reader::open_range defers). Runs at most once
             // per (seq, index) — singleflight; skipped on a cache hit.
             let init = async move {
-                match tokio::task::spawn_blocking(move || ng_index::build_sfst_range(&path, range))
+                match tokio::task::spawn_blocking(move || ng_index::index_logs_range(&path, range))
                     .await
                 {
                     Ok(Ok((summary, bytes))) => {
@@ -232,43 +232,33 @@ impl OtelLogsHandler {
                                 summary.record_count
                             ))
                         } else {
-                            Ok(Arc::new(bytes))
+                            Ok(Arc::new(IndexedChunk {
+                                summary,
+                                bytes: Arc::new(bytes),
+                            }))
                         }
                     }
-                    Ok(Err(e)) => Err(format!("build_sfst_range: {e}")),
-                    Err(e) => Err(format!("build task: {e}")),
+                    Ok(Err(e)) => Err(format!("index_logs_range: {e}")),
+                    Err(e) => Err(format!("indexing task: {e}")),
                 }
             };
 
-            match self.chunk_cache.get_or_build(seq, chunk.index, init).await {
-                Ok(bytes) => match sfst::IndexReader::open(&bytes[..]) {
-                    Ok(reader) => candidates.push(SfstCandidate {
-                        summary: reader.summary().clone(),
-                        file_seq: seq,
-                        // Chunks and the tail of one WAL share `seq`;
-                        // the chunk index disambiguates them in the
-                        // cursor order.
-                        part: sfsq::logs::Part::Indexed(chunk.index),
-                        source: Source::Memory(bytes),
-                    }),
-                    // Unexpected — the bytes were just built. Same
-                    // policy: refuse the whole WAL (see above).
-                    Err(e) => {
-                        tracing::warn!(
-                            seq,
-                            index = chunk.index,
-                            "chunk parse failed; refusing to query this WAL: {e}"
-                        );
-                        return (Vec::new(), Vec::new());
-                    }
-                },
-                // Build failure (decode error, count mismatch, panic):
+            match self.chunk_cache.get_or_index(seq, chunk.index, init).await {
+                Ok(indexed) => candidates.push(SfstCandidate {
+                    summary: indexed.summary.clone(),
+                    file_seq: seq,
+                    // Chunks and the tail of one WAL share `seq`; the
+                    // chunk index disambiguates them in the cursor order.
+                    part: sfsq::logs::Part::Indexed(chunk.index),
+                    source: Source::Memory(Arc::clone(&indexed.bytes)),
+                }),
+                // Indexing failure (decode error, count mismatch, panic):
                 // refuse the whole WAL — see the failure policy above.
                 Err(e) => {
                     tracing::warn!(
                         seq,
                         index = chunk.index,
-                        "chunk build failed; refusing to query this WAL: {e}"
+                        "chunk indexing failed; refusing to query this WAL: {e}"
                     );
                     return (Vec::new(), Vec::new());
                 }
@@ -395,9 +385,9 @@ impl FunctionHandler for OtelLogsHandler {
         let required_params = stream_required_params(local_streams.with_catalog(&selector_catalog));
 
         // Resolve each WAL into in-memory chunk SFSTs + a tail (off the
-        // lock; chunk builds are singleflighted through the cache). The
-        // chunk-building phase can be the slow one, so it polls the
-        // call's cancellation token between builds.
+        // lock; chunk indexing is singleflighted through the cache). The
+        // chunk-indexing phase can be the slow one, so it polls the
+        // call's cancellation token between chunks.
         let mut wal_tails: Vec<WalTail> = Vec::new();
         for wal in wal_descs {
             let (chunks, tails) = self.resolve_wal(wal, &ctx.cancellation).await;
@@ -500,7 +490,7 @@ impl FunctionHandler for OtelLogsHandler {
         // cannot be aborted, so the engine polls the token per source and bails
         // early; the bridge's cancel `select!` surfaces the loss as a 500 to
         // the caller and discards this partial result (the 499 mapping is the
-        // rt engine's adapter, not the bridge's).
+        // netdata-plugin-rt engine's adapter, not the bridge's).
         let cancel = ctx.cancellation.clone();
         // The failure fallback needs the grid and histogram field, but
         // `query` moves into the closure — hoist them out first (`Grid`
@@ -527,14 +517,19 @@ impl FunctionHandler for OtelLogsHandler {
 
     /// Advertise the function to the agent/Cloud: `global` (not scoped to
     /// one node), tagged `logs`, accessible to signed-in users of the same
-    /// space, with the SENSITIVE_DATA flag since log payloads may carry
-    /// sensitive content.
+    /// space on a commercial plan (OpenTelemetry logs are a paid feature;
+    /// ingestion and storage are not gated), with the SENSITIVE_DATA flag
+    /// since log payloads may carry sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-logs", "Query OpenTelemetry logs");
         d.global = true;
         d.tags = Some("logs".to_string());
-        d.access =
-            Some(HttpAccess::SIGNED_ID | HttpAccess::SAME_SPACE | HttpAccess::SENSITIVE_DATA);
+        d.access = Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA,
+        );
         d
     }
 }

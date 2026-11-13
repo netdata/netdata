@@ -38,8 +38,8 @@ func (s *Store) Finalize(
 	if !runIDPattern.MatchString(runID) {
 		return nil, ErrInvalidID
 	}
-	jobID := s.active[runID]
-	if jobID == "" {
+	owner := s.active[runID]
+	if owner.JobID == "" {
 		return nil, ErrNotFound
 	}
 	delete(s.active, runID)
@@ -83,7 +83,8 @@ func (s *Store) Finalize(
 	m := manifest{
 		Version: 2,
 		Manifest: Manifest{
-			JobID:       jobID,
+			JobID:       owner.JobID,
+			VnodeGUID:   owner.VnodeGUID,
 			RunID:       runID,
 			PublishedUS: time.Now().UnixMicro(),
 			Artifacts:   []synthetic.Artifact{},
@@ -114,7 +115,7 @@ func (s *Store) Finalize(
 			return nil, errors.Join(err, source.Close())
 		}
 		if info.Size() > FetchMaxBytes {
-			return nil, errors.Join(ErrTooLarge, source.Close())
+			return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, source.Close())}
 		}
 		if capture.Kind == "screenshot" {
 			var header [8]byte
@@ -146,7 +147,7 @@ func (s *Store) Finalize(
 			}, FetchMaxBytes+1),
 		)
 		if count > FetchMaxBytes {
-			copyErr = errors.Join(copyErr, ErrTooLarge)
+			copyErr = &CaptureError{ID: capture.ID, Err: errors.Join(copyErr, ErrTooLarge)}
 		}
 		closeErr := errors.Join(dest.Sync(), dest.Close(), source.Close())
 		if err = errors.Join(copyErr, closeErr); err != nil {
@@ -160,6 +161,7 @@ func (s *Store) Finalize(
 				MIME:   capture.MIME,
 				Bytes:  count,
 				SHA256: hex.EncodeToString(hash.Sum(nil)),
+				Test:   capture.Test,
 			},
 		)
 	}
@@ -188,6 +190,7 @@ func (s *Store) Finalize(
 		return nil, err
 	}
 	delete(s.uncertain, runID)
+	s.observedPublished.Store(true)
 	// Work includes scripts, browser profiles and any unselected attachments.
 	if err = s.cleanupDrained(runID); err != nil {
 		s.recordCleanupError(err)

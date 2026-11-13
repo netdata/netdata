@@ -230,7 +230,7 @@ func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {
 			path := filepath.Join(dir, "dem.journal")
 			writer, err := journal.Create(path, journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
 			require.NoError(t, err)
-			fields, err := appendEnvelope(testFields())
+			fields, _, err := appendEnvelope(testFields())
 			require.NoError(t, err)
 			require.NoError(t, writer.Append(fields, host.EntryOptions()))
 			require.NoError(t, writer.Append(fields, host.EntryOptions()))

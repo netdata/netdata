@@ -872,3 +872,45 @@ func bgpStateSymbolWithOID(oid string) SymbolConfig {
 		}),
 	}
 }
+
+func TestBGPProcessScopedIdentityValidationAndClone(t *testing.T) {
+	for name, tc := range map[string]struct {
+		process, instance, remoteAS bool
+		wantError                   bool
+	}{
+		"legacy AS identity":                {remoteAS: true},
+		"process zero and VPN without AS":   {process: true, instance: true},
+		"process alone does not replace AS": {process: true, wantError: true},
+		"VPN alone does not replace AS":     {instance: true, wantError: true},
+		"missing both identities":           {wantError: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			row := validBGPPeerRowForTable("peerTable", "1.2.3")
+			if !tc.remoteAS {
+				row.Identity.RemoteAS = BGPValueConfig{}
+			}
+			if tc.process {
+				row.Identity.ProcessID = BGPValueConfig{Value: "0"}
+			}
+			if tc.instance {
+				row.Identity.RoutingInstance = BGPValueConfig{Value: "7"}
+			}
+			profile := ProfileDefinition{BGP: []BGPConfig{row}}
+			err := ValidateEnrichProfile(&profile)
+			if tc.wantError {
+				require.ErrorContains(t, err, "require remote_as identity")
+				return
+			}
+			require.NoError(t, err)
+			cloned := profile.Clone()
+			assert.Equal(t, profile.BGP[0].Identity.ProcessID, cloned.BGP[0].Identity.ProcessID)
+			cloned.BGP[0].Identity.ProcessID.Value = "changed"
+			assert.Equal(t, row.Identity.ProcessID.Value, profile.BGP[0].Identity.ProcessID.Value)
+		})
+	}
+	row := validBGPPeerRowForTable("peerTable", "1.2.3")
+	row.Identity.ProcessID = BGPValueConfig{IndexTransform: []MetricIndexTransform{{Start: 0, End: 0}}}
+	cloned := row.Clone()
+	cloned.Identity.ProcessID.IndexTransform[0].Start = 1
+	assert.Zero(t, row.Identity.ProcessID.IndexTransform[0].Start)
+}

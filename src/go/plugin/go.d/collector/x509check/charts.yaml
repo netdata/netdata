@@ -1,0 +1,39 @@
+version: v1
+context_namespace: x509check
+groups:
+  - family: expiration time
+    metrics:
+      - expiry
+    charts:
+      - title: Time Until Certificate Expiration
+        context: time_until_expiration
+        units: seconds
+        instances:
+          by_labels: [depth]
+        lifecycle:
+          expire_after_cycles: 0
+        dimensions:
+          - selector: expiry
+            name: expiry
+  - family: revocation
+    metrics:
+      - revocation_status
+      - revocation_check_status
+    charts:
+      - title: Revocation Status
+        context: revocation_status
+        units: boolean
+        instances:
+          by_labels: [depth]
+        lifecycle:
+          expire_after_cycles: 0
+        dimensions:
+          - selector: revocation_status
+      - title: Revocation Check Status
+        context: revocation_check_status
+        units: status
+        type: stacked
+        instances:
+          by_labels: [depth]
+        dimensions:
+          - selector: revocation_check_status

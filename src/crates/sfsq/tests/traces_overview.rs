@@ -9,25 +9,24 @@
 //!   straddling sources counts once with its envelope merged; legacy
 //!   pre-rollup files are excluded and flagged `RollupAbsent`, never
 //!   mixed in; shard merge is associative across source shapes (the
-//!   tail/seal parity underneath is tests/traces_rollup_tail.rs's
+//!   tail/file parity underneath is tests/traces_rollup_tail.rs's
 //!   contract); ceiling termination with the deterministic prefix;
 //!   all-or-empty cancellation; per-source failure honesty while the
 //!   rest count.
 //! - Exact nearest-rank per-bucket percentiles (observed durations,
-//!   never interpolated from the decade-wide bins) and the opt-in root
-//!   facets with their partition identity
-//!   `sum(top) + other + unattributed == total_traces`.
+//!   never interpolated from the decade-wide bins).
 //! - The filtered grid: a span-local predicate matches STORED rows and
 //!   selects whole traces — under the search engine's start-in-window
 //!   rule and the fold's one ceiling, and agreeing with `search`'s
 //!   list population.
 //!
 //! Fixtures: tests/common/mod.rs — real WALs through the production
-//! write/seal pipeline, mixed sealed/tail source shapes, and the
+//! write/index pipeline, mixed sealed/tail source shapes, and the
 //! hand-built legacy no-rollup file. Grids are tiny (one-second
-//! buckets, [`grid`]); ceilings are forced with
-//! `visited_rows_ceiling_for_tests`, so the 4M default budget is never
-//! what's under test. Not pinned: the bins' wire labels, error cells
+//! buckets, [`grid`]); budgets are forced with
+//! `fold_rows_ceiling_for_tests`, `filter_units_ceiling_for_tests` and
+//! `remainder_traces_for_tests`, so the defaults are never what's under
+//! test. Not pinned: the bins' wire labels, error cells
 //! and percentiles under every partial path, and progress ticking
 //! beyond the one-per-source count.
 
@@ -45,9 +44,9 @@ use common::{
 };
 use sfsq::traces::{
     AttributeOwner, BuiltinField, CompareOp, Condition, DURATION_BIN_COUNT, DurationPercentiles,
-    FACET_TOP_K, OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate,
-    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow,
-    TraceQuery, TraceSource, overview, search, trace_by_id,
+    HEATMAP_ROWS, OverviewData, OverviewQuery, OverviewRequestError, PartialReason, Predicate,
+    PredicateTarget, PredicateValue, QueryStatus, SearchQuery, SearchSources, TimeWindow, Token,
+    TokenQuery, TraceQuery, TraceSource, heatmap_row_bounds, overview, search, trace_by_id,
 };
 
 /// The suite's standard grid: 10 one-second buckets covering [0s, 10s).
@@ -148,19 +147,18 @@ fn sealed_grid_counts_traces_by_merged_envelope() {
 /// `total_errors` reports, not "traces that failed": the cell that
 /// binned ONE trace with two failed spans reads 2.
 #[test]
-fn error_cells_count_error_spans_per_bucket_and_duration_bin() {
+fn error_spans_count_failed_spans_per_bucket() {
     let dir = tempfile::tempdir().unwrap();
     // D: two failed spans, 3us envelope → bucket 7, bin 0.
     let mut d1 = tspan(0xD, 6, 7_000_000_000, 7_000_001_000, "d-1");
     d1.status = Some((2, "boom"));
     let mut d2 = tspan(0xD, 7, 7_000_002_000, 7_000_003_000, "d-2");
     d2.status = Some((2, "boom"));
-    // F: one failed span in D's BUCKET but a 5s envelope → bin 4, so the
-    // two failures never share a cell.
+    // F: one failed span in D's bucket, with a 5s envelope.
     let mut f = tspan(0xF, 9, 7_000_000_000, 12_000_000_000, "f-slow");
     f.status = Some((2, "boom"));
     // Past the grid's end: the envelope-start clipping drops E from the
-    // cells, the totals AND the error cells.
+    // cells, the totals AND the error spans.
     let mut e = tspan(0xE, 8, 12_000_000_000, 12_000_001_000, "e-clipped");
     e.status = Some((2, "boom"));
     let mut spans = corpus();
@@ -170,16 +168,12 @@ fn error_cells_count_error_spans_per_bucket_and_duration_bin() {
         vec![sealed_source(dir.path(), &wal, "a")],
         OverviewQuery::new(grid()),
     );
-    let mut expected = vec![[0u64; DURATION_BIN_COUNT]; 10];
-    expected[3][0] = 1; // B: one failed span, 500ns
-    expected[7][0] = 2; // D: two failed spans, 3us
-    expected[7][4] = 1; // F: one failed span, 5s
-    assert_eq!(data.error_cells, expected);
+    let mut expected = vec![0u64; 10];
+    expected[3] = 1; // B: one failed span
+    expected[7] = 3; // D: two failed spans, F: one
+    assert_eq!(data.error_spans, expected);
     assert_eq!(data.total_errors, 4, "E never reached the totals");
-    assert_eq!(
-        data.error_cells.iter().flatten().sum::<u64>(),
-        data.total_errors
-    );
+    assert_eq!(data.error_spans.iter().sum::<u64>(), data.total_errors);
     assert_eq!(data.cells[7][0], 1, "one trace, two failed spans");
 }
 
@@ -256,8 +250,8 @@ fn legacy_file_without_the_rollup_is_excluded_and_flagged_never_mixed() {
 
 /// Where the data is split cannot change the aggregate: the corpus
 /// split across a sealed file and a tail gives the same cells and
-/// totals as the whole corpus sealed — the overview-level face of the
-/// tail/seal parity tests/traces_rollup_tail.rs pins per trace.
+/// totals as the whole corpus indexed — the overview-level face of
+/// the tail/file parity tests/traces_rollup_tail.rs pins per trace.
 #[test]
 fn shard_merge_is_associative_across_source_shapes() {
     let (half_a, half_b) = {
@@ -300,7 +294,7 @@ fn ceiling_terminates_with_the_deterministic_prefix_and_the_partial() {
             sealed_source(dir.path(), &wal_a, "1-first"),
             sealed_source(dir.path(), &wal_b, "2-second"),
         ],
-        OverviewQuery::new(grid()).visited_rows_ceiling_for_tests(0),
+        OverviewQuery::new(grid()).fold_rows_ceiling_for_tests(0),
     );
     assert!(data.status.has(PartialReason::OverviewCeiling));
     assert_eq!(data.total_traces, 1, "only the first source's trace");
@@ -402,8 +396,12 @@ fn percentile_corpus() -> Vec<common::SpanSpec> {
     spans
 }
 
+/// Per-bucket percentiles come from the bucket's histogram: within 1/32
+/// of the exact nearest-rank duration and inside the bucket's observed
+/// range, so the top ranks land on the largest duration and a one-trace
+/// bucket reports its duration at every rank.
 #[test]
-fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
+fn per_bucket_percentiles_from_the_histogram() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "pct");
     let data = run(
@@ -412,18 +410,12 @@ fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
     );
     assert_eq!(data.total_traces, 11);
     assert_eq!(data.bucket_percentiles.len(), 10, "one per time bucket");
-    // n=10, nearest rank ceil(p/100 x n) - 1 (0-based): p50 is the 5th
-    // smallest, p95 and p99 the largest. Every answer is an OBSERVED
-    // duration — the ranks select from the bucket's real durations,
-    // they are not interpolated from the decade-wide "1-10ms" bin.
-    assert_eq!(
-        data.bucket_percentiles[2],
-        Some(DurationPercentiles {
-            p50: 5_000_000,
-            p95: 10_000_000,
-            p99: 10_000_000,
-        })
-    );
+    // n=10, durations 1..10 ms: the exact p50 is 5 ms (the 5th
+    // smallest), p95 and p99 the largest. The histogram answers p50
+    // within 1/32 and clamps the top ranks to the observed maximum.
+    let p = data.bucket_percentiles[2].expect("bucket 2 binned traces");
+    assert!((p.p50 - 5_000_000).abs() <= 5_000_000 / 32, "p50 {}", p.p50);
+    assert_eq!((p.p95, p.p99), (10_000_000, 10_000_000));
     // A one-trace bucket answers that trace's duration at every rank.
     assert_eq!(
         data.bucket_percentiles[5],
@@ -437,6 +429,32 @@ fn per_bucket_percentiles_are_exact_nearest_rank_durations() {
     for (i, p) in data.bucket_percentiles.iter().enumerate() {
         assert_eq!(p.is_some(), i == 2 || i == 5, "bucket {i}");
     }
+}
+
+/// Each bucket's traces per heatmap row, the explorer's rows: a trace
+/// lands in the row whose bound first exceeds its envelope duration, and
+/// a bucket's rows sum to its traces.
+#[test]
+fn per_bucket_duration_rows_count_traces_by_envelope() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&percentile_corpus())], "rows");
+    let data = run(
+        vec![sealed_source(dir.path(), &wal, "a")],
+        OverviewQuery::new(grid()),
+    );
+    let bounds = heatmap_row_bounds();
+    let row_of = |duration_ns: i64| {
+        bounds
+            .iter()
+            .position(|bound| bound.is_none_or(|b| duration_ns < b))
+            .unwrap()
+    };
+    let mut expected = vec![[0u64; HEATMAP_ROWS]; 10];
+    for ms in 1..=10 {
+        expected[2][row_of(ms * 1_000_000)] += 1;
+    }
+    expected[5][row_of(42_000_000)] += 1;
+    assert_eq!(data.bucket_duration_rows, expected);
 }
 
 /// The all-or-empty paths keep the array at the grid's shape, so a
@@ -453,281 +471,7 @@ fn a_cancelled_call_keeps_the_percentile_array_at_the_grid_shape() {
     )
     .unwrap();
     assert_eq!(data.bucket_percentiles, vec![None; 10]);
-}
-
-// ── Root facets ─────────────────────────────────────────────────────
-
-/// A CHILD span (parent set) of trace `t`.
-fn fspan(t: u8, id: u8, parent: u8, start_ns: u64, name: &'static str) -> common::SpanSpec {
-    let mut s = sp(id, parent, start_ns, name);
-    s.trace = [t; 16];
-    s.end = start_ns + 500;
-    s
-}
-
-/// Five traces across three requests, one expected root each — the
-/// facet tests below assert these mappings brute-force:
-///  - A (svc-a): root "op-a" + a child          → svc-a / op-a
-///  - B (svc-a): root "op-b"                    → svc-a / op-b
-///  - C (svc-b): root "op-a"                    → svc-b / op-a
-///  - D (svc-b): only a child span (its parent is nowhere in the
-///    corpus) → no true root (Indeterminate): unattributed on BOTH
-///    dimensions
-///  - E (request with no resource attributes): root "op-e" →
-///    service-less root: unattributed service, op-e operation
-fn facet_wal(dir: &std::path::Path) -> std::path::PathBuf {
-    use common::{kv_str, req_with};
-    write_wal(
-        dir,
-        vec![
-            req_with(
-                vec![kv_str("service.name", "svc-a")],
-                None,
-                &[
-                    tspan(0xA, 1, 1_000_000_000, 1_500_000_000, "op-a"),
-                    fspan(0xA, 2, 1, 1_100_000_000, "a-child"),
-                    tspan(0xB, 3, 2_000_000_000, 2_500_000_000, "op-b"),
-                ],
-            ),
-            req_with(
-                vec![kv_str("service.name", "svc-b")],
-                None,
-                &[
-                    tspan(0xC, 4, 3_000_000_000, 3_500_000_000, "op-a"),
-                    fspan(0xD, 5, 9, 4_000_000_000, "d-orphan"),
-                ],
-            ),
-            req_with(
-                vec![],
-                None,
-                &[tspan(0xE, 6, 5_000_000_000, 5_500_000_000, "op-e")],
-            ),
-        ],
-        "facets",
-    )
-}
-
-/// Root facets are opt-in, and asking changes nothing else: without the
-/// flag the section is absent; with it, grid, totals and status are
-/// identical to the plain run.
-#[test]
-fn facets_are_absent_unless_requested_and_change_nothing_else() {
-    let dir = tempfile::tempdir().unwrap();
-    let wal = facet_wal(dir.path());
-    let plain = run(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        OverviewQuery::new(grid()),
-    );
-    assert!(plain.root_facets.is_none(), "opt-in only");
-
-    let with = run(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        OverviewQuery::new(grid()).root_facets(true),
-    );
-    assert!(with.root_facets.is_some());
-    assert_eq!(with.cells, plain.cells, "the grid is identical");
-    assert_eq!(with.total_traces, plain.total_traces);
-    assert_eq!(with.total_spans, plain.total_spans);
-    assert_eq!(with.status, plain.status);
-}
-
-#[test]
-fn facet_counts_match_brute_force_with_explicit_unattributed_buckets() {
-    let dir = tempfile::tempdir().unwrap();
-    let wal = facet_wal(dir.path());
-    let data = run(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        OverviewQuery::new(grid()).root_facets(true),
-    );
-    assert_eq!(data.total_traces, 5);
-    let f = data.root_facets.expect("requested");
-
-    // Services: svc-a×2 (A,B) > svc-b×1 (C); D (Indeterminate) and E
-    // (service-less root) are bucketed, never attributed.
-    assert_eq!(
-        f.services.top,
-        vec![("svc-a".to_string(), 2), ("svc-b".to_string(), 1)]
-    );
-    assert_eq!((f.services.other, f.services.unattributed), (0, 2));
-
-    // Operations: op-a×2 (A,C) then value-ASC among the ×1s; only D
-    // lacks a root name.
-    assert_eq!(
-        f.operations.top,
-        vec![
-            ("op-a".to_string(), 2),
-            ("op-b".to_string(), 1),
-            ("op-e".to_string(), 1)
-        ]
-    );
-    assert_eq!((f.operations.other, f.operations.unattributed), (0, 1));
-
-    // The partition identity, both dimensions.
-    for list in [&f.services, &f.operations] {
-        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
-        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
-    }
-}
-
-#[test]
-fn a_straddling_root_attributes_once_from_the_source_holding_it() {
-    // The root lives in the sealed part; the tail holds only a child.
-    // The merged trace attributes to the root's service exactly once.
-    let dir = tempfile::tempdir().unwrap();
-    let wal_1 = write_wal(
-        dir.path(),
-        vec![common::req_with(
-            vec![common::kv_str("service.name", "svc-root")],
-            None,
-            &[tspan(0xA, 1, 1_000_000_000, 1_500_000_000, "op-root")],
-        )],
-        "part1",
-    );
-    let wal_2 = write_wal(
-        dir.path(),
-        vec![common::req_with(
-            vec![common::kv_str("service.name", "svc-child")],
-            None,
-            &[fspan(0xA, 2, 1, 2_000_000_000, "op-child")],
-        )],
-        "part2",
-    );
-    let data = run(
-        vec![
-            sealed_source(dir.path(), &wal_1, "s1"),
-            tail_source(&wal_2, "t2"),
-        ],
-        OverviewQuery::new(grid()).root_facets(true),
-    );
-    assert_eq!(data.total_traces, 1);
-    let f = data.root_facets.unwrap();
-    assert_eq!(f.services.top, vec![("svc-root".to_string(), 1)]);
-    assert_eq!(f.operations.top, vec![("op-root".to_string(), 1)]);
-    assert_eq!((f.services.unattributed, f.operations.unattributed), (0, 0));
-}
-
-#[test]
-fn the_top_k_cap_folds_the_tail_into_other_deterministically() {
-    // Twelve services, one trace each: all counts tie, so the top 10
-    // are the value-ASC prefix and `other` carries the remaining two.
-    use common::{kv_str, req_with};
-    let dir = tempfile::tempdir().unwrap();
-    let reqs: Vec<_> = (0..12u8)
-        .map(|i| {
-            req_with(
-                vec![kv_str("service.name", &format!("svc-{:02}", i))],
-                None,
-                &[tspan(0x10 + i, 1, 1_000_000_000, 1_500_000_000, "op")],
-            )
-        })
-        .collect();
-    let wal = write_wal(dir.path(), reqs, "many");
-    let data = run(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        OverviewQuery::new(grid()).root_facets(true),
-    );
-    let f = data.root_facets.unwrap();
-    assert_eq!(f.services.top.len(), FACET_TOP_K);
-    assert_eq!(f.services.top[0].0, "svc-00");
-    assert_eq!(f.services.top[FACET_TOP_K - 1].0, "svc-09");
-    assert_eq!(f.services.other, 2, "svc-10 and svc-11 fold into other");
-    assert_eq!(f.services.unattributed, 0);
-}
-
-#[test]
-fn the_partition_identity_holds_under_a_partial_and_facets_survive_it() {
-    // A legacy (rollup-absent) file beside the facet corpus: the
-    // partial fires, and the facet partition still describes the
-    // COUNTED population exactly.
-    let dir = tempfile::tempdir().unwrap();
-    let wal = facet_wal(dir.path());
-    let data = run(
-        vec![
-            sealed_source(dir.path(), &wal, "modern"),
-            common::legacy_sfst_source(dir.path(), "legacy"),
-        ],
-        OverviewQuery::new(grid()).root_facets(true),
-    );
-    assert!(data.status.has(PartialReason::RollupAbsent));
-    let f = data
-        .root_facets
-        .expect("requested facets survive the partial");
-    for list in [&f.services, &f.operations] {
-        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
-        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
-    }
-}
-
-#[test]
-fn a_cancelled_call_keeps_the_requested_facet_shape_empty() {
-    // All-or-empty: the DATA is discarded but the response SHAPE
-    // follows the request — requested facets come back as empty lists,
-    // not as an absent section.
-    let dir = tempfile::tempdir().unwrap();
-    let wal = facet_wal(dir.path());
-    let cancel = CancellationToken::new();
-    cancel.cancel();
-    let data = overview(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        OverviewQuery::new(grid()).root_facets(true),
-        cancel,
-        Arc::new(AtomicUsize::new(0)),
-    )
-    .unwrap();
-    assert!(data.status.has(PartialReason::Cancelled));
-    let f = data.root_facets.expect("shape follows the request");
-    assert!(f.services.top.is_empty() && f.operations.top.is_empty());
-    assert_eq!((f.services.unattributed, f.operations.unattributed), (0, 0));
-}
-
-#[test]
-fn all_traces_outside_the_grid_yield_empty_facets_with_the_zero_identity() {
-    // The merge succeeds but every envelope start misses the grid: the
-    // facet lists describe the (empty) binned population — identity
-    // 0 == 0 + 0 + 0.
-    let dir = tempfile::tempdir().unwrap();
-    let wal = facet_wal(dir.path());
-    let data = run(
-        vec![sealed_source(dir.path(), &wal, "s")],
-        // The corpus lives in [1s, 6s); this grid starts at 100s.
-        OverviewQuery::new(sfst::Grid::new(100_000_000_000, 1_000_000_000, 10)).root_facets(true),
-    );
-    assert_eq!(data.status, QueryStatus::Complete);
-    assert_eq!(data.total_traces, 0);
-    let f = data.root_facets.unwrap();
-    for list in [&f.services, &f.operations] {
-        assert!(list.top.is_empty());
-        assert_eq!((list.other, list.unattributed), (0, 0));
-    }
-}
-
-#[test]
-fn the_ceiling_prefix_keeps_the_facet_identity() {
-    // Ceiling 0 with facets on: only the first source folds; the facet
-    // partition describes exactly that prefix's binned traces.
-    let dir = tempfile::tempdir().unwrap();
-    let wal_a = facet_wal(dir.path());
-    let wal_b = write_wal(
-        dir.path(),
-        vec![req(&[tspan(0x77, 1, 7_000_000_000, 7_500_000_000, "late")])],
-        "b",
-    );
-    let data = run(
-        vec![
-            sealed_source(dir.path(), &wal_a, "1-first"),
-            sealed_source(dir.path(), &wal_b, "2-second"),
-        ],
-        OverviewQuery::new(grid())
-            .root_facets(true)
-            .visited_rows_ceiling_for_tests(0),
-    );
-    assert!(data.status.has(PartialReason::OverviewCeiling));
-    assert_eq!(data.total_traces, 5, "the first source's corpus only");
-    let f = data.root_facets.unwrap();
-    for list in [&f.services, &f.operations] {
-        let sum: u64 = list.top.iter().map(|(_, n)| n).sum();
-        assert_eq!(sum + list.other + list.unattributed, data.total_traces);
-    }
+    assert_eq!(data.bucket_duration_rows, vec![[0; HEATMAP_ROWS]; 10]);
 }
 
 // ── Filtered grid (the page's selections applied to the heatmap) ─────
@@ -755,7 +499,7 @@ fn name_in(values: &[&str]) -> Predicate {
     }
 }
 
-/// `resource.service.name = <value>` (the rail's service filter).
+/// `resource.attributes.service.name = <value>` (the rail's service filter).
 fn service_eq(value: &str) -> Predicate {
     Predicate {
         conditions: vec![cond(
@@ -768,7 +512,7 @@ fn service_eq(value: &str) -> Predicate {
 
 /// `run` with the predicate attached — the filtered-grid driver below.
 fn filtered(sources: Vec<TraceSource>, predicate: Predicate) -> OverviewData {
-    run(sources, OverviewQuery::new(grid()).predicate(predicate))
+    run(sources, OverviewQuery::new(grid()).tokens(predicate))
 }
 
 /// The filter selects TRACES by a matching stored row and keeps each
@@ -922,11 +666,11 @@ fn filtered_grid_selects_by_any_stored_copy() {
     }
 }
 
-/// The filter's scans share the fold's ONE ceiling: an exhausted budget
+/// The filter's scans are charged to their own budget: an exhausted one
 /// stops the merge with the overview's own `OverviewCeiling` partial,
 /// and nothing half-flagged is binned.
 #[test]
-fn filtered_grid_charges_the_visited_ceiling() {
+fn filtered_grid_charges_the_filter_ceiling() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
     for src in [
@@ -936,18 +680,18 @@ fn filtered_grid_charges_the_visited_ceiling() {
         let data = run(
             src,
             OverviewQuery::new(grid())
-                .predicate(name_in(&["c-1"]))
-                .visited_rows_ceiling_for_tests(1),
+                .tokens(name_in(&["c-1"]))
+                .filter_units_ceiling_for_tests(0),
         );
         assert!(data.status.has(PartialReason::OverviewCeiling));
         assert_eq!(data.total_traces, 0);
     }
 }
 
-/// The filter's scans are charged to the fold's ONE ceiling and
-/// accumulate across sources: two files each affordable alone are not
-/// affordable together, and the merge stops with the partial reason
-/// while the traces the earlier file already selected stay binned.
+/// The filter's units accumulate across sources: two files each
+/// affordable alone are not affordable together, and the merge stops
+/// with the partial reason while the traces the earlier file already
+/// selected stay binned.
 #[test]
 fn filter_work_accumulates_across_sources() {
     let dir = tempfile::tempdir().unwrap();
@@ -961,12 +705,12 @@ fn filter_work_accumulates_across_sources() {
         run(
             sources,
             OverviewQuery::new(grid())
-                .predicate(predicate())
-                .visited_rows_ceiling_for_tests(ceiling),
+                .tokens(predicate())
+                .filter_units_ceiling_for_tests(ceiling),
         )
     };
-    // The smallest ceiling under which one file alone completes: its
-    // fold rows plus its filter's scan and emission.
+    // The smallest filter budget under which one file alone completes:
+    // its filter's scan and emission.
     let minimal = |source: &dyn Fn() -> TraceSource| {
         (0..64)
             .find(|&ceiling| at(vec![source()], ceiling).status == QueryStatus::Complete)
@@ -1001,7 +745,7 @@ fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
     let c = corpus();
     let wal_bad = write_wal(dir.path(), vec![req(&c[2..])], "bad"); // B, C
     let wal_ok = write_wal(dir.path(), vec![req(&c[..2])], "ok"); // A
-    // Seal once, corrupt in place, then build sources WITHOUT resealing.
+    // Index once, corrupt in place, then build sources WITHOUT re-indexing.
     drop(sealed_source(dir.path(), &wal_bad, "bad"));
     let bad_path = dir.path().join("bad.sfst");
     corrupt_chunk(&bad_path, *b"TRCE");
@@ -1025,42 +769,73 @@ fn a_failed_filter_scan_leaves_the_files_traces_unflagged() {
     assert_eq!(data.total_traces, 1);
     assert_eq!(data.cells[1][3], 1, "A, from the healthy file");
     assert_eq!(data.cells[5][5], 0, "C stays unflagged");
+
+    // A negated token cannot pass the failed file's traces: their rows
+    // might match it.
+    let data = run(
+        src(),
+        OverviewQuery::new(grid()).tokens(TokenQuery {
+            tokens: vec![Token::negated(name_in(&["nope"]))],
+        }),
+    );
+    assert!(data.status.has(PartialReason::SourceFailure));
+    assert_eq!(data.total_traces, 1, "A alone");
 }
 
-/// Trace-level and trace-id conditions cannot be answered from stored
-/// rows: a clean request error names the offending target, never a
-/// silently unfiltered grid.
+/// The unfiltered grid reads a file's metadata and rollup alone: a
+/// corrupt primary dictionary does not touch it. A filter needs that
+/// dictionary, so there the file's matches are unknown and reported.
 #[test]
-fn filtered_grid_rejects_trace_level_conditions() {
+fn the_unfiltered_grid_never_reads_the_primary_dictionary() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_bad = write_wal(dir.path(), vec![req(&c[2..])], "bad"); // B, C
+    let wal_ok = write_wal(dir.path(), vec![req(&c[..2])], "ok"); // A
+    drop(sealed_source(dir.path(), &wal_bad, "bad"));
+    let bad_path = dir.path().join("bad.sfst");
+    corrupt_chunk(&bad_path, *b"PRIM");
+    let src = || {
+        vec![
+            sealed_source_at(&bad_path, "bad"),
+            sealed_source(dir.path(), &wal_ok, "ok"),
+        ]
+    };
+
+    let plain = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(plain.status, QueryStatus::Complete);
+    assert_eq!(plain.total_traces, 3);
+
+    let data = filtered(src(), name_in(&["a-1", "c-1"]));
+    assert!(data.status.has(PartialReason::SourceFailure));
+    assert_eq!(data.total_traces, 1);
+    assert_eq!(data.cells[5][5], 0, "C stays unflagged");
+}
+
+/// The duration is the grid's own axis: a trace-duration token is a
+/// clean request error, either polarity, never a silently unfiltered
+/// grid. Root and `trace_id` tokens are accepted (tests below).
+#[test]
+fn grid_rejects_duration_tokens() {
     let dir = tempfile::tempdir().unwrap();
     let wal = write_wal(dir.path(), vec![req(&corpus())], "c");
-    for (field, value) in [
-        (BuiltinField::RootName, text("a-1")),
-        (BuiltinField::RootServiceName, text("svc")),
-        (BuiltinField::TraceDuration, PredicateValue::Integer(1000)),
-        (
-            BuiltinField::TraceId,
-            text("0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"),
-        ),
-    ] {
-        let predicate = Predicate {
-            conditions: vec![Condition {
-                target: PredicateTarget::Builtin(field),
-                op: CompareOp::Eq,
-                values: vec![value],
-            }],
-        };
+    let duration = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceDuration),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(1000)],
+        }],
+    };
+    for token in [Token::positive(duration()), Token::negated(duration())] {
         let err = overview(
             vec![sealed_source(dir.path(), &wal, "a")],
-            OverviewQuery::new(grid()).predicate(predicate),
+            OverviewQuery::new(grid()).tokens(TokenQuery {
+                tokens: vec![token],
+            }),
             CancellationToken::new(),
             Arc::new(AtomicUsize::new(0)),
         )
         .unwrap_err();
-        assert!(
-            matches!(err, OverviewRequestError::TraceLevelCondition { .. }),
-            "{field:?}: {err}"
-        );
+        assert!(matches!(err, OverviewRequestError::AxisToken), "{err}");
     }
 }
 
@@ -1116,6 +891,77 @@ fn filtered_grid_agrees_with_search_on_a_canonical_corpus() {
     }
 }
 
+/// A trace that started before the window but has a span inside it is
+/// listed, and a `trace_start` bound at the window's start drops it —
+/// which makes the list the grid's population: the grid bins a trace by
+/// its start and leaves an earlier-starting one out. Both search paths.
+#[test]
+fn a_trace_start_bound_lists_the_grid_population() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut child = sp(2, 1, 6_000_000_000, "x-child");
+    child.trace = [0x51; 16];
+    child.end = 6_100_000_000;
+    let spans = vec![
+        tspan(0x51, 1, 1_000_000_000, 9_000_000_000, "x-root"),
+        child,
+        tspan(0x52, 3, 6_000_000_000, 6_200_000_000, "y-root"),
+    ];
+    let wal = write_wal(dir.path(), vec![req(&spans)], "straddle");
+    let src = || vec![sealed_source(dir.path(), &wal, "s")];
+    let window = TimeWindow::new(5_000_000_000, 10_000_000_000).unwrap();
+    let started_in_window = Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceStart),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(5_000_000_000)],
+        }],
+    };
+
+    let grid = overview(
+        src(),
+        OverviewQuery::new(sfst::Grid::new(5_000_000_000, 1_000_000_000, 5)),
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )
+    .unwrap();
+    assert_eq!(
+        grid.total_traces, 1,
+        "the grid counts only the trace that started inside"
+    );
+
+    for rows in [true, false] {
+        let listed = |predicate: Predicate| {
+            search(
+                SearchSources {
+                    window: src(),
+                    completion: src(),
+                },
+                SearchQuery::new(predicate)
+                    .window(window)
+                    .limit(100)
+                    .rows_for_tests(rows),
+                CancellationToken::new(),
+                Arc::new(AtomicUsize::new(0)),
+            )
+            .unwrap()
+            .traces
+            .iter()
+            .map(|t| t.trace_id)
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            listed(Predicate::all()).len(),
+            2,
+            "rows={rows}: any span in the window lists"
+        );
+        assert_eq!(
+            listed(started_in_window.clone()),
+            vec![sfst::TraceId::from([0x52; 16])],
+            "rows={rows}: the bound keeps the trace the grid counts"
+        );
+    }
+}
+
 /// An unavailable source reports its own reason beside a missing file's
 /// while the healthy source still counts; alone, it is never Complete
 /// and never a source failure.
@@ -1159,4 +1005,408 @@ fn unavailable_sources_are_reported_while_the_rest_count() {
         only.status,
         QueryStatus::Partial(BTreeSet::from([PartialReason::RemoteUnavailable]))
     );
+}
+
+// ── Tokens ────────────────────────────────────────────────────────────
+
+fn tokens_grid(sources: Vec<TraceSource>, tokens: Vec<Token>) -> OverviewData {
+    run(
+        sources,
+        OverviewQuery::new(grid()).tokens(TokenQuery { tokens }),
+    )
+}
+
+/// Tokens AND per trace over stored rows from any source: A's two spans
+/// live in a sealed file and a tail, and two tokens matched by
+/// different rows (and sources) select it; tokens matched by different
+/// traces select nothing.
+#[test]
+fn grid_population_follows_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&[c[0].clone(), c[2].clone()])], "s"); // a-1, B
+    let wal_tail = write_wal(
+        dir.path(),
+        vec![req(&[c[1].clone(), c[3].clone(), c[4].clone()])],
+        "t",
+    ); // a-2, C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let both = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["a-1"])),
+            Token::positive(name_in(&["a-2"])),
+        ],
+    );
+    assert_eq!(both.status, QueryStatus::Complete);
+    assert_eq!(both.total_traces, 1);
+    assert_eq!(both.cells[1][3], 1, "A, whole");
+    assert_eq!(both.total_spans, 2);
+
+    let apart = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["a-1"])),
+            Token::positive(name_in(&["b-err"])),
+        ],
+    );
+    assert_eq!(apart.total_traces, 0);
+
+    // One token's values OR: the flat-predicate meaning.
+    let either = tokens_grid(src(), vec![Token::positive(name_in(&["a-1", "b-err"]))]);
+    assert_eq!(either.total_traces, 2);
+}
+
+/// A filter scan the ceiling refuses leaves its source's rows folded
+/// but unflagged: those traces are unknown, so they cannot pass a
+/// negated token. A token every trace matches keeps the grid empty at
+/// every budget, whether the refused source is a sealed file or a tail.
+#[test]
+fn a_refused_filter_scan_cannot_pass_negated_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_a = write_wal(dir.path(), vec![req(&c[..2])], "a"); // A
+    let wal_b = write_wal(dir.path(), vec![req(&c[2..])], "b"); // B, C
+    let any_name = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Name),
+            op: CompareOp::Regex,
+            values: vec![text(".*")],
+        }],
+    };
+    let sources: [&dyn Fn() -> Vec<TraceSource>; 2] = [
+        &|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                sealed_source(dir.path(), &wal_b, "b"),
+            ]
+        },
+        &|| {
+            vec![
+                sealed_source(dir.path(), &wal_a, "a"),
+                tail_source(&wal_b, "b"),
+            ]
+        },
+    ];
+    for src in sources {
+        let mut partials = 0;
+        for ceiling in 0..64 {
+            let data = run(
+                src(),
+                OverviewQuery::new(grid())
+                    .tokens(TokenQuery {
+                        tokens: vec![Token::negated(any_name())],
+                    })
+                    .filter_units_ceiling_for_tests(ceiling),
+            );
+            partials += data.status.has(PartialReason::OverviewCeiling) as usize;
+            assert_eq!(data.total_traces, 0, "ceiling {ceiling}: {:?}", data.status);
+        }
+        assert!(partials > 0, "some ceilings refuse the work");
+    }
+}
+
+/// A two-file corpus where trace C straddles the files: A and C's first
+/// span in `a`, B and C's second span in `b`.
+fn straddling_sources(dir: &std::path::Path) -> impl Fn() -> Vec<TraceSource> + '_ {
+    let c = corpus();
+    let wal_a = write_wal(
+        dir,
+        vec![req(&[c[0].clone(), c[1].clone(), c[3].clone()])],
+        "a",
+    );
+    let wal_b = write_wal(dir, vec![req(&[c[2].clone(), c[4].clone()])], "b");
+    move || {
+        vec![
+            sealed_source(dir, &wal_a, "a"),
+            sealed_source(dir, &wal_b, "b"),
+        ]
+    }
+}
+
+/// Past the remainder cap, a trace stored in several files counts once
+/// per file with its file-local envelope, flagged `TraceFragments`;
+/// single-file traces bin as they always do.
+#[test]
+fn remainder_overflow_counts_fragments_and_flags_them() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = straddling_sources(dir.path());
+    let merged = run(src(), OverviewQuery::new(grid()));
+    assert_eq!(merged.status, QueryStatus::Complete);
+    assert_eq!(merged.total_traces, 3);
+    assert_eq!((merged.cells[5][3], merged.cells[5][5]), (0, 1), "C: 12 s");
+
+    let split = run(
+        src(),
+        OverviewQuery::new(grid()).remainder_traces_for_tests(0),
+    );
+    assert!(split.status.has(PartialReason::TraceFragments));
+    assert_eq!(split.total_traces, 4, "C counts once per file");
+    assert_eq!(split.cells[5][3], 1, "C in a: 100 ms");
+    assert_eq!(split.cells[5][5], 1, "C in b: ~12 s");
+    assert_eq!(split.total_spans, merged.total_spans);
+    assert_eq!(
+        (split.cells[1][3], split.cells[3][0]),
+        (1, 1),
+        "A and B unchanged"
+    );
+}
+
+/// A trace held by one file never enters the remainder map: with no
+/// room at all, a single-file corpus still bins exactly and completes.
+#[test]
+fn single_source_traces_never_enter_the_remainder() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_a = write_wal(dir.path(), vec![req(&c[..3])], "a"); // A, B
+    let wal_b = write_wal(dir.path(), vec![req(&c[3..])], "b"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_a, "a"),
+            tail_source(&wal_b, "b"),
+        ]
+    };
+    let data = run(
+        src(),
+        OverviewQuery::new(grid()).remainder_traces_for_tests(0),
+    );
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 3);
+    assert_eq!(data.cells, run(src(), OverviewQuery::new(grid())).cells);
+}
+
+/// The fold and the filter have separate budgets: a fold budget that
+/// just covers the files completes a filtered grid too, and a filter
+/// budget alone trips the partial however large the fold budget is.
+#[test]
+fn fold_and_filter_meters_trip_separately() {
+    let dir = tempfile::tempdir().unwrap();
+    let src = straddling_sources(dir.path());
+    let fold = |ceiling: u64| OverviewQuery::new(grid()).fold_rows_ceiling_for_tests(ceiling);
+    // The smallest fold budget that completes the unfiltered grid.
+    let fold_cost = (0..64)
+        .find(|&c| run(src(), fold(c)).status == QueryStatus::Complete)
+        .expect("a small corpus completes");
+    let filtered = run(src(), fold(fold_cost).tokens(name_in(&["a-1", "c-2"])));
+    assert_eq!(filtered.status, QueryStatus::Complete);
+    assert_eq!(filtered.total_traces, 2, "A and C");
+
+    let starved = run(
+        src(),
+        fold(u64::MAX)
+            .tokens(name_in(&["a-1", "c-2"]))
+            .filter_units_ceiling_for_tests(0),
+    );
+    assert!(starved.status.has(PartialReason::OverviewCeiling));
+}
+
+/// A negated token excludes the traces with a matching stored row in
+/// the grid, from any source.
+#[test]
+fn grid_negated_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..3])], "s"); // A, B
+    let wal_tail = write_wal(dir.path(), vec![req(&c[3..])], "t"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let error = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::Status),
+            op: CompareOp::Eq,
+            values: vec![text("ERROR")],
+        }],
+    };
+    let data = tokens_grid(src(), vec![Token::negated(error())]);
+    assert_eq!(data.total_traces, 2, "A and C");
+    assert_eq!(data.total_errors, 0);
+    let data = tokens_grid(src(), vec![Token::negated(name_in(&["c-1"]))]);
+    assert_eq!(data.total_traces, 2, "A and B");
+    let data = tokens_grid(
+        src(),
+        vec![
+            Token::positive(name_in(&["c-2"])),
+            Token::negated(name_in(&["c-1"])),
+        ],
+    );
+    assert_eq!(data.total_traces, 0);
+}
+
+/// Free text selects by stored values, case-insensitively, from sealed
+/// files and tails.
+#[test]
+fn grid_text_token() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let wal_sealed = write_wal(dir.path(), vec![req(&c[..3])], "s"); // A, B
+    let wal_tail = write_wal(dir.path(), vec![req(&c[3..])], "t"); // C
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let text_token = |term: &str| {
+        Token::positive(Predicate {
+            conditions: vec![Condition {
+                target: PredicateTarget::FreeText,
+                op: CompareOp::Contains,
+                values: vec![text(term)],
+            }],
+        })
+    };
+    assert_eq!(
+        tokens_grid(src(), vec![text_token("B-ERR")]).total_traces,
+        1
+    );
+    assert_eq!(tokens_grid(src(), vec![text_token("c-2")]).total_traces, 1);
+    assert_eq!(
+        tokens_grid(src(), vec![text_token("svc")]).total_traces,
+        3,
+        "resource values"
+    );
+    assert_eq!(tokens_grid(src(), vec![text_token("nope")]).total_traces, 0);
+}
+
+/// Root tokens read the recorded roots: a sealed file's rollup claim, a
+/// tail's earliest unset-parent span. A trace whose root was never
+/// stored passes a negated root token and fails the positive one.
+#[test]
+fn grid_root_claims() {
+    let dir = tempfile::tempdir().unwrap();
+    let c = corpus();
+    let mut child = tspan(0xD, 6, 7_000_000_000, 7_100_000_000, "orphan");
+    child.parent = [9; 8];
+    let wal_sealed = write_wal(
+        dir.path(),
+        vec![
+            req_with(vec![kv_str("service.name", "svc-a")], None, &c[..2]),
+            req_with(vec![kv_str("service.name", "svc-b")], None, &c[2..3]),
+            req_with(vec![kv_str("service.name", "svc-d")], None, &[child]),
+        ],
+        "s",
+    );
+    let wal_tail = write_wal(
+        dir.path(),
+        vec![req_with(
+            vec![kv_str("service.name", "svc-c")],
+            None,
+            &c[3..],
+        )],
+        "t",
+    );
+    let src = || {
+        vec![
+            sealed_source(dir.path(), &wal_sealed, "s"),
+            tail_source(&wal_tail, "t"),
+        ]
+    };
+    let root = |field: BuiltinField, value: &str| Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(field),
+            op: CompareOp::Eq,
+            values: vec![text(value)],
+        }],
+    };
+    let count = |tokens| tokens_grid(src(), tokens).total_traces;
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-a"
+        ))]),
+        1
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-c"
+        ))]),
+        1,
+        "tail root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "a-1"))]),
+        1,
+        "the earliest root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "c-1"))]),
+        1,
+        "the tail's earliest root"
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "c-2"))]),
+        0
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(BuiltinField::RootName, "a-2"))]),
+        0
+    );
+    assert_eq!(
+        count(vec![Token::positive(root(
+            BuiltinField::RootServiceName,
+            "svc-d"
+        ))]),
+        0,
+        "no root"
+    );
+    assert_eq!(
+        count(vec![Token::negated(root(
+            BuiltinField::RootServiceName,
+            "svc-a"
+        ))]),
+        3,
+        "B, C and the rootless D"
+    );
+}
+
+/// `trace_id` tokens pin or exclude traces in the grid.
+#[test]
+fn grid_trace_id_tokens() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "s");
+    let src = || vec![sealed_source(dir.path(), &wal, "s")];
+    let id = || Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceId),
+            op: CompareOp::Eq,
+            values: vec![text(&sfst::TraceId::from([0xA; 16]).to_string())],
+        }],
+    };
+    let pinned = tokens_grid(src(), vec![Token::positive(id())]);
+    assert_eq!((pinned.total_traces, pinned.cells[1][3]), (1, 1));
+    assert_eq!(
+        tokens_grid(src(), vec![Token::negated(id())]).total_traces,
+        2
+    );
+}
+
+/// A filter of `trace_id` tokens alone is tested on the ids: no source
+/// is scanned, so even a file whose dictionary is corrupt answers.
+#[test]
+fn trace_id_only_filter_scans_no_source() {
+    let dir = tempfile::tempdir().unwrap();
+    let wal = write_wal(dir.path(), vec![req(&corpus())], "ids");
+    drop(sealed_source(dir.path(), &wal, "s"));
+    let path = dir.path().join("s.sfst");
+    corrupt_chunk(&path, *b"PRIM");
+    let a = Predicate {
+        conditions: vec![Condition {
+            target: PredicateTarget::Builtin(BuiltinField::TraceId),
+            op: CompareOp::Eq,
+            values: vec![text(&sfst::TraceId::from([0xA; 16]).to_string())],
+        }],
+    };
+    let data = tokens_grid(vec![sealed_source_at(&path, "s")], vec![Token::positive(a)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+    assert_eq!(data.total_traces, 1, "trace A");
 }

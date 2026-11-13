@@ -51,7 +51,7 @@ fn make_handler(tr: TenantRegistries) -> OtelLogsHandler {
 fn make_ctx(transaction: &str) -> FunctionCallContext {
     FunctionCallContext::new(
         transaction.to_string(),
-        bridge::function::ProgressState::new(),
+        otel_bridge::function::ProgressState::new(),
         CancellationToken::new(),
     )
 }
@@ -127,6 +127,7 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -144,10 +145,10 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
 }
 
 /// Install one 6-log SFST under `tenant` at sequence `seq`. The fixed
-/// part key (7) never affects a query here: these tests never select
+/// partition key (7) never affects a query here: these tests never select
 /// a stream, so the query's partition filter stays empty. (The remote
 /// tests below use stream-derived ids instead: `track_remote_catalog`
-/// enforces production's part_key = ns_hash pairing.)
+/// enforces production's partition_key = ns_hash pairing.)
 fn install_sfst(tr: &mut TenantRegistries, tenant: &str, seq: u64, min_s: u32) {
     let id = FileId::new(test_identity(), 0, seq, 7);
 
@@ -211,6 +212,7 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -279,6 +281,7 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
         event_index: false,
         link_index: false,
         trace_rollup: false,
+        trace_rollup_stats: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -391,7 +394,7 @@ async fn files_request_returns_inventory_with_upload_state() {
     assert_eq!(sfst[0]["min_ts_s"], 1_700_000_000u64);
     assert_eq!(sfst[0]["stream"]["namespace"], "ns");
     assert_eq!(sfst[0]["stream"]["name"], "svc");
-    assert_eq!(sfst[0]["ns_hash"], "0000000000000007"); // wire ns_hash = FileId part_key = 7
+    assert_eq!(sfst[0]["ns_hash"], "0000000000000007"); // wire ns_hash = FileId partition_key = 7
     // seq 1 went through the upload lifecycle; seq 2 did not
     assert_eq!(sfst[0]["rotated"], true);
     assert_eq!(sfst[0]["uploaded"], true);
@@ -1008,20 +1011,25 @@ fn patched_args_payload_parses_as_a_logs_request() {
     assert_eq!(req.before, 200);
 }
 
-/// The Function declaration keeps the legacy shape: global visibility,
-/// the `logs` tag, and the SIGNED_ID | SAME_SPACE | SENSITIVE_DATA
+/// The Function declaration advertises global visibility, the `logs` tag,
+/// and the SIGNED_ID | SAME_SPACE | COMMERCIAL_SPACE | SENSITIVE_DATA
 /// access mask.
 #[test]
-fn declaration_carries_legacy_flags() {
+fn declaration_advertises_otel_logs() {
     let h = make_handler(make_tenant_registries());
     let d = h.declaration();
     assert_eq!(d.name, "otel-logs");
     assert!(d.global);
     assert_eq!(d.tags.as_deref(), Some("logs"));
-    let access = d.access.unwrap();
-    assert!(access.contains(HttpAccess::SIGNED_ID));
-    assert!(access.contains(HttpAccess::SAME_SPACE));
-    assert!(access.contains(HttpAccess::SENSITIVE_DATA));
+    assert_eq!(
+        d.access,
+        Some(
+            HttpAccess::SIGNED_ID
+                | HttpAccess::SAME_SPACE
+                | HttpAccess::COMMERCIAL_SPACE
+                | HttpAccess::SENSITIVE_DATA
+        )
+    );
 }
 
 // ── Tenant scoping ────────────────────────────────────────────────
@@ -1094,11 +1102,11 @@ fn track_remote_catalog(
 ) -> std::path::PathBuf {
     let stream = ServiceStream::new("ns", "svc");
     // Production `build_catalog_entry` copies both id and stream from one SFST, so
-    // the FileId's part_key always matches the stream's ns_hash. Enforce it on the fixture.
+    // the FileId's partition_key always matches the stream's ns_hash. Enforce it on the fixture.
     assert_eq!(
-        id.part_key,
+        id.partition_key,
         stream.ns_hash(),
-        "catalog fixture id.part_key must match its stream"
+        "catalog fixture id.partition_key must match its stream"
     );
     let entry = otel_catalog::CatalogEntry {
         id,
@@ -1225,7 +1233,7 @@ async fn remote_only_sfst_is_fetched_and_served() {
     .unwrap();
     // Keep a handle to the progress state so we can assert the fetch phase
     // advanced it. Build the context inline (make_ctx hides its ProgressState).
-    let progress = bridge::function::ProgressState::new();
+    let progress = otel_bridge::function::ProgressState::new();
     let ctx =
         FunctionCallContext::new("t1".to_string(), progress.clone(), CancellationToken::new());
     let v = serde_json::to_value(&h.on_call(ctx, req).await.unwrap()).unwrap();
@@ -1478,12 +1486,12 @@ async fn an_unreadable_catalog_is_skipped() {
         MachineId::new(Uuid::from_u128(0x11)).unwrap(),
         InstanceId::new(Uuid::from_u128(0x22)).unwrap(),
     );
-    let part_key = ServiceStream::new("ns", "svc").ns_hash();
+    let partition_key = ServiceStream::new("ns", "svc").ns_hash();
     let min_s = 1_700_000_000u32;
     track_remote_catalog(
         &mut tr,
         "default",
-        FileId::new(identity, 0, 1, part_key),
+        FileId::new(identity, 0, 1, partition_key),
         "missing/1.sfst",
         min_s,
         min_s + 5,
@@ -1492,7 +1500,7 @@ async fn an_unreadable_catalog_is_skipped() {
     let corrupt = track_remote_catalog(
         &mut tr,
         "default",
-        FileId::new(identity, 0, 2, part_key),
+        FileId::new(identity, 0, 2, partition_key),
         "missing/2.sfst",
         min_s,
         min_s + 5,

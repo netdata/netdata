@@ -101,7 +101,7 @@ func buildSNMPTopologyV1Links(
 			evidenceRows.sources = append(evidenceRows.sources, nullableStringRef(stringsDict, topologyEvidenceSource(link)))
 		}
 		if linkType == snmpTopologyV1LinkBGP {
-			evidenceRows.routingInstances = append(evidenceRows.routingInstances, nullableStringRef(stringsDict, topologymodel.LinkBGPRoutingInstance(link)))
+			evidenceRows.routingInstances = append(evidenceRows.routingInstances, nullableBGPIdentifierRef(stringsDict, topologymodel.LinkBGPRoutingInstance(link)))
 			evidenceRows.localIdentifiers = append(evidenceRows.localIdentifiers, nullableStringRef(stringsDict, topologymodel.LinkBGPLocalIdentifier(link)))
 			evidenceRows.peerIdentifiers = append(evidenceRows.peerIdentifiers, nullableStringRef(stringsDict, topologymodel.LinkBGPPeerIdentifier(link)))
 			evidenceRows.localIPs = append(evidenceRows.localIPs, nullableStringRef(stringsDict, topologymodel.LinkBGPLocalIP(link)))

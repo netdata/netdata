@@ -212,6 +212,10 @@ static void http_header_x_forwarded_for(struct web_client *w, const char *v, siz
     while(e > v && isspace((uint8_t)e[-1]))
         e--;
 
+    // an empty first entry carries no address
+    if(e == v)
+        return;
+
     // the address part of the entry, and the family it must parse as (AF_UNSPEC: either)
     const char *address_end = e;
     int family = AF_UNSPEC;

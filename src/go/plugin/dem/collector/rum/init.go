@@ -93,6 +93,7 @@ func (c *Collector) Init(ctx context.Context) error {
 	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
 		Name:               c.Name,
+		VnodeGUID:          c.vnodeGUID,
 		DisplayName:        c.Label(),
 		PageGroups:         c.PageGroups,
 		Countries:          c.Countries,

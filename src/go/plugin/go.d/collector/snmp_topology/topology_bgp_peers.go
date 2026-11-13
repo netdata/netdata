@@ -42,12 +42,21 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologymodel.BGPPeer, bool) {
 
 	neighbor := topologyutil.FirstNonEmptyString(row.Identity.Neighbor, row.Tags["neighbor"])
 	remoteAS := topologyutil.FirstNonEmptyString(row.Identity.RemoteAS, row.Tags["remote_as"])
-	if strings.TrimSpace(neighbor) == "" || strings.TrimSpace(remoteAS) == "" {
+	processID := topologyutil.FirstBGPIdentifier(row.Identity.ProcessID, row.Tags["process_id"])
+	instance := topologyBGPRoutingInstance(row)
+	identity := ddsnmp.BGPIdentity{
+		ProcessID:       processID,
+		RoutingInstance: topologyutil.FirstBGPIdentifier(row.Identity.RoutingInstance, row.Tags["routing_instance"]),
+		Neighbor:        neighbor,
+		RemoteAS:        remoteAS,
+	}
+	if !identity.HasPeerIdentity() {
 		return topologymodel.BGPPeer{}, false
 	}
 
 	peer := topologymodel.BGPPeer{
-		RoutingInstance:       topologyBGPRoutingInstance(row),
+		ProcessID:             processID,
+		RoutingInstance:       instance,
 		NeighborIP:            topologyutil.NormalizeBGPPeerAddress(neighbor),
 		RemoteAS:              strings.TrimSpace(remoteAS),
 		LocalIP:               topologyutil.NormalizeBGPPeerAddress(row.Descriptors.LocalAddress),
@@ -66,21 +75,18 @@ func topologyBGPPeerFromRow(row ddsnmp.BGPRow) (topologymodel.BGPPeer, bool) {
 }
 
 func topologyBGPRoutingInstance(row ddsnmp.BGPRow) string {
-	return topologyutil.FirstNonEmptyString(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
+	return topologyutil.FirstBGPIdentifier(row.Identity.RoutingInstance, row.Tags["routing_instance"], "default")
 }
 
 func topologyBGPPeerCacheKey(row ddsnmp.BGPRow, peer topologymodel.BGPPeer) string {
 	if key := strings.TrimSpace(row.StructuralID); key != "" {
 		return key
 	}
-	return topologyutil.JoinKeyParts(
-		row.OriginProfileID,
-		row.Table,
-		row.RowKey,
-		peer.RoutingInstance,
-		peer.NeighborIP,
-		peer.RemoteAS,
-	)
+	parts := []string{row.OriginProfileID, row.Table, row.RowKey, peer.RoutingInstance, peer.NeighborIP, peer.RemoteAS}
+	if peer.ProcessID != "" {
+		parts = append(parts, "process_id", peer.ProcessID)
+	}
+	return topologyutil.JoinKeyParts(parts...)
 }
 
 func (c *topologyBuilder) snapshotBGPPeers(localDeviceID string) []topologymodel.BGPPeer {

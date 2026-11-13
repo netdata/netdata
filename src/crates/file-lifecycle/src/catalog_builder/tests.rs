@@ -8,6 +8,9 @@
 //!   holds exactly that scope's entries.
 //! - Rotation drains the accumulator: the next rotation holds only the
 //!   post-rotation entries, under a new filename.
+//! - A rotation that gives the name of an existing file replaces it and
+//!   holds only its own entries (each comes from a confirmed upload; an
+//!   older file's entries are not carried over).
 //! - A `rotation_count` of 1 rotates on every `AddEntry`.
 //! - A failed rotation returns `RotationFailed` and keeps the accumulator; the
 //!   next trigger retries with every entry still in it.
@@ -49,9 +52,9 @@ fn date() -> NaiveDate {
 /// filename (the below-threshold test recomputes the expected path from them);
 /// everything else rides along verbatim.
 fn entry_for(seq: u64) -> CatalogEntry {
-    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     CatalogEntry {
-        id: FileId::new(ident(), 0, seq, part_key),
+        id: FileId::new(ident(), 0, seq, partition_key),
         remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
         min_timestamp_s: 1_700_000_000,
         max_timestamp_s: 1_700_003_600,
@@ -183,6 +186,40 @@ async fn rotation_fires_at_threshold_and_writes_file() {
         }
         other => panic!("expected Rotated, got {other:?}"),
     }
+}
+
+#[tokio::test]
+async fn a_rotation_onto_a_file_with_the_same_name_writes_only_its_own_entries() {
+    // A first rotation writes the entries 1, 2 and 3. Then 2 and 3 come
+    // again (their uploads were taken back at a start, after a move to
+    // another bucket) and are flushed: the same largest seq and the same
+    // times make the same file name.
+    let mut h = Harness::new(3);
+    h.send_recv(add_request(1)).await;
+    h.send_recv(add_request(2)).await;
+    let CatalogBuilderResponse::Rotated { path: first, .. } = h.send_recv(add_request(3)).await
+    else {
+        panic!("expected the first rotation");
+    };
+
+    h.send_recv(add_request(2)).await;
+    h.send_recv(add_request(3)).await;
+    let CatalogBuilderResponse::Rotated { path, mut seqs, .. } =
+        h.send_recv(CatalogBuilderRequest::Flush).await
+    else {
+        panic!("expected the second rotation");
+    };
+
+    // Entry 1 is not carried over: nothing confirms its upload to the
+    // current remote, and an entry of a catalog file lets retention delete
+    // the local index file once the catalog is uploaded.
+    assert_eq!(path, first);
+    let catalog = Catalog::from_container_bytes(&std::fs::read(&path).unwrap()).unwrap();
+    let mut in_file: Vec<u64> = catalog.entries.keys().map(|id| id.seq).collect();
+    in_file.sort();
+    assert_eq!(in_file, [2, 3]);
+    seqs.sort();
+    assert_eq!(seqs, [2, 3]);
 }
 
 #[tokio::test]

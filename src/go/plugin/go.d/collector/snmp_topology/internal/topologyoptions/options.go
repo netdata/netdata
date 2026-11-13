@@ -22,6 +22,8 @@ const (
 	InferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
 	ManagedFocusAllDevices               = "all_devices"
 	ManagedFocusIPPrefix                 = "ip:"
+	ManagedFocusBindingsTable            = "focus_roots"
+	ManagedFocusBindingsType             = "focus_root_bindings"
 	DepthAll                             = "all"
 	DepthMin                             = 0
 	DepthMax                             = 10

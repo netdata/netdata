@@ -28,11 +28,16 @@ func (s *Store) Append(ctx context.Context, fields []journal.Field) (attempted b
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	fields, err = appendEnvelope(fields)
+	var kind string
+	fields, kind, err = appendEnvelope(fields)
 	if err != nil {
 		return false, err
 	}
-	return true, s.recordFailure(s.log.Append(fields, s.host.EntryOptions()))
+	err = s.recordFailure(s.log.Append(fields, s.host.EntryOptions()))
+	if err == nil {
+		s.observeKind(kind)
+	}
+	return true, err
 }
 
 // Sync flushes admitted entries to disk. Cancellation interrupts admission, not

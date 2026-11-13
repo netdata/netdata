@@ -65,6 +65,7 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 		metricTag.Symbol.OID = metricTag.OID
 		metricTag.OID = ""
 	}
+	errs = append(errs, validateEnrichIndexFrom(metricTag), validateIndexDecode(metricTag))
 	if metricTag.IsIndexTag() {
 		symbol := SymbolConfig(metricTag.Symbol)
 		if symbol.Name == "" && metricTag.Tag == "" && metricTag.Index == 0 {
@@ -129,6 +130,9 @@ func validateEnrichMetricTag(path string, metricTag *MetricTagConfig, scalar boo
 
 func validateScalarMetricTag(tag *MetricTagConfig) error {
 	var errs []error
+	if tag.IndexDecode != nil {
+		errs = append(errs, errors.New("scalar metric_tags do not support `index_decode`"))
+	}
 	if tag.Table != "" {
 		errs = append(
 			errs,
@@ -140,6 +144,9 @@ func validateScalarMetricTag(tag *MetricTagConfig) error {
 			errs,
 			fmt.Errorf("scalar metric_tags do not support `index` lookups (tag=%q, index=%d)", tag.Tag, tag.Index),
 		)
+	}
+	if len(tag.IndexFrom) > 0 {
+		errs = append(errs, fmt.Errorf("scalar metric_tags do not support `index_from` (tag=%q)", tag.Tag))
 	}
 	if len(tag.IndexTransform) > 0 {
 		errs = append(errs, fmt.Errorf("scalar metric_tags do not support `index_transform` (tag=%q)", tag.Tag))
@@ -154,6 +161,51 @@ func validateEnrichMetricTags(path string, tags []MetricTagConfig, scalar bool) 
 	var errs []error
 	for i := range tags {
 		errs = append(errs, validateEnrichMetricTag(fmt.Sprintf("%s.metric_tags[%d]", path, i), &tags[i], scalar))
+	}
+	return errors.Join(errs...)
+}
+
+func validateEnrichIndexFrom(tag *MetricTagConfig) error {
+	if len(tag.IndexFrom) == 0 {
+		return nil
+	}
+	var errs []error
+	if tag.Table == "" {
+		errs = append(errs, errors.New("`index_from` requires final `table`"))
+	}
+	if tag.Symbol.OID == "" || tag.Symbol.Name == "" {
+		errs = append(errs, errors.New("`index_from` requires final `symbol.OID` and `symbol.name`"))
+	}
+	if tag.Index != 0 {
+		errs = append(errs, errors.New("`index_from` cannot be combined with `index`"))
+	}
+	for i := range tag.IndexFrom {
+		source := &tag.IndexFrom[i]
+		var sourceErrs []error
+		if source.Table == "" {
+			sourceErrs = append(sourceErrs, errors.New("requires `table`"))
+		}
+		symbol := &source.Symbol
+		sourceErrs = append(sourceErrs, validateEnrichSymbol(symbol, metricTagSymbol))
+		if symbol.ScaleFactor != 0 {
+			sourceErrs = append(sourceErrs, errors.New("`scale_factor` is not supported"))
+		}
+		if symbol.ChartMeta != (ChartMeta{}) {
+			sourceErrs = append(sourceErrs, errors.New("`chart_meta` is not supported"))
+		}
+		if symbol.Transform != "" {
+			sourceErrs = append(sourceErrs, errors.New("`transform` is not supported"))
+		}
+		if symbol.ExtractValueCompiled != nil && symbol.ExtractValueCompiled.NumSubexp() == 0 {
+			sourceErrs = append(sourceErrs, errors.New("`extract_value` requires a capture group"))
+		}
+		if symbol.MatchPattern != "" && symbol.MatchValue == "" {
+			sourceErrs = append(sourceErrs, errors.New("`match_pattern` requires `match_value`"))
+		}
+		if symbol.MatchValue != "" && symbol.MatchPattern == "" {
+			sourceErrs = append(sourceErrs, errors.New("`match_value` requires `match_pattern`"))
+		}
+		errs = append(errs, withValidationPath(fmt.Sprintf("index_from[%d]", i), errors.Join(sourceErrs...)))
 	}
 	return errors.Join(errs...)
 }

@@ -859,6 +859,7 @@
           "columns": [
             "actor:actor_ref:role=reference",
             "remote_actor:actor_ref:nullable:role=reference",
+            "process_id:string_ref:dict=strings:nullable",
             "routing_instance:string_ref:dict=strings:nullable",
             "neighbor_ip:string_ref:dict=strings:nullable",
             "remote_as:string_ref:dict=strings:nullable",
@@ -1894,6 +1895,16 @@
           ]
         },
         "type": "actor_ports"
+      },
+      "focus_roots": {
+        "table": {
+          "columns": [
+            "option:string:role=attribute",
+            "actor:actor_ref:role=reference"
+          ],
+          "rows": null
+        },
+        "type": "focus_root_bindings"
       }
     }
   },
@@ -2844,6 +2855,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -3982,6 +4003,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -5271,6 +5302,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -6585,6 +6626,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -7884,6 +7935,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -9019,6 +9080,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -10160,6 +10231,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -11295,6 +11376,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -12595,6 +12686,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -13730,6 +13831,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -14871,6 +14982,16 @@
                   },
                   {
                     "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
                     "id": "routing_instance",
                     "label": "Routing Instance",
                     "projection": {
@@ -16006,6 +16127,16 @@
                       "actor_column": "remote_actor",
                       "kind": "actor_ref_label"
                     }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "process_id",
+                    "label": "Process ID",
+                    "projection": {
+                      "column": "process_id",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
                   },
                   {
                     "cell": "text",
@@ -18279,6 +18410,12 @@
           },
           {
             "dictionary": "strings",
+            "id": "process_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
             "id": "routing_instance",
             "nullable": true,
             "type": "string_ref"
@@ -18404,6 +18541,16 @@
                 "actor_column": "remote_actor",
                 "kind": "actor_ref_label"
               }
+            },
+            {
+              "cell": "text",
+              "id": "process_id",
+              "label": "Process ID",
+              "projection": {
+                "column": "process_id",
+                "kind": "direct"
+              },
+              "visibility": "expanded"
             },
             {
               "cell": "text",
@@ -19525,6 +19672,27 @@
           ],
           "label": "Ports",
           "order": 1
+        },
+        "role": "actor_detail"
+      },
+      "focus_root_bindings": {
+        "aggregation": "append",
+        "columns": [
+          {
+            "id": "option",
+            "role": "attribute",
+            "type": "string"
+          },
+          {
+            "id": "actor",
+            "role": "reference",
+            "type": "actor_ref"
+          }
+        ],
+        "owner": "actor",
+        "presentation": {
+          "default_visibility": "hidden",
+          "label": "Focus bindings"
         },
         "role": "actor_detail"
       }

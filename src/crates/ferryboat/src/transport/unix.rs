@@ -5,7 +5,7 @@
 //! connect retries live above it in `lib.rs`: streams are wrapped in
 //! `Framed<ConnectionStream, LengthDelimitedCodec>` with `max_frame_length`
 //! set to the configured message size (8 MiB default; the supervisor↔worker
-//! links pin `bridge::IPC_MAX_MESSAGE_SIZE`, 16 MiB, on both ends, while the
+//! links pin `otel_bridge::IPC_MAX_MESSAGE_SIZE`, 16 MiB, on both ends, while the
 //! writer→ledger link runs at the default), payloads are bincode with
 //! optional LZ4, and `connect` makes a single attempt — the retry loop is
 //! `ConnectionBuilder::connect_ipc_with_retry` (100 ms interval, 50 attempts
@@ -36,7 +36,7 @@
 //! otel-legacy-logs) connect; the writer→ledger WAL-event link is bound by
 //! `file_lifecycle::ipc::accept_writer` (called by otel-ledger) and connected
 //! by the ingestor's `LedgerSender`, which retries forever. Message contracts
-//! live in the `bridge` crate and `file_lifecycle::ipc`; socket naming and
+//! live in the `otel-bridge` crate and `file_lifecycle::ipc`; socket naming and
 //! child-process lifecycle in otel-plugin/src/supervisor.rs. Tests across the
 //! family bind and connect over unique temp paths (PID-suffixed `/tmp` names
 //! or `tempfile` dirs).

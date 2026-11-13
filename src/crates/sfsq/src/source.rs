@@ -24,10 +24,11 @@ use memmap2::{Mmap, UncheckedAdvice};
 /// Where an SFST candidate's bytes come from.
 ///
 /// `File` is the steady-state case — a sealed index on disk, memory-
-/// mapped lazily. `Memory` is an in-memory SFST built from a chunk of an
-/// active WAL (`ng_index::build_sfst_range` / `build_sfst_traces_range`);
-/// the bytes are shared (`Arc`) so a query holds them alive even if the
-/// producing cache evicts the entry mid-query.
+/// mapped lazily. `Memory` is an in-memory SFST indexed from a chunk of
+/// an active WAL (`ng_index::index_logs_range` /
+/// `index_traces_range`); the bytes are shared (`Arc`) so a query
+/// holds them alive even if the producing cache evicts the entry
+/// mid-query.
 #[derive(Clone)]
 pub enum Source {
     File(PathBuf),
@@ -66,6 +67,16 @@ impl Mapped {
         match self {
             Mapped::File(m) => m,
             Mapped::Memory(v) => v,
+        }
+    }
+
+    /// Drop a mapped file's pages from this process's resident set (the
+    /// page cache keeps them; a later read faults them back). For a
+    /// reader whose decoded state lives on the heap and that is done with
+    /// the file for now. An in-memory source has nothing to drop.
+    pub(crate) fn release_pages(&self) {
+        if let Mapped::File(m) = self {
+            release_cold_region(m, (0, m.len()));
         }
     }
 }

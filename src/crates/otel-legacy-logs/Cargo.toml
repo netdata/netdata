@@ -10,7 +10,7 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-bridge = { workspace = true }
+otel-bridge = { workspace = true }
 ferryboat = { workspace = true }
 netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }

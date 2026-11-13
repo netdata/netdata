@@ -6,6 +6,7 @@
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
+#include "web/api/queries/weights.h"
 
 #include <curl/curl.h>
 
@@ -174,16 +175,17 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
-// set when shutdown stopped waiting for dbengine work that may still be running on the libuv threadpool
-static bool dbengine_work_abandoned = false;
+// set when shutdown stopped waiting for dbengine or parallel weights work that may still be running
+static bool work_abandoned = false;
 
-// The last thing shutdown does. When shutdown gave up on work that may still be running on a libuv threadpool
-// worker (a SQLite user, see sqlite_teardown_is_unsafe(), or undrained dbengine work), exit() would run libuv's
-// library destructor, which joins every threadpool thread - so the process would wait for the job it already gave
-// up on, until systemd kills it. Shutdown is complete and its status saved by then: leave without running
-// destructors. No stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
+// The last thing shutdown does. When shutdown gave up on work that may still be running (a SQLite user on a libuv
+// threadpool worker, see sqlite_teardown_is_unsafe(), undrained dbengine work, or a parallel weights chunk),
+// exit() would run destructors under it: libuv's library destructor joins every threadpool thread - so the process
+// would wait for the job it already gave up on, until systemd kills it - and the other destructors free state that
+// work may still use. Shutdown is complete and its status saved by then: leave without running destructors. No
+// stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
 NORETURN void netdata_exit_process(int status) {
-    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&dbengine_work_abandoned, __ATOMIC_RELAXED))
+    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&work_abandoned, __ATOMIC_RELAXED))
         _exit(status);
 
     exit(status);
@@ -194,6 +196,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     // false when dbengine work may still be running after its event loop stopped
     bool dbengine_drained __maybe_unused = true;
+    bool weights_drained __maybe_unused = true;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
@@ -286,6 +289,18 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 20 * USEC_PER_SEC);
+
+    // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
+    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline.
+    // Not waited for on an abnormal exit, like the dbengine drain: the fatal may be on a WEIGHTS thread (which
+    // would wait for itself) or hold the weights lock. Chunks may then still be running: skip the ASAN teardown.
+    if(abnormal)
+        weights_drained = false;
+    else if(!weights_parallel_shutdown()) {
+        weights_drained = false;
+        __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+        daemon_status_file_shutdown_gave_up("WEIGHTS ", "parallel weights work may still be running");
+    }
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
@@ -350,7 +365,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             dbengine_drained = dbengine_shutdown();
             if(!dbengine_drained) {
-                __atomic_store_n(&dbengine_work_abandoned, true, __ATOMIC_RELAXED);
+                __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
                 daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
             }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
@@ -450,9 +465,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_thread_stop();
 
 #if defined(FSANITIZE_ADDRESS)
-    // a worker still running would use what the teardown frees
-    if(!dbengine_drained)
-        fprintf(stderr, "\nWARNING: dbengine work may still be running, skipping the teardown.\n");
+    // a worker still running would use what the teardown frees. Health waits for notifications
+    // without the alert dictionary lock, and rrdhost_free_all() does not take the host pin health
+    // holds, so a health thread that has not exited yet can still be using a host.
+    if(!dbengine_drained || !weights_drained || service_is_running(SERVICE_HEALTH))
+        fprintf(stderr, "\nWARNING: dbengine, weights or health work may still be running, skipping the teardown.\n");
     else {
         fprintf(stderr, "\n");
 

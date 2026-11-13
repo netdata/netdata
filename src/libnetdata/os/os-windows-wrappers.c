@@ -104,4 +104,29 @@ bool EnableWindowsPrivilege(const char *privilegeName) {
     return true;
 }
 
+bool os_windows_service_is_running(const wchar_t *service_name, DWORD *current_state) {
+    DWORD state = 0;
+
+    if (service_name) {
+        SC_HANDLE scm = OpenSCManagerW(NULL, NULL, SC_MANAGER_CONNECT);
+        if (scm) {
+            SC_HANDLE service = OpenServiceW(scm, service_name, SERVICE_QUERY_STATUS);
+            if (service) {
+                SERVICE_STATUS_PROCESS status;
+                DWORD needed = 0;
+                if (QueryServiceStatusEx(
+                        service, SC_STATUS_PROCESS_INFO, (LPBYTE)&status, sizeof(status), &needed))
+                    state = status.dwCurrentState;
+                CloseServiceHandle(service);
+            }
+            CloseServiceHandle(scm);
+        }
+    }
+
+    if (current_state)
+        *current_state = state;
+
+    return state == SERVICE_RUNNING;
+}
+
 #endif

@@ -14,7 +14,7 @@ and evidence interpretation. Topology production remains in the
 
 | Layer | Source entry points | Responsibility |
 |---|---|---|
-| Normal collector | `collect.go`, `profile_sets.go`, `collect_snmp.go` | Runtime initialization, profile selection, and orchestration of profile results into charts and samples |
+| Normal collector | `collect.go`, `device_refresh.go`, `profile_sets.go`, `collect_snmp.go` | Runtime initialization, system observation, profile selection, and orchestration of profile results into charts and samples |
 | Profile acquisition | `ddsnmp/profile_catalog.go`, `ddsnmp/ddsnmpcollector/collector.go` | Consumer-specific profile projection, SNMP acquisition, value processing, virtual metrics, and typed BGP/licensing rows |
 | Collector consumers | `bgp_integration.go`, `licensing_integration.go` | Peer/cache updates and typed BGP samples; normalized license inventory and aggregate samples |
 | Diagnostic capture | `normal_diagnostics*.go`, `diagnostics/` | Capture adapters plus shared documents, codecs, and file publication |
@@ -39,19 +39,90 @@ names.
 `setupProfiles` lives in `profile_sets.go`; catalog matching and projection live in `ddsnmp/profile_catalog.go`.
 The captured selection/projection description is assembled by `ProjectedView.Context` in `ddsnmp/profile_context.go`.
 
+## Runtime System Metadata
+
+Normal SNMP polling jobs read the five standard system scalars once per minute, synchronously before metric polling. The
+interval is internal and is evaluated on collection ticks; scheduling, request duration and failures can delay a
+successful observation. `ping_only` keeps its setup-only SNMP behavior. There is no periodic rebuild and no public
+option.
+
+`device_refresh.go` owns the check. It has one response to a change: `rebuildDevice` replaces every piece of
+device-derived state. The trigger is a single predicate, so widening or narrowing it does not change how state is
+refreshed.
+
+| Observation | Response |
+|---|---|
+| No answered field differs | Nothing; ordinary collection continues |
+| Request fails, or a field is unanswered | Not a change; the previous value stays |
+| Answered `sysName`, `sysDescr`, `sysContact` or `sysLocation` differs | Rebuild. If it fails, the incumbent state keeps collecting and the next check retries |
+| Valid `sysObjectID` differs | Suspend the incumbent, then rebuild. Old-profile samples stay suspended until a rebuild succeeds |
+
+A rebuild:
+
+- reselects profiles from the observed identity (both `sysObjectID` and `sysDescr` are selection inputs);
+- prepares a new SNMP client with freshly probed transport settings before touching the incumbent, so a failed
+  candidate leaves the incumbent intact;
+- installs a new DD collector, which discards table caches, missing-OID decisions and prepared profile inputs;
+- clears Function contents and counter baselines under their existing owner locks;
+- records the existing charts as stale (`resetDevicePresentation`).
+
+Nothing is published at the swap. Publication follows the new state's first profile poll, which runs in the same
+collection cycle:
+
+| What | When | After a failed first poll |
+|---|---|---|
+| Charts the new state reports | Redefined in place with their new labels (`installChart`) | Not reported, so unchanged |
+| Stale charts it does not report | Removed after the first poll that succeeds (`retireStaleCharts`); the job runtime prunes them after accepted output | Stay, showing gaps like any failed poll |
+| Vnode and DeviceStore registration | `syncDeviceMetadata`, once the new DD collector has prepared profile inputs | The previous publication stays, so consumers never see an identity without its profile metadata |
+
+A partially successful first poll counts as success: charts of a profile that failed in that cycle are removed and
+come back when the profile reports, the same way absent table charts behave in ordinary polling.
+
+The vnode GUID, the DeviceStore registration ID and compatible chart identities/history stay stable. Authored
+`Config`, including local vnode overrides, never receives acquired identity values.
+
+A changed `sysObjectID` means the incumbent profiles no longer describe the device. The check immediately withdraws
+the DeviceStore connection from SNMP-family consumers (the accepted registration ID and runtime writer authority are
+kept) and clears Function state, even if the rebuild cannot finish yet. An unanswered or invalid object ID on a later
+check cannot resume the incompatible profiles.
+
+Normal initialization uses the same publication point: `syncDeviceMetadata` publishes after a profile poll whenever the
+DD collector's prepared-input revision changed. A poll that prepared nothing publishes nothing, so a new job, a device
+suspended by a changed `sysObjectID` (which stays withdrawn until then) and a rebuilt device that kept its registration
+are each published together with their profile metadata. Samples only come from profiles whose inputs are prepared, so
+routing to the vnode exists before any sample leaves the collector and optional profile input failures cannot send
+healthy samples to the local Agent. Profile metadata is acquired once, by normal profile preparation, each publication
+is a single DeviceStore update, and metadata recovered after a failed preparation publishes without a system-field
+change. Diagnostic input evidence follows the installed snapshots; a rebuild starts a new current diagnostic view,
+preserving sources for its own system and transport preparation.
+
+A replacement that changes none of the five scalars is not detected.
+
 ## Metric Emission
 
-The normal SNMP collector skips a table metric when its resolved tag map is empty. To keep rows distinct, provide
-non-empty identifying tag values; the SNMP row index is not automatically part of the emitted series identity.
+The normal SNMP collector skips a table metric when its resolved tag map is empty. Every required identity
+component must be an explicit public tag; the SNMP row index is not automatically part of emitted series identity.
 
-The collector's `tableMetricKey` combines the metric name with non-empty public tag values, ordered by tag key.
-[Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags) do not distinguish chart IDs. Rows that reach
-`collectProfileTableMetrics` with the same key accumulate their ordinary numeric values into one sample; multi-value
-mapped dimensions use assignment instead. A captured row can therefore be present without having a distinct chart
-series, and a final sample can combine several rows.
+`tableMetricKey` in `metric_ids.go` frames the complete metric name and sorted public tag names and values,
+including explicit empty values. A bounded readable prefix and full SHA-256 digest produce the final chart-safe ID.
+Dimension subkeys are framed separately for job-scoped sample-map lookup. They do not replace the chart-scoped
+Netdata dimension ID: V1 emits `Dim.Name` when set and falls back to `Dim.ID` only when the name is empty. [Underscore-prefixed tags](/src/go/plugin/go.d/collector/snmp/profile-format.md#underscore-prefixed-tags)
+are display metadata and do not partition identity. Acquisition preserves semantic tags and typed identity bytes;
+only temporary `rm:` tags are removed. The framework sanitizes chart-label values when serializing the wire protocol,
+after machine identity has been established.
 
-`collect_snmp.go` owns these emission decisions; `normal_diagnostics.go` records their relationship to captured samples.
-Profile authoring details remain in the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).
+Rows reaching `collectProfileTableMetrics` with the same exact tuple accumulate ordinary numeric values into one
+sample; multi-value dimensions use assignment. Distinct semantic tuples remain distinct even when presentation
+sanitation makes their display labels look the same. Historical table IDs are not backfilled after migration.
+
+Table charts absent from the current results are retired, preserving the existing ordinary-poll behavior. A
+[device rebuild](#runtime-system-metadata) clears the seen state and records existing charts as stale; fresh DD results
+redefine active charts and the rest are removed after the first successful poll. Newly observed composite dimensions
+are added, and current-profile dimensions can revive pending incumbent removals after a rebuild. The chart owner
+indexes live dimensions so steady collection remains O(observed values), without scanning all retained charts.
+
+`collect_snmp.go` owns emission and `normal_diagnostics.go` records the relation to captured samples. Profile authoring
+belongs to the [table metric guide](/src/go/plugin/go.d/collector/snmp/profile-format.md#table-metrics-multiple-rows).
 
 ## BGP Collection And Retained Rows
 

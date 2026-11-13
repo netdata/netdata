@@ -7,8 +7,8 @@
 //! Contract (follows open-telemetry/opentelemetry-collector
 //! `receiver/otlpreceiver/otlphttp.go`, except where marked "local"):
 //!
-//! - method mismatch → `405 text/plain` ("405 method not allowed, supported:
-//!   [POST]"); unmatched path → `404 text/plain`;
+//! - method mismatch → `405 text/plain` (`405 method not allowed, supported:
+//!   [POST]`); unmatched path → `404 text/plain`;
 //! - `Content-Type`: the media type before any `;` is matched
 //!   case-insensitively; exactly `application/x-protobuf` and
 //!   `application/json` are accepted, anything else → `415 text/plain`
@@ -59,12 +59,13 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, Response, StatusCode};
 use axum::routing::post;
-use bridge::config::{AuthConfig, ProtocolConfig};
 use file_registry::TenantId;
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+use otel_bridge::config::{AuthConfig, ProtocolConfig};
 use prost::Message as _;
+use tokio_util::sync::CancellationToken;
 use tonic::{Code, Status};
 
 use crate::logs_service::NetdataLogsService;
@@ -73,13 +74,13 @@ use crate::otlp_json::{OtlpJson, OtlpJsonResponse};
 use crate::tenant::extract_tenant_id_from_headers;
 use crate::trace_service::NetdataTracesService;
 
-/// The maximum accepted request body, on the wire AND after gzip expansion.
-///
-/// This mirrors tonic's default `max_decoding_message_size` (4 MiB), so the
-/// two transports reject the same requests; capping the expanded body too is
-/// the decompression-bomb guard (a 4 MiB gzip stream can otherwise expand
-/// unboundedly before prost ever sees a length).
-const MAX_BODY_BYTES: usize = 4 * 1024 * 1024;
+/// The maximum accepted request body, on the wire AND after gzip expansion:
+/// [`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES), the limit that the gRPC
+/// services have too, so the two transports reject the same requests.
+/// Capping the expanded body too is the decompression-bomb guard (a 4 MiB
+/// gzip stream can otherwise expand unboundedly before prost ever sees a
+/// length).
+const MAX_BODY_BYTES: usize = crate::MAX_REQUEST_BYTES;
 
 /// The three signals' service handles plus the shared tenant policy. Cheap to
 /// clone: three `Arc`s and a one-flag `AuthConfig`.
@@ -232,16 +233,23 @@ pub(crate) async fn bind_http(listener: &ProtocolConfig) -> Result<Option<HttpLi
     }
 }
 
-/// Serve the router on the bound listener until the server future is dropped.
-/// axum's serve loop never returns (it retries accept errors itself), so the
-/// `Result` only satisfies axum's signature; the contexts name the transport
-/// should that ever change.
-pub(crate) async fn serve(listener: HttpListener, app: Router) -> Result<()> {
+/// Serve the router on the bound listener until `stop` is cancelled. From
+/// then on the server takes no new request, and the future ends when the
+/// requests in progress have their answers (`run_ingestor` gives that a
+/// budget). Before that, axum's serve loop never returns (it retries accept
+/// errors itself); the contexts name the transport should that ever change.
+pub(crate) async fn serve(
+    listener: HttpListener,
+    app: Router,
+    stop: CancellationToken,
+) -> Result<()> {
     match listener {
         HttpListener::Plain(listener) => axum::serve(listener, app)
+            .with_graceful_shutdown(stop.cancelled_owned())
             .await
             .context("OTLP/HTTP server error"),
         HttpListener::Tls(listener) => axum::serve(listener, app)
+            .with_graceful_shutdown(stop.cancelled_owned())
             .await
             .context("OTLP/HTTP TLS server error"),
     }
@@ -646,12 +654,16 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
 }
 
 /// The collector's gRPC→HTTP table (otlpreceiver `GetHTTPStatusCodeFromStatus`).
-/// Today only three codes reach it: `InvalidArgument` (undecodable body,
-/// invalid tenant), `Unauthenticated` (missing tenant header) and `Internal`
-/// (frame encoding and WAL failures). The other arms are kept so a future
-/// core error maps correctly without touching the transport — e.g.
-/// throttling's `ResourceExhausted` becomes the retryable 429. The 503 arm is
-/// the spec's retryable set; `Unimplemented` → 404 is the collector's choice.
+/// Today four codes reach it: `InvalidArgument` (undecodable body, invalid
+/// tenant, a request whose records are too many for one WAL frame:
+/// `tenant_writers::check_frame_size`), `Unauthenticated` (missing tenant
+/// header), `Internal` (frame encoding) and `Unavailable` (the records could
+/// not be stored: `tenant_writers::storage_unavailable`; or the plugin
+/// stopped before their sync: `tenant_writers::export_task_ended`). The other
+/// arms are kept so a future core error maps correctly without touching the
+/// transport — e.g. throttling's `ResourceExhausted` becomes the retryable
+/// 429. The 503 arm is the spec's retryable set; `Unimplemented` → 404 is the
+/// collector's choice.
 fn http_status_for(code: Code) -> StatusCode {
     match code {
         Code::Cancelled
@@ -705,7 +717,6 @@ mod tests {
 
     use axum::body::Body;
     use axum::http::{Request, StatusCode, header};
-    use bridge::config::{AuthConfig, IngestConfig, RotationEntry, TlsServerConfig, WalConfig};
     use file_registry::{Identity, InstanceId, MachineId, MonotonicClock};
     use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
     use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -715,6 +726,9 @@ mod tests {
     use opentelemetry_proto::tonic::logs::v1::{LogRecord, ResourceLogs, ScopeLogs};
     use opentelemetry_proto::tonic::resource::v1::Resource;
     use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
+    use otel_bridge::config::{
+        AuthConfig, IngestConfig, RotationEntry, TlsServerConfig, WalConfig,
+    };
     use tower::ServiceExt;
 
     use super::*;
@@ -798,7 +812,7 @@ mod tests {
             dir: dir.to_path_buf(),
             crc_enabled: true,
             compression_enabled: true,
-            rotation: bridge::config::RotationPolicy::try_from(rotation)
+            rotation: otel_bridge::config::RotationPolicy::try_from(rotation)
                 .expect("test rotation has a complete default"),
         }
     }
@@ -824,7 +838,11 @@ mod tests {
     ) -> (HttpState, tempfile::TempDir) {
         let tmp = tempfile::tempdir().unwrap();
         let socket = format!("/tmp/netdata-http-service-test-{}.sock", std::process::id());
-        let sender = Arc::new(LedgerSender::new(&socket));
+        let sender = Arc::new(LedgerSender::new(
+            &socket,
+            Arc::default(),
+            tokio_util::sync::CancellationToken::new(),
+        ));
         let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
         let clock = Arc::new(Mutex::new(MonotonicClock::new()));
         let identity = Identity::new(
@@ -834,7 +852,6 @@ mod tests {
 
         let logs = Arc::new(NetdataLogsService::new(
             Arc::clone(&sender),
-            tmp.path().join("logs/wal"),
             wal_config(&tmp.path().join("logs/wal")),
             ingest.clone(),
             Arc::clone(&seq),
@@ -845,7 +862,6 @@ mod tests {
 
         let traces = Arc::new(NetdataTracesService::new(
             sender,
-            tmp.path().join("traces/wal"),
             wal_config(&tmp.path().join("traces/wal")),
             ingest,
             seq,
@@ -1420,6 +1436,44 @@ mod tests {
         assert_eq!(v["code"], serde_json::json!(3));
     }
 
+    /// A stop does not cut a request in progress: it gets its answer, and
+    /// then the server ends by itself.
+    #[tokio::test]
+    async fn a_stop_ends_the_server_after_the_request_in_progress_is_answered() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let app = Router::new().route(
+            "/slow",
+            axum::routing::post(|| async {
+                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+                "done"
+            }),
+        );
+        let stop = CancellationToken::new();
+        let server = tokio::spawn(serve(HttpListener::Plain(listener), app, stop.clone()));
+
+        let mut stream = tokio::net::TcpStream::connect(addr).await.unwrap();
+        stream
+            .write_all(b"POST /slow HTTP/1.1\r\nhost: x\r\ncontent-length: 0\r\n\r\n")
+            .await
+            .unwrap();
+        // The request is in its handler when the stop comes.
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        stop.cancel();
+
+        let mut answer = String::new();
+        stream.read_to_string(&mut answer).await.unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        assert!(answer.ends_with("done"), "{answer}");
+        tokio::time::timeout(std::time::Duration::from_secs(5), server)
+            .await
+            .expect("the server ends after the answer")
+            .unwrap()
+            .unwrap();
+    }
+
     /// End-to-end over a real listener: a hand-rolled HTTP/1.1 request (no
     /// client dependencies) must land in the WAL and answer 200.
     #[tokio::test]
@@ -1428,9 +1482,13 @@ mod tests {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
         let server = tokio::spawn(async move {
-            serve(HttpListener::Plain(listener), router(state))
-                .await
-                .unwrap();
+            serve(
+                HttpListener::Plain(listener),
+                router(state),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
         });
 
         let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
@@ -1572,9 +1630,13 @@ mod tests {
         let addr = listener.listener.local_addr().unwrap();
         let (state, tmp) = test_state(AuthConfig::default());
         let server = tokio::spawn(async move {
-            serve(HttpListener::Tls(listener), router(state))
-                .await
-                .unwrap();
+            serve(
+                HttpListener::Tls(listener),
+                router(state),
+                CancellationToken::new(),
+            )
+            .await
+            .unwrap();
         });
         (addr, server, tmp)
     }

@@ -169,20 +169,6 @@ void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size) {
     return mem;
 }
 
-char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s) {
-    size_t size = strlen(s) + 1;
-    char *d = onewayalloc_mallocz((OWA_PAGE *)owa, size);
-    memcpy(d, s, size);
-    return d;
-}
-
-void *onewayalloc_memdupz(ONEWAYALLOC *owa, const void *src, size_t size) {
-    void *mem = onewayalloc_mallocz((OWA_PAGE *)owa, size);
-    // memcpy() is way faster than strcpy() since it does not check for '\0'
-    memcpy(mem, src, size);
-    return mem;
-}
-
 void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_unused) {
 #ifdef FSANITIZE_ADDRESS
     freez((void *)ptr);
@@ -216,14 +202,6 @@ void onewayalloc_freez(ONEWAYALLOC *owa __maybe_unused, const void *ptr __maybe_
     // let's free it with the system allocator
     netdata_log_error("ONEWAYALLOC: request to free address 0x%p that is not allocated by this OWA", ptr);
 #endif
-}
-
-void *onewayalloc_doublesize(ONEWAYALLOC *owa, const void *src, size_t oldsize) {
-    size_t newsize = onewayalloc_mul_or_fatal(oldsize, 2, "doubled");
-    void *dst = onewayalloc_mallocz(owa, newsize);
-    memcpy(dst, src, oldsize);
-    onewayalloc_freez(owa, src);
-    return dst;
 }
 
 void onewayalloc_reset(ONEWAYALLOC *owa) {

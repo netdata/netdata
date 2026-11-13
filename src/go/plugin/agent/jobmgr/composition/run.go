@@ -240,6 +240,7 @@ func newRunGeneration(
 		config.Diagnostics,
 		config.Modules,
 		config.ProcessFunctions,
+		funcapi.ProcessFunctionContext{LookupVnodeGUID: vnodeConfig.LookupGUID},
 		config.Frames,
 		initialRoutes...,
 	)

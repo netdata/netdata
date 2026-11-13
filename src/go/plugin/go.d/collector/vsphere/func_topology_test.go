@@ -72,6 +72,7 @@ func TestFuncTopology_Handle(t *testing.T) {
 func newVSphereTopologyTestCollector() *Collector {
 	collr := New()
 	collr.resources = &rs.Resources{
+		VCenterInstanceUUID: "vcenter-uuid-a",
 		DataCenters: rs.DataCenters{
 			"datacenter-1": {ID: "datacenter-1", Name: "DC1"},
 		},

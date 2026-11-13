@@ -5,24 +5,24 @@
 //! resource/scope flattening is shared via [`Flattener::flatten_resource`] /
 //! [`Flattener::flatten_scope`].
 //!
-//! One span → one SFST row. What becomes what at seal time (the builder is
-//! `src/crates/ng-index/src/sfst_build.rs::populate_trace_row_index`):
-//! - interned facets: `name`, `kind`/`_kind`, `status_code`/`_status_code`,
-//!   `trace_state`, `status_message`, `attributes.*` (emitted by
+//! One span → one SFST row. What becomes what at index time (the filler is
+//! `src/crates/ng-index/src/indexing.rs::populate_trace_row_index`):
+//! - interned facets: `name`, `kind`/`_kind`, `role`, `status.code`/`_status_code`,
+//!   `status.message`, `trace_state`, `attributes.*` (emitted by
 //!   [`Flattener::flatten_span`]), plus the event/link `events.*` / `links.*`
 //!   entries — searchable tokens in the shared [`SchemaTree`];
 //! - per-row columns from [`SpanRecord`]: `ts` (row key), `duration`,
 //!   `trace_id`/`span_id`/`parent_span_id`, `flags`, `dropped_attributes_count`,
-//!   with the `TIDX` index + `TBLM` bloom built from the chronological
+//!   with the `TIDX` index + `TBLM` bloom written from the chronological
 //!   `trace_id` column, the `EVNB`/`LNKB` event/link chunks fed by the
 //!   structured lists, and the trace rollup capturing the `name`/`_kind`/
-//!   `status_code` facets plus the resource's `service.name`.
+//!   `status.code` facets plus the resource's `service.name`.
 //!
 //! [`prepare_trace_frame`] is the single normalize → flatten → encode recipe;
 //! producers: `ng-ingest::write_trace_request` (no bounds — dev/bench) and the
 //! `otel-ingestor` trace service (with bounds). Readers decode via
-//! [`decode_trace_frame`]: `ng-index::sfst_build` (index build) and
-//! `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
+//! [`decode_trace_frame`]: `ng-index::indexing` (the indexing of a closed WAL
+//! file) and `sfsq::traces` (unindexed WAL-tail scan). Same frame rule as logs:
 //! positional bincode with no inner version — the WAL header's
 //! `payload_format` id ([`TRACE_FRAME_PAYLOAD_FORMAT`]) carries the version
 //! (see [`crate::logs`]).
@@ -59,20 +59,20 @@ pub struct SpanScopeGroup {
 
 /// One span: its per-row columns, its flattened entries, and its structured
 /// sub-objects (span analog of [`crate::logs::Record`]). Carries every OTLP
-/// `Span` field: the scalar facets (`name`, `kind`, `status_code`,
-/// `trace_state`, `status_message`) and `attributes.*` live in
-/// [`entries`](Self::entries); events and links are the structured lists
-/// ([`EventRecord`] / [`LinkRecord`]) whose searchable parts double as entries
-/// at seal time.
+/// `Span` field: the scalar facets (`name`, `kind`, `status.code`,
+/// `status.message`, `trace_state`, plus the derived `role`) and
+/// `attributes.*` live in [`entries`](Self::entries); events and links are
+/// the structured lists ([`EventRecord`] / [`LinkRecord`]) whose searchable
+/// parts double as entries at index time.
 ///
 /// Per-row columns (NOT facets): `ts` = the resolved `start_time_unix_nano`
-/// (the row-ordering key at seal); `duration` = `end - start` ns clamped to 0
-/// (see `span_duration`); `trace_id`/`span_id`/`parent_span_id` typed raw
+/// (the row-ordering key when indexed); `duration` = `end - start` ns clamped
+/// to 0 (see `span_duration`); `trace_id`/`span_id`/`parent_span_id` typed raw
 /// bytes — absent or normalized-away ids become the all-zero UNSET sentinel, so
 /// an UNSET `parent_span_id` is the downstream root-span marker; `flags` /
 /// `dropped_attributes_count` verbatim. There is no `observed_ts` (spans have
-/// none). `dropped_events_count`/`dropped_links_count` seal as per-row counts
-/// alongside the event/link structures (`EVNB`/`LNKB`).
+/// none). `dropped_events_count`/`dropped_links_count` are written as per-row
+/// counts alongside the event/link structures (`EVNB`/`LNKB`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpanRecord {
     pub ts: i64,
@@ -91,9 +91,10 @@ pub struct SpanRecord {
 
 /// One span event (OTLP `Span.Event`), flattened: the per-event scalars plus its
 /// name/attribute [`Entry`]s. The entries share the frame's [`SchemaTree`]
-/// (`events.name`, `events.attributes.*`) so at seal they intern into the same
-/// token space as the row's other facets — searchable via the normal tiers —
-/// while the per-event grouping/order lives in the sealed `EVNB` structure.
+/// (`events.name`, `events.attributes.*`) so at index time they intern into
+/// the same token space as the row's other facets — searchable via the normal
+/// tiers — while the per-event grouping/order lives in the sealed `EVNB`
+/// structure.
 ///
 /// `time_unix_nano` is stored **raw** (no normalization — a zero stays zero);
 /// `name` is always present as an entry, even for a (malformed) empty name, so
@@ -110,7 +111,7 @@ pub struct EventRecord {
 /// scalars plus its attribute [`Entry`]s (`links.attributes.*`). Link ids are
 /// deliberately NOT entries (near-unique identifiers don't belong in facets —
 /// the same rule that keeps log correlation ids out, see `crate::logs`); they
-/// seal into the `LNKB` structure. `trace_state` is carried verbatim.
+/// are written into the `LNKB` structure. `trace_state` is carried verbatim.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkRecord {
     pub trace_id: TraceId,
@@ -257,7 +258,7 @@ pub struct TraceNormalization {
 ///    with an absurd end is rejected.
 /// 3. **Clears malformed trace/span ids**: any non-empty
 ///    `trace_id`/`span_id`/`parent_span_id` — including each link's ids — whose
-///    length is not the spec width (16/8) becomes absent (sealed as the
+///    length is not the spec width (16/8) becomes absent (written as the
 ///    all-zero "unset" sentinel).
 ///
 /// Scopes emptied by the bounds filter (and resources emptied of scopes) are
@@ -381,9 +382,22 @@ pub struct PreparedTraceFrame {
 /// sanitized keys) — one owner for the message text too; the counts are
 /// still returned for callers that want them.
 pub fn prepare_trace_frame(
+    req: ExportTraceServiceRequest,
+    fallback_base_ns: u64,
+    bounds: Option<TimeBounds>,
+) -> Result<PreparedTraceFrame, bincode::error::EncodeError> {
+    prepare_trace_frame_with(req, fallback_base_ns, bounds, |_| {})
+}
+
+/// [`prepare_trace_frame`] that also shows the request to `visit` once, after
+/// normalization and before flattening, when at least one span was kept:
+/// `visit` sees exactly the stored population with resolved timestamps
+/// (out-of-window spans removed). The OTel ingestor derives its metrics here.
+pub fn prepare_trace_frame_with(
     mut req: ExportTraceServiceRequest,
     fallback_base_ns: u64,
     bounds: Option<TimeBounds>,
+    visit: impl FnOnce(&ExportTraceServiceRequest),
 ) -> Result<PreparedTraceFrame, bincode::error::EncodeError> {
     let norm = normalize_trace_request(&mut req, fallback_base_ns, bounds);
     // Nothing to flatten or encode without kept spans: callers skip writing
@@ -401,6 +415,7 @@ pub fn prepare_trace_frame(
             rejected: norm.rejected,
         });
     }
+    visit(&req);
     if norm.bad_ids.any() {
         tracing::warn!(
             bad_trace_ids = norm.bad_ids.trace,
@@ -439,7 +454,7 @@ pub const TRACE_FRAME_PAYLOAD_FORMAT: u16 = 3;
 /// Encode a [`FlattenedTraceRequest`] to the bincode bytes stored in a traces WAL
 /// frame — the span analog of [`crate::logs::encode_log_frame`], same codec.
 /// Span `Entry.hash`es are filled at emit time by the flattener (as the logs
-/// path does before [`crate::logs::encode_log_frame`]), so the seal rides the
+/// path does before [`crate::logs::encode_log_frame`]), so indexing rides the
 /// interner fast path.
 pub fn encode_trace_frame(
     req: &FlattenedTraceRequest,

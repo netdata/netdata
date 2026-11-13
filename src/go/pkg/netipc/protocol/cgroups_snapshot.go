@@ -355,18 +355,26 @@ type CgroupsBuilder struct {
 // NewCgroupsBuilder initializes a cgroups response builder. buf must be
 // caller-owned and large enough for the expected snapshot.
 func NewCgroupsBuilder(buf []byte, maxItems uint32, systemdEnabled uint32, generation uint64) *CgroupsBuilder {
+	b := &CgroupsBuilder{}
+	b.Reset(buf, maxItems, systemdEnabled, generation)
+	return b
+}
+
+// Reset reinitializes a builder against a caller-owned buffer, as
+// NewCgroupsBuilder does, so hot paths can reuse one builder instead of
+// allocating one per response. It panics on the same too-small buffer.
+func (b *CgroupsBuilder) Reset(buf []byte, maxItems uint32, systemdEnabled uint32, generation uint64) {
 	minRequired, ok := CgroupsBuilderMinBytes(maxItems)
 	if !ok || len(buf) < minRequired {
 		panic(fmt.Sprintf("CgroupsBuilder buffer too small: need at least %d bytes, got %d",
 			minRequired, len(buf)))
 	}
-	dataOffset := minRequired
-	return &CgroupsBuilder{
+	*b = CgroupsBuilder{
 		buf:            buf,
 		systemdEnabled: systemdEnabled,
 		generation:     generation,
 		maxItems:       maxItems,
-		dataOffset:     dataOffset,
+		dataOffset:     minRequired,
 	}
 }
 

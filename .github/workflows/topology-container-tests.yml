@@ -8,19 +8,23 @@ on:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
   pull_request:
     paths:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
 
 concurrency:
   group: topology-container-tests-${{ github.ref }}
@@ -31,11 +35,14 @@ permissions:
 
 env:
   TEST_TARGETS: >-
+    apps-stat-test
+    apps-identity-test
     apps-cgroups-path-test
     apps-cgroups-enrichment-test
     apps-lookup-protocol-test
     apps-lookup-netipc-lock-test
     apps-cgroups-lookup-client-abort-test
+    apps-target-lifecycle-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
     cgroup-name-config-test
@@ -67,7 +74,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema libcap-dev \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
@@ -104,6 +111,13 @@ jobs:
 
       - name: Validate topology fixtures
         run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate topology selector metadata
+        run: |
+          set -euo pipefail
+          selector_runtime_dir="$(mktemp -d "${RUNNER_TEMP:?}/topology-selector.XXXXXX")"
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_selector_metadata.py \
+            build/network-viewer.plugin --run-dir "$selector_runtime_dir"
 
       - name: Validate network-viewer topology payload (live)
         run: |
@@ -173,7 +187,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev libcap-dev \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure

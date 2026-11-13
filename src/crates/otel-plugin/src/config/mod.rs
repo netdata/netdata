@@ -25,7 +25,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use bridge::config::{PluginConfig, ProtocolConfig, TlsServerConfig};
+use otel_bridge::config::{PluginConfig, ProtocolConfig, TlsServerConfig};
 use serde::Deserialize;
 
 use metrics::MetricsOverride;
@@ -231,6 +231,9 @@ impl ConfigResolver {
         }
 
         validate(&config)?;
+        for sentence in config.correct_harmful_values() {
+            tracing::warn!("configuration: {sentence}");
+        }
         log_config("effective", &config);
         Ok(config)
     }
@@ -377,7 +380,7 @@ fn validate_listener(prefix: &str, listener: &ProtocolConfig) -> Result<()> {
 /// enabled, each enabled one must pass [`validate_listener`], and two enabled
 /// listeners must not overlap (two listeners cannot bind one socket); and each
 /// signal's retention must satisfy the catalog-horizon invariant
-/// (`netdata-plugin/bridge/src/config.rs` `RetentionPolicy::validate`).
+/// (`otel-bridge/src/config.rs` `RetentionPolicy::validate`).
 fn validate(config: &PluginConfig) -> Result<()> {
     if config.base_dir.as_os_str().is_empty() {
         anyhow::bail!("base_dir must be set (the mandatory root for all signal storage)");
@@ -767,7 +770,7 @@ traces:
     fn stock_yaml_logs_tuning_parsed() {
         let config = resolved_stock();
         // Dirs are derived from base_dir, not configured per signal.
-        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
+        let logs = config.lifecycle_for(otel_bridge::signals::Signal::Logs);
         assert_eq!(
             logs.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v2/logs/wal")
@@ -795,7 +798,7 @@ traces:
     #[test]
     fn stock_yaml_traces_tuning_parsed() {
         let config = resolved_stock();
-        let traces = config.lifecycle_for(bridge::signals::Signal::Traces);
+        let traces = config.lifecycle_for(otel_bridge::signals::Signal::Traces);
         assert_eq!(
             traces.wal.dir,
             std::path::Path::new("/var/log/netdata/otel/v2/traces/wal")
@@ -1150,7 +1153,7 @@ logs:
         let config = resolve_with_user("base_dir: /data/otel\n").unwrap();
         assert_eq!(config.base_dir, std::path::Path::new("/data/otel"));
         // Derived dirs follow the new base.
-        let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
+        let logs = config.lifecycle_for(otel_bridge::signals::Signal::Logs);
         assert_eq!(logs.wal.dir, std::path::Path::new("/data/otel/logs/wal"));
     }
 
@@ -2313,6 +2316,11 @@ logs:
         assert_eq!(config.metrics.grace_period_secs, Some(60));
         assert_eq!(config.metrics.expiry_duration_secs, Some(900));
         assert_eq!(config.metrics.max_new_charts_per_request, 100);
+        // The same for the chart limit: a 0 gets this constant.
+        assert_eq!(
+            config.metrics.max_new_charts_per_request,
+            otel_bridge::config::DEFAULT_MAX_NEW_CHARTS_PER_REQUEST
+        );
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
 
@@ -2356,6 +2364,13 @@ logs:
             assert_eq!(rotation.max_file_size, ByteSize::mb(25));
             assert_eq!(rotation.max_entries, 50000);
             assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
+            // A limit of 0 is read as "not set" and gets the built-in value
+            // (`PluginConfig::correct_harmful_values`): that must be the
+            // shipped one.
+            let built_in = otel_bridge::config::RotationPolicy::default().resolve("default");
+            assert_eq!(rotation.max_file_size, built_in.max_file_size);
+            assert_eq!(rotation.max_entries, built_in.max_entries);
+            assert_eq!(rotation.max_file_duration, built_in.max_file_duration);
             let retention = signal.retention.resolve("default");
             assert_eq!(retention.max_files, 100_000);
             assert_eq!(retention.max_total_size, ByteSize::gb(1));

@@ -690,7 +690,7 @@ modules:
             Uses the job's existing credentials, TLS and proxy settings. Reading logs requires BMC permissions for the linked services and entries. Queries are read-only apart from creating and deleting their authentication sessions. Event messages may contain sensitive operational information; credentials and session tokens are not returned.
           availability: |
             Available for running jobs without waiting for a successful metric poll. An empty service selector means no supported linked services were advertised. Missing Entries support and inaccessible services return an error; an empty readable log returns an empty table. The view has no histogram, live tail or historical archive, and a multi-page read is not an atomic snapshot.
-          require_cloud: false
+          require_cloud: true
     metrics:
       folding:
         title: Metrics

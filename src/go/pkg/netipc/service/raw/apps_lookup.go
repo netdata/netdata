@@ -6,7 +6,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
-// AppsLookupHandler serves a single APPS_LOOKUP service kind.
+// AppsLookupHandler serves a single APPS_LOOKUP service kind. The request
+// borrows the receive buffer and the builder writes into the response
+// buffer; both are valid only during the call, so copy what you keep.
 type AppsLookupHandler func(*protocol.AppsLookupRequestView, *protocol.AppsLookupBuilder) bool
 
 func appsLookupRequestSize(pids []uint32) (int, error) {
@@ -84,10 +86,13 @@ func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*pr
 		reqCount, reqSize, err := appsLookupNextRequest(pids[start:], c.sessionMaxRequestPayloadBytes())
 		if err != nil {
 			oneItemSize, serr := appsLookupRequestSize([]uint32{0})
-			if errors.Is(err, protocol.ErrOverflow) && start < len(pids) && serr == nil {
-				if c.ensureLookupRequestCapacity(oneItemSize) == nil {
-					continue
+			if errors.Is(err, protocol.ErrOverflow) && start < len(pids) && serr == nil &&
+				c.lookupRequestCapacityCanReconnect(oneItemSize) {
+				// The reconnect's own error ends the lookup, as in C and Rust.
+				if cerr := c.ensureLookupRequestCapacity(oneItemSize, deadline); cerr != nil {
+					return nil, cerr
 				}
+				continue
 			}
 			return nil, err
 		}
@@ -107,7 +112,7 @@ func (c *Client) CallAppsLookupWithTimeout(pids []uint32, timeoutMs uint32) (*pr
 			return nil, protocol.ErrOverflow
 		}
 		var payload []byte
-		if err := c.callWithRetry(func() error {
+		if err := c.callWithRetry(remainingTimeout, func() error {
 			_, callPayload, rerr := c.doRawCallWithTimeout(protocol.MethodAppsLookup, reqBuf[:reqLen], remainingTimeout)
 			if rerr != nil {
 				return rerr

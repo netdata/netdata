@@ -2,10 +2,11 @@
 //! (`index_reader/trace_plan.rs`): one compilation resolving every
 //! term against a file, then rank-bounded extractions of the newest-K
 //! matched positions. Pins: per-tier term resolution (exact, regex,
-//! dictionary numerics), cross-term conjunction, negation (the pinned
-//! `presence ∩ complement` rule), duration bounds, work accounting
-//! (free dictionary terms, ONE shared stream-batch pass, in-scan
-//! budget stops), and the rank-bounded proof — emission is
+//! dictionary numerics, contains), free-text field sets, cross-term
+//! conjunction, negation (the pinned `presence ∩ complement` rule),
+//! duration bounds, work accounting (dictionary terms visit no rows,
+//! ONE shared stream-batch pass, in-scan budget stops, dictionary
+//! bytes and their ceiling), and the rank-bounded proof — emission is
 //! `min(K, matched)`, never the full set.
 //!
 //! One shared 256-row fixture (one field per tier at threshold 10,
@@ -13,15 +14,31 @@
 //! brute-force full-scan oracle; dedicated fixtures cover what it
 //! structurally cannot — multi-batch masking, the short-circuit arms
 //! (no event/link index; empty matching set with the chunk present),
-//! and a file without DURN.
+//! a file without DURN, and non-ASCII case variants.
 
 use std::io::Cursor;
 
 use bumpalo::Bump;
 
+use crate::NumberValue::{self, Float, Int};
 use crate::{
-    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork, TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, NumberCmp, PlanTerm, RowIndex,
+    ScanLimits, ScanWork, TracePlan, numeric_token_matches,
 };
+
+/// No ceiling on either unit.
+const UNLIMITED: ScanLimits = ScanLimits {
+    rows: u64::MAX,
+    dict_bytes: u64::MAX,
+};
+
+/// A rows ceiling alone.
+fn rows_ceiling(rows: u64) -> ScanLimits {
+    ScanLimits {
+        rows,
+        dict_bytes: u64::MAX,
+    }
+}
 
 /// One fixture row's field values, mirrored for the oracle.
 struct FixtureRow {
@@ -116,7 +133,7 @@ fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
 
 /// A numeric-comparison `Fields` term; `negated` applies the same
 /// `presence ∩ complement` rule.
-fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> PlanTerm {
+fn number(field: &str, cmp: crate::NumberCmp, values: &[NumberValue], negated: bool) -> PlanTerm {
     PlanTerm::Fields {
         fields: vec![field.to_string()],
         matcher: crate::PlanMatcher::Number {
@@ -129,7 +146,7 @@ fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> 
 
 /// Whole-file, unbounded compile — the shape most tests need.
 fn compile(idx: &IndexReader<'_>, p: &TracePlan, work: &mut ScanWork) -> CompiledTracePlan {
-    idx.compile_trace_plan(p, (0, idx.summary().record_count), u64::MAX, work)
+    idx.compile_trace_plan(p, (0, idx.summary().record_count), UNLIMITED, work)
         .unwrap()
         .expect("an unbounded compile cannot run out of budget")
 }
@@ -246,7 +263,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![not_tokens("absent", &["x"], &[])]),
             Box::new(|_| false),
         ),
-        // ── Multi-field OR (the unscoped disjunction) ──────
+        // ── Multi-field OR ──────
         (
             plan(vec![PlanTerm::Fields {
                 fields: vec!["s".to_string(), "l".to_string()],
@@ -275,30 +292,40 @@ fn tier_matrix_matches_the_oracle() {
         ),
         // ── Dictionary numerics ────────────────────────────
         (
-            plan(vec![number("num", crate::NumberCmp::Gte, &[45.0], false)]),
+            plan(vec![number(
+                "num",
+                crate::NumberCmp::Gte,
+                &[Int(45)],
+                false,
+            )]),
             Box::new(|r: &FixtureRow| r.num >= 45),
         ),
         (
-            plan(vec![number("fnum", crate::NumberCmp::Lt, &[3.0], false)]),
+            plan(vec![number(
+                "fnum",
+                crate::NumberCmp::Lt,
+                &[Float(3.0)],
+                false,
+            )]),
             Box::new(|r: &FixtureRow| r.fnum < 3.0),
         ),
         (
             plan(vec![number(
                 "num",
                 crate::NumberCmp::Eq,
-                &[5.0, 7.0],
+                &[Int(5), Int(7)],
                 false,
             )]),
             Box::new(|r: &FixtureRow| r.num == 5 || r.num == 7),
         ),
         // Negated numeric equality: present and no value equals.
         (
-            plan(vec![number("num", crate::NumberCmp::Eq, &[5.0], true)]),
+            plan(vec![number("num", crate::NumberCmp::Eq, &[Int(5)], true)]),
             Box::new(|r: &FixtureRow| r.num != 5),
         ),
         // Unparseable stored values never match a numeric comparison.
         (
-            plan(vec![number("m", crate::NumberCmp::Gte, &[0.0], false)]),
+            plan(vec![number("m", crate::NumberCmp::Gte, &[Int(0)], false)]),
             Box::new(|_| false),
         ),
         // ── Duration interval sets, straight and negated ───
@@ -323,7 +350,7 @@ fn tier_matrix_matches_the_oracle() {
             plan(vec![
                 tokens("l", &["a"], &[]),
                 not_tokens("m", &["v02"], &[]),
-                number("num", crate::NumberCmp::Lt, &[40.0], false),
+                number("num", crate::NumberCmp::Lt, &[Int(40)], false),
             ]),
             Box::new(|r: &FixtureRow| r.l == "a" && r.m != "v02" && r.num < 40),
         ),
@@ -401,8 +428,9 @@ fn absent_field_collapses_the_conjunction() {
     assert_eq!(work.rows_visited, 0, "collapsed plan skips the SB scan");
 }
 
-/// Compilation work: dictionary terms are free; high-card terms cost one
-/// shared stream-batch pass however many there are.
+/// Compilation rows: dictionary terms visit none (their dictionary
+/// bytes are pinned by `dict_ceiling_truncates_compile`); high-card
+/// terms cost one shared stream-batch pass however many there are.
 #[test]
 fn work_counts_one_shared_stream_batch_pass() {
     let (bytes, _) = fixture();
@@ -440,7 +468,7 @@ fn work_counts_one_shared_stream_batch_pass() {
 
     // Batch masking itself is proven by
     // `narrow_high_terms_visit_only_their_masked_batches` — this 256-row
-    // fixture seals into a single stream batch (num_stream_batches(256)
+    // fixture is written as one stream batch (num_stream_batches(256)
     // == 1), so any per-batch expectation here would equal a full scan.
 }
 
@@ -471,7 +499,10 @@ fn narrow_high_terms_visit_only_their_masked_batches() {
     let idx = IndexReader::open(&bytes).unwrap();
 
     let batch_size = crate::stream_batch_size(ROWS as u32);
-    assert_eq!(batch_size, 1024, "the fixture must seal into two batches");
+    assert_eq!(
+        batch_size, 1024,
+        "the fixture must be written as two batches"
+    );
 
     // Each needle's visit count is ONE batch — half the file. A masking
     // regression that scans every batch reports 2048 and fails.
@@ -565,7 +596,7 @@ fn malformed_pattern_fails_compilation() {
                 idx.compile_trace_plan(
                     &plan(vec![tokens(field, &[], &["("])]),
                     (0, N as u32),
-                    u64::MAX,
+                    UNLIMITED,
                     &mut work,
                 ),
                 Err(crate::Error::InvalidPattern(_))
@@ -591,7 +622,7 @@ fn duration_term_requires_the_durn_column() {
         idx.compile_trace_plan(
             &plan(vec![PlanTerm::duration(Some(0), None)]),
             (0, 1),
-            u64::MAX,
+            UNLIMITED,
             &mut work,
         )
         .is_err()
@@ -609,7 +640,7 @@ fn compile_budget_stops_the_stream_batch_scan() {
     let p = plan(vec![tokens("h", &[], &["w.*"])]);
     let mut work = ScanWork::default();
     let out = idx
-        .compile_trace_plan(&p, (0, N as u32), 10, &mut work)
+        .compile_trace_plan(&p, (0, N as u32), rows_ceiling(10), &mut work)
         .unwrap();
     assert!(out.is_none(), "budget-truncated compile yields no plan");
     assert_eq!(work.rows_visited, 11, "stopped one past the ceiling");
@@ -620,7 +651,7 @@ fn compile_budget_stops_the_stream_batch_scan() {
         .compile_trace_plan(
             &plan(vec![tokens("l", &["a"], &[])]),
             (0, N as u32),
-            0,
+            rows_ceiling(0),
             &mut w2,
         )
         .unwrap();
@@ -637,7 +668,7 @@ fn duration_scan_is_clipped_to_the_range() {
     let p = plan(vec![PlanTerm::duration(Some(0), None)]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (10, 20), u64::MAX, &mut work)
+        .compile_trace_plan(&p, (10, 20), UNLIMITED, &mut work)
         .unwrap()
         .expect("in budget");
     assert_eq!(compiled.count_in_range(10, 20), 10);
@@ -688,7 +719,7 @@ fn impossible_subgroup_skips_the_budgeted_scan() {
     let mut work = ScanWork::default();
     // Even a ZERO budget compiles: nothing needs scanning.
     let compiled = idx
-        .compile_trace_plan(&p, (0, N as u32), 0, &mut work)
+        .compile_trace_plan(&p, (0, N as u32), rows_ceiling(0), &mut work)
         .unwrap()
         .expect("no scan needed");
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
@@ -741,7 +772,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     ]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (0, ROWS as u32), 0, &mut work)
+        .compile_trace_plan(&p, (0, ROWS as u32), rows_ceiling(0), &mut work)
         .unwrap()
         .expect("no scan needed");
     assert_eq!(compiled.count_in_range(0, ROWS as u32), 0);
@@ -760,7 +791,7 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
     }]);
     let mut work = ScanWork::default();
     let compiled = idx
-        .compile_trace_plan(&p, (0, ROWS as u32), u64::MAX, &mut work)
+        .compile_trace_plan(&p, (0, ROWS as u32), UNLIMITED, &mut work)
         .unwrap()
         .expect("within budget");
     assert_eq!(
@@ -768,4 +799,755 @@ fn empty_event_kvid_set_short_circuits_with_the_chunk_present() {
         1,
         "only row 5 carries e005"
     );
+}
+
+/// A free-text term over a field set (exact names and name prefixes).
+fn fields_in(exact: &[&str], prefixes: &[&str], term: &str) -> PlanTerm {
+    PlanTerm::FieldsIn {
+        exact: exact.iter().map(|s| s.to_string()).collect(),
+        prefixes: prefixes.iter().map(|s| s.to_string()).collect(),
+        matcher: crate::PlanMatcher::Contains(term.to_string()),
+    }
+}
+
+/// Every matched position, checked against the full-scan oracle.
+fn assert_matches_oracle(
+    idx: &IndexReader<'_>,
+    rows: &[FixtureRow],
+    p: &TracePlan,
+    pred: impl Fn(&FixtureRow) -> bool,
+    case: &str,
+) {
+    let mut work = ScanWork::default();
+    let compiled = compile(idx, p, &mut work);
+    let want = oracle(rows, pred, 0, N as u32, N);
+    let mut w = ScanWork::default();
+    assert_eq!(
+        compiled.matched_in_range(0, N as u32, &mut w),
+        want,
+        "{case}"
+    );
+    assert_eq!(
+        compiled.count_in_range(0, N as u32),
+        want.len() as u64,
+        "{case}"
+    );
+}
+
+/// A free-text term resolves over the low, mid and high tiers of the
+/// fields its scope selects, case-insensitively, and ANDs with other
+/// terms; a scope selecting no field, or an empty term, matches nothing.
+#[test]
+fn fields_in_matches_every_tier() {
+    let (bytes, rows) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    type Pred = Box<dyn Fn(&FixtureRow) -> bool>;
+    let cases: Vec<(&str, TracePlan, Pred)> = vec![
+        (
+            "mid and both high fields (prefix h selects h and h2)",
+            plan(vec![fields_in(&["l", "m"], &["h"], "1")]),
+            Box::new(|r: &FixtureRow| r.m.contains('1') || r.h.contains('1') || r.h2.contains('1')),
+        ),
+        (
+            "high tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "W01")]),
+            Box::new(|r: &FixtureRow| r.h.contains("w01")),
+        ),
+        (
+            "mid tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "V0")]),
+            Box::new(|r: &FixtureRow| r.m.starts_with("v0")),
+        ),
+        (
+            "low tier, upper-case term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "A")]),
+            Box::new(|r: &FixtureRow| r.l == "a"),
+        ),
+        (
+            "sparse field selected by exact name",
+            plan(vec![fields_in(&["s"], &[], "ye")]),
+            Box::new(|r: &FixtureRow| r.s.as_deref() == Some("yes")),
+        ),
+        (
+            "AND with a token term",
+            plan(vec![
+                fields_in(&["m"], &["h"], "1"),
+                tokens("l", &["a"], &[]),
+            ]),
+            Box::new(|r: &FixtureRow| {
+                r.l == "a" && (r.m.contains('1') || r.h.contains('1') || r.h2.contains('1'))
+            }),
+        ),
+        (
+            "no field in scope",
+            plan(vec![fields_in(&["zz"], &["q"], "1")]),
+            Box::new(|_| false),
+        ),
+        (
+            "empty term",
+            plan(vec![fields_in(&["l", "m"], &["h"], "")]),
+            Box::new(|_| false),
+        ),
+    ];
+    for (case, p, pred) in &cases {
+        assert_matches_oracle(&idx, &rows, p, pred, case);
+    }
+}
+
+/// Free text tests VALUES only: a term that occurs only in field names
+/// (or in the `field=` key syntax) matches nothing, whether the scope
+/// is a field set or a single field.
+#[test]
+fn fields_in_never_matches_key_names() {
+    let (bytes, rows) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    for term in ["h2", "um", "=", "l=a", "h=w"] {
+        let p = plan(vec![fields_in(&["l", "m", "num", "s"], &["h", "f"], term)]);
+        assert_matches_oracle(&idx, &rows, &p, |_| false, term);
+        let single = plan(vec![PlanTerm::Fields {
+            fields: vec!["num".to_string()],
+            matcher: crate::PlanMatcher::Contains(term.to_string()),
+            negated: false,
+        }]);
+        assert_matches_oracle(&idx, &rows, &single, |_| false, term);
+    }
+}
+
+/// The plan's contains matcher is suggest's contains class: a stored
+/// value matches a (non-empty) term exactly when the suggest matcher
+/// ranks it exact, prefix or contains — on every tier, with Unicode
+/// case variants (`É`/`é`, `ẞ`/`ß`, the Kelvin sign) included.
+#[test]
+fn contains_equals_suggest_contains() {
+    const ROWS: usize = 128;
+    let base = [
+        "Élan",
+        "élan",
+        "ELAN",
+        "Straße",
+        "STRAẞE",
+        "\u{212A}elvin",
+        "kelvin",
+        "plain",
+    ];
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    // Field -> per-row value: `t` low (8 values), `tm` mid (16), `th`
+    // high (128).
+    let mut values: Vec<(&str, Vec<String>)> =
+        vec![("t", Vec::new()), ("tm", Vec::new()), ("th", Vec::new())];
+    for i in 0..ROWS {
+        let b = base[i % base.len()];
+        let row = [
+            b.to_string(),
+            format!("{b}-{}", i % 2),
+            format!("{b}-{i:03}"),
+        ];
+        let mut slots = Vec::new();
+        for ((field, column), value) in values.iter_mut().zip(row) {
+            slots.push(ri.intern(None, &format!("{field}={value}")));
+            column.push(value);
+        }
+        ri.row(1_000 + i as i64, &slots);
+    }
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+
+    let terms = [
+        "élan", "ÉLAN", "elan", "straße", "STRASSE", "ẞ", "ß", "kelvin", "\u{212A}", "-1", "PLAIN",
+        "x",
+    ];
+    for term in terms {
+        let suggest = crate::ValueMatcher::new(term);
+        for (field, column) in &values {
+            let want: Vec<u32> = (0..ROWS as u32)
+                .filter(|&p| {
+                    suggest
+                        .classify(column[p as usize].as_bytes())
+                        .is_some_and(|c| c <= crate::MatchClass::Contains)
+                })
+                .collect();
+            let p = plan(vec![PlanTerm::Fields {
+                fields: vec![field.to_string()],
+                matcher: crate::PlanMatcher::Contains(term.to_string()),
+                negated: false,
+            }]);
+            let mut work = ScanWork::default();
+            let compiled = compile(&idx, &p, &mut work);
+            let mut w = ScanWork::default();
+            assert_eq!(
+                compiled.matched_in_range(0, ROWS as u32, &mut w),
+                want,
+                "term {term:?}, field {field}"
+            );
+        }
+    }
+}
+
+/// Dictionary walks are charged by key bytes and bounded by their own
+/// ceiling: low, mid and high walks charge every walked `field=value`
+/// key; the high-tier exact lookup is free; a breach stops after the
+/// field that crossed it (no truncated plan); and a compilation entered
+/// over the ceiling returns before any walk.
+#[test]
+fn dict_ceiling_truncates_compile() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let dict = |limit: u64| ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: limit,
+    };
+    let walked = |p: &TracePlan| {
+        let mut work = ScanWork::default();
+        compile(&idx, p, &mut work);
+        work.dict_bytes
+    };
+    // Exact key sizes: `l=a`/`l=b`, sixteen `m=vNN`, 128 `h=wNNN`, 128
+    // `h2=xNNN`.
+    assert_eq!(walked(&plan(vec![tokens("l", &["a"], &[])])), 2 * 3);
+    assert_eq!(walked(&plan(vec![tokens("m", &["v03"], &[])])), 16 * 5);
+    let high = plan(vec![PlanTerm::Fields {
+        fields: vec!["h".to_string()],
+        matcher: crate::PlanMatcher::Contains("w00".to_string()),
+        negated: false,
+    }]);
+    assert_eq!(walked(&high), 128 * 6);
+    assert_eq!(
+        walked(&plan(vec![tokens("h", &["w005"], &[])])),
+        0,
+        "exact lookup is free"
+    );
+
+    // At the ceiling: compiles. One byte under: no plan, stopped after
+    // the walk.
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&high, (0, N as u32), dict(128 * 6), &mut work)
+            .unwrap()
+            .is_some()
+    );
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&high, (0, N as u32), dict(128 * 6 - 1), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(work.dict_bytes, 128 * 6);
+
+    // A field set stops at the first field over the ceiling: it never
+    // walks every field in scope.
+    let text = plan(vec![fields_in(&["l", "m"], &["h"], "1")]);
+    let all = walked(&text);
+    assert_eq!(
+        all,
+        2 * 3 + 16 * 5 + 128 * 6 + 128 * 7,
+        "l, m, h and h2 walked"
+    );
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plan(&text, (0, N as u32), dict(1), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        work.dict_bytes > 1 && work.dict_bytes < all,
+        "{}",
+        work.dict_bytes
+    );
+
+    // Entered over the ceiling: no plan and no walk, so later files of
+    // a query never overshoot by a field each — even a plan with no
+    // dictionary term gets no plan.
+    for p in [
+        plan(vec![tokens("l", &["a"], &[])]),
+        plan(vec![PlanTerm::duration(Some(0), None)]),
+    ] {
+        let mut work = ScanWork {
+            rows_visited: 0,
+            dict_bytes: 11,
+        };
+        assert!(
+            idx.compile_trace_plan(&p, (0, N as u32), dict(10), &mut work)
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(work.dict_bytes, 11, "nothing walked");
+    }
+}
+
+/// Several plans compiled together equal each plan compiled alone —
+/// windowed or whole-file, with ready-empty, probe-free, negated,
+/// numeric and subgroup plans among them — while their high-card probes
+/// share ONE stream-batch pass. A ceiling breach anywhere yields no
+/// plans at all.
+#[test]
+fn multi_plan_compile_equals_per_plan() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = vec![
+        plan(vec![tokens("h", &[], &["w0[0-5]."])]),
+        plan(vec![tokens("h2", &[], &["x0.."])]),
+        plan(vec![
+            tokens("l", &["a"], &[]),
+            PlanTerm::duration(Some(100), None),
+        ]),
+        plan(vec![
+            tokens("absent", &["x"], &[]),
+            tokens("h", &[], &["w.*"]),
+        ]),
+        plan(vec![not_tokens("m", &["v03"], &[])]),
+        plan(vec![number(
+            "fnum",
+            crate::NumberCmp::Lt,
+            &[Float(20.0)],
+            false,
+        )]),
+        plan(vec![fields_in(&["m"], &["h"], "1")]),
+        plan(vec![PlanTerm::EventGroup {
+            conditions: vec![crate::GroupCondition::TimeSinceStart {
+                intervals: vec![(Some(0), None)],
+            }],
+        }]),
+        TracePlan::default(),
+    ];
+    for range in [(0, N as u32), (10, 200)] {
+        let mut multi_work = ScanWork::default();
+        let multi = idx
+            .compile_trace_plans(&plans, range, UNLIMITED, &mut multi_work)
+            .unwrap()
+            .expect("unbounded");
+        assert_eq!(multi.len(), plans.len());
+        let mut single_rows = 0;
+        for (i, (p, compiled)) in plans.iter().zip(&multi).enumerate() {
+            let mut work = ScanWork::default();
+            let alone = idx
+                .compile_trace_plan(p, range, UNLIMITED, &mut work)
+                .unwrap()
+                .expect("unbounded");
+            single_rows += work.rows_visited;
+            let mut w = ScanWork::default();
+            assert_eq!(
+                compiled.matched_in_range(range.0, range.1, &mut w),
+                alone.matched_in_range(range.0, range.1, &mut w),
+                "plan {i}, range {range:?}"
+            );
+        }
+        // The h, h2, fnum and free-text (h, h2) plans each scan alone;
+        // together one pass.
+        assert_eq!(single_rows, 4 * N as u64);
+        assert_eq!(multi_work.rows_visited, N as u64, "one shared pass");
+    }
+
+    // All-or-nothing under either ceiling.
+    let mut work = ScanWork::default();
+    assert!(
+        idx.compile_trace_plans(&plans, (0, N as u32), rows_ceiling(10), &mut work)
+            .unwrap()
+            .is_none()
+    );
+    let mut work = ScanWork::default();
+    let dict = ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: 100,
+    };
+    assert!(
+        idx.compile_trace_plans(&plans, (0, N as u32), dict, &mut work)
+            .unwrap()
+            .is_none()
+    );
+
+    // Probes only a ready-empty plan registered are left out: beside a
+    // probe-free plan, nothing is scanned.
+    let mut work = ScanWork::default();
+    let pair = [plans[3].clone(), plans[2].clone()];
+    idx.compile_trace_plans(&pair, (0, N as u32), UNLIMITED, &mut work)
+        .unwrap()
+        .expect("unbounded");
+    assert_eq!(work.rows_visited, 0);
+}
+
+/// A live subgroup plan compiled beside a high-card plan refines the
+/// same rows as when compiled alone.
+/// 128 rows, each with a high-card `h=wNNN` and one event named
+/// `eNN` (16 names, the mid tier).
+fn event_file() -> Vec<u8> {
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    let mut events = crate::EventRows::new();
+    for i in 0..128 {
+        let h = ri.intern(None, &format!("h=w{i:03}"));
+        let name = ri.intern(None, &format!("events.name=e{:02}", i % 16));
+        ri.row(1_000 + i as i64, &[h, name]);
+        events.push_event(1_000 + i as u64, 0, name, &[]);
+        events.end_row(0);
+    }
+    ri.events = Some(events);
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    buf.into_inner()
+}
+
+#[test]
+fn multi_plan_compile_refines_subgroups() {
+    const ROWS: usize = 128;
+    let bytes = event_file();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = vec![
+        plan(vec![PlanTerm::EventGroup {
+            conditions: vec![crate::GroupCondition::Field {
+                field: "events.name".to_string(),
+                matcher: crate::PlanMatcher::Tokens {
+                    exact: vec!["e05".to_string()],
+                    patterns: vec![],
+                },
+            }],
+        }]),
+        plan(vec![tokens("h", &[], &["w0.."])]),
+    ];
+    let mut work = ScanWork::default();
+    let multi = idx
+        .compile_trace_plans(&plans, (0, ROWS as u32), UNLIMITED, &mut work)
+        .unwrap()
+        .expect("unbounded");
+    for (p, compiled) in plans.iter().zip(&multi) {
+        let mut w = ScanWork::default();
+        let alone = idx
+            .compile_trace_plan(p, (0, ROWS as u32), UNLIMITED, &mut w)
+            .unwrap()
+            .expect("unbounded");
+        assert_eq!(
+            compiled.matched_in_range(0, ROWS as u32, &mut w),
+            alone.matched_in_range(0, ROWS as u32, &mut w)
+        );
+    }
+    let mut w = ScanWork::default();
+    assert_eq!(
+        multi[0].matched_in_range(0, ROWS as u32, &mut w),
+        (0..ROWS as u32).filter(|i| i % 16 == 5).collect::<Vec<_>>()
+    );
+}
+
+/// Membership agrees with the range count inside the compile range and
+/// is false outside it — for whole-file dictionary sets too — and past
+/// the universe.
+#[test]
+fn contains_equals_count_in_range() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let plans = [
+        plan(vec![tokens("h", &[], &["w0[0-5]."])]),
+        plan(vec![not_tokens("s", &["yes"], &[])]),
+        plan(vec![PlanTerm::duration(Some(100), Some(900))]),
+        TracePlan::default(),
+        plan(vec![tokens("absent", &["x"], &[])]),
+    ];
+    for range in [(0, N as u32), (10, 20)] {
+        for (i, p) in plans.iter().enumerate() {
+            let mut work = ScanWork::default();
+            let compiled = idx
+                .compile_trace_plan(p, range, UNLIMITED, &mut work)
+                .unwrap()
+                .expect("unbounded");
+            for pos in 0..N as u32 + 5 {
+                let in_range = (range.0..range.1).contains(&pos);
+                assert_eq!(
+                    compiled.contains(pos),
+                    in_range && compiled.count_in_range(pos, pos + 1) == 1,
+                    "plan {i}, range {range:?}, pos {pos}"
+                );
+            }
+        }
+    }
+}
+
+/// A subgroup field condition walks its dictionary twice (the flat
+/// pre-filter, then the KvIds the refine needs); a ceiling crossed by
+/// the first walk stops before the second.
+#[test]
+fn subgroup_field_stops_after_one_walk() {
+    let bytes = event_file();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let p = plan(vec![PlanTerm::EventGroup {
+        conditions: vec![crate::GroupCondition::Field {
+            field: "events.name".to_string(),
+            matcher: crate::PlanMatcher::Contains("e0".to_string()),
+        }],
+    }]);
+    let one_walk = 16 * "events.name=e00".len() as u64;
+    let mut work = ScanWork::default();
+    compile(&idx, &p, &mut work);
+    assert_eq!(work.dict_bytes, 2 * one_walk, "both walks charged");
+    let mut work = ScanWork::default();
+    let limits = ScanLimits {
+        rows: u64::MAX,
+        dict_bytes: one_walk - 1,
+    };
+    assert!(
+        idx.compile_trace_plan(&p, (0, 128), limits, &mut work)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(work.dict_bytes, one_walk);
+}
+
+/// The comparator compares an integer right-hand side exactly against
+/// stored integer text and keeps the `f64` rule for everything else,
+/// so results inside ±2^53 are unchanged.
+#[test]
+fn numeric_comparator_is_exact_for_integers() {
+    const P53: i64 = 1 << 53;
+    use NumberCmp::{Eq, Gt, Gte, Lt, Lte};
+    let cases: &[(&str, NumberCmp, NumberValue, bool)] = &[
+        // Past 2^53 an f64 cannot tell these apart; integers can.
+        ("9007199254740993", Eq, Int(P53), false),
+        ("9007199254740993", Eq, Int(P53 + 1), true),
+        ("9007199254740993", Gt, Int(P53), true),
+        ("9007199254740993", Lte, Int(P53), false),
+        ("9007199254740992", Lt, Int(P53 + 1), true),
+        ("-9007199254740993", Eq, Int(-P53), false),
+        ("-9007199254740993", Lt, Int(-P53), true),
+        ("9223372036854775807", Eq, Int(i64::MAX), true),
+        ("9223372036854775806", Lt, Int(i64::MAX), true),
+        ("-9223372036854775808", Eq, Int(i64::MIN), true),
+        // Inside ±2^53, the f64 rule's answers.
+        ("379", Eq, Int(379), true),
+        ("+379", Eq, Int(379), true),
+        ("0379", Eq, Int(379), true),
+        ("379.0", Eq, Int(379), true),
+        ("1e3", Eq, Int(1000), true),
+        ("379.5", Gt, Int(379), true),
+        ("379", Eq, Float(379.0), true),
+        ("0.1", Eq, Float(0.1), true),
+        ("2.5", Gte, Float(2.5), true),
+        ("abc", Gte, Int(0), false),
+        ("", Eq, Int(0), false),
+        ("1", Eq, Float(f64::NAN), false),
+        // Integer text past the i64 range falls back to f64, where it
+        // equals i64::MAX.
+        ("9223372036854775808", Gt, Int(i64::MAX), false),
+    ];
+    for &(value, cmp, rhs, want) in cases {
+        assert_eq!(
+            numeric_token_matches(value, cmp, rhs),
+            want,
+            "{value} {cmp:?} {rhs:?}"
+        );
+    }
+}
+
+/// Dictionary walks compare integers exactly past 2^53 in every tier,
+/// plain and negated: neighbours an f64 would equate stay apart.
+#[test]
+fn big_integer_terms_select_exact_rows() {
+    const P53: i64 = 1 << 53;
+    const ROWS: usize = 128;
+    let lo = |i: usize| [P53 - 1, P53, P53 + 1, P53 + 2][i % 4];
+    let mid = |i: usize| P53 + (i % 16) as i64;
+    let hi = |i: usize| P53 + i as i64;
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    for i in 0..ROWS {
+        let kvs = [
+            format!("lo={}", lo(i)),
+            format!("mid={}", mid(i)),
+            format!("hi={}", hi(i)),
+        ];
+        let slots: Vec<_> = kvs.iter().map(|kv| ri.intern(None, kv)).collect();
+        ri.row(1_000 + i as i64, &slots);
+    }
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let bytes = buf.into_inner();
+    let idx = IndexReader::open(&bytes).unwrap();
+    for (field, tier) in [
+        ("lo", crate::FieldTier::Low),
+        ("mid", crate::FieldTier::Mid),
+        ("hi", crate::FieldTier::High),
+    ] {
+        assert_eq!(idx.field_table().get(field).unwrap().tier, tier, "{field}");
+    }
+
+    type Want = Box<dyn Fn(usize) -> bool>;
+    let cases: Vec<(PlanTerm, Want)> = vec![
+        (
+            number("lo", NumberCmp::Eq, &[Int(P53)], false),
+            Box::new(move |i| lo(i) == P53),
+        ),
+        (
+            number("lo", NumberCmp::Gt, &[Int(P53)], false),
+            Box::new(move |i| lo(i) > P53),
+        ),
+        (
+            number("lo", NumberCmp::Eq, &[Int(P53)], true),
+            Box::new(move |i| lo(i) != P53),
+        ),
+        (
+            number("mid", NumberCmp::Eq, &[Int(P53 + 3), Int(P53 + 9)], false),
+            Box::new(move |i| mid(i) == P53 + 3 || mid(i) == P53 + 9),
+        ),
+        (
+            number("mid", NumberCmp::Lte, &[Int(P53 + 1)], false),
+            Box::new(move |i| mid(i) <= P53 + 1),
+        ),
+        (
+            number("hi", NumberCmp::Eq, &[Int(P53 + 5)], false),
+            Box::new(|i| i == 5),
+        ),
+        (
+            number("hi", NumberCmp::Gte, &[Int(P53 + 100)], false),
+            Box::new(|i| i >= 100),
+        ),
+        (
+            number("hi", NumberCmp::Lt, &[Int(P53 + 1)], false),
+            Box::new(|i| i == 0),
+        ),
+    ];
+    for (ci, (term, want)) in cases.into_iter().enumerate() {
+        let mut work = ScanWork::default();
+        let compiled = compile(&idx, &plan(vec![term]), &mut work);
+        let expected: Vec<u32> = (0..ROWS).filter(|&i| want(i)).map(|i| i as u32).collect();
+        let mut w = ScanWork::default();
+        assert_eq!(
+            compiled.matched_in_range(0, ROWS as u32, &mut w),
+            expected,
+            "case {ci}"
+        );
+    }
+}
+
+/// Which fixture rows a case expects.
+type RowPredicate = Box<dyn Fn(&FixtureRow) -> bool>;
+
+/// Every matched position of `p` within `[lo, hi)`.
+fn matched(idx: &IndexReader<'_>, p: &TracePlan, (lo, hi): (u32, u32)) -> CompiledTracePlan {
+    idx.compile_trace_plan(p, (lo, hi), UNLIMITED, &mut ScanWork::default())
+        .unwrap()
+        .expect("an unbounded compile cannot run out of budget")
+}
+
+/// AND and AND-NOT of two compiled plans equal the per-row conjunction
+/// and difference inside the compile range, across tiers.
+#[test]
+fn plans_combine_per_row() {
+    let (buf, rows) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    let a = plan(vec![tokens("l", &["a"], &[])]);
+    let b = plan(vec![tokens("h", &["w000", "w003", "w050", "w100"], &[])]);
+    let in_a = |r: &FixtureRow| r.l == "a";
+    let in_b = |r: &FixtureRow| ["w000", "w003", "w050", "w100"].contains(&r.h.as_str());
+    for range in [(0, N as u32), (37, 201)] {
+        let mut both = matched(&idx, &a, range);
+        both.and_assign(&matched(&idx, &b, range));
+        let mut a_not_b = matched(&idx, &a, range);
+        a_not_b.and_not_assign(&matched(&idx, &b, range));
+        let mut w = ScanWork::default();
+        assert_eq!(
+            both.matched_in_range(range.0, range.1, &mut w),
+            oracle(&rows, |r| in_a(r) && in_b(r), range.0, range.1, N),
+            "{range:?}"
+        );
+        assert_eq!(
+            a_not_b.matched_in_range(range.0, range.1, &mut w),
+            oracle(&rows, |r| in_a(r) && !in_b(r), range.0, range.1, N),
+            "{range:?}"
+        );
+    }
+}
+
+#[test]
+#[should_panic(expected = "plans compiled for different files or ranges")]
+fn plans_of_different_ranges_do_not_combine() {
+    let (buf, _) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    let mut a = matched(&idx, &plan(Vec::new()), (0, 10));
+    a.and_assign(&matched(&idx, &plan(Vec::new()), (0, 11)));
+}
+
+/// A plan as a filter: the timeline, its totals and the matched count
+/// count exactly the plan's rows inside the compile range — an empty
+/// plan included, which must not widen to the whole file.
+#[test]
+fn a_plan_filters_the_per_bucket_statistics() {
+    let (buf, rows) = fixture();
+    let idx = IndexReader::open(&buf).unwrap();
+    // Four buckets of 64 positions: row i has timestamp 1_000 + i.
+    let grid = crate::Grid::new(1_000, 64, 4);
+    let cases: Vec<(TracePlan, RowPredicate)> = vec![
+        (plan(Vec::new()), Box::new(|_| true)),
+        (
+            plan(vec![tokens("m", &["v00", "v01", "v02"], &[])]),
+            Box::new(|r| ["v00", "v01", "v02"].contains(&r.m.as_str())),
+        ),
+    ];
+    for (p, want) in cases {
+        for range in [(0, N as u32), (37, 201)] {
+            let filter = matched(&idx, &p, range).to_filter();
+            let in_scope =
+                |i: usize| (range.0 as usize..range.1 as usize).contains(&i) && want(&rows[i]);
+            let per_bucket: Vec<u64> = (0..4)
+                .map(|b| (b * 64..(b + 1) * 64).filter(|&i| in_scope(i)).count() as u64)
+                .collect();
+            assert_eq!(idx.timeline_totals(&filter, grid).unwrap(), per_bucket);
+            assert_eq!(
+                idx.matched_count(&filter, 1_000..1_000 + N as i64).unwrap(),
+                per_bucket.iter().sum::<u64>()
+            );
+            let timeline = idx.timeline("l", &filter, grid).unwrap();
+            for (b, bucket) in timeline.buckets.iter().enumerate() {
+                for (dim, count) in timeline.dimensions.iter().zip(&bucket.counts) {
+                    let expected = (b * 64..(b + 1) * 64)
+                        .filter(|&i| in_scope(i) && &rows[i].l == dim)
+                        .count() as u64;
+                    assert_eq!(*count, expected, "bucket {b}, l={dim}, {range:?}");
+                }
+                assert_eq!(bucket.unset, 0);
+            }
+        }
+    }
+}
+
+/// The span-level trace-id filter: rows of the given traces inside the
+/// range; an unset id never matches; a file without TRCE errors.
+#[test]
+fn trace_ids_select_rows_inside_the_range() {
+    let tid = |b: u8| crate::TraceId::from([b; 16]);
+    let ids = [
+        tid(1),
+        tid(2),
+        tid(1),
+        crate::TraceId::from([0; 16]),
+        tid(3),
+        tid(1),
+        tid(2),
+        tid(1),
+    ];
+    let arena = Bump::new();
+    let mut ri = RowIndex::new(&arena, 10);
+    let mut trace_ids = crate::TraceIds::with_capacity(ids.len());
+    let mut span_ids = crate::SpanIds::with_capacity(ids.len());
+    let mut parents = crate::ParentSpanIds::with_capacity(ids.len());
+    for (i, &id) in ids.iter().enumerate() {
+        let token = ri.intern(None, "k=v");
+        ri.row(1_000 + i as i64, &[token]);
+        trace_ids.push(id);
+        span_ids.push(crate::SpanId::from([i as u8 + 1; 8]));
+        parents.push(crate::SpanId::UNSET);
+    }
+    ri.trace_ids = Some(trace_ids);
+    ri.span_ids = Some(span_ids);
+    ri.parent_span_ids = Some(parents);
+    ri.durations = Some(Durations(vec![5; ids.len()]));
+    ri.flags = Some(crate::Flags(vec![0; ids.len()]));
+    ri.dropped_attribute_counts = Some(crate::DroppedAttributeCounts(vec![0; ids.len()]));
+    let (buf, _s, _m) = IndexWriter::write_into(&ri, Cursor::new(Vec::new()), Vec::new()).unwrap();
+    let buf = buf.into_inner();
+    let idx = IndexReader::open(&buf).unwrap();
+    let got = idx
+        .compile_trace_ids(&[tid(1), tid(3), crate::TraceId::from([0; 16])], (1, 7))
+        .unwrap();
+    let mut w = ScanWork::default();
+    assert_eq!(got.matched_in_range(0, 8, &mut w), vec![2, 4, 5]);
+
+    let (plain, _) = fixture();
+    let plain = IndexReader::open(&plain).unwrap();
+    assert!(plain.compile_trace_ids(&[tid(1)], (0, 8)).is_err());
 }

@@ -5,7 +5,10 @@
 //! (see [`crate::aggregation`] for the flavor-specific state machines), and
 //! on each tick emits ready slots in chronological order — finalizing slots
 //! with data, gap-filling slots without, and writing the `CHART` definition
-//! plus `BEGIN`/`SET`/`END` blocks via [`crate::output`].
+//! plus `BEGIN`/`SET`/`END` blocks via [`crate::output`]. A chart's id on the
+//! wire is its name made valid for the agent, and so is a dimension's: the
+//! names hold a metric name or an attribute value, which a sender chose. Two
+//! dimension names that give one id are one dimension.
 //!
 //! Consumers: `metrics_service.rs`'s `ChartManager` owns one `Chart` per
 //! chart name and drives [`Chart::emit`] from lib.rs's per-second tick loop;
@@ -14,6 +17,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
+use netdata_plugin_protocol::{
+    Chunker, MAX_LABEL_KEY_BYTES, MAX_LABEL_VALUE_BYTES, sanitize_chart_id, sanitize_dimension_id,
+};
 use opentelemetry_proto::tonic::metrics::v1::AggregationTemporality;
 
 use crate::aggregation::{
@@ -22,14 +28,55 @@ use crate::aggregation::{
 use crate::iter::MetricDataKind;
 use crate::output::{ChartDefinition, ChartType, DimensionValue, write_data_slot};
 
+/// The longest name a metric or a dimension may have, in bytes: the
+/// OpenTelemetry API's limit for an instrument name is 255 characters. The
+/// names go into ids, and a chart id has a longest length at the agent
+/// (`netdata_plugin_protocol::MAX_CHART_ID_BYTES`); a metric's name of this
+/// length leaves its chart ids far below it, so they are never cut.
+pub const MAX_NAME_BYTES: usize = 255;
+
+/// The most dimensions one chart takes. A chart's definition and each of its
+/// updates is one block of text that leaves as one message, with a line per
+/// dimension: with this limit and [`MAX_NAME_BYTES`] the dimensions' lines
+/// stay near 2 MiB of a block.
+///
+/// The whole of a block stays under the 16 MiB a message may have
+/// (`otel_bridge::IPC_MAX_MESSAGE_SIZE`): next to its dimensions, a
+/// definition has its labels ([`MAX_LABELS`], near 1 MiB) and one copy of
+/// the metric's description and unit, which are part of one request
+/// ([`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES)).
+pub const MAX_DIMENSIONS: usize = 4096;
+
+/// The most labels one chart takes; the rest of a longer set is left out.
+/// The labels are the sender's attributes, and they can be many times larger
+/// than the request that carried them: a nested attribute gives one label
+/// per leaf, each with the whole path as its key. With this limit, and each
+/// key and value cut at the agent's limit for it ([`MAX_LABEL_KEY_BYTES`],
+/// [`MAX_LABEL_VALUE_BYTES`]), a definition's labels stay near 1 MiB.
+///
+/// The agent cuts a label too, after it sanitized the text, so the two cuts
+/// can differ for a key or a value over the limit: one with runs of spaces,
+/// and a key with multi-byte characters (the agent turns each of them into
+/// one `_`), is stored shorter than the agent alone would store it.
+pub const MAX_LABELS: usize = 1024;
+
+/// Cut `text` to at most `max_bytes`, at a character boundary, and give back
+/// the memory of what was cut: a cut `String` keeps its whole allocation.
+fn cut_text(text: &mut String, max_bytes: usize) {
+    if text.len() > max_bytes {
+        text.truncate(text.floor_char_boundary(max_bytes));
+        text.shrink_to_fit();
+    }
+}
+
 /// One dimension of a chart: a cross-slot context plus per-slot accumulators.
 ///
 /// Slots live in a `BTreeMap`, so points can land in any slot that has not
 /// been emitted yet (out-of-order or late arrivals), and one tick can drain
 /// several ready slots in chronological order.
 struct Dimension<Ctx: CrossSlotContext> {
-    /// The name of the dimension.
-    name: String,
+    /// The dimension's id in the protocol commands, also its display name.
+    id: String,
     /// Cross-slot context (persists across slot boundaries).
     context: Ctx,
     /// Per-slot accumulators, keyed by slot timestamp.
@@ -37,9 +84,9 @@ struct Dimension<Ctx: CrossSlotContext> {
 }
 
 impl<Ctx: CrossSlotContext> Dimension<Ctx> {
-    fn new(name: String) -> Self {
+    fn new(id: String) -> Self {
         Self {
-            name,
+            id,
             context: Ctx::default(),
             slots: BTreeMap::new(),
         }
@@ -53,8 +100,26 @@ pub struct ChartConfig {
     pub collection_interval: u64,
     /// How long to wait for data before gap-filling on a tick with no data.
     pub grace_period: Duration,
-    /// Duration after which a chart with no new data stops emitting.
+    /// Duration after which a chart with no new data is marked obsolete and
+    /// dropped. Also how far from now a data point's timestamp may be
+    /// ([`Self::shows`]).
     pub expiry_duration: Duration,
+}
+
+impl ChartConfig {
+    /// Whether a chart with this timing can show a data point of time
+    /// `timestamp_ns` at `now_ns`: the point is not further from now than
+    /// the chart's expiry, in either direction.
+    ///
+    /// A chart follows the wall clock: it emits one slot after the other up
+    /// to now and fills the slots without data. A point from long ago would
+    /// make it fill every slot from there to now; a point from far ahead
+    /// would wait in memory for its slot to come. The sender sets the
+    /// timestamp, so the ingestor checks it before a chart sees the point.
+    pub fn shows(&self, timestamp_ns: u64, now_ns: u64) -> bool {
+        let window_ns = u64::try_from(self.expiry_duration.as_nanos()).unwrap_or(u64::MAX);
+        timestamp_ns.abs_diff(now_ns) <= window_ns
+    }
 }
 
 impl Default for ChartConfig {
@@ -106,36 +171,52 @@ impl ChartAggregationType {
     }
 }
 
-/// Tracks whether the chart definition has been emitted.
+/// The chart's definition, and what the agent knows of it.
 enum DefinitionState {
     /// No definition set yet.
     Unset,
-    /// Definition ready but not yet written to output.
+    /// Ready, never written to output: the agent does not have the chart.
     Pending(ChartDefinition),
-    /// Definition has been written to output.
+    /// Written to output as it is.
     Emitted(ChartDefinition),
+    /// Written to output, and changed since (a new dimension): the agent has
+    /// the chart, with an older definition.
+    Changed(ChartDefinition),
 }
 
 impl DefinitionState {
     fn as_ref(&self) -> Option<&ChartDefinition> {
         match self {
-            Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Pending(def) | Self::Emitted(def) | Self::Changed(def) => Some(def),
             Self::Unset => None,
         }
     }
 
     fn as_mut(&mut self) -> Option<&mut ChartDefinition> {
         match self {
-            Self::Pending(def) | Self::Emitted(def) => Some(def),
+            Self::Pending(def) | Self::Emitted(def) | Self::Changed(def) => Some(def),
             Self::Unset => None,
         }
     }
 
-    /// Mark the definition as needing (re-)emission.
-    fn mark_pending(&mut self) {
+    /// The definition, if the agent has the chart.
+    fn known_to_the_agent(&self) -> Option<&ChartDefinition> {
+        match self {
+            Self::Emitted(def) | Self::Changed(def) => Some(def),
+            Self::Unset | Self::Pending(_) => None,
+        }
+    }
+
+    /// Whether the definition must be written (again).
+    fn needs_emission(&self) -> bool {
+        matches!(self, Self::Pending(_) | Self::Changed(_))
+    }
+
+    /// The definition changed: it needs (re-)emission.
+    fn mark_changed(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
-            Self::Emitted(def) => Self::Pending(def),
+            Self::Emitted(def) => Self::Changed(def),
             other => other,
         };
     }
@@ -144,7 +225,7 @@ impl DefinitionState {
     fn mark_emitted(&mut self) {
         let prev = std::mem::replace(self, Self::Unset);
         *self = match prev {
-            Self::Pending(def) => Self::Emitted(def),
+            Self::Pending(def) | Self::Changed(def) => Self::Emitted(def),
             other => other,
         };
     }
@@ -152,13 +233,13 @@ impl DefinitionState {
 
 /// A Netdata chart that manages dimensions and tick-driven aggregation.
 pub struct Chart {
-    /// The chart name used in Netdata protocol commands.
-    chart_name: String,
+    /// The chart's id in the protocol commands: its name, made valid.
+    chart_id: String,
     /// The Netdata chart type (line or heatmap).
     chart_type: ChartType,
     /// Collection interval in seconds.
     update_every: u64,
-    /// Duration after which a chart with no new data stops emitting.
+    /// Duration after which a chart with no new data expires.
     expiry_duration: Duration,
     /// How long to wait for data before gap-filling on a tick with no data.
     grace_period: Duration,
@@ -193,13 +274,21 @@ enum DimensionStore {
 }
 
 impl DimensionStore {
-    /// Number of dimensions; no production caller today.
-    #[allow(dead_code)]
+    /// Number of dimensions.
     fn len(&self) -> usize {
         match self {
             Self::Gauge(dims) => dims.len(),
             Self::DeltaSum(dims) => dims.len(),
             Self::CumulativeSum(dims) => dims.len(),
+        }
+    }
+
+    /// Whether the chart has the dimension `id`.
+    fn contains(&self, id: &str) -> bool {
+        match self {
+            Self::Gauge(dims) => dims.contains_key(id),
+            Self::DeltaSum(dims) => dims.contains_key(id),
+            Self::CumulativeSum(dims) => dims.contains_key(id),
         }
     }
 }
@@ -219,7 +308,7 @@ impl Chart {
         };
 
         Self {
-            chart_name: name.to_string(),
+            chart_id: sanitize_chart_id(name).into_owned(),
             chart_type,
             update_every: config.collection_interval,
             expiry_duration: config.expiry_duration,
@@ -253,14 +342,47 @@ impl Chart {
         (timestamp_secs / self.update_every) * self.update_every
     }
 
-    /// Ingest a data point into a dimension's per-slot accumulator.
+    /// Ingest a data point into a dimension's per-slot accumulator. The
+    /// dimension is the one whose id `dimension_name` gives.
+    ///
+    /// Returns `false` when the chart does not take the point: it would add
+    /// a dimension whose name is longer than [`MAX_NAME_BYTES`], or one more
+    /// than [`MAX_DIMENSIONS`].
+    ///
+    /// A value that is not finite (NaN, an infinity) is left out, and that
+    /// is not a refusal: the agent's `SET` takes an integer, and the value
+    /// would be charted as 0 or as the largest one, and would stay in a
+    /// cumulative dimension's state. Every value passes here: a number
+    /// point's (which `DataPointRef::value` already leaves out, with its
+    /// point), and a histogram's or a summary's sum, minimum, maximum and
+    /// quantiles (for which the callers make no chart when it would take
+    /// no value).
     pub fn ingest(
         &mut self,
         dimension_name: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
-    ) {
+    ) -> bool {
+        if !value.is_finite() {
+            return true;
+        }
+
+        let dimension_id = sanitize_dimension_id(dimension_name);
+        if !self.dimensions.contains(&dimension_id) {
+            let dimensions = self.dimensions.len();
+            if dimension_id.len() > MAX_NAME_BYTES || dimensions == MAX_DIMENSIONS {
+                return false;
+            }
+            if dimensions + 1 == MAX_DIMENSIONS {
+                tracing::warn!(
+                    "chart {} has {MAX_DIMENSIONS} dimensions, the most a chart takes: data \
+                     points of other dimensions are dropped",
+                    self.chart_id
+                );
+            }
+        }
+
         self.last_ingest_instant = Some(Instant::now());
 
         let slot = self.slot_for_timestamp(timestamp_ns);
@@ -268,20 +390,22 @@ impl Chart {
         // Record into the correct slot's accumulator.
         let new_dimension =
             self.dimensions
-                .ingest(dimension_name, value, timestamp_ns, start_time_ns, slot);
+                .ingest(&dimension_id, value, timestamp_ns, start_time_ns, slot);
 
         // If a new dimension was added, update the definition and mark it
         // for re-emission.
         if new_dimension {
             if let Some(def) = self.definition.as_mut() {
-                def.dimensions.push(dimension_name.to_string());
+                def.dimensions.push(dimension_id.into_owned());
             }
-            self.definition.mark_pending();
+            self.definition.mark_changed();
         }
+
+        true
     }
 
-    /// Number of dimensions; no production caller today.
-    #[allow(dead_code)]
+    /// Number of dimensions.
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.dimensions.len()
     }
@@ -298,7 +422,7 @@ impl Chart {
     /// 2. **Data pending but not ready**: slot hasn't fully elapsed yet — skip.
     /// 3. **No data at all**: respect grace period, then gap-fill one slot
     ///    per tick.
-    pub fn emit(&mut self, tick_timestamp: u64, buf: &mut String) {
+    pub fn emit(&mut self, tick_timestamp: u64, out: &mut Chunker) {
         // Chart must have received data at some point.
         let Some(last_ingest_instant) = self.last_ingest_instant else {
             return;
@@ -323,7 +447,7 @@ impl Chart {
         // Collect slots that are ready: after last_emission_slot, before cutoff.
         let ready_slots = self.dimensions.ready_slots(self.last_emission_slot, cutoff);
 
-        self.emit_definition_if_needed(buf);
+        self.emit_definition_if_needed(out);
 
         if !ready_slots.is_empty() {
             for &slot in &ready_slots {
@@ -332,16 +456,14 @@ impl Chart {
                     let mut catchup = last + self.update_every;
                     while catchup < slot {
                         let values = self.dimensions.gap_fill(self.update_every);
-                        write_data_slot(buf, &self.chart_name, self.update_every, catchup, &values)
-                            .expect("infallible string write");
+                        self.write_slot(out, catchup, &values);
                         catchup += self.update_every;
                     }
                 }
 
                 // Finalize this slot across all dimensions.
                 let values = self.dimensions.finalize_slot(slot, self.update_every);
-                write_data_slot(buf, &self.chart_name, self.update_every, slot, &values)
-                    .expect("infallible string write");
+                self.write_slot(out, slot, &values);
 
                 self.last_emission_slot = Some(slot);
             }
@@ -358,8 +480,7 @@ impl Chart {
             // are ready (fill_slot < cutoff).
             if fill_slot < cutoff {
                 let values = self.dimensions.gap_fill(self.update_every);
-                write_data_slot(buf, &self.chart_name, self.update_every, fill_slot, &values)
-                    .expect("infallible string write");
+                self.write_slot(out, fill_slot, &values);
 
                 self.last_emission_slot = Some(fill_slot);
             }
@@ -373,8 +494,14 @@ impl Chart {
         }
     }
 
-    /// Write the chart definition into `buf` if pending, then mark as emitted.
-    fn emit_definition_if_needed(&mut self, buf: &mut String) {
+    /// Write one data slot as one block of `out`.
+    fn write_slot(&self, out: &mut Chunker, slot: u64, values: &[DimensionValue]) {
+        out.block(|buf| write_data_slot(buf, &self.chart_id, self.update_every, slot, values));
+    }
+
+    /// Write the chart definition as one block of `out` if it needs
+    /// emission, then mark as emitted.
+    fn emit_definition_if_needed(&mut self, out: &mut Chunker) {
         if !self.needs_definition() {
             return;
         }
@@ -387,18 +514,15 @@ impl Chart {
             }
         }
 
-        use std::fmt::Write;
-        write!(
-            buf,
-            "{}",
-            self.definition.as_ref().expect("definition must be set")
-        )
-        .expect("infallible string write");
+        let definition = self.definition.as_ref().expect("definition must be set");
+        out.block(|buf| definition.write(buf));
 
         self.definition.mark_emitted();
     }
 
-    /// Initialize the chart definition from metric metadata.
+    /// Initialize the chart definition from metric metadata. Of `labels` it
+    /// takes the first [`MAX_LABELS`], each key and value cut at the agent's
+    /// limit for it, and it keeps no memory for what it left out.
     ///
     /// Debug-asserts the definition is still unset; callers gate on
     /// [`has_definition()`](Self::has_definition) first.
@@ -407,9 +531,16 @@ impl Chart {
         metric_name: &str,
         title: &str,
         units: &str,
-        labels: Vec<(String, String)>,
+        mut labels: Vec<(String, String)>,
     ) {
         debug_assert!(matches!(self.definition, DefinitionState::Unset));
+
+        labels.truncate(MAX_LABELS);
+        labels.shrink_to_fit();
+        for (key, value) in &mut labels {
+            cut_text(key, MAX_LABEL_KEY_BYTES);
+            cut_text(value, MAX_LABEL_VALUE_BYTES);
+        }
 
         // Rate-normalized charts emit per-second values; reflect that in the units.
         let units = if self.is_rate_normalized() && !units.is_empty() {
@@ -419,7 +550,7 @@ impl Chart {
         };
 
         self.definition = DefinitionState::Pending(ChartDefinition {
-            chart_name: self.chart_name.clone(),
+            chart_id: self.chart_id.clone(),
             title: title.to_string(),
             units,
             family: metric_name.replace('.', "/"),
@@ -446,15 +577,35 @@ impl Chart {
 
     /// Returns `true` if the chart needs its definition (re-)emitted.
     fn needs_definition(&self) -> bool {
-        matches!(self.definition, DefinitionState::Pending(_))
+        self.definition.needs_emission()
     }
 
-    /// Whether the chart has expired (no data for longer than the expiry duration).
+    /// Tell the agent that the chart is obsolete, as one block of `out`, if
+    /// the agent has the chart. The agent keeps a chart until it is told so.
+    pub fn emit_obsolete(&self, out: &mut Chunker) {
+        if let Some(definition) = self.definition.known_to_the_agent() {
+            out.block(|buf| definition.write_obsolete(buf));
+        }
+    }
+
+    /// Whether the chart has expired: no data for longer than the expiry
+    /// duration, or no data ever. A chart is created for a data point, and it
+    /// can refuse that point ([`Self::ingest`]); such a chart took nothing,
+    /// and nothing would ever make it expire by time.
     pub fn is_expired(&self) -> bool {
         match self.last_ingest_instant {
             Some(instant) => instant.elapsed() >= self.expiry_duration,
-            None => false,
+            None => true,
         }
+    }
+
+    /// Make the chart's last data point `by` older than it is, so a test
+    /// can let a chart expire without waiting.
+    #[cfg(test)]
+    pub(crate) fn backdate_last_ingest(&mut self, by: Duration) {
+        self.last_ingest_instant = self
+            .last_ingest_instant
+            .map(|instant| instant.checked_sub(by).expect("a time the clock can hold"));
     }
 
     /// Get a reference to the chart definition (test only).
@@ -474,13 +625,13 @@ impl DimensionStore {
         }
     }
 
-    /// Ingest a value into a dimension's per-slot accumulator, creating the
-    /// dimension and/or slot entry if needed.
+    /// Ingest a value into the per-slot accumulator of the dimension `id`,
+    /// creating the dimension and/or slot entry if needed.
     ///
     /// Returns `true` if a new dimension was created.
     fn ingest(
         &mut self,
-        name: &str,
+        id: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
@@ -488,29 +639,29 @@ impl DimensionStore {
     ) -> bool {
         match self {
             Self::Gauge(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
             Self::DeltaSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
             Self::CumulativeSum(dims) => {
-                Self::ingest_into(dims, name, value, timestamp_ns, start_time_ns, slot)
+                Self::ingest_into(dims, id, value, timestamp_ns, start_time_ns, slot)
             }
         }
     }
 
     fn ingest_into<Ctx: CrossSlotContext>(
         dims: &mut HashMap<String, Dimension<Ctx>>,
-        name: &str,
+        id: &str,
         value: f64,
         timestamp_ns: u64,
         start_time_ns: u64,
         slot: u64,
     ) -> bool {
-        let new_dimension = !dims.contains_key(name);
+        let new_dimension = !dims.contains_key(id);
         let dim = dims
-            .entry(name.to_string())
-            .or_insert_with(|| Dimension::new(name.to_string()));
+            .entry(id.to_string())
+            .or_insert_with(|| Dimension::new(id.to_string()));
 
         let acc = dim.slots.entry(slot).or_default();
         acc.record(value, timestamp_ns, start_time_ns);
@@ -588,7 +739,7 @@ impl DimensionStore {
                 };
 
                 DimensionValue {
-                    name: dim.name.clone(),
+                    id: dim.id.clone(),
                     value: normalize(value, interval_divisor),
                 }
             })
@@ -612,7 +763,7 @@ impl DimensionStore {
     ) -> Vec<DimensionValue> {
         dims.values()
             .map(|dim| DimensionValue {
-                name: dim.name.clone(),
+                id: dim.id.clone(),
                 value: normalize(Some(dim.context.gap_fill()), interval_divisor),
             })
             .collect()
@@ -622,6 +773,24 @@ impl DimensionStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Emit into `buf` as one piece of text, whatever its size.
+    fn emit(chart: &mut Chart, tick_timestamp: u64, buf: &mut Vec<u8>) {
+        let mut out = Chunker::new(usize::MAX);
+        chart.emit(tick_timestamp, &mut out);
+        buf.extend(out.finish().concat());
+    }
+
+    fn emit_definition(chart: &mut Chart, buf: &mut Vec<u8>) {
+        let mut out = Chunker::new(usize::MAX);
+        chart.emit_definition_if_needed(&mut out);
+        buf.extend(out.finish().concat());
+    }
+
+    /// The emitted chart text.
+    fn text(buf: &[u8]) -> &str {
+        std::str::from_utf8(buf).expect("chart text is UTF-8")
+    }
 
     fn ns(secs: u64) -> u64 {
         secs * 1_000_000_000
@@ -664,6 +833,197 @@ mod tests {
             ChartType::Line,
             test_config(),
         )
+    }
+
+    /// A sender chooses metric names, attribute values and descriptions: none
+    /// of them may break a line of the stream.
+    #[test]
+    fn text_from_a_sender_cannot_break_the_chart_stream() {
+        let mut chart = Chart::new(
+            "my metric.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            test_config(),
+        );
+        chart.init_definition(
+            "my metric",
+            "it's a\ntitle",
+            "requests",
+            vec![("dir".to_string(), r"C:\temp\".to_string())],
+        );
+        chart.ingest("GET /users a=b", 1.0, ns(100), 0);
+        chart.ingest("", 2.0, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
+        assert!(text(&buf).contains("BEGIN my_metric.42 "), "{}", text(&buf));
+    }
+
+    /// A histogram's sum, minimum and maximum and a summary's sum and
+    /// quantiles reach a chart here with whatever the sender put in them.
+    #[test]
+    fn a_value_that_is_not_finite_makes_no_dimension() {
+        let mut chart = gauge_chart();
+        chart.init_definition("load", "Load", "load", Vec::new());
+
+        assert!(chart.ingest("sum", f64::NAN, ns(100), 0));
+        assert!(chart.ingest("max", f64::INFINITY, ns(100), 0));
+        assert!(chart.ingest("min", f64::NEG_INFINITY, ns(100), 0));
+        assert_eq!(chart.dimensions.len(), 0);
+
+        // The value of the same dimension that follows is taken.
+        assert!(chart.ingest("sum", 2.0, ns(100), 0));
+        assert_eq!(chart.dimensions.len(), 1);
+    }
+
+    /// A chart's labels come from the request's attributes, in any number
+    /// and of any length: the definition takes a limited number of them, each
+    /// cut at the agent's limit, so its block of text has a limit too.
+    #[test]
+    fn a_definition_takes_a_limited_number_of_labels_of_limited_length() {
+        let mut chart = gauge_chart();
+        let mut labels: Vec<(String, String)> = (0..2 * MAX_LABELS)
+            .map(|i| (format!("key.{i:04}"), "€".repeat(2_000)))
+            .collect();
+        labels[0].0 = "k".repeat(MAX_LABEL_KEY_BYTES + 1);
+        chart.init_definition("load", "Load", "load", labels);
+        chart.ingest("value", 1.0, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
+        let chart_text = text(&buf);
+        let label_lines: Vec<&str> = chart_text
+            .lines()
+            .filter(|line| line.starts_with("CLABEL '"))
+            .collect();
+        assert_eq!(label_lines.len(), MAX_LABELS);
+        // The first labels are the ones taken; a key and a value are cut at
+        // a character boundary ("€" is three bytes, 800 is not a multiple).
+        let cut_key = "k".repeat(MAX_LABEL_KEY_BYTES);
+        let cut_value = "€".repeat(MAX_LABEL_VALUE_BYTES / 3);
+        assert_eq!(
+            label_lines[0],
+            format!("CLABEL '{cut_key}' '{cut_value}' 1")
+        );
+        assert_eq!(label_lines[1], format!("CLABEL 'key.0001' '{cut_value}' 1"));
+    }
+
+    /// A chart lives for minutes: it must not hold the memory of the labels
+    /// and of the text that it left out.
+    #[test]
+    fn a_chart_holds_no_memory_for_what_it_cut_from_its_labels() {
+        let mut chart = gauge_chart();
+        let labels: Vec<(String, String)> = (0..2 * MAX_LABELS)
+            .map(|i| (format!("key.{i:04}"), "v".repeat(100_000)))
+            .collect();
+        chart.init_definition("load", "Load", "load", labels);
+
+        let DefinitionState::Pending(definition) = &chart.definition else {
+            panic!("the definition is not pending");
+        };
+        assert!(definition.labels.capacity() < 2 * MAX_LABELS);
+        for (_, value) in &definition.labels {
+            assert!(value.capacity() < 2 * MAX_LABEL_VALUE_BYTES);
+        }
+    }
+
+    #[test]
+    fn a_dimension_with_a_name_too_long_is_refused() {
+        let mut chart = gauge_chart();
+
+        assert!(chart.ingest(&"d".repeat(MAX_NAME_BYTES), 1.0, ns(100), 0));
+        assert!(!chart.ingest(&"d".repeat(MAX_NAME_BYTES + 1), 1.0, ns(100), 0));
+        assert_eq!(chart.len(), 1);
+    }
+
+    #[test]
+    fn a_chart_at_its_dimension_limit_refuses_new_dimensions_only() {
+        let mut chart = gauge_chart();
+        for i in 0..MAX_DIMENSIONS {
+            assert!(chart.ingest(&format!("d{i}"), 1.0, ns(100), 0));
+        }
+
+        assert!(!chart.ingest("one more", 1.0, ns(100), 0));
+        assert!(chart.ingest("d0", 2.0, ns(101), 0));
+        assert_eq!(chart.len(), MAX_DIMENSIONS);
+    }
+
+    /// Two names that an id cannot tell apart are one dimension: an update
+    /// never sets one id twice.
+    #[test]
+    fn names_with_one_id_share_a_dimension() {
+        let mut chart = Chart::new(
+            "http.requests.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            test_config(),
+        );
+        chart.init_definition("http.requests", "Requests", "requests", Vec::new());
+        chart.ingest("GET /x", 1.0, ns(100), 0);
+        chart.ingest("GET_/x", 2.0, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        netdata_plugin_protocol::validate_chart_stream(&buf).unwrap();
+        assert_eq!(text(&buf).matches("DIMENSION GET_/x ").count(), 1);
+    }
+
+    /// The window is the chart's expiry, on both sides of now.
+    #[test]
+    fn a_chart_shows_points_within_its_expiry_of_now() {
+        let config = ChartConfig {
+            expiry_duration: Duration::from_secs(900),
+            ..ChartConfig::default()
+        };
+        let now = ns(1_000_000);
+
+        assert!(config.shows(now, now));
+        assert!(config.shows(now - ns(900), now));
+        assert!(config.shows(now + ns(900), now));
+        assert!(!config.shows(now - ns(901), now));
+        assert!(!config.shows(now + ns(901), now));
+        assert!(!config.shows(0, now));
+        assert!(!config.shows(u64::MAX, now));
+    }
+
+    /// The whole text of a chart whose names need no change. The agent reads
+    /// it as it read the text the ingestor wrote before it used the shared
+    /// writer; the one difference in bytes is the quoted dimension name.
+    #[test]
+    fn chart_text_of_plain_names() {
+        let mut chart = Chart::new(
+            "http.requests.42",
+            ChartAggregationType::Gauge,
+            ChartType::Line,
+            test_config(),
+        );
+        chart.init_definition(
+            "http.requests",
+            "Requests",
+            "requests",
+            vec![("service.name".to_string(), "checkout".to_string())],
+        );
+        chart.ingest("GET", 1.5, ns(100), 0);
+
+        let mut buf = Vec::new();
+        emit(&mut chart, 102, &mut buf);
+
+        assert_eq!(
+            text(&buf),
+            "CHART http.requests.42 '' 'Requests' 'requests' 'http/requests' 'otel.http.requests' \
+             line 1 1 'store_first'\n\
+             CLABEL 'service.name' 'checkout' 1\n\
+             CLABEL_COMMIT\n\
+             DIMENSION GET 'GET' absolute 1 1000\n\
+             BEGIN http.requests.42 1000000\n\
+             SET GET = 1500\n\
+             END 101\n"
+        );
     }
 
     /// Parse a SET line into (dimension_name, Option<f64>).
@@ -801,15 +1161,15 @@ mod tests {
             chart.ingest("dim1", 50.0, ms(300), 0); // Latest
             chart.ingest("dim1", 45.0, ms(200), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
 
             // Gap fill: repeats last value (gauge behavior, not 0).
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -832,8 +1192,8 @@ mod tests {
         #[test]
         fn tick_without_data_emits_nothing() {
             let mut chart = gauge_chart();
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -842,15 +1202,15 @@ mod tests {
             let mut chart = gauge_chart();
 
             chart.ingest("dim1", 42.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
-            let sets = last_block_sets(&buf);
+            let sets = last_block_sets(text(&buf));
             assert_eq!(sets.len(), 1);
             assert_eq!(sets[0].0, "dim1");
             assert_eq!(sets[0].1, Some(42.0));
-            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
+            assert!(text(&buf).contains("END 1\n")); // slot 0 + interval 1
         }
 
         #[test]
@@ -869,8 +1229,8 @@ mod tests {
             chart.ingest("dim1", 42.0, ns(5), 0);
 
             // With zero expiry, the chart is immediately expired.
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -880,18 +1240,18 @@ mod tests {
 
             // Ingest data, then tick to finalize.
             chart.ingest("dim1", 42.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
 
             // Second tick with no new data and zero grace: gap-fills by
             // repeating the last gauge value.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
-            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
+            assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
         }
 
         #[test]
@@ -900,14 +1260,14 @@ mod tests {
 
             // Ingest in slot 0. Slot 0 ends at t=1; with 1s buffer, ready at t=2.
             chart.ingest("dim1", 1.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert!(text(&buf).contains("END 1\n")); // slot 0 + interval 1
 
             // Next tick with no data and zero grace -> gap-fill slot 1.
             buf.clear();
-            chart.emit(3, &mut buf);
-            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
+            emit(&mut chart, 3, &mut buf);
+            assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
         }
 
         #[test]
@@ -925,14 +1285,14 @@ mod tests {
 
             // Ingest data and tick to emit.
             chart.ingest("dim1", 42.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active,
             // so the tick should skip.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -951,18 +1311,18 @@ mod tests {
 
             // Ingest data and tick to emit.
             chart.ingest("dim1", 42.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
 
             // Tick with no new data and zero grace period — gap-fill repeats
             // the last gauge value.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
-            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(42.0));
+            assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(42.0));
         }
 
         #[test]
@@ -982,8 +1342,8 @@ mod tests {
             chart.ingest("dim1", 42.0, ns(5), 0);
 
             // Tick at t=11: slot 0 ends at t=10, +1s buffer -> ready.
-            let mut buf = String::new();
-            chart.emit(11, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 11, &mut buf);
             assert!(!buf.is_empty());
 
             // Ingest data in slot 10 (ns(15) -> slot 10).
@@ -991,28 +1351,28 @@ mod tests {
 
             // Tick at t=16: slot 10 ends at t=20, not ready yet.
             buf.clear();
-            chart.emit(16, &mut buf);
+            emit(&mut chart, 16, &mut buf);
             assert!(buf.is_empty());
 
             // Tick at t=21: slot 10 ends at t=20, +1s buffer -> ready.
             buf.clear();
-            chart.emit(21, &mut buf);
+            emit(&mut chart, 21, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(43.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(43.0));
 
             // Ingest data in slot 20 (ns(25) -> slot 20).
             chart.ingest("dim1", 44.0, ns(25), 0);
 
             // Tick at t=26: slot 20 ends at t=30, not ready yet.
             buf.clear();
-            chart.emit(26, &mut buf);
+            emit(&mut chart, 26, &mut buf);
             assert!(buf.is_empty());
 
             // Tick at t=31: slot 20 ends at t=30, +1s buffer -> ready.
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(44.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(44.0));
         }
 
         #[test]
@@ -1030,8 +1390,8 @@ mod tests {
 
             chart.ingest("dim1", 10.0, ns(5), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1049,13 +1409,13 @@ mod tests {
             );
 
             chart.ingest("dim1", 10.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1074,8 +1434,8 @@ mod tests {
 
             chart.ingest("dim1", 100.0, ns(5), 1_000_000_000);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(buf.is_empty());
         }
 
@@ -1093,13 +1453,13 @@ mod tests {
             );
 
             chart.ingest("dim1", 100.0, ms(500), 1_000_000_000);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Tick again with no new data — grace period is still active.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(buf.is_empty());
         }
     }
@@ -1122,32 +1482,32 @@ mod tests {
 
             // Data at slot 0.
             chart.ingest("dim1", 1.0, ns(5), 0);
-            let mut buf = String::new();
-            chart.emit(11, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 11, &mut buf);
             assert!(!buf.is_empty());
 
             // Data at slot 30 — should produce gap-filled catchup slots at
             // 10 and 20 (repeating gauge value 1.0), then data at 30.
             chart.ingest("dim1", 2.0, ns(30), 0);
             buf.clear();
-            chart.emit(41, &mut buf);
+            emit(&mut chart, 41, &mut buf);
             assert!(!buf.is_empty());
 
             // 2 catchup slots + 1 data slot = 3 BEGIN lines.
-            assert_eq!(count_begins(&buf), 3);
+            assert_eq!(count_begins(text(&buf)), 3);
 
             // All 3 slots have SET lines (gap-filled catchup + real data).
-            assert_eq!(count_sets(&buf), 3);
+            assert_eq!(count_sets(text(&buf)), 3);
 
             // Verify END timestamps (slot + interval 10).
-            assert!(buf.contains("END 20\n"));
-            assert!(buf.contains("END 30\n"));
-            assert!(buf.contains("END 40\n"));
+            assert!(text(&buf).contains("END 20\n"));
+            assert!(text(&buf).contains("END 30\n"));
+            assert!(text(&buf).contains("END 40\n"));
 
             // The data slot at 30 must have the NEW value (2.0), not a
             // gap-fill. This verifies that catchup slots don't consume
             // the pending data.
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(2.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(2.0));
         }
 
         #[test]
@@ -1156,29 +1516,29 @@ mod tests {
 
             // Ingest in slot 0 and emit.
             chart.ingest("dim1", 1.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
             assert!(!buf.is_empty());
 
             // Grace = ZERO, so each subsequent tick with no data emits one
             // gap-filled slot (repeating the last gauge value).
             buf.clear();
-            chart.emit(5, &mut buf);
-            assert_eq!(count_begins(&buf), 1);
-            assert_eq!(count_sets(&buf), 1);
-            assert!(buf.contains("END 2\n")); // gap-fill slot 1 + interval 1
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
+            emit(&mut chart, 5, &mut buf);
+            assert_eq!(count_begins(text(&buf)), 1);
+            assert_eq!(count_sets(text(&buf)), 1);
+            assert!(text(&buf).contains("END 2\n")); // gap-fill slot 1 + interval 1
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             buf.clear();
-            chart.emit(5, &mut buf);
-            assert_eq!(count_begins(&buf), 1);
-            assert!(buf.contains("END 3\n")); // gap-fill slot 2 + interval 1
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
+            emit(&mut chart, 5, &mut buf);
+            assert_eq!(count_begins(text(&buf)), 1);
+            assert!(text(&buf).contains("END 3\n")); // gap-fill slot 2 + interval 1
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             buf.clear();
-            chart.emit(5, &mut buf);
-            assert!(buf.contains("END 4\n")); // gap-fill slot 3 + interval 1
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
+            emit(&mut chart, 5, &mut buf);
+            assert!(text(&buf).contains("END 4\n")); // gap-fill slot 3 + interval 1
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
         }
 
         #[test]
@@ -1187,12 +1547,12 @@ mod tests {
 
             // First data ever — no catchup slots should precede it.
             chart.ingest("dim1", 1.0, ns(100), 0);
-            let mut buf = String::new();
-            chart.emit(102, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 102, &mut buf);
 
-            assert_eq!(count_begins(&buf), 1);
-            assert_eq!(count_sets(&buf), 1);
-            assert!(buf.contains("END 101\n")); // slot 100 + interval 1
+            assert_eq!(count_begins(text(&buf)), 1);
+            assert_eq!(count_sets(text(&buf)), 1);
+            assert!(text(&buf).contains("END 101\n")); // slot 100 + interval 1
         }
 
         #[test]
@@ -1200,16 +1560,16 @@ mod tests {
             let mut chart = delta_sum_chart();
 
             chart.ingest("dim1", 10.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(count_sets(&buf), 1);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
+            assert_eq!(count_sets(text(&buf)), 1);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1227,19 +1587,19 @@ mod tests {
 
             // Emit at slot 0 with value 42.0.
             chart.ingest("dim1", 42.0, ns(5), 0);
-            let mut buf = String::new();
-            chart.emit(11, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 11, &mut buf);
 
             // Data at slot 20 — catchup at slot 10 should repeat 42.0.
             chart.ingest("dim1", 99.0, ns(20), 0);
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
-            assert_eq!(count_begins(&buf), 2);
-            assert_eq!(count_sets(&buf), 2);
-            assert!(buf.contains("END 20\n")); // catchup slot 10 + interval 10
-            assert!(buf.contains("END 30\n")); // data slot 20 + interval 10
+            assert_eq!(count_begins(text(&buf)), 2);
+            assert_eq!(count_sets(text(&buf)), 2);
+            assert!(text(&buf).contains("END 20\n")); // catchup slot 10 + interval 10
+            assert!(text(&buf).contains("END 30\n")); // data slot 20 + interval 10
         }
 
         #[test]
@@ -1257,23 +1617,23 @@ mod tests {
 
             // Emit at slot 0 with delta 10; divided by update_every (10) = 1.0/s.
             chart.ingest("dim1", 10.0, ns(5), 0);
-            let mut buf = String::new();
-            chart.emit(11, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(1.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 11, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(1.0));
 
             // Data at slot 20 — catchup at slot 10 should emit 0.
             chart.ingest("dim1", 5.0, ns(20), ns(10));
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
-            assert_eq!(count_begins(&buf), 2);
-            assert_eq!(count_sets(&buf), 2);
-            assert!(buf.contains("END 20\n")); // catchup slot 10 + interval 10
-            assert!(buf.contains("END 30\n")); // data slot 20 + interval 10
+            assert_eq!(count_begins(text(&buf)), 2);
+            assert_eq!(count_sets(text(&buf)), 2);
+            assert!(text(&buf).contains("END 20\n")); // catchup slot 10 + interval 10
+            assert!(text(&buf).contains("END 30\n")); // data slot 20 + interval 10
 
             // Data slot: delta 5 / update_every 10 = 0.5/s.
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.5));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.5));
         }
 
         #[test]
@@ -1293,22 +1653,22 @@ mod tests {
 
             // Slot 0: baseline (first slot returns None for cumulative sum).
             chart.ingest("dim1", 100.0, ns(5), START_TIME);
-            let mut buf = String::new();
-            chart.emit(11, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), None);
+            let mut buf = Vec::new();
+            emit(&mut chart, 11, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), None);
 
             // Data at slot 20 — catchup at slot 10 should gap-fill with 0.
             chart.ingest("dim1", 150.0, ns(20), START_TIME);
             buf.clear();
-            chart.emit(31, &mut buf);
+            emit(&mut chart, 31, &mut buf);
 
             // 1 catchup + 1 data = 2 BEGIN/SET/END blocks.
-            assert_eq!(count_begins(&buf), 2);
-            assert!(buf.contains("END 20\n")); // catchup slot 10 + interval 10
-            assert!(buf.contains("END 30\n")); // data slot 20 + interval 10
+            assert_eq!(count_begins(text(&buf)), 2);
+            assert!(text(&buf).contains("END 20\n")); // catchup slot 10 + interval 10
+            assert!(text(&buf).contains("END 30\n")); // data slot 20 + interval 10
 
             // Data slot: delta = 150 - 100 = 50, divided by update_every (10) = 5.0/s.
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(5.0));
         }
     }
 
@@ -1324,13 +1684,13 @@ mod tests {
             chart.ingest("dim1", 42.0, ns(0), 0);
 
             // Both slots are in the BTreeMap. Emit drains them in order.
-            let mut buf = String::new();
-            chart.emit(3, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 3, &mut buf);
 
             // Slot 0 emitted first (42.0), then slot 1 (50.0).
             // Last emitted block reflects the last finalized slot.
-            assert_eq!(count_begins(&buf), 2);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            assert_eq!(count_begins(text(&buf)), 2);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1339,8 +1699,8 @@ mod tests {
 
             // Ingest and emit slot 0.
             chart.ingest("dim1", 10.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
 
             // Late arrival for slot 0 — already emitted, should be dropped.
             chart.ingest("dim1", 99.0, ms(600), 0);
@@ -1349,11 +1709,11 @@ mod tests {
             chart.ingest("dim1", 50.0, ns(1), 0);
 
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Only slot 1 emitted. The late 99.0 for slot 0 was dropped.
-            assert_eq!(count_begins(&buf), 1);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            assert_eq!(count_begins(text(&buf)), 1);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1367,16 +1727,16 @@ mod tests {
             chart.ingest("dim1", 5.0, ns(1), ns(0));
 
             // Tick at 2: both slots drained in order.
-            let mut buf = String::new();
-            chart.emit(3, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 3, &mut buf);
 
             // Two slots emitted: slot 0 + slot 1.
-            assert_eq!(count_begins(&buf), 2);
-            assert!(buf.contains("END 1\n")); // slot 0 + interval 1
-            assert!(buf.contains("END 2\n")); // slot 1 + interval 1
+            assert_eq!(count_begins(text(&buf)), 2);
+            assert!(text(&buf).contains("END 1\n")); // slot 0 + interval 1
+            assert!(text(&buf).contains("END 2\n")); // slot 1 + interval 1
 
             // Last emitted block reflects the last finalize (slot 1).
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(5.0));
         }
 
         #[test]
@@ -1392,9 +1752,9 @@ mod tests {
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
 
             // Tick at 2: slot 0 (baseline, None) + slot 1 (delta=150-100=50).
-            let mut buf = String::new();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1414,9 +1774,9 @@ mod tests {
             chart.ingest("dim1", 20.0, ns(2), new_start);
 
             // Tick at 3: should report 0 for the restart slot.
-            let mut buf = String::new();
-            chart.emit(4, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 4, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1429,9 +1789,9 @@ mod tests {
             chart.ingest("dim1", 30.0, ns(2), 0);
 
             // Tick at 3: all three slots drained in order.
-            let mut buf = String::new();
-            chart.emit(4, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 4, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
         #[test]
@@ -1446,10 +1806,10 @@ mod tests {
             chart.ingest("dim1", 15.0, ns(1), 0);
 
             // Tick at 2: slot 0 and 1 drained. dim2 gap-fills for slot 1.
-            let mut buf = String::new();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(15.0));
-            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(15.0));
+            assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
         }
 
         #[test]
@@ -1458,9 +1818,9 @@ mod tests {
 
             // Ingest and emit slot 0.
             chart.ingest("dim1", 10.0, ns(0), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // Late arrival for slot 0 — dropped (already emitted).
             chart.ingest("dim1", 3.0, ns(0), 0);
@@ -1468,12 +1828,12 @@ mod tests {
             chart.ingest("dim1", 5.0, ns(1), ns(0));
 
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
 
             // Only slot 1 emitted. The 3.0 was dropped because slot 0
             // was already emitted.
-            assert_eq!(count_begins(&buf), 1);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(5.0));
+            assert_eq!(count_begins(text(&buf)), 1);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(5.0));
         }
 
         #[test]
@@ -1497,14 +1857,14 @@ mod tests {
             }
 
             // emit() drains both: slot 0 (10 deltas) + slot 10 (1 delta).
-            let mut buf = String::new();
-            chart.emit(21, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 21, &mut buf);
 
             // Slot 0 + slot 10 = 2 BEGIN blocks.
-            assert_eq!(count_begins(&buf), 2);
+            assert_eq!(count_begins(text(&buf)), 2);
 
-            assert!(buf.contains("END 10\n")); // slot 0 + interval 10
-            assert!(buf.contains("END 20\n")); // slot 10 + interval 10
+            assert!(text(&buf).contains("END 10\n")); // slot 0 + interval 10
+            assert!(text(&buf).contains("END 20\n")); // slot 10 + interval 10
         }
     }
 
@@ -1520,9 +1880,9 @@ mod tests {
             chart.ingest("dim1", 30.0, ms(300), 0); // Latest
             chart.ingest("dim1", 20.0, ms(200), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
         #[test]
@@ -1534,19 +1894,19 @@ mod tests {
             chart.ingest("dim2", 20.0, ms(500), 0);
 
             // Tick at 1: finalizes slot 0.
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
-            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
+            assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
 
             // Only dim1 gets new data in slot 1.
             chart.ingest("dim1", 15.0, ms(1500), 0);
 
             // Tick at 2: dim2 should be gap-filled with previous value.
             buf.clear();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(15.0));
-            assert_eq!(last_dim_value(&buf, "dim2"), Some(20.0));
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(15.0));
+            assert_eq!(last_dim_value(text(&buf), "dim2"), Some(20.0));
         }
 
         #[test]
@@ -1558,9 +1918,9 @@ mod tests {
             chart.ingest("dim1", 30.0, ms(300), 0); // Latest
             chart.ingest("dim1", 10.0, ms(100), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(30.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(30.0));
         }
 
         #[test]
@@ -1572,21 +1932,21 @@ mod tests {
             chart.ingest("dim2", 200.0, ms(500), 0);
             chart.ingest("dim3", 300.0, ms(500), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_block_sets(&buf).len(), 3);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(100.0));
-            assert_eq!(last_dim_value(&buf, "dim2"), Some(200.0));
-            assert_eq!(last_dim_value(&buf, "dim3"), Some(300.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_block_sets(text(&buf)).len(), 3);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(100.0));
+            assert_eq!(last_dim_value(text(&buf), "dim2"), Some(200.0));
+            assert_eq!(last_dim_value(text(&buf), "dim3"), Some(300.0));
 
             // Only dim1 gets new data in slot 1.
             chart.ingest("dim1", 110.0, ms(1500), 0);
 
             buf.clear();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(110.0));
-            assert_eq!(last_dim_value(&buf, "dim2"), Some(200.0)); // gap-fill
-            assert_eq!(last_dim_value(&buf, "dim3"), Some(300.0)); // gap-fill
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(110.0));
+            assert_eq!(last_dim_value(text(&buf), "dim2"), Some(200.0)); // gap-fill
+            assert_eq!(last_dim_value(text(&buf), "dim3"), Some(300.0)); // gap-fill
         }
     }
 
@@ -1602,9 +1962,9 @@ mod tests {
             chart.ingest("dim1", 20.0, ms(200), ms(100));
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(35.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(35.0));
         }
 
         #[test]
@@ -1617,9 +1977,9 @@ mod tests {
             chart.ingest("dim1", 15.0, ms(300), ms(200));
             chart.ingest("dim1", 20.0, ms(400), ms(300));
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1627,16 +1987,16 @@ mod tests {
             let mut chart = delta_sum_chart();
 
             chart.ingest("dim1", 10.0, ms(500), 0);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(10.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(10.0));
 
             // No new data — gap-fill emits 0 for delta sums.
             buf.clear();
-            chart.emit(3, &mut buf);
+            emit(&mut chart, 3, &mut buf);
             assert!(!buf.is_empty());
-            assert_eq!(count_sets(&buf), 1);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
+            assert_eq!(count_sets(text(&buf)), 1);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
 
         #[test]
@@ -1657,9 +2017,9 @@ mod tests {
             chart.ingest("dim1", -3.0, ms(200), ms(100));
             chart.ingest("dim1", 5.0, ms(300), ms(200));
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(12.0));
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(12.0));
         }
     }
 
@@ -1673,9 +2033,9 @@ mod tests {
             let mut chart = cumulative_sum_chart();
 
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), None);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), None);
         }
 
         #[test]
@@ -1684,15 +2044,15 @@ mod tests {
 
             // First tick: baseline in slot 0, no delta.
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), None);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), None);
 
             // Second tick: data in slot 1, delta = 150 - 100 = 50.
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
             buf.clear();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
         }
 
         #[test]
@@ -1701,21 +2061,21 @@ mod tests {
 
             // Establish baseline in slot 0.
             chart.ingest("dim1", 100.0, ms(500), START_TIME);
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
 
             // Normal delta in slot 1.
             chart.ingest("dim1", 150.0, ns(1), START_TIME);
             buf.clear();
-            chart.emit(3, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(50.0));
+            emit(&mut chart, 3, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(50.0));
 
             // Restart in slot 2: new start_time.
             let new_start = START_TIME + 1_000_000;
             chart.ingest("dim1", 20.0, ns(2), new_start);
             buf.clear();
-            chart.emit(4, &mut buf);
-            assert_eq!(last_dim_value(&buf, "dim1"), Some(0.0));
+            emit(&mut chart, 4, &mut buf);
+            assert_eq!(last_dim_value(text(&buf), "dim1"), Some(0.0));
         }
     }
 
@@ -1728,8 +2088,8 @@ mod tests {
 
             chart.init_definition("metric", "title", "units", vec![]);
             // Emit definition to mark as emitted.
-            let mut buf = String::new();
-            chart.emit_definition_if_needed(&mut buf);
+            let mut buf = Vec::new();
+            emit_definition(&mut chart, &mut buf);
             assert!(!chart.needs_definition());
 
             // Ingest a new dimension.
@@ -1759,11 +2119,14 @@ mod tests {
             chart.init_definition("metric", "title", "units", vec![]);
             chart.ingest("dim1", 1.0, ns(1), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
 
             // The CHART line should include 'store_first'.
-            let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
+            let chart_line = text(&buf)
+                .lines()
+                .find(|l| l.starts_with("CHART "))
+                .unwrap();
             assert!(
                 chart_line.contains("'store_first'"),
                 "CHART line missing store_first: {}",
@@ -1783,10 +2146,13 @@ mod tests {
             chart.init_definition("metric", "title", "units", vec![]);
             chart.ingest("dim1", 1.0, ns(1), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
 
-            let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
+            let chart_line = text(&buf)
+                .lines()
+                .find(|l| l.starts_with("CHART "))
+                .unwrap();
             assert!(
                 chart_line.contains(" line "),
                 "CHART line should contain 'line': {}",
@@ -1806,10 +2172,13 @@ mod tests {
             chart.init_definition("metric", "title", "units", vec![]);
             chart.ingest("dim1", 1.0, ns(1), 0);
 
-            let mut buf = String::new();
-            chart.emit(2, &mut buf);
+            let mut buf = Vec::new();
+            emit(&mut chart, 2, &mut buf);
 
-            let chart_line = buf.lines().find(|l| l.starts_with("CHART ")).unwrap();
+            let chart_line = text(&buf)
+                .lines()
+                .find(|l| l.starts_with("CHART "))
+                .unwrap();
             assert!(
                 chart_line.contains(" heatmap "),
                 "CHART line should contain 'heatmap': {}",

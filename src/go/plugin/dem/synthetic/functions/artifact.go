@@ -13,7 +13,7 @@ import (
 var artifactMethod = method{
 	id:     "synthetics-artifact",
 	title:  "Synthetic artifacts",
-	help:   "Retained capture metadata for one run; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.",
+	help:   "Retained capture metadata for one run; file bytes are verified when fetched. Test identifies the associated test, not a page, failing step or screenshot time. Missing-capture observations and publication decisions are in synthetics-run while history remains. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.",
 	sort:   "artifact_id",
 	params: []string{"job_id", "run_id", "artifact_id"},
 	columns: columns(
@@ -28,6 +28,8 @@ var artifactMethod = method{
 		column{"bytes", "Size", funcapi.FieldTypeInteger, "bytes"},
 		column{"sha256", "SHA-256", funcapi.FieldTypeString, ""},
 		column{"availability", "Availability", funcapi.FieldTypeString, ""},
+		column{"test", "Test", funcapi.FieldTypeString, ""},
+		column{"label", "Label", funcapi.FieldTypeString, ""},
 	),
 }
 
@@ -40,7 +42,7 @@ func (h *Handler) artifact(
 	if errors.Is(err, query.ErrExpired) {
 		return funcapi.RawResponse(map[string]any{
 			"status": 404, "errorMessage": err.Error(), "capture_state": evidence.CaptureState,
-			"job_id": evidence.JobID, "run_id": evidence.RunID,
+			"job_id": evidence.JobID, "run_id": evidence.RunID, "vnode_guid": evidence.VnodeGUID,
 		})
 	}
 	if err != nil {
@@ -49,9 +51,16 @@ func (h *Handler) artifact(
 	response["capture_state"] = evidence.CaptureState
 	response["run_id"] = evidence.RunID
 	response["job_id"] = evidence.JobID
+	response["vnode_guid"] = evidence.VnodeGUID
 	rows := make([][]any, 0, len(evidence.Artifacts))
 	for _, item := range evidence.Artifacts {
-		rows = append(rows, []any{item.ID, item.Kind, item.MIME, item.Bytes, item.SHA256, item.Availability})
+		label, title := "Screenshot", item.Test.Title
+		if item.Kind == "report" {
+			label = "Lighthouse report"
+		} else if item.Test.ID == "" {
+			title = "Test not recorded"
+		}
+		rows = append(rows, []any{item.ID, item.Kind, item.MIME, item.Bytes, item.SHA256, item.Availability, title, label})
 	}
 	response["data"] = rows
 	if args["artifact_id"] != "" {

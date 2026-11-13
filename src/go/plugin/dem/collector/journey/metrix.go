@@ -3,7 +3,7 @@ package journey
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
 type metrics struct {
@@ -27,8 +27,8 @@ func newMetrics(m metrix.SnapshotMeter) metrics {
 		notRun:          m.Gauge("tests_not_run"),
 	}
 }
-func (m metrics) write(run model.Run) {
-	if v := run.Tests; v != nil {
+func (m metrics) write(run monitor.Observation) {
+	if v := run.Tests; run.HasTests {
 		m.declared.Observe(float64(v.Declared))
 		m.passed.Observe(float64(v.Passed))
 		m.failed.Observe(float64(v.Failed))

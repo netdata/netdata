@@ -81,6 +81,7 @@ func testWinHandler() Handler {
 type winTestServer struct {
 	server *Server
 	done   chan struct{}
+	t      *testing.T
 }
 
 func startWinTestServer(t *testing.T, service string) *winTestServer {
@@ -92,28 +93,32 @@ func startWinTestServer(t *testing.T, service string) *winTestServer {
 		defer close(done)
 		_ = s.Run()
 	}()
-	time.Sleep(200 * time.Millisecond)
-	return &winTestServer{server: s, done: done}
+	select {
+	case <-s.Listening():
+	case <-done:
+		t.Fatal("server Run returned before listening")
+	case <-time.After(10 * time.Second):
+		t.Fatal("server not listening after 10s")
+	}
+	return &winTestServer{server: s, done: done, t: t}
 }
 
 func (ts *winTestServer) stop() {
 	ts.server.Stop()
 	select {
 	case <-ts.done:
-	case <-time.After(2 * time.Second):
+	case <-time.After(10 * time.Second):
+		ts.t.Error("server Run did not return within 10s of Stop")
 	}
 }
 
+// connectReadyWin connects once: the server is already listening.
 func connectReadyWin(t *testing.T, client *Client) {
 	t.Helper()
-	for i := 0; i < 200; i++ {
-		client.Refresh()
-		if client.Ready() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	client.Refresh()
+	if !client.Ready() {
+		t.Fatalf("client not READY after one refresh: %+v", client.Status())
 	}
-	t.Fatal("client did not reach READY state")
 }
 
 func TestSnapshotRoundTripWindows(t *testing.T) {
@@ -150,16 +155,8 @@ func TestCacheRoundTripWindows(t *testing.T) {
 		t.Fatalf("unexpected initial cache status: %+v", status0)
 	}
 
-	var updated bool
-	for i := 0; i < 200; i++ {
-		if cache.Refresh() {
-			updated = true
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if !updated {
-		t.Fatal("Refresh never succeeded")
+	if !cache.Refresh() {
+		t.Fatal("first Refresh against a listening server must succeed")
 	}
 	if !cache.Ready() {
 		t.Fatal("cache not ready after refresh")
@@ -191,8 +188,8 @@ func TestClientNotReadyReturnsErrorWindows(t *testing.T) {
 		t.Fatalf("unexpected initial client status: %+v", status)
 	}
 
-	if _, err := client.CallSnapshot(); err != protocol.ErrBadLayout {
-		t.Fatalf("CallSnapshot err = %v, want %v", err, protocol.ErrBadLayout)
+	if _, err := client.CallSnapshot(); err != protocol.ErrNotReady {
+		t.Fatalf("CallSnapshot err = %v, want %v", err, protocol.ErrNotReady)
 	}
 
 	status = client.Status()

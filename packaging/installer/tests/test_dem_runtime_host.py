@@ -43,7 +43,7 @@ if name == 'id':
         print(settings.get('root_uid', '0'))
 elif name == 'stat':
     path = Path(args[-1])
-    mode = (stat.S_IMODE((path.lstat() if args[1] == '%u' else path.stat()).st_mode)
+    mode = (stat.S_IMODE(path.lstat().st_mode)
             if path == root or root in path.parents else 0o755)
     uid = '991' if str(path) in settings.get('untrusted', []) else '0'
     print(uid if args[1] == '%u' else uid + ':' + format(mode, 'o'))
@@ -539,6 +539,76 @@ class HostPolicyTests(unittest.TestCase):
         self.settings['uid'] = '0'
         self.assertNotEqual(self.high('install', '--allow-download').returncode, 0)
         self.assertEqual(self.calls('dem.plugin'), [])
+
+    def test_rejected_path_reports_permissions_without_changing_them(self):
+        cases = {
+            'group-writable Agent': (self.agent, 0o775, '0'),
+            'group-writable plugin': (self.plugin, 0o775, '0'),
+            'group-writable parent': (self.bin, 0o775, '0'),
+            'world-writable parent': (self.bin, 0o757, '0'),
+            'nonroot Agent': (self.agent, 0o755, '991'),
+            'nonroot plugin': (self.plugin, 0o755, '991'),
+            'nonroot parent': (self.bin, 0o755, '991'),
+        }
+        for name, (path, mode, uid) in cases.items():
+            with self.subTest(name=name):
+                original_mode = path.stat().st_mode & 0o7777
+                path.chmod(mode)
+                self.settings['untrusted'] = [] if uid == '0' else [str(path)]
+                agent_calls = len(self.calls('netdata'))
+                try:
+                    result = self.high('install', '--allow-download')
+                    self.assertEqual(result.returncode, 1)
+                    self.assertEqual(result.stdout, '')
+                    self.assertIn(str(path), result.stderr)
+                    self.assertIn('owner UID=' + uid, result.stderr)
+                    self.assertIn('mode=' + format(mode, '04o'), result.stderr)
+                    self.assertIn('namei -l', result.stderr)
+                    self.assertIn('chmod go-w', result.stderr)
+                    self.assertEqual(path.stat().st_mode & 0o7777, mode)
+                    if path != self.plugin:
+                        self.assertEqual(len(self.calls('netdata')), agent_calls)
+                    self.assertEqual(self.calls('dem.plugin'), [])
+                    self.assertEqual(self.calls('apparmor_parser'), [])
+                    self.assertEqual(self.registrations(), [])
+                    self.assertEqual(self.profiles(), [])
+                finally:
+                    path.chmod(original_mode)
+                    self.settings.pop('untrusted')
+
+    def test_untrusted_alias_reports_link_ownership(self):
+        alias = self.root / 'agent alias'
+        alias.symlink_to(self.agent)
+        self.settings['untrusted'] = [str(alias)]
+        result = self.invoke('install', '--agent', str(alias), '--allow-download')
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, '')
+        self.assertIn(str(alias), result.stderr)
+        self.assertIn('owner UID=991', result.stderr)
+        self.assertIn('mode=' + format(alias.lstat().st_mode & 0o7777, '04o'), result.stderr)
+        self.assertIn('symbolic link', result.stderr)
+        self.assertIn('namei -l', result.stderr)
+        self.assertNotIn('chmod go-w', result.stderr)
+        self.assertTrue(alias.is_symlink())
+        self.assertEqual(self.calls('netdata'), [])
+        self.assertEqual(self.calls('dem.plugin'), [])
+        self.assertEqual(self.registrations(), [])
+        self.assertEqual(self.profiles(), [])
+
+    def test_alias_target_reports_writable_ancestor_before_execution(self):
+        alias = self.root / 'agent alias'
+        alias.symlink_to(self.agent)
+        self.bin.chmod(0o775)
+        result = self.invoke('install', '--agent', str(alias), '--allow-download')
+        self.assertEqual(result.returncode, 1)
+        self.assertIn(str(self.bin), result.stderr)
+        self.assertIn('owner UID=0', result.stderr)
+        self.assertIn('mode=0775', result.stderr)
+        self.assertEqual(self.bin.stat().st_mode & 0o7777, 0o775)
+        self.assertEqual(self.calls('netdata'), [])
+        self.assertEqual(self.calls('dem.plugin'), [])
+        self.assertEqual(self.registrations(), [])
+        self.assertEqual(self.profiles(), [])
 
     def test_setup_protocol_invalid_output_never_registers_policy(self):
         valid = 'netdata-dem-runtime-setup-v1\nstandalone\nmanaged\n/valid\n'
