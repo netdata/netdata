@@ -1,30 +1,26 @@
 //! The OTLP logs ingestion service: receives `ExportLogsServiceRequest`s
-//! and lands them in per-tenant WALs. The logic is transport-agnostic — it
-//! lives on the [`NetdataLogsService::export_logs`] core, which both the
-//! gRPC `LogsService` wrapper and the OTLP/HTTP front end call once they
-//! have resolved the tenant (`x-scope-orgid` header).
+//! and lands them in per-tenant WALs. The logic is transport-agnostic: it
+//! lives on the [`NetdataLogsService::export_logs`] core.
 //!
 //! The export, in order:
 //!
 //! 1. `group_by_stream` groups the request's `ResourceLogs` by their
 //!    `ServiceStream` identity.
 //! 2. `StorableStream::admit` turns each group into a storable stream or
-//!    rejects it: its identity is too large for the substrate's
+//!    rejects it: its identity is too large for the WAL's
 //!    `content_meta` caps, or its `ns_hash` is already claimed by a different
 //!    identity (first claim wins, per tenant; see `ClaimedStreams`).
 //! 3. `StorableStream::flatten` prepares each stream's WAL frame, lock-free,
-//!    via `ng_flatten::prepare_log_frame_with` (normalization + flattening +
-//!    the ingestion time-window; `Some(bounds)` here — production enforces
-//!    the window, `ng-ingest` and the benches pass `None`).
+//!    via `ng_flatten::prepare_log_frame_with` (normalization, flattening and
+//!    the ingestion time window).
 //! 4. Under the tenant's writer lock: `StorableStream::write_to` writes the
 //!    frames.
 //! 5. Without the lock, in a task of its own so that a client going away
 //!    cannot stop it: `TenantWriter::make_durable` waits for a sync round
 //!    that covers the frames (one round serves every request of the tenant
 //!    that wrote before it began) and forwards the WAL's lifecycle events to
-//!    the ledger over fire-and-forget IPC ([`LedgerSender`]); the ledger's
-//!    per-signal indexer seals the WAL into SFST indexes (`ng-index`). Then
-//!    the records are counted.
+//!    the ledger over fire-and-forget IPC ([`LedgerSender`]). Then the
+//!    records are counted.
 //!
 //! All rejections — collisions, oversized identities, out-of-window records —
 //! are collected in `Rejections` and reported to the sender via OTLP
@@ -149,8 +145,8 @@ fn group_by_stream(resource_logs: Vec<ResourceLogs>) -> HashMap<ServiceStream, S
 enum Payload {
     /// As received and grouped; not flattened yet.
     Records(Vec<ResourceLogs>),
-    /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
-    /// serialized write region (phase 2). Holds at least one record.
+    /// Flattened and encoded lock-free (phase 1): one WAL frame, waiting for
+    /// the write under the writer lock (phase 2). Holds at least one record.
     Frame(ng_flatten::PreparedLogFrame),
     /// Every record fell outside the ingestion window: nothing to write.
     OutOfWindow,
@@ -356,7 +352,7 @@ enum Rejection {
 }
 
 /// A stream identity too large to store: it could not be encoded into the
-/// substrate's `content_meta` budget (the codec's per-field `u16` cap or the
+/// WAL's `content_meta` budget (the codec's per-field `u16` cap or the
 /// WAL header budget), so the stream's frame is dropped. Reported to the OTLP
 /// client via `partial_success`, the same as a collision — so a sender learns
 /// its records were not stored.
@@ -531,7 +527,7 @@ fn identity_preview(s: &str) -> String {
     s.chars().take(IDENTITY_LOG_PREVIEW_CHARS).collect()
 }
 
-/// Lower a stream identity onto the substrate's content-agnostic contract:
+/// Lower a stream identity onto the WAL's content-agnostic contract:
 /// encode the opaque `content_meta` blob and validate it against both caps that
 /// can reject an identity — the codec's per-field `u16` limit
 /// (`encode_content_meta` returns `None`) and the WAL header budget
@@ -578,9 +574,7 @@ fn encode_identity(
 
 /// Transport-agnostic sink for OTLP log exports: polices per-tenant stream
 /// identities, appends flattened frames to per-tenant WALs, and forwards
-/// lifecycle events to the ledger. The gRPC path reaches it via the thin
-/// `LogsService` wrapper; the OTLP/HTTP front end calls the same core. See
-/// the module docs for the request flow.
+/// lifecycle events to the ledger. See the module docs for the request flow.
 pub struct NetdataLogsService {
     /// The per-tenant WAL writers of this signal.
     writers: TenantWriters,
@@ -589,9 +583,9 @@ pub struct NetdataLogsService {
     /// identity is rejected via `partial_success`.
     claimed_streams: ClaimedStreams,
     /// Process-wide monotonic clock, shared across tenants, streams, and
-    /// signals (lib.rs creates one instance for logs + traces). The WAL writer
-    /// orders frames by the `ingestion_ns` stamped here, so one clock keeps
-    /// that ordering consistent across every stream and signal. `export_logs`
+    /// signals. The WAL writer orders frames by the `ingestion_ns` stamped
+    /// here, so one clock keeps that ordering consistent across every stream
+    /// and signal. `export_logs`
     /// also reads it to seed fallback timestamps and the ingestion-time
     /// bounds.
     clock: Arc<Mutex<MonotonicClock>>,
@@ -658,12 +652,11 @@ impl NetdataLogsService {
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
     /// threshold as of now, without a new frame (the idle-rotation sweep).
-    /// lib.rs calls it periodically per signal, off the write path and off the
-    /// async worker pool (it does serial fsyncs), so a quiet stream still
-    /// seals, gets indexed, and (with remote storage) uploaded.
+    /// Call it periodically, off the write path and off the async worker pool
+    /// (it does serial fsyncs), so a quiet stream still seals.
     ///
-    /// The clock is read ONCE here and its guard dropped before any writer is
-    /// locked; the rest of the lock discipline is on
+    /// The clock is read once here, and its guard is dropped before any
+    /// writer is locked. The rest of the lock discipline is on
     /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
@@ -671,11 +664,8 @@ impl NetdataLogsService {
     }
 
     /// The transport-agnostic OTLP logs export core: everything between
-    /// "tenant resolved, request decoded" and the response. The gRPC
-    /// `LogsService::export` wrapper resolves the tenant from tonic
-    /// metadata and calls this; the OTLP/HTTP front end resolves the tenant
-    /// from HTTP headers and calls the same code — one behavior for both
-    /// transports. The caller owns transport concerns (metadata/headers,
+    /// "tenant resolved, request decoded" and the response. The caller owns
+    /// transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
     pub(crate) async fn export_logs(
@@ -710,7 +700,7 @@ impl NetdataLogsService {
             ));
         }
 
-        // Phase 1 — prepare every frame WITHOUT holding any writer lock:
+        // Phase 1: prepare every frame without holding any writer lock.
         // `prepare_log_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The
         // single clock tick below is both the base for synthesized fallback
@@ -719,9 +709,9 @@ impl NetdataLogsService {
         // window and the same fallback base. The frame header's `ingestion_ns`
         // is ticked separately at write time, inside the writer lock, so it
         // stays monotonic per file. A prepare error aborts the request before
-        // ANY of its frames is written.
+        // any of its frames is written.
         let fallback_base_ns = self.clock.lock().unwrap().now_ns().as_u64();
-        // Inclusive window [now - max_age, now + future_skew] on the RESOLVED
+        // Inclusive window [now - max_age, now + future_skew] on the resolved
         // per-record timestamp. Loop-invariant (one base per request), so it is
         // built once. `prepare_log_frame` exempts synthesized (now-based)
         // fallbacks from the window entirely, so timestamp-less records are
@@ -766,7 +756,7 @@ impl NetdataLogsService {
             ));
         }
 
-        // Phase 2 — the writes, under THIS TENANT's writer lock only. All
+        // Phase 2: the writes, under this tenant's writer lock only. All
         // sync code: no `.await` while the guard is held. The frame header's
         // `ingestion_ns` is ticked per frame inside the lock (`write_to`).
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
@@ -821,8 +811,7 @@ impl NetdataLogsService {
 }
 
 /// Count the `kept` records of an export that could not be stored: its
-/// answer is [`storage_unavailable`], and the sender sends them again. They
-/// show as `failed` on `netdata.otel.log_records`.
+/// answer is [`storage_unavailable`], and the sender sends them again.
 fn count_failed(derived_metrics: Option<&DerivedMetrics>, kept: usize) {
     if let Some(derived_metrics) = derived_metrics {
         derived_metrics.record_ingest_failed(Signal::Logs, kept as u64);
@@ -1027,7 +1016,7 @@ mod tests {
         // Two genuinely different streams hashing to the same u64 is
         // impossible to construct naturally — xxhash64 collisions are
         // vanishingly rare. We simulate one by pre-seeding the claimed
-        // streams at the *rejected* stream's own hash slot with a different
+        // streams at the rejected stream's own hash slot with a different
         // holder (deliberately not that slot's natural occupant),
         // as if an earlier colliding stream had claimed it. The incoming
         // group then hashes to the occupied slot with a mismatching identity
@@ -1124,8 +1113,8 @@ mod tests {
         // Existing tests use arbitrary fixed timestamps and do not exercise the
         // ingestion window; give them an effectively-unbounded window
         // (`from_secs(u64::MAX)` clamps to `[0, u64::MAX]` in `max_age_ns` /
-        // `future_skew_ns`). The window itself is covered by ng-flatten's bounds
-        // tests and `export_rejects_out_of_window_records_via_partial_success`.
+        // `future_skew_ns`). The window itself is covered by
+        // `export_rejects_out_of_window_records_via_partial_success`.
         test_service_with_ingest(
             wal_dir,
             otel_bridge::config::IngestConfig {
@@ -1363,8 +1352,6 @@ mod tests {
         let service = test_service(wal_dir.clone());
 
         // Two ResourceLogs with stream identity but zero log records.
-        // Pre-fix, each of these would have claimed its hash and
-        // produced a WAL file with a zero-entry frame.
         let req = Request::new(ExportLogsServiceRequest {
             resource_logs: vec![
                 rl(Some("prod"), Some("api"), 0),
@@ -1387,8 +1374,7 @@ mod tests {
         let wal_dir = tmp.path().to_path_buf();
         let service = test_service(wal_dir.clone());
 
-        // First request: empty ResourceLogs for `(prod, api)`. Pre-fix,
-        // this would claim that ns_hash.
+        // First request: empty ResourceLogs for `(prod, api)`.
         let _ = service
             .export(Request::new(ExportLogsServiceRequest {
                 resource_logs: vec![rl(Some("prod"), Some("api"), 0)],
@@ -1412,9 +1398,8 @@ mod tests {
 
         // A namespace far past the WAL `content_meta` budget but well under the
         // codec's per-field `u16` cap: `encode_content_meta` succeeds, only the
-        // WAL header budget rejects it. Pre-fix this `Err` aborted the whole
-        // export RPC (a trivial OTLP-driven DoS); post-fix the offending frame
-        // is dropped and the co-submitted well-formed stream still persists.
+        // WAL header budget rejects it. The offending frame is dropped and the
+        // co-submitted well-formed stream still persists.
         let huge_ns = "n".repeat(wal::MAX_CONTENT_META_BYTES + 64);
         let req = Request::new(ExportLogsServiceRequest {
             resource_logs: vec![
@@ -1457,7 +1442,7 @@ mod tests {
             "only the well-formed stream may produce a WAL file; the oversized one is dropped"
         );
 
-        // The oversized identity is unstorable, so it must NOT have claimed a
+        // The oversized identity is unstorable, so it must not have claimed a
         // `partition_key` (validated before the claim). Only the well-formed
         // stream holds one — otherwise a later valid stream colliding on that
         // hash would be rejected against a phantom.
@@ -1481,7 +1466,7 @@ mod tests {
         let service = test_service(wal_dir.clone());
 
         // A field past the codec's per-field `u16` cap (> 65535 bytes):
-        // `encode_content_meta` returns `None` — the *first* drop branch, vs the
+        // `encode_content_meta` returns `None` — the first drop branch, vs the
         // WAL-budget branch exercised above. Co-submitted well-formed stream
         // must still persist, and the drop must be reported via partial_success.
         let huge_name = "x".repeat((u16::MAX as usize) + 16);
@@ -1991,14 +1976,13 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let service = test_service(tmp.path().to_path_buf());
 
-        // Two distinct streams (different service.name) in ONE request, each with
+        // Two distinct streams (different service.name) in one request, each with
         // a single timestamp-less record so both resolve via the synthesized
         // fallback (`fallback_base_ns + k`). The clock is read once per request,
         // so both groups derive from the same base and their single record
-        // resolves to the identical timestamp. A per-group clock read (the prior
-        // behavior) would hand the second group a strictly-later base, so the two
-        // ranges would differ — this pins the "one clock read per request"
-        // contract against a silent revert.
+        // resolves to the identical timestamp. A per-group clock read would
+        // hand the second group a strictly-later base, so the two ranges would
+        // differ.
         let a = rl(Some("prod"), Some("api"), 1);
         let b = rl(Some("prod"), Some("web"), 1);
         service

@@ -15,13 +15,13 @@
 //!   (local: parameters are ignored, not validated — upstream's
 //!   `mime.ParseMediaType` 415s a malformed one);
 //! - `Content-Encoding`: absent, `identity` and `gzip` (flate2) are
-//!   accepted, anything else → `400` with a `google.rpc.Status` (local: the
-//!   set — upstream also decompresses `zstd`, `zlib`, `deflate`, `snappy`,
-//!   `lz4` and `x-snappy-framed`, and 400s an explicit `identity`, which its
-//!   own tests flag as a bug; and the order — upstream's decompressor runs
-//!   before the Content-Type check, so a request bad in both gets its 400
-//!   where this receiver answers the Content-Type 415);
-//! - bodies are capped (see `MAX_BODY_BYTES`, applied to the wire body AND
+//!   accepted, anything else → `400` with a `google.rpc.Status`. Local: the
+//!   set. Upstream also decompresses `zstd`, `zlib`, `deflate`, `snappy`,
+//!   `lz4` and `x-snappy-framed`, and 400s an explicit `identity`. Local: the
+//!   order. Upstream's decompressor runs before the Content-Type check, so a
+//!   request bad in both gets its 400 where this receiver answers the
+//!   Content-Type 415;
+//! - bodies are capped (see `MAX_BODY_BYTES`, applied to the wire body and
 //!   the gzip-expanded body — the second cap is the decompression-bomb guard)
 //!   → over-limit `400` with a `google.rpc.Status` (local: the limit —
 //!   upstream caps at 20 MiB);
@@ -33,16 +33,12 @@
 //! - export errors are returned as `google.rpc.Status` in the request's
 //!   encoding (locally defined: we never attach `details`, so the wire format
 //!   is byte-identical to upstream's two populated fields);
-//! - success replies `200` with the response encoded in the SAME encoding and
+//! - success replies `200` with the response encoded in the same encoding and
 //!   a mirrored `Content-Type`.
 //!
 //! JSON bodies are OTLP/JSON (hex ids, integer enums, 64-bit integers as
 //! decimal strings or numbers, omitted fields), decoded by
-//! `crate::otlp_json`, which repairs the `opentelemetry-proto` derives'
-//! narrower JSON forms first. Deviations from the collector's decoder: enum
-//! names and the `NaN`/`Infinity` doubles are rejected with a `400`, never
-//! dropped silently. Metric losses and the rewrite's own rejections name the
-//! offending JSON field path; errors from the derives carry serde's message.
+//! `crate::otlp_json`.
 //!
 //! The listener binds during startup with the same strict fail-fast rule as
 //! the gRPC endpoint: a bind or TLS failure aborts the worker before `Ready`,
@@ -74,7 +70,7 @@ use crate::otlp_json::{OtlpJson, OtlpJsonResponse};
 use crate::tenant::extract_tenant_id_from_headers;
 use crate::trace_service::NetdataTracesService;
 
-/// The maximum accepted request body, on the wire AND after gzip expansion:
+/// The maximum accepted request body, on the wire and after gzip expansion:
 /// [`MAX_REQUEST_BYTES`](crate::MAX_REQUEST_BYTES), the limit that the gRPC
 /// services have too, so the two transports reject the same requests.
 /// Capping the expanded body too is the decompression-bomb guard (a 4 MiB
@@ -429,9 +425,7 @@ fn build_tls_acceptor(
     Ok(tokio_rustls::TlsAcceptor::from(Arc::new(config)))
 }
 
-// ---------------------------------------------------------------------------
 // Handlers
-// ---------------------------------------------------------------------------
 
 async fn export_logs(
     State(state): State<HttpState>,
@@ -540,7 +534,7 @@ where
         BodyCoding::Identity => wire,
         BodyCoding::Gzip => {
             let mut out = Vec::new();
-            // `take` caps the EXPANDED size (the wire cap alone does not bound
+            // `take` caps the expanded size (the wire cap alone does not bound
             // a gzip stream), reading one extra byte to notice the overflow.
             // `MultiGzDecoder` (not `GzDecoder`) so a concatenated-members
             // stream — legal gzip that Go's compress/gzip also reads whole —
@@ -654,16 +648,10 @@ fn rpc_error(codec: Codec, status: Status) -> Response<Body> {
 }
 
 /// The collector's gRPC→HTTP table (otlpreceiver `GetHTTPStatusCodeFromStatus`).
-/// Today four codes reach it: `InvalidArgument` (undecodable body, invalid
-/// tenant, a request whose records are too many for one WAL frame:
-/// `tenant_writers::check_frame_size`), `Unauthenticated` (missing tenant
-/// header), `Internal` (frame encoding) and `Unavailable` (the records could
-/// not be stored: `tenant_writers::storage_unavailable`; or the plugin
-/// stopped before their sync: `tenant_writers::export_task_ended`). The other
-/// arms are kept so a future core error maps correctly without touching the
-/// transport — e.g. throttling's `ResourceExhausted` becomes the retryable
-/// 429. The 503 arm is the spec's retryable set; `Unimplemented` → 404 is the
-/// collector's choice.
+/// Every arm is kept, so a future core error maps correctly without touching
+/// the transport: for example throttling's `ResourceExhausted` becomes the
+/// retryable 429. The 503 arm is the spec's retryable set; `Unimplemented` →
+/// 404 is the collector's choice.
 fn http_status_for(code: Code) -> StatusCode {
     match code {
         Code::Cancelled
@@ -875,7 +863,7 @@ mod tests {
                 logs,
                 traces,
                 metrics: Arc::new(NetdataMetricsService::default()),
-                // The router's tenant policy must be the SAME auth config the
+                // The router's tenant policy must be the same auth config the
                 // services carry — the test builds both from one value.
                 auth,
             },
@@ -1367,7 +1355,7 @@ mod tests {
     #[tokio::test]
     async fn concatenated_gzip_members_all_decode() {
         // `cat a.gz b.gz` is legal gzip with two members; Go's compress/gzip
-        // reads every member. Split ONE valid request across two members so
+        // reads every member. Split one valid request across two members so
         // the reassembled body is a single JSON document — a first-member-
         // only decoder would see truncated JSON and 400 it.
         let (state, _tmp) = test_state(AuthConfig::default());
@@ -1524,7 +1512,7 @@ mod tests {
         Ok(response)
     }
 
-    // -- TLS listener --------------------------------------------------------
+    // TLS listener
 
     /// The process-level rustls provider the otel-plugin binary installs at
     /// startup; tests share one process, so a repeat install is expected.
@@ -1656,7 +1644,7 @@ mod tests {
         let pki = TestPki::new();
         let (addr, server, tmp) = spawn_tls_server(&pki.endpoint(false)).await;
 
-        // A client offering ONLY http/1.1 (Python requests/urllib3 does this)
+        // A client offering only http/1.1 (Python requests/urllib3 does this)
         // must negotiate it, not fail the handshake.
         let stream = tls_connect(&pki.client(&[b"http/1.1"], false), addr)
             .await
