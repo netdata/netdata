@@ -81,6 +81,15 @@ add_netdata_to_ipmi_plugin_group() {
   add_user_to_gid "${group_gid}" "netdata-ipmi"
 }
 
+# Older images ran otel-plugin SUID-root, so its data on a persisted log volume
+# is root-owned. Transitional: hand it to DOCKER_USR, which now runs the plugin.
+fix_otel_data_ownership() {
+  [ "${DOCKER_USR}" = "root" ] && return 0
+  [ -d /var/log/netdata/otel ] || return 0
+
+  find /var/log/netdata/otel -user 0 -exec chown -h "${DOCKER_USR}:" {} +
+}
+
 if [ "${DISABLE_TELEMETRY:-0}" != "0" ] ||
   [ "${DO_NOT_TRACK:-0}" != "0" ]; then
   touch /etc/netdata/.opt-out-from-anonymous-statistics
@@ -144,6 +153,8 @@ if [ "${EUID}" -eq 0 ]; then
   fi
 
   add_netdata_to_ipmi_plugin_group || true
+
+  fix_otel_data_ownership || true
 else
   echo >&2 "WARNING: Entrypoint started as non-root user. This is not officially supported and some features may not be available."
 fi
