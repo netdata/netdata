@@ -9,16 +9,10 @@
 //! `datapoint_iter`, which attaches each metric's matching per-metric config
 //! from chart_config.rs. Number data points ingest into one chart named
 //! `<metric>.<identity-hash>`; histograms and summaries are decomposed into
-//! several charts each. `Chart::ingest` only accumulates into `update_every`
-//! slots — chart.rs owns slot quantization, readiness, gap-fill and
-//! per-second rate division — and lib.rs's tick loop calls
-//! [`ChartManager::emit`] once per second, forwarding the CHART/BEGIN/SET/END
-//! text to the otel-plugin supervisor over ferryboat IPC, in chunks under the
-//! IPC message limit. Metrics never
-//! touch the WAL (logs and traces do).
+//! several charts each.
 //!
 //! Chart creation is budgeted per request (`max_new_charts_per_request`,
-//! from otel.yaml's `metrics.max_new_charts_per_request`, default 100); once
+//! from otel.yaml's `metrics.max_new_charts_per_request`); once
 //! the budget is exhausted, points for not-yet-created charts are dropped
 //! with one warn. A data point whose timestamp is further from now than its
 //! chart's expiry is dropped as well (`ChartConfig::shows`): the timestamp
@@ -52,8 +46,6 @@ use crate::output::ChartType;
 
 /// All charts created from OTLP metrics, keyed by chart name
 /// (`<metric>.<identity-hash>` plus decomposition suffixes like `.bucket`).
-/// Written by the export core on ingest; drained once per second by
-/// lib.rs's tick loop via [`Self::emit`].
 pub struct ChartManager {
     charts: HashMap<String, Chart>,
 }
@@ -112,9 +104,6 @@ impl ChartManager {
     /// (plugin-protocol text; see chart.rs). A chart that has had no data for
     /// longer than its expiry duration is dropped, after it has told the
     /// agent that it is obsolete.
-    ///
-    /// Called once per second by lib.rs's tick loop; slot readiness,
-    /// gap-fill and rate division all live in chart.rs.
     pub fn emit(&mut self, slot_timestamp: u64, out: &mut Chunker) {
         self.charts.retain(|_, chart| {
             if chart.is_expired() {
@@ -154,10 +143,7 @@ enum PointOutcome {
 }
 
 /// The OTLP metrics ingestion service: OTLP metric exports in, chart
-/// accumulations out. Transport-agnostic — the gRPC `MetricsService`
-/// wrapper and the OTLP/HTTP front end both funnel into the
-/// `export_metrics` core. Shared with lib.rs, whose tick loop drains
-/// `chart_manager` once per second.
+/// accumulations out.
 pub struct NetdataMetricsService {
     /// Per-metric chart configs and global timing defaults (chart_config.rs);
     /// read-locked for the duration of each request.
@@ -711,9 +697,7 @@ impl NetdataMetricsService {
 
     /// The transport-agnostic OTLP metrics export core: process the decoded
     /// request and always answer Ok, even when points were dropped
-    /// (`partial_success` is never set). The gRPC `MetricsService::export`
-    /// wrapper and the OTLP/HTTP front end both call this, so both
-    /// transports share one behavior. Metrics carry no tenant, so unlike
+    /// (`partial_success` is never set). Metrics carry no tenant, so unlike
     /// logs/traces there is no header to resolve first.
     pub(crate) async fn export_metrics(
         &self,

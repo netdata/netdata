@@ -4,20 +4,11 @@
 //! config, and identity-hash state the chart pipeline needs.
 //!
 //! Chart identity is a chained XxHash64 (`MetricIdentityHasher`): each level
-//! hashes its identity via `MetricIdentityHash` (otel.rs — skips volatile data
-//! such as values and timestamps), and the resource and scope levels add their
-//! schema_urls. Prefix states are pushed/popped so siblings share the parent
-//! hashing work. The finished metric-level state rides along in
-//! [`MetricRef::hasher_state`]; hashing data-point attributes on top yields
-//! the chart hash used as the chart-name suffix.
-//!
-//! Consumers: `metrics_service.rs::process_request` drives chart
-//! creation/ingest from this stream; `chart_config.rs` matches a
-//! [`MetricConfig`] per [`MetricRef`]. Logs and traces do not pass through
-//! here — they flatten via `ng_flatten::prepare_log_frame` /
-//! `prepare_trace_frame`. Chart labels below are rendered with `flatten_otel`
-//! (a separate crate, not ng-flatten), which produces the dotted
-//! `resource.attributes.*` / `scope.*` key names.
+//! hashes its identity via `MetricIdentityHash`, and the resource and scope
+//! levels add their schema_urls. Prefix states are pushed/popped so siblings
+//! share the parent hashing work. The finished metric-level state rides along
+//! in [`MetricRef::hasher_state`]; hashing data-point attributes on top yields
+//! the chart hash.
 
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
@@ -209,8 +200,6 @@ impl DataPointContext<'_> {
     /// Hash identifying the chart this data point belongs to: the metric's
     /// identity hash extended with the data point's attributes, excluding the
     /// dimension attribute (it varies per dimension within one chart).
-    /// metrics_service.rs composes it into the chart name, so points sharing
-    /// it land on the same chart as dimensions.
     pub fn chart_hash(&self) -> u64 {
         let mut hasher = self.metric_ref.hasher_state.clone();
         self.datapoint_ref

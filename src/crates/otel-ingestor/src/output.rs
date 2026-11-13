@@ -6,19 +6,12 @@
 //! that keep a line parseable by the agent; this module only decides what goes
 //! into them. Everything here comes from a sender (metric names, descriptions,
 //! units, attribute keys and values), so nothing is written verbatim: text
-//! fields go through the protocol crate's quoting, and chart.rs makes the ids
-//! valid with its `sanitize_*` functions before they come here. A malformed
+//! fields go through the protocol crate's quoting, and ids must be valid
+//! before they come here (see the fields of `ChartDefinition`). A malformed
 //! command stops the agent's parser, and the agent then restarts or disables
 //! the whole plugin (`src/plugins.d/plugins_d.c`), logs and traces included.
 //!
-//! These bytes are the ingestor's agent-facing output: chart.rs writes each
-//! definition, data slot and obsolete mark as one block, the lib.rs tick loop
-//! sends the blocks in chunks as `IngestorResponse::ChartData`, and the
-//! otel-plugin supervisor writes each chunk to stdout as it is. Line order
-//! here is wire order.
-//!
-//! Consumers: chart.rs uses everything here; metrics_service.rs only
-//! [`ChartType`].
+//! Line order here is wire order.
 
 use netdata_plugin_protocol::{
     ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
@@ -26,9 +19,7 @@ use netdata_plugin_protocol::{
     write_set_empty, write_set_int,
 };
 
-/// The chart rendering type. This ingestor emits only `Line` and `Heatmap`:
-/// line for every chart except the histogram bucket charts
-/// (metrics_service.rs).
+/// The chart rendering type.
 pub use netdata_plugin_protocol::ChartType;
 
 /// Fixed-point divisor shared by SET and DIMENSION.
@@ -47,9 +38,7 @@ const PRIORITY: i32 = 1;
 /// `CLABEL_COMMIT` when there are labels, then one `DIMENSION` line per entry
 /// in `dimensions`, in that order.
 ///
-/// The agent requires this block before the first `BEGIN` for the chart, so
-/// chart.rs emits it once per (re)definition and only then streams data
-/// slots via [`write_data_slot`].
+/// The agent requires this block before the first `BEGIN` for the chart.
 pub struct ChartDefinition {
     /// A valid chart id (`netdata_plugin_protocol::sanitize_chart_id`).
     pub chart_id: String,
@@ -133,8 +122,7 @@ impl ChartDefinition {
     ///
     /// Names that fail to parse are also treated as `+Inf`. Used for heatmap
     /// charts: the agent preserves DIMENSION order, so this is what puts
-    /// histogram buckets in ascending order on the dashboard. chart.rs sorts
-    /// before emitting a heatmap definition.
+    /// histogram buckets in ascending order on the dashboard.
     pub fn sort_dimensions_numerically(&mut self) {
         self.dimensions.sort_by(|a, b| {
             let a_val = if a == "+Inf" {
@@ -166,8 +154,8 @@ pub struct DimensionValue {
 /// Write one data slot: BEGIN, one SET per dimension in slice order, END.
 ///
 /// `update_every` is the collection interval in seconds; `slot_timestamp`
-/// is the slot's start boundary, already floored to `update_every` by
-/// chart.rs.
+/// is the slot's start boundary, which the caller must floor to
+/// `update_every`.
 ///
 /// BEGIN carries the interval in microseconds: the agent uses it as the
 /// time since the previous update. END carries `slot_timestamp +
