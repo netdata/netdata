@@ -417,9 +417,9 @@ modules:
         - A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number. A record without a severity number counts as `unspecified`, also when it has a severity text. The sender or the OpenTelemetry Collector must set the severity number.
         - The average request duration is the mean duration of the requests that ended in each second. Over a longer time, the chart shows the mean of these per-second values. This is not the mean duration of all the requests in that time.
         - The charts count only the spans and the log records that the plugin stores. When an SDK or a Collector drops spans by sampling and does not write a sampling threshold, the request rates are lower than the real rates, and the share of failed requests can change.
-        - The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Adjusted records" chart shows these records as `late` and `future`.
+        - The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Adjusted log records" and "Adjusted spans" charts show this data as `late` and `future`.
 
-        At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived metrics" and "Expired services" charts count the overflow chart set as one service. The "Adjusted records" chart shows its records as `overflowed`. Such a record can also count as `late` or `future`.
+        At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived metrics" and "Expired services" charts count the overflow chart set as one service. The "Adjusted log records" and "Adjusted spans" charts show its data as `overflowed`. Such a record or span can also count as `late` or `future`.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
@@ -460,6 +460,36 @@ modules:
               chart_type: line
               dimensions:
                 - name: events
+            - name: netdata.otel.derived_services
+              description: Services with derived metrics
+              unit: services
+              chart_type: line
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.derived_expired_services
+              description: Expired services
+              unit: services/s
+              chart_type: line
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.derived_adjusted_log_records
+              description: Adjusted log records
+              unit: records/s
+              chart_type: line
+              dimensions:
+                - name: late
+                - name: future
+                - name: overflowed
+            - name: netdata.otel.derived_adjusted_spans
+              description: Adjusted spans
+              unit: spans/s
+              chart_type: line
+              dimensions:
+                - name: late
+                - name: future
+                - name: overflowed
             - name: netdata.otel.indexing_operations
               description: Indexing operations
               unit: operations
@@ -522,32 +552,6 @@ modules:
               dimensions:
                 - name: succeeded
                 - name: failed
-        - name: signal
-          description: One signal, logs or traces, that the per-service charts are made from.
-          labels:
-            - name: signal
-              description: The signal that the per-service metrics are made from, `logs` or `traces`.
-          metrics:
-            - name: netdata.otel.derived_services
-              description: Services with derived metrics
-              unit: services
-              chart_type: line
-              dimensions:
-                - name: services
-            - name: netdata.otel.derived_expired_services
-              description: Expired services
-              unit: services/s
-              chart_type: line
-              dimensions:
-                - name: expired
-            - name: netdata.otel.derived_adjusted_records
-              description: Adjusted records
-              unit: records/s
-              chart_type: line
-              dimensions:
-                - name: late
-                - name: future
-                - name: overflowed
         - name: service
           description: One service, identified by its resource attributes and tenant.
           labels:

@@ -47,14 +47,10 @@ columns! {
 }
 
 columns! {
-    enum Services {
-        Services = "services",
-    }
-}
-
-columns! {
-    enum Expired {
-        Expired = "expired",
+    /// The signal a per-service derivation reads.
+    enum Derivation {
+        Logs = "logs",
+        Traces = "traces",
     }
 }
 
@@ -201,20 +197,23 @@ impl IngestOutcomes {
     }
 }
 
-/// How the per-service derivation of each signal behaves: one entity per
-/// signal, labelled `signal`, fed from its aggregator's statistics every tick.
+/// How the per-service derivation of each signal behaves: one label-less
+/// entity, fed from each signal's aggregator statistics every tick. A signal
+/// is a dimension where the chart has one number per signal, and has its own
+/// chart where it has several.
 pub(crate) struct DerivationHealth {
     metric_set: MetricSet,
     aggregator: SharedAggregator,
-    services: Gauge<Services>,
-    expired: CumulativeCounter<Expired>,
-    adjusted: CumulativeCounter<Adjustment>,
+    services: Gauge<Derivation>,
+    expired: CumulativeCounter<Derivation>,
+    adjusted_log_records: CumulativeCounter<Adjustment>,
+    adjusted_spans: CumulativeCounter<Adjustment>,
 }
 
 impl DerivationHealth {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
-        let services = builder.gauge::<Services>(ChartDescriptor {
+        let services = builder.gauge::<Derivation>(ChartDescriptor {
             title: "Services with derived metrics".into(),
             units: "services".into(),
             family: "derived metrics".into(),
@@ -222,7 +221,7 @@ impl DerivationHealth {
             chart_type: ChartType::Line,
             priority: 150_010,
         })?;
-        let expired = builder.cumulative_counter::<Expired>(ChartDescriptor {
+        let expired = builder.cumulative_counter::<Derivation>(ChartDescriptor {
             title: "Expired services".into(),
             units: "services/s".into(),
             family: "derived metrics".into(),
@@ -230,14 +229,23 @@ impl DerivationHealth {
             chart_type: ChartType::Line,
             priority: 150_011,
         })?;
-        let adjusted = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
-            title: "Adjusted records".into(),
+        let adjusted_log_records = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
+            title: "Adjusted log records".into(),
             units: "records/s".into(),
             family: "derived metrics".into(),
-            context: "netdata.otel.derived_adjusted_records".into(),
+            context: "netdata.otel.derived_adjusted_log_records".into(),
             // One record can be both late and overflowed.
             chart_type: ChartType::Line,
             priority: 150_012,
+        })?;
+        let adjusted_spans = builder.cumulative_counter::<Adjustment>(ChartDescriptor {
+            title: "Adjusted spans".into(),
+            units: "spans/s".into(),
+            family: "derived metrics".into(),
+            context: "netdata.otel.derived_adjusted_spans".into(),
+            // One span can be both late and overflowed.
+            chart_type: ChartType::Line,
+            priority: 150_013,
         })?;
         let metric_set = builder.build()?;
         let aggregator = SharedAggregator::new(&metric_set);
@@ -246,7 +254,8 @@ impl DerivationHealth {
             aggregator,
             services,
             expired,
-            adjusted,
+            adjusted_log_records,
+            adjusted_spans,
         })
     }
 
@@ -260,44 +269,27 @@ impl DerivationHealth {
         chunks: &mut Vec<Vec<u8>>,
     ) {
         let mut batch = Batch::new(&self.metric_set);
+        let mut entity = batch.entity(Labels::new());
+        let mut measurements = entity.record(now);
         for (signal, stats) in signal_stats {
-            self.record(&mut batch, signal, &stats, now);
+            let (derivation, adjusted) = match signal {
+                Signal::Logs => (Derivation::Logs, self.adjusted_log_records),
+                Signal::Traces => (Derivation::Traces, self.adjusted_spans),
+            };
+            measurements
+                .set_value(self.services, derivation, stats.entities as f64)
+                .set_total(self.expired, derivation, stats.expired_entities as f64)
+                .set_total(adjusted, Adjustment::Late, stats.late_events as f64)
+                .set_total(adjusted, Adjustment::Future, stats.future_events as f64)
+                .set_total(
+                    adjusted,
+                    Adjustment::Overflowed,
+                    stats.overflowed_events as f64,
+                );
         }
+
         self.aggregator.merge(batch, now);
         self.aggregator.emit(now, chunks);
-    }
-
-    /// Record the statistics of `signal`'s aggregator at `now` into `batch`.
-    fn record(&self, batch: &mut Batch, signal: Signal, stats: &Stats, now: u64) {
-        let mut labels = Labels::new();
-        labels.insert("signal", signal_name(signal));
-        batch
-            .entity(labels)
-            .record(now)
-            .set_value(self.services, Services::Services, stats.entities as f64)
-            .set_total(self.adjusted, Adjustment::Late, stats.late_events as f64)
-            .set_total(
-                self.adjusted,
-                Adjustment::Future,
-                stats.future_events as f64,
-            )
-            .set_total(
-                self.adjusted,
-                Adjustment::Overflowed,
-                stats.overflowed_events as f64,
-            )
-            .set_total(
-                self.expired,
-                Expired::Expired,
-                stats.expired_entities as f64,
-            );
-    }
-}
-
-fn signal_name(signal: Signal) -> &'static str {
-    match signal {
-        Signal::Traces => "traces",
-        Signal::Logs => "logs",
     }
 }
 
@@ -376,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn derivation_charts_one_entity_per_signal_with_increases() {
+    fn derivation_charts_show_each_signal_with_increases() {
         let health = DerivationHealth::new().unwrap();
         let tick = |traces: Stats, now: u64| {
             let signal_stats = [(Signal::Traces, traces), (Signal::Logs, Stats::default())];
@@ -401,12 +393,22 @@ mod tests {
         let second = tick(later, 102);
         netdata_plugin_protocol::validate_chart_stream(format!("{first}{second}").as_bytes())
             .unwrap();
-        assert_eq!(first.matches("CLABEL 'signal' 'traces' 1").count(), 3);
-        assert_eq!(first.matches("CLABEL 'signal' 'logs' 1").count(), 3);
+        assert!(!first.contains("CLABEL 'signal'"));
         // The first reading is the baseline.
-        assert!(first.contains("SET late =\nSET future =\nSET overflowed =\n"));
-        assert!(second.contains("SET services = 3\n"));
-        assert!(second.contains("SET late = 2\nSET future = 1\nSET overflowed = 4\n"));
-        assert!(second.contains("SET expired = 1\n"));
+        assert!(first.contains(
+            "BEGIN netdata.otel.derived_adjusted_spans 1000000\nSET late =\nSET future =\nSET overflowed =\n"
+        ));
+        assert!(second.contains(
+            "BEGIN netdata.otel.derived_services 1000000\nSET logs = 0\nSET traces = 3\n"
+        ));
+        assert!(second.contains(
+            "BEGIN netdata.otel.derived_expired_services 1000000\nSET logs = 0\nSET traces = 1\n"
+        ));
+        assert!(second.contains(
+            "BEGIN netdata.otel.derived_adjusted_spans 1000000\nSET late = 2\nSET future = 1\nSET overflowed = 4\n"
+        ));
+        assert!(second.contains(
+            "BEGIN netdata.otel.derived_adjusted_log_records 1000000\nSET late = 0\nSET future = 0\nSET overflowed = 0\n"
+        ));
     }
 }

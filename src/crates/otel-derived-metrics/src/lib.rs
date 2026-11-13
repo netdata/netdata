@@ -262,8 +262,9 @@ mod tests {
         // Each tick charts the statistics the tick before it read: one
         // service per signal.
         let second = readable(derived.emit(now + 14));
-        assert!(second.contains("CHART netdata.otel.derived_services_"));
-        assert_eq!(second.matches("SET services = 1\n").count(), 2);
+        assert!(second.contains(
+            "BEGIN netdata.otel.derived_services 1000000\nSET logs = 1\nSET traces = 1\n"
+        ));
         netdata_plugin_protocol::validate_chart_stream(format!("{first}{second}").as_bytes())
             .unwrap();
     }
