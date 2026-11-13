@@ -22,7 +22,7 @@ Module: journey
 
 ## Overview
 
-Monitor whether browser workflow checks execute and pass with real Playwright Test. Inspect test outcomes, attempt durations and retained failure details.
+Monitor whether browser workflow checks execute and pass with real Playwright Test. Inspect test outcomes, attempt durations and retained failure details. Optionally collect bounded browser error counts and primitive samples, including passing tests.
 
 Runs the configured Playwright Test entry with sandboxed Chromium at the native check_every interval, using one worker without retries. Workflows can perform the actions their scripts request on the target website. Configuration Test executes the submitted draft, including resolved secrets, without saving monitoring results or captures. Test actions on the target website are real and are not rolled back.
 
@@ -47,11 +47,11 @@ Jobs require explicit configuration; no websites or scripts are discovered autom
 
 #### Limits
 
-Empty suites, skipped tests and expected failures cannot establish successful coverage. A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the prior result for diagnosis; that observation becomes stale after two check intervals and does not imply recovery. Failure screenshots are disabled unless requested. Configuration Test returns pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
+Empty suites, skipped tests and expected failures cannot establish successful coverage. A failed check takes precedence over incomplete coverage. Waiting and running attempts retain the prior result for diagnosis; that observation becomes stale after two check intervals and does not imply recovery. Failure screenshots and browser error summaries are disabled unless requested. Browser summaries cover only fixture contexts; missing evidence does not mean zero browser errors. Configuration Test returns pass/fail within the caller's request deadline; long drafts may time out. Test does not retain screenshots.
 
 #### Performance Impact
 
-Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space.
+Each attempt starts a fresh browser and consumes CPU, memory and target website requests. Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent due jobs and configuration tests can wait. A running Test can delay monitoring. Optional monitoring captures consume local disk space. Enabling browser_error_summary can add substantial CPU and memory cost on console-heavy pages, even without console errors; sample limits do not bound browser event-dispatch cost.
 
 ## Setup
 
@@ -112,6 +112,7 @@ Options apply independently to each native job.
 | **Secrets** | secrets[].name | Unique environment variable name starting with DEM_SECRET_, followed by letters, digits or underscores. |  | no |
 |  | secrets[].value | Credential value or a native secret reference, such as ${env:WORKFLOW_PASSWORD}. |  | no |
 | **Diagnosis** | screenshot_on_failure | Save a screenshot when a workflow check fails. Screenshots can contain sensitive page content; timeout capture is best effort. | no | no |
+|  | browser_error_summary | Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text. | no | no |
 | **Collection** | check_every | Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check. | 900 | no |
 |  | update_every | Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`. | 10 | no |
 |  | timeout | Browser attempt budget, in seconds, excluding time waiting for a browser slot. Journeys reserve up to 5 seconds (20% for budgets below 25 seconds) inside this budget for timeout reporting. Verified cleanup and persistence follow execution. | 120 | no |
@@ -321,6 +322,8 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | first_failure | string |  |  | First unexpected journey test failure, with retained step path, source location and error excerpt when available. |
 | last_observed_step | string |  |  | Last retained running step observation; this does not imply the browser is still executing it. |
 | stop_context | string |  |  | Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop. Source locations identify the displayed step or the test declaration when no step is known, not the timeout location. |
+| browser_summary_status | string |  |  | Optional journey browser summary reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); completion does not imply complete browser coverage. |
+| browser_errors | string |  |  | Observed browser error counts by category, with sampling limitations when reported; missing evidence is not zero errors. |
 
 ### Synthetic run detail
 
@@ -347,7 +350,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey browser_summary adds typed fixture-context coverage, observed counts, bounded primitive samples and explicit omissions when enabled; missing evidence is not zero errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned. The run.captures field contains available publication decisions. For journeys, it can also contain test associations, screenshot attachment counts, reporting status and detail truncation. An absent field means reporting was not recorded, not zero captures.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -402,7 +405,7 @@ One row per retained capture set. The storage object reports global effective po
 
 ### Synthetic capture detail
 
-Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.
+Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run history retention; file bytes are verified when fetched. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB. The test column identifies the associated test, not a page or failing step. Missing-capture observations and publication decisions are in `synthetics-run` while history remains.
 
 | Aspect | Description |
 |:-------|:------------|
@@ -436,6 +439,8 @@ Retained capture metadata remains available after run history expires. Fetch ver
 | bytes | integer | bytes |  | Size. |
 | sha256 | string |  |  | SHA-256. |
 | availability | string |  |  | Availability. |
+| test | string |  |  | Associated screenshot test title, redacted and possibly clipped, or Test not recorded; empty for Lighthouse reports. |
+| label | string |  |  | Screenshot or Lighthouse report. |
 
 
 
