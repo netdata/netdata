@@ -304,6 +304,10 @@ At most limit retained attempts selected by start time, with explicit truncated 
 | scheduled_us | timestamp |  |  | Selected due time. |
 | queued_us | timestamp |  |  | Original admission queue time. |
 | termination_reason | string |  |  | Reason execution stopped, separate from the first reported error. |
+| failure_evidence_status | string |  |  | Journey evidence reporting status (not_recorded, unavailable, unsupported, partial, complete or invalid); detail truncation is reported separately. |
+| first_failure | string |  |  | First unexpected journey test failure, with retained step path, source location and error excerpt when available. |
+| last_observed_step | string |  |  | Last retained running step observation; this does not imply the browser is still executing it. |
+| stop_context | string |  |  | Pending activity observed before cleanup in the first timed-out or interrupted test; this does not identify the cause of the stop. Source locations identify the displayed step or the test declaration when no step is known, not the timeout location. |
 
 ### Synthetic run detail
 
@@ -330,7 +334,7 @@ No additional configuration is required.
 
 #### Returns
 
-One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors; dropped_events discloses omitted event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
+One row per retained reporter event, preserving actual and expected status and failure phase. The run object also contains test counts, termination_reason, nullable lab metrics, capture state, artifact metadata and history errors. Journey failure_evidence adds test and step observations, the first unexpected failure, reporting completeness and separate truncation flags; absent evidence is not a report of zero failures. dropped_events discloses omitted generic event detail. The run.vnode_guid field contains the canonical vnode GUID recorded for the attempt; an empty value means unassigned.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
