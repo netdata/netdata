@@ -44,20 +44,20 @@ impl ServiceRequests {
             title: "Service requests".into(),
             units: "requests/s".into(),
             family: "requests".into(),
-            context: "otel_service.requests".into(),
+            context: "otel.derived_metrics.requests".into(),
             chart_type: ChartType::Stacked,
             priority: 60_010,
         })?;
-        // Charts `otel_service.request_duration_avg`,
-        // `otel_service.request_duration_max` and
-        // `otel_service.request_duration_histogram`.
+        // Charts `otel.derived_metrics.request_duration_avg`,
+        // `otel.derived_metrics.request_duration_max` and
+        // `otel.derived_metrics.request_duration_histogram`.
         let duration = builder.histogram(
             DURATION_BOUNDS,
             ChartDescriptor {
                 title: "Service request duration".into(),
                 units: "seconds".into(),
                 family: "requests".into(),
-                context: "otel_service.request_duration".into(),
+                context: "otel.derived_metrics.request_duration".into(),
                 chart_type: ChartType::Line,
                 priority: 60_011,
             },
@@ -327,7 +327,7 @@ mod tests {
             out.contains("CLABEL 'resource.attributes.deployment.environment.name' 'staging' 1\n")
         );
         assert!(out.contains("CLABEL 'tenant' 'default' 1\n"));
-        assert!(out.contains("CHART otel_service.requests_"));
+        assert!(out.contains("CHART otel.derived_metrics.requests_"));
 
         let unnamed = render(&export(vec![], vec![root(span(SpanKind::Server, 10))]));
         assert!(

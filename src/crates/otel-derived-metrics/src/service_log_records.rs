@@ -55,7 +55,7 @@ impl ServiceLogRecords {
             title: "Service log records by severity".into(),
             units: "records/s".into(),
             family: "logs".into(),
-            context: "otel_service.log_records".into(),
+            context: "otel.derived_metrics.log_records".into(),
             chart_type: ChartType::Stacked,
             priority: 60_000,
         })?;

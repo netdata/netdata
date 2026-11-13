@@ -253,10 +253,10 @@ mod tests {
 
         // Past the services' 10 s lateness.
         let first = readable(derived.emit(now + 13));
-        assert!(first.contains("CHART otel_service.requests_"));
+        assert!(first.contains("CHART otel.derived_metrics.requests_"));
         assert_eq!(first.matches("SET success = 1\n").count(), 1);
         assert!(!first.contains("SET success = 2\n"));
-        assert!(first.contains("CHART otel_service.log_records_"));
+        assert!(first.contains("CHART otel.derived_metrics.log_records_"));
         assert_eq!(first.matches("SET unspecified = 1\n").count(), 1);
 
         // Each tick charts the statistics the tick before it read: one
