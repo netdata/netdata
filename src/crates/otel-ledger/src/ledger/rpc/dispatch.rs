@@ -2,19 +2,14 @@
 //! `SupervisorReq` / `OutboundResp` select arms of [`crate::Ledger::run`]
 //! and the per-call spawn backing `LedgerRequest::Call`.
 //!
-//! A `Call` routes by declared function name — the dispatch key,
-//! clash-checked at startup in `Ledger::new` — to the owning
-//! pipeline, so this dispatcher stays signal-neutral: each pipeline
-//! contributes its own `RawFunctionHandler` + args shim
-//! (`build_logs_pipeline` in `ledger/pipeline.rs`, `build_traces_pipeline`
-//! in `ledger/traces_pipeline.rs`). The call
-//! gets a per-call `CancellationToken` registered in `Ledger::transactions`
-//! and is spawned onto a task running the
-//! `otel_bridge::function` engine's `RawFunctionHandler::handle_raw`
-//! (`otel-bridge/src/function.rs`).
-//! Results and progress funnel back through `Ledger::outbound_tx` into
-//! [`crate::Ledger::run`]. The transaction map is only touched from the single
-//! run-loop task, so it needs no lock.
+//! A `Call` routes by declared function name to the owning pipeline. Each
+//! pipeline brings its own `RawFunctionHandler` and args shim, so this
+//! dispatcher is signal-neutral. Each call gets a `CancellationToken`
+//! registered in `Ledger::transactions` and runs
+//! `RawFunctionHandler::handle_raw` on its own task. Results and progress
+//! come back through `Ledger::outbound_tx` into [`crate::Ledger::run`]. The
+//! transaction map is only touched from the single run-loop task, so it
+//! needs no lock.
 
 use std::sync::Arc;
 
@@ -27,13 +22,10 @@ use tokio_util::sync::CancellationToken;
 use crate::ledger::Ledger;
 
 impl Ledger {
-    /// Handle a `SupervisorReq` event; the run loop is the only caller
-    /// ([`crate::Ledger::run`]). `Call` spawns the handler task, `Cancel`
-    /// triggers its token, `Shutdown` is the only `Ok(true)` — the run loop
-    /// then flushes in-flight catalogs (`Ledger::flush_catalogs_on_shutdown`)
-    /// and exits — and a repeat `Configure` is a protocol-order violation
-    /// that is logged and ignored (`Configure` is consumed once in the
-    /// [`crate::run_worker`] handshake).
+    /// Handle a `SupervisorReq` event. `Call` spawns the handler task and
+    /// `Cancel` triggers its token. `Shutdown` is the only request that
+    /// returns `Ok(true)`, which asks the run loop to exit. A repeat
+    /// `Configure` is logged and ignored.
     pub(in crate::ledger) async fn handle_supervisor_req(
         &mut self,
         req: LedgerRequest,
@@ -62,34 +54,30 @@ impl Ledger {
                 Ok(false)
             }
             LedgerRequest::Shutdown => {
-                // The only exit=true request.
                 tracing::info!("received Shutdown from supervisor");
                 Ok(true)
             }
             LedgerRequest::Configure(_) => {
                 // Configure is consumed exactly once, in the `run_worker`
-                // handshake (`lib.rs`); a repeat means the supervisor
-                // broke the protocol order. Log and keep running.
+                // handshake. A repeat means the supervisor broke the
+                // protocol order.
                 tracing::warn!("unexpected late Configure message");
                 Ok(false)
             }
         }
     }
 
-    /// Forward an `OutboundResp` event to the supervisor (the run-loop arm
-    /// in [`crate::Ledger::run`]). This is the funnel for everything dispatch
-    /// spawns — handler results, the unknown-function 404, and progress.
-    /// The transaction entry is dropped on `Result`, before the send, so a
-    /// later Cancel finds nothing.
+    /// Forward an `OutboundResp` event to the supervisor. Everything that
+    /// dispatch spawns sends its output here: handler results, the
+    /// unknown-function 404, and progress. The transaction entry is dropped
+    /// on `Result`, before the send, so a later Cancel finds nothing.
     ///
-    /// An oversized message is degraded to a per-request failure rather
-    /// than propagated: ferryboat checks the size limit *before* writing
-    /// any bytes (`Error::MessageTooLarge`, `ferryboat/src/lib.rs`), so the
-    /// connection is still intact, and one outsized function response must
-    /// not tear down the whole ledger (it did — a ~10 MB dashboard response
-    /// crash-looped the plugin). The oversized result is replaced with a
-    /// small status-500 result so the agent gets an answer instead of a
-    /// timeout; every other error remains fatal.
+    /// An oversized message becomes a per-request failure instead of an
+    /// error. ferryboat checks the size limit before it writes any bytes
+    /// (`ferryboat::Error::MessageTooLarge`), so the connection is still
+    /// intact. One oversized response must not tear down the whole ledger.
+    /// The result is replaced with a small status-500 result, so the agent
+    /// gets an answer instead of a timeout. Every other error stays fatal.
     pub(in crate::ledger) async fn handle_outbound_resp(
         &mut self,
         resp: LedgerResponse,
@@ -126,12 +114,9 @@ impl Ledger {
         }
     }
 
-    /// Spawn a function-handler task. The pre-handler steps live here —
-    /// args→payload shim, 404 for unknown names, and the `transactions`
-    /// registration that lets Cancel reach the in-flight call; the engine
-    /// owns JSON deserialization, progress reporting, cancellation, and JSON
-    /// serialization of the response (`HandlerAdapter::handle_raw`,
-    /// `otel-bridge/src/function.rs`).
+    /// Spawn a function-handler task. Before the handler runs, this applies
+    /// the args shim, answers 404 for unknown names, and registers the call
+    /// in `transactions` so that a Cancel can reach it.
     fn dispatch_function_call(
         &mut self,
         transaction: String,
@@ -140,14 +125,9 @@ impl Ledger {
         args: Vec<String>,
         payload: Option<Vec<u8>>,
     ) {
-        // Route by declared function name (`declaration.name`, surfaced by
-        // `Pipeline::function_name`, `file-lifecycle/src/pipeline.rs`) to
-        // the owning pipeline.
         let Some(pipeline) = self.pipelines.iter().find(|p| p.function_name() == name) else {
-            // No pipeline answers this name: answer 404 straight onto
-            // `outbound_tx` — the same funnel a handler result uses. No
-            // transaction entry exists yet, so the forwarding remove is a
-            // no-op.
+            // No transaction entry exists yet, so the remove in
+            // `handle_outbound_resp` is a no-op.
             let result = netdata_plugin_types::FunctionResult {
                 transaction: transaction.clone(),
                 status: 404,
@@ -161,19 +141,15 @@ impl Ledger {
         let handler = pipeline.handler().clone();
         let arg_shim = pipeline.arg_shim();
 
-        // A shim-synthesized payload wins; when the shim declines (a POST
-        // body is already present, or there is nothing to synthesize from)
-        // the original body is kept.
         let payload = arg_shim(&args, payload.as_deref()).or(payload);
 
         let cancel = CancellationToken::new();
         self.transactions
             .insert(transaction.clone(), cancel.clone());
 
-        // Per-call message channel: the engine writes
-        // `Message::FunctionProgressResponse` here; the bridge task
-        // below translates each one into `LedgerResponse::Progress`
-        // and forwards via `outbound_tx`.
+        // Per-call message channel. The engine writes
+        // `Message::FunctionProgressResponse` here, and the bridge task
+        // forwards each one as `LedgerResponse::Progress`.
         let (msg_tx, msg_rx) = mpsc::unbounded_channel::<Message>();
         spawn_progress_bridge(msg_rx, self.outbound_tx.clone());
 
@@ -202,11 +178,9 @@ impl Ledger {
 }
 
 /// Translate `Message::FunctionProgressResponse` into
-/// `LedgerResponse::Progress` for the duration of one function call; any
-/// other `Message` variant is dropped. The task ends when the call's
-/// `msg_tx` clones are gone — the handler task's `FunctionContext` and the
-/// engine's progress ticker — or when `ledger_out` fails (the ledger is
-/// gone).
+/// `LedgerResponse::Progress` for one function call. Any other `Message`
+/// variant is dropped. The task ends when every clone of the call's `msg_tx`
+/// is gone, or when `ledger_out` fails because the ledger is gone.
 fn spawn_progress_bridge(
     mut msg_rx: mpsc::UnboundedReceiver<Message>,
     ledger_out: mpsc::UnboundedSender<LedgerResponse>,

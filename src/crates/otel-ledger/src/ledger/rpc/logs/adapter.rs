@@ -1,6 +1,5 @@
 //! Mapping between the netdata `otel-logs` wire types ([`super::wire`])
-//! and the wire-neutral [`sfsq::logs`] engine — the logs query Function's
-//! translation layer, no I/O of its own:
+//! and the wire-neutral [`sfsq::logs`] engine. It does no I/O of its own.
 //!
 //! * wire → engine — [`OtelLogsRequest::into_query`] canonicalizes a
 //!   request into a fully-specified [`LogsQuery`];
@@ -14,10 +13,7 @@
 //! The per-structure converters ([`facet_from_sfst`],
 //! [`histogram_from_sfst`], [`available_histograms_from_fields`],
 //! [`build_table`]) are pure transformers over `sfst` values, so tests
-//! exercise them against synthetic inputs. The only code consumer is the
-//! logs handler (`handler.rs`), which owns the registry locking and calls
-//! all of the above; the grid derivation below is shared with the traces
-//! handler (`rpc/grid.rs`).
+//! exercise them against synthetic inputs.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -61,21 +57,18 @@ impl StreamStat {
     }
 }
 
-/// One nanosecond expressed as a millisecond fraction. Histogram bucket
-/// timestamps go on the wire in milliseconds (legacy chart contract).
+/// Histogram bucket timestamps go on the wire in milliseconds (legacy chart
+/// contract).
 const NS_PER_MS: i64 = 1_000_000;
 
-/// One nanosecond expressed as a second fraction. ChartView `after` /
-/// `before` / `update_every` are u32 seconds (legacy chart contract).
+/// ChartView `after` / `before` / `update_every` are u32 seconds (legacy
+/// chart contract).
 const NS_PER_S: i64 = 1_000_000_000;
 
-// ── Request canonicalization (wire request → engine query) ──────────
+// Request canonicalization (wire request → engine query).
 //
-// The frontend sends a loose window and no bucket geometry, so the
-// adapter canonicalizes here — defaulting the window, picking a "nice"
-// bucket width, snapping the window outward, and building the histogram
-// grid — before handing a fully-specified [`LogsQuery`] to the engine.
-// The engine takes the grid as given; deciding it is this layer's job.
+// The frontend sends a loose window and no bucket geometry. The engine
+// takes the grid as given, so this layer decides it.
 
 /// Default request window in seconds when the frontend doesn't specify
 /// `after`/`before`. Matches the consuming UI's default time range.
@@ -85,19 +78,17 @@ impl OtelLogsRequest {
     /// Canonicalize this wire request into the engine's neutral
     /// [`LogsQuery`]: default + bucket-align the window, build the
     /// histogram grid, and map the remaining fields. The empty
-    /// `histogram` string becomes `None`; a histogram-click µs timestamp
-    /// becomes an [`Anchor::Timestamp`] in ns; a malformed cursor string
+    /// `histogram` string becomes `None`. A histogram-click µs timestamp
+    /// becomes an [`Anchor::Timestamp`] in ns. A malformed cursor string
     /// is dropped (treated as "no anchor").
     ///
     /// Fails with [`sfst::Error::InvalidPattern`] if the free-text `query`
-    /// is not a valid regex — validated once here, at the boundary, so a
-    /// bad search is a clean request error rather than a per-file degrade.
+    /// is not a valid regex. It is validated once here, at the boundary, so
+    /// a bad search is a clean request error rather than a per-file degrade.
     pub fn into_query(self) -> Result<LogsQuery, sfst::Error> {
         let (after, before) = effective_window(self.after, self.before);
-        // Nice width + outward alignment + the exact grid — the shared
-        // derivation (`rpc::grid::grid_for_window_s`) both otel Function
-        // handlers (logs, traces) use. The aligned window is discarded
-        // here; the handler recovers it from the grid via `window_secs`.
+        // The aligned window is discarded here. The handler recovers it
+        // from the grid via `window_secs`.
         let (grid, _, _) = crate::ledger::rpc::grid::grid_for_window_s(after, before);
 
         let anchor = self.anchor.and_then(|a| match a {
@@ -112,18 +103,14 @@ impl OtelLogsRequest {
             .facet_fields(self.facets)
             .direction(self.direction)
             .limit(self.last);
-        // Empty histogram / no anchor fall through to the builder's
-        // defaults (the engine's default dimension; start at the edge).
         if !self.histogram.is_empty() {
             builder = builder.histogram_field(self.histogram);
         }
         if let Some(anchor) = anchor {
             builder = builder.anchor(anchor);
         }
-        // Field-less full-text search: an unanchored regex over `key=value`
-        // (sfst/src/query.rs). Validate once here (compile-and-discard) so a
-        // malformed pattern is a clean error; the engine recompiles the source
-        // per file, where a failure would silently zero that file's rows.
+        // Compile and discard. The engine compiles the pattern again per
+        // file, where a failure would silently zero that file's rows.
         if !self.query.is_empty() {
             sfst::compile_query(&self.query)?;
             builder = builder.query(self.query);
@@ -134,7 +121,7 @@ impl OtelLogsRequest {
     /// Remove the reserved stream-selector key ([`STREAM_SELECTION_PARAM`])
     /// from `selections` and decode each pick — a stream's `ns_hash` as
     /// lowercase hex, the option id the response advertises — into a
-    /// `u64`. Done **before** [`Self::into_query`] so the engine never
+    /// `u64`. Done before [`Self::into_query`] so the engine never
     /// treats `__streams` as a row facet. An unparseable pick is skipped
     /// (a UI-supplied filter should degrade, not fail the whole query);
     /// an absent or empty selection yields an empty vec, which
@@ -152,15 +139,14 @@ impl OtelLogsRequest {
 /// Build the otel-logs `required_params` from a tenant's streams: a single
 /// [`MultiSelection`] (`__streams`, "Services") whose options are the
 /// streams, each pre-selected so the default view spans all of them. An
-/// empty `stats` yields `Vec::new()` — a tenant with no streams advertises
-/// no selector.
+/// empty `partitions` yields `Vec::new()`: a tenant with no streams
+/// advertises no selector.
 pub fn stream_required_params(partitions: Vec<PartitionStat>) -> Vec<RequiredParam> {
     if partitions.is_empty() {
         return Vec::new();
     }
     // Decode each partition's opaque identity, then sort by `(namespace, name)`
-    // for display (the substrate yields them ordered by opaque
-    // `partition_key`).
+    // for display.
     let mut stats: Vec<StreamStat> = partitions
         .into_iter()
         .map(StreamStat::from_partition)
@@ -253,8 +239,7 @@ fn humanize_span_s(secs: u32) -> String {
     parts.join(" ")
 }
 
-/// The `[after, before)` window (seconds) a [`sfst::Grid`] covers — the
-/// span the handler uses to enumerate overlapping SFST candidates.
+/// The `[after, before)` window (seconds) a [`sfst::Grid`] covers.
 pub fn window_secs(grid: &sfst::Grid) -> std::ops::Range<u32> {
     let r = grid.range_ns();
     (r.start / NS_PER_S) as u32..(r.end / NS_PER_S) as u32
@@ -276,11 +261,10 @@ fn effective_window(after: u32, before: u32) -> (u32, u32) {
     (now.saturating_sub(DEFAULT_WINDOW_SECS), now)
 }
 
-// ── Engine result → wire envelope ───────────────────────────────────
+// Engine result → wire envelope.
 
-/// Shape an engine [`LogsData`] into the wire [`LogsResult`] — always a
-/// complete response (`progress: 100`, `status: 200`); degenerate handler
-/// paths shape an empty [`LogsData`] rather than return a partial one.
+/// Shape an engine [`LogsData`] into the wire [`LogsResult`]. The result is
+/// always a complete response (`progress: 100`, `status: 200`).
 /// `max_to_return` echoes the request's `last` into `items.max_to_return`.
 pub fn to_result(data: LogsData, max_to_return: usize) -> LogsResult {
     let facets = data
@@ -327,13 +311,11 @@ pub fn to_result(data: LogsData, max_to_return: usize) -> LogsResult {
     }
 }
 
-// ── Per-structure converters ────────────────────────────────────────
+// Per-structure converters.
 
 /// Convert one [`sfst::FacetResult`] into a [`Facet`].
 ///
-/// Option order is preserved from the input — [`sfst::IndexReader::facets`]
-/// already surfaces values in FST iteration order, which is lexicographic
-/// and stable across runs.
+/// Option order is preserved from the input.
 fn facet_from_sfst(order: usize, sfst_facet: &sfst::FacetResult) -> Facet {
     let options = sfst_facet
         .values
@@ -442,8 +424,7 @@ fn histogram_from_sfst(field: &str, timeline: &sfst::Timeline) -> Histogram {
 }
 
 /// Build the `available_histograms` list from the engine's available
-/// (low/mid-card) field set. The engine already excludes high-card
-/// fields, so this is a straight enumeration in field order.
+/// field set, in field order.
 fn available_histograms_from_fields(fields: &sfst::FieldTable) -> Vec<AvailableHistogram> {
     fields
         .iter()
@@ -456,13 +437,12 @@ fn available_histograms_from_fields(fields: &sfst::FieldTable) -> Vec<AvailableH
         .collect()
 }
 
-/// Build the table's column schema: the three fixed columns — the visible
-/// µs `timestamp`, a hidden `severity`, and the hidden `cursor`
-/// (`unique_key`; the `pagination.column` whose value the UI echoes back
-/// as the `anchor` param) — plus one hidden column per field. Each column
-/// is a UI-specific metadata blob; a field present in `facetable` gets
-/// `filter: "facet"` so the UI's "+ Add Filter Field" picker offers it,
-/// everything else is `"none"`.
+/// Build the table's column schema. Three fixed columns come first: the
+/// visible µs `timestamp`, a hidden `severity`, and the hidden `cursor`.
+/// `cursor` is the `unique_key` and the `pagination.column`, whose value the
+/// UI echoes back as the `anchor` param. Then comes one hidden column per
+/// field. A field present in `facetable` gets `filter: "facet"`, so the UI's
+/// "+ Add Filter Field" picker offers it. Every other field gets `"none"`.
 fn build_columns(fields: &[String], facetable: &BTreeSet<&str>) -> serde_json::Value {
     use serde_json::json;
 
@@ -523,7 +503,7 @@ fn group_row_fields(row: &sfst::MaterializedRow) -> HashMap<&str, Vec<&str>> {
 ///
 /// A generic field cell joins the field's values with `", "` (the wire is
 /// one string per column; filters/search run on the index, never on
-/// cells). The dedicated severity cell takes the **last** `severity_text`
+/// cells). The dedicated severity cell takes the last `severity_text`
 /// value in row order. Row pairs are interned resource → scope → record,
 /// and a record's top-level scalars (incl. `severity_text`) come before
 /// its `attributes.*` (ng-flatten/src/common.rs, ng-index/src/indexing.rs),

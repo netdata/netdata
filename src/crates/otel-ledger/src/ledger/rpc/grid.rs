@@ -1,15 +1,8 @@
 //! The shared time-grid derivation for the otel ledger's Function
-//! views. Wire requests carry only a loose second-granular
-//! `[after, before)` window — no bucket geometry — so each signal's
-//! adapter canonicalizes the window, then derives everything else
-//! through here: a "nice" bucket width, the window snapped outward to
-//! wall-clock multiples, and the exact `sfst::Grid` the engine
-//! queries against.
-//!
-//! Consumers: the logs adapter's `into_query` (`rpc/logs/adapter.rs`),
-//! the traces `overview` and the aggregate section of the traces
-//! Functions view (`rpc/traces/handler.rs`).
-//! A change here re-grids every otel Function view at once.
+//! views. Wire requests carry only a second-granular `[after, before)`
+//! window, with no bucket geometry. From a canonicalized window this module
+//! derives a "nice" bucket width, the window snapped outward to wall-clock
+//! multiples, and the exact `sfst::Grid` the engine queries against.
 
 /// Aim for at least this many buckets across the window when picking
 /// from [`VALID_BUCKET_WIDTHS_S`]; with these widths a 15-minute window
@@ -20,11 +13,7 @@ const TARGET_BUCKETS: u32 = 60;
 /// `calculate_bucket_duration` (`journal-engine/src/histogram.rs`) so
 /// otel charts land on the same wall-clock-friendly intervals
 /// (1s, 2s, 5s, 10s, 15s, 30s,
-/// 1m, 5m, …) as the journal histograms. Only the density target
-/// differs: journal-engine settles for ≥ 50 buckets, this picks the
-/// largest entry that still meets [`TARGET_BUCKETS`] (see
-/// [`bucket_width_for_span_s`]), so chart density is stable as the
-/// window scales.
+/// 1m, 5m, …) as the journal histograms.
 const VALID_BUCKET_WIDTHS_S: &[u32] = &[
     1, 2, 5, 10, 15, 30, // seconds
     60, 120, 180, 300, 600, 900, 1800, // minutes
@@ -69,11 +58,8 @@ pub(crate) fn align_window(after: u32, before: u32, width_s: u32) -> (u32, u32) 
 /// pair, so capture and file-pruning windows come from the pair (or
 /// the grid's own range), never the raw request.
 ///
-/// `after < before` is the caller's job; the wire adapters' window
-/// canonicalizers guarantee it (`effective_window` in
-/// `rpc/logs/adapter.rs`, `validate_trace_bounds` in
-/// `rpc/traces/adapter.rs`). Given that, the result always holds at
-/// least one bucket, horizon saturation included.
+/// The caller must ensure `after < before`. Given that, the result always
+/// holds at least one bucket, horizon saturation included.
 pub(crate) fn grid_for_window_s(after: u32, before: u32) -> (sfst::Grid, u32, u32) {
     const NS_PER_S: i64 = 1_000_000_000;
     let width_s = bucket_width_for_span_s(before.saturating_sub(after));
@@ -105,7 +91,7 @@ mod tests {
     #[test]
     fn jittered_requests_in_the_same_slot_share_one_grid() {
         // The UI polls every second with a sliding window; requests
-        // within the same bucket-width slot must produce the SAME grid
+        // within the same bucket-width slot must produce the same grid
         // so the chart x-axis never jitters.
         let (a, ..) = grid_for_window_s(7, 907);
         let (b, ..) = grid_for_window_s(9, 909);

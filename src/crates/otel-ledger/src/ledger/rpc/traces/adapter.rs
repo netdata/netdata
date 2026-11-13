@@ -1,6 +1,6 @@
 //! Mapping between the `otel-traces` wire types ([`super::wire`]) and
-//! the wire-neutral `sfsq::traces` engine — the traces analogue of
-//! the logs `adapter`: a pure translation layer, no I/O of its own.
+//! the wire-neutral `sfsq::traces` engine. It is a pure translation layer,
+//! with no I/O of its own.
 //!
 //! * wire → engine — request-side parsing: hex ids, keys (the engine's
 //!   vocabulary, `sfsq::traces::parse_key`: OTLP field paths), the
@@ -9,9 +9,7 @@
 //! * engine → wire — the response shapers (`to_*_result`), ids rendered
 //!   as W3C lowercase hex.
 //!
-//! The only consumer is the traces handler (`handler.rs`), which owns
-//! mode dispatch and the sealed-SFST + live-WAL source capture
-//! ([`super::sources`]) — the adapter never touches registry state.
+//! The adapter never touches registry state.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -35,8 +33,7 @@ use super::wire::{
 
 /// Parse a W3C text-form trace id: exactly 32 hex chars (16 bytes),
 /// case-insensitive. Shape only: the all-zero (unset) sentinel parses
-/// here — rejecting it is the caller's semantic job (the handler
-/// pre-captures the engine's `UnsetTraceId` rejection).
+/// here. Rejecting it is the caller's semantic job.
 pub(crate) fn parse_trace_id(s: &str) -> Result<sfst::TraceId, String> {
     parse_hex_id::<16>("trace id", s).map(sfst::TraceId::from)
 }
@@ -65,11 +62,11 @@ fn parse_hex_id<const N: usize>(what: &str, s: &str) -> Result<[u8; N], String> 
 }
 
 /// Validate the `trace` sub-object's optional assembly bounds into a
-/// capture range. Both-or-neither and `after < before` — violations
-/// are client errors, like the window fields of every other mode. Any
-/// width is accepted: the agent is relaxed on time ranges, and the
-/// response's `coverage` declares the range used. `None` = full
-/// retention (the handler passes `0..u32::MAX`).
+/// capture range. It requires both or neither, and `after < before`.
+/// Violations are client errors, like the window fields of every other
+/// mode. Any width is accepted: the agent is relaxed on time ranges, and
+/// the response's `coverage` declares the range used. `None` = full
+/// retention.
 pub(crate) fn validate_trace_bounds(
     after: Option<u32>,
     before: Option<u32>,
@@ -92,18 +89,18 @@ pub(crate) fn validate_trace_bounds(
     Ok(Some(after..before))
 }
 
-/// Search completion slack, per side, seconds: the completion capture
-/// is the match window widened by `clamp(window_width, 1h, 24h)` per
-/// side — saturating at the u32 second boundaries — so a hit whose
-/// trace straddles the window edge still assembles its out-of-window
-/// spans. The window width is the scale hint: a narrow view gets at
-/// least an hour of slack, a wide one at most a day per side.
+/// Search completion slack per side, in seconds. The completion capture
+/// is the match window widened by `clamp(window_width, 1h, 24h)` per side,
+/// saturating at the u32 second boundaries. So a hit whose trace straddles
+/// the window edge still assembles its out-of-window spans. The window
+/// width is the scale hint: a narrow view gets at least an hour of slack,
+/// a wide one at most a day per side.
 pub(crate) const SEARCH_COMPLETION_SLACK_MIN_S: u32 = 3_600;
 pub(crate) const SEARCH_COMPLETION_SLACK_MAX_S: u32 = 86_400;
 
 /// The completion capture range for a match window: window widened by
 /// the clamped per-side slack. Deterministic in the window alone, so a
-/// pagination cursor that freezes the ORIGINAL window re-derives the
+/// pagination cursor that freezes the original window re-derives the
 /// same completion range on every page.
 pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::ops::Range<u32> {
     let slack = (window.end - window.start)
@@ -111,7 +108,7 @@ pub(crate) fn completion_capture_range(window: &std::ops::Range<u32>) -> std::op
     window.start.saturating_sub(slack)..window.end.saturating_add(slack)
 }
 
-// ── Response bounds ─────────────────────────────────────────────────
+// Response bounds.
 
 /// Per-value cap on the strings a trace's spans carry, in JSON bytes
 /// (see [`truncate_value`]). The largest value seen in practice is a
@@ -497,26 +494,30 @@ fn kind_entry_bound() -> usize {
     )) + 2
 }
 
-/// Shapes a trace's spans for the wire while the engine merges them (the
-/// trace handler passes it to `TraceQuery::shaper`): caps each span's
-/// values at [`TRACE_VALUE_MAX_BYTES`], flags the span when it cut one,
-/// numbers the span's resource in [`ShapedResources`] (read back through
-/// [`WireShaper::resources`]), and weighs the span as its compact JSON
-/// (with its resource index, without its resource pairs) and the comma
-/// after it, plus its resource's entry and comma when it is the first
-/// span to use that resource, plus, for each attribute key it is the
-/// first to expose (the keys of `field_kinds`), an upper bound of that
-/// key's entry (kinds are known only once the merge is done). The first
-/// span also carries the spans and resources lists' brackets and the
-/// empty field-kind map. The engine keeps spans while they fit
+/// Shapes a trace's spans for the wire while the engine merges them. For
+/// each span it caps the values at [`TRACE_VALUE_MAX_BYTES`] and flags the
+/// span when it cut one. It numbers the span's resource in
+/// [`ShapedResources`], read back through [`WireShaper::resources`]. It
+/// weighs the span as the sum of:
+///
+/// - its compact JSON, with its resource index and without its resource
+///   pairs, and the comma after it;
+/// - its resource's entry and comma, when it is the first span to use that
+///   resource;
+/// - for each attribute key it is the first to expose (the keys of
+///   `field_kinds`), an upper bound of that key's entry, because kinds are
+///   known only once the merge is done.
+///
+/// The first span also carries the spans and resources lists' brackets and
+/// the empty field-kind map. The engine keeps spans while they fit
 /// [`TRACE_SPANS_MAX_BYTES`], so `spans`, `resources` and `field_kinds`
 /// together never exceed it.
 ///
 /// The kept spans hold what the answer sends, so the budget also bounds
-/// the merge's memory: a span gives its resource pairs up unless it is
-/// the first to use that resource, which keeps them for the engine (it
-/// derives `field_kinds` from the kept spans' names) and for the result's
-/// table; the shaper keeps one lookup copy of each resource.
+/// the merge's memory. A span gives its resource pairs up unless it is the
+/// first to use that resource. That span keeps them for the engine, which
+/// derives `field_kinds` from the kept spans' names, and for the result's
+/// table. The shaper keeps one lookup copy of each resource.
 pub(crate) struct WireShaper {
     /// Attribute keys already charged.
     names: HashSet<String>,
@@ -684,7 +685,7 @@ fn link_wire(l: &sfst::TraceLink) -> LinkWire {
     }
 }
 
-// ── Search: keys ────────────────────────────────────────────────────
+// Search: keys.
 
 /// Parse one key — the engine's vocabulary, its OTLP field path
 /// (`resource.attributes.service.name`, `status.code`) — as the target
@@ -879,7 +880,7 @@ pub(crate) fn heatmap_tokens(tokens: &TokenQuery) -> TokenQuery {
     }
 }
 
-// ── Suggest: keys ───────────────────────────────────────────────────
+// Suggest: keys.
 
 /// A key whose values a request suggests: bounded in length,
 /// and with stored values (a virtual builtin such as the duration has
@@ -966,15 +967,13 @@ pub(crate) fn to_suggest_result(
     }
 }
 
-// ── Overview: engine data → wire ────────────────────────────────────
+// Overview: engine data → wire.
 
 /// Shape the list response's embedded window aggregate. The wire's
-/// second-granular geometry derives from the SAME `grid` the engine
-/// binned on — one source of truth; the shared derivation guarantees
-/// whole seconds (debug-asserted). `coverage` is the grid's aligned
-/// window (derived together with `grid`) and `scope` is what the
-/// engine pass actually carried, which only the caller knows. The wire
-/// contract is `OverviewSection`.
+/// second-granular geometry derives from the same `grid` the engine
+/// binned on. The shared derivation guarantees whole seconds
+/// (debug-asserted). `coverage` is the grid's aligned window (derived
+/// together with `grid`). The wire contract is `OverviewSection`.
 pub(crate) fn to_overview_section(
     data: OverviewData,
     grid: sfst::Grid,
@@ -1018,41 +1017,41 @@ fn to_percentiles(buckets: &[Option<DurationPercentiles>]) -> OverviewPercentile
     }
 }
 
-// ── Search: pagination cursor ───────────────────────────────────────
+// Search: pagination cursor.
 
 /// The wire pagination state. The engine has no anchor concept, and its
-/// rank — (newest matched-span start DESC, trace_id ASC) — is
-/// WINDOW-DEPENDENT: narrowing the window re-ranks any trace whose
-/// matched spans straddle the boundary through an older span,
-/// duplicating it on a later page. So the cursor NEVER narrows the
-/// window. Instead it:
+/// rank (newest matched-span start descending, then trace_id ascending)
+/// depends on the window. Narrowing the window re-ranks any trace whose
+/// matched spans straddle the boundary through an older span, which
+/// duplicates it on a later page. So the cursor never narrows the window.
+/// Instead it:
 ///
-/// - FREEZES the canonicalized window of page 1, so every page ranks
-///   the same corpus the same way (and a default `now`-derived window
-///   can't drift between pages);
-/// - carries the AFTER-KEY — the last served trace's (rank, trace_id) —
-///   and the served count. The next page re-runs the SAME query with
-///   `limit = served + limit` and drops everything ranked at-or-above
-///   the key: at a fixed corpus the engine's deterministic total order
-///   makes the pages an exact partition, tie runs and straddling
-///   traces included.
+/// - freezes the canonicalized window of page 1, so every page ranks the
+///   same corpus the same way, and a default `now`-derived window cannot
+///   drift between pages;
+/// - carries the after-key, the last served trace's (rank, trace_id), and
+///   the served count. The next page re-runs the same query with
+///   `limit = served + limit` and drops everything ranked at or above the
+///   key. At a fixed corpus the engine's deterministic total order makes
+///   the pages an exact partition, tie runs and straddling traces
+///   included.
 ///
 /// Live-data caveats (inherent to most-recent-first pagination; walk a
 /// window that ends in the past to avoid them):
 ///
-/// - Late arrivals ranking ABOVE the key are never shown by this walk
-///   AND consume the over-fetch allowance — a burst larger than `limit`
-///   can shorten a page below `limit` and end the walk early (silently:
-///   indistinguishable from exhaustion). Late arrivals ranking BELOW
-///   the key appear on later pages normally.
-/// - The cursor freezes the window but NOT the filters: echoing it with
+/// - Late arrivals ranking above the key are never shown by this walk, and
+///   they consume the over-fetch allowance. A burst larger than `limit`
+///   can shorten a page below `limit` and end the walk early, silently:
+///   it looks like exhaustion. Late arrivals ranking below the key appear
+///   on later pages normally.
+/// - The cursor freezes the window but not the filters. Echoing it with
 ///   different chips or text re-partitions a different result set. The
 ///   client must keep the filters fixed for the walk's lifetime.
 ///
 /// Cost note: each page reruns the query with `limit = served + limit`,
-/// so a full walk of N traces does O(N²/limit) engine ranking work —
-/// acceptable at human paging depths and hard-capped by
-/// [`CURSOR_SERVED_CAP`]; the engine's own ceilings bound any single
+/// so a full walk of N traces does O(N²/limit) engine ranking work. That
+/// is acceptable at human paging depths and hard-capped by
+/// [`CURSOR_SERVED_CAP`]. The engine's own ceilings bound any single
 /// request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SearchCursor {
@@ -1130,7 +1129,7 @@ fn is_served(c: &SearchCursor, t: &sfsq::traces::TraceSummary) -> bool {
         || (t.newest_matched_start_ns == c.rank_ns && t.trace_id <= c.trace_id)
 }
 
-// ── Explore ─────────────────────────────────────────────────────────
+// Explore.
 
 /// The keys a span row carries when the request names none: the service,
 /// the span name, the kind and the status.
@@ -1362,7 +1361,7 @@ pub(crate) fn to_explore_result(
     }
 }
 
-// ── Search: window canonicalization ─────────────────────────────────
+// Search: window canonicalization.
 
 /// The canonicalized search window: the engine bounds in nanoseconds
 /// plus the same range as whole seconds — the capture range the
@@ -1376,11 +1375,11 @@ pub(crate) struct ResolvedWindow {
     pub capture: std::ops::Range<u32>,
 }
 
-/// Canonicalize the wire window (unix seconds; the logs precedent for
-/// unspecified bounds: `before` → now, `after` → before − 900 s). An
-/// anchor page uses the cursor's FROZEN window verbatim — the request's
-/// own window fields (and the drifting `now`) are ignored so every page
-/// of one walk ranks the same corpus.
+/// Canonicalize the wire window (unix seconds). An unspecified `before`
+/// becomes now, and an unspecified `after` becomes `before` − 900 s. An
+/// anchor page uses the cursor's frozen window verbatim. The request's own
+/// window fields and the drifting `now` are ignored, so every page of one
+/// walk ranks the same corpus.
 pub(crate) fn resolve_window(
     after_s: u32,
     before_s: u32,
@@ -1411,17 +1410,16 @@ pub(crate) fn resolve_window(
     })
 }
 
-// ── Search: engine data → wire ──────────────────────────────────────
+// Search: engine data → wire.
 
 /// Shape one search result page. Drops everything the cursor's walk
-/// already served (the engine re-emits the served prefix first — same
-/// query, same deterministic total order), trims to `limit`, and emits
-/// the next cursor only for a FULL page with a COMPLETE status: a short
-/// page means the walk is exhausted, and a PARTIAL page's continuation
-/// would not be a stable prefix (the engine's work ceilings scale with
-/// the limit), so the walk ends there with the status saying why.
-/// `frozen` is the window this page actually ran (carried into the next
-/// cursor).
+/// already served, because the engine re-emits the served prefix first
+/// (same query, same deterministic total order). Trims to `limit`. Emits
+/// the next cursor only for a full page with a complete status. A short
+/// page means the walk is exhausted. A partial page's continuation would
+/// not be a stable prefix, because the engine's work ceilings scale with
+/// the limit, so the walk ends there with the status saying why. `frozen`
+/// is the window this page actually ran (carried into the next cursor).
 pub(crate) fn to_search_result(
     data: SearchData,
     limit: usize,
@@ -1464,9 +1462,8 @@ pub(crate) fn to_search_result(
         },
         traces: traces.into_iter().map(summary_wire).collect(),
         anchor,
-        // Composed by the caller when it ran the aggregate pass: only
-        // the Functions view does, and only it holds the second engine
-        // call's result.
+        // Composed by the caller when it ran the aggregate pass, because
+        // only the caller holds that engine call's result.
         overview: None,
     }
 }

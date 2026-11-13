@@ -5,18 +5,13 @@
 //! list plus its trace-density grid), `info` (capability discovery),
 //! `trace` (exact single-trace fetch), `suggest` (the search bar's
 //! keys and values, and the span view's stack keys), and `explore`
-//! (the span view). Mode selection and every request-SHAPE check happen at
-//! deserialization (the wire's typed request — shape errors are
-//! transport 400s); this handler owns only the semantic validation
+//! (the span view). Mode selection and every request-shape check happen at
+//! deserialization of the wire's typed request, so shape errors are
+//! transport 400s. This handler owns only the semantic validation
 //! (trace-id shape, zero limits, bounds).
 //!
-//! The wire contract lives in [`super::wire`], the engine mapping in
-//! [`super::adapter`], source resolution in [`super::sources`], and
-//! the shared time-grid derivation in [`super::super::grid`].
-//!
-//! Netdata-plugin glue only, like the logs handler: the engine
-//! ([`sfsq::traces`]) stays wire-neutral; `otel-bridge`'s `HandlerAdapter`
-//! owns the JSON round-trip, progress ticker, and cancellation.
+//! Netdata-plugin glue only: the engine ([`sfsq::traces`]) stays
+//! wire-neutral.
 
 use std::sync::Arc;
 
@@ -211,18 +206,18 @@ impl OtelTracesHandler {
     /// The `trace` mode: exact single-trace fetch via the engine's
     /// cross-source `trace_by_id`.
     ///
-    /// Ignores the envelope window; assembly bounds live in the `trace`
-    /// sub-object. Absent bounds capture the FULL local range; offloaded
-    /// files are skipped, never downloaded (each reports
-    /// `remote_unavailable`), so a lookup without bounds stays cheap
-    /// however much retention is offloaded. Present bounds also download
-    /// the offloaded files they select (too-large history fails via the
-    /// download cache rather than truncate) — a trace is one object whose
-    /// spans straddle files. Present bounds prune file-granularly (a file
-    /// overlapping the bounds is probed whole). Either way the response DECLARES
-    /// the range used (`coverage`) — spans beyond it are unknown, never
-    /// silently dropped. An id absent from the sources is a Complete
-    /// empty trace, not an error.
+    /// Ignores the envelope window. Assembly bounds live in the `trace`
+    /// sub-object. Absent bounds capture the full local range. Offloaded
+    /// files are then skipped, never downloaded, and each reports
+    /// `remote_unavailable`, so a lookup without bounds stays cheap however
+    /// much retention is offloaded. Present bounds also download the
+    /// offloaded files they select, because a trace is one object whose
+    /// spans straddle files. Too much history then fails through the
+    /// download cache rather than truncating. Present bounds prune at file
+    /// granularity: a file overlapping the bounds is probed whole. Either
+    /// way the response declares the range used (`coverage`). Spans beyond
+    /// it are unknown, never silently dropped. An id absent from the
+    /// sources is a Complete empty trace, not an error.
     async fn trace(
         &self,
         ctx: &FunctionCallContext,
@@ -281,11 +276,10 @@ impl OtelTracesHandler {
         };
 
         let tenant = TenantId::resolve_query(tenant);
-        // A cancelled capture returns NO copies; the empty default flows
-        // into the engine, which polls the same token up front and
-        // reports the Cancelled partial — one consistent cancel path.
-        // The capture sets the progress total; the engine ticks the done
-        // counter once per source and the bridge's ticker renders it.
+        // A cancelled capture returns no copies. The empty default flows
+        // into the engine, which polls the same token up front and reports
+        // the Cancelled partial, so there is one consistent cancel path.
+        // The capture sets the progress total.
         let Capture {
             mut sets,
             pins,
@@ -307,12 +301,13 @@ impl OtelTracesHandler {
         let done = ctx.progress.done_counter();
         let cancel = ctx.cancellation.clone();
 
-        // Sync engine (maps + decompresses files) — off the runtime
-        // thread. Engine request errors are internal: the handler checked
-        // each one first ([`engine_rejected`]). A rejected SOURCE SET is
-        // the supplier's inconsistency (duplicate ids / overlapping WAL
-        // coverage), framed as internal so a debugger looks at the right
-        // side. A panicked task is a handler failure.
+        // The engine is synchronous (it maps and decompresses files), so
+        // it runs off the runtime thread. Engine request errors are
+        // internal, because the handler checked each one first
+        // ([`engine_rejected`]). A rejected source set is the supplier's
+        // inconsistency (duplicate ids or overlapping WAL coverage). It is
+        // framed as internal so a debugger looks at the right side. A
+        // panicked task is a handler failure.
         let mut data = match tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _pins = pins;
@@ -346,19 +341,18 @@ impl OtelTracesHandler {
     }
 
     /// The engine's bounded most-recent-first search over the request's
-    /// (canonicalized) window, with wire-level tie-safe pagination —
-    /// see the adapter's cursor docs. The Functions view's page core
-    /// (it layers the aggregate on through `aggregate`).
+    /// (canonicalized) window, with wire-level tie-safe pagination (see
+    /// `SearchCursor`). The Functions view's page core.
     ///
-    /// `aggregate` adds the Functions view's full-window section: a
-    /// SECOND engine pass in this same call, off the same capture, over
+    /// `aggregate` adds the Functions view's full-window section. It is a
+    /// second engine pass in this same call, off the same capture, over
     /// the page's tokens minus the trace-duration and trace-start ones
-    /// (the grid's own axes; `heatmap_tokens`). It cannot ride along with the
-    /// first — search is top-K with early termination and hard-caps its
-    /// assembly far below the window's population, so an accumulator on
-    /// its scan loop would describe the few hundred traces the ranker
+    /// (the grid's own axes; `heatmap_tokens`). It cannot ride along with
+    /// the first pass. Search is top-K with early termination and hard-caps
+    /// its assembly far below the window's population. So an accumulator
+    /// on its scan loop would describe the few hundred traces the ranker
     /// happened to touch, not the window. The Functions view passes
-    /// `false` on an ANCHOR page (the anchor gate in `functions`).
+    /// `false` on an anchor page (the anchor gate in `functions`).
     async fn search_result(
         &self,
         ctx: &FunctionCallContext,
@@ -366,15 +360,15 @@ impl OtelTracesHandler {
         tenant: Option<&str>,
         aggregate: bool,
     ) -> netdata_plugin_error::Result<SearchResult> {
-        // Zero must be rejected BEFORE the anchor allowance is added —
-        // `limit=0` with a cursor would otherwise sneak a positive engine
+        // Zero must be rejected before the anchor allowance is added.
+        // Otherwise `limit=0` with a cursor would sneak a positive engine
         // limit past the engine's own ZeroLimit check.
         if params.limit == 0 {
             return Err(client_err(
                 "a zero 'last' would return nothing; the list has no unbounded option",
             ));
         }
-        // The wire cap on the CLIENT half of the limit; the engine's
+        // The wire cap on the client half of the limit. The engine's
         // effective limit (served + limit on cursor walks) is bounded by
         // construction once this side is capped (see SEARCH_LIMIT_MAX).
         if params.limit > super::wire::SEARCH_LIMIT_MAX {
@@ -394,9 +388,9 @@ impl OtelTracesHandler {
         let aggregate_tokens = aggregate.then(|| heatmap_tokens(&tokens));
 
         let now_s = unix_now_s();
-        // An anchor page reruns the SAME query over the cursor's frozen
-        // window (never narrowed — the rank is window-dependent) with an
-        // over-fetch covering the served prefix; the adapter drops it.
+        // An anchor page reruns the same query over the cursor's frozen
+        // window, with an over-fetch covering the served prefix. The
+        // adapter drops that prefix.
         let window = resolve_window(params.after, params.before, now_s, cursor.as_ref())
             .map_err(client_err)?;
 
@@ -405,16 +399,16 @@ impl OtelTracesHandler {
             .window(TimeWindow::new(window.start_ns, window.end_ns).map_err(client_err)?)
             .limit(params.limit.saturating_add(cursor.map_or(0, |c| c.served)));
 
-        // ONE capture over the COMPLETION range (the match window
-        // widened by the clamped slack), feeding two roles: the engine
-        // narrows the window role internally, so identical copies keep
-        // window ⊆ completion by construction while slack-only files
+        // One capture over the completion range (the match window widened
+        // by the clamped slack) feeds two roles. The engine narrows the
+        // window role internally, so identical copies keep
+        // window ⊆ completion by construction, while slack-only files
         // still complete straddling hits. The cursor keeps freezing the
-        // ORIGINAL window (window.capture) — the completion range
+        // original window (window.capture). The completion range
         // re-derives from it deterministically on every page.
         let completion_range = completion_capture_range(&window.capture);
         // The aggregate's geometry and window: the grid's, snapped
-        // outward to wall-clock bucket multiples — NOT the page's
+        // outward to wall-clock bucket multiples, not the page's
         // slack-widened range. Its sources are captured by that window
         // alone.
         let aggregate_grid = aggregate.then(|| {
@@ -437,7 +431,7 @@ impl OtelTracesHandler {
         };
 
         let tenant = TenantId::resolve_query(tenant);
-        // ONE capture for every pass: the two search roles over the
+        // One capture for every pass: the two search roles over the
         // completion range, the aggregate over the grid's. One snapshot
         // means one `valid_up_to`, so the page and the section can never
         // describe two different corpora.
@@ -477,8 +471,8 @@ impl OtelTracesHandler {
             .map(|((grid, ..), tokens)| OverviewQuery::new(grid).tokens(tokens));
 
         // Both engine calls are pure-sync and expect to run off the
-        // runtime thread, so one blocking task covers the pair — and a
-        // cancellation between them cannot pair mismatched snapshots.
+        // runtime thread, so one blocking task covers the pair. A
+        // cancellation between them then cannot pair mismatched snapshots.
         let joined = tokio::task::spawn_blocking(move || {
             let _permit = permit;
             let _pins = pins;
@@ -559,9 +553,9 @@ impl OtelTracesHandler {
     }
 
     /// The Functions view: the search page plus the full-window
-    /// aggregate, in one request. Nothing else composes both — and only
-    /// a FIRST page does, since an anchor page's aggregate would repeat
-    /// the first page's (the anchor gate below).
+    /// aggregate, in one request. Only a first page composes both, since an
+    /// anchor page's aggregate would repeat the first page's (the anchor
+    /// gate below).
     async fn functions(
         &self,
         ctx: &FunctionCallContext,
@@ -570,13 +564,13 @@ impl OtelTracesHandler {
     ) -> netdata_plugin_error::Result<OtelTracesResponse> {
         let search_params = params.search_params(unix_now_s()).map_err(client_err)?;
         // The anchor gate. An anchor page reruns the same query over the
-        // cursor's FROZEN window, so the section it would compose is the
-        // first page's, byte for byte — only the rows advance. It is
-        // skipped and the section simply ABSENT (never a `null` on the
-        // wire); consumers re-read it on the next anchor-less request,
-        // the only kind that can move the window. Details on the wire
-        // (`SearchResult::overview`). A caller that keeps drawing an
-        // earlier section (a heatmap cell's list) turns it off.
+        // cursor's frozen window, so the section it would compose is the
+        // first page's. Only the rows advance. The section is skipped and
+        // absent, never a `null` on the wire. Consumers re-read it on the
+        // next anchor-less request, the only kind that can move the window.
+        // Details on the wire (`SearchResult::overview`). A caller that
+        // keeps drawing an earlier section (a heatmap cell's list) turns it
+        // off.
         let aggregate = !params.skip_overview && params.anchor.is_none();
         let data = self
             .search_result(ctx, &search_params, tenant, aggregate)
@@ -832,11 +826,10 @@ impl FunctionHandler for OtelTracesHandler {
         }
     }
 
-    /// Advertise the function to the agent/Cloud: `global` (not scoped
-    /// to one node), tagged `traces`, accessible to signed-in users of
-    /// the same space on a commercial plan (traces are a paid feature),
-    /// with the SENSITIVE_DATA flag since trace payloads may carry
-    /// sensitive content.
+    /// Advertise the function to the agent and Cloud. Access requires a
+    /// signed-in user of the same space on a commercial plan, because
+    /// traces are a paid feature. `SENSITIVE_DATA` is set because trace
+    /// payloads may carry sensitive content.
     fn declaration(&self) -> FunctionDeclaration {
         let mut d = FunctionDeclaration::new("otel-traces", "Query OpenTelemetry traces");
         d.global = true;
