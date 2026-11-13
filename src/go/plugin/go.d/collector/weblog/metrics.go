@@ -85,6 +85,8 @@ type (
 		BytesSent     oldmetrix.Counter    `stm:"bytes_sent"`
 		BytesReceived oldmetrix.Counter    `stm:"bytes_received"`
 		ReqProcTime   oldmetrix.Summary    `stm:"req_proc_time"`
+		// ReqMethodProcTime is the request processing time per HTTP method, keyed by method.
+		ReqMethodProcTime map[string]oldmetrix.Summary `stm:"req_method_proc_time"`
 	}
 )
 
@@ -118,6 +120,9 @@ func (m *metricsData) reset() {
 	m.UpsRespTime.Reset()
 	for _, v := range m.URLPatternStats {
 		v.ReqProcTime.Reset()
+		for _, s := range v.ReqMethodProcTime {
+			s.Reset()
+		}
 	}
 	for _, v := range m.ReqCustomTimeField {
 		v.Time.Reset()
@@ -139,9 +144,10 @@ func newURLPatternStats(patterns []userPattern) map[string]*patternMetrics {
 	stats := make(map[string]*patternMetrics)
 	for _, p := range patterns {
 		stats[p.Name] = &patternMetrics{
-			RespCode:    oldmetrix.NewCounterVec(),
-			ReqMethod:   oldmetrix.NewCounterVec(),
-			ReqProcTime: newWebLogSummary(),
+			RespCode:          oldmetrix.NewCounterVec(),
+			ReqMethod:         oldmetrix.NewCounterVec(),
+			ReqProcTime:       newWebLogSummary(),
+			ReqMethodProcTime: make(map[string]oldmetrix.Summary),
 		}
 	}
 	return stats
