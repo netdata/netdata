@@ -26,7 +26,7 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
 
     int code = 0;
 
-    bool in_process = ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+    bool in_process = atomic_flags_check(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
     if (!in_process) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "attempted to wait for the execution of alert that has not an execution in progress");
         code = 128;
@@ -72,11 +72,12 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
     netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", code);
 
 cleanup:
-    ae->exec_code = code;
-    ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
-
-    if(ae->exec_code != 0)
-        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_FAILED;
+    // stored before the flags change that announces it (release), so a concurrent save sees both or neither
+    __atomic_store_n(&ae->exec_code, code, __ATOMIC_RELAXED);
+    if(code != 0)
+        atomic_flags_set_and_clear(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_FAILED, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
+    else
+        atomic_flags_clear(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
 
     if (in_process)
         unlink_alarm_notify_in_progress(ae);
@@ -387,7 +388,10 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
                       rrdcalc_status2string(ae->new_status)
     );
 
-    ae->flags |= HEALTH_ENTRY_FLAG_PROCESSED;
+    // The entry is published in the health log and no health-log lock is held here: other threads set
+    // UPDATED (a newer transition) and SAVED (the metadata worker) on it concurrently, so every flag change
+    // is atomic. The flags tested below are set when the entry is created and never change.
+    uint32_t flags = atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_PROCESSED);
 
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
         // do not send notifications for internal statuses
@@ -395,7 +399,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         goto done;
     }
 
-    if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
+    if(unlikely(ae->new_status <= RRDCALC_STATUS_CLEAR && (flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         // do not send notifications for disabled statuses
 
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -410,12 +414,12 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     // which we have run the exec script
     // exception: alarms with HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION set
     RRDCALC_STATUS last_executed_status = -3;
-    if(likely(!(ae->flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
+    if(likely(!(flags & HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION))) {
         int ret = sql_health_get_last_executed_event(host, ae, &last_executed_status);
 
         if (likely(ret == 1)) {
             // we have executed this alarm notification in the past
-            if(last_executed_status == ae->new_status && !(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) {
+            if(last_executed_status == ae->new_status && !(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) {
                 // don't send the notification for the same status again
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "[%s]: Health not sending again notification for alarm '%s.%s' status %s",
@@ -428,7 +432,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
             // we have not executed this alarm notification in the past
             // so, don't send CLEAR notifications
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
-                if((!(ae->flags & HEALTH_ENTRY_RUN_ONCE)) || (ae->flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
+                if((!(flags & HEALTH_ENTRY_RUN_ONCE)) || (flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
                     netdata_log_debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
                                       , ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
                     goto done;
@@ -438,7 +442,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
     }
 
     // Check if alarm notifications are silenced
-    if (ae->flags & HEALTH_ENTRY_FLAG_SILENCED) {
+    if (flags & HEALTH_ENTRY_FLAG_SILENCED) {
         nd_log(NDLS_DAEMON, NDLP_DEBUG,
                "[%s]: Health not sending notification for alarm '%s.%s' status %s "
                "(command API has disabled notifications)",
@@ -457,8 +461,8 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     // Built here, past every bail-out above, so it costs nothing unless a
     // notification is actually rendered. Idempotent across repeated calls.
-    // Callers must not hold the health-log lock (see the note on
-    // alerts_raised_summary_populate()).
+    // It walks the alert dictionary, so no health-log lock may be held here
+    // (see health_alarm_log_process_to_send_notifications()).
     alerts_raised_summary_populate(hrm);
 
     BUFFER *warn_alarms = buffer_create(1024, &netdata_buffers_statistics.buffers_health);
@@ -485,7 +489,7 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
                               ae->source?ae_source(ae):"UNKNOWN",
                               nd_duration_to_uint32_saturating(ae->duration),
                               nd_duration_to_uint32_saturating(
-                                  (ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ?
+                                  (flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ?
                                       ae->duration : ae->non_clear_duration),
                               ae_units(ae),
                               ae_info(ae),
@@ -509,13 +513,13 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     const char *command_to_run = buffer_tostring(wb);
     if (ok) {
-        ae->flags |= HEALTH_ENTRY_FLAG_EXEC_RUN;
-        ae->exec_run_timestamp = now_realtime_sec(); /* will be updated by real time after spawning */
+        __atomic_store_n(&ae->exec_run_timestamp, now_realtime_sec(), __ATOMIC_RELAXED);
+        atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_RUN);
 
         netdata_log_debug(D_HEALTH, "executing command '%s'", command_to_run);
         ae->popen_instance = spawn_popen_run(command_to_run);
         if(ae->popen_instance) {
-            ae->flags |= HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+            atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);
             enqueue_alarm_notify_in_progress(ae);
         }
         else
@@ -536,54 +540,67 @@ done:
     health_alarm_log_save(host, ae, false);
 }
 
+// The entries due for a notification, collected under the health-log lock and sent after it is released.
+// Only the health thread runs the notification pass, so one buffer is reused across passes.
+static __thread struct {
+    ALARM_ENTRY **array;
+    size_t size;
+} health_due_notifications = { 0 };
+
 void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health_raised_summary *hrm) {
     time_t now = now_realtime_sec();
     uint32_t first_waiting;
+    size_t due = 0;
 
-    // Lock order matters below. The raised summary walk takes the host's alert
-    // dictionary read lock, while chart alert teardown takes that dictionary's
-    // write lock first and then the health-log write lock:
+    // Sending a notification queries and writes SQLite and spawns a process, which can take seconds per entry
+    // on slow storage. None of that runs under the health-log lock: chart alert teardown waits for its write
+    // lock while it holds the chart and alert dictionary write locks,
     //   rrdcalc_unlink_and_delete_all_rrdset_alerts()  [alert dict write]
     //     -> rrdcalc_unlink_and_delete()
     //       -> rrdcalc_unlink_from_rrdset()
     //         -> health_alarm_log_add_entry()          [health log write]
-    // Building the summary while holding the health-log lock would invert that
-    // order and deadlock the health thread against a concurrent chart removal.
+    // and everything that walks charts or alerts would queue behind it. Building the raised summary under the
+    // health-log lock would also invert that lock order.
     //
-    // So the first entry that needs a notification drops the lock, builds the
-    // summary, and restarts the pass. Entries already notified have
-    // HEALTH_ENTRY_FLAG_PROCESSED set and are skipped on the retry, and the
-    // summary is built at most once, so this restarts at most once.
-restart:
+    // So the due entries are collected under the read lock, and each is pinned with pending_save_count:
+    // retention cleanup skips pinned entries, and freeing a pinned entry is deferred to the metadata worker
+    // until the count drops to zero. The pin is taken while the lock still protects the pointer, and dropped
+    // after the entry's last use below.
     rw_spinlock_read_lock(&host->health_log.spinlock);
 
     first_waiting = (host->health_log.alarms)?host->health_log.alarms->unique_id:0;
 
     for(ALARM_ENTRY *ae = host->health_log.alarms; ae && ae->unique_id >= host->health_last_processed_id; ae = ae->next) {
-        if(unlikely(
-                !(ae->flags & HEALTH_ENTRY_FLAG_PROCESSED) &&
-                !(ae->flags & HEALTH_ENTRY_FLAG_UPDATED)
-                    )) {
+        if(unlikely(!atomic_flags_check(&ae->flags, HEALTH_ENTRY_FLAG_PROCESSED | HEALTH_ENTRY_FLAG_UPDATED))) {
             if(unlikely(ae->unique_id < first_waiting))
                 first_waiting = ae->unique_id;
 
             if(likely(now >= ae->delay_up_to_timestamp)) {
-                if(unlikely(!hrm->populated)) {
-                    rw_spinlock_read_unlock(&host->health_log.spinlock);
-                    alerts_raised_summary_populate(hrm);
-
-                    // re-sample: building the summary walks and sorts the host's
-                    // whole alert list, so entries can become due while it runs
-                    now = now_realtime_sec();
-                    goto restart;
+                if(unlikely(due == health_due_notifications.size)) {
+                    health_due_notifications.size = health_due_notifications.size ? health_due_notifications.size * 2 : 64;
+                    health_due_notifications.array = reallocz(
+                        health_due_notifications.array, health_due_notifications.size * sizeof(ALARM_ENTRY *));
                 }
 
-                health_send_notification(host, ae, hrm);
+                __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+                health_due_notifications.array[due++] = ae;
             }
         }
     }
 
     rw_spinlock_read_unlock(&host->health_log.spinlock);
+
+    for(size_t i = 0; i < due; i++) {
+        ALARM_ENTRY *ae = health_due_notifications.array[i];
+
+        // Sent even if a newer transition marked it UPDATED after it was collected: whether it is due was decided
+        // under the lock, as before. Re-checking here would drop the notification of every alert whose chart is
+        // removed while the pass runs, since the removal no longer waits for the pass.
+        health_send_notification(host, ae, hrm);
+
+        // release: this entry's last use above happens before whoever frees it sees the pin drop
+        __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    }
 
     // remember this for the next iteration
     host->health_last_processed_id = first_waiting;
@@ -595,13 +612,14 @@ restart:
     while(ae) {
         ALARM_ENTRY *next = ae->next; // set it here, for the next iteration
 
-        if((likely(!(ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
-             (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) &&
-             (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-             !(ae->flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
+        uint32_t flags = atomic_flags_get(&ae->flags);
+        if((likely(!(flags & HEALTH_ENTRY_FLAG_IS_REPEATING)) &&
+             (flags & HEALTH_ENTRY_FLAG_UPDATED) &&
+             (flags & HEALTH_ENTRY_FLAG_SAVED) &&
+             !(flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS))
             ||
             ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
-             (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
+             (flags & HEALTH_ENTRY_FLAG_SAVED) &&
              (nd_time_t_add_compare(ae->when, 86400, now_realtime_sec()) < 0)))
         {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);

@@ -2310,7 +2310,7 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(config->ae_DelJudyL, &Index, &first))) {
         ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
-        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
+        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE)) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             (void) JudyLDel(&config->ae_DelJudyL, Index, PJE0);
         }
@@ -2603,7 +2603,8 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
 
         sql_health_alarm_log_save(host, ae);
 
-        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
+        // release: the save above happens before whoever frees the entry sees the count drop
+        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELEASE);
         __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
     }
 

@@ -719,7 +719,7 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
+            atomic_flags_set(&t->flags, HEALTH_ENTRY_FLAG_UPDATED); // read lock only: other threads change flags too
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 

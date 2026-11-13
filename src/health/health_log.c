@@ -277,9 +277,11 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     // marked as updated by ae.
     for(ALARM_ENTRY *t = ae->next ; t ; t = t->next) {
         if(t->alarm_id == ae->alarm_id) {
-            if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
-                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
-                t->updated_by_id = ae->unique_id;
+            if(!atomic_flags_check(&t->flags, HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
+                // t is published: the notification pass and the savers read its fields without the health-log
+                // lock. updated_by_id is stored before the flag that announces it (release).
+                __atomic_store_n(&t->updated_by_id, ae->unique_id, __ATOMIC_RELAXED);
+                atomic_flags_set(&t->flags, HEALTH_ENTRY_FLAG_UPDATED);
                 ae->updates_id = t->unique_id;
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
@@ -306,7 +308,8 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
+    // acquire: pairs with the release that drops each pin, so the pin holder's last use happens before the free
+    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
         metadata_queue_ae_deletion(ae);
     else {
         string_freez(ae->name);
@@ -369,8 +372,10 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     while(ae) {
         // Check if entry is old enough to be deleted
         if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
-           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
+           // Only remove entries that have been processed/updated, and whose notification is not running: the
+           // in-progress queue keeps the pointer until health_alarm_wait_for_execution()
+           (atomic_flags_get(&ae->flags) & (HEALTH_ENTRY_FLAG_UPDATED | HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) == HEALTH_ENTRY_FLAG_UPDATED &&
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0) { // Only remove entries not pending save
             
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;
