@@ -54,47 +54,25 @@ type sessionDetail struct {
 	investigated        bool // currently selected for retained/exported detail
 }
 
-// touchSession updates (or creates) the session behind b.SessionID and
-// appends any events this beacon produced to its ring. Eviction (cap
-// maxTrackedSessions) drops the least-recently-seen session, same LRU
-// discipline as the error-group state. hist receives self-contained
-// events freshly appended this call; nil disables persistence. Only investigated sessions reach
-// history; a sampled-out session that hits an always-keep condition
-// is promoted and its in-memory timeline so far is written too. It returns
+// touchSession updates (or creates) the session behind b.SessionID and records
+// the timeline entries b produced. hist receives self-contained events recorded
+// by this call; nil disables persistence. Only investigated sessions reach
+// history: a sampled-out session that hits an always-keep condition is promoted,
+// and its retained timeline is written before the current entries. It returns
 // whether the session is investigated.
 func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time, hist HistorySink) bool {
-	id := b.SessionID
 	page := b.PageGroup
 	if page == "" {
 		page = "/"
 	}
-	var sd *sessionDetail
-	if el := st.sessIdx[id]; el != nil && now.Sub(el.Value.(*sessionDetail).lastSeen) > sessionTTL {
-		st.dropSession(el)
-	}
-	if el, ok := st.sessIdx[id]; ok {
-		sd = el.Value.(*sessionDetail)
-		st.sess.MoveToFront(el)
-	} else {
-		for st.sess.Len() >= maxTrackedSessions {
-			st.dropSession(st.sess.Back())
-		}
-		sd = &sessionDetail{
-			id:           id,
-			started:      now,
-			entryPage:    page,
-			investigated: SessionSampled(id, st.cfg.Investigate.Rate),
-		}
-		st.sessIdx[id] = st.sess.PushFront(sd)
-	}
-	promoted := !sd.investigated && st.cfg.Investigate.alwaysKeep(b)
-	if promoted {
+	sd := st.trackSession(b.SessionID, page, now)
+	if !sd.investigated && st.cfg.Investigate.alwaysKeep(b) {
 		sd.investigated = true
 		// Replay only the preceding context. Current events must never be limited
 		// by the ring or inherit the context of this promoting observation.
 		if hist != nil {
 			for _, event := range sd.events {
-				hist.Event(event.history(st.cfg.Name, id))
+				hist.Event(event.history(st.cfg.Name, sd.id))
 			}
 		}
 	}
@@ -102,84 +80,158 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		sd.lastSeen = now
 	}
 	sd.lastPage = page
-	context := newEventContext(b)
-	recorded := false
-	record := func(event sessionEvent) {
-		if event.typ != "vital" {
-			event.context = context
-		}
-		sd.pushEvent(event)
-		recorded = true
-		if hist != nil && sd.investigated {
-			hist.Event(event.history(st.cfg.Name, id))
-		}
+	t := timeline{
+		site:    st.cfg.Name,
+		session: sd,
+		hist:    hist,
+		context: newEventContext(b),
 	}
 	if pageView {
-		var revision uint64
-		for _, ev := range b.Events {
-			if ev.Kind == beacon.EventDocument {
-				revision = ev.Revision
-				break
-			}
-		}
 		sd.pageviews++
-		record(sessionEvent{
+		t.record(sessionEvent{
 			ts:       now,
 			typ:      "pageview",
-			revision: revision,
+			revision: documentRevision(b),
 			page:     page,
 		})
 	}
-
-	for _, v := range b.Vitals {
-		if poorVital(v) {
-			origin := context
-			originPage := page
-			if attrs := v.Origin; attrs != nil {
-				origin.browser, origin.device, origin.country, origin.version = attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
-				originPage = attrs.PageGroup
-			}
-			record(
-				sessionEvent{
-					ts:       now,
-					typ:      "vital",
-					page:     originPage,
-					context:  origin,
-					metricID: v.ID,
-					revision: v.Revision,
-					text:     truncateRunes(poorVitalText(v), sessionEventTextMax),
-				},
-			)
-		}
-	}
+	t.recordPoorVitals(b.Vitals, page, now)
 	for _, err := range b.Errors {
 		sd.errors++
 		event, detail := newErrorEvent(err, now, page)
 		event.error = &detail
-		record(event)
+		t.record(event)
 	}
-	for _, ev := range b.Events {
-		if ev.Kind == beacon.EventDocument || ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource ||
-			ev.Kind == beacon.EventSession {
+	t.recordEvents(b.Events, page, now)
+	// An investigated report without timeline entries still marks session activity.
+	if hist != nil && sd.investigated && !t.recorded &&
+		(len(b.Vitals) > 0 || len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
+		event := sessionEvent{
+			ts:      now,
+			typ:     "activity",
+			page:    page,
+			context: t.context,
+		}
+		hist.Event(event.history(st.cfg.Name, sd.id))
+	}
+	return sd.investigated
+}
+
+// trackSession returns the detail of a current session, or creates one with its
+// sampling decision. A session idle longer than sessionTTL starts over; at
+// maxTrackedSessions the least recently seen session is evicted.
+func (st *siteState) trackSession(id, page string, now time.Time) *sessionDetail {
+	if el := st.sessIdx[id]; el != nil {
+		sd := el.Value.(*sessionDetail)
+		if now.Sub(sd.lastSeen) <= sessionTTL {
+			st.sess.MoveToFront(el)
+			return sd
+		}
+		st.dropSession(el)
+	}
+	for st.sess.Len() >= maxTrackedSessions {
+		st.dropSession(st.sess.Back())
+	}
+	sd := &sessionDetail{
+		id:           id,
+		started:      now,
+		entryPage:    page,
+		investigated: SessionSampled(id, st.cfg.Investigate.Rate),
+	}
+	st.sessIdx[id] = st.sess.PushFront(sd)
+	return sd
+}
+
+// recordSessionless decides detail for a report without a session. It has no
+// timeline: an investigated error goes to history directly, with the page group
+// as reported.
+func (st *siteState) recordSessionless(b *beacon.Beacon, now time.Time, hist HistorySink) bool {
+	investigated := st.cfg.Investigate.Rate >= 1 || st.cfg.Investigate.alwaysKeep(b)
+	if investigated && hist != nil {
+		context := newEventContext(b)
+		for _, e := range b.Errors {
+			event, detail := newErrorEvent(e, now, b.PageGroup)
+			event.context = context
+			rec := event.history(st.cfg.Name, "")
+			detail.apply(&rec)
+			hist.Event(rec)
+		}
+	}
+	return investigated
+}
+
+// timeline appends one report's entries to a session ring and forwards them to
+// history while the session is investigated.
+type timeline struct {
+	site     string
+	session  *sessionDetail
+	hist     HistorySink
+	context  eventContext
+	recorded bool
+}
+
+// record gives an entry the report's context; a poor vital keeps the context of
+// its measurement.
+func (t *timeline) record(event sessionEvent) {
+	if event.typ != "vital" {
+		event.context = t.context
+	}
+	t.session.pushEvent(event)
+	t.recorded = true
+	if t.hist != nil && t.session.investigated {
+		t.hist.Event(event.history(t.site, t.session.id))
+	}
+}
+
+// recordPoorVitals records each poor vital with the dimensions frozen when it
+// was first measured.
+func (t *timeline) recordPoorVitals(vitals []beacon.Vital, page string, now time.Time) {
+	for _, v := range vitals {
+		if !poorVital(v) {
 			continue
 		}
-		if ev.Kind == beacon.EventView {
+		origin := t.context
+		originPage := page
+		if attrs := v.Origin; attrs != nil {
+			origin.browser, origin.device, origin.country, origin.version = attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
+			originPage = attrs.PageGroup
+		}
+		t.record(sessionEvent{
+			ts:       now,
+			typ:      "vital",
+			page:     originPage,
+			context:  origin,
+			metricID: v.ID,
+			revision: v.Revision,
+			text:     truncateRunes(poorVitalText(v), sessionEventTextMax),
+		})
+	}
+}
+
+// recordEvents records application views, frustration signals, traced requests
+// and custom events. Activations, session lifecycle and timing events are
+// represented elsewhere or not at all.
+func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Time) {
+	for _, ev := range events {
+		switch {
+		case ev.Kind == beacon.EventDocument || ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource ||
+			ev.Kind == beacon.EventSession:
+			// The page view entry stands for the activation; the rest have none.
+		case ev.Kind == beacon.EventView:
 			target := ev.Attrs["toView"]
 			if target == "" {
 				target = page
 			}
-			record(sessionEvent{
+			t.record(sessionEvent{
 				ts:       now,
 				typ:      "view",
 				revision: ev.Revision,
 				page:     target,
 				text:     target,
 			})
-			continue
-		}
-		if beacon.IsFrustration(ev.Name) {
-			sd.frustrations++
-			record(sessionEvent{
+		case beacon.IsFrustration(ev.Name):
+			t.session.frustrations++
+			t.record(sessionEvent{
 				ts:   now,
 				typ:  "frustration",
 				page: page,
@@ -188,38 +240,33 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 					sessionEventTextMax,
 				),
 			})
-			continue
+		case ev.TraceID != "" && ev.Kind == beacon.EventRequest:
+			t.record(sessionEvent{
+				ts:      now,
+				typ:     "request",
+				page:    page,
+				text:    truncateRunes(requestText(ev.Attrs), sessionEventTextMax),
+				traceID: ev.TraceID,
+			})
+		default:
+			t.record(sessionEvent{
+				ts:   now,
+				typ:  "event",
+				page: page,
+				text: truncateRunes(ev.Name, sessionEventTextMax),
+			})
 		}
-		if ev.TraceID != "" && ev.Kind == beacon.EventRequest {
-			record(
-				sessionEvent{
-					ts:      now,
-					typ:     "request",
-					page:    page,
-					text:    truncateRunes(requestText(ev.Attrs), sessionEventTextMax),
-					traceID: ev.TraceID,
-				},
-			)
-			continue
-		}
-		record(sessionEvent{
-			ts:   now,
-			typ:  "event",
-			page: page,
-			text: truncateRunes(ev.Name, sessionEventTextMax),
-		})
 	}
-	if hist != nil && sd.investigated && !recorded &&
-		(len(b.Vitals) > 0 || len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
-		event := sessionEvent{
-			ts:      now,
-			typ:     "activity",
-			page:    page,
-			context: context,
+}
+
+// documentRevision is the revision of the report's document activation, or zero.
+func documentRevision(b *beacon.Beacon) uint64 {
+	for _, ev := range b.Events {
+		if ev.Kind == beacon.EventDocument {
+			return ev.Revision
 		}
-		hist.Event(event.history(st.cfg.Name, id))
 	}
-	return sd.investigated
+	return 0
 }
 
 // newEventContext captures the identity, release and location b arrived with.

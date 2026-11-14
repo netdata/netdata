@@ -70,12 +70,7 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	if pageView {
 		row := base
 		row.Kind = "document"
-		for _, ev := range b.Events {
-			if ev.Kind == beacon.EventDocument {
-				row.Revision = ev.Revision
-				break
-			}
-		}
+		row.Revision = documentRevision(b)
 		row.PageView = true
 		appendRow(row)
 	}
