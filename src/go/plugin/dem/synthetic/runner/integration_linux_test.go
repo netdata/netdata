@@ -380,7 +380,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		require.Equal(t, synthetic.Failed, got.Run.Outcome)
 		verifyGone(t)
 		require.NotEmpty(t, got.Run.Artifacts)
-		assert.Equal(t, "available", got.Run.CaptureState)
+		assert.Equal(t, synthetic.CaptureAvailable, got.Run.CaptureState)
 		_, raw, err := captures.Fetch(context.Background(), got.Run.JobID, got.Run.ID, got.Run.Artifacts[0].ID)
 		require.NoError(t, err)
 		assert.Equal(t, "\x89PNG\r\n\x1a\n", string(raw[:8]))
@@ -420,7 +420,7 @@ test('selected entry',async({message},info)=>{
 		}
 		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
 		require.Equal(t, &synthetic.TestCounts{Declared: 1, Passed: 1}, got.Run.Tests)
-		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Equal(t, synthetic.CaptureDisabled, got.Run.CaptureState)
 		require.Empty(t, got.Run.Artifacts)
 		encoded, err := json.Marshal(got.Run)
 		require.NoError(t, err)
@@ -430,7 +430,7 @@ test('selected entry',async({message},info)=>{
 	t.Run("capture-disabled-browser-failure", func(t *testing.T) {
 		got := run(t, context.Background(), "no-capture", browserPrefix+"test('fails',async({page})=>{await page.goto("+string(urlJSON)+");expect(1).toBe(2)});", 30*time.Second, false)
 		require.Equal(t, synthetic.Failed, got.Run.Outcome)
-		require.Equal(t, "disabled", got.Run.CaptureState)
+		require.Equal(t, synthetic.CaptureDisabled, got.Run.CaptureState)
 		require.Empty(t, got.Run.Artifacts)
 		verifyGone(t)
 	})
@@ -625,7 +625,7 @@ type identityHistory struct {
 	records map[string][]synthetic.Run
 }
 
-func (h *identityHistory) AppendRun(ctx context.Context, phase string, run synthetic.Run) (bool, error) {
+func (h *identityHistory) AppendRun(ctx context.Context, phase synthetic.HistoryPhase, run synthetic.Run) (bool, error) {
 	attempted, err := h.Store.AppendRun(ctx, phase, run)
 	if err == nil {
 		if h.records == nil {

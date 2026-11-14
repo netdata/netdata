@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 func (h *Handler) runs(ctx context.Context, args map[string]string, response map[string]any) *funcapi.FunctionResponse {
@@ -85,10 +86,10 @@ var runsMethod = method{
 		column{"queued_us", "Original admission queue time", funcapi.FieldTypeTimestamp, ""},
 		column{"termination_reason", "Termination reason", funcapi.FieldTypeString, ""},
 		column{"failure_evidence_status", "Evidence reporting", funcapi.FieldTypeString, ""},
-		column{"first_failure", "First unexpected failure", funcapi.FieldTypeString, ""},
-		column{"last_observed_step", "Last observed running step", funcapi.FieldTypeString, ""},
-		column{"stop_context", "Pending before cleanup", funcapi.FieldTypeString, ""},
+		column{"first_failure", model.FirstFailureLabel, funcapi.FieldTypeString, ""},
+		column{"last_observed_step", model.LastObservedStepLabel, funcapi.FieldTypeString, ""},
+		column{"stop_context", model.StopContextLabel, funcapi.FieldTypeString, ""},
 		column{"browser_summary_status", "Browser summary reporting", funcapi.FieldTypeString, ""},
-		column{"browser_errors", "Browser errors", funcapi.FieldTypeString, ""},
+		column{"browser_errors", model.BrowserErrorsLabel, funcapi.FieldTypeString, ""},
 	),
 }

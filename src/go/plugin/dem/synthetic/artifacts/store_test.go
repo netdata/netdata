@@ -166,11 +166,11 @@ func TestPNGCapture(t *testing.T) {
 }
 func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
 	for _, trace := range []bool{false, true} {
-		kind, mime, payload := "screenshot", "image/png", png
+		kind, mime, payload := synthetic.ScreenshotCapture, "image/png", png
 		if trace {
-			kind, mime, payload = "trace", "application/zip", []byte("PK\x03\x04fixture")
+			kind, mime, payload = synthetic.TraceCapture, "application/zip", []byte("PK\x03\x04fixture")
 		}
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			for _, tc := range []struct {
 				name  string
 				order []string

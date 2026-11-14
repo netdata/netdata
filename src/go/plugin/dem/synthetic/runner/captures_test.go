@@ -34,7 +34,7 @@ func consumeCaptures(t *testing.T, lines ...string) sinkSnapshot {
 	r.CaptureState = "not_needed"
 	terminal, err := json.Marshal(frame{Type: "result", Result: &r})
 	require.NoError(t, err)
-	s := newSink(synthetic.Journey, true, newRedactor(map[string]string{"token": "synthetic-secret"}), true, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true}, newRedactor(map[string]string{"token": "synthetic-secret"}))
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(append(lines, string(terminal)), "\n"))))
 	snap := s.snapshot()
 	require.NoError(t, snap.err)
@@ -63,8 +63,8 @@ func TestCaptureReportingNegotiationAndIsolation(t *testing.T) {
 			s := consumeCaptures(t, tc.lines...)
 			require.NotNil(t, s.captures)
 			assert.Equal(t, tc.status, s.captures.Reporting)
-			assert.NotEqual(t, "invalid", s.evidence.Availability)
-			assert.NotEqual(t, "invalid", s.browser.Availability)
+			assert.NotEqual(t, "invalid", s.evidence.ReportingStatus())
+			assert.NotEqual(t, "invalid", s.browser.ReportingStatus())
 		})
 	}
 }
@@ -128,7 +128,7 @@ func TestCaptureDetailLimitNeverLimitsCandidateAuthority(t *testing.T) {
 }
 
 func TestCaptureMetadataCannotWidenCoreWire(t *testing.T) {
-	s := newSink(synthetic.Journey, true, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true}, newRedactor(nil))
 	err := s.consume(strings.NewReader(`{"type":"result","result":{"status":"failed","capture_state":"available","artifacts":[{"id":"s1","kind":"screenshot","path":"output/x.png","mime":"image/png","test":{"id":"t1"}}]}}`))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown field "test"`)
@@ -164,7 +164,7 @@ func TestTraceSupportReporting(t *testing.T) {
 		"unrequested selection":   {lines: []string{selected}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Journey, true, newRedactor(nil), true, tc.trace)
+			s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true, Trace: tc.trace}, newRedactor(nil))
 			r := success()
 			r.CaptureState = "not_needed"
 			terminal, err := json.Marshal(frame{Type: "result", Result: &r})
@@ -208,7 +208,7 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 					}
 					raw, err := json.Marshal(frame{Type: "result", Result: &r})
 					require.NoError(t, err)
-					s := newSink(synthetic.Journey, true, newRedactor(nil), false, trace)
+					s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, Trace: trace}, newRedactor(nil))
 					err = s.consume(strings.NewReader(strings.TrimSpace(init + "\n" + string(raw))))
 					if trace {
 						require.NoError(t, err)
@@ -221,4 +221,51 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 			}
 		}
 	}
+}
+
+// TestCaptureWireBounds accepts each capture_details.v1 field budget at its
+// limit and invalidates the feature one past it. Records past the record
+// budget are truncated instead; the feature stays valid.
+func TestCaptureWireBounds(t *testing.T) {
+	text := func(n int) string { return strings.Repeat("x", n-2) }
+	withTitle := func(n int) map[string]any {
+		record := captureTest("t1", 1, 0)
+		value := record["test"].(synthetic.CaptureTest)
+		value.Title = text(n)
+		record["test"] = value
+		return record
+	}
+	for name, tc := range map[string]struct {
+		lines []string
+		want  string
+	}{
+		"test ID at limit":   {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0))}, "partial"},
+		"test ID past limit": {[]string{captureInit, captureRecord(captureTest(text(129), 1, 0))}, "invalid"},
+		"title at limit":     {[]string{captureInit, captureRecord(withTitle(256))}, "partial"},
+		"title past limit":   {[]string{captureInit, captureRecord(withTitle(257))}, "invalid"},
+		"link test ID limit": {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0)), captureRecord(captureLink("s1", text(128)))}, "partial"},
+		"counts at safe max": {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger, maxSafeInteger))}, "partial"},
+		"counts past safe":   {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger+1, 0))}, "invalid"},
+		"records at limit":   {captureRecords(captureDetailLimit), "partial"},
+		"records past limit": {captureRecords(captureDetailLimit + 1), "partial"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := consumeCaptures(t, tc.lines...)
+			assert.Equal(t, tc.want, s.captures.Reporting)
+		})
+	}
+	s := consumeCaptures(t, captureRecords(captureDetailLimit)...)
+	assert.False(t, s.captures.Truncated)
+	assert.Len(t, s.captures.Tests, captureDetailLimit)
+	s = consumeCaptures(t, captureRecords(captureDetailLimit+1)...)
+	assert.True(t, s.captures.Truncated, "detail past the record budget is truncated, not invalid")
+	assert.Len(t, s.captures.Tests, captureDetailLimit)
+}
+
+func captureRecords(n int) []string {
+	lines := []string{captureInit}
+	for i := range n {
+		lines = append(lines, captureRecord(captureTest(fmt.Sprintf("t%d", i), 1, 0)))
+	}
+	return lines
 }

@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -436,8 +435,6 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 		DroppedEvents: 2,
 		Metrics: &model.LabMetrics{
 			Performance: ptr(0),
-			LCPMS:       ptr(math.NaN()),
-			CLS:         ptr(math.Inf(1)),
 		},
 		CaptureState: "unavailable",
 	}
@@ -548,13 +545,13 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	_, err = store.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
 	got = call(h, "synthetics-artifact", args...)
-	assert.Equal(t, "expired_or_unavailable", got.RawResponse["capture_state"])
+	assert.Equal(t, model.CaptureExpired, got.RawResponse["capture_state"])
 	assert.Equal(t, "expired_or_unavailable", rowValues(t, got, responseData(t, got)[0])["availability"])
 	validate(t, got)
 	got = call(h, "synthetics-artifact", append(args, "artifact_id:report")...)
 	require.NotNil(t, got.RawResponse)
 	assert.Equal(t, 404, got.RawResponse["status"])
-	assert.Equal(t, "expired_or_unavailable", got.RawResponse["capture_state"])
+	assert.Equal(t, model.CaptureExpired, got.RawResponse["capture_state"])
 	validate(t, got)
 }
 
@@ -608,8 +605,8 @@ func TestCaptureLabelsThroughRealStore(t *testing.T) {
 }
 
 func TestCaptureAbsenceStates(t *testing.T) {
-	for _, state := range []string{"disabled", "not_needed", "unavailable"} {
-		t.Run(state, func(t *testing.T) {
+	for _, state := range []model.CaptureState{model.CaptureDisabled, model.CaptureNotNeeded, model.CaptureUnavailable} {
+		t.Run(string(state), func(t *testing.T) {
 			src := &source{
 				history: map[string]model.Run{"journey:a/r": {ID: "r", JobID: "journey:a", CaptureState: state}},
 			}

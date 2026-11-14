@@ -284,7 +284,7 @@ func TestSyntheticRejectsInvalidProducerRecordBeforeAppend(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	for name, test := range map[string]struct {
-		phase string
+		phase synthetic.HistoryPhase
 		run   synthetic.Run
 	}{
 		"missing run": {"start", synthetic.Run{

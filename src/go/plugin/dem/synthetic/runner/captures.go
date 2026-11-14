@@ -10,40 +10,30 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
-const captureDetailsFeature = "capture_details.v1"
-
-// Match the producer: 32 eligible tests with four screenshots need 160 records.
-// This bounds optional detail only; terminal candidates have no new count cap.
+// captureDetailLimit matches the producer (src/dem-runtime/runner/capture-details.cjs):
+// 32 eligible tests with four screenshots need 160 test and link records. It
+// bounds optional detail only; terminal candidates have no count cap.
 const captureDetailLimit = 256
 
+// captureState decodes capture_details.v1. failure_trace.v1 has no records;
+// its lifecycle is stored with the capture report.
 type captureState struct {
-	value   *synthetic.CaptureReport
+	featureState
+	trace   *featureState // nil unless traces were requested
+	value   synthetic.CaptureReport
 	tests   map[string]int
 	ids     map[string]int
 	records int
 }
 
 func newCaptureState() *captureState {
-	return &captureState{
-		value: &synthetic.CaptureReport{Reporting: "negotiation_not_reported"},
-		tests: make(map[string]int), ids: make(map[string]int),
-	}
+	return &captureState{tests: make(map[string]int), ids: make(map[string]int)}
 }
 
-func (c *captureState) invalid() {
-	if c != nil {
-		c.value.Reporting = "invalid"
-	}
-}
+func (c *captureState) invalid() { c.invalidate("invalid_record") }
 
+// accept decodes one record of a selected, incomplete stream.
 func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
-	if c == nil || c.value.Reporting == "invalid" {
-		return
-	}
-	if c.value.Reporting == "complete" {
-		c.invalid()
-		return
-	}
 	var data struct {
 		Record string `json:"record"`
 		Test   *struct {
@@ -81,12 +71,12 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 			return
 		}
 		var clipped bool
-		value.Title, clipped = evidenceText(value.Title, 256, redact)
+		value.Title, clipped = evidenceText(value.Title, titleBytes, redact)
 		value.TextTruncated = value.TextTruncated || clipped
 		c.tests[data.Test.ID] = len(c.value.Tests)
 		c.value.Tests = append(c.value.Tests, value)
 	case "capture":
-		if data.Test != nil || !artifacts.ValidArtifactID(data.ID) || !validEvidenceID(data.TestID, 128) {
+		if data.Test != nil || !artifacts.ValidArtifactID(data.ID) || !validEvidenceID(data.TestID, testIDBytes) {
 			c.invalid()
 			return
 		}
@@ -116,7 +106,7 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 		if data.Record == "truncated" {
 			c.value.Truncated = true
 		} else {
-			c.value.Reporting = "complete"
+			c.complete()
 		}
 	default:
 		c.invalid()
@@ -133,7 +123,7 @@ func (c *captureState) admit() bool {
 }
 
 func validCaptureTest(t synthetic.CaptureTest) bool {
-	return validEvidenceID(t.ID, 128) && boundedJSON(t.Title, 256) &&
+	return validEvidenceID(t.ID, testIDBytes) && boundedJSON(t.Title, titleBytes) &&
 		slices.Contains([]string{"failed", "timedOut", "interrupted"}, t.Status) &&
 		slices.Contains([]string{"passed", "failed", "skipped"}, t.ExpectedStatus) &&
 		t.Accepted >= 0 && t.Accepted <= maxSafeInteger && t.Unaccepted >= 0 && t.Unaccepted <= maxSafeInteger
@@ -143,13 +133,18 @@ func (c *captureState) snapshot() *synthetic.CaptureReport {
 	if c == nil {
 		return nil
 	}
-	return synthetic.CloneCaptureReport(c.value)
+	out := synthetic.CloneCaptureReport(&c.value)
+	out.Reporting = c.word("partial")
+	if c.trace != nil {
+		out.Trace = c.trace.word("supported")
+	}
+	return out
 }
 
 // joinCaptures adds labels only to already admitted terminal candidates. Metadata
 // IDs absent from that authority remain explanations, never offered files.
 func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture) {
-	if run.CaptureState == "disabled" {
+	if run.CaptureState == synthetic.CaptureDisabled {
 		return
 	}
 	if run.Captures == nil {

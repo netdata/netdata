@@ -210,17 +210,16 @@ func (s *Store) Finalize(
 	return m.Artifacts, nil
 }
 
-func validCaptureKind(kind, mime string) bool {
-	return kind == "screenshot" && mime == "image/png" ||
-		kind == "report" && mime == "text/html" ||
-		kind == "trace" && mime == "application/zip"
+func validCaptureKind(kind synthetic.CaptureKind, mime string) bool {
+	return mime != "" && kind.MIME() == mime
 }
 
-func captureSignature(kind string) string {
+// captureSignature is the magic prefix of a kind's file format, or "".
+func captureSignature(kind synthetic.CaptureKind) string {
 	switch kind {
-	case "screenshot":
+	case synthetic.ScreenshotCapture:
 		return "\x89PNG\r\n\x1a\n"
-	case "trace":
+	case synthetic.TraceCapture:
 		return "PK\x03\x04"
 	default:
 		return ""

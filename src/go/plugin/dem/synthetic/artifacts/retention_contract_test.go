@@ -56,19 +56,17 @@ func (f *retentionFixture) begin(job string) (string, string) {
 	return id, work
 }
 
-func (f *retentionFixture) publish(job, kind string, bytes int) string {
+func (f *retentionFixture) publish(job string, kind synthetic.CaptureKind, bytes int) string {
 	f.t.Helper()
 	id, work := f.begin(job)
 	payload := []byte(strings.Repeat("x", bytes))
-	mime := "text/html"
-	if kind == "screenshot" {
+	if kind == synthetic.ScreenshotCapture {
 		payload = append([]byte("\x89PNG\r\n\x1a\n"), payload...)
-		mime = "image/png"
 	}
 	require.NoError(f.t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(f.t, os.WriteFile(filepath.Join(work, "output", "capture"), payload, 0600))
 	out, err := f.store.Finalize(context.Background(), id, []synthetic.Capture{{
-		ID: "capture", Kind: kind, MIME: mime, Path: "output/capture",
+		ID: "capture", Kind: kind, MIME: kind.MIME(), Path: "output/capture",
 	}})
 	require.NoError(f.t, err)
 	require.Len(f.t, out, 1)
@@ -114,7 +112,10 @@ func (f *retentionFixture) retained(job, id string, want bool) {
 }
 
 func TestRetentionPrefersNewestCapturePerJob(t *testing.T) {
-	for _, test := range []struct{ name, quietJob, kind string }{
+	for _, test := range []struct {
+		name, quietJob string
+		kind           synthetic.CaptureKind
+	}{
 		{"mixed capture kinds", "journey:quiet", "screenshot"},
 		{"same capture kind", "lighthouse:quiet", "report"},
 	} {

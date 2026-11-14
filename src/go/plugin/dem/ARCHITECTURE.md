@@ -493,7 +493,7 @@ Synthetic packages:
 
 | Package | Responsibility |
 |---|---|
-| `synthetic` | Shared request, run, event and artifact values plus request validation |
+| `synthetic` | Shared request, run, event, capture and optional-output status values with their vocabularies, plus request and job ID validation |
 | `synthetic/registry` | Copied active-job observations, generation fencing and freshness |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |

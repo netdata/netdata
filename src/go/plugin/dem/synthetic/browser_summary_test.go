@@ -30,24 +30,18 @@ func TestBrowserSummaryCoveragePresentation(t *testing.T) {
 	assert.Equal(t, "invalid", value.ReportingStatus())
 	assert.Contains(t, value.Summary(), "console_error=5")
 }
-func TestBrowserSparseAndPrimitiveJSON(t *testing.T) {
-	for _, raw := range []string{`{"tests":{},"counts":{"uncaught":null}}`, `{"tests":null,"counts":{}}`, `{"tests":{},"counts":null}`, `{"tests":{}}`, `{"tests":{"observed":null},"counts":{}}`} {
-		var a BrowserAggregate
-		assert.Error(t, json.Unmarshal([]byte(raw), &a), raw)
-	}
+
+// TestBrowserStoredJSONRoundTrip covers the stored shapes; wire strictness is
+// the runner's (TestBrowserWireRejectsNullAndAmbiguousMembers).
+func TestBrowserStoredJSONRoundTrip(t *testing.T) {
 	var a BrowserAggregate
 	require.NoError(t, json.Unmarshal([]byte(`{"tests":{"observed":1},"counts":{}}`), &a))
-	assert.Equal(t, int64(1), a.Tests.Observed)
-	assert.Equal(t, BrowserCounts{}, a.Counts)
+	assert.Equal(t, BrowserAggregate{Tests: BrowserTestCounts{Observed: 1}}, a)
 	for _, raw := range []string{`{"value":null}`, `{"value":false}`, `{"value":1.25}`, `{"value":"text"}`, `{"omitted":"unrepresentable"}`} {
 		var arg BrowserArgument
 		require.NoError(t, json.Unmarshal([]byte(raw), &arg))
 		out, err := json.Marshal(arg)
 		require.NoError(t, err)
 		assert.JSONEq(t, raw, string(out))
-	}
-	for _, raw := range []string{`{}`, `{"value":null,"omitted":"object"}`, `{"omitted":null}`} {
-		var arg BrowserArgument
-		assert.Error(t, json.Unmarshal([]byte(raw), &arg))
 	}
 }

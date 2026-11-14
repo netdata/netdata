@@ -11,45 +11,46 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-const failureEvidenceFeature = "failure_evidence.v1"
-
-// Diagnostic quotas bound arbitrary user-script detail independently of core
-// outcomes. Separate pools reserve test and user-step detail against API noise.
-// With the per-item limits below, retained data is <544 KiB and the producer's
-// begin/end records plus failure/stop context emit <1 MiB. See the runtime wire policy.
+// failure_evidence.v1 budgets, enforced by the producer
+// (src/dem-runtime/runner/failure-evidence.cjs) and described in
+// src/dem-runtime/README.md, "Feature budgets". They bound arbitrary user-script
+// detail independently of core outcomes; separate pools reserve test and
+// user-step detail against API noise. Retained data stays below 544 KiB.
 const (
 	evidenceTestLimit      = 64
 	evidenceUserStepLimit  = 128
 	evidenceOtherStepLimit = 64
-	evidencePayloadLimit   = 32 << 10
-	maxSafeInteger         = 1<<53 - 1
+	failurePathLimit       = 16 // first eight and last eight ancestors
+
+	// Encoded JSON bytes, quotes included. Browser and capture details share
+	// the test ID and title budgets.
+	testIDBytes      = 128
+	stepIDBytes      = 64
+	titleBytes       = 256
+	sourceBytes      = 256 // script-relative source file label
+	categoryBytes    = 64
+	stepMessageBytes = 1024
+	stepBytes        = 2048 // one serialized step; field budgets alone allow more
+	// A first-failure message is clipped to TextLimit runes; at the widest JSON
+	// escape (\u00XX) that encodes to this many bytes.
+	failureMessageBytes = 6*TextLimit + 2
 )
 
+// maxSafeInteger is JavaScript's Number.MAX_SAFE_INTEGER: the producer's counts
+// and source positions are JavaScript numbers.
+const maxSafeInteger = 1<<53 - 1
+
 type evidenceState struct {
-	value      *synthetic.FailureEvidence
+	featureState
+	value      synthetic.FailureEvidence
 	tests      map[string]int
 	steps      map[string]int
 	userSteps  int
 	otherSteps int
 }
 
-func newEvidenceState(kind synthetic.Kind) *evidenceState {
-	if kind != synthetic.Journey {
-		return nil
-	}
-	return &evidenceState{
-		value: &synthetic.FailureEvidence{Availability: "unavailable", Reason: "negotiation_not_reported"},
-		tests: make(map[string]int), steps: make(map[string]int),
-	}
-}
-
-func (e *evidenceState) invalid(reason string) {
-	if e == nil || e.value.Availability == "invalid" {
-		return
-	}
-	e.value.Availability = "invalid"
-	e.value.Reason = reason
-	e.value.ReporterComplete = false
+func newEvidenceState() *evidenceState {
+	return &evidenceState{tests: make(map[string]int), steps: make(map[string]int)}
 }
 
 func (e *evidenceState) truncate(scope string) {
@@ -58,14 +59,8 @@ func (e *evidenceState) truncate(scope string) {
 	}
 }
 
+// accept decodes one record of a selected, incomplete stream.
 func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
-	if e == nil || e.value.Availability == "invalid" {
-		return
-	}
-	if e.value.ReporterComplete {
-		e.invalid("record_after_completion")
-		return
-	}
 	var data struct {
 		Record  string                   `json:"record"`
 		Test    *synthetic.EvidenceTest  `json:"test"`
@@ -75,7 +70,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		Scope   string                   `json:"scope"`
 	}
 	if json.Unmarshal(raw, &data) != nil {
-		e.invalid("invalid_record")
+		e.invalidate("invalid_record")
 		return
 	}
 	valid := false
@@ -115,12 +110,12 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		}
 	case "complete":
 		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" {
-			e.value.ReporterComplete = true
+			e.complete()
 			valid = true
 		}
 	}
 	if !valid {
-		e.invalid("invalid_record")
+		e.invalidate("invalid_record")
 	}
 }
 
@@ -132,7 +127,7 @@ func (e *evidenceState) redactDetail(detail *synthetic.FailureDetail, redact *te
 		detail.TextTruncated = detail.TextTruncated || detail.Path[i].TextTruncated
 	}
 	var clipped bool
-	detail.Message, clipped = evidenceText(detail.Message, 12002, redact)
+	detail.Message, clipped = evidenceText(detail.Message, failureMessageBytes, redact)
 	locationClipped := redactLocation(detail.Location, redact)
 	detail.TextTruncated = detail.TextTruncated || clipped || locationClipped
 	if detail.TextTruncated {
@@ -228,7 +223,9 @@ func (e *evidenceState) snapshot() *synthetic.FailureEvidence {
 	if e == nil {
 		return nil
 	}
-	return synthetic.CloneFailureEvidence(e.value)
+	out := synthetic.CloneFailureEvidence(&e.value)
+	out.FeatureStatus = e.status()
+	return out
 }
 
 func boundedJSON(value any, limit int) bool {
@@ -252,7 +249,7 @@ func validLocation(l *synthetic.EvidenceLocation) bool {
 	if l == nil {
 		return true
 	}
-	if l.File == "" || strings.HasPrefix(l.File, "/") || strings.ContainsAny(l.File, "\\:\x00") || !boundedJSON(l.File, 256) || l.Line <= 0 || l.Column <= 0 || int64(l.Line) > maxSafeInteger || int64(l.Column) > maxSafeInteger {
+	if l.File == "" || strings.HasPrefix(l.File, "/") || strings.ContainsAny(l.File, "\\:\x00") || !boundedJSON(l.File, sourceBytes) || l.Line <= 0 || l.Column <= 0 || int64(l.Line) > maxSafeInteger || int64(l.Column) > maxSafeInteger {
 		return false
 	}
 	return !slices.Contains(strings.Split(l.File, "/"), "..")
@@ -263,16 +260,20 @@ func validDuration(d *float64) bool {
 }
 
 func validEvidenceTest(t synthetic.EvidenceTest) bool {
-	return validEvidenceID(t.ID, 128) && boundedJSON(t.Title, 256) && validLocation(t.Location) &&
+	// The producer's 1024-byte limit per serialized test never binds here: the
+	// field budgets keep a test well below it.
+	return validEvidenceID(t.ID, testIDBytes) && boundedJSON(t.Title, titleBytes) && validLocation(t.Location) &&
 		slices.Contains([]string{"running", "passed", "failed", "timedOut", "skipped", "interrupted"}, t.Status) &&
 		slices.Contains([]string{"passed", "failed", "skipped"}, t.ExpectedStatus) &&
-		(t.Status != "running") == t.ReportingComplete && validDuration(t.DurationMS) && boundedJSON(t, 1024)
+		(t.Status != "running") == t.ReportingComplete && validDuration(t.DurationMS)
 }
 
 func validEvidenceStep(s synthetic.EvidenceStep) bool {
-	return validEvidenceID(s.ID, 64) && validEvidenceID(s.TestID, 128) && (s.ParentID == "" || validEvidenceID(s.ParentID, 64) && s.ParentID != s.ID) &&
-		boundedJSON(s.Title, 256) && s.Category != "" && boundedJSON(s.Category, 64) && validLocation(s.Location) &&
-		slices.Contains([]string{"running", "passed", "failed"}, s.State) && validDuration(s.DurationMS) && boundedJSON(s.Message, 1024) && boundedJSON(s, 2048)
+	return validEvidenceID(s.ID, stepIDBytes) && validEvidenceID(s.TestID, testIDBytes) &&
+		(s.ParentID == "" || validEvidenceID(s.ParentID, stepIDBytes) && s.ParentID != s.ID) &&
+		boundedJSON(s.Title, titleBytes) && s.Category != "" && boundedJSON(s.Category, categoryBytes) && validLocation(s.Location) &&
+		slices.Contains([]string{"running", "passed", "failed"}, s.State) && validDuration(s.DurationMS) &&
+		boundedJSON(s.Message, stepMessageBytes) && boundedJSON(s, stepBytes)
 }
 
 func validFailure(f synthetic.FailureDetail) bool {
@@ -287,8 +288,8 @@ func validStop(f synthetic.FailureDetail) bool {
 
 func validDetail(f synthetic.FailureDetail) bool {
 	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
-		len(f.Path) > 16 || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
-		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f.Message, 12002) || !boundedJSON(f, evidencePayloadLimit) {
+		len(f.Path) > failurePathLimit || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
+		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f, extensionBodyLimit) {
 		return false
 	}
 	seen := make(map[string]bool, len(f.Path))
@@ -332,7 +333,7 @@ func redactLocation(l *synthetic.EvidenceLocation, redact *textRedactor) bool {
 		return false
 	}
 	var clipped bool
-	l.File, clipped = evidenceText(l.File, 256, redact)
+	l.File, clipped = evidenceText(l.File, sourceBytes, redact)
 	if clipped {
 		l.File = "[external]"
 	}
@@ -341,16 +342,16 @@ func redactLocation(l *synthetic.EvidenceLocation, redact *textRedactor) bool {
 
 func redactEvidenceTest(t *synthetic.EvidenceTest, redact *textRedactor) {
 	var clipped bool
-	t.Title, clipped = evidenceText(t.Title, 256, redact)
+	t.Title, clipped = evidenceText(t.Title, titleBytes, redact)
 	locationClipped := redactLocation(t.Location, redact)
 	t.TextTruncated = t.TextTruncated || clipped || locationClipped
 }
 
 func redactEvidenceStep(s *synthetic.EvidenceStep, redact *textRedactor) {
 	var clipped bool
-	s.Title, clipped = evidenceText(s.Title, 256, redact)
+	s.Title, clipped = evidenceText(s.Title, titleBytes, redact)
 	s.TextTruncated = s.TextTruncated || clipped
-	s.Message, clipped = evidenceText(s.Message, 1024, redact)
+	s.Message, clipped = evidenceText(s.Message, stepMessageBytes, redact)
 	locationClipped := redactLocation(s.Location, redact)
 	s.TextTruncated = s.TextTruncated || clipped || locationClipped
 }

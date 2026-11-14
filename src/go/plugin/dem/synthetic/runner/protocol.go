@@ -3,12 +3,13 @@ package runner
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +33,8 @@ func newRedactor(values map[string]string) *textRedactor {
 			known = append(known, value)
 		}
 	}
-	sort.Slice(known, func(i, j int) bool { return len(known[i]) > len(known[j]) })
+	// Longest first, so a secret containing another is replaced whole.
+	slices.SortFunc(known, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
 	var pairs []string
 	for _, value := range known {
 		pairs = append(pairs, value, "[REDACTED]")
@@ -78,7 +80,7 @@ type reporterResult struct {
 	Tests                *synthetic.TestCounts       `json:"tests,omitempty"`
 	Metrics              *synthetic.LabMetrics       `json:"metrics,omitempty"`
 	Artifacts            []synthetic.Capture         `json:"artifacts,omitempty"`
-	CaptureState         string                      `json:"capture_state"`
+	CaptureState         synthetic.CaptureState      `json:"capture_state"`
 }
 
 // wireEnvelope separates strict core decoding from optional-body validation.
@@ -118,14 +120,16 @@ type sinkSnapshot struct {
 	partial  *synthetic.TestCounts
 }
 
-func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser, trace bool) *sink {
+// newSink reads one attempt's output; the request decides which results and
+// optional outputs are legal.
+func newSink(request synthetic.Request, redact *textRedactor) *sink {
 	return &sink{
-		extensions:   newExtensions(kind, browser, capture, trace),
+		extensions:   newExtensions(request),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
-		kind:         kind,
-		capture:      capture,
-		trace:        trace,
+		kind:         request.Kind,
+		capture:      request.Capture,
+		trace:        request.Trace,
 		redact:       redact,
 		events:       []synthetic.Event{},
 		tests:        make(map[string]synthetic.Event),
@@ -373,16 +377,16 @@ func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterRe
 		return errors.New("invalid terminal outcome")
 	}
 	candidateCount := len(result.Artifacts) + len(result.InterruptedArtifacts)
-	if !capture && (result.CaptureState != "disabled" || candidateCount != 0) {
+	if !capture && (result.CaptureState != synthetic.CaptureDisabled || candidateCount != 0) {
 		return errors.New("runner captured content while capture was disabled")
 	}
 	if capture {
 		switch result.CaptureState {
-		case "not_needed", "unavailable", "available":
+		case synthetic.CaptureNotNeeded, synthetic.CaptureUnavailable, synthetic.CaptureAvailable:
 		default:
 			return errors.New("invalid capture state")
 		}
-		if (result.CaptureState == "available") != (candidateCount > 0) {
+		if (result.CaptureState == synthetic.CaptureAvailable) != (candidateCount > 0) {
 			return errors.New("capture state contradicts artifact candidates")
 		}
 	}
@@ -464,14 +468,18 @@ func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterRe
 		if kind == synthetic.Journey && !validJourneyCapture(a, trace) {
 			return errors.New("unsupported journey capture")
 		}
-		if kind == synthetic.Lighthouse && (a.Kind != "report" || a.MIME != "text/html") {
+		if kind == synthetic.Lighthouse && !validCapture(a, synthetic.ReportCapture) {
 			return errors.New("unsupported audit capture")
 		}
 	}
 	return nil
 }
 func validJourneyCapture(a synthetic.Capture, trace bool) bool {
-	return a.Kind == "screenshot" && a.MIME == "image/png" || trace && a.Kind == "trace" && a.MIME == "application/zip"
+	return validCapture(a, synthetic.ScreenshotCapture) || trace && validCapture(a, synthetic.TraceCapture)
+}
+
+func validCapture(a synthetic.Capture, kind synthetic.CaptureKind) bool {
+	return a.Kind == kind && a.MIME == kind.MIME()
 }
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 

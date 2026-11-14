@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
@@ -51,33 +52,13 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 // rehearsalFailureText preserves the core error and adds the same diagnostic
 // summaries shown in run history without assigning them outcome authority.
 func rehearsalFailureText(run synthetic.Run) string {
-	text := run.Error
-	if e := run.FailureEvidence; e != nil && e.FirstFailure != nil && e.FirstFailure.Message == text {
-		text = "" // The same core error is preserved in the contextual failure summary.
+	var lines []string
+	// The contextual first-failure summary already carries an identical core error.
+	if e := run.FailureEvidence; run.Error != "" && (e == nil || e.FirstFailure == nil || e.FirstFailure.Message != run.Error) {
+		lines = append(lines, run.Error)
 	}
-	if failure := run.FailureEvidence.FailureSummary(); failure != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "First unexpected failure: " + failure
+	for _, d := range run.Diagnostics() {
+		lines = append(lines, d.Label+": "+d.Text)
 	}
-	if step := run.FailureEvidence.LastObservedStepSummary(); step != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Last observed running step: " + step
-	}
-	if stop := run.FailureEvidence.StopSummary(); stop != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Pending before cleanup: " + stop
-	}
-	if summary := run.BrowserSummary.Summary(); summary != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Browser errors: " + summary
-	}
-	return text
+	return strings.Join(lines, "\n")
 }
