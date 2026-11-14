@@ -88,7 +88,7 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
 		return
 	}
-	bot := r.URL.Query().Get("bot") == "1" || beacon.IsBot(r.Header.Get("User-Agent"))
+	bot := r.URL.Query().Get("bot") == "1" || faro.IsBot(r.Header.Get("User-Agent"))
 	if bot && !st.includeBots {
 		route.processor.Reject(st.key, beacon.RejectBot)
 		w.WriteHeader(http.StatusNoContent)

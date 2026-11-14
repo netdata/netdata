@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 )
 
 // snapshot is the immutable, compiled receiver configuration used by
@@ -32,7 +32,7 @@ type site struct {
 	// header patterns.
 	tracing   bool
 	propagate []string
-	pathRules []beacon.PathRule // redact_paths
+	pathRules []faro.PathRule // redact_paths
 	redactor  *redact.Redactor
 }
 
@@ -83,7 +83,7 @@ func compileSite(sc config.Site) *site {
 			continue // an empty pattern would match everywhere
 		}
 		if re, err := regexp.Compile(pr.Pattern); err == nil {
-			st.pathRules = append(st.pathRules, beacon.PathRule{
+			st.pathRules = append(st.pathRules, faro.PathRule{
 				Re:      re,
 				Replace: pr.Replace,
 			})

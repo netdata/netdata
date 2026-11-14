@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 )
 
 type discardHistory struct{}
@@ -120,7 +121,7 @@ func BenchmarkIngestErrors(b *testing.B) {
 				Type:        "TypeError",
 				Message:     "checkout failed",
 				Stack:       "at checkout()",
-				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+				Fingerprint: faro.Fingerprint("TypeError", "checkout failed", "at checkout()"),
 			},
 		},
 	}
@@ -154,7 +155,7 @@ func BenchmarkIngestSessionlessErrors(b *testing.B) {
 				Type:        "TypeError",
 				Message:     "checkout failed",
 				Stack:       "at checkout()",
-				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+				Fingerprint: faro.Fingerprint("TypeError", "checkout failed", "at checkout()"),
 			},
 		},
 	}

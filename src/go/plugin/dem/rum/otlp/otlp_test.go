@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/require"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -422,7 +423,7 @@ func TestTruncateKeepsRuneBoundaries(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := beacon.Truncate(tc.in, tc.n); got != tc.want {
+			if got := faro.Truncate(tc.in, tc.n); got != tc.want {
 				t.Fatalf("truncate(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
 			}
 		})

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -46,7 +47,7 @@ func mk(now time.Time, session, page string, vitals ...beacon.Vital) *beacon.Bea
 		Received:  now,
 		SessionID: session,
 		Path:      page,
-		PageGroup: beacon.PageGroup(page),
+		PageGroup: faro.PageGroup(page),
 		Browser:   "Chrome",
 		Device:    "desktop",
 		Country:   "GR",

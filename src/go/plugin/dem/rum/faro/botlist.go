@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package beacon
+package faro
 
 // Code generated from isbot 5.2.2 (https://github.com/omrilotan/isbot,
 // Unlicense); regenerate when refreshing the list.

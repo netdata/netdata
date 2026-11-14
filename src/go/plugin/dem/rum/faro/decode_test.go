@@ -62,9 +62,9 @@ func TestParseFaro(t *testing.T) {
 				Country:   "GR",
 				Errors: []beacon.Error{
 					{Type: "TypeError", Message: "x is undefined", Stack: "render (https://x/app.js:10:5)\n", Time: ts,
-						Fingerprint: beacon.Fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
+						Fingerprint: Fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
 					{Type: "Error", Message: "no stack", Time: now,
-						Fingerprint: beacon.Fingerprint("Error", "no stack", "")},
+						Fingerprint: Fingerprint("Error", "no stack", "")},
 				},
 			},
 		},
@@ -439,7 +439,7 @@ func TestParseFaroPrivacyAttributionAndUser(t *testing.T) {
 		FrustrationSignals: true,
 		Site:               "s",
 		Now:                time.Now(),
-		PathRules:          []beacon.PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
+		PathRules:          []PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
 	}
 	b, err := Decode([]byte(body), opt)
 	if err != nil {

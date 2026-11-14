@@ -28,28 +28,28 @@ func (o Options) apply(value string) string {
 }
 
 func (o Options) text(value string, limit int) string {
-	return beacon.Clean(o.apply(value), limit)
+	return Clean(o.apply(value), limit)
 }
 
 func (o Options) cleanURL(value string) string {
 	if value == "" {
 		return ""
 	}
-	value = o.apply(beacon.RedactURL(value, o.PathRules))
+	value = o.apply(RedactURL(value, o.PathRules))
 	// Keep the full URL until callers separate host and path or bound an attribute.
-	return beacon.Clean(value, len(value))
+	return Clean(value, len(value))
 }
 
 func (o Options) url(value string, limit int) string {
-	return beacon.Truncate(o.cleanURL(value), limit)
+	return Truncate(o.cleanURL(value), limit)
 }
 
 func (o Options) view(value string) string {
-	value = beacon.Clean(value, len(value))
+	value = Clean(value, len(value))
 	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
 		value = o.url(value, maxPathLen)
 		if value != "" {
-			value = beacon.Path(value)
+			value = Path(value)
 		}
 	} else {
 		for _, rule := range o.PathRules {
@@ -65,7 +65,7 @@ func (o Options) selector(value string) string {
 	if r == nil {
 		r = defaultRedactor
 	}
-	return beacon.Clean(beacon.RedactSelector(r.Apply(value)), maxSelector)
+	return Clean(RedactSelector(r.Apply(value)), maxSelector)
 }
 
 type stackFrame struct {
@@ -77,7 +77,7 @@ type stackFrame struct {
 
 func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 	function := o.text(frame.Function, maxStackLen)
-	filename := o.text(beacon.RedactSourceURL(frame.Filename, o.PathRules), maxStackLen)
+	filename := o.text(RedactSourceURL(frame.Filename, o.PathRules), maxStackLen)
 	fmt.Fprintf(stack, "%s (%s:%d:%d)\n", function, filename, frame.Lineno, frame.Colno)
 	return function + "@" + filename
 }
@@ -128,12 +128,12 @@ func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bo
 		numeric = key == "http.response.status_code" || key == "duration_ns"
 	}
 	if numeric {
-		value = beacon.Clean(value, len(value))
+		value = Clean(value, len(value))
 		n, err := strconv.ParseFloat(value, 64)
 		if err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 			return "", false
 		}
-		return beacon.Truncate(value, maxAttrLen), true
+		return Truncate(value, maxAttrLen), true
 	}
 	return o.cleanAttr(key, value), true
 }

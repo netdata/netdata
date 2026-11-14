@@ -118,7 +118,7 @@ type Options struct {
 	Redactor           *redact.Redactor
 	ConsoleLogs        bool
 	Tracing            bool
-	PathRules          []beacon.PathRule
+	PathRules          []PathRule
 }
 
 const (
@@ -171,9 +171,9 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		}
 	}
 	pageURL := opt.cleanURL(p.Meta.Page.URL)
-	b.Path = beacon.Path(pageURL)
+	b.Path = Path(pageURL)
 	b.PageHost = pageHost(pageURL)
-	b.PageGroup = beacon.PageGroup(b.Path)
+	b.PageGroup = PageGroup(b.Path)
 
 	for i, m := range p.Measurements {
 		if i >= maxItems {
@@ -222,9 +222,9 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       beacon.Truncate(stack.String(), maxStackLen),
+			Stack:       Truncate(stack.String(), maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
-			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
+			Fingerprint: Fingerprint(typ, msg, firstFrame),
 		})
 	}
 
@@ -233,7 +233,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			break
 		}
 		// Classification uses protocol names, before free-text transformation.
-		name := beacon.Clean(ev.Name, len(ev.Name))
+		name := Clean(ev.Name, len(ev.Name))
 		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
 			continue
 		}
@@ -247,7 +247,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
-				k = beacon.Clean(k, len(k))
+				k = Clean(k, len(k))
 				nativeAttr := keepEventAttr(kind, name, k)
 				if !opt.EventLogs && !nativeAttr {
 					continue
@@ -336,7 +336,7 @@ func (o Options) attributedElement(vital string, ctx map[string]any) string {
 }
 
 // pageHost is the page URL's host (first-party resource
-// classification), independent of beacon.Path's query/fragment stripping.
+// classification), independent of Path's query/fragment stripping.
 // "" when the URL has no host (relative path, unparsable).
 func pageHost(raw string) string {
 	u, err := url.Parse(strings.TrimSpace(raw))
@@ -379,7 +379,7 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
 		Host:      strings.ToLower(attrs["httpHost"]),
-		Initiator: beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Initiator: Clean(attrs["initiatorType"], maxNameLen),
 		Self:      isCollectorRequest(attrs["name"]),
 	}
 	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
@@ -478,5 +478,5 @@ func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
 			break
 		}
 	}
-	return typ, beacon.Truncate(stack.String(), maxStackLen)
+	return typ, Truncate(stack.String(), maxStackLen)
 }

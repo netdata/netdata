@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package beacon
+package faro
 
 import (
 	"net/url"
@@ -9,10 +9,7 @@ import (
 	"unicode/utf8"
 )
 
-const (
-	maxPathLen  = 512
-	maxGroupLen = 200
-)
+const maxGroupLen = 200
 
 // Path reduces a page URL to its path: query and fragment are dropped
 // before any other use, control characters removed, length capped.

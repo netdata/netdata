@@ -9,6 +9,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
@@ -24,7 +25,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	retained := history.NewStore(journalStore)
 	sites := registry.New()
-	fingerprint := beacon.Fingerprint("TypeError", "failed", "app.js")
+	fingerprint := faro.Fingerprint("TypeError", "failed", "app.js")
 	for _, site := range []string{"a", "b"} {
 		owner, _ := addSite(t, sites, site, "first")
 		page(owner, site, "/shared")
