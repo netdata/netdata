@@ -13,8 +13,8 @@ func (c *Collector) Collect(context.Context) error {
 		state = "serving"
 	}
 	c.metrics.state.Enable(state)
-	for i, counter := range c.metrics.requests {
-		counter.ObserveTotal(float64(c.requests[i].Load()))
-	}
+	c.metrics.success.ObserveTotal(float64(c.requests.success.Load()))
+	c.metrics.clientErrors.ObserveTotal(float64(c.requests.clientErrors.Load()))
+	c.metrics.serverErrors.ObserveTotal(float64(c.requests.serverErrors.Load()))
 	return nil
 }

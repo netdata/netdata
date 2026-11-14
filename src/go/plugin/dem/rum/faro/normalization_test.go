@@ -16,7 +16,7 @@ import (
 func TestCaptureNormalizesBeforeFingerprinting(t *testing.T) {
 	opt := Options{Site: "shop", Now: now, EventLogs: true, FrustrationSignals: true,
 		Redactor:  redact.NewRedactor("configured-value"),
-		PathRules: []beacon.PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
+		PathRules: []PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
 	}
 	var fingerprints []string
 	for _, query := range []string{"?request=one#first", "?request=two#second"} {
@@ -199,7 +199,7 @@ func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
 	opt := Options{
 		Now:         now,
 		ConsoleLogs: true,
-		PathRules:   []beacon.PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
+		PathRules:   []PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
 	}
 	var fingerprints []string
 	for _, filename := range []string{"framework-2c79e2a64abdb08b.js", "framework-3c79e2a64abdb08b.mjs", "framework-4c79e2a64abdb08b.cjs"} {

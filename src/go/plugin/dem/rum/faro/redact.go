@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package beacon
+package faro
 
 import (
 	"errors"
@@ -16,13 +16,10 @@ type PathRule struct {
 	Replace string
 }
 
-// RedactPath removes personal data from a URL path: the site's
-// rules first, then per segment email addresses (email), UUIDs and
-// numbers of 6+ digits (id), and long token-like strings (token).
-func RedactPath(path string, rules []PathRule) string {
-	return redactPath(path, rules, false)
-}
-
+// redactPath removes personal data from a URL path: the site's rules first,
+// then per segment email addresses (email), UUIDs and numbers of 6+ digits
+// (id), and long token-like strings (token). A source path keeps a final
+// script file name.
 func redactPath(path string, rules []PathRule, source bool) string {
 	for _, r := range rules {
 		path = r.Re.ReplaceAllString(path, r.Replace)
@@ -48,24 +45,24 @@ func redactPath(path string, rules []PathRule, source bool) string {
 	return strings.Join(segs, "/")
 }
 
-// RedactURL strips credentials, query and fragment and applies the site's path
+// redactURL strips credentials, query and fragment and applies the site's path
 // rules. Relative paths follow the same policy.
-func RedactURL(raw string, rules []PathRule) string {
-	return redactURL(raw, rules, false)
+func redactURL(raw string, rules []PathRule) string {
+	return redactLink(raw, rules, false)
 }
 
-// RedactSourceURL retains script basenames for source attribution and error
+// redactSourceURL retains script basenames for source attribution and error
 // fingerprints. Site rules and identifier redaction still apply; only the token
 // heuristic is skipped for the final .js, .mjs or .cjs path segment.
-func RedactSourceURL(raw string, rules []PathRule) string {
-	return redactURL(raw, rules, true)
+func redactSourceURL(raw string, rules []PathRule) string {
+	return redactLink(raw, rules, true)
 }
 
 func isScriptFile(name string) bool {
 	return strings.HasSuffix(name, ".js") || strings.HasSuffix(name, ".mjs") || strings.HasSuffix(name, ".cjs")
 }
 
-func redactURL(raw string, rules []PathRule, source bool) string {
+func redactLink(raw string, rules []PathRule, source bool) string {
 	raw = strings.TrimSpace(raw)
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -135,9 +132,9 @@ var (
 	selectorLongNum = regexp.MustCompile(`\d{6,}`)
 )
 
-// RedactSelector removes email addresses, UUIDs and long numbers that can
+// redactSelector removes email addresses, UUIDs and long numbers that can
 // end up in element ids or classes.
-func RedactSelector(s string) string {
+func redactSelector(s string) string {
 	s = selectorEmailRe.ReplaceAllString(s, ":email")
 	s = selectorUUIDRe.ReplaceAllString(s, ":id")
 	return selectorLongNum.ReplaceAllString(s, ":id")

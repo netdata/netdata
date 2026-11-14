@@ -259,8 +259,7 @@ func TestGeoIPCollectPublishesRecordErrors(t *testing.T) {
 		GeoIP:   c.geo.Status(),
 	})
 	t.Cleanup(c.publication.Close)
-	country, _, _, _, _ := c.geo.Lookup("192.0.2.1")
-	assert.Empty(t, country)
+	assert.Empty(t, c.geo.Lookup("192.0.2.1").Country)
 	assert.Zero(t, hub.Availability().GeoIP.LookupErrors)
 	collectGeoIPStatus(t, c)
 	assert.Equal(t, uint64(1), hub.Availability().GeoIP.LookupErrors)

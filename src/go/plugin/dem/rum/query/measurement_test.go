@@ -25,7 +25,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	store := history.NewStore(journalStore)
 	hub := registry.New()
 	owner, retire := addSite(t, hub, "shop", "first")
-	writer := history.NewWriter("shop", store, discardCounters{})
+	writer := history.NewWriter(store, discardCounters{})
 	owner.SetHistorySink(writer)
 	service := query.New(hub, store)
 	handler := functions.New(service, nil)

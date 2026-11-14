@@ -135,7 +135,7 @@ The four collector modules (the journeys below show them in action):
 | Module | Job shape | Defaults | Owns while running |
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
-| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters, transport counters |
+| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, history writer, optional exporters, transport counters |
 | `journey` | One job per journey script (`script` or `script_path`) | Checks every 900 s, 120 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 | `lighthouse` | One job per audited URL | Checks every 1800 s, 180 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 
@@ -282,9 +282,8 @@ Each site job builds its own objects; nothing is shared between sites:
 | Object | Package | Built in | Notes |
 |---|---|---|---|
 | Aggregator | `rum/aggregate` | `Init` | One site's rolling measurements and investigation state, behind one lock |
-| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text |
-| Diagnostics state | `rum/diagnostics` | `Run` | Last rejected origin |
-| Route | `rum/httpapi` | `Run` | The site's policy and processor, admitted through the registry |
+| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text; handed to the route and exporters |
+| Route | `rum/httpapi` | `Run` | The site's policy, processor, redactor and last rejected origin, admitted through the registry |
 | History writer | `rum/history` | `Run` | Queued, batched journal appends |
 | Event-log exporter | `rum/otlp` | `Run` | Only when `event_logs` is enabled |
 | Browser-trace exporter | `rum/otlp` | `Run` | Only when `tracing` is enabled |
@@ -476,12 +475,11 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 
 | Role | Package | Responsibility |
 |---|---|---|
-| Processing | `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| Processing | `rum/beacon` | Normalized browser observation model: event kinds, device and vital names, reject reasons |
 | Processing | `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
-| Processing | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
-| Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
-| Processing | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
-| Processing | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
+| Processing | `rum/faro` | Faro wire decoding and input policy (normalization, redaction, error fingerprints, bot classification), spans, event classification and pinned bootstrap rendering/assets |
+| Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, last rejected origin, caching and demo responses |
+| Processing | `rum/aggregate` | One site's rolling measurements, Core Web Vitals ratings, session sampling and investigation state, behind one lock |
 | Processing | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
 | Processing | `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
@@ -541,10 +539,10 @@ Dependency direction:
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.
 - HTTP never imports the registry or collectors; its small `Processor` and `Routes` interfaces describe its consumers.
-- Diagnostics does not depend on HTTP.
-- Faro is a pure protocol adapter. Its embedded bootstrap template requires no frontend build.
-- Configuration policy does not read the hostname or generate UI prose. Diagnostics derives fallback addresses and
-  Functions owns presentation.
+- Faro is an I/O-free protocol adapter that owns input policy. Its embedded bootstrap template requires no frontend
+  build.
+- Configuration policy does not read the hostname or generate UI prose. The sites query derives the fallback install
+  address and Functions own presentation.
 
 File layout within packages:
 
@@ -605,16 +603,16 @@ Receiver:
 
 Sites:
 
-- Each site initializes its immutable policy, then independently admits its aggregator, route, redactor and runtime
-  generation.
+- Each site initializes its immutable policy, then independently admits its aggregator, route (carrying the site
+  redactor) and runtime generation.
 - Site readiness does not depend on receiver readiness.
-- One RUM job constructs one aggregator, diagnostic state, route and history writer. It also constructs an event-log
+- One RUM job constructs one aggregator, route and history writer. It also constructs an event-log
   exporter when `event_logs` is enabled and a browser-trace exporter when `tracing` is enabled. Both default to
   disabled.
 - These objects have no site inventory or reconfiguration API.
 - The registry admits references to those exact owners; it does not construct them.
-- The route records address/rejection observations in the separate diagnostic state.
-- Aggregation and each exporter reject an observation for another site before changing state.
+- The route records the last rejected origin; a replacement runtime starts without it.
+- One site job feeds only its own aggregator, exporters and history writer, so they do not re-check the site name.
 - Native `Name` identifies the site; `DisplayName` is presentation metadata.
 
 ### Installation bootstrap
@@ -760,7 +758,7 @@ Vital attribution:
 Processing order:
 
 - The collector's processor calls aggregation and then each enabled exporter directly.
-- Aggregation leaves the normalized Beacon unchanged and returns acceptance/detail decisions plus a filtered
+- Aggregation leaves the normalized Beacon unchanged and returns page-view/detail decisions plus a filtered
   observation containing only newly eligible reports.
 - Exporters consume that filtered observation, including when it is empty. They MUST NOT fall back to the input batch.
 - History enqueue remains nonblocking under the aggregate lock and does not call back into it.

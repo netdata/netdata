@@ -357,17 +357,15 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	e.ch = make(chan *logspb.LogRecord, 1)
 
 	b1 := mkBeacon() // One pageview fills the queue.
-	e.Ingest(b1, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  b1,
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
 	b2 := mkBeacon()
 	b2.SessionID = "sess2"
-	e.Ingest(b2, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  b2,
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
@@ -383,9 +381,8 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 // the regular export timeout (the agent's SIGTERM grace is 3s).
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
-	e.Ingest(mkBeacon(), aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  mkBeacon(),
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
@@ -409,35 +406,14 @@ func TestShutdownFlushIsBounded(t *testing.T) {
 	_ = e.Close()
 }
 
-func TestTruncateKeepsRuneBoundaries(t *testing.T) {
-	tests := map[string]struct {
-		in   string
-		n    int
-		want string
-	}{
-		"short string untouched":     {in: "héllo", n: 10, want: "héllo"},
-		"cut inside a rune backs up": {in: "héllo", n: 2, want: "h"},
-		"cut on a boundary keeps it": {in: "héllo", n: 3, want: "hé"},
-		"ascii exact":                {in: "abc", n: 3, want: "abc"},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := beacon.Truncate(tc.in, tc.n); got != tc.want {
-				t.Fatalf("truncate(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
-			}
-		})
-	}
-}
-
 // Investigate sampling: a beacon whose session is sampled out is
 // still measured, but produces no events.
 func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	counters := newRecCounters()
 	e := newExporter(t, "127.0.0.1:1", counters, nil)
 	b := mkBeacon()
-	e.Ingest(b, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation: b,
-		Accepted:    true,
 	})
 	if n := len(e.ch); n != 0 {
 		t.Fatalf("queued %d records for a sampled-out beacon", n)

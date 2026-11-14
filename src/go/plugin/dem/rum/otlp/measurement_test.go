@@ -35,7 +35,7 @@ func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
 		Vitals:       []beacon.Vital{{Name: beacon.CLS, ID: "metric", Revision: 1, Value: 0.1}},
 	}
-	exporter.Ingest(event, owner.Ingest(event))
+	exporter.Ingest(owner.Ingest(event))
 	require.Len(t, exporter.ch, 2)
 	page, vital := simplify(<-exporter.ch), simplify(<-exporter.ch)
 	require.Equal(t, "pageview", page.attrs["rum.type"])
@@ -45,12 +45,12 @@ func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 	require.Equal(t, "/entry", vital.attrs["page.group"])
 	require.Equal(t, "metric", vital.attrs["metric.id"])
 	require.Equal(t, "1", vital.attrs["metric.revision"])
-	exporter.Ingest(event, owner.Ingest(event))
+	exporter.Ingest(owner.Ingest(event))
 	require.Empty(t, exporter.ch, "filtered empty result must never fall back to original beacon")
 	event.Vitals[0].Revision, event.Vitals[0].Value = 2, 0.4
 	event.View, event.ViewID = "later-route", "later-view"
 	event.Browser, event.AppVersion = "Firefox", "later-release"
-	exporter.Ingest(event, owner.Ingest(event))
+	exporter.Ingest(owner.Ingest(event))
 	require.Len(t, exporter.ch, 1, "a vital update is not a document activation")
 	update := simplify(<-exporter.ch)
 	require.Equal(t, "vital", update.attrs["rum.type"])
@@ -63,21 +63,20 @@ func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 	require.Equal(t, "first-release", update.attrs["app.version"])
 }
 
-func TestExportDoesNotResurrectFilteredOrMissingObservation(t *testing.T) {
+// Exporters build records only from the admitted observation, never from the
+// browser beacon the aggregator received.
+func TestExportDoesNotResurrectFilteredObservation(t *testing.T) {
 	counters := newRecCounters()
 	logs := newExporter(t, "127.0.0.1:1", counters, nil)
 	traces := newTraceExporter(t, "127.0.0.1:1", "s1", counters, nil)
-	original := tracedBeacon()
-	original.Errors = []beacon.Error{{Type: "Error", Message: "already processed"}}
-	for _, observation := range []*beacon.Beacon{nil, {Site: "s1"}} {
-		result := aggregate.Result{
-			Accepted:     true,
-			Investigated: true,
-			Observation:  observation,
-		}
-		logs.Ingest(original, result)
-		traces.Ingest(original, result)
+	result := aggregate.Result{
+		Investigated: true,
+		Observation: &beacon.Beacon{
+			Site: "s1",
+		},
 	}
+	logs.Ingest(result)
+	traces.Ingest(result)
 	require.Empty(t, logs.ch)
 	require.Empty(t, traces.spanCh)
 	require.Empty(t, counters.snapshot())

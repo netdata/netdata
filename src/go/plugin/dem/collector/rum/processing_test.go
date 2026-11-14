@@ -140,7 +140,7 @@ func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
 func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *testing.T) {
 	const session = "late-error"
 	const rate = 0.000001
-	require.False(t, beacon.SessionSampled(session, rate))
+	require.False(t, aggregate.SessionSampled(session, rate))
 	p, history, drain, _, _ := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate:       rate,
 		KeepErrors: true,
@@ -194,7 +194,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 
 func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T) {
 	const rate = 0.000001
-	require.False(t, beacon.SessionSampled("quiet", rate))
+	require.False(t, aggregate.SessionSampled("quiet", rate))
 	p, history, drain, _, transport := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate: rate,
 	})
@@ -207,20 +207,13 @@ func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T
 			Errors:    []beacon.Error{{Fingerprint: "failure", Message: "failed"}},
 		},
 	)
-	p.Ingest(&beacon.Beacon{
-		Site:      "other",
-		SessionID: "wrong",
-		Errors:    []beacon.Error{{Message: "wrong site"}},
-	})
-	p.Reject("site", beacon.RejectOrigin)
-	p.Reject("other", beacon.RejectRate)
+	p.Reject(beacon.RejectOrigin)
 	assert.Empty(t, drain())
 	assert.Empty(t, history.events)
 	snapshot := p.aggregator.Snapshot()
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterAccepted])
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterJSErrors])
 	assert.EqualValues(t, 1, snapshot.Counters[beacon.RejectOrigin])
-	assert.Zero(t, snapshot.Counters[beacon.RejectRate])
 	assert.Zero(t, transport.get(otlp.CounterLogsDropped))
 	assert.Zero(t, transport.get(otlp.CounterLogsSent))
 }

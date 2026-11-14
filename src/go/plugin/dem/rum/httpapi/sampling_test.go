@@ -18,9 +18,15 @@ import (
 
 type samplingGeo struct{ calls atomic.Int64 }
 
-func (g *samplingGeo) Lookup(string) (string, string, float64, float64, bool) {
+func (g *samplingGeo) Lookup(string) beacon.Location {
 	g.calls.Add(1)
-	return "GR", "Athens", 38, 23.7, true
+	return beacon.Location{
+		Country: "GR",
+		City:    "Athens",
+		Lat:     38,
+		Lon:     23.7,
+		HasGeo:  true,
+	}
 }
 
 func samplingConfig(t *testing.T, rate float64) *fixtureConfig {
@@ -86,7 +92,7 @@ func TestSamplingZeroPreservesAdmissionPolicies(t *testing.T) {
 			assert.Equal(t, tc.status, resp.StatusCode)
 			accepted, rejected := sink.snapshot()
 			assert.Zero(t, accepted)
-			assert.Equal(t, map[string]int{"shop/" + tc.reject: 1}, rejected)
+			assert.Equal(t, map[string]int{tc.reject: 1}, rejected)
 			assert.Zero(t, geo.calls.Load())
 		})
 	}
@@ -104,7 +110,7 @@ func TestSamplingZeroPreservesRateLimit(t *testing.T) {
 	}
 	accepted, rejected := sink.snapshot()
 	assert.Zero(t, accepted)
-	assert.Equal(t, map[string]int{"shop/" + beacon.RejectRate: 1}, rejected)
+	assert.Equal(t, map[string]int{beacon.RejectRate: 1}, rejected)
 }
 
 func TestSamplingPositiveRatesDoNotResampleReceivedBeacons(t *testing.T) {

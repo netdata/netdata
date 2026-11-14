@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 )
 
-// CountryResolver maps a client IP to an ISO country code plus city-level
-// location in one lookup. city/lat/lon are zero when hasGeo is false.
-type CountryResolver interface {
-	Lookup(ip string) (country, city string, lat, lon float64, hasGeo bool)
+// Locator maps a client IP to its approximate location in one lookup.
+type Locator interface {
+	Lookup(ip string) beacon.Location
 }
 
 // Routes supplies one exact runtime registration for the whole request.
@@ -25,13 +25,13 @@ type Routes interface {
 type Server struct {
 	snap     *snapshot
 	routes   Routes
-	geo      CountryResolver
+	geo      Locator
 	now      func() time.Time
 	ips      *limiter
 	siteRate float64
 }
 
-func New(cfg *config.Receiver, routes Routes, geo CountryResolver) *Server {
+func New(cfg *config.Receiver, routes Routes, geo Locator) *Server {
 	return &Server{
 		snap:     compile(cfg),
 		routes:   routes,
@@ -42,7 +42,7 @@ func New(cfg *config.Receiver, routes Routes, geo CountryResolver) *Server {
 	}
 }
 
-// acquire fences policy, processor and diagnostics to one site runtime. Closing an
+// acquire fences policy, processor and rejection evidence to one site runtime. Closing an
 // admitted body on retirement also interrupts a slow producer inside ReadAll.
 func (s *Server) acquire(w http.ResponseWriter, r *http.Request, key string) (*Route, func(), bool) {
 	route, ctx, release, ok := s.routes.Acquire(key)

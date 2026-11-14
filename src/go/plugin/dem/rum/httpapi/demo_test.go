@@ -52,7 +52,9 @@ func TestBootstrapCompilesTracingOrigins(t *testing.T) {
 		Enabled:     true,
 		PropagateTo: []string{"https://[2001:db8::1]:8443", "https://api.example"},
 	}
-	require.Empty(t, config.ValidateSiteExtras(cfg.Sites[0]))
+	site := cfg.Sites[0]
+	site.PageGroups, site.Countries = 20, 20
+	require.NoError(t, site.Validate())
 	_, server := newTestServer(t, cfg, newRecSink(), nil)
 	response, err := server.Client().Get(server.URL + "/rum/shop.js")
 	require.NoError(t, err)

@@ -172,30 +172,6 @@ func TestSessionLRUEvictsOldest(t *testing.T) {
 	_ = now
 }
 
-func TestSessionsStayWithTheirOwner(t *testing.T) {
-	for _, site := range []string{"a", "b"} {
-		a, now := newAgg(30*time.Minute, SiteCfg{
-			Name:       site,
-			PageGroups: 20,
-			Countries:  20,
-		})
-		for _, incoming := range []string{"a", "b"} {
-			a.Ingest(&beacon.Beacon{
-				ExperienceID: incoming,
-				Events:       []beacon.Event{{ID: incoming, Revision: 1, Kind: beacon.EventDocument}},
-				Site:         incoming,
-				Received:     *now,
-				SessionID:    "shared",
-				PageGroup:    "/" + incoming,
-			})
-		}
-		events, ok := a.SessionEvents("shared")
-		if !ok || len(events) != 1 || events[0].Page != "/"+site {
-			t.Fatalf("site %s events = %+v, found=%v", site, events, ok)
-		}
-	}
-}
-
 // The observation window controls session measurement independently of details.
 func TestObservedSessionsAgeByWindow(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
@@ -241,8 +217,8 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 
 func TestBotsFilteredPerMinute(t *testing.T) {
 	a, _ := newAgg(5 * time.Minute)
-	a.Reject("s", beacon.RejectBot)
-	a.Reject("s", beacon.RejectBot)
+	a.Reject(beacon.RejectBot)
+	a.Reject(beacon.RejectBot)
 	if got := a.Activity().BotsPerMin; got != 2 {
 		t.Fatalf("bots per min = %d", got)
 	}

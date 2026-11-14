@@ -5,8 +5,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 )
 
 type fixtureConfig struct {
@@ -31,7 +31,7 @@ type fixtureServer struct {
 	sink    Processor
 }
 
-func newFixture(cfg *fixtureConfig, sink Processor, geo CountryResolver) *fixtureServer {
+func newFixture(cfg *fixtureConfig, sink Processor, geo Locator) *fixtureServer {
 	routes := &fixtureRoutes{}
 	s := &fixtureServer{
 		Server:  New(&cfg.Receiver, routes, geo),
@@ -46,7 +46,7 @@ func (s *fixtureServer) Update(cfg *fixtureConfig) {
 	defer s.fixture.mu.Unlock()
 	s.fixture.sites = map[string]*Route{}
 	for _, sc := range cfg.Sites {
-		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, diagnostics.New())
+		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, redact.NewRedactor(sc.Secrets()...))
 	}
 }
 func (s *fixtureServer) site(k string) *site {

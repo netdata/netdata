@@ -62,9 +62,9 @@ func TestParseFaro(t *testing.T) {
 				Country:   "GR",
 				Errors: []beacon.Error{
 					{Type: "TypeError", Message: "x is undefined", Stack: "render (https://x/app.js:10:5)\n", Time: ts,
-						Fingerprint: beacon.Fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
+						Fingerprint: fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
 					{Type: "Error", Message: "no stack", Time: now,
-						Fingerprint: beacon.Fingerprint("Error", "no stack", "")},
+						Fingerprint: fingerprint("Error", "no stack", "")},
 				},
 			},
 		},
@@ -245,7 +245,7 @@ func TestParseFaro(t *testing.T) {
 				Options{
 					Site:               "s",
 					Now:                now,
-					Country:            "GR",
+					Location:           beacon.Location{Country: "GR"},
 					ConsoleLogs:        tc.consoleLogs,
 					EventLogs:          true,
 					FrustrationSignals: true,
@@ -318,13 +318,15 @@ func TestParseFaroSetsGeoFields(t *testing.T) {
 	got, err := Decode(
 		[]byte(`{}`),
 		Options{
-			Site:    "s",
-			Now:     now,
-			Country: "GR",
-			City:    "Athens",
-			Lat:     38.0,
-			Lon:     23.7,
-			HasGeo:  true,
+			Site: "s",
+			Now:  now,
+			Location: beacon.Location{
+				Country: "GR",
+				City:    "Athens",
+				Lat:     38.0,
+				Lon:     23.7,
+				HasGeo:  true,
+			},
 		},
 	)
 	if err != nil {
@@ -439,7 +441,7 @@ func TestParseFaroPrivacyAttributionAndUser(t *testing.T) {
 		FrustrationSignals: true,
 		Site:               "s",
 		Now:                time.Now(),
-		PathRules:          []beacon.PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
+		PathRules:          []PathRule{{Re: regexp.MustCompile(`^/u/[^/]+`), Replace: "/u/:user"}},
 	}
 	b, err := Decode([]byte(body), opt)
 	if err != nil {

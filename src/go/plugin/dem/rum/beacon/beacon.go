@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package beacon holds the normalized RUM beacon model shared by the
-// collector (producer), the aggregator and the OTLP exporter
-// (consumers). Keeping it separate avoids import cycles between them.
+// Package beacon holds the normalized RUM beacon model: faro produces it from
+// browser payloads; aggregation, history and OTLP export consume it. Input
+// policy (normalization, redaction, fingerprints, bots) belongs to faro.
 package beacon
 
 import "time"
@@ -30,14 +30,6 @@ const (
 	DeviceBot = "bot"
 )
 
-// TabletViewportMinWidth is the viewport width (CSS px) at/above which a
-// mobile:true beacon is classified as tablet rather than mobile ("viewport width >= 600").
-const TabletViewportMinWidth = 600
-
-// SessionTTL is how long a session lasts without a beacon before the next
-// one starts a new session.
-const SessionTTL = 30 * time.Minute
-
 // EventKind describes normalized event semantics independently of wire names.
 type EventKind uint8
 
@@ -62,6 +54,16 @@ const (
 // IsFrustration reports whether an event name is a frustration signal.
 func IsFrustration(name string) bool {
 	return name == RageClickEvent || name == DeadClickEvent || name == ErrorClickEvent
+}
+
+// Location is the receiver-resolved approximate client location. Lat and Lon
+// are rounded to one decimal degree and valid only when HasGeo.
+type Location struct {
+	Country string // ISO 3166-1 alpha-2, "" when unknown
+	City    string // "" when unknown
+	Lat     float64
+	Lon     float64
+	HasGeo  bool
 }
 
 // Beacon is one accepted Faro payload after origin/limit checks, URL

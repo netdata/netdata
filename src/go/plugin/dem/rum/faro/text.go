@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package beacon
+package faro
 
 import (
 	"net/url"
@@ -9,15 +9,10 @@ import (
 	"unicode/utf8"
 )
 
-const (
-	maxPathLen  = 512
-	maxGroupLen = 200
-)
-
-// Path reduces a page URL to its path: query and fragment are dropped
+// urlPath reduces a page URL to its path: query and fragment are dropped
 // before any other use, control characters removed, length capped.
 // Unparsable or empty input yields "/".
-func Path(raw string) string {
+func urlPath(raw string) string {
 	raw = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || unicode.IsSpace(r) {
 			return -1
@@ -42,13 +37,13 @@ func Path(raw string) string {
 			p = "/"
 		}
 	}
-	return Truncate(p, maxPathLen)
+	return truncate(p, maxPathLen)
 }
 
-// PageGroup replaces volatile path segments (decimal numbers, UUIDs,
+// pageGroup replaces volatile path segments (decimal numbers, UUIDs,
 // hex strings of 8+ chars) with ":id" so /users/42 and /users/43 share
 // one instance.
-func PageGroup(path string) string {
+func pageGroup(path string) string {
 	if path == "" || path == "/" {
 		return "/"
 	}
@@ -62,7 +57,7 @@ func PageGroup(path string) string {
 		}
 	}
 	g := strings.Join(segs, "/")
-	return Truncate(g, maxGroupLen)
+	return truncate(g, maxGroupLen)
 }
 
 func isNumeric(s string) bool {
@@ -110,20 +105,20 @@ func isUUID(s string) bool {
 	return true
 }
 
-// Clean bounds a free-form string coming from the client (browser name,
+// clean bounds a free-form string coming from the client (browser name,
 // OS, event names): control characters dropped, length capped.
-func Clean(s string, max int) string {
+func clean(s string, max int) string {
 	s = strings.TrimSpace(strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) {
 			return -1
 		}
 		return r
 	}, s))
-	return Truncate(s, max)
+	return truncate(s, max)
 }
 
-// Truncate limits valid UTF-8 text to n bytes without splitting a rune.
-func Truncate(s string, n int) string {
+// truncate limits valid UTF-8 text to n bytes without splitting a rune.
+func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}

@@ -49,12 +49,7 @@ func TestMappedFaultSubprocess(t *testing.T) {
 			require.NoError(t, r.Refresh())
 			raw := r.current.db.mapping.data
 			require.NoError(t, os.Truncate(path, 0))
-			c, city, lat, lon, ok := r.Lookup("81.2.69.142")
-			assert.Empty(t, c)
-			assert.Empty(t, city)
-			assert.Zero(t, lat)
-			assert.Zero(t, lon)
-			assert.False(t, ok)
+			assert.Zero(t, r.Lookup("81.2.69.142"))
 			assert.Equal(t, "unavailable", r.Status().State)
 			assert.Equal(t, uint64(1), r.Status().LookupErrors)
 			select {
@@ -67,8 +62,7 @@ func TestMappedFaultSubprocess(t *testing.T) {
 			assert.Equal(t, uint64(1), r.Status().LookupErrors)
 			require.Error(t, r.Refresh())
 			assert.Equal(t, "stock", r.Status().Source)
-			c, _, _, _, _ = r.Lookup("81.2.69.142")
-			assert.Equal(t, "GB", c)
+			assert.Equal(t, "GB", r.Lookup("81.2.69.142").Country)
 			assert.Error(t, unix.Munmap(raw), "faulted source must have been released after fallback")
 		}
 		assert.Equal(t, prior, debug.SetPanicOnFault(prior), "guard must restore the caller's setting")

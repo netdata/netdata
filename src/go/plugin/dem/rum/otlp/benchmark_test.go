@@ -31,14 +31,12 @@ func BenchmarkIngest(b *testing.B) {
 		spanCh:    make(chan spanItem, spanQueueCap),
 	}
 	event := tracedBeacon()
-	traces.Ingest(event, aggregate.Result{
+	traces.Ingest(aggregate.Result{
 		Observation:  event,
-		Accepted:     true,
 		Investigated: true,
 	})
-	e.Ingest(event, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  event,
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
@@ -49,14 +47,12 @@ func BenchmarkIngest(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		traces.Ingest(event, aggregate.Result{
+		traces.Ingest(aggregate.Result{
 			Observation:  event,
-			Accepted:     true,
 			Investigated: true,
 		})
-		e.Ingest(event, aggregate.Result{
+		e.Ingest(aggregate.Result{
 			Observation:  event,
-			Accepted:     true,
 			Investigated: true,
 			PageView:     true,
 		})

@@ -9,19 +9,17 @@ import (
 	"errors"
 	"sync"
 
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 )
 
+// Site is one admitted site runtime. Its Route carries the immutable policy,
+// the site redactor and the last rejected origin.
 type Site struct {
-	Route       *httpapi.Route
-	Diagnostics *diagnostics.State
-	Aggregator  *aggregate.Aggregator
-	Generation  string
-	Redactor    *redact.Redactor
+	Route      *httpapi.Route
+	Aggregator *aggregate.Aggregator
+	Generation string
 }
 type Availability struct {
 	// Listen is the actual bound socket, never an advertised browser address.

@@ -6,55 +6,86 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 )
 
 // Processor accepts normalized observations and accounts for rejected requests.
 // The owning collector sequences aggregation and export behind this boundary.
 type Processor interface {
 	Ingest(*beacon.Beacon)
-	Reject(site, reason string)
+	Reject(reason string)
 }
 
-// Route is one immutable site policy and its runtime-owned processor and diagnostic state.
-// Registration leases fence access; receiver replacement does not replace it.
+// RejectedOrigin is the last origin refused by a site, including an OPTIONS
+// preflight. The zero value means no origin was refused.
+type RejectedOrigin struct {
+	Origin string
+	At     time.Time
+}
+
+// Route is one immutable site policy with its runtime-owned processor, redactor
+// and last rejected origin. Registration leases fence access; receiver
+// replacement does not replace it.
 type Route struct {
-	config      config.Site
-	policy      *site
-	processor   Processor
-	diagnostics *diagnostics.State
-	rateMu      sync.Mutex
-	rate        float64
-	bucket      bucket
+	config    config.Site
+	policy    *site
+	processor Processor
+	redactor  *redact.Redactor
+
+	rateMu sync.Mutex
+	rate   float64
+	bucket bucket
+
+	rejectedMu     sync.Mutex
+	rejectedOrigin RejectedOrigin
 }
 
-func NewRoute(cfg config.Site, processor Processor, state *diagnostics.State) *Route {
+// NewRoute compiles cfg. The redactor masks the site's configured secrets in
+// decoded text; nil applies only the built-in credential patterns.
+func NewRoute(cfg config.Site, processor Processor, redactor *redact.Redactor) *Route {
 	return &Route{
-		config:      cfg,
-		policy:      compileSite(cfg),
-		processor:   processor,
-		diagnostics: state,
+		config:    cfg,
+		policy:    compileSite(cfg),
+		processor: processor,
+		redactor:  redactor,
 	}
 }
+
 func (s *Route) Config() config.Site { return s.config }
+
+// Redactor is the site redactor handed to NewRoute, possibly nil.
+func (s *Route) Redactor() *redact.Redactor { return s.redactor }
+
+// LastRejectedOrigin is the last origin refused by this site, if any.
+func (s *Route) LastRejectedOrigin() RejectedOrigin {
+	s.rejectedMu.Lock()
+	defer s.rejectedMu.Unlock()
+	return s.rejectedOrigin
+}
+
+func (s *Route) rejectOrigin(origin string, at time.Time) {
+	if origin == "" {
+		return
+	}
+	s.rejectedMu.Lock()
+	defer s.rejectedMu.Unlock()
+	s.rejectedOrigin = RejectedOrigin{
+		Origin: origin,
+		At:     at,
+	}
+}
+
 func (s *Route) allowSite(rate float64, now time.Time) bool {
 	s.rateMu.Lock()
 	defer s.rateMu.Unlock()
 	if s.rate != rate {
 		s.rate = rate
-		s.bucket.tokens = rate
-		s.bucket.last = now
+		s.bucket = bucket{
+			tokens: rate,
+			last:   now,
+		}
 	}
-	elapsed := now.Sub(s.bucket.last).Seconds()
-	if elapsed > 0 {
-		s.bucket.tokens = min(rate, s.bucket.tokens+elapsed*rate)
-		s.bucket.last = now
-	}
-	if s.bucket.tokens < 1 {
-		return false
-	}
-	s.bucket.tokens--
-	return true
+	return s.bucket.take(rate, rate, now)
 }

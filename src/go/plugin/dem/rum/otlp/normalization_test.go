@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -43,11 +44,13 @@ func TestDecodedObservationsPreservedAcrossOTLPLogsAndTraces(t *testing.T) {
  }]}}
  `
 	opt := faro.Options{
-		Site:      "s1",
-		Now:       t0,
-		Country:   "GR",
-		City:      "live-city-only",
-		HasGeo:    true,
+		Site: "s1",
+		Now:  t0,
+		Location: beacon.Location{
+			Country: "GR",
+			City:    "live-city-only",
+			HasGeo:  true,
+		},
 		EventLogs: true,
 		Tracing:   true,
 		Redactor:  newRedactor(t, "capture-secret"),
