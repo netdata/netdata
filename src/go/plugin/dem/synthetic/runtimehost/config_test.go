@@ -84,7 +84,7 @@ func TestInstalledReleaseTrust(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, raw, 0600))
 	loaded, err := cfg.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
-	assert.Equal(t, release, loaded)
+	assert.Equal(t, release, loaded.Release())
 	// Envelope decoding (trailing data, unknown fields, size) is the runtime package's contract.
 	_, err = cfg.ReleaseLoader("relative.json", false)(context.Background())
 	require.ErrorContains(t, err, "absolute")
@@ -160,12 +160,12 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, []byte("invalid"), 0600))
 	got, err := cfg.ReleaseLoader(path, true)(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 	require.Equal(t, []string{runtime.ReleaseKeyringURL}, requests)
 	requests = nil
 	got, err = cfg.ReleaseLoader("", true)(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 	require.Equal(t, []string{runtime.ReleaseKeyringURL, cfg.ReleaseURL}, requests)
 	requests = nil
 	fail = true
@@ -176,7 +176,7 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, pgptest.Public(t, pgptest.Key(t, 19)), 0600))
 	got, err = cfg.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 	require.Empty(t, requests, "explicit offline import must never acquire trust online")
 	_, err = cfg.ReleaseLoader("", false)(context.Background())
 	require.ErrorContains(t, err, "network consent")

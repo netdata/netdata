@@ -82,14 +82,14 @@ func (c Config) Validate() error {
 // ReleaseLoader selects canonical online trust only with network consent.
 // Offline imports require an explicit administrator-provisioned public keyring.
 // Call it under installation exclusion, never before checking update consent.
-func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
-	return func(ctx context.Context) (runtime.Release, error) {
+func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.VerifiedRelease, error) {
+	return func(ctx context.Context) (runtime.VerifiedRelease, error) {
 		if path == "" {
 			if !networkAllowed {
-				return runtime.Release{}, errors.New("release download requires explicit network consent")
+				return runtime.VerifiedRelease{}, errors.New("release download requires explicit network consent")
 			}
 			if c.ReleaseURL == "" {
-				return runtime.Release{}, errors.New("online runtime preparation requires runtime.release_url")
+				return runtime.VerifiedRelease{}, errors.New("online runtime preparation requires runtime.release_url")
 			}
 		}
 		var keys *runtime.ReleaseTrust
@@ -98,14 +98,14 @@ func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Con
 			keys, trustErr = runtime.FetchReleaseKeyring(ctx)
 		} else {
 			if c.OfflineKeyring == "" {
-				return runtime.Release{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
+				return runtime.VerifiedRelease{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
 			}
 			keys, trustErr = runtime.ReadReleaseKeyring(c.OfflineKeyring)
 		}
 		if trustErr != nil {
-			return runtime.Release{}, fmt.Errorf("runtime verification key: %w", trustErr)
+			return runtime.VerifiedRelease{}, fmt.Errorf("runtime verification key: %w", trustErr)
 		}
-		var release runtime.Release
+		var release runtime.VerifiedRelease
 		var err error
 		if path == "" {
 			release, err = runtime.FetchRelease(ctx, c.ReleaseURL, keys)
@@ -113,10 +113,10 @@ func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Con
 			release, err = runtime.ReadRelease(path, keys)
 		}
 		if err != nil {
-			return runtime.Release{}, err
+			return runtime.VerifiedRelease{}, err
 		}
-		if !release.Manifest.MatchesHost() {
-			return runtime.Release{}, errors.New("runtime release does not match this architecture")
+		if !release.Release().Manifest.MatchesHost() {
+			return runtime.VerifiedRelease{}, errors.New("runtime release does not match this architecture")
 		}
 		return release, nil
 	}

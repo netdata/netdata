@@ -81,7 +81,7 @@ func TestHistoricalInvalidOtherKeysDoNotRejectValidSigner(t *testing.T) {
 	require.NoError(t, err)
 	got, err := VerifyRelease(signed, trust)
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 }
 
 func TestReleaseSignaturePolicyAndPacketBounds(t *testing.T) {

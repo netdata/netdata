@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
@@ -88,29 +89,46 @@ func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
 	return envelope, err
 }
 
+// VerifiedRelease is a Release whose signature VerifyRelease checked against
+// administrator-provided keys. Installation accepts only this type, so an
+// unauthenticated release cannot be selected. The zero value is refused.
+type VerifiedRelease struct{ release Release }
+
+// Release returns a copy of the authenticated release; changing the copy never
+// changes what an installation selects.
+func (v VerifiedRelease) Release() Release {
+	r := v.release
+	r.Manifest.Bindings = slices.Clone(r.Manifest.Bindings)
+	for i := range r.Manifest.Bindings {
+		r.Manifest.Bindings[i].Expected = bytes.Clone(r.Manifest.Bindings[i].Expected)
+	}
+	return r
+}
+
 // VerifyRelease authenticates every preparation field and checks current signer validity.
-func VerifyRelease(data []byte, trusted *ReleaseTrust) (Release, error) {
-	var result Release
+// It is the only constructor of a non-zero VerifiedRelease.
+func VerifyRelease(data []byte, trusted *ReleaseTrust) (VerifiedRelease, error) {
 	if len(data) > ReleaseEnvelopeLimit {
-		return result, errors.New("runtime release descriptor exceeds protocol size limit")
+		return VerifiedRelease{}, errors.New("runtime release descriptor exceeds protocol size limit")
 	}
 	var envelope releaseEnvelope
 	if err := decodeReleaseJSON(data, &envelope); err != nil {
-		return result, fmt.Errorf("runtime release envelope: %w", err)
+		return VerifiedRelease{}, fmt.Errorf("runtime release envelope: %w", err)
 	}
 	if envelope.Format != 1 {
-		return result, errors.New("invalid runtime release envelope")
+		return VerifiedRelease{}, errors.New("invalid runtime release envelope")
 	}
 	if err := verifyReleaseSignature(releaseSignedBytes(envelope.Payload), envelope.Signature, trusted); err != nil {
-		return result, err
+		return VerifiedRelease{}, err
 	}
+	var result Release
 	if err := decodeReleaseJSON(envelope.Payload, &result); err != nil {
-		return Release{}, fmt.Errorf("signed runtime release: %w", err)
+		return VerifiedRelease{}, fmt.Errorf("signed runtime release: %w", err)
 	}
 	if err := result.Validate(); err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
-	return result, nil
+	return VerifiedRelease{release: result}, nil
 }
 
 func decodeReleaseJSON(data []byte, target any) error {
@@ -153,41 +171,41 @@ func releaseUpdate(current, next Release) (bool, error) {
 
 // FetchRelease authenticates bounded metadata before any archive acquisition.
 // Trust is installed independently; a downloaded descriptor cannot supply keys.
-func FetchRelease(ctx context.Context, address string, trusted *ReleaseTrust) (Release, error) {
+func FetchRelease(ctx context.Context, address string, trusted *ReleaseTrust) (VerifiedRelease, error) {
 	if err := validateReleaseTrust(trusted); err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
 	if !ValidHTTPSURL(address) {
-		return Release{}, errors.New("runtime release discovery requires HTTPS without credentials or a fragment")
+		return VerifiedRelease{}, errors.New("runtime release discovery requires HTTPS without credentials or a fragment")
 	}
 	body, err := openDownload(ctx, address, downloadIdleTimeout)
 	if err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
 	defer body.Close()
 	return readRelease(body, trusted)
 }
 
 // ReadRelease uses the same publisher trust for explicit offline provisioning.
-func ReadRelease(path string, trusted *ReleaseTrust) (Release, error) {
+func ReadRelease(path string, trusted *ReleaseTrust) (VerifiedRelease, error) {
 	if err := validateReleaseTrust(trusted); err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
 	if !filepath.IsAbs(path) {
-		return Release{}, errors.New("runtime release descriptor requires an absolute path")
+		return VerifiedRelease{}, errors.New("runtime release descriptor requires an absolute path")
 	}
 	file, err := safefile.Open(path)
 	if err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
 	defer file.Close()
 	return readRelease(file, trusted)
 }
 
-func readRelease(reader io.Reader, trusted *ReleaseTrust) (Release, error) {
+func readRelease(reader io.Reader, trusted *ReleaseTrust) (VerifiedRelease, error) {
 	data, err := io.ReadAll(io.LimitReader(reader, ReleaseEnvelopeLimit+1))
 	if err != nil {
-		return Release{}, err
+		return VerifiedRelease{}, err
 	}
 	return VerifyRelease(data, trusted)
 }

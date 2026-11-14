@@ -6,8 +6,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 
@@ -32,6 +34,41 @@ func releaseFixture(t *testing.T) (Release, *openpgp.Entity) {
 	}, pgptest.Key(t, 1)
 }
 
+// fixturePublisher signs fixture releases. Installation accepts only releases
+// that VerifyRelease authenticated, so fixtures take the same path as published
+// ones. Helper processes create their own publisher.
+var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
+	key, err := openpgp.NewEntity("Runtime fixture", "", "fixture@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	if err != nil {
+		return fixtureKeys{}, err
+	}
+	var public bytes.Buffer
+	if err := key.Serialize(&public); err != nil {
+		return fixtureKeys{}, err
+	}
+	trust, err := ParseReleaseKeyring(public.Bytes())
+	return fixtureKeys{key: key, trust: trust}, err
+})
+
+type fixtureKeys struct {
+	key   *openpgp.Entity
+	trust *ReleaseTrust
+}
+
+// verifyFixture signs release as its publisher and authenticates it as a
+// production loader does; validation errors come from VerifyRelease.
+func verifyFixture(release Release) (VerifiedRelease, error) {
+	keys, err := fixturePublisher()
+	if err != nil {
+		return VerifiedRelease{}, err
+	}
+	envelope, err := pgptest.Release(release, keys.key)
+	if err != nil {
+		return VerifiedRelease{}, err
+	}
+	return VerifyRelease(envelope, keys.trust)
+}
+
 func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	release, key := releaseFixture(t)
 	public := key
@@ -39,7 +76,12 @@ func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	require.NoError(t, err)
 	verified, err := VerifyRelease(data, testTrust(t, public))
 	require.NoError(t, err)
-	assert.Equal(t, release, verified)
+	assert.Equal(t, release, verified.Release())
+	// The accessor returns a copy: changing it cannot change what is installed.
+	changed := verified.Release()
+	changed.Manifest.Bindings[0].Expected[0] = '!'
+	changed.Manifest.Bindings[1].Offset++
+	assert.Equal(t, release, verified.Release())
 	for _, field := range []string{"binding", "layout", "bounds", "sequence", "sources"} {
 		t.Run(field, func(t *testing.T) {
 			var envelope releaseEnvelope

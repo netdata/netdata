@@ -35,12 +35,27 @@ func publishedBundle(t *testing.T, version string, sequence uint64) (runtime.Rel
 		Sources: runtime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("a", 64), Bytes: 100}}, data
 }
 
+// verifiedRelease signs release with the fixture publisher key and authenticates
+// it as a production loader does.
+func verifiedRelease(t *testing.T, release runtime.Release) runtime.VerifiedRelease {
+	t.Helper()
+	key := pgptest.Key(t, 66)
+	public, err := runtime.ParseReleaseKeyring(pgptest.Public(t, key))
+	require.NoError(t, err)
+	envelope, err := pgptest.Release(release, key)
+	require.NoError(t, err)
+	verified, err := runtime.VerifyRelease(envelope, public)
+	require.NoError(t, err)
+	return verified
+}
+
 func selectPublished(t *testing.T, store *runtime.Store, release runtime.Release, data []byte, policy runtime.UpdatePolicy) {
 	t.Helper()
+	verified := verifiedRelease(t, release)
 	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
 	path := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(path, data, 0600))
-	candidate, err := store.BeginPublishedInstall(context.Background(), runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: policy}, func(context.Context) (runtime.Release, error) { return release, nil })
+	candidate, err := store.BeginPublishedInstall(context.Background(), runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: policy}, func(context.Context) (runtime.VerifiedRelease, error) { return verified, nil })
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), path))
 	require.NoError(t, candidate.Select())
@@ -64,14 +79,8 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	http.DefaultTransport = server.Client().Transport
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
-	private := pgptest.Key(t, 66)
-	public, err := runtime.ParseReleaseKeyring(pgptest.Public(t, private))
-	require.NoError(t, err)
-	envelope, err := pgptest.Release(next, private)
-	require.NoError(t, err)
-	load := func(context.Context) (runtime.Release, error) {
-		return runtime.VerifyRelease(envelope, public)
-	}
+	verifiedNext := verifiedRelease(t, next)
+	load := func(context.Context) (runtime.VerifiedRelease, error) { return verifiedNext, nil }
 	calls := 0
 	u := host.NewUpdater(qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
 		calls++
@@ -117,11 +126,12 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	http.DefaultTransport = server.Client().Transport
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
+	verifiedFirst, verifiedNext := verifiedRelease(t, first), verifiedRelease(t, next)
 	failure := errors.New("sandbox qualification failed")
 	var logs healthLog
 	host.log = logger.NewWithWriter(&logs)
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
-		func(context.Context) (runtime.Release, error) { return next, nil })
+		func(context.Context) (runtime.VerifiedRelease, error) { return verifiedNext, nil })
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
 	require.Equal(t, first.Manifest, *status.Storage.Selected)
@@ -134,7 +144,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	host.sweep()
 	require.Equal(t, "update: sandbox qualification failed", host.Status().MaintenanceError, "storage cleanup cannot clear update health")
 	// A later check that finds no newer release clears update health.
-	u.load = func(context.Context) (runtime.Release, error) { return first, nil }
+	u.load = func(context.Context) (runtime.VerifiedRelease, error) { return verifiedFirst, nil }
 	require.NoError(t, u.check(context.Background()))
 	require.Empty(t, host.Status().MaintenanceError)
 	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update recovered"))
@@ -150,10 +160,10 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
-	}), func(ctx context.Context) (runtime.Release, error) {
+	}), func(ctx context.Context) (runtime.VerifiedRelease, error) {
 		close(entered)
 		<-ctx.Done()
-		return runtime.Release{}, ctx.Err()
+		return runtime.VerifiedRelease{}, ctx.Err()
 	})
 	u.delay = func(bool) time.Duration { return 0 }
 	go u.Run(context.Background())
@@ -177,10 +187,10 @@ func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
-	}), func(ctx context.Context) (runtime.Release, error) {
+	}), func(ctx context.Context) (runtime.VerifiedRelease, error) {
 		close(entered)
 		<-ctx.Done()
-		return runtime.Release{}, ctx.Err()
+		return runtime.VerifiedRelease{}, ctx.Err()
 	})
 	u.delay = func(bool) time.Duration { return 0 }
 	go u.Run(context.Background())
@@ -202,9 +212,9 @@ func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}),
-		func(context.Context) (runtime.Release, error) {
+		func(context.Context) (runtime.VerifiedRelease, error) {
 			t.Error("unexpected discovery")
-			return runtime.Release{}, nil
+			return runtime.VerifiedRelease{}, nil
 		})
 	require.NoError(t, u.check(context.Background()))
 	require.Zero(t, host.Status().Update.LastCheckUS)

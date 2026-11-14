@@ -91,8 +91,9 @@ func TestSignVerifyBothArchitectures(t *testing.T) {
 			require.NoError(t, run(f.verifyArgs(), io.Discard))
 			data, err := os.ReadFile(filepath.Join(f.dir, "release.json"))
 			require.NoError(t, err)
-			release, err := runtime.VerifyRelease(data, f.trust)
+			verified, err := runtime.VerifyRelease(data, f.trust)
 			require.NoError(t, err)
+			release := verified.Release()
 			expected := f.manifest
 			expected.Archive.URL = "https://example.invalid/runtime.tar.zst"
 			assert.Equal(t, expected, release.Manifest)

@@ -276,7 +276,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 		var selected *runtime.Manifest
 		if command == "ensure" {
 			load := cfg.ReleaseLoader(*releasePath, *allowDownload)
-			candidate, selected, err = store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.Release, error) {
+			candidate, selected, err = store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
 				fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
 				return load(ctx)
 			})

@@ -21,8 +21,7 @@ import (
 var fixtureSequence atomic.Uint64
 
 // fixtureRelease publishes m with a sequence above every earlier fixture in this
-// process. The store persists what its loader returns; signature verification
-// is covered by the release trust tests.
+// process.
 func fixtureRelease(m Manifest) Release {
 	return Release{
 		Format:   1,
@@ -47,7 +46,7 @@ func (s *Store) beginRelease(ctx context.Context, release Release, operation Rel
 		Operation: operation,
 		Updates:   ManualUpdates,
 	}
-	candidate, err := s.BeginPublishedInstall(ctx, options, func(context.Context) (Release, error) { return release, nil })
+	candidate, err := s.BeginPublishedInstall(ctx, options, func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) })
 	if err == nil && candidate == nil {
 		err = errors.New("fixture installation was an unexpected no-op")
 	}

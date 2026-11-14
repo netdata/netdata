@@ -42,13 +42,14 @@ type ReleaseInstallOptions struct {
 	Updates UpdatePolicy
 }
 
-// BeginPublishedInstall takes installer exclusion BEFORE reading eligibility or
-// calling load. The caller must authenticate load's result with VerifyRelease.
-// Discovery runs outside inventory exclusion, so active monitoring continues.
+// BeginPublishedInstall takes installer exclusion before reading eligibility or
+// calling load, which returns a release authenticated by VerifyRelease (through
+// FetchRelease or ReadRelease in production). Discovery runs outside inventory
+// exclusion, so active monitoring continues.
 // The returned candidate owns installer exclusion through qualification and
 // publication. A nil candidate is a successful no-op: disabled automatic updates
 // or an unchanged release. No download can resurrect an uninstalled selection.
-func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (*Candidate, error) {
+func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (VerifiedRelease, error)) (*Candidate, error) {
 	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
 	return candidate, err
 }
@@ -58,11 +59,11 @@ func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstal
 // qualification or changing its update policy. The returned manifest is a
 // snapshot; exclusion is released before return. Damage requires explicit repair.
 // A new candidate enables automatic preparation only when successfully selected.
-func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (Release, error)) (*Candidate, *Manifest, error) {
+func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (VerifiedRelease, error)) (*Candidate, *Manifest, error) {
 	return s.beginPublishedInstall(ctx, ReleaseInstallOptions{Operation: ensureRelease, Updates: AutomaticUpdates}, load)
 }
 
-func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (_ *Candidate, _ *Manifest, result error) {
+func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (VerifiedRelease, error)) (_ *Candidate, _ *Manifest, result error) {
 	switch options.Operation {
 	case InstallRelease, RepairRelease, ensureRelease:
 		if options.Updates != AutomaticUpdates && options.Updates != ManualUpdates {
@@ -117,10 +118,12 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 	if options.Operation == UpdateRelease && current.Release == nil {
 		return nil, nil, errors.New("install an authenticated runtime release before checking updates")
 	}
-	release, err := load(ctx)
+	verified, err := load(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
+	// The zero VerifiedRelease, the only one not built by VerifyRelease, is invalid.
+	release := verified.release
 	if err := release.Validate(); err != nil {
 		return nil, nil, err
 	}
