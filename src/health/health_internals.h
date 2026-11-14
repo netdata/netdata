@@ -183,10 +183,18 @@ struct health_raised_summary *alerts_raised_summary_create(RRDHOST *host);
 void alerts_raised_summary_populate(struct health_raised_summary *hrm);
 void alerts_raised_summary_free(struct health_raised_summary *hrm);
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm);
+// Collect pins the host's due entries into a per-thread buffer. On the same thread, each collect MUST be followed by
+// exactly one send (or discard) for the same host before the next collect: a second collect drops the buffer and leaks
+// its pins. Only builds with internal checks catch that.
 void health_alarm_log_collect_notifications(RRDHOST *host);
 bool health_alarm_log_notifications_collected(void);
 void health_alarm_log_send_notifications(RRDHOST *host, struct health_raised_summary *hrm);
 void health_alarm_log_discard_notifications(void);
+
+// Links a transition into the health log and pins it, and the earlier entry it marks UPDATED (returned, may be NULL).
+// The caller MUST pass both to health_alarm_log_save_linked(), which saves them and drops the pins.
+ALARM_ENTRY *health_alarm_log_add_entry_linked(RRDHOST *host, ALARM_ENTRY *ae);
+void health_alarm_log_save_linked(RRDHOST *host, ALARM_ENTRY *update_ae, ALARM_ENTRY *ae);
 
 void health_apply_prototype_to_host(RRDHOST *host, RRD_ALERT_PROTOTYPE *ap);
 void health_prototype_apply_to_all_hosts(RRD_ALERT_PROTOTYPE *ap);

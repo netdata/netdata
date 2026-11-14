@@ -1641,7 +1641,9 @@ static int aq_test_pending_for_alarm(nd_uuid_t *host_id, uint32_t alarm_id, int6
 }
 
 // Two threads save one entry at once, as the metadata worker (a queued transition) and the health thread (the
-// entry it just notified) do. The notifier changes the fields a notification changes before it saves.
+// entry it just notified) do. The notifier changes the fields a notification changes before it saves. Releasing both
+// workers together makes the saves overlap often but not always, so this is a stress test: before the save mutex it
+// duplicated the row in most rounds. Forcing the overlap inside the save would deadlock against that mutex.
 struct aq_concurrent_save {
     RRDHOST *host;
     ALARM_ENTRY *ae;
@@ -2128,7 +2130,7 @@ int alert_queue_unittest(void)
         h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
 
         const int rounds = 200;
-        int duplicated = 0, missing = 0, stale = 0;
+        int duplicated = 0, missing = 0, stale = 0, threads_failed = 0;
         for (int round = 0; round < rounds; round++) {
             ALARM_ENTRY *ae =
                 aq_test_ae(7, 7000 + round, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, "concurrent");
@@ -2138,8 +2140,17 @@ int alert_queue_unittest(void)
             ND_THREAD *notifier =
                 nd_thread_create("AQNOTIFY", NETDATA_THREAD_OPTION_DONT_LOG, aq_concurrent_notifier, &s);
             __atomic_store_n(&s.go, true, __ATOMIC_RELEASE);
-            nd_thread_join(saver);
-            nd_thread_join(notifier);
+            if (saver)
+                nd_thread_join(saver);
+            if (notifier)
+                nd_thread_join(notifier);
+
+            if (!saver || !notifier) {
+                // one save alone cannot duplicate the row: fail instead of passing without the race
+                aq_test_ae_free(ae);
+                threads_failed++;
+                continue;
+            }
 
             uint32_t flags = 0;
             int64_t exec_run_timestamp = 0;
@@ -2158,10 +2169,10 @@ int alert_queue_unittest(void)
         }
 
         AQ_CHECK(
-            !duplicated && !missing && !stale,
+            !duplicated && !missing && !stale && !threads_failed,
             "concurrent saves: each transition is inserted once and holds the final fields "
-            "(%d rounds: %d duplicated, %d missing, %d stale)",
-            rounds, duplicated, missing, stale);
+            "(%d rounds: %d duplicated, %d missing, %d stale, %d without both threads)",
+            rounds, duplicated, missing, stale, threads_failed);
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         freez(h->aclk_host_config);

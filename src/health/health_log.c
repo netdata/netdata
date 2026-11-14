@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "health_internals.h"
 #include "health-alert-entry.h"
 
 // ----------------------------------------------------------------------------
