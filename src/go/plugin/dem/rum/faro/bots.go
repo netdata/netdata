@@ -9,10 +9,6 @@ import (
 	"unicode/utf8"
 )
 
-// BotPatternJS is the bot pattern the snippet tests navigator.userAgent
-// against before starting Faro.
-func BotPatternJS() string { return botPatternJS }
-
 // contextRule is an isbot entry that needs look-around: core must match
 // without one of notBefore right before it or notAfter right after it.
 type contextRule struct {

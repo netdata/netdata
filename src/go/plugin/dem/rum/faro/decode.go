@@ -97,6 +97,10 @@ const (
 	maxItems      = 500 // per array; the body cap bounds the rest
 )
 
+// tabletViewportMinWidth is the viewport width (CSS px) at or above which a
+// mobile:true beacon is classified as tablet rather than mobile.
+const tabletViewportMinWidth = 600
+
 // vitalKeys maps Faro web-vitals value keys to beacon vital names.
 var vitalKeys = map[string]string{
 	"lcp": beacon.LCP, "fcp": beacon.FCP, "ttfb": beacon.TTFB, "inp": beacon.INP, "cls": beacon.CLS,
@@ -166,14 +170,14 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		// Tablet needs a viewport width the SDK actually reported; an unparsable/absent width keeps the mobile|desktop
 		// split unchanged.
 		if w, err := strconv.Atoi(strings.TrimSpace(p.Meta.Browser.ViewportWidth)); err == nil &&
-			w >= beacon.TabletViewportMinWidth {
+			w >= tabletViewportMinWidth {
 			b.Device = beacon.DeviceTablet
 		}
 	}
 	pageURL := opt.cleanURL(p.Meta.Page.URL)
-	b.Path = Path(pageURL)
+	b.Path = urlPath(pageURL)
 	b.PageHost = pageHost(pageURL)
-	b.PageGroup = PageGroup(b.Path)
+	b.PageGroup = pageGroup(b.Path)
 
 	for i, m := range p.Measurements {
 		if i >= maxItems {
@@ -222,9 +226,9 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       Truncate(stack.String(), maxStackLen),
+			Stack:       truncate(stack.String(), maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
-			Fingerprint: Fingerprint(typ, msg, firstFrame),
+			Fingerprint: fingerprint(typ, msg, firstFrame),
 		})
 	}
 
@@ -233,7 +237,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			break
 		}
 		// Classification uses protocol names, before free-text transformation.
-		name := Clean(ev.Name, len(ev.Name))
+		name := clean(ev.Name, len(ev.Name))
 		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
 			continue
 		}
@@ -247,7 +251,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
-				k = Clean(k, len(k))
+				k = clean(k, len(k))
 				nativeAttr := keepEventAttr(kind, name, k)
 				if !opt.EventLogs && !nativeAttr {
 					continue
@@ -379,7 +383,7 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
 		Host:      strings.ToLower(attrs["httpHost"]),
-		Initiator: Clean(attrs["initiatorType"], maxNameLen),
+		Initiator: clean(attrs["initiatorType"], maxNameLen),
 		Self:      isCollectorRequest(attrs["name"]),
 	}
 	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
@@ -478,5 +482,5 @@ func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
 			break
 		}
 	}
-	return typ, Truncate(stack.String(), maxStackLen)
+	return typ, truncate(stack.String(), maxStackLen)
 }

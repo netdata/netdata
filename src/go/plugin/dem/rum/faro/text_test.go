@@ -28,8 +28,8 @@ func TestPath(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := Path(tc.in); got != tc.want {
-				t.Fatalf("Path(%q) = %q want %q", tc.in, got, tc.want)
+			if got := urlPath(tc.in); got != tc.want {
+				t.Fatalf("urlPath(%q) = %q want %q", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -59,8 +59,8 @@ func TestPageGroup(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := PageGroup(tc.in); got != tc.want {
-				t.Fatalf("PageGroup(%q) = %q want %q", tc.in, got, tc.want)
+			if got := pageGroup(tc.in); got != tc.want {
+				t.Fatalf("pageGroup(%q) = %q want %q", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -78,8 +78,28 @@ func TestClean(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := Clean(tc.in, tc.max); got != tc.want {
-				t.Fatalf("Clean(%q) = %q want %q", tc.in, got, tc.want)
+			if got := clean(tc.in, tc.max); got != tc.want {
+				t.Fatalf("clean(%q) = %q want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestTruncateKeepsRuneBoundaries(t *testing.T) {
+	tests := map[string]struct {
+		in   string
+		n    int
+		want string
+	}{
+		"short string untouched":     {in: "héllo", n: 10, want: "héllo"},
+		"cut inside a rune backs up": {in: "héllo", n: 2, want: "h"},
+		"cut on a boundary keeps it": {in: "héllo", n: 3, want: "hé"},
+		"ascii exact":                {in: "abc", n: 3, want: "abc"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := truncate(tc.in, tc.n); got != tc.want {
+				t.Fatalf("truncate(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
 			}
 		})
 	}

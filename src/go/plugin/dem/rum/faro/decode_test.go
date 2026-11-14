@@ -62,9 +62,9 @@ func TestParseFaro(t *testing.T) {
 				Country:   "GR",
 				Errors: []beacon.Error{
 					{Type: "TypeError", Message: "x is undefined", Stack: "render (https://x/app.js:10:5)\n", Time: ts,
-						Fingerprint: Fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
+						Fingerprint: fingerprint("TypeError", "x is undefined", "render@https://x/app.js")},
 					{Type: "Error", Message: "no stack", Time: now,
-						Fingerprint: Fingerprint("Error", "no stack", "")},
+						Fingerprint: fingerprint("Error", "no stack", "")},
 				},
 			},
 		},

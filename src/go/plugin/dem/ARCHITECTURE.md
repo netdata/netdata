@@ -476,12 +476,12 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 
 | Role | Package | Responsibility |
 |---|---|---|
-| Processing | `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| Processing | `rum/beacon` | Normalized browser observation model: event kinds, device and vital names, reject reasons |
 | Processing | `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
-| Processing | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
+| Processing | `rum/faro` | Faro wire decoding and input policy (normalization, redaction, error fingerprints, bot classification), spans, event classification and pinned bootstrap rendering/assets |
 | Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
 | Processing | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
-| Processing | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
+| Processing | `rum/aggregate` | One site's rolling measurements, Core Web Vitals ratings, session sampling and investigation state, behind one lock |
 | Processing | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
 | Processing | `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |

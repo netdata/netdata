@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package beacon holds the normalized RUM beacon model shared by the
-// collector (producer), the aggregator and the OTLP exporter
-// (consumers). Keeping it separate avoids import cycles between them.
+// Package beacon holds the normalized RUM beacon model: faro produces it from
+// browser payloads; aggregation, history and OTLP export consume it. Input
+// policy (normalization, redaction, fingerprints, bots) belongs to faro.
 package beacon
 
 import "time"
@@ -29,10 +29,6 @@ const (
 	// DeviceBot marks bot traffic a site keeps with bots: include.
 	DeviceBot = "bot"
 )
-
-// TabletViewportMinWidth is the viewport width (CSS px) at/above which a
-// mobile:true beacon is classified as tablet rather than mobile ("viewport width >= 600").
-const TabletViewportMinWidth = 600
 
 // EventKind describes normalized event semantics independently of wire names.
 type EventKind uint8

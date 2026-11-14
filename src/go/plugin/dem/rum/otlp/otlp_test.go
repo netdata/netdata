@@ -15,7 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/require"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
@@ -408,26 +407,6 @@ func TestShutdownFlushIsBounded(t *testing.T) {
 		t.Fatalf("shutdown flush took %v, want about %v", d, ShutdownFlushTimeout)
 	}
 	_ = e.Close()
-}
-
-func TestTruncateKeepsRuneBoundaries(t *testing.T) {
-	tests := map[string]struct {
-		in   string
-		n    int
-		want string
-	}{
-		"short string untouched":     {in: "héllo", n: 10, want: "héllo"},
-		"cut inside a rune backs up": {in: "héllo", n: 2, want: "h"},
-		"cut on a boundary keeps it": {in: "héllo", n: 3, want: "hé"},
-		"ascii exact":                {in: "abc", n: 3, want: "abc"},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := faro.Truncate(tc.in, tc.n); got != tc.want {
-				t.Fatalf("truncate(%q,%d)=%q want %q", tc.in, tc.n, got, tc.want)
-			}
-		})
-	}
 }
 
 // Investigate sampling: a beacon whose session is sampled out is

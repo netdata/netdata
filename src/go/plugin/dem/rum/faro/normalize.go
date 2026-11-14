@@ -28,28 +28,28 @@ func (o Options) apply(value string) string {
 }
 
 func (o Options) text(value string, limit int) string {
-	return Clean(o.apply(value), limit)
+	return clean(o.apply(value), limit)
 }
 
 func (o Options) cleanURL(value string) string {
 	if value == "" {
 		return ""
 	}
-	value = o.apply(RedactURL(value, o.PathRules))
+	value = o.apply(redactURL(value, o.PathRules))
 	// Keep the full URL until callers separate host and path or bound an attribute.
-	return Clean(value, len(value))
+	return clean(value, len(value))
 }
 
 func (o Options) url(value string, limit int) string {
-	return Truncate(o.cleanURL(value), limit)
+	return truncate(o.cleanURL(value), limit)
 }
 
 func (o Options) view(value string) string {
-	value = Clean(value, len(value))
+	value = clean(value, len(value))
 	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
 		value = o.url(value, maxPathLen)
 		if value != "" {
-			value = Path(value)
+			value = urlPath(value)
 		}
 	} else {
 		for _, rule := range o.PathRules {
@@ -65,7 +65,7 @@ func (o Options) selector(value string) string {
 	if r == nil {
 		r = defaultRedactor
 	}
-	return Clean(RedactSelector(r.Apply(value)), maxSelector)
+	return clean(redactSelector(r.Apply(value)), maxSelector)
 }
 
 type stackFrame struct {
@@ -77,7 +77,7 @@ type stackFrame struct {
 
 func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 	function := o.text(frame.Function, maxStackLen)
-	filename := o.text(RedactSourceURL(frame.Filename, o.PathRules), maxStackLen)
+	filename := o.text(redactSourceURL(frame.Filename, o.PathRules), maxStackLen)
 	fmt.Fprintf(stack, "%s (%s:%d:%d)\n", function, filename, frame.Lineno, frame.Colno)
 	return function + "@" + filename
 }
@@ -128,12 +128,12 @@ func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bo
 		numeric = key == "http.response.status_code" || key == "duration_ns"
 	}
 	if numeric {
-		value = Clean(value, len(value))
+		value = clean(value, len(value))
 		n, err := strconv.ParseFloat(value, 64)
 		if err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
 			return "", false
 		}
-		return Truncate(value, maxAttrLen), true
+		return truncate(value, maxAttrLen), true
 	}
 	return o.cleanAttr(key, value), true
 }

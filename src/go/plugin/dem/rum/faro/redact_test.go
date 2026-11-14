@@ -22,26 +22,26 @@ func TestRedactPath(t *testing.T) {
 		"/u/jane/profile":                              "/u/:user/profile",
 		"/":                                            "/",
 	} {
-		if got := RedactPath(in, custom); got != want {
-			t.Errorf("RedactPath(%q) = %q, want %q", in, got, want)
+		if got := redactPath(in, custom, false); got != want {
+			t.Errorf("redactPath(%q) = %q, want %q", in, got, want)
 		}
 	}
 }
 
 func TestRedactURL(t *testing.T) {
-	if got := RedactURL("https://api.example.com/users/jane@example.com", nil); got != "https://api.example.com/users/:email" {
+	if got := redactURL("https://api.example.com/users/jane@example.com", nil); got != "https://api.example.com/users/:email" {
 		t.Fatalf("got %q", got)
 	}
-	if got := RedactURL("https://api.example.com", nil); got != "https://api.example.com" {
+	if got := redactURL("https://api.example.com", nil); got != "https://api.example.com" {
 		t.Fatalf("host only: %q", got)
 	}
 }
 
 func TestRedactSelector(t *testing.T) {
-	if got := RedactSelector("div#row-jane@example.com > button.buy-1234567"); got != "div#:email > button.buy-:id" {
+	if got := redactSelector("div#row-jane@example.com > button.buy-1234567"); got != "div#:email > button.buy-:id" {
 		t.Fatalf("got %q", got)
 	}
-	if got := RedactSelector("#hero img"); got != "#hero img" {
+	if got := redactSelector("#hero img"); got != "#hero img" {
 		t.Fatalf("plain selector changed: %q", got)
 	}
 }
@@ -56,17 +56,17 @@ func TestRedactURLMalformedEscapes(t *testing.T) {
 		"https://example.org:bad/50%":                        "",
 		"https://example.org/path\n50%":                      "",
 	} {
-		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, RedactURL(raw, nil)) })
+		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, redactURL(raw, nil)) })
 	}
 }
 
 func TestRedactSourceURLKeepsOnlyScriptBasename(t *testing.T) {
 	const chunk = "framework-2c79e2a64abdb08b.js"
 	const raw = "https://user:password@example.org/eyJhbGciOiJIUzI1NiJ9/" + chunk + "?secret=private#fragment"
-	assert.Equal(t, "https://example.org/:token/:token", RedactURL(raw, nil))
-	assert.Equal(t, "https://example.org/:token/"+chunk, RedactSourceURL(raw, nil))
-	assert.Equal(t, "https://example.org/:token/:file", RedactSourceURL(raw, []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}}))
-	assert.Equal(t, "https://example.org/:email", RedactSourceURL("https://example.org/person@example.org.js", nil))
-	assert.Equal(t, "https://example.org/:id", RedactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000", nil))
-	assert.Equal(t, "https://example.org/:token", RedactSourceURL("https://example.org/eyJhbGciOiJIUzI1NiJ9.txt", nil))
+	assert.Equal(t, "https://example.org/:token/:token", redactURL(raw, nil))
+	assert.Equal(t, "https://example.org/:token/"+chunk, redactSourceURL(raw, nil))
+	assert.Equal(t, "https://example.org/:token/:file", redactSourceURL(raw, []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}}))
+	assert.Equal(t, "https://example.org/:email", redactSourceURL("https://example.org/person@example.org.js", nil))
+	assert.Equal(t, "https://example.org/:id", redactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000", nil))
+	assert.Equal(t, "https://example.org/:token", redactSourceURL("https://example.org/eyJhbGciOiJIUzI1NiJ9.txt", nil))
 }
