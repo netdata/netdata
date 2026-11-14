@@ -83,7 +83,7 @@ func TestLegacySiteTextNeverBecomesVnodeIdentity(t *testing.T) {
 	fields := eventFields(EventRecord{Site: "job", SessionID: "session", Type: "event", ObservedUS: time.Now().UnixMicro()})
 	// Even UUID-looking legacy site text was not a captured vnode association.
 	fields = append(fields, journal.StringField("DEM_SITE_ID", "11111111-1111-4111-8111-111111111111"))
-	attempted, err := store.journal.Append(ctx, fields)
+	attempted, err := store.store.Append(ctx, fields)
 	require.True(t, attempted)
 	require.NoError(t, err)
 	require.NoError(t, store.Sync(ctx))

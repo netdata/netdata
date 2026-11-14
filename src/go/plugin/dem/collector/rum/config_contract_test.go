@@ -15,7 +15,7 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -28,7 +28,7 @@ import (
 
 func nativeRUMConfigFactory(t *testing.T) (*joboutput.ConfigModuleFactory, func() *rum.Collector) {
 	t.Helper()
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	creator := rum.Creator(rum.Dependencies{

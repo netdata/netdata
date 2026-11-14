@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
@@ -615,9 +615,9 @@ func TestCaptureAbsenceStates(t *testing.T) {
 
 func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	run := model.Run{
 		ID:        "epoch-bound",
 		JobID:     "journey:epoch",
@@ -626,25 +626,25 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 		Outcome:   model.Success,
 	}
 	run.CompletedUS = run.StartedUS + 1
-	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
+	_, err = synthetichistory.NewStore(journalStore).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunc.New(query.New(syntheticregistry.New(), synthetichistory.NewStore(journal), emptyArtifacts(t), noPolicyError), nil)
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), synthetichistory.NewStore(journalStore), emptyArtifacts(t), noPolicyError), nil)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
 	assert.Equal(t, int64(0), got.RawResponse["before"])
 	// Internal detail lookup still has no picker bound.
-	retained, err := synthetichistory.NewStore(journal).GetRun(ctx, run.JobID, run.ID)
+	retained, err := synthetichistory.NewStore(journalStore).GetRun(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, run.ID, retained.ID)
 }
 
 func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
-	retained := synthetichistory.NewStore(journal)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	retained := synthetichistory.NewStore(journalStore)
 	run := model.Run{
 		ID:        "past-attempt",
 		JobID:     "journey:past",
@@ -766,10 +766,10 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 
 func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
-	store := synthetichistory.NewStore(journal)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	store := synthetichistory.NewStore(journalStore)
 	active := activeJobs{runs: map[string]model.Run{}}
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		name := []string{"checkout", "search", "legacy"}[i]
@@ -810,7 +810,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 // emptyHistory is a real run history holding no runs.
 func emptyHistory(t *testing.T) *synthetichistory.Store {
 	t.Helper()
-	store, err := demjournal.Open(t.Context(), "")
+	store, err := journalstore.Open(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	return synthetichistory.NewStore(store)

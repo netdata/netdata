@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
@@ -17,16 +18,13 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 	if after < 0 || before < after {
 		return fmt.Errorf("invalid RUM observation range")
 	}
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
 	var previous EventRecord
-	return reader.VisitRange("rum", after, before, func(entry *journal.SnapshotEntry) error {
+	return reader.VisitRange(journalstore.KindRUM, after, before, func(entry *journal.SnapshotEntry) error {
 		record, rum, err := decodeEvent(entry, &previous)
 		if err != nil {
 			return err
@@ -41,14 +39,11 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 
 // matchSession reads identity postings across all retained time.
 func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID string, visit func(EventRecord)) error {
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
 	var previous EventRecord
 	return reader.VisitMatch("DEM_SESSION_ID", session, func(entry *journal.SnapshotEntry) error {
 		record, rum, err := decodeEvent(entry, &previous)

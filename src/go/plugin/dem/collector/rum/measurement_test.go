@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -21,7 +21,7 @@ import (
 func measurementCollector(t *testing.T) (*Collector, *registry.Registry) {
 	t.Helper()
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()
@@ -326,7 +326,7 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 
 func TestConfiguredVnodeDoesNotBecomeChartLabelOrIdentity(t *testing.T) {
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()

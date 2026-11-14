@@ -19,7 +19,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	collector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
@@ -51,7 +51,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		"tracing-failure", "core-failure", "disabled", "wrong-origin", "alias-coherent", "alias-bootstrap-only",
 	}
 	hub := registry.New()
-	db, err := journal.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"))
+	db, err := journalstore.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 

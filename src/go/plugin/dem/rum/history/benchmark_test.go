@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
@@ -34,7 +34,7 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 	} {
 		b.Run(workload.name, func(b *testing.B) {
 			ctx := context.Background()
-			owner, err := demjournal.Open(ctx, "")
+			owner, err := journalstore.Open(ctx, "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -163,7 +163,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	if err := log.Close(); err != nil {
 		b.Fatal(err)
 	}
-	owner, err := demjournal.Open(context.Background(), root)
+	owner, err := journalstore.Open(context.Background(), root)
 	s := NewStore(owner)
 	if err != nil {
 		b.Fatal(err)
@@ -210,7 +210,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 // run; use a fixed count (e.g. -benchtime=50000x) when comparing implementations.
 func BenchmarkHistoryEventAppend(b *testing.B) {
 	ctx := context.Background()
-	owner, err := demjournal.Open(ctx, "")
+	owner, err := journalstore.Open(ctx, "")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -245,12 +245,12 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 }
 
 func BenchmarkAppendRumEvent(b *testing.B) {
-	owner, err := demjournal.Open(context.Background(), b.TempDir())
+	owner, err := journalstore.Open(context.Background(), b.TempDir())
 	s := NewStore(owner)
 	if err != nil {
 		b.Fatal(err)
 	}
-	defer s.journal.Close()
+	defer s.store.Close()
 	r := EventRecord{
 		Site:       "shop",
 		SessionID:  "session",

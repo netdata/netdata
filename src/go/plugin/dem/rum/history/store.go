@@ -6,16 +6,16 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 )
 
 // Store encodes and queries RUM records in the command-owned journal.
 // It borrows the journal; only the command may close it or enforce retention.
-type Store struct{ journal *demjournal.Store }
+type Store struct{ store *journalstore.Store }
 
-func NewStore(journal *demjournal.Store) *Store {
+func NewStore(store *journalstore.Store) *Store {
 	return &Store{
-		journal: journal,
+		store: store,
 	}
 }
 
@@ -32,7 +32,7 @@ func (s *Store) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	if err := validateEvent(r); err != nil {
 		return false, err
 	}
-	return s.journal.Append(ctx, eventFields(r))
+	return s.store.Append(ctx, eventFields(r))
 }
 
-func (s *Store) Sync(ctx context.Context) error { return s.journal.Sync(ctx) }
+func (s *Store) Sync(ctx context.Context) error { return s.store.Sync(ctx) }

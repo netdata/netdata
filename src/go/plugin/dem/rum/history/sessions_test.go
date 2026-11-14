@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -172,7 +172,7 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 		Page:       "/old",
 		UserID:     "prior-user",
 	}, now)
-	owner, err := demjournal.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })
 	s := NewStore(owner)

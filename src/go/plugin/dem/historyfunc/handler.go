@@ -10,12 +10,12 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 )
 
 // Deps exposes storage facts without owning the process store.
 type Deps interface {
-	Status(context.Context) (journal.Status, error)
+	Status(context.Context) (journalstore.Status, error)
 }
 
 type Handler struct {
@@ -109,7 +109,7 @@ func statusError(err error) *funcapi.FunctionResponse {
 
 // statusRow is the store status with the retention worker's reload error.
 type statusRow struct {
-	journal.Status
+	journalstore.Status
 	policyError string
 }
 

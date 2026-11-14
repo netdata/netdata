@@ -15,14 +15,14 @@ import (
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInitRejectsURLsWithoutHostname(t *testing.T) {
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
 	for _, field := range []string{"public_url", "allowed_origins"} {
@@ -44,7 +44,7 @@ func TestInitRejectsURLsWithoutHostname(t *testing.T) {
 }
 
 func TestCancelledPlaintextPreparationAndRun(t *testing.T) {
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	defer db.Close()
 	c := rum.New(rum.Dependencies{
@@ -63,7 +63,7 @@ func TestCancelledPlaintextPreparationAndRun(t *testing.T) {
 }
 
 func TestInitSamplingRates(t *testing.T) {
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	for _, rate := range []float64{0, .25, 1, -.1, 1.1, math.NaN(), math.Inf(1), math.Inf(-1)} {
@@ -94,7 +94,7 @@ func TestInitSamplingRates(t *testing.T) {
 // Init accepts or rejects each site setting with a stable message; the checks run
 // in this order, so the first failing rule names the error.
 func TestInitValidationContract(t *testing.T) {
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	text := func(s string) *string { return &s }

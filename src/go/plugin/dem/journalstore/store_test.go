@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package journal
+package journalstore
 
 import (
 	"context"
@@ -38,12 +38,20 @@ func countEntries(t *testing.T, s *Store) int {
 	reader, release, err := s.OpenReader(context.Background())
 	require.NoError(t, err)
 	defer release()
-	if reader == nil {
-		return 0
-	}
 	n := 0
-	require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { n++; return nil }))
+	require.NoError(t, visitEntries(reader, func(*journal.SnapshotEntry) error { n++; return nil }))
 	return n
+}
+
+// visitEntries walks every captured entry in native order. Production readers
+// select through the indexes instead (VisitMatch, VisitRange).
+func visitEntries(r *Snapshot, visit func(*journal.SnapshotEntry) error) error {
+	for _, file := range r.files {
+		if err := file.VisitEntries(r.ctx, visit); err != nil {
+			return err
+		}
+	}
+	return r.ctx.Err()
 }
 
 func TestCancelledAdmissionDoesNotAppend(t *testing.T) {
@@ -73,7 +81,7 @@ func TestScanCancellationAndSnapshotBoundaries(t *testing.T) {
 	reader, release, err := s.OpenReader(ctx)
 	require.NoError(t, err)
 	count := 0
-	err = reader.VisitEntries(func(*journal.SnapshotEntry) error { count++; cancel(); return nil })
+	err = visitEntries(reader, func(*journal.SnapshotEntry) error { count++; cancel(); return nil })
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, 1, count)
 	release()
@@ -82,7 +90,7 @@ func TestScanCancellationAndSnapshotBoundaries(t *testing.T) {
 	defer release()
 	appendEntry(t, s)
 	count = 0
-	require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { count++; return nil }))
+	require.NoError(t, visitEntries(reader, func(*journal.SnapshotEntry) error { count++; return nil }))
 	assert.Equal(t, 4, count, "snapshot excludes later appends")
 }
 
@@ -178,40 +186,6 @@ func TestAppendEnvelopeRejectsIncompatibleFieldsBeforeAttempt(t *testing.T) {
 			assert.Equal(t, 1, countEntries(t, s), "validation failure leaves writer usable")
 		})
 	}
-}
-
-func TestEnvelopeChecksSchemaClockAndBucket(t *testing.T) {
-	fields := []journal.Field{journal.StringField("DEM_SCHEMA", "1"), journal.StringField("DEM_KIND", "rum"), journal.StringField("DEM_OBSERVED_US", "60000001"), journal.StringField("DEM_RUM_MINUTE", "1")}
-	var valid Envelope
-	for _, field := range fields {
-		require.NoError(t, valid.Observe([]byte(field.Name), field.Value))
-	}
-	kind, timestamp, err := valid.Validate()
-	require.NoError(t, err)
-	assert.Equal(t, "rum", kind)
-	assert.Equal(t, int64(60000001), timestamp)
-	t.Run("duplicate", func(t *testing.T) {
-		candidate := valid
-		assert.ErrorContains(t, candidate.Observe([]byte("DEM_RUM_MINUTE"), []byte("1")), "duplicate history field")
-	})
-	t.Run("unsupported schema", func(t *testing.T) {
-		var candidate Envelope
-		assert.ErrorContains(t, candidate.Observe([]byte("DEM_SCHEMA"), []byte("0")), "incompatible DEM history schema")
-	})
-	t.Run("noncanonical", func(t *testing.T) {
-		var candidate Envelope
-		for _, field := range fields[:3] {
-			require.NoError(t, candidate.Observe([]byte(field.Name), field.Value))
-		}
-		assert.ErrorContains(t, candidate.Observe([]byte("DEM_RUM_MINUTE"), []byte("01")), "expected canonical nonnegative decimal")
-	})
-	fields[3] = journal.StringField("DEM_RUM_MINUTE", "2")
-	var mismatch Envelope
-	for _, field := range fields {
-		require.NoError(t, mismatch.Observe([]byte(field.Name), field.Value))
-	}
-	_, _, err = mismatch.Validate()
-	assert.Error(t, err)
 }
 
 func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {

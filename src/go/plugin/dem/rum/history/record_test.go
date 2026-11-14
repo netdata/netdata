@@ -3,7 +3,10 @@
 package history
 
 import (
+	"bytes"
 	"context"
+	"errors"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -247,11 +250,104 @@ func TestSelectedDomainScalarsAreValidated(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s, _ := newTestStore(t)
 			fields := eventFields(EventRecord{Site: "shop", SessionID: "session", Type: "pageview", ObservedUS: 1_000_000, Page: "/page"})
-			_, err := s.journal.Append(context.Background(), tc.mutate(fields))
+			_, err := s.store.Append(context.Background(), tc.mutate(fields))
 			require.NoError(t, err)
 			rows, err := s.QuerySessions(context.Background(), "shop", "", 1, 1, 0, "")
 			require.Error(t, err)
 			require.Nil(t, rows, "malformed candidates cannot return partial aggregates")
+		})
+	}
+}
+
+// storedEntries reads every retained entry straight from the journal files with
+// the SDK, independent of the store's own reader. Trusted "_" fields come from
+// the host identity and are left out.
+func storedEntries(t *testing.T, root string) []map[string][]string {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(root, "*", "*.journal"))
+	require.NoError(t, err)
+	var entries []map[string][]string
+	for _, path := range paths {
+		file, err := journal.OpenIndexedSnapshot(context.Background(), path, journal.IndexedSnapshotOptions{})
+		require.NoError(t, err)
+		err = file.VisitEntries(context.Background(), func(entry *journal.SnapshotEntry) error {
+			fields := map[string][]string{}
+			entries = append(entries, fields)
+			return entry.VisitPayloads(func(payload []byte) error {
+				name, value, _ := bytes.Cut(payload, []byte("="))
+				if !bytes.HasPrefix(name, []byte("_")) {
+					fields[string(name)] = append(fields[string(name)], string(value))
+				}
+				return nil
+			})
+		})
+		require.NoError(t, errors.Join(err, file.Close()))
+	}
+	return entries
+}
+
+// The complete stored entry, including the envelope the store derives, is the
+// persisted RUM history contract.
+func TestStoredEventEntryContract(t *testing.T) {
+	tests := map[string]struct {
+		record EventRecord
+		want   map[string][]string
+	}{
+		"every field set": {
+			record: fullEventRecord(t),
+			want: map[string][]string{
+				"DEM_SCHEMA":        {"1"},
+				"DEM_KIND":          {"rum"},
+				"DEM_OBSERVED_US":   {"1700000000000008"},
+				"DEM_RUM_MINUTE":    {"28333333"},
+				"DEM_REVISION":      {"1005"},
+				"DEM_EXPERIENCE_ID": {"ExperienceID-value"},
+				"DEM_VIEW":          {"View-value"},
+				"DEM_VIEW_ID":       {"ViewID-value"},
+				"DEM_METRIC_ID":     {"MetricID-value"},
+				"DEM_VNODE_GUID":    {"11111111-1111-4111-8111-111111111111"},
+				"DEM_SITE":          {"Site-value"},
+				"DEM_SESSION_ID":    {"SessionID-value"},
+				"DEM_TYPE":          {"Type-value"},
+				"DEM_PAGE":          {"Page-value"},
+				"DEM_TEXT":          {"Text-value"},
+				"DEM_TRACE_ID":      {"TraceID-value"},
+				"DEM_BROWSER":       {"Browser-value"},
+				"DEM_DEVICE":        {"Device-value"},
+				"DEM_COUNTRY":       {"Country-value"},
+				"DEM_VERSION":       {"Version-value"},
+				"DEM_USER_ID":       {"UserID-value"},
+				"DEM_FINGERPRINT":   {"Fingerprint-value"},
+				"DEM_ERROR_TYPE":    {"ErrorType-value"},
+				"DEM_MESSAGE":       {"Message-value"},
+				"DEM_SAMPLE_STACK":  {"SampleStack-value"},
+				"MESSAGE":           {"Text-value"},
+			},
+		},
+		"minimal record at epoch": {
+			record: EventRecord{
+				Site:       "shop",
+				Type:       "activity",
+				ObservedUS: 0,
+			},
+			want: map[string][]string{
+				"DEM_SCHEMA":      {"1"},
+				"DEM_KIND":        {"rum"},
+				"DEM_OBSERVED_US": {"0"},
+				"DEM_RUM_MINUTE":  {"0"},
+				"DEM_REVISION":    {"0"},
+				"DEM_SITE":        {"shop"},
+				"DEM_TYPE":        {"activity"},
+				"MESSAGE":         {"activity"},
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			s, root := newTestStore(t)
+			appendEvent(t, s, tc.record)
+			require.NoError(t, s.Sync(context.Background()))
+			require.Equal(t, []map[string][]string{tc.want}, storedEntries(t, root))
 		})
 	}
 }

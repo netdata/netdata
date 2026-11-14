@@ -13,7 +13,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
@@ -77,7 +77,7 @@ func page(a *aggregate.Aggregator, site, path string) {
 
 func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	retained := history.NewStore(journalStore)
@@ -137,7 +137,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 
 func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	retained := history.NewStore(journalStore)
@@ -208,7 +208,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 
 func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := history.NewStore(journalStore)
@@ -286,7 +286,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 
 func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := history.NewStore(journalStore)
@@ -349,7 +349,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 }
 
 func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
-	journalStore, err := journal.Open(context.Background(), "")
+	journalStore, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := history.NewStore(journalStore)
@@ -422,7 +422,7 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 
 func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := history.NewStore(journalStore)
@@ -510,7 +510,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
-			journalStore, err := journal.Open(ctx, "")
+			journalStore, err := journalstore.Open(ctx, "")
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 			st := history.NewStore(journalStore)
@@ -565,7 +565,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 
 func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := history.NewStore(journalStore)
@@ -637,7 +637,7 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 
 func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	ctx := context.Background()
-	owner, err := journal.Open(ctx, t.TempDir())
+	owner, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })
 	store := history.NewStore(owner)
@@ -771,7 +771,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 
 func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := history.NewStore(journalStore)

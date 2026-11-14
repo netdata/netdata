@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package journal
+package journalstore
 
 import (
 	"context"
@@ -117,14 +117,6 @@ func (r *Snapshot) close() error {
 	}
 	return err
 }
-func (r *Snapshot) VisitEntries(visit func(*journal.SnapshotEntry) error) error {
-	for _, file := range r.files {
-		if err := file.VisitEntries(r.ctx, visit); err != nil {
-			return err
-		}
-	}
-	return r.ctx.Err()
-}
 func (r *Snapshot) VisitMatch(name, value string, visit func(*journal.SnapshotEntry) error) error {
 	for _, file := range r.files {
 		if err := file.VisitMatch(r.ctx, []byte(name), []byte(value), visit); err != nil {
@@ -142,15 +134,15 @@ const exactBucketLimit = int64(256)
 
 // VisitRange selects candidates by the domain clock's minute. Domain decoders
 // validate exact timestamps against the inclusive whole-second bounds afterward.
-func (r *Snapshot) VisitRange(kind string, after, before int64, visit func(*journal.SnapshotEntry) error) error {
+func (r *Snapshot) VisitRange(kind Kind, after, before int64, visit func(*journal.SnapshotEntry) error) error {
 	if after < 0 || before < after {
 		return fmt.Errorf("invalid history observation/start range")
 	}
 	field := ""
 	switch kind {
-	case "rum":
+	case KindRUM:
 		field = rumBucket
-	case "synthetic":
+	case KindSynthetic:
 		field = syntheticBucket
 	default:
 		return fmt.Errorf("invalid history kind %q", kind)
