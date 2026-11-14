@@ -82,7 +82,6 @@ jobs:
             **/*.patch
             src/crates/
             src/aclk/aclk-schemas/
-            src/ml/dlib/
           files_ignore: |
             src/go/otel-collector/release-config.yaml.in
             **/*.md

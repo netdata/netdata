@@ -1284,11 +1284,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
     build_info_set_status(BIB_LIB_ZLIB, true);
 
-#ifdef HAVE_DLIB
-    build_info_set_status(BIB_LIB_DLIB, true);
-    build_info_set_value(BIB_LIB_DLIB, "bundled");
-#endif
-
 #ifdef HAVE_PROTOBUF
     build_info_set_status(BIB_LIB_PROTOBUF, true);
 #ifdef ENABLE_BUNDLED_PROTOBUF

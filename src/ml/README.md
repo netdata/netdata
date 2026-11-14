@@ -29,7 +29,7 @@ When you use Netdata's machine learning models, you benefit from these key princ
 
 :::note
 
-Netdata deliberately avoids using deep learning models, as they would introduce heavy dependencies and resource requirements that wouldn't align with Netdata's goal of running efficiently on any Linux system. Instead, the implementation uses the lightweight [dlib](https://github.com/davisking/dlib) library and spreads training costs over a wide window to minimize performance impact.
+Netdata deliberately avoids using deep learning models, as they would introduce heavy dependencies and resource requirements that wouldn't align with Netdata's goal of running efficiently on any Linux system. Instead, the implementation uses a small built-in k-means and spreads training costs over a wide window to minimize performance impact.
 
 :::
 
