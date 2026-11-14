@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var now = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
@@ -517,4 +519,114 @@ func TestDecodeEventKinds(t *testing.T) {
 			t.Errorf("event %d = %+v; want %s/%d", i, b.Events[i], w.name, w.kind)
 		}
 	}
+}
+
+func TestDurationPresenceAndNavigationRevision(t *testing.T) {
+	b, err := Decode([]byte(`{"events":[
+  {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"0","domContentLoadHandlerTime":"0","observation_sequence":"3"}},
+  {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"99","observation_sequence":"2"}},
+  {"name":"faro.performance.resource","attributes":{"duration":"0","observation_id":"resource-1"}},
+  {"name":"faro.performance.resource","attributes":{"httpHost":"example.org","observation_id":"resource-2"}},
+  {"name":"session_start"},{"name":"session_resume"},{"name":"session_extend"}]}`), Options{
+		Now: now,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, &beacon.Navigation{
+		Revision: 3,
+		HasLoad:  true,
+		HasDCL:   true,
+	}, b.Navigation)
+	require.Len(t, b.Resources, 2)
+	assert.True(t, b.Resources[0].HasDuration)
+	assert.False(t, b.Resources[1].HasDuration)
+	assert.Empty(t, b.Resources[0].Host, "unknown ownership stays distinct")
+	for _, event := range b.Events[4:] {
+		assert.Equal(t, beacon.EventSession, event.Kind)
+	}
+}
+
+func TestConsoleContextNormalization(t *testing.T) {
+	for name, ctx := range map[string]any{
+		"absent": nil, "wrong context": "malformed", "wrong type": map[string]any{"type": 42, "stackFrames": true},
+		"null frame":         map[string]any{"type": "TypeError", "stackFrames": "null"},
+		"bad frames":         map[string]any{"type": "TypeError", "stackFrames": "{not json}"},
+		"wrong frame fields": map[string]any{"type": "TypeError", "stackFrames": `{"filename":123}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw, err := json.Marshal(
+				map[string]any{
+					"logs":       []any{map[string]any{"message": "message", "level": "error", "context": ctx}},
+					"exceptions": []any{map[string]any{"type": "Error", "value": "core"}},
+				},
+			)
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{
+				Now:         now,
+				ConsoleLogs: true,
+			})
+			require.NoError(t, err)
+			require.Len(t, b.Logs, 1)
+			require.Len(t, b.Errors, 1)
+			assert.Empty(t, b.Logs[0].Stack)
+			off, err := Decode(raw, Options{
+				Now: now,
+			})
+			require.NoError(t, err)
+			assert.Empty(t, off.Logs)
+			require.Len(t, off.Errors, 1)
+		})
+	}
+	frame, _ := json.Marshal(
+		map[string]any{
+			"filename": "https://example.org/users/123456/app.js?password=urlsecret",
+			"function": "token=framesecret",
+			"lineno":   12,
+			"colno":    3,
+		},
+	)
+	raw, err := json.Marshal(
+		map[string]any{
+			"logs": []any{
+				map[string]any{
+					"message": "password=messagesecret",
+					"context": map[string]any{
+						"type":        "token=typesecret",
+						"stackFrames": string(frame),
+						"arbitrary":   "discard me",
+					},
+				},
+			},
+		},
+	)
+	require.NoError(t, err)
+	b, err := Decode(raw, Options{
+		Now:         now,
+		ConsoleLogs: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, b.Logs, 1)
+	assert.Equal(t, "password=[REDACTED]", b.Logs[0].Message)
+	assert.Equal(t, "token=[REDACTED]", b.Logs[0].ErrorType)
+	assert.Equal(t, "token=[REDACTED] (https://example.org/users/:id/app.js:12:3)\n", b.Logs[0].Stack)
+	frame, _ = json.Marshal(map[string]any{"filename": strings.Repeat("a", maxStackLen*2)})
+	raw, _ = json.Marshal(
+		map[string]any{
+			"logs": []any{
+				map[string]any{
+					"message": strings.Repeat("m", maxMessageLen*2),
+					"context": map[string]any{"type": strings.Repeat("t", maxNameLen*2), "stackFrames": string(frame)},
+				},
+			},
+		},
+	)
+	b, err = Decode(raw, Options{
+		Now:         now,
+		ConsoleLogs: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, b.Logs, 1)
+	assert.Len(t, b.Logs[0].Message, maxMessageLen)
+	assert.Len(t, b.Logs[0].ErrorType, maxNameLen)
+	assert.Len(t, b.Logs[0].Stack, maxStackLen)
+	assert.Empty(t, b.Errors)
 }

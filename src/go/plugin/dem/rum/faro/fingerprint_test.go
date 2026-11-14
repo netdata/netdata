@@ -2,7 +2,9 @@
 
 package faro
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestNormalizeMessage(t *testing.T) {
 	tests := map[string]struct {
