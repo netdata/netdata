@@ -4,36 +4,53 @@ package receiver
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/model"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/traptest"
 )
 
 const testEngineIDHex = "80001f888077dfe44faa700258"
 
-func newTestV3SecurityTable(t *testing.T, users ...USMUser) *gosnmp.SnmpV3SecurityParametersTable {
+// newTestV3Receiver is the receiver of a static job whose whitelist holds the
+// users' engine IDs.
+func newTestV3Receiver(t *testing.T, users ...USMUser) *gosnmp.Receiver {
 	t.Helper()
-	table, err := buildSnmpV3SecurityTable(users, false)
-	if err != nil {
-		t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
+	var engineIDs []string
+	for _, u := range users {
+		engineIDs = append(engineIDs, u.EngineID)
 	}
-	return table
+	whitelist, err := buildEngineIDWhitelist(engineIDs)
+	if err != nil {
+		t.Fatalf("buildEngineIDWhitelist failed: %v", err)
+	}
+	registered, _, err := receiverUsers(users, whitelist, nil, false)
+	if err != nil {
+		t.Fatalf("receiverUsers failed: %v", err)
+	}
+	receiver, err := gosnmp.NewReceiver(gosnmp.ReceiverConfig{Users: registered})
+	if err != nil {
+		t.Fatalf("NewReceiver failed: %v", err)
+	}
+	return receiver
 }
 
-func marshalPacket(t testing.TB, pkt *gosnmp.SnmpPacket) []byte {
-	return traptest.Marshal(t, pkt)
+// newPlainReceiver decodes SNMPv1 and SNMPv2c messages.
+func newPlainReceiver(t testing.TB) *gosnmp.Receiver {
+	t.Helper()
+	receiver, err := gosnmp.NewReceiver(gosnmp.ReceiverConfig{})
+	if err != nil {
+		t.Fatalf("NewReceiver failed: %v", err)
+	}
+	return receiver
 }
 
-func buildV3Trap(t *testing.T, user string, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
-	return traptest.BuildV3Trap(t, user, trapOID, extra...)
-}
-
-func buildV3TrapWithEngineID(t *testing.T, user, engineIDHex, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV3TrapWithEngineID(t *testing.T, user, engineIDHex, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV3TrapWithEngineID(t, user, engineIDHex, trapOID, extra...)
 }
 
@@ -45,14 +62,14 @@ type v3SecuredTrapSpec struct {
 	authKey     string
 	privKey     string
 	trapOID     string
-	extra       []gosnmp.SnmpPDU
+	extra       []gosnmp.VarBind
 }
 
 func buildV3SecuredTrap(t *testing.T, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredTrap(t, spec.traptest())
 }
 
-func buildV3SecuredTrapWithFlags(t *testing.T, spec v3SecuredTrapSpec, flags gosnmp.SnmpV3MsgFlags) []byte {
+func buildV3SecuredTrapWithFlags(t *testing.T, spec v3SecuredTrapSpec, flags gosnmp.SecurityLevel) []byte {
 	return traptest.BuildV3SecuredTrapWithFlags(t, spec.traptest(), flags)
 }
 
@@ -60,7 +77,7 @@ func buildV3SecuredInform(t *testing.T, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredInform(t, spec.traptest())
 }
 
-func buildV3SecuredInformWithFlags(t *testing.T, spec v3SecuredTrapSpec, flags gosnmp.SnmpV3MsgFlags) []byte {
+func buildV3SecuredInformWithFlags(t *testing.T, spec v3SecuredTrapSpec, flags gosnmp.SecurityLevel) []byte {
 	return traptest.BuildV3SecuredInformWithFlags(t, spec.traptest(), flags)
 }
 
@@ -71,23 +88,24 @@ func (s v3SecuredTrapSpec) traptest() traptest.V3Spec {
 	}
 }
 
-func buildV2cTrap(t testing.TB, community, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV2cTrap(t testing.TB, community, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV2cTrap(t, community, trapOID, extra...)
 }
 
-func buildV2cPDU(t testing.TB, pduType gosnmp.PDUType, community, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV2cPDU(t testing.TB, pduType gosnmp.PDUType, community, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV2cPDU(t, pduType, community, trapOID, extra...)
 }
 
-func buildV1Trap(t *testing.T, community, agentAddr string, genericTrap, specificTrap int, extra ...gosnmp.SnmpPDU) []byte {
+func buildV1Trap(t *testing.T, community, agentAddr string, genericTrap, specificTrap int, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV1Trap(t, community, agentAddr, genericTrap, specificTrap, extra...)
 }
 
 func TestMinimalV2cDecode(t *testing.T) {
-	pkt, err := decodePacket(buildV2cTrap(t, "c", "1.3.6.1.6.3.1.1.5.1"), nil)
+	n, _, err := decodePacket(buildV2cTrap(t, "c", "1.3.6.1.6.3.1.1.5.1"), false, newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("unexpected decode error: %v", err)
 	}
+	pkt := &n.Message
 	if pkt.Version != gosnmp.Version2c {
 		t.Errorf("expected v2c, got %s", pkt.Version)
 	}
@@ -101,7 +119,7 @@ func TestMinimalV2cDecode(t *testing.T) {
 }
 
 func TestV2cLinkDownDecode(t *testing.T) {
-	ctx, err := decodeTrap(buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.3"), net.ParseIP("10.1.2.3"), nil)
+	ctx, _, err := decodeTrap(buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.3"), net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -114,7 +132,7 @@ func TestV2cLinkDownDecode(t *testing.T) {
 }
 
 func TestInformDecode(t *testing.T) {
-	ctx, err := decodeTrap(buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1"), net.ParseIP("10.1.2.3"), nil)
+	ctx, _, err := decodeTrap(buildV2cPDU(t, gosnmp.InformRequest, "public", "1.3.6.1.6.3.1.1.5.1"), net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -126,59 +144,35 @@ func TestInformDecode(t *testing.T) {
 func TestDecodeOversized(t *testing.T) {
 	data := make([]byte, maxDatagramSize+1)
 	data[0] = 0x30
-	if _, err := decodePacket(data, nil); err == nil {
+	if _, _, err := decodePacket(data, false, newPlainReceiver(t)); err == nil {
 		t.Fatal("expected error for oversized datagram")
 	}
 }
 
 func TestDecodeMalformed(t *testing.T) {
 	data := []byte{0x30, 0x01, 0x02}
-	if _, err := decodePacket(data, nil); err == nil {
+	if _, _, err := decodePacket(data, false, newPlainReceiver(t)); err == nil {
 		t.Fatal("expected error for truncated packet")
-	}
-}
-
-func TestSniffSNMPVersionRejectsHugeBERLength(t *testing.T) {
-	_, ok := sniffSNMPVersion([]byte{tagSequence, 0x84, 0x80, 0x00, 0x00, 0x00})
-	if ok {
-		t.Fatal("expected huge BER length to be rejected")
-	}
-}
-
-func TestSniffSNMPVersionMalformedDoesNotAllocate(t *testing.T) {
-	for name, data := range map[string][]byte{
-		"indefinite length": {tagSequence, 0x80, 0x00, 0x00},
-		"truncated":         {tagSequence, 0x01, tagInteger},
-	} {
-		t.Run(name, func(t *testing.T) {
-			if got := testing.AllocsPerRun(1000, func() {
-				_, _ = sniffSNMPVersion(data)
-			}); got != 0 {
-				t.Fatalf("sniffSNMPVersion allocations = %.0f, want 0", got)
-			}
-		})
 	}
 }
 
 func TestDecodeRejectsOctetStringOverLimit(t *testing.T) {
 	longValue := make([]byte, maxOctetStringLen+1)
-	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.SnmpPDU{
+	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1", gosnmp.VarBind{
 		Name:  "1.3.6.1.2.1.1.1.0",
-		Type:  gosnmp.OctetString,
-		Value: longValue,
+		Value: gosnmp.OctetStringValue([]byte(longValue)),
 	})
-	if _, err := decodePacket(data, nil); err == nil {
+	if _, _, err := decodePacket(data, false, newPlainReceiver(t)); err == nil {
 		t.Fatal("expected error for oversized OctetString")
 	}
 }
 
 func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing.T) {
-	var extra []gosnmp.SnmpPDU
+	var extra []gosnmp.VarBind
 	for i := range 40 {
-		extra = append(extra, gosnmp.SnmpPDU{
+		extra = append(extra, gosnmp.VarBind{
 			Name:  "1.3.6.1.4.1.999.1." + strconv.Itoa(i+1),
-			Type:  gosnmp.OctetString,
-			Value: strings.Repeat("x", 48),
+			Value: gosnmp.OctetStringValue([]byte(strings.Repeat("x", 48))),
 		})
 	}
 	data := buildV3SecuredTrap(t, v3SecuredTrapSpec{
@@ -194,7 +188,7 @@ func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing
 	if len(data) <= maxOctetStringLen {
 		t.Fatalf("test packet length = %d, want encrypted ScopedPDU coverage over %d", len(data), maxOctetStringLen)
 	}
-	tbl := newTestV3SecurityTable(t, USMUser{
+	tbl := newTestV3Receiver(t, USMUser{
 		Username:  "testuser",
 		EngineID:  testEngineIDHex,
 		AuthProto: "sha256",
@@ -203,7 +197,7 @@ func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing
 		PrivKey:   "privpassword",
 	})
 
-	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
 		t.Fatalf("decodeTrap failed for valid authPriv packet: %v", err)
 	}
@@ -212,31 +206,17 @@ func TestDecodeV3AuthPrivAllowsEncryptedScopedPDUOverOctetStringLimit(t *testing
 	}
 }
 
-func TestNormalizePDUValueRejectsUnexpectedType(t *testing.T) {
-	_, err := normalizePDUValue(gosnmp.SnmpPDU{
-		Name:  "1.3.6.1.4.1.9.1",
-		Type:  gosnmp.Opaque,
-		Value: struct{ Unsupported bool }{Unsupported: true},
-	})
-	if err == nil {
-		t.Fatal("expected unsupported value type error")
-	}
-	if !strings.Contains(err.Error(), "unsupported PDU value type") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestNormalizePDUValueSupportsOpaqueFloats(t *testing.T) {
 	tests := map[string]struct {
-		pdu  gosnmp.SnmpPDU
+		pdu  gosnmp.VarBind
 		want float64
 	}{
 		"float32": {
-			pdu:  gosnmp.SnmpPDU{Name: "1.3.6.1.4.1.9.1", Type: gosnmp.OpaqueFloat, Value: float32(1.25)},
+			pdu:  gosnmp.VarBind{Name: "1.3.6.1.4.1.9.1", Value: gosnmp.OpaqueFloatValue(1.25)},
 			want: 1.25,
 		},
 		"float64": {
-			pdu:  gosnmp.SnmpPDU{Name: "1.3.6.1.4.1.9.2", Type: gosnmp.OpaqueDouble, Value: float64(2.5)},
+			pdu:  gosnmp.VarBind{Name: "1.3.6.1.4.1.9.2", Value: gosnmp.OpaqueDoubleValue(2.5)},
 			want: 2.5,
 		},
 	}
@@ -274,7 +254,7 @@ func TestDecodeRejectsBERLimits(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if _, err := decodePacket(tc.data, nil); err == nil {
+			if _, _, err := decodePacket(tc.data, false, newPlainReceiver(t)); err == nil {
 				t.Fatal("expected BER limit error")
 			}
 		})
@@ -467,7 +447,7 @@ func TestV1DecodeRejectsInvalidGenericTrap(t *testing.T) {
 	for name, genericTrap := range tests {
 		t.Run(name, func(t *testing.T) {
 			data := buildV1Trap(t, "public", "192.0.2.10", genericTrap, 0)
-			_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+			_, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 			if err == nil {
 				t.Fatal("expected error for invalid generic trap")
 			}
@@ -480,7 +460,7 @@ func TestV1DecodeRejectsInvalidGenericTrap(t *testing.T) {
 
 func TestV1DecodeRejectsInvalidEnterpriseSpecificTrap(t *testing.T) {
 	data := buildV1Trap(t, "public", "192.0.2.10", 6, -1)
-	_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	_, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 	if err == nil {
 		t.Fatal("expected error for invalid enterprise-specific trap")
 	}
@@ -492,7 +472,7 @@ func TestV1DecodeRejectsInvalidEnterpriseSpecificTrap(t *testing.T) {
 func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 	data := buildV1Trap(t, "public", "192.0.2.10", 6, 42)
 
-	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -514,7 +494,7 @@ func TestV1DecodeConvertsAgentAddressAndSyntheticVarbinds(t *testing.T) {
 func TestDecodeTrapIntegration(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
 
-	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), nil)
+	ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -533,7 +513,7 @@ func TestDecodeTrapIntegration(t *testing.T) {
 func TestDecodeTrapNilPeer(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
 
-	ctx, err := decodeTrap(data, nil, nil)
+	ctx, _, err := decodeTrap(data, nil, newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -548,17 +528,17 @@ func TestDecodeTrapNilPeer(t *testing.T) {
 
 func TestDecodePacketSucceeds(t *testing.T) {
 	data := buildV2cTrap(t, "c", "1.3.6.1.6.3.1.1.5.1")
-	_, err := decodePacket(data, nil)
+	_, _, err := decodePacket(data, false, newPlainReceiver(t))
 	if err != nil {
 		t.Fatalf("unexpected decode error: %v", err)
 	}
 }
 
-func TestDecodeTrapV2cWithV3SecurityTable(t *testing.T) {
+func TestDecodeTrapV2cWithV3Receiver(t *testing.T) {
 	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
-	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
+	tbl := newTestV3Receiver(t, USMUser{Username: "testuser", EngineID: testEngineIDHex})
 
-	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
 		t.Fatalf("decodeTrap failed: %v", err)
 	}
@@ -568,15 +548,10 @@ func TestDecodeTrapV2cWithV3SecurityTable(t *testing.T) {
 }
 
 func TestV3DecodeNoAuth(t *testing.T) {
-	data := buildV3Trap(t, "testuser", "1.3.6.1.6.3.1.1.5.1")
-	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
-	tbl.Add("testuser", &gosnmp.UsmSecurityParameters{
-		UserName:               "testuser",
-		AuthenticationProtocol: gosnmp.NoAuth,
-		PrivacyProtocol:        gosnmp.NoPriv,
-	})
+	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	tbl := newTestV3Receiver(t, USMUser{Username: "testuser", EngineID: testEngineIDHex})
 
-	ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err != nil {
 		t.Fatalf("v3 decode failed: %v", err)
 	}
@@ -603,18 +578,15 @@ func TestV3DecodeAuthProtocols(t *testing.T) {
 				authKey:     "authpassword",
 				trapOID:     "1.3.6.1.6.3.1.1.5.1",
 			})
-			tbl, err := buildSnmpV3SecurityTable([]USMUser{{
+			tbl := newTestV3Receiver(t, USMUser{
 				Username:  "testuser",
 				EngineID:  testEngineIDHex,
 				AuthProto: authProto,
 				AuthKey:   "authpassword",
 				PrivProto: "none",
-			}}, false)
-			if err != nil {
-				t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-			}
+			})
 
-			ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+			ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 			if err != nil {
 				t.Fatalf("decodeTrap failed: %v", err)
 			}
@@ -643,19 +615,16 @@ func TestV3DecodePrivacyProtocols(t *testing.T) {
 				privKey:     "privpassword",
 				trapOID:     "1.3.6.1.6.3.1.1.5.1",
 			})
-			tbl, err := buildSnmpV3SecurityTable([]USMUser{{
+			tbl := newTestV3Receiver(t, USMUser{
 				Username:  "testuser",
 				EngineID:  testEngineIDHex,
 				AuthProto: "sha256",
 				AuthKey:   "authpassword",
 				PrivProto: privProto,
 				PrivKey:   "privpassword",
-			}}, false)
-			if err != nil {
-				t.Fatalf("buildSnmpV3SecurityTable failed: %v", err)
-			}
+			})
 
-			ctx, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+			ctx, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 			if err != nil {
 				t.Fatalf("decodeTrap failed: %v", err)
 			}
@@ -666,43 +635,11 @@ func TestV3DecodePrivacyProtocols(t *testing.T) {
 	}
 }
 
-func TestExtractSNMPv3EngineIDHex(t *testing.T) {
-	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
-
-	got, ok, err := extractSNMPv3EngineIDHex(data)
-	if err != nil {
-		t.Fatalf("extractSNMPv3EngineIDHex failed: %v", err)
-	}
-	if !ok {
-		t.Fatal("expected v3 engine ID")
-	}
-	if got != testEngineIDHex {
-		t.Fatalf("engine ID = %q, want %q", got, testEngineIDHex)
-	}
-}
-
-func TestExtractSNMPv3EngineIDHexIgnoresV2c(t *testing.T) {
-	data := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
-
-	got, ok, err := extractSNMPv3EngineIDHex(data)
-	if err != nil {
-		t.Fatalf("extractSNMPv3EngineIDHex failed: %v", err)
-	}
-	if ok || got != "" {
-		t.Fatalf("expected no v3 engine ID, got %q/%v", got, ok)
-	}
-}
-
 func TestV3DecodeWrongUser(t *testing.T) {
-	data := buildV3Trap(t, "testuser", "1.3.6.1.6.3.1.1.5.1")
-	tbl := gosnmp.NewSnmpV3SecurityParametersTable(trapDecodeLogger)
-	tbl.Add("otheruser", &gosnmp.UsmSecurityParameters{
-		UserName:               "otheruser",
-		AuthenticationProtocol: gosnmp.NoAuth,
-		PrivacyProtocol:        gosnmp.NoPriv,
-	})
+	data := buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	tbl := newTestV3Receiver(t, USMUser{Username: "otheruser", EngineID: testEngineIDHex})
 
-	_, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
+	_, _, err := decodeTrap(data, net.ParseIP("10.1.2.3"), tbl)
 	if err == nil {
 		t.Fatal("expected error for wrong user")
 	}
@@ -713,24 +650,34 @@ func TestV3DecodeWrongUser(t *testing.T) {
 }
 
 func TestClassifyDecodeError(t *testing.T) {
+	wrap := func(category error) error { return fmt.Errorf("decode: %w", category) }
 	tests := map[string]struct {
-		errMsg string
-		want   ErrorKind
+		err  error
+		want ErrorKind
 	}{
-		"auth_failure":       {errMsg: "authentication failure", want: "auth_failures"},
-		"decrypt_failure":    {errMsg: "decrypt error", want: "auth_failures"},
-		"no_security_params": {errMsg: "no security parameters found", want: "usm_failures"},
-		"no_credentials":     {errMsg: "no credentials successfully", want: "usm_failures"},
-		"usm_failure":        {errMsg: "SNMPv3 USM", want: "usm_failures"},
-		"unknown_engine":     {errMsg: "SNMPv3 unknown engine", want: "unknown_engine_id"},
-		"ber_failure":        {errMsg: "BER: trailing data", want: "malformed_pdu"},
-		"missing_trap_oid":   {errMsg: "missing snmpTrapOID.0", want: "malformed_pdu"},
-		"generic":            {errMsg: "some other error", want: "decode_failed"},
+		"none":                    {},
+		"ASN.1 parse":             {err: wrap(gosnmp.ErrASNParse), want: "malformed_pdu"},
+		"bad version":             {err: wrap(gosnmp.ErrBadVersion), want: "malformed_pdu"},
+		"invalid messages":        {err: wrap(gosnmp.ErrInvalidMsgs), want: "malformed_pdu"},
+		"wrong digest":            {err: wrap(gosnmp.ErrWrongDigest), want: "auth_failures"},
+		"decryption":              {err: wrap(gosnmp.ErrDecryption), want: "auth_failures"},
+		"unknown username":        {err: wrap(gosnmp.ErrUnknownUsername), want: "usm_failures"},
+		"unknown security level":  {err: wrap(gosnmp.ErrUnknownSecurityLevel), want: "usm_failures"},
+		"unknown security models": {err: wrap(gosnmp.ErrUnknownSecurityModels), want: "usm_failures"},
+		"not in time window":      {err: wrap(gosnmp.ErrNotInTimeWindow), want: "usm_failures"},
+		"unknown engine ID":       {err: wrap(gosnmp.ErrUnknownEngineID), want: "unknown_engine_id"},
+		"BER budget":              {err: errors.New("BER: trailing data"), want: "malformed_pdu"},
+		"datagram too large":      {err: errors.New("datagram too large: 2 > 1"), want: "malformed_pdu"},
+		"too many varbinds":       {err: errors.New("too many varbinds: 2 > 1"), want: "malformed_pdu"},
+		"long OctetString":        {err: errors.New("OctetString too long: 2 > 1"), want: "malformed_pdu"},
+		"missing trap OID":        {err: errors.New("missing snmpTrapOID.0"), want: "malformed_pdu"},
+		"invalid SNMPv1 trap":     {err: errors.New("invalid SNMPv1 generic trap value: 7"), want: "malformed_pdu"},
+		"other":                   {err: errors.New("some other error"), want: "decode_failed"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := classifyDecodeError(errors.New(tc.errMsg))
+			got := classifyDecodeError(tc.err)
 			if got != tc.want {
 				t.Errorf("expected %s, got %s", tc.want, got)
 			}
@@ -761,4 +708,68 @@ func berTLV(tag byte, content []byte) []byte {
 		out = append(out, 0x82, byte(length>>8), byte(length))
 	}
 	return append(out, content...)
+}
+
+// A decode failure carries what the unauthenticated header says: the version
+// and the engine ID of a header that parses, nothing of one that does not.
+func TestDecodeFailureEnvelope(t *testing.T) {
+	wrongKey := buildV3SecuredTrap(t, v3SecuredTrapSpec{
+		user:        "testuser",
+		engineIDHex: testEngineIDHex,
+		authProto:   "sha256",
+		privProto:   "aes",
+		authKey:     "wrongpassword",
+		privKey:     "privpassword",
+		trapOID:     "1.3.6.1.6.3.1.1.5.1",
+	})
+	v2c := buildV2cTrap(t, "public", "1.3.6.1.6.3.1.1.5.1")
+	badCommunity := append([]byte(nil), v2c...)
+	badCommunity[berChildren(t, badCommunity, berElementAt(t, badCommunity, 0))[1].start] = tagInteger
+
+	type envelope struct {
+		kind         ErrorKind
+		versionKnown bool
+		version      model.SnmpVersion
+		engineID     string
+	}
+	tests := map[string]struct {
+		data []byte
+		want envelope
+	}{
+		"SNMPv3 header that parses": {
+			data: wrongKey,
+			want: envelope{kind: ErrorAuthFailure, versionKnown: true, version: model.SnmpVersionV3, engineID: testEngineIDHex},
+		},
+		"SNMPv3 header field that does not parse": {
+			data: corruptV3HeaderFieldTag(t, wrongKey, 0, tagOctetStr),
+			want: envelope{kind: ErrorMalformedPDU},
+		},
+		"SNMPv2c community that does not parse": {
+			data: badCommunity,
+			want: envelope{kind: ErrorMalformedPDU},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			recv := New(NewPolicy(PolicyConfig{
+				Versions:          []string{"v2c", "v3"},
+				USMUsers:          []USMUser{securityLevelAuthUser(testEngineIDHex)},
+				EngineIDWhitelist: []string{testEngineIDHex},
+			}), nil)
+			if err := recv.PrepareV3(t.TempDir(), "decode-failure-test"); err != nil {
+				t.Fatalf("prepare v3 receiver: %v", err)
+			}
+			t.Cleanup(recv.RollbackPreparedState)
+			peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
+
+			failure := recv.Process(Datagram{Data: tc.data, PeerIP: peer.IP, Peer: peer}).DecodeFailure
+			if failure == nil {
+				t.Fatal("want a decode failure")
+			}
+			got := envelope{kind: failure.Kind, versionKnown: failure.VersionKnown, version: failure.SniffedVersion, engineID: failure.EngineID}
+			if got != tc.want {
+				t.Fatalf("decode failure = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
 }

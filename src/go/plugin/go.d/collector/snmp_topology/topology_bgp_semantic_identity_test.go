@@ -4,14 +4,15 @@ package snmptopology
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 	"gopkg.in/yaml.v2"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -71,25 +72,22 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 					}
 					require.NoError(t, ddsnmp.CompileTransforms(profile))
 					ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{profile})
-					handler := snmpmock.NewMockHandler(gomock.NewController(t))
-					handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-					var pdus []gosnmp.SnmpPDU
+					handler := snmpmock.NewMockSession(gomock.NewController(t))
+					var pdus []gosnmp.VarBind
 					for i, value := range values {
 						pdus = append(
 							pdus,
-							gosnmp.SnmpPDU{
+							gosnmp.VarBind{
 								Name:  fmt.Sprintf("%s.1.%d", root, i+1),
-								Type:  gosnmp.Counter32,
-								Value: uint(i + 100),
+								Value: gosnmp.Counter32Value(uint32(i + 100)),
 							},
-							gosnmp.SnmpPDU{
+							gosnmp.VarBind{
 								Name:  fmt.Sprintf("%s.2.%d", root, i+1),
-								Type:  gosnmp.OctetString,
-								Value: []byte(value),
+								Value: gosnmp.OctetStringValue([]byte(value)),
 							},
 						)
 					}
-					handler.EXPECT().BulkWalkAll(root).Return(pdus, nil)
+					handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return(pdus, gosnmp.WalkEnd{}, nil)
 					input := topologydiag.DeviceInput{
 						Hostname: "192.0.2.2",
 					}
@@ -105,12 +103,13 @@ func TestTopologyBGPSemanticIdentifiersFromAcquisitionAndReplay(t *testing.T) {
 						},
 					)
 					collector := ddsnmpcollector.New(ddsnmpcollector.Config{
+						Version:             gosnmp.Version2c,
 						SnmpClient:          handler,
 						Profiles:            []*ddsnmp.Profile{profile},
 						Log:                 logger.NewWithWriter(&bytes.Buffer{}),
 						AcquisitionObserver: recorder.beginContext(0, "", ""),
 					})
-					pms, err := collector.Collect()
+					pms, err := collector.Collect(context.Background())
 					require.NoError(t, err)
 					require.Len(t, pms, 1)
 					require.Len(t, pms[0].BGPRows, len(values))

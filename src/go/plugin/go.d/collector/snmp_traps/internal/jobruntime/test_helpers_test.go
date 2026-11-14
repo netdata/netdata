@@ -14,7 +14,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	sdkjournal "github.com/netdata/systemd-journal-sdk/go/journal"
 	"gopkg.in/yaml.v2"
 
@@ -46,7 +46,7 @@ type v3SecuredTrapSpec struct {
 	authKey     string
 	privKey     string
 	trapOID     string
-	extra       []gosnmp.SnmpPDU
+	extra       []gosnmp.VarBind
 }
 
 func (s v3SecuredTrapSpec) traptest() traptest.V3Spec {
@@ -56,15 +56,15 @@ func (s v3SecuredTrapSpec) traptest() traptest.V3Spec {
 	}
 }
 
-func buildV2cTrap(t testing.TB, community, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV2cTrap(t testing.TB, community, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV2cTrap(t, community, trapOID, extra...)
 }
 
-func buildV3TrapWithEngineID(t testing.TB, user, engineIDHex, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV3TrapWithEngineID(t testing.TB, user, engineIDHex, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV3TrapWithEngineID(t, user, engineIDHex, trapOID, extra...)
 }
 
-func buildV3Trap(t testing.TB, user, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildV3Trap(t testing.TB, user, trapOID string, extra ...gosnmp.VarBind) []byte {
 	return traptest.BuildV3Trap(t, user, trapOID, extra...)
 }
 
@@ -72,7 +72,7 @@ func buildV3SecuredTrap(t testing.TB, spec v3SecuredTrapSpec) []byte {
 	return traptest.BuildV3SecuredTrap(t, spec.traptest())
 }
 
-func buildV3SecuredTrapWithFlags(t testing.TB, spec v3SecuredTrapSpec, flags gosnmp.SnmpV3MsgFlags) []byte {
+func buildV3SecuredTrapWithFlags(t testing.TB, spec v3SecuredTrapSpec, flags gosnmp.SecurityLevel) []byte {
 	return traptest.BuildV3SecuredTrapWithFlags(t, spec.traptest(), flags)
 }
 

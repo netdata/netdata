@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
@@ -402,7 +401,7 @@ func (r *topologyAcquisitionRecorder) fail(reason topologydiag.CaptureReason) {
 	r.evidence = nil
 }
 
-func (r *topologyAcquisitionRecorder) sourceClient(client gosnmp.Handler) gosnmp.Handler {
+func (r *topologyAcquisitionRecorder) sourceClient(client snmputils.Client) snmputils.Client {
 	context := r.contextByOrdinal(0)
 	if context == nil {
 		return client

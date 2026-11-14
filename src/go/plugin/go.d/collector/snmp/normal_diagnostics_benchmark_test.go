@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
@@ -20,27 +20,24 @@ import (
 )
 
 type normalBenchmarkHandler struct {
-	gosnmp.Handler
+	snmputils.Session
 	rows int
 	fail bool
 }
 
-func (*normalBenchmarkHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*normalBenchmarkHandler) MaxOids() int                { return 32 }
-func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (h *normalBenchmarkHandler) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	if h.fail {
 		return nil, errors.New("benchmark timeout")
 	}
-	packet := &gosnmp.SnmpPacket{
-		Variables: make([]gosnmp.SnmpPDU, len(oids)),
+	packet := &gosnmp.Message{
+		VarBinds: make([]gosnmp.VarBind, len(oids)),
 	}
 	for i, oid := range oids {
 		switch oid {
 		case snmputils.OidSysObject:
-			packet.Variables[i] = gosnmp.SnmpPDU{
+			packet.VarBinds[i] = gosnmp.VarBind{
 				Name:  oid,
-				Type:  gosnmp.ObjectIdentifier,
-				Value: "1.3.6.1.4.1.99999.1",
+				Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.99999.1"),
 			}
 			continue
 		case snmputils.OidSysName, snmputils.OidSysDescr, snmputils.OidSysContact, snmputils.OidSysLocation:
@@ -48,10 +45,9 @@ func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 			if oid == snmputils.OidSysName {
 				value = "benchmark"
 			}
-			packet.Variables[i] = gosnmp.SnmpPDU{
+			packet.VarBinds[i] = gosnmp.VarBind{
 				Name:  oid,
-				Type:  gosnmp.OctetString,
-				Value: []byte(value),
+				Value: gosnmp.OctetStringValue([]byte(value)),
 			}
 			continue
 		}
@@ -65,24 +61,22 @@ func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 		if oid == normalTestRoot+".5.0" {
 			value = 6
 		}
-		packet.Variables[i] = gosnmp.SnmpPDU{
+		packet.VarBinds[i] = gosnmp.VarBind{
 			Name:  oid,
-			Type:  gosnmp.Integer,
-			Value: value,
+			Value: gosnmp.IntegerValue(int32(value)),
 		}
 	}
 	return packet, nil
 }
-func (h *normalBenchmarkHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
-	values := make([]gosnmp.SnmpPDU, h.rows)
+func (h *normalBenchmarkHandler) BulkWalkAll(ctx context.Context, root string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	values := make([]gosnmp.VarBind, h.rows)
 	for i := range values {
-		values[i] = gosnmp.SnmpPDU{
+		values[i] = gosnmp.VarBind{
 			Name:  root + ".1." + strconv.Itoa(i+1),
-			Type:  gosnmp.Counter64,
-			Value: uint64(7),
+			Value: gosnmp.Counter64Value(7),
 		}
 	}
-	return values, nil
+	return values, gosnmp.WalkEnd{}, nil
 }
 
 // Both modes run the real acquisition, normalization, chart/sample and consumer
@@ -100,7 +94,7 @@ func BenchmarkNormalWarmCollection(b *testing.B) {
 						c.beginNormalAttempt("collect")
 					}
 					mx := make(map[string]int64)
-					err := c.collectSNMP(mx)
+					err := c.collectSNMP(context.Background(), mx)
 					if record {
 						c.finishNormalAttempt(err, mx)
 					}
@@ -155,11 +149,14 @@ func newNormalBenchmarkCollector(tables, rows int, record bool) *Collector {
 		SysObjectID: "1.3.6.1.4.1.99999.1",
 		Name:        "benchmark",
 	}
-	c.snmpClient = &normalBenchmarkHandler{
+	session := &normalBenchmarkHandler{
 		rows: rows,
 	}
+	c.snmpSession, c.snmpClient = session, session
 	cfg := ddsnmpcollector.Config{
 		SnmpClient: c.snmpClient,
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    32,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        c.Logger,
 	}
@@ -199,7 +196,7 @@ func BenchmarkNormalColdCollection(b *testing.B) {
 						c.beginNormalAttempt("collect")
 					}
 					mx := make(map[string]int64)
-					err := c.collectSNMP(mx)
+					err := c.collectSNMP(context.Background(), mx)
 					if err != nil {
 						b.Fatal(err)
 					}
@@ -224,7 +221,7 @@ func BenchmarkNormalCaptureAndEncode(b *testing.B) {
 			handler.fail = failed
 			c.beginNormalAttempt("collect")
 			mx := make(map[string]int64)
-			err := c.collectSNMP(mx)
+			err := c.collectSNMP(context.Background(), mx)
 			if (err != nil) != failed {
 				b.Fatalf("unexpected collection result: %v", err)
 			}

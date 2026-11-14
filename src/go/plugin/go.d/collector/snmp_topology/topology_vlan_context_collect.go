@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
@@ -69,20 +69,25 @@ func collectTopologyVLANContext(
 		progress.interruption = snmputils.ClassifyFailure(err)
 		return nil, progress, err
 	}
-	client, stopContextClose, progress, err := initTopologyVLANClient(ctx, c, dev, vlanID)
+	client, progress, err := initTopologyVLANClient(ctx, c, dev, vlanID)
 	if err != nil {
 		return nil, progress, err
 	}
-	defer stopContextClose()
 	defer func() { _ = client.Close() }()
 	if err := ctx.Err(); err != nil {
 		progress.interruption = snmputils.ClassifyFailure(err)
 		return nil, progress, err
 	}
 	sourceRecorder := &ddsnmpcollector.SourceRecorder{}
-	client = sourceRecorder.Wrap(client)
 	collector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: client, Profiles: profiles, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, AcquisitionObserver: observer,
+		SnmpClient:          sourceRecorder.Wrap(client),
+		Version:             snmputils.ParseSNMPVersion(dev.SNMPVersion),
+		MaxOIDs:             dev.MaxOIDs,
+		MaxRepetitions:      dev.MaxRepetitions,
+		Profiles:            profiles,
+		SysObjectID:         dev.SysObjectID,
+		DisableBulkWalk:     dev.DisableBulkWalk,
+		AcquisitionObserver: observer,
 		Log: c.Logger.With(
 			slog.String("device", dev.Hostname),
 			slog.String("registration", registrationID.String()),
@@ -91,7 +96,7 @@ func collectTopologyVLANContext(
 		),
 		LogKeyPrefix: "snmp_topology:registration:" + registrationID.String() + ":vlan:" + vlanID + ":",
 	})
-	pms, err := collector.Collect()
+	pms, err := collector.Collect(ctx)
 	progress.sources = sourceRecorder.Finish()
 	if source, ok := collector.(interface {
 		CollectionFailures() ddsnmp.CollectionFailures
@@ -116,36 +121,43 @@ func initTopologyVLANClient(
 	c *Collector,
 	dev ddsnmp.DeviceConnectionInfo,
 	vlanID string,
-) (gosnmp.Handler, func(), topologyVLANProgress, error) {
+) (snmputils.Session, topologyVLANProgress, error) {
 	progress := newTopologyVLANProgress()
 	if err := ctx.Err(); err != nil {
 		progress.interruption = snmputils.ClassifyFailure(err)
-		return nil, func() {}, progress, err
+		return nil, progress, err
 	}
-	client, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	client, err := newVLANContextSession(c.newSnmpClient, dev, vlanID)
 	if err != nil {
 		progress.client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
-		return nil, func() {}, progress, err
+		return nil, progress, err
 	}
 	progress.client = successfulAcquisitionPhase()
-	switch client.Version() {
-	case gosnmp.Version3:
-		client.SetContextName("vlan-" + vlanID)
-	default:
-		baseCommunity := client.Community()
-		if baseCommunity == "" {
-			baseCommunity = dev.Community
-		}
-		client.SetCommunity(baseCommunity + "@" + vlanID)
-	}
-	if dev.MaxRepetitions != 0 {
-		client.SetMaxRepetitions(dev.MaxRepetitions)
-	}
-	if err := client.Connect(); err != nil {
+	if err := client.Connect(ctx); err != nil {
 		progress.connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 		progress.interruption = snmputils.ClassifyFailure(ctx.Err())
-		return nil, func() {}, progress, err
+		return nil, progress, err
 	}
 	progress.connect = successfulAcquisitionPhase()
-	return client, closeSNMPClientOnContextCancel(ctx, client), progress, nil
+	return client, progress, nil
+}
+
+// newVLANContextSession makes the SNMP client of one VLAN context: the
+// device's settings with the VLAN's context name (SNMPv3) or the VLAN-indexed
+// community "<community>@<vlan>" (SNMPv1 and SNMPv2c).
+func newVLANContextSession(
+	newClient func(gosnmp.Config) (snmputils.Session, error),
+	dev ddsnmp.DeviceConnectionInfo,
+	vlanID string,
+) (snmputils.Session, error) {
+	cfg, err := snmpClientConfigFromDeviceInfo(dev)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Version == gosnmp.Version3 {
+		cfg.ContextName = "vlan-" + vlanID
+	} else {
+		cfg.Community = dev.Community + "@" + vlanID
+	}
+	return newClient(cfg)
 }

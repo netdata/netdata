@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -120,20 +121,22 @@ func TestCollector_Collect_AristaAndDellBGP_FromLibreNMSFixtures(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, tc.sysObjectID, tc.profileFile)
 			pdus := loadSnmprecPDUs(t, tc.fixture)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSystemMetadataGets(mockHandler, tc.sysObjectID, "bgp-device")
 			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
 				SysObjectID: tc.sysObjectID,
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Empty(t, results[0].Metrics)
@@ -154,7 +157,7 @@ func TestCollector_Collect_DellOS10BGP_IPv6Rows(t *testing.T) {
 	familyIndex := peerIndex + ".2.1"
 	peerOID := func(column string) string { return column + "." + peerIndex }
 	familyOID := func(column string) string { return column + "." + familyIndex }
-	pdus := []gosnmp.SnmpPDU{
+	pdus := []gosnmp.VarBind{
 		createPDU(peerOID("1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.3"), gosnmp.OctetString, []byte{0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}),
 		createGauge32PDU(peerOID("1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.7"), 64514),
 		createStringPDU(peerOID("1.3.6.1.4.1.674.11000.5000.200.1.1.2.1.8"), "192.0.2.10"),
@@ -169,20 +172,22 @@ func TestCollector_Collect_DellOS10BGP_IPv6Rows(t *testing.T) {
 		createGauge32PDU(familyOID("1.3.6.1.4.1.674.11000.5000.200.1.1.8.1.5"), 269),
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSystemMetadataGets(mockHandler, sysObjectID, "dell-ipv6")
 	expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: sysObjectID,
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 

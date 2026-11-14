@@ -196,14 +196,14 @@ aggregate `stats` and, when recorded, an `execution` block:
 - `walk_operations` references executed source operations in the collection context. Those operations record roots,
   returned OIDs and typed values, elapsed time, and structured failure outcomes. Duration includes client processing,
   pagination, and retries inside `WalkAll`/`BulkWalkAll`; it is not network RTT or a per-packet measurement.
-  A successful Handler return does not prove complete table coverage: terminal SNMP response reasons are not yet recorded.
+  A walk without an error does not prove complete table coverage: how the walk ended is not recorded.
 - Shared walks appear once, with bindings from consuming routes. Cached or dormant consumers do not cause another walk.
   Repeated roots in separate passes or VLAN contexts remain separate executions.
 - An absent execution block means not recorded; a present block with zero requests means measured no such work.
 
 Compare latest-attempt and retained-success accounting separately; `same_attempt` indicates when they alias the same
-capture. Do not sum them when they alias. GET/walk counts are Handler calls, not network packets or retry counts.
-`walk_pdus` counts varbinds returned by successful walk calls. Missing-OID counts include configured sources already
+capture. Do not sum them when they alias. GET/walk counts are client calls, not network packets or retry counts.
+`walk_pdus` counts varbinds returned by walk calls that succeeded or that an error-status ended after some rows. Missing-OID counts include configured sources already
 known unavailable as well as received missing-value exceptions. Processing errors can coexist with usable values or an
 ignored metadata rule.
 

@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"slices"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,10 +25,10 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 		unitOID  = tableOID + ".1.4"
 	)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, tableOID, []gosnmp.VarBind{
 		createStringPDU(nameOID+".17", "cpu-temperature"),
 		createIntegerPDU(valueOID+".17", 51),
 		createIntegerPDU(unitOID+".17", 1),
@@ -50,7 +51,7 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 		valueOID + ".7201",
 		valueOID + ".7202",
 		valueOID + ".7203",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createIntegerPDU(valueOID+".17", 52),
 		createIntegerPDU(valueOID+".18", 0),
 		createIntegerPDU(valueOID+".7201", 501),
@@ -59,6 +60,8 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 	})
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{mustLoadMikroTikGaugeProfile(t)},
 		Log:        logger.New(),
@@ -80,7 +83,7 @@ func TestCollector_Collect_MikroTikGaugeProfile(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 

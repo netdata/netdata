@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -301,24 +301,24 @@ func withEnterpriseNumbersFile(t *testing.T, path string) {
 
 func TestPduToString(t *testing.T) {
 	cases := map[string]struct {
-		pdu     gosnmp.SnmpPDU
+		pdu     gosnmp.VarBind
 		want    string
 		wantErr bool
 	}{
 		"octet_string": {
-			pdu:  gosnmp.SnmpPDU{Type: gosnmp.OctetString, Value: []byte("hello\nworld")},
+			pdu:  gosnmp.VarBind{Value: gosnmp.OctetStringValue([]byte("hello\nworld"))},
 			want: "hello\nworld",
 		},
 		"integer": {
-			pdu:  gosnmp.SnmpPDU{Type: gosnmp.Integer, Value: int(42)},
+			pdu:  gosnmp.VarBind{Value: gosnmp.IntegerValue(42)},
 			want: "42",
 		},
 		"counter32": {
-			pdu:  gosnmp.SnmpPDU{Type: gosnmp.Counter32, Value: uint32(7)},
+			pdu:  gosnmp.VarBind{Value: gosnmp.Counter32Value(7)},
 			want: "7",
 		},
 		"object_identifier_trims_dot": {
-			pdu:  gosnmp.SnmpPDU{Type: gosnmp.ObjectIdentifier, Value: ".1.3.6.1.2.1.1.1.0"},
+			pdu:  gosnmp.VarBind{Value: gosnmp.ObjectIdentifierValue(".1.3.6.1.2.1.1.1.0")},
 			want: "1.3.6.1.2.1.1.1.0",
 		},
 	}

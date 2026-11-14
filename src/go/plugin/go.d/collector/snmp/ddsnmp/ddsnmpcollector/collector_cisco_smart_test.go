@@ -3,30 +3,31 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strings"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 	tests := map[string]struct {
-		setup      func(*snmpmock.MockHandler)
+		setup      func(*snmpmock.MockSession)
 		assertRows func(*testing.T, []ddsnmp.LicenseRow)
 	}{
 		"complete data": {
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.9.9.831.0.6.1.0",
 					},
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createIntegerPDU("1.3.6.1.4.1.9.9.831.0.6.1.0", 2),
 					},
 				)
@@ -35,23 +36,23 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 						"1.3.6.1.4.1.9.9.831.0.7.1.0",
 						"1.3.6.1.4.1.9.9.831.0.7.2.0",
 					},
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.9.9.831.0.7.1.0", 1775152800),
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.7.2.0", "Out of Compliance"),
 					},
 				)
 				expectSNMPGet(mockHandler,
 					[]string{"1.3.6.1.4.1.9.9.831.0.6.3.0"},
-					[]gosnmp.SnmpPDU{createGauge32PDU("1.3.6.1.4.1.9.9.831.0.6.3.0", 1777831200)},
+					[]gosnmp.VarBind{createGauge32PDU("1.3.6.1.4.1.9.9.831.0.6.3.0", 1777831200)},
 				)
 				expectSNMPGet(mockHandler,
 					[]string{"1.3.6.1.4.1.9.9.831.0.7.4.2.0"},
-					[]gosnmp.SnmpPDU{createGauge32PDU("1.3.6.1.4.1.9.9.831.0.7.4.2.0", 1773943200)},
+					[]gosnmp.VarBind{createGauge32PDU("1.3.6.1.4.1.9.9.831.0.7.4.2.0", 1773943200)},
 				)
 				expectSNMPWalk(mockHandler,
 					gosnmp.Version2c,
 					"1.3.6.1.4.1.9.9.831.0.5.1",
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.9.9.831.0.5.1.1.2.1", 42),
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.5.1.1.3.1", "dna_advantage"),
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.5.1.1.4.1", "17.12"),
@@ -95,12 +96,12 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 			},
 		},
 		"partial data": {
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.9.9.831.0.6.1.0",
 					},
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createIntegerPDU("1.3.6.1.4.1.9.9.831.0.6.1.0", 2),
 					},
 				)
@@ -109,7 +110,7 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 						"1.3.6.1.4.1.9.9.831.0.7.1.0",
 						"1.3.6.1.4.1.9.9.831.0.7.2.0",
 					},
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.7.2.0", "Authorized"),
 					},
 				)
@@ -118,7 +119,7 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 				expectSNMPWalk(mockHandler,
 					gosnmp.Version2c,
 					"1.3.6.1.4.1.9.9.831.0.5.1",
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.9.9.831.0.5.1.1.2.1", 7),
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.5.1.1.3.1", "dna_essentials"),
 						createStringPDU("1.3.6.1.4.1.9.9.831.0.5.1.1.4.1", "17.9"),
@@ -152,20 +153,22 @@ func TestCollector_Collect_CiscoSmartLicensingProfile(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setup(mockHandler)
 			profile := mustLoadCiscoSmartProfile(t)
 			require.True(t, hasLicensingTable(profile, "1.3.6.1.4.1.9.9.831.0.5.1"))
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 

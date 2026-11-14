@@ -43,9 +43,7 @@ func newDecodeErrorEntry(jobName string, failure *receiver.DecodeFailure, packet
 	if failure.VersionKnown {
 		info.SnmpVersion = string(failure.SniffedVersion)
 	}
-	if engineID, ok := receiver.ExtractEngineID(failure.Data); ok {
-		info.EngineID = engineID
-	}
+	info.EngineID = failure.EngineID
 
 	messageSource := sourcePeer
 	if messageSource == "" {

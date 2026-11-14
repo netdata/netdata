@@ -17,7 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -85,7 +85,7 @@ func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmen
 		topologyRegistry: newTopologyRegistryWithResolver(reverseDNS),
 		deviceSource:     deviceStore,
 		trapEnrichment:   trapEnrichment,
-		newSnmpClient:    gosnmp.NewHandler,
+		newSnmpClient:    newSNMPSession,
 		newDdSnmpColl: func(cfg ddsnmpcollector.Config) ddCollector {
 			return ddsnmpcollector.New(cfg)
 		},
@@ -126,7 +126,7 @@ type (
 		metrics *collectorMetrics
 
 		topologyProfiles func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile
-		newSnmpClient    func() gosnmp.Handler
+		newSnmpClient    func(gosnmp.Config) (snmputils.Session, error)
 		newDdSnmpColl    func(ddsnmpcollector.Config) ddCollector
 		resolveTargetIPs func(context.Context, string) ([]netip.Addr, error)
 		now              func() time.Time
@@ -139,7 +139,7 @@ type (
 		Entries() []ddsnmp.DeviceEntry
 	}
 	ddCollector interface {
-		Collect() ([]*ddsnmp.ProfileMetrics, error)
+		Collect(ctx context.Context) ([]*ddsnmp.ProfileMetrics, error)
 	}
 )
 
@@ -486,7 +486,7 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
-	snmpClient, err := newSNMPClientFromDeviceInfo(c.newSnmpClient, dev)
+	session, err := newSNMPSessionFromDeviceInfo(c.newSnmpClient, dev)
 	if err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.Client = failedAcquisitionPhase(topologydiag.AcquisitionFailureClientConfiguration, err)
@@ -505,11 +505,8 @@ func (c *Collector) refreshDeviceTopology(
 			ctx.Client = successfulAcquisitionPhase()
 		}
 	}
-	snmpClient = recorder.sourceClient(snmpClient)
-	if dev.MaxRepetitions != 0 {
-		snmpClient.SetMaxRepetitions(dev.MaxRepetitions)
-	}
-	if err := snmpClient.Connect(); err != nil {
+	snmpClient := recorder.sourceClient(session)
+	if err := session.Connect(ctx); err != nil {
 		if recorder.evidence != nil {
 			recorder.evidence.Connect = failedAcquisitionPhase(topologydiag.AcquisitionFailureConnect, err)
 			if ctx := recorder.contextByOrdinal(0); ctx != nil {
@@ -531,9 +528,7 @@ func (c *Collector) refreshDeviceTopology(
 			ctx.Connect = successfulAcquisitionPhase()
 		}
 	}
-	stopContextClose := closeSNMPClientOnContextCancel(ctx, snmpClient)
-	defer stopContextClose()
-	defer func() { _ = snmpClient.Close() }()
+	defer func() { _ = session.Close() }()
 
 	if ctx.Err() != nil {
 		recorder.recordInterruption(ctx.Err())
@@ -561,8 +556,11 @@ func (c *Collector) refreshDeviceTopology(
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: snmpClient,
-		Profiles:   profiles,
+		SnmpClient:     snmpClient,
+		Version:        snmputils.ParseSNMPVersion(dev.SNMPVersion),
+		MaxOIDs:        dev.MaxOIDs,
+		MaxRepetitions: dev.MaxRepetitions,
+		Profiles:       profiles,
 		Log: c.Logger.With(
 			slog.String("device", dev.Hostname),
 			slog.String("registration", attemptID.RegistrationID.String()),
@@ -574,7 +572,7 @@ func (c *Collector) refreshDeviceTopology(
 		AcquisitionObserver: mainObserver,
 	})
 
-	pms, err := coll.Collect()
+	pms, err := coll.Collect(ctx)
 	if source, ok := coll.(interface {
 		CollectionFailures() ddsnmp.CollectionFailures
 	}); ok {
@@ -605,7 +603,7 @@ func (c *Collector) refreshDeviceTopology(
 		return nil, topologydiag.RefreshOutcomeFailed, recorder.finish()
 	}
 
-	sysUptime, uptimeFailure, err := snmputils.GetSysUptimeWithDiagnostics(snmpClient)
+	sysUptime, uptimeFailure, err := snmputils.GetSysUptimeWithDiagnostics(ctx, snmpClient)
 	if recorder.evidence != nil {
 		if uptimeFailure.Reason != "" {
 			uptimeFailure.Operation = "sys_uptime"
@@ -732,18 +730,6 @@ func (c *Collector) resolveTopologyTargetManagementIPs(
 	}
 }
 
-func closeSNMPClientOnContextCancel(ctx context.Context, client gosnmp.Handler) func() {
-	done := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = client.Close()
-		case <-done:
-		}
-	}()
-	return func() { close(done) }
-}
-
 func (c *Collector) currentTime() time.Time {
 	if c != nil && c.now != nil {
 		return c.now()
@@ -852,43 +838,60 @@ func (c *Collector) getTopologyProfiles(dev ddsnmp.DeviceConnectionInfo) ([]*dds
 	return view.Profiles(), view.Context()
 }
 
-func newSNMPClientFromDeviceInfo(newClient func() gosnmp.Handler, dev ddsnmp.DeviceConnectionInfo) (gosnmp.Handler, error) {
-	client := newClient()
+// newSNMPSession makes a topology refresh's SNMP client from cfg.
+func newSNMPSession(cfg gosnmp.Config) (snmputils.Session, error) {
+	client, err := gosnmp.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
 
-	client.SetTarget(dev.Hostname)
-	client.SetPort(uint16(dev.Port))
-	client.SetRetries(dev.Retries)
-	client.SetTimeout(time.Duration(dev.Timeout) * time.Second)
-	client.SetMaxOids(dev.MaxOIDs)
-	client.SetMaxRepetitions(dev.MaxRepetitions)
+// newSNMPSessionFromDeviceInfo makes the SNMP client the device's connection
+// settings describe; its errors are client configuration failures.
+func newSNMPSessionFromDeviceInfo(
+	newClient func(gosnmp.Config) (snmputils.Session, error),
+	dev ddsnmp.DeviceConnectionInfo,
+) (snmputils.Session, error) {
+	cfg, err := snmpClientConfigFromDeviceInfo(dev)
+	if err != nil {
+		return nil, err
+	}
+	return newClient(cfg)
+}
 
-	ver := snmputils.ParseSNMPVersion(dev.SNMPVersion)
-
-	switch ver {
-	case gosnmp.Version1:
-		client.SetCommunity(dev.Community)
-		client.SetVersion(gosnmp.Version1)
-	case gosnmp.Version2c:
-		client.SetCommunity(dev.Community)
-		client.SetVersion(gosnmp.Version2c)
-	case gosnmp.Version3:
-		if dev.V3User == "" {
-			return nil, snmputils.WithFailure(fmt.Errorf("username is required for SNMPv3"), "client", "missing_v3_username")
-		}
-		client.SetVersion(gosnmp.Version3)
-		client.SetSecurityModel(gosnmp.UserSecurityModel)
-		client.SetMsgFlags(snmputils.ParseSNMPv3SecurityLevel(dev.V3SecurityLevel))
-		client.SetSecurityParameters(&gosnmp.UsmSecurityParameters{
-			UserName:                 dev.V3User,
-			AuthenticationProtocol:   snmputils.ParseSNMPv3AuthProtocol(dev.V3AuthProto),
-			AuthenticationPassphrase: dev.V3AuthKey,
-			PrivacyProtocol:          snmputils.ParseSNMPv3PrivProtocol(dev.V3PrivProto),
-			PrivacyPassphrase:        dev.V3PrivKey,
-		})
-		client.SetContextName(dev.V3ContextName)
-	default:
-		return nil, snmputils.WithFailure(fmt.Errorf("invalid SNMP version: %s", dev.SNMPVersion), "client", "invalid_snmp_version")
+// snmpClientConfigFromDeviceInfo is the SNMP client configuration of the
+// device's connection settings; bulk walks pass the device's max-repetitions
+// themselves.
+func snmpClientConfigFromDeviceInfo(dev ddsnmp.DeviceConnectionInfo) (gosnmp.Config, error) {
+	cfg := gosnmp.Config{
+		Target:  dev.Hostname,
+		Port:    uint16(dev.Port),
+		Retries: dev.Retries,
+		Timeout: time.Duration(dev.Timeout) * time.Second,
+		MaxOids: dev.MaxOIDs,
 	}
 
-	return client, nil
+	switch ver := snmputils.ParseSNMPVersion(dev.SNMPVersion); ver {
+	case gosnmp.Version1, gosnmp.Version2c:
+		cfg.Version, cfg.Community = ver, dev.Community
+	case gosnmp.Version3:
+		if dev.V3User == "" {
+			return gosnmp.Config{}, snmputils.WithFailure(fmt.Errorf("username is required for SNMPv3"), "client", "missing_v3_username")
+		}
+		cfg.Version = gosnmp.Version3
+		cfg.SecurityLevel = snmputils.ParseSNMPv3SecurityLevel(dev.V3SecurityLevel)
+		cfg.User = gosnmp.User{
+			Name:           dev.V3User,
+			AuthProtocol:   snmputils.ParseSNMPv3AuthProtocol(dev.V3AuthProto),
+			AuthPassphrase: dev.V3AuthKey,
+			PrivProtocol:   snmputils.ParseSNMPv3PrivProtocol(dev.V3PrivProto),
+			PrivPassphrase: dev.V3PrivKey,
+		}
+		cfg.ContextName = dev.V3ContextName
+	default:
+		return gosnmp.Config{}, snmputils.WithFailure(fmt.Errorf("invalid SNMP version: %s", dev.SNMPVersion), "client", "invalid_snmp_version")
+	}
+
+	return cfg, nil
 }

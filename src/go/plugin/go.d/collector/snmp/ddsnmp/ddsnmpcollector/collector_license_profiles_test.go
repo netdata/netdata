@@ -3,12 +3,13 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,17 +21,17 @@ import (
 func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 	tests := map[string]struct {
 		profileName string
-		setup       func(*snmpmock.MockHandler)
+		setup       func(*snmpmock.MockSession)
 		keep        func(ddprofiledefinition.LicensingConfig) bool
 		assertRows  func(*testing.T, []ddsnmp.LicenseRow)
 	}{
 		"checkpoint": {
 			profileName: "checkpoint",
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPWalk(mockHandler,
 					gosnmp.Version2c,
 					"1.3.6.1.4.1.2620.1.6.18.1",
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createGauge32PDU("1.3.6.1.4.1.2620.1.6.18.1.1.1.17", 17),
 						createGauge32PDU("1.3.6.1.4.1.2620.1.6.18.1.1.2.17", 17),
 						createStringPDU("1.3.6.1.4.1.2620.1.6.18.1.1.4.17", "Application Control"),
@@ -96,12 +97,12 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 		},
 		"mikrotik": {
 			profileName: "mikrotik-router",
-			setup: func(mockHandler *snmpmock.MockHandler) {
+			setup: func(mockHandler *snmpmock.MockSession) {
 				expectSNMPGet(mockHandler,
 					[]string{
 						"1.3.6.1.4.1.14988.1.1.4.2.0",
 					},
-					[]gosnmp.SnmpPDU{
+					[]gosnmp.VarBind{
 						createDateAndTimePDU("1.3.6.1.4.1.14988.1.1.4.2.0", time.Date(2030, time.January, 1, 0, 0, 0, 0, time.UTC)),
 					},
 				)
@@ -126,19 +127,21 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setup(mockHandler)
 			profile := mustLoadTypedLicensingProfile(t, tc.profileName, tc.keep)
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -150,11 +153,11 @@ func TestCollector_Collect_LicensingProfiles(t *testing.T) {
 	}
 }
 
-func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockHandler) {
+func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockSession) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.12356.101.4.6.3.1.2",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.1.2.1.1.1", "FortiCare Support"),
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.1.2.1.2.1", "Mon 11 November 2030"),
 		},
@@ -162,7 +165,7 @@ func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockHandler) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.12356.101.4.6.3.2.2",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.2.2.1.1.2", "FortiGuard Antivirus"),
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.2.2.1.2.2", "Sat Jul 26 01:00:00 2025"),
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.2.2.1.3.2", "1.00000"),
@@ -171,7 +174,7 @@ func expectFortiGateLicensingWalks(mockHandler *snmpmock.MockHandler) {
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.12356.101.4.6.3.3.2",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.3.2.1.1.7", "FortiCare Premium"),
 			createStringPDU("1.3.6.1.4.1.12356.101.4.6.3.3.2.1.2.7", "Mon 11 November 2030"),
 		},

@@ -5,7 +5,7 @@ package snmpauth
 import (
 	"fmt"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
 // Config is the authentication contract for new SNMP consumers. Legacy public
@@ -67,10 +67,10 @@ func (c Config) ContextName() string {
 	}
 	return ""
 }
-func (c Config) Validate() error { return c.Apply(&gosnmp.GoSNMP{}) }
+func (c Config) Validate() error { return c.Apply(&gosnmp.Config{}) }
 
 // Apply validates before installing credentials. Errors name fields, never values.
-func (c Config) Apply(client *gosnmp.GoSNMP) error {
+func (c Config) Apply(client *gosnmp.Config) error {
 	c = c.Normalized()
 	switch c.Version {
 	case "", "2c", "1":
@@ -94,7 +94,7 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 	if u.SecurityLevel == "" {
 		u.SecurityLevel = "authPriv"
 	}
-	flags, ok := map[string]gosnmp.SnmpV3MsgFlags{"noAuthNoPriv": gosnmp.NoAuthNoPriv, "authNoPriv": gosnmp.AuthNoPriv, "authPriv": gosnmp.AuthPriv}[u.SecurityLevel]
+	flags, ok := map[string]gosnmp.SecurityLevel{"noAuthNoPriv": gosnmp.NoAuthNoPriv, "authNoPriv": gosnmp.AuthNoPriv, "authPriv": gosnmp.AuthPriv}[u.SecurityLevel]
 	if !ok {
 		return fmt.Errorf("invalid credentials3.security_level")
 	}
@@ -103,7 +103,7 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 		if u.AuthProtocol == "" {
 			u.AuthProtocol = "sha512"
 		}
-		auth, ok = map[string]gosnmp.SnmpV3AuthProtocol{"md5": gosnmp.MD5, "sha": gosnmp.SHA, "sha224": gosnmp.SHA224, "sha256": gosnmp.SHA256, "sha384": gosnmp.SHA384, "sha512": gosnmp.SHA512}[u.AuthProtocol]
+		auth, ok = map[string]gosnmp.AuthProtocol{"md5": gosnmp.MD5, "sha": gosnmp.SHA, "sha224": gosnmp.SHA224, "sha256": gosnmp.SHA256, "sha384": gosnmp.SHA384, "sha512": gosnmp.SHA512}[u.AuthProtocol]
 		if !ok {
 			return fmt.Errorf("invalid credentials3.auth_protocol")
 		}
@@ -115,7 +115,7 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 		if u.PrivProtocol == "" {
 			u.PrivProtocol = "aes192c"
 		}
-		priv, ok = map[string]gosnmp.SnmpV3PrivProtocol{"des": gosnmp.DES, "aes": gosnmp.AES, "aes192": gosnmp.AES192, "aes256": gosnmp.AES256, "aes192c": gosnmp.AES192C, "aes256c": gosnmp.AES256C}[u.PrivProtocol]
+		priv, ok = map[string]gosnmp.PrivProtocol{"des": gosnmp.DES, "aes": gosnmp.AES, "aes192": gosnmp.AES192, "aes256": gosnmp.AES256, "aes192c": gosnmp.AES192C, "aes256c": gosnmp.AES256C}[u.PrivProtocol]
 		if !ok {
 			return fmt.Errorf("invalid credentials3.priv_protocol")
 		}
@@ -124,9 +124,8 @@ func (c Config) Apply(client *gosnmp.GoSNMP) error {
 		}
 	}
 	client.Version = gosnmp.Version3
-	client.MsgFlags = flags
-	client.SecurityModel = gosnmp.UserSecurityModel
+	client.SecurityLevel = flags
 	client.ContextName = u.ContextName
-	client.SecurityParameters = &gosnmp.UsmSecurityParameters{UserName: u.Username, AuthenticationProtocol: auth, AuthenticationPassphrase: u.AuthPassword, PrivacyProtocol: priv, PrivacyPassphrase: u.PrivPassword}
+	client.User = gosnmp.User{Name: u.Username, AuthProtocol: auth, AuthPassphrase: u.AuthPassword, PrivProtocol: priv, PrivPassphrase: u.PrivPassword}
 	return nil
 }

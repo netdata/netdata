@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"maps"
@@ -11,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -28,18 +29,20 @@ const (
 type licenseValueContext struct {
 	rowIndex   string
 	processing *processingObserver
-	rowPDUs    map[string]gosnmp.SnmpPDU
-	pdus       map[string]gosnmp.SnmpPDU
+	rowPDUs    map[string]gosnmp.VarBind
+	pdus       map[string]gosnmp.VarBind
 }
 
 func (c *Collector) collectLicenseRows(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.LicenseRow, error) {
-	return c.collectLicenseRowsObserved(prof, stats, nil)
+	return c.collectLicenseRowsObserved(ctx, prof, stats, nil)
 }
 
 func (c *Collector) collectLicenseRowsObserved(
+	ctx context.Context,
 	prof *ddsnmp.Profile,
 	stats *ddsnmp.CollectionStats,
 	acquisition *acquisitionProfileCollection,
@@ -51,13 +54,13 @@ func (c *Collector) collectLicenseRowsObserved(
 	var rows []ddsnmp.LicenseRow
 	var errs []error
 
-	scalarRows, err := c.collectScalarLicenseRows(prof.Definition.Licensing, stats, acquisition)
+	scalarRows, err := c.collectScalarLicenseRows(ctx, prof.Definition.Licensing, stats, acquisition)
 	if err != nil {
 		errs = append(errs, err)
 	}
 	rows = append(rows, scalarRows...)
 
-	tableRows, err := c.collectTableLicenseRows(prof.Definition.Licensing, stats, acquisition)
+	tableRows, err := c.collectTableLicenseRows(ctx, prof.Definition.Licensing, stats, acquisition)
 	if err != nil {
 		errs = append(errs, err)
 	}
@@ -75,6 +78,7 @@ func (c *Collector) collectLicenseRowsObserved(
 }
 
 func (c *Collector) collectScalarLicenseRows(
+	ctx context.Context,
 	configs []ddprofiledefinition.LicensingConfig,
 	stats *ddsnmp.CollectionStats,
 	acquisition *acquisitionProfileCollection,
@@ -95,12 +99,12 @@ func (c *Collector) collectScalarLicenseRows(
 			stats.Errors.MissingOIDs += int64(len(missingOIDs))
 		}
 
-		var pdus map[string]gosnmp.SnmpPDU
+		var pdus map[string]gosnmp.VarBind
 		var err error
 		if len(oids) > 0 {
 			source := sourceRecorder(c.scalarCollector.snmpClient)
 			cursor := source.Cursor()
-			pdus, err = c.scalarCollector.getScalarValues(oids, stats)
+			pdus, err = c.scalarCollector.getScalarValues(ctx, oids, stats)
 			if source != nil && route != nil {
 				requests := source.requestsSince(cursor)
 				for _, oid := range oids {
@@ -137,6 +141,7 @@ func (c *Collector) collectScalarLicenseRows(
 }
 
 func (c *Collector) collectTableLicenseRows(
+	ctx context.Context,
 	configs []ddprofiledefinition.LicensingConfig,
 	stats *ddsnmp.CollectionStats,
 	acquisition *acquisitionProfileCollection,
@@ -156,13 +161,19 @@ func (c *Collector) collectTableLicenseRows(
 		}
 		metricsCfg := licensingConfigAsMetricsConfig(cfg)
 
-		outcome := walkPass.walk(c.tableCollector, cfg.Table.OID, stats)
+		outcome := walkPass.walk(ctx, c.tableCollector, cfg.Table.OID, stats)
 		bindSourceWalk(route, outcome.sourceOperation, cfg.Table.OID, "primary")
+		// A walk an error-status ended is the table as far as the agent
+		// returned it: its failure is recorded, and its rows (none included)
+		// are collected.
+		partial := outcome.err != nil && isPartialWalk(outcome.err)
 		if outcome.err != nil {
-			failAcquisitionRoute(route, AcquisitionFailureClassTransport)
 			recordCollectionFailure(&c.failures.Licensing, outcome.err, "licensing", "")
-			errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
-			continue
+			if !partial {
+				errs = append(errs, fmt.Errorf("licensing table %q: %w", licensingConfigDisplayName(cfg), outcome.err))
+				failAcquisitionRoute(route, AcquisitionFailureClassTransport)
+				continue
+			}
 		}
 		pdus := outcome.pdus
 		if len(pdus) == 0 {
@@ -172,32 +183,32 @@ func (c *Collector) collectTableLicenseRows(
 			continue
 		}
 
-		if err := c.walkLicenseTableDependencies(metricsCfg, tableNameToOID, walkPass, stats, route); err != nil {
+		if err := c.walkLicenseTableDependencies(ctx, metricsCfg, tableNameToOID, walkPass, stats, route); err != nil {
 			failAcquisitionRoute(route, AcquisitionFailureClassDependency)
 			recordCollectionFailure(&c.failures.Licensing, err, "licensing", "dependency")
 			errs = append(errs, fmt.Errorf("licensing table %q dependencies: %w", licensingConfigDisplayName(cfg), err))
 			continue
 		}
 
-		ctx := &tableProcessingContext{
+		tableCtx := &tableProcessingContext{
 			processingRoute: route,
 			config:          metricsCfg,
 			pdus:            pdus,
 			walkedData:      walkPass.walkedData,
 			tableNameToOID:  tableNameToOID,
 		}
-		ctx.columnOIDs = buildColumnOIDs(metricsCfg)
-		ctx.orderedTags = buildOrderedTags(metricsCfg)
-		ctx.rows, _, _ = c.tableCollector.organizePDUsByRow(ctx)
-		crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
+		tableCtx.columnOIDs = buildColumnOIDs(metricsCfg)
+		tableCtx.orderedTags = buildOrderedTags(metricsCfg)
+		tableCtx.rows, _, _ = c.tableCollector.organizePDUsByRow(tableCtx)
+		crossTableCtx := newCrossTableContext(tableCtx.walkedData, tableCtx.tableNameToOID)
 		staticTags := parseStaticTags(cfg.StaticTags)
 
 		if route != nil {
-			route.Rows = uint64(len(ctx.rows))
+			route.Rows = uint64(len(tableCtx.rows))
 		}
 		var rowErrors tableProcessingErrors
-		for rowIndex, rowPDUs := range ctx.rows {
-			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, ctx, crossTableCtx, staticTags)
+		for rowIndex, rowPDUs := range tableCtx.rows {
+			row, ok, err := c.buildTableLicenseRow(cfg, rowIndex, rowPDUs, tableCtx, crossTableCtx, staticTags)
 			if err != nil {
 				rejectAcquisitionRoute(route)
 				stats.Errors.Processing.Licensing++
@@ -215,6 +226,9 @@ func (c *Collector) collectTableLicenseRows(
 		}
 		if route != nil {
 			setAcquisitionRouteCounts(route, route.Rows, route.Values, route.Rejected)
+			if partial && route.Outcome == AcquisitionRouteOutcomeValues {
+				route.Outcome = AcquisitionRouteOutcomePartial
+			}
 		}
 	}
 
@@ -225,6 +239,7 @@ func (c *Collector) collectTableLicenseRows(
 }
 
 func (c *Collector) walkLicenseTableDependencies(
+	ctx context.Context,
 	cfg ddprofiledefinition.MetricsConfig,
 	tableNameToOID map[string]string,
 	walkPass *tableWalkPass,
@@ -233,9 +248,12 @@ func (c *Collector) walkLicenseTableDependencies(
 ) error {
 	var errs []error
 	for _, depOID := range extractTableDependencies(cfg, tableNameToOID) {
-		outcome := walkPass.walk(c.tableCollector, depOID, stats)
+		outcome := walkPass.walk(ctx, c.tableCollector, depOID, stats)
 		bindSourceWalk(route, outcome.sourceOperation, depOID, "dependency")
-		if outcome.err != nil {
+		if outcome.err != nil && isPartialWalk(outcome.err) {
+			// The rows before the error-status feed the table's tags.
+			recordCollectionFailure(&c.failures.Licensing, outcome.err, "licensing", "dependency")
+		} else if outcome.err != nil {
 			errs = append(errs, fmt.Errorf("table OID %q: %w", trimOID(depOID), outcome.err))
 		}
 	}
@@ -244,14 +262,14 @@ func (c *Collector) walkLicenseTableDependencies(
 
 func (c *Collector) buildScalarLicenseRow(
 	cfg ddprofiledefinition.LicensingConfig,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 ) (ddsnmp.LicenseRow, bool, error) {
 	return c.buildScalarLicenseRowObserved(cfg, pdus, nil)
 }
 
 func (c *Collector) buildScalarLicenseRowObserved(
 	cfg ddprofiledefinition.LicensingConfig,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 	route *AcquisitionRouteReport,
 ) (ddsnmp.LicenseRow, bool, error) {
 	rowKey := scalarLicenseRowKey(cfg)
@@ -300,7 +318,7 @@ func (c *Collector) buildScalarLicenseRowObserved(
 func (c *Collector) buildTableLicenseRow(
 	cfg ddprofiledefinition.LicensingConfig,
 	rowIndex string,
-	rowPDUs map[string]gosnmp.SnmpPDU,
+	rowPDUs map[string]gosnmp.VarBind,
 	ctx *tableProcessingContext,
 	crossTableCtx *crossTableContext,
 	staticTags map[string]string,
@@ -572,15 +590,9 @@ func licenseTimerSource(cfg ddprofiledefinition.LicenseValueConfig, fallback str
 	return fallback
 }
 
-func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.SnmpPDU) bool {
-	switch v := pdu.Value.(type) {
-	case []byte:
-		return string(v) == "0" || (len(v) == 1 && v[0] == 0)
-	case string:
-		return v == "0"
-	default:
-		return false
-	}
+func isZeroDateAndTimePlaceholderPDU(pdu gosnmp.VarBind) bool {
+	v, ok := pdu.Value.Bytes()
+	return ok && (string(v) == "0" || (len(v) == 1 && v[0] == 0))
 }
 
 func (c *Collector) populateLicenseUsage(
@@ -770,7 +782,7 @@ func (c *Collector) licenseIndexValue(cfg ddprofiledefinition.LicenseValueConfig
 	return value, err
 }
 
-func (ctx licenseValueContext) lookupPDU(oid string) (gosnmp.SnmpPDU, bool) {
+func (ctx licenseValueContext) lookupPDU(oid string) (gosnmp.VarBind, bool) {
 	oid = trimOID(oid)
 	if ctx.rowPDUs != nil {
 		pdu, ok := ctx.rowPDUs[oid]

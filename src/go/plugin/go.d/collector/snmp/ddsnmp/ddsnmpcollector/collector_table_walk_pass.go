@@ -3,47 +3,53 @@
 package ddsnmpcollector
 
 import (
-	"github.com/gosnmp/gosnmp"
+	"context"
+
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
 
 type tableWalkOutcome struct {
 	sourceOperation uint64
-	pdus            map[string]gosnmp.SnmpPDU
+	pdus            map[string]gosnmp.VarBind
 	err             error
 }
 
 type tableWalkPass struct {
 	execution  *AcquisitionExecutionReport
 	outcomes   map[string]tableWalkOutcome
-	walkedData map[string]map[string]gosnmp.SnmpPDU
+	walkedData map[string]map[string]gosnmp.VarBind
 }
 
 func newTableWalkPass(execution *AcquisitionExecutionReport) *tableWalkPass {
 	return &tableWalkPass{
 		execution:  execution,
 		outcomes:   make(map[string]tableWalkOutcome),
-		walkedData: make(map[string]map[string]gosnmp.SnmpPDU),
+		walkedData: make(map[string]map[string]gosnmp.VarBind),
 	}
 }
 
 func walkTableWithStats(
+	ctx context.Context,
 	tc *tableCollector,
 	oid string,
 	stats *ddsnmp.CollectionStats,
 	execution *AcquisitionExecutionReport,
-) (map[string]gosnmp.SnmpPDU, error) {
-	pdus, err := tc.snmpWalk(oid, stats, execution)
+) (map[string]gosnmp.VarBind, error) {
+	pdus, err := tc.snmpWalk(ctx, oid, stats, execution)
 	if err != nil {
 		stats.Errors.SNMP++
-		return pdus, err
+		if !isPartialWalk(err) {
+			return pdus, err
+		}
 	}
 	stats.SNMP.TablesWalked++
-	return pdus, nil
+	return pdus, err
 }
 
 func (p *tableWalkPass) walk(
+	ctx context.Context,
 	tc *tableCollector,
 	oid string,
 	stats *ddsnmp.CollectionStats,
@@ -53,13 +59,14 @@ func (p *tableWalkPass) walk(
 		return outcome
 	}
 
-	pdus, err := walkTableWithStats(tc, oid, stats, p.execution)
+	pdus, err := walkTableWithStats(ctx, tc, oid, stats, p.execution)
 	outcome := tableWalkOutcome{pdus: pdus, err: err, sourceOperation: sourceRecorder(tc.snmpClient).Cursor()}
 	p.outcomes[oid] = outcome
-	if err != nil {
+	if err != nil && !isPartialWalk(err) {
 		return outcome
 	}
 
+	// A partial table feeds its dependents as a complete one does.
 	p.walkedData[oid] = pdus
 	return outcome
 }

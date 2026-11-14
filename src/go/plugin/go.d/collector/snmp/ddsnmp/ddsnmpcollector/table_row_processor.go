@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -25,7 +25,7 @@ type (
 	// tableRowData represents data for a single table row
 	tableRowData struct {
 		index      string
-		pdus       map[string]gosnmp.SnmpPDU
+		pdus       map[string]gosnmp.VarBind
 		tags       map[string]string
 		staticTags map[string]string
 		tableName  string
@@ -281,7 +281,7 @@ func (p *tableRowProcessor) processRowMetrics(
 
 func (p *tableRowProcessor) createMetric(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 	row *tableRowData,
 	mode tableSymbolMode,
 ) (*ddsnmp.Metric, error) {
@@ -320,7 +320,7 @@ type (
 	}
 	// crossTableContext contains all data needed for cross-table resolution
 	crossTableContext struct {
-		walkedData         map[string]map[string]gosnmp.SnmpPDU                            // tableOID -> PDUs
+		walkedData         map[string]map[string]gosnmp.VarBind                            // tableOID -> PDUs
 		tableNameToOID     map[string]string                                               // tableName -> tableOID
 		lookupValueIndexes map[crossTableLookupValueIndexKey][]*crossTableLookupValueIndex // lookup semantics -> normalized value index
 		rowTags            map[string]string
@@ -335,7 +335,7 @@ func newCrossTableResolver(log *logger.Logger) *crossTableResolver {
 }
 
 func newCrossTableContext(
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
+	walkedData map[string]map[string]gosnmp.VarBind,
 	tableNameToOID map[string]string,
 ) *crossTableContext {
 	return &crossTableContext{
@@ -380,8 +380,8 @@ func (r *crossTableResolver) findReferencedTableOID(
 func (r *crossTableResolver) getReferencedTableData(
 	tableName string,
 	tableOID string,
-	walkedData map[string]map[string]gosnmp.SnmpPDU,
-) (map[string]gosnmp.SnmpPDU, error) {
+	walkedData map[string]map[string]gosnmp.VarBind,
+) (map[string]gosnmp.VarBind, error) {
 	pdus, ok := walkedData[tableOID]
 	if !ok {
 		r.log.Debugf("No walked data for referenced table %s (OID: %s)", tableName, tableOID)

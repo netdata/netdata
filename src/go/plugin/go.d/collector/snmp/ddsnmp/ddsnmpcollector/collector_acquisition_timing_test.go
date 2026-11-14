@@ -3,14 +3,16 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -21,9 +23,9 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 	const oid = "1.3.6.1.4.1.99999.1.0"
 	for name, topology := range map[string]bool{"ordinary": false, "topology": true} {
 		t.Run(name, func(t *testing.T) {
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
-			handler.EXPECT().Get([]string{oid}).DoAndReturn(func([]string) (*gosnmp.SnmpPacket, error) {
+			handler.EXPECT().Get(gomock.Any(), []string{oid}).DoAndReturn(func(context.Context, []string) (*gosnmp.Message, error) {
 				time.Sleep(time.Millisecond)
 				return nil, errors.New("transport failure")
 			})
@@ -38,6 +40,8 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 			}
 			var report AcquisitionProfileReport
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: handler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
@@ -45,7 +49,7 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 					func(value AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = value },
 				),
 			})
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.Error(t, err)
 			assert.GreaterOrEqual(t, report.Stats.Timing.Scalar, time.Millisecond)
 		})
@@ -53,11 +57,11 @@ func TestCollector_AcquisitionScalarFailureTiming(t *testing.T) {
 }
 
 func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	profile := createTestProfile("preparation.yaml", nil)
 	var oids []string
-	var pdus []gosnmp.SnmpPDU
+	var pdus []gosnmp.VarBind
 	for i := range 11 {
 		oid := fmt.Sprintf("1.3.6.1.4.1.99999.%02d.0", i)
 		oids = append(oids, oid)
@@ -79,6 +83,8 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 	expectSNMPGetError(handler, oids[10:], errors.New("second batch failed"))
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -86,7 +92,7 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 			func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r },
 		),
 	})
-	_, err := collector.Collect()
+	_, err := collector.Collect(context.Background())
 	require.Error(t, err)
 	require.NotNil(t, report.Execution)
 	firstReport := report
@@ -102,14 +108,14 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 
 	// A failed preparation retries; the already-missing OID stays suppressed.
 	expectSNMPGet(handler, oids[1:], pdus[1:])
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.EqualValues(t, 1, metrics[0].Stats.SNMP.GetRequests)
 	assert.EqualValues(t, 10, metrics[0].Stats.SNMP.GetOIDs)
 	assert.Zero(t, metrics[0].Stats.Errors.SNMP)
 	assert.Positive(t, metrics[0].Stats.Errors.MissingOIDs)
-	metrics, err = collector.Collect()
+	metrics, err = collector.Collect(context.Background())
 	require.NoError(t, err)
 	assert.Zero(t, metrics[0].Stats.SNMP.GetRequests, "initialized inputs are cached")
 	assert.Equal(t, p, firstReport.Execution.Preparation, "later collections must not mutate retained evidence")
@@ -117,7 +123,7 @@ func TestCollector_AcquisitionPreparationBatchesFailureAndRetry(t *testing.T) {
 }
 
 func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const base = "1.3.6.1.4.1.99999"
 	profile := createTestProfile("metadata.yaml", nil)
@@ -140,10 +146,10 @@ func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
 	}
 	profile.Definition.Metrics = []ddprofiledefinition.MetricsConfig{createScalarMetric(base+".4.0", "value")}
 	expectSNMPGetError(handler, []string{base + ".1.0"}, errors.New("ignored rule failure"))
-	expectSNMPGet(handler, []string{base + ".2.0", base + ".3.0"}, []gosnmp.SnmpPDU{
+	expectSNMPGet(handler, []string{base + ".2.0", base + ".3.0"}, []gosnmp.VarBind{
 		createStringPDU(base+".2.0", "not matching"), createStringPDU(base+".3.0", "fallback"),
 	})
-	expectSNMPGet(handler, []string{base + ".4.0"}, []gosnmp.SnmpPDU{createGauge32PDU(base+".4.0", 10)})
+	expectSNMPGet(handler, []string{base + ".4.0"}, []gosnmp.VarBind{createGauge32PDU(base+".4.0", 10)})
 	var report AcquisitionProfileReport
 	collector := New(
 		Config{
@@ -156,7 +162,7 @@ func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
 			),
 		},
 	)
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	assert.Equal(t, "fallback", metrics[0].DeviceMetadata["model"].Value)
@@ -171,7 +177,7 @@ func TestCollector_AcquisitionPreparationNonfatalMetadataErrors(t *testing.T) {
 
 func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 	for name, tc := range map[string]struct {
-		version gosnmp.SnmpVersion
+		version gosnmp.Version
 		failed  bool
 	}{
 		"v1 success": {version: gosnmp.Version1},
@@ -181,7 +187,7 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			version, failed := tc.version, tc.failed
-			ctrl, handler := setupMockHandler(t)
+			ctrl, handler := setupMockSession(t)
 			defer ctrl.Finish()
 			const root = "1.3.6.1.4.1.99999.1"
 			metric := ddprofiledefinition.MetricsConfig{
@@ -195,15 +201,21 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 			if failed {
 				callErr = errors.New("walk failure")
 			}
-			handler.EXPECT().Version().Return(version)
-			walk := func(string) ([]gosnmp.SnmpPDU, error) { time.Sleep(time.Millisecond); return nil, callErr }
+			walk := func(context.Context, string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+				time.Sleep(time.Millisecond)
+				return nil, gosnmp.WalkEnd{}, callErr
+			}
 			if version == gosnmp.Version1 {
-				handler.EXPECT().WalkAll(root).DoAndReturn(walk)
+				handler.EXPECT().WalkAll(gomock.Any(), root).DoAndReturn(walk)
 			} else {
-				handler.EXPECT().BulkWalkAll(root).DoAndReturn(walk)
+				handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).DoAndReturn(func(ctx context.Context, oid string, _ uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+					return walk(ctx, oid)
+				})
 			}
 			var reports []AcquisitionProfileReport
 			collector := New(Config{
+				Version:    version,
+				MaxOIDs:    10,
 				SnmpClient: new(SourceRecorder).Wrap(handler),
 				Log:        logger.New(),
 				Profiles: []*ddsnmp.Profile{
@@ -212,7 +224,7 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 				},
 				AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) }),
 			})
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			assert.Equal(t, failed, err != nil)
 			require.Len(t, reports, 2)
 			walks := testWalkSources(t, collector, reports[0].Execution)
@@ -229,11 +241,11 @@ func TestCollector_AcquisitionSharedWalkAccounting(t *testing.T) {
 }
 
 func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
-	ctrl, handler := setupMockHandler(t)
+	ctrl, handler := setupMockSession(t)
 	defer ctrl.Finish()
 	const anchor = "1.3.6.1.4.1.99999.70.1"
 	const dependency = "1.3.6.1.4.1.99999.70.2"
-	pdus := []gosnmp.SnmpPDU{createGauge32PDU(anchor+".1.4.192.0.2.1.1.1", 42)}
+	pdus := []gosnmp.VarBind{createGauge32PDU(anchor+".1.4.192.0.2.1.1.1", 42)}
 	// The regular-table session and the BGP pass execute this root separately.
 	expectSNMPWalk(handler, gosnmp.Version2c, anchor, pdus)
 	expectSNMPWalk(handler, gosnmp.Version2c, anchor, pdus)
@@ -248,6 +260,8 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 	profile.Definition.BGP = []ddprofiledefinition.BGPConfig{crossTableBGPTestConfig(), crossTableBGPTestConfig()}
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(handler),
 		Log:        logger.New(),
 		Profiles:   []*ddsnmp.Profile{profile},
@@ -255,7 +269,7 @@ func TestCollector_AcquisitionBGPWalkPassAccounting(t *testing.T) {
 			func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { report = r },
 		),
 	})
-	metrics, err := collector.Collect()
+	metrics, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, metrics, 1)
 	require.Error(t, metrics[0].BGPCollectError)

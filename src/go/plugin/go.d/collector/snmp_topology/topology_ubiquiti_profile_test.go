@@ -3,9 +3,10 @@
 package snmptopology
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +17,7 @@ import (
 func TestTopologyProductionPath_UniFiCapabilityProfiles(t *testing.T) {
 	tests := map[string]struct {
 		device      ddsnmp.DeviceConnectionInfo
-		pdus        []gosnmp.SnmpPDU
+		pdus        []gosnmp.VarBind
 		wantKinds   []ddsnmp.TopologyKind
 		absentKinds []ddsnmp.TopologyKind
 	}{
@@ -122,7 +123,7 @@ func TestTopologyProductionPath_UniFiQBridgeRendersDefaultManagedFabric(t *testi
 func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 	tests := map[string]struct {
 		device            ddsnmp.DeviceConnectionInfo
-		pdus              []gosnmp.SnmpPDU
+		pdus              []gosnmp.VarBind
 		wantProfileVendor bool
 		wantProfileModel  string
 		wantVendor        string
@@ -152,7 +153,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "Unknown",
 				Model:       "Unknown",
 			},
-			pdus: []gosnmp.SnmpPDU{
+			pdus: []gosnmp.VarBind{
 				topologyOctetStringPDU("1.3.6.1.4.1.41112.1.6.3.3.0", ""),
 				topologySysDescrPDU("Ubiquiti UniFi U6-Mesh 6.8.2.15592"),
 			},
@@ -170,7 +171,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "Unknown",
 				Model:       "Unknown",
 			},
-			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("device model UAP-AC-LR 6.8.2.15592")},
+			pdus:              []gosnmp.VarBind{topologySysDescrPDU("device model UAP-AC-LR 6.8.2.15592")},
 			wantProfileVendor: true,
 			wantProfileModel:  "UniFi UAP-AC-LR",
 			wantVendor:        "Ubiquiti",
@@ -185,7 +186,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "net-snmp",
 				Model:       "Linux",
 			},
-			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("Linux appliance UniFi UDR7 5.1.19 ipq5322")},
+			pdus:              []gosnmp.VarBind{topologySysDescrPDU("Linux appliance UniFi UDR7 5.1.19 ipq5322")},
 			wantProfileVendor: true,
 			wantProfileModel:  "UniFi UDR7",
 			wantVendor:        "Ubiquiti",
@@ -200,7 +201,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "Unknown",
 				Model:       "Unknown",
 			},
-			pdus:              []gosnmp.SnmpPDU{topologySysDescrPDU("Ubiquiti UniFi U6-Mesh-Pro 6.8.2")},
+			pdus:              []gosnmp.VarBind{topologySysDescrPDU("Ubiquiti UniFi U6-Mesh-Pro 6.8.2")},
 			wantProfileVendor: true,
 			wantProfileModel:  "UniFi U6-Mesh-Pro",
 			wantVendor:        "Ubiquiti",
@@ -243,7 +244,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 				Vendor:      "net-snmp",
 				Model:       "Linux",
 			},
-			pdus:       []gosnmp.SnmpPDU{topologySysDescrPDU("Linux generic Net-SNMP agent")},
+			pdus:       []gosnmp.VarBind{topologySysDescrPDU("Linux generic Net-SNMP agent")},
 			wantVendor: "net-snmp",
 			wantModel:  "Linux",
 		},
@@ -291,7 +292,7 @@ func TestTopologyProductionPath_UniFiActorsUseProfileIdentity(t *testing.T) {
 func collectMainProfileMetrics(
 	t *testing.T,
 	device ddsnmp.DeviceConnectionInfo,
-	pdus []gosnmp.SnmpPDU,
+	pdus []gosnmp.VarBind,
 ) []*ddsnmp.ProfileMetrics {
 	t.Helper()
 
@@ -301,11 +302,13 @@ func collectMainProfileMetrics(
 	}).Project(ddsnmp.ConsumerMetrics, ddsnmp.ConsumerLicensing, ddsnmp.ConsumerBGP).Profiles()
 	require.NotEmpty(t, profiles)
 	metrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  newTopologySNMPHandler(pdus),
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
 		SysObjectID: device.SysObjectID,
-	}).Collect()
+	}).Collect(context.Background())
 	require.NoError(t, err)
 	return metrics
 }
@@ -313,18 +316,20 @@ func collectMainProfileMetrics(
 func collectTopologyProfileMetrics(
 	t *testing.T,
 	device ddsnmp.DeviceConnectionInfo,
-	pdus []gosnmp.SnmpPDU,
+	pdus []gosnmp.VarBind,
 ) []*ddsnmp.ProfileMetrics {
 	t.Helper()
 
 	profiles := (&Collector{}).findTopologyProfiles(device)
 	require.NotEmpty(t, profiles)
 	metrics, err := ddsnmpcollector.New(ddsnmpcollector.Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     60,
 		SnmpClient:  newTopologySNMPHandler(pdus),
 		Profiles:    profiles,
 		Log:         newTestSNMPTopologyCollector().Logger,
 		SysObjectID: device.SysObjectID,
-	}).Collect()
+	}).Collect(context.Background())
 	require.NoError(t, err)
 	return metrics
 }
@@ -339,8 +344,8 @@ func collectedTopologyKinds(metrics []*ddsnmp.ProfileMetrics) map[ddsnmp.Topolog
 	return kinds
 }
 
-func topologyUniFiSwitchPDUs() []gosnmp.SnmpPDU {
-	return []gosnmp.SnmpPDU{
+func topologyUniFiSwitchPDUs() []gosnmp.VarBind {
+	return []gosnmp.VarBind{
 		// The bridge identity is present, while dot1dBasePortIfIndex is intentionally absent.
 		topologyOctetPDU("1.3.6.1.2.1.17.1.1.0", 0x02, 0, 0, 0, 0, 0x10),
 		topologyOctetStringPDU("1.3.6.1.2.1.31.1.1.1.1.7", "Port 7"),
@@ -360,16 +365,16 @@ func topologyUniFiSwitchPDUs() []gosnmp.SnmpPDU {
 	}
 }
 
-func topologyUniFiAPPDUs() []gosnmp.SnmpPDU {
-	return []gosnmp.SnmpPDU{
+func topologyUniFiAPPDUs() []gosnmp.VarBind {
+	return []gosnmp.VarBind{
 		topologyOctetStringPDU("1.3.6.1.4.1.41112.1.6.3.3.0", "U6-Mesh"),
 		topologyOctetPDU("1.3.6.1.2.1.4.22.1.2.17.192.0.2.1", 0x02, 0, 0, 0, 0, 1),
 		topologyIntegerPDU("1.3.6.1.2.1.4.22.1.4.17.192.0.2.1", 3),
 	}
 }
 
-func topologyUniFiGatewayPDUs() []gosnmp.SnmpPDU {
-	return []gosnmp.SnmpPDU{
+func topologyUniFiGatewayPDUs() []gosnmp.VarBind {
+	return []gosnmp.VarBind{
 		topologyOctetPDU("1.3.6.1.2.1.4.35.1.4.3.1.4.192.0.2.10", 0x02, 0, 0, 0, 0, 0x10),
 		topologyIntegerPDU("1.3.6.1.2.1.4.35.1.6.3.1.4.192.0.2.10", 3),
 		topologyIntegerPDU("1.3.6.1.2.1.4.35.1.7.3.1.4.192.0.2.10", 1),
@@ -378,18 +383,18 @@ func topologyUniFiGatewayPDUs() []gosnmp.SnmpPDU {
 	}
 }
 
-func topologyIntegerPDU(name string, value int) gosnmp.SnmpPDU {
-	return gosnmp.SnmpPDU{Name: name, Type: gosnmp.Integer, Value: value}
+func topologyIntegerPDU(name string, value int) gosnmp.VarBind {
+	return gosnmp.VarBind{Name: name, Value: gosnmp.IntegerValue(int32(value))}
 }
 
-func topologyOctetPDU(name string, value ...byte) gosnmp.SnmpPDU {
-	return gosnmp.SnmpPDU{Name: name, Type: gosnmp.OctetString, Value: value}
+func topologyOctetPDU(name string, value ...byte) gosnmp.VarBind {
+	return gosnmp.VarBind{Name: name, Value: gosnmp.OctetStringValue([]byte(value))}
 }
 
-func topologyOctetStringPDU(name, value string) gosnmp.SnmpPDU {
+func topologyOctetStringPDU(name, value string) gosnmp.VarBind {
 	return topologyOctetPDU(name, []byte(value)...)
 }
 
-func topologySysDescrPDU(value string) gosnmp.SnmpPDU {
+func topologySysDescrPDU(value string) gosnmp.VarBind {
 	return topologyOctetStringPDU("1.3.6.1.2.1.1.1.0", value)
 }

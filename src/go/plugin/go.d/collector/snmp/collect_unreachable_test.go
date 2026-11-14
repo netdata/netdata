@@ -6,13 +6,15 @@ import (
 	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/pinger"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestCollector_UnreachablePollDoesNotEmitProfileStats(t *testing.T) {
@@ -35,7 +37,7 @@ func TestCollector_UnreachablePollDoesNotEmitProfileStats(t *testing.T) {
 		}},
 		{SourceFile: "vendor.yaml", Definition: &ddprofiledefinition.ProfileDefinition{}},
 	}
-	c.newSnmpClient = func() gosnmp.Handler { return handler }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 	c.newPinger = func(pinger.Config, *logger.Logger) (pinger.Client, error) {
 		return &mockPingClient{
 			sample: pingSuccessSample("192.0.2.1"),
@@ -47,10 +49,10 @@ func TestCollector_UnreachablePollDoesNotEmitProfileStats(t *testing.T) {
 
 	for _, blocked := range []bool{false, true, false} {
 		if blocked {
-			handler.EXPECT().Get([]string{oid}).Return(nil, context.DeadlineExceeded)
+			handler.EXPECT().Get(gomock.Any(), []string{oid}).Return(nil, context.DeadlineExceeded)
 		} else {
-			handler.EXPECT().Get([]string{oid}).Return(&gosnmp.SnmpPacket{
-				Variables: []gosnmp.SnmpPDU{{Name: oid, Type: gosnmp.TimeTicks, Value: uint32(100)}},
+			handler.EXPECT().Get(gomock.Any(), []string{oid}).Return(&gosnmp.Message{
+				VarBinds: []gosnmp.VarBind{{Name: oid, Value: gosnmp.TimeTicksValue(100)}},
 			}, nil)
 		}
 		metrics := c.Collect(context.Background())

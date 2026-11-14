@@ -4,8 +4,6 @@ go 1.27.0
 
 replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
 
-replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
-
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.24.0
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
@@ -44,11 +42,9 @@ require (
 	github.com/godbus/dbus/v5 v5.2.4
 	github.com/gofrs/flock v0.13.2
 	github.com/gohugoio/hashstructure v1.1.0
-	github.com/golang/mock v1.6.0
 	github.com/golangsnmp/gomib v0.13.2
 	github.com/google/uuid v1.6.0
 	github.com/gorcon/rcon v1.4.0
-	github.com/gosnmp/gosnmp v1.42.1
 	github.com/grafana/regexp v0.0.0-20240518133315-a468a5bfb3bc
 	github.com/ibm-messaging/mq-golang/v5 v5.7.3
 	github.com/ibmdb/go_ibm_db v0.5.4 // Used by ibm.d.plugin (requires CGO)
@@ -67,6 +63,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/moby/api v1.56.1
 	github.com/moby/moby/client v0.6.2
+	github.com/netdata/gosnmp v0.0.0-20261112121521-088919090b99
 	github.com/netdata/systemd-journal-sdk/go v0.10.0
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/prometheus-community/pro-bing v0.9.1
@@ -85,6 +82,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.10.0
 	go.opentelemetry.io/proto/otlp v1.11.1
 	go.uber.org/automaxprocs v1.6.0
+	go.uber.org/mock v0.6.0
 	go4.org/netipx v0.0.0-20231129151722-fdeea329fbba
 	golang.org/x/crypto v0.58.0
 	golang.org/x/net v0.62.0

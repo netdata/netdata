@@ -3,13 +3,15 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -19,7 +21,7 @@ import (
 func TestScalarCollector_Collect(t *testing.T) {
 	tests := map[string]struct {
 		profile        *ddsnmp.Profile
-		setupMock      func(m *snmpmock.MockHandler)
+		setupMock      func(m *snmpmock.MockSession)
 		expectedResult []ddsnmp.Metric
 		expectedError  bool
 		errorContains  string
@@ -29,8 +31,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
 				createScalarMetric("1.3.6.1.2.1.1.5.0", "sysName"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0", "1.3.6.1.2.1.1.5.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0", "1.3.6.1.2.1.1.5.0"}, []gosnmp.VarBind{
 					createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 					createStringPDU("1.3.6.1.2.1.1.5.0", "test-host"),
 				})
@@ -60,8 +62,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.VarBind{
 					createGauge32PDU("1.3.6.1.4.1.12124.1.1.2", 1024),
 				})
 			},
@@ -89,8 +91,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.8"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.8"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.8", "25C"),
 				})
 			},
@@ -142,8 +144,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0", "1.3.6.1.4.1.2604.5.1.5.1.2.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.2604.5.1.5.1.1.0", "1.3.6.1.4.1.2604.5.1.5.1.2.0"}, []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.4.1.2604.5.1.5.1.1.0", 4),
 					createStringPDU("1.3.6.1.4.1.2604.5.1.5.1.2.0", "11 Nov 2031"),
 				})
@@ -180,8 +182,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.999.1.1.0", "never"),
 				})
 			},
@@ -203,8 +205,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.999.1.1.0"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.999.1.1.0", "not-a-date"),
 				})
 			},
@@ -216,8 +218,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 			profile: createTestProfile("test-profile.yaml", []ddprofiledefinition.MetricsConfig{
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.VarBind{
 					createNoSuchObjectPDU("1.3.6.1.2.1.1.3.0"),
 				})
 			},
@@ -226,7 +228,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 		},
 		"empty profile - no metrics defined": {
 			profile: createTestProfile("empty-profile.yaml", []ddprofiledefinition.MetricsConfig{}),
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// No SNMP calls expected
 			},
 			expectedResult: nil,
@@ -236,7 +238,7 @@ func TestScalarCollector_Collect(t *testing.T) {
 			profile: createTestProfile("test-profile.yaml", []ddprofiledefinition.MetricsConfig{
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPGetError(m, []string{"1.3.6.1.2.1.1.3.0"}, errors.New("SNMP timeout"))
 			},
 			expectedResult: nil,
@@ -249,12 +251,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 				createScalarMetric("1.3.6.1.4.1.9.9.305.1.1.2.0", "cpmCPULoadAvg5min"),
 				createScalarMetric("1.3.6.1.4.1.9.9.305.1.1.3.0", "cpmCPULoadAvg15min"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPGet(m, []string{
 					"1.3.6.1.4.1.9.9.305.1.1.1.0",
 					"1.3.6.1.4.1.9.9.305.1.1.2.0",
 					"1.3.6.1.4.1.9.9.305.1.1.3.0",
-				}, []gosnmp.SnmpPDU{
+				}, []gosnmp.VarBind{
 					createPDU("1.3.6.1.4.1.9.9.305.1.1.1.0", gosnmp.OpaqueFloat, float32(0.75)),
 					createPDU("1.3.6.1.4.1.9.9.305.1.1.2.0", gosnmp.OpaqueFloat, float32(1.23)),
 					createPDU("1.3.6.1.4.1.9.9.305.1.1.3.0", gosnmp.OpaqueFloat, float32(2.45)),
@@ -285,12 +287,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 				createScalarMetric("1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.2", "cpqHeSysBatteryCurrent"),
 				createScalarMetric("1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.3", "cpqHeSysBatteryCapacity"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPGet(m, []string{
 					"1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.1",
 					"1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.2",
 					"1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.3",
-				}, []gosnmp.SnmpPDU{
+				}, []gosnmp.VarBind{
 					createPDU("1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.1", gosnmp.OpaqueDouble, 12.6),
 					createPDU("1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.2", gosnmp.OpaqueDouble, 2.4),
 					createPDU("1.3.6.1.4.1.232.6.2.6.8.1.4.1.1.6.3", gosnmp.OpaqueDouble, 98.5),
@@ -343,12 +345,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPGet(m, []string{
 					"1.3.6.1.2.1.1.3.0",
 					"1.3.6.1.2.1.1.7.0",
 					"1.3.6.1.2.1.2.1.0",
-				}, []gosnmp.SnmpPDU{
+				}, []gosnmp.VarBind{
 					createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 					createIntegerPDU("1.3.6.1.2.1.1.7.0", 72),
 					createIntegerPDU("1.3.6.1.2.1.2.1.0", 4),
@@ -391,8 +393,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.VarBind{
 					createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 				})
 			},
@@ -433,8 +435,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.2", "WARNING"),
 				})
 			},
@@ -473,8 +475,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.8"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.8"}, []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.8", 2), // down
 				})
 			},
@@ -514,8 +516,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.8"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.8"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.8", "Fan2"),
 				})
 			},
@@ -552,8 +554,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.7"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.7"}, []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.7", 2), // down
 				})
 			},
@@ -585,8 +587,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.2", "CRITICAL"),
 				})
 			},
@@ -613,8 +615,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.12124.1.1.2"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.12124.1.1.2", "ERROR"),
 				})
 			},
@@ -626,8 +628,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 			profile: createTestProfile("test-profile.yaml", []ddprofiledefinition.MetricsConfig{
 				createScalarMetric("1.3.6.1.2.1.1.3.0", "sysUpTime"),
 			}),
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.1.3.0"}, []gosnmp.VarBind{
 					createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 				})
 			},
@@ -660,8 +662,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.7"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.2.1.2.2.1.7"}, []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.2.1.2.2.1.7", 1), // up
 				})
 			},
@@ -702,8 +704,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.674.10892.1.1100.32.1.6"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.674.10892.1.1100.32.1.6"}, []gosnmp.VarBind{
 					createIntegerPDU("1.3.6.1.4.1.674.10892.1.1100.32.1.6", 129), // internalError + processorPresent
 				})
 			},
@@ -742,8 +744,8 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
-				expectSNMPGet(m, []string{"1.3.6.1.4.1.318.1.1.1.2.2.1.0"}, []gosnmp.SnmpPDU{
+			setupMock: func(m *snmpmock.MockSession) {
+				expectSNMPGet(m, []string{"1.3.6.1.4.1.318.1.1.1.2.2.1.0"}, []gosnmp.VarBind{
 					createStringPDU("1.3.6.1.4.1.318.1.1.1.2.2.1.0", "batteryLow"),
 				})
 			},
@@ -773,12 +775,12 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				},
 			},
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				expectSNMPGet(m, []string{
 					"1.3.6.1.2.1.1.3.0",
 					"1.3.6.1.2.1.1.5.0",
 					"1.3.6.1.2.1.1.6.0",
-				}, []gosnmp.SnmpPDU{
+				}, []gosnmp.VarBind{
 					createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456),
 					createNoSuchObjectPDU("1.3.6.1.2.1.1.5.0"),
 					createStringPDU("1.3.6.1.2.1.1.6.0", "DataCenter"),
@@ -812,32 +814,32 @@ func TestScalarCollector_Collect(t *testing.T) {
 					},
 				}
 			}(),
-			setupMock: func(m *snmpmock.MockHandler) {
+			setupMock: func(m *snmpmock.MockSession) {
 				// Expect 3 chunks (10 + 10 + 5)
 				chunk1OIDs := make([]string, 10)
-				chunk1PDUs := make([]gosnmp.SnmpPDU, 10)
+				chunk1PDUs := make([]gosnmp.VarBind, 10)
 				for i := range 10 {
 					chunk1OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i)
 					chunk1PDUs[i] = createIntegerPDU(chunk1OIDs[i], i*100)
 				}
 
 				chunk2OIDs := make([]string, 10)
-				chunk2PDUs := make([]gosnmp.SnmpPDU, 10)
+				chunk2PDUs := make([]gosnmp.VarBind, 10)
 				for i := range 10 {
 					chunk2OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+10)
 					chunk2PDUs[i] = createIntegerPDU(chunk2OIDs[i], (i+10)*100)
 				}
 
 				chunk3OIDs := make([]string, 5)
-				chunk3PDUs := make([]gosnmp.SnmpPDU, 5)
+				chunk3PDUs := make([]gosnmp.VarBind, 5)
 				for i := range 5 {
 					chunk3OIDs[i] = fmt.Sprintf("1.3.6.1.2.1.1.%02d.0", i+20)
 					chunk3PDUs[i] = createIntegerPDU(chunk3OIDs[i], (i+20)*100)
 				}
 
-				m.EXPECT().Get(chunk1OIDs).Return(&gosnmp.SnmpPacket{Variables: chunk1PDUs}, nil)
-				m.EXPECT().Get(chunk2OIDs).Return(&gosnmp.SnmpPacket{Variables: chunk2PDUs}, nil)
-				m.EXPECT().Get(chunk3OIDs).Return(&gosnmp.SnmpPacket{Variables: chunk3PDUs}, nil)
+				m.EXPECT().Get(gomock.Any(), chunk1OIDs).Return(&gosnmp.Message{VarBinds: chunk1PDUs}, nil)
+				m.EXPECT().Get(gomock.Any(), chunk2OIDs).Return(&gosnmp.Message{VarBinds: chunk2PDUs}, nil)
+				m.EXPECT().Get(gomock.Any(), chunk3OIDs).Return(&gosnmp.Message{VarBinds: chunk3PDUs}, nil)
 			},
 			expectedResult: func() []ddsnmp.Metric {
 				// Generate expected metrics
@@ -857,16 +859,16 @@ func TestScalarCollector_Collect(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			tc.setupMock(mockHandler)
 
 			missingOIDs := make(map[string]bool)
-			collector := newScalarCollector(mockHandler, missingOIDs, logger.New())
+			collector := newScalarCollector(mockHandler, testRequests, missingOIDs, logger.New())
 
 			var stats ddsnmp.CollectionStats
-			result, err := collector.collect(tc.profile, &stats)
+			result, err := collector.collect(context.Background(), tc.profile, &stats)
 
 			if tc.expectedError {
 				assert.Error(t, err)

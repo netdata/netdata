@@ -3,13 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -129,7 +130,7 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectCiscoTraditionalLicensingWalk(mockHandler, tc.rows...)
@@ -139,13 +140,15 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 			require.Len(t, profile.Definition.Licensing, 1)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
 				SysObjectID: "",
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -158,7 +161,7 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile(t *testing.T) {
 }
 
 func TestCollector_Collect_CiscoTraditionalLicensingProfile_OmitsMalformedNonPlaceholderExpiry(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectCiscoTraditionalLicensingWalk(mockHandler, ciscoTraditionalRow{
@@ -181,13 +184,15 @@ func TestCollector_Collect_CiscoTraditionalLicensingProfile_OmitsMalformedNonPla
 	require.Len(t, profile.Definition.Licensing, 1)
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: "",
 	})
 
-	rows, err := collector.collectLicenseRows(profile, &ddsnmp.CollectionStats{})
+	rows, err := collector.collectLicenseRows(context.Background(), profile, &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 
@@ -220,8 +225,8 @@ type ciscoTraditionalRow struct {
 	hasEndDatePDU bool
 }
 
-func expectCiscoTraditionalLicensingWalk(mockHandler *snmpmock.MockHandler, rows ...ciscoTraditionalRow) {
-	pdus := make([]gosnmp.SnmpPDU, 0, len(rows)*10)
+func expectCiscoTraditionalLicensingWalk(mockHandler *snmpmock.MockSession, rows ...ciscoTraditionalRow) {
+	pdus := make([]gosnmp.VarBind, 0, len(rows)*10)
 
 	for _, row := range rows {
 		idx := strconv.Itoa(row.entPhysical) + "." + strconv.Itoa(row.storeUsed) + "." + strconv.Itoa(row.index)

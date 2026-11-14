@@ -3,9 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -49,7 +50,7 @@ func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromLibreNMSFixtures(t *testing
 				assert.Equal(t, "10.255.9.31", row.Descriptors.LocalAddress)
 				assert.Equal(t, "65011", row.Identity.RemoteAS)
 				assert.EqualValues(t, 30, row.Routes.Current.Accepted.Value)
-				assert.EqualValues(t, 4294967295, row.RouteLimits.Limit.Value)
+				assert.EqualValues(t, int64(4294967295), row.RouteLimits.Limit.Value)
 				assert.EqualValues(t, 75, row.RouteLimits.Threshold.Value)
 				assert.EqualValues(t, 75, row.RouteLimits.ClearThreshold.Value)
 				assert.EqualValues(t, 8, row.Routes.Current.Advertised.Value)
@@ -67,16 +68,16 @@ func TestCollector_Collect_CiscoBgpPeer2Prefixes_FromLibreNMSFixtures(t *testing
 }
 
 func TestCollector_Collect_CiscoBgpPeer2PrefixRows_OmitsInvalidOptionalLocalAddress(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	prefixIndex := "1.4.198.19.220.34.1.128"
 	peerIndex := "1.4.198.19.220.34"
 
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", []gosnmp.VarBind{
 		createCounter32PDU("1.3.6.1.4.1.9.9.187.1.2.8.1.1."+prefixIndex, 12),
 	})
-	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", []gosnmp.SnmpPDU{
+	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", []gosnmp.VarBind{
 		createPDU("1.3.6.1.4.1.9.9.187.1.2.5.1.6."+peerIndex, gosnmp.OctetString, []byte("00 00 7F C3 ")),
 		createGauge32PDU("1.3.6.1.4.1.9.9.187.1.2.5.1.11."+peerIndex, 65001),
 	})
@@ -85,13 +86,15 @@ func TestCollector_Collect_CiscoBgpPeer2PrefixRows_OmitsInvalidOptionalLocalAddr
 	filterProfileForTypedBGPByID(t, profile, "cisco-bgp-peer-family")
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: "1.3.6.1.4.1.9.1.923",
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].BGPRows, 1)
@@ -113,20 +116,22 @@ func collectCiscoPeer2PrefixRowsFromFixture(t *testing.T, sysObjectID, profileFi
 
 	pdus := loadSnmprecPDUs(t, fixturePath)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.8", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.8."))
 	expectSNMPWalk(mockHandler, gosnmp.Version2c, "1.3.6.1.4.1.9.9.187.1.2.5.1", snmprecPDUsWithPrefix(pdus, "1.3.6.1.4.1.9.9.187.1.2.5.1."))
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: sysObjectID,
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Empty(t, results[0].Metrics)

@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -39,7 +40,7 @@ func TestDeviceMetadataCollector_SysobjectIDMetadataWithoutDeviceResource(t *tes
     metadata:
       model: {value: example}
 `)
-			got, err := newDeviceMetadataCollector(nil, nil, logger.New(), tc.oid).collect(&ddsnmp.Profile{
+			got, err := newDeviceMetadataCollector(nil, testRequests, nil, logger.New(), tc.oid).collect(context.Background(), &ddsnmp.Profile{
 				Definition: def,
 			})
 			require.NoError(t, err)
@@ -60,15 +61,14 @@ func TestTableRowProcessor_StockPowerSupplyMetrics(t *testing.T) {
 	require.NotEmpty(t, cfg.Symbols)
 	row := &tableRowData{
 		index:     "1",
-		pdus:      map[string]gosnmp.SnmpPDU{},
+		pdus:      map[string]gosnmp.VarBind{},
 		tableName: cfg.Table.Name,
 	}
 	for _, sym := range cfg.Symbols {
 		if sym.OID != "" {
-			row.pdus[sym.OID] = gosnmp.SnmpPDU{
+			row.pdus[sym.OID] = gosnmp.VarBind{
 				Name:  sym.OID + ".1",
-				Type:  gosnmp.Integer,
-				Value: 1,
+				Value: gosnmp.IntegerValue(1),
 			}
 		}
 	}
@@ -107,16 +107,15 @@ func TestTableTagProcessor_TransformationChain(t *testing.T) {
 			}
 			require.NoError(t, ddprofiledefinition.ValidateEnrichProfile(&def))
 			cfg := def.MetricTags[0].MetricTagConfig
-			pdu := gosnmp.SnmpPDU{
+			pdu := gosnmp.VarBind{
 				Name:  "1.2.3.0",
-				Type:  gosnmp.OctetString,
-				Value: []byte(tc.input),
+				Value: gosnmp.OctetStringValue([]byte(tc.input)),
 			}
 			for _, global := range []bool{false, true} {
 				tags := map[string]string{}
 				var err error
 				if global {
-					err = newGlobalTagProcessor().processTag(cfg, map[string]gosnmp.SnmpPDU{"1.2.3.0": pdu}, tagAdder{
+					err = newGlobalTagProcessor().processTag(cfg, map[string]gosnmp.VarBind{"1.2.3.0": pdu}, tagAdder{
 						tags: tags,
 					})
 				} else {
@@ -228,10 +227,9 @@ func BenchmarkProfileTagProcessing(b *testing.B) {
 			}
 			require.NoError(b, ddprofiledefinition.ValidateEnrichProfile(&def))
 			cfg := def.MetricTags[0].MetricTagConfig
-			pdu := gosnmp.SnmpPDU{
+			pdu := gosnmp.VarBind{
 				Name:  "1.2.3.0",
-				Type:  gosnmp.OctetString,
-				Value: []byte("value=1"),
+				Value: gosnmp.OctetStringValue([]byte("value=1")),
 			}
 			p := newTableTagProcessor()
 			tags := map[string]string{}
@@ -263,11 +261,11 @@ func BenchmarkProfileDeviceMetadata(b *testing.B) {
 	prof := &ddsnmp.Profile{
 		Definition: def,
 	}
-	c := newDeviceMetadataCollector(nil, nil, logger.New(), "1.2.3")
+	c := newDeviceMetadataCollector(nil, testRequests, nil, logger.New(), "1.2.3")
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := c.collect(prof); err != nil {
+		if _, err := c.collect(context.Background(), prof); err != nil {
 			b.Fatal(err)
 		}
 	}

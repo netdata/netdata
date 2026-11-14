@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"errors"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -41,7 +41,7 @@ func newGlobalTagProcessor() *globalTagProcessor {
 	}
 }
 
-func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.SnmpPDU, ta tagAdder) error {
+func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdus map[string]gosnmp.VarBind, ta tagAdder) error {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
 	if !ok {
 		ta.processing.record(metricTagDisplayName(cfg), cfg.Symbol.OID, "missing_input")
@@ -52,7 +52,7 @@ func (p *globalTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig,
 
 func (p *globalTagProcessor) processTagObserved(
 	cfg ddprofiledefinition.MetricTagConfig,
-	pdus map[string]gosnmp.SnmpPDU,
+	pdus map[string]gosnmp.VarBind,
 	ta tagAdder,
 ) (bool, error) {
 	pdu, ok := pdus[trimOID(cfg.Symbol.OID)]
@@ -72,7 +72,7 @@ func newTableTagProcessor() *tableTagProcessor {
 	return &tableTagProcessor{}
 }
 
-func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.SnmpPDU, ta tagAdder) error {
+func (p *tableTagProcessor) processTag(cfg ddprofiledefinition.MetricTagConfig, pdu gosnmp.VarBind, ta tagAdder) error {
 	tagName := ternary(cfg.Tag != "", cfg.Tag, cfg.Symbol.Name)
 	if tagName == "" {
 		return nil

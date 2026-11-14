@@ -3,6 +3,8 @@
 package ddsnmpcollector
 
 import (
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -12,20 +14,20 @@ type topologyMetricLookupKey struct {
 	name  string
 }
 
-func (c *Collector) collectTopologyMetrics(prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
+func (c *Collector) collectTopologyMetrics(ctx context.Context, prof *ddsnmp.Profile, stats *ddsnmp.CollectionStats) ([]ddsnmp.Metric, error) {
 	topologyProfile, kinds := buildTopologyProfile(prof)
 	if topologyProfile == nil {
 		return nil, nil
 	}
 
-	scalarMetrics, err := c.scalarCollector.collect(topologyProfile, stats)
+	scalarMetrics, err := c.scalarCollector.collect(ctx, topologyProfile, stats)
 	if err != nil {
 		return nil, err
 	}
 	session := newTableCollectionSession(c.tableCollector, c.tableIdentity)
 	scope := session.addScope(topologyProfile, tableSymbolModePresence, stats)
-	session.resolve()
-	tableMetrics, err := session.collectScope(scope)
+	session.resolve(ctx)
+	tableMetrics, err := session.collectScope(ctx, scope)
 	if err != nil {
 		return nil, err
 	}

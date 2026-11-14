@@ -10,15 +10,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 const replacementTestObjectID = "1.3.6.1.4.1.9.1.1166"
@@ -30,10 +30,9 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 	c.LocalVnode.Labels = map[string]string{"name": "authored name", "contact": ""}
 	authored := c.Config
 	authored.LocalVnode.Labels = maps.Clone(c.LocalVnode.Labels)
-	device.values[refreshTestTable+".1.2"] = gosnmp.SnmpPDU{
+	device.values[refreshTestTable+".1.2"] = gosnmp.VarBind{
 		Name:  refreshTestTable + ".1.2",
-		Type:  gosnmp.Counter64,
-		Value: uint64(50),
+		Value: gosnmp.Counter64Value(50),
 	}
 	require.NotEmpty(t, c.Collect(context.Background()))
 	require.NotEmpty(t, c.Collect(context.Background()))
@@ -50,7 +49,7 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 
 	client, clientCloses := newReplacementTestClient(t, device, nil)
 	clientCreations := 0
-	c.newSnmpClient = func() gosnmp.Handler { clientCreations++; return client }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { clientCreations++; return client, nil }
 	var replacement *mockDdSnmpCollector
 	ddCreations := 0
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
@@ -58,10 +57,9 @@ func TestCollectorRuntimeDeviceReplacement(t *testing.T) {
 		replacement = newReplacementTestDD(t, cfg)
 		return replacement
 	}
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	device.setText(snmputils.OidSysName, "replacement")
 	*now = now.Add(time.Minute)
@@ -125,22 +123,21 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	clientCreations := 0
 	failedClient, failedCloses := newReplacementTestClient(t, device, errors.New("synthetic connect failure"))
 	recoveredClient, recoveredCloses := newReplacementTestClient(t, device, nil)
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		clientCreations++
 		if clientCreations == 1 {
-			return failedClient
+			return failedClient, nil
 		}
-		return recoveredClient
+		return recoveredClient, nil
 	}
 	ddCreations := 0
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		ddCreations++
 		return newReplacementTestDD(t, cfg)
 	}
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: "1.3.6.1.2.1.999",
+		Value: gosnmp.ObjectIdentifierValue("1.3.6.1.2.1.999"),
 	}
 	*now = now.Add(time.Minute)
 	assert.Empty(
@@ -168,8 +165,8 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 		"a confirmed classification change must withdraw prior-device Function rows immediately",
 	)
 
-	device.probePDUs = []gosnmp.SnmpPDU{
-		{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: []byte("incomplete")},
+	device.probePDUs = []gosnmp.VarBind{
+		{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("incomplete"))},
 	}
 	*now = now.Add(time.Minute)
 	assert.Empty(t, c.Collect(context.Background()), "a later unanswered object ID cannot resume incompatible profiles")
@@ -177,10 +174,9 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	assert.Zero(t, clientCreations)
 	assert.Empty(t, interfaceRows(), "an incomplete retry cannot restore prior-device Function rows")
 	device.probePDUs = nil
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	*now = now.Add(time.Minute)
 	assert.Empty(t, c.Collect(context.Background()), "failed candidate connection must keep old profiles suspended")
@@ -219,13 +215,11 @@ func TestCollectorRuntimeDeviceReplacementFailureAndRecovery(t *testing.T) {
 	assert.Equal(t, 1, *recoveredCloses)
 }
 
-func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectErr error) (*snmpmock.MockHandler, *int) {
+func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectErr error) (*snmpmock.MockSession, *int) {
 	t.Helper()
-	client := snmpmock.NewMockHandler(gomock.NewController(t))
+	client := snmpmock.NewMockSession(gomock.NewController(t))
 	// Register the concrete protocol before the shared helper's permissive getter.
-	client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-	setMockClientSetterExpect(client)
-	client.EXPECT().Connect().Return(connectErr).Times(1)
+	client.EXPECT().Connect(gomock.Any()).Return(connectErr).Times(1)
 	closes := new(int)
 	closeCalls := 0
 	if connectErr == nil {
@@ -233,9 +227,8 @@ func newReplacementTestClient(t *testing.T, device *refreshTestDevice, connectEr
 	}
 	client.EXPECT().Close().DoAndReturn(func() error { *closes++; return nil }).Times(closeCalls)
 	if connectErr == nil {
-		client.EXPECT().MaxOids().Return(20).AnyTimes()
-		client.EXPECT().Get(gomock.Any()).DoAndReturn(device.Get).AnyTimes()
-		client.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem).DoAndReturn(device.BulkWalkAll).Times(2)
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(device.Get).AnyTimes()
+		client.EXPECT().BulkWalkAll(gomock.Any(), snmputils.RootOidMibSystem, gomock.Any()).DoAndReturn(device.BulkWalkAll).Times(2)
 	}
 	return client, closes
 }
@@ -275,10 +268,9 @@ func TestCollectorRuntimeReplacementDisablesUnselectedBGP(t *testing.T) {
 		normalTestRoot + ".1.0": 7, normalTestRoot + ".2.0": 3, normalTestRoot + ".3.0": 1,
 		normalTestRoot + ".4.0": 3600, normalTestRoot + ".5.0": 6,
 	} {
-		device.values[oid] = gosnmp.SnmpPDU{
+		device.values[oid] = gosnmp.VarBind{
 			Name:  oid,
-			Type:  gosnmp.Integer,
-			Value: value,
+			Value: gosnmp.IntegerValue(int32(value)),
 		}
 	}
 	require.NotEmpty(t, c.Collect(context.Background()))
@@ -287,7 +279,7 @@ func TestCollectorRuntimeReplacementDisablesUnselectedBGP(t *testing.T) {
 	require.Equal(t, 200, c.funcRouter.Handle(context.Background(), bgpPeersMethodID, nil).Status)
 	client, _ := newReplacementTestClient(t, device, nil)
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
-	c.newSnmpClient = func() gosnmp.Handler { return client }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return client, nil }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
 		require.False(t, profilesHaveBGP(cfg.Profiles), "the current catalog selection must not declare BGP")
 		return &mockDdSnmpCollector{
@@ -296,10 +288,9 @@ func TestCollectorRuntimeReplacementDisablesUnselectedBGP(t *testing.T) {
 			},
 		}
 	}
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: "1.3.6.1.4.1.9.1.1",
+		Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.9.1.1"),
 	}
 	*now = now.Add(time.Minute)
 	require.NotEmpty(t, c.Collect(context.Background()))
@@ -317,14 +308,13 @@ func TestCollectorRuntimeReplacementWithBlankAcquiredName(t *testing.T) {
 	guid := c.VirtualNode().GUID
 	client, _ := newReplacementTestClient(t, device, nil)
 	creations := 0
-	c.newSnmpClient = func() gosnmp.Handler { creations++; return client }
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { creations++; return client, nil }
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector { return newReplacementTestDD(t, cfg) }
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	device.setText(snmputils.OidSysName, " \t\n ")
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	*now = now.Add(time.Minute)
 	require.NotEmpty(t, c.Collect(context.Background()))

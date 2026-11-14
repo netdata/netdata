@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -17,7 +17,7 @@ func TestTableRowProcessor_ProcessRowMetrics_SkipsTextDateNoValue(t *testing.T) 
 	p := newTableRowProcessor(logger.New())
 
 	row := &tableRowData{
-		pdus: map[string]gosnmp.SnmpPDU{
+		pdus: map[string]gosnmp.VarBind{
 			"1.3.6.1.4.1.999.1.1.1": createStringPDU("1.3.6.1.4.1.999.1.1.1.1", "never"),
 		},
 		tags:       map[string]string{},

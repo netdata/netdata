@@ -3,15 +3,16 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -19,7 +20,7 @@ import (
 )
 
 func TestCollector_Collect_RegularScalarFallbackKeepsFirstSuccessfulMetric(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -27,7 +28,7 @@ func TestCollector_Collect_RegularScalarFallbackKeepsFirstSuccessfulMetric(t *te
 		fallbackOID = "1.3.6.1.4.1.99999.2.0"
 	)
 
-	expectSNMPGet(mockHandler, []string{primaryOID, fallbackOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{primaryOID, fallbackOID}, []gosnmp.VarBind{
 		createGauge32PDU(primaryOID, 10),
 		createGauge32PDU(fallbackOID, 20),
 	})
@@ -46,11 +47,13 @@ func TestCollector_Collect_RegularScalarFallbackKeepsFirstSuccessfulMetric(t *te
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -88,7 +91,7 @@ func TestCollector_Collect_RegularScalarFallbackFallsThrough(t *testing.T) {
 
 	tests := map[string]struct {
 		primaryConfig   ddprofiledefinition.MetricsConfig
-		primaryPDU      gosnmp.SnmpPDU
+		primaryPDU      gosnmp.VarBind
 		missingErrors   int64
 		processingError int64
 	}{
@@ -116,10 +119,10 @@ func TestCollector_Collect_RegularScalarFallbackFallsThrough(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
-			expectSNMPGet(mockHandler, []string{primaryOID, fallbackOID}, []gosnmp.SnmpPDU{
+			expectSNMPGet(mockHandler, []string{primaryOID, fallbackOID}, []gosnmp.VarBind{
 				test.primaryPDU,
 				createGauge32PDU(fallbackOID, 20),
 			})
@@ -129,11 +132,13 @@ func TestCollector_Collect_RegularScalarFallbackFallsThrough(t *testing.T) {
 				createScalarMetric(fallbackOID, "systemUptime"),
 			})
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
 			})
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 
@@ -172,7 +177,7 @@ func TestCollector_KeepFirstRegularScalarMetricByName(t *testing.T) {
 }
 
 func TestCollector_Collect_RegularScalarFallbackDoesNotAffectTopologyScalars(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	const (
@@ -180,7 +185,7 @@ func TestCollector_Collect_RegularScalarFallbackDoesNotAffectTopologyScalars(t *
 		secondOID = "1.3.6.1.4.1.99999.11.0"
 	)
 
-	expectSNMPGet(mockHandler, []string{firstOID, secondOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{firstOID, secondOID}, []gosnmp.VarBind{
 		createGauge32PDU(firstOID, 1),
 		createGauge32PDU(secondOID, 2),
 	})
@@ -206,11 +211,13 @@ func TestCollector_Collect_RegularScalarFallbackDoesNotAffectTopologyScalars(t *
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	assert.Empty(t, results[0].Metrics)
@@ -225,8 +232,7 @@ func BenchmarkCollector_CollectScalarFallbacks(b *testing.B) {
 			ctrl := gomock.NewController(b)
 			defer ctrl.Finish()
 
-			mockHandler := snmpmock.NewMockHandler(ctrl)
-			mockHandler.EXPECT().MaxOids().Return(4096).AnyTimes()
+			mockHandler := snmpmock.NewMockSession(ctrl)
 			device := newStatefulSNMPDevice()
 			device.install(mockHandler)
 
@@ -241,19 +247,21 @@ func BenchmarkCollector_CollectScalarFallbacks(b *testing.B) {
 			}
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    4096,
 				SnmpClient: mockHandler,
 				Profiles:   []*ddsnmp.Profile{createTestProfile("benchmark-fallbacks.yaml", metrics)},
 				Log:        logger.New(),
 			})
 
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.NoError(b, err)
 
 			b.ReportAllocs()
 			b.ReportMetric(float64(names), "names/op")
 			b.ResetTimer()
 			for range b.N {
-				results, err := collector.Collect()
+				results, err := collector.Collect(context.Background())
 				if err != nil || len(results) != 1 {
 					b.Fatalf("collect: results=%d err=%v", len(results), err)
 				}

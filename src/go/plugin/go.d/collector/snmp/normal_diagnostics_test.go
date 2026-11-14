@@ -15,10 +15,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -82,16 +82,14 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			bgpMissing := strings.HasPrefix(tc.failure, "missing_bgp")
 			handler, cleanup := mockInit(t)
 			defer cleanup()
-			handler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-			setMockClientInitExpect(handler)
-			handler.EXPECT().BulkWalkAll(snmputils.RootOidMibSystem).Return([]gosnmp.SnmpPDU{{Name: snmputils.OidSysName, Type: gosnmp.OctetString, Value: "switch"}}, nil).Times(2)
-			handler.EXPECT().MaxOids().Return(20).AnyTimes()
+			setMockClientConnectExpect(handler)
+			handler.EXPECT().BulkWalkAll(gomock.Any(), snmputils.RootOidMibSystem, gomock.Any()).Return([]gosnmp.VarBind{{Name: snmputils.OidSysName, Value: gosnmp.OctetStringValue([]byte("switch"))}}, gosnmp.WalkEnd{}, nil).Times(2)
 			poll := 0
-			handler.EXPECT().Get(gomock.Any()).DoAndReturn(func(oids []string) (*gosnmp.SnmpPacket, error) {
-				packet := &gosnmp.SnmpPacket{}
+			handler.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, oids []string) (*gosnmp.Message, error) {
+				packet := &gosnmp.Message{}
 				for _, oid := range oids {
 					if oid == snmputils.OidSysObject {
-						packet.Variables = append(packet.Variables, gosnmp.SnmpPDU{Name: oid, Type: gosnmp.ObjectIdentifier, Value: "1.3.6.1.4.1.99999"})
+						packet.VarBinds = append(packet.VarBinds, gosnmp.VarBind{Name: oid, Value: gosnmp.ObjectIdentifierValue("1.3.6.1.4.1.99999")})
 						continue
 					}
 					if poll == 2 && (((tc.failure == "metrics" || bgpMissing) && oid == normalTestRoot+".1.0") || (tc.failure == "bgp" && oid == normalTestRoot+".5.0")) {
@@ -107,29 +105,29 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 					if oid == normalTestRoot+".5.0" {
 						value = 6
 					}
-					pdu := gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: value}
+					pdu := gosnmp.VarBind{Name: oid, Value: gosnmp.IntegerValue(int32(value))}
 					if poll == 2 && tc.failure == "bgp_conversion" && oid == normalTestRoot+".7.0" {
-						pdu.Type, pdu.Value = gosnmp.OctetString, "invalid"
+						pdu.Value = gosnmp.OctetStringValue([]byte("invalid"))
 					}
 					missingBGPOID := normalTestRoot + ".5.0"
 					if tc.failure == "missing_bgp_identity" {
 						missingBGPOID = normalTestRoot + ".6.0"
 					}
 					if bgpMissing && oid == missingBGPOID {
-						pdu.Type, pdu.Value = gosnmp.NoSuchObject, nil
+						pdu.Value = gosnmp.NoSuchObjectValue()
 					}
 					if tc.failure == "cached" && oid == normalTestRoot+".6.0" {
-						pdu.Type, pdu.Value = gosnmp.OctetString, "invalid"
+						pdu.Value = gosnmp.OctetStringValue([]byte("invalid"))
 					}
 					if poll == 2 && oid == normalTestRoot+".4.0" {
 						if tc.failure == "license" {
-							pdu.Type, pdu.Value = gosnmp.OctetString, "not-a-number"
+							pdu.Value = gosnmp.OctetStringValue([]byte("not-a-number"))
 						}
 						if tc.failure == "missing" {
-							pdu.Type, pdu.Value = gosnmp.NoSuchInstance, nil
+							pdu.Value = gosnmp.NoSuchInstanceValue()
 						}
 					}
-					packet.Variables = append(packet.Variables, pdu)
+					packet.VarBinds = append(packet.VarBinds, pdu)
 				}
 				return packet, nil
 			}).AnyTimes()
@@ -144,7 +142,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 			creator := Creator(store, publisher)
 			c := creator.Create().(*Collector)
 			c.Config = prepareV2Config()
-			c.newSnmpClient = func() gosnmp.Handler { return handler }
+			c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 			// Inject profile input only; Init, Check, all acquisition, normalization
 			// and consumer commits run through their production implementations.
 			c.snmpProfiles = []*ddsnmp.Profile{normalTestProfile()}
@@ -160,7 +158,7 @@ func TestNormalEvidenceRealCollection(t *testing.T) {
 				cfg.Table = ddprofiledefinition.SymbolConfig{OID: root, Name: "peers"}
 				cfg.State.Symbol.OID = root + ".1"
 				cfg.MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: root + ".2", Name: "site"}}}
-				handler.EXPECT().BulkWalkAll(root).Return([]gosnmp.SnmpPDU{{Name: root + ".2.1", Type: gosnmp.OctetString, Value: "site"}}, nil).AnyTimes()
+				handler.EXPECT().BulkWalkAll(gomock.Any(), root, gomock.Any()).Return([]gosnmp.VarBind{{Name: root + ".2.1", Value: gosnmp.OctetStringValue([]byte("site"))}}, gosnmp.WalkEnd{}, nil).AnyTimes()
 			}
 			if tc.failure == "missing_bgp_tags" {
 				c.snmpProfiles[0].Definition.BGP[0].MetricTags = []ddprofiledefinition.MetricTagConfig{{Tag: "site", Symbol: ddprofiledefinition.SymbolConfigCompat{OID: normalTestRoot + ".6.0", Name: "site"}}}

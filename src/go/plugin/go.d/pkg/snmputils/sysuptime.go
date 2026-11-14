@@ -3,10 +3,12 @@
 package snmputils
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"strings"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
 const (
@@ -27,15 +29,15 @@ var sysUptimeSources = []sysUptimeSource{
 	{oid: OidSysUpTime, scale: sysUptimeTimeTicks},
 }
 
-func GetSysUptime(client gosnmp.Handler) (int64, error) {
-	value, _, err := GetSysUptimeWithDiagnostics(client)
+func GetSysUptime(ctx context.Context, client ScalarClient) (int64, error) {
+	value, _, err := GetSysUptimeWithDiagnostics(ctx, client)
 	return value, err
 }
 
 // GetSysUptimeWithDiagnostics observes the response without changing the uptime
 // fallback or operational error behavior used by GetSysUptime.
-func GetSysUptimeWithDiagnostics(client gosnmp.Handler) (int64, Failure, error) {
-	packet, err := client.Get(sysUptimeOIDs())
+func GetSysUptimeWithDiagnostics(ctx context.Context, client ScalarClient) (int64, Failure, error) {
+	packet, err := client.Get(ctx, sysUptimeOIDs())
 	failure := ClassifyGetFailure(packet, err)
 	value, err := sysUptimeFromResponse(packet, err)
 	if failure.Reason == "" {
@@ -44,16 +46,22 @@ func GetSysUptimeWithDiagnostics(client gosnmp.Handler) (int64, Failure, error) 
 	return value, failure, err
 }
 
-func sysUptimeFromResponse(packet *gosnmp.SnmpPacket, err error) (int64, error) {
+func sysUptimeFromResponse(packet *gosnmp.Message, err error) (int64, error) {
+	var status *gosnmp.StatusError
+	if errors.As(err, &status) {
+		// An answer with an error-status carries no uptime, which is not a
+		// failure of the caller; the diagnostics keep the status.
+		return 0, nil
+	}
 	if err != nil {
 		return 0, WithFailure(err, "get", "")
 	}
-	if packet == nil || len(packet.Variables) == 0 {
+	if packet == nil || len(packet.VarBinds) == 0 {
 		return 0, nil
 	}
 
-	pdusByOID := make(map[string]gosnmp.SnmpPDU, len(packet.Variables))
-	for _, pdu := range packet.Variables {
+	pdusByOID := make(map[string]gosnmp.VarBind, len(packet.VarBinds))
+	for _, pdu := range packet.VarBinds {
 		pdusByOID[strings.TrimPrefix(pdu.Name, ".")] = pdu
 	}
 
@@ -88,15 +96,19 @@ func sysUptimeOIDs() []string {
 	return oids
 }
 
-func sysUptimePduValue(pdu gosnmp.SnmpPDU) (int64, error) {
+func sysUptimePduValue(pdu gosnmp.VarBind) (int64, error) {
 	if !isSysUptimeNumericPdu(pdu) {
-		return 0, fmt.Errorf("cannot convert %T to numeric uptime", pdu.Value)
+		return 0, fmt.Errorf("cannot convert %v to numeric uptime", pdu.Value.Type())
 	}
-	return gosnmp.ToBigInt(pdu.Value).Int64(), nil
+	if v, ok := pdu.Value.Int64(); ok {
+		return v, nil
+	}
+	v, _ := pdu.Value.Uint64()
+	return int64(v), nil
 }
 
-func isPduWithData(pdu gosnmp.SnmpPDU) bool {
-	switch pdu.Type {
+func isPduWithData(pdu gosnmp.VarBind) bool {
+	switch pdu.Value.Type() {
 	case gosnmp.NoSuchObject,
 		gosnmp.NoSuchInstance,
 		gosnmp.Null,
@@ -107,8 +119,8 @@ func isPduWithData(pdu gosnmp.SnmpPDU) bool {
 	}
 }
 
-func isSysUptimeNumericPdu(pdu gosnmp.SnmpPDU) bool {
-	switch pdu.Type {
+func isSysUptimeNumericPdu(pdu gosnmp.VarBind) bool {
+	switch pdu.Value.Type() {
 	case gosnmp.Counter32,
 		gosnmp.Counter64,
 		gosnmp.Integer,

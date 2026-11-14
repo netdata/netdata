@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"fmt"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
@@ -24,10 +24,10 @@ func (r *crossTableResolver) lookupTagPDU(
 	tag ddprofiledefinition.MetricTagConfig,
 	index string,
 	ctx *crossTableContext,
-) (gosnmp.SnmpPDU, *tableLookupError) {
+) (gosnmp.VarBind, *tableLookupError) {
 	lookupIndex, err := r.transformIndex(index, tag.IndexTransform)
 	if err != nil {
-		return gosnmp.SnmpPDU{}, &tableLookupError{
+		return gosnmp.VarBind{}, &tableLookupError{
 			oid:    tag.Symbol.OID,
 			reason: "dependency_processing",
 			err:    err,
@@ -36,15 +36,15 @@ func (r *crossTableResolver) lookupTagPDU(
 	for _, source := range tag.IndexFrom {
 		_, pdus, failure := r.referencedTable(source.Table, source.Symbol.OID, ctx)
 		if failure != nil {
-			return gosnmp.SnmpPDU{}, failure
+			return gosnmp.VarBind{}, failure
 		}
 		pdu, failure := lookupTableColumn(source.Symbol.OID, lookupIndex, pdus)
 		if failure != nil {
-			return gosnmp.SnmpPDU{}, failure
+			return gosnmp.VarBind{}, failure
 		}
 		value, reason, err := r.processIndexSourceValue(source.Symbol, pdu)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, &tableLookupError{
+			return gosnmp.VarBind{}, &tableLookupError{
 				oid:    trimOID(source.Symbol.OID) + "." + lookupIndex,
 				reason: reason,
 				err:    err,
@@ -55,12 +55,12 @@ func (r *crossTableResolver) lookupTagPDU(
 
 	root, pdus, failure := r.referencedTable(tag.Table, tag.Symbol.OID, ctx)
 	if failure != nil {
-		return gosnmp.SnmpPDU{}, failure
+		return gosnmp.VarBind{}, failure
 	}
 	if r.requiresLookupByValue(tag) {
 		lookupIndex, err = r.resolveLookupIndexByValue(tag, lookupIndex, root, pdus, ctx)
 		if err != nil {
-			return gosnmp.SnmpPDU{}, &tableLookupError{
+			return gosnmp.VarBind{}, &tableLookupError{
 				oid:    tag.LookupSymbol.OID,
 				reason: "dependency_processing",
 				err:    err,
@@ -73,7 +73,7 @@ func (r *crossTableResolver) lookupTagPDU(
 func (r *crossTableResolver) referencedTable(
 	table, column string,
 	ctx *crossTableContext,
-) (string, map[string]gosnmp.SnmpPDU, *tableLookupError) {
+) (string, map[string]gosnmp.VarBind, *tableLookupError) {
 	root, err := r.findReferencedTableOID(table, ctx.tableNameToOID)
 	if err != nil {
 		return "", nil, &tableLookupError{
@@ -93,11 +93,11 @@ func (r *crossTableResolver) referencedTable(
 	return root, pdus, nil
 }
 
-func lookupTableColumn(column, index string, pdus map[string]gosnmp.SnmpPDU) (gosnmp.SnmpPDU, *tableLookupError) {
+func lookupTableColumn(column, index string, pdus map[string]gosnmp.VarBind) (gosnmp.VarBind, *tableLookupError) {
 	oid := trimOID(column) + "." + index
 	pdu, ok := pdus[oid]
 	if !ok {
-		return gosnmp.SnmpPDU{}, &tableLookupError{
+		return gosnmp.VarBind{}, &tableLookupError{
 			oid:    oid,
 			reason: "missing_dependency",
 			err:    fmt.Errorf("value not found at OID %s", oid),
@@ -110,7 +110,7 @@ func lookupTableColumn(column, index string, pdus map[string]gosnmp.SnmpPDU) (go
 // reusing an unextracted value could select an unrelated row in the next table.
 func (r *crossTableResolver) processIndexSourceValue(
 	sym ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 ) (string, string, error) {
 	value, err := convPduToStringf(pdu, sym.Format)
 	if err != nil {

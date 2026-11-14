@@ -294,14 +294,14 @@ func TestBGPIntegration_PreservesFunctionCacheOnProfileBGPError(t *testing.T) {
 			collr.enableBGPIntegration()
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
 
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)
 			require.Len(t, responseRows(t, resp), 1)
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.failed}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp = newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)
@@ -342,10 +342,10 @@ func TestBGPIntegration_RecoveryClearsStaleFunctionRows(t *testing.T) {
 			collr.enableBGPIntegration()
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.failed}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)
@@ -355,7 +355,7 @@ func TestBGPIntegration_RecoveryClearsStaleFunctionRows(t *testing.T) {
 			assert.Equal(t, true, rows[0][findBGPPeerColIdx("Stale")])
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.recovered}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp = newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)
@@ -404,10 +404,10 @@ func TestBGPIntegration_MixedProfileBGPErrorRefreshesSuccessfulProfiles(t *testi
 			collr.enableBGPIntegration()
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
 
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.next}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)
@@ -461,11 +461,11 @@ func TestBGPIntegration_ExpiredFailedProfileDoesNotKeepStaleRowsWithFreshProfile
 			collr.bgp.setStaleAfter(time.Minute)
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.initial}
 
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 			markBGPCacheSourceLastUpdate(t, collr.bgp.peerCache, "profile-a.yaml", time.Now().Add(-2*time.Minute))
 
 			collr.ddSnmpColl = &mockDdSnmpCollector{pms: tc.next}
-			require.NoError(t, collr.collectSNMP(map[string]int64{}))
+			require.NoError(t, collr.collectSNMP(context.Background(), map[string]int64{}))
 
 			resp := newTestFuncBGPPeers(collr.bgp.peerCache).Handle(context.Background(), bgpPeersMethodID, nil)
 			assert.Equal(t, 200, resp.Status)

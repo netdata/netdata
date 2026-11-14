@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 )
 
 func TestCollectProfileStatsPreparation(t *testing.T) {
@@ -25,7 +26,7 @@ func TestCollectProfileStatsPreparation(t *testing.T) {
 	collector.Config = prepareV2Config()
 	collector.CreateVnode = false
 	collector.snmpProfiles = []*ddsnmp.Profile{{}}
-	collector.newSnmpClient = func() gosnmp.Handler { return handler }
+	collector.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) { return handler, nil }
 	profile := &ddsnmp.ProfileMetrics{
 		Source: "synthetic.yaml",
 	}

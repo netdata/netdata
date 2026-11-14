@@ -8,13 +8,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
@@ -37,9 +38,9 @@ func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
 				calls := 0
 				fail := false
 				noProfiles := false
-				coll.newSnmpClient = func() gosnmp.Handler {
+				coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 					calls++
-					client := snmpmock.NewMockHandler(gomock.NewController(t))
+					client := snmpmock.NewMockSession(gomock.NewController(t))
 					switch {
 					case fail:
 						expectTopologyRefreshSNMPClientConnectError(client, dev, errors.New("unreachable"))
@@ -49,7 +50,7 @@ func TestCollectorRefreshReclassificationWithinRegistration(t *testing.T) {
 					default:
 						expectTopologyRefreshSNMPClient(client, dev)
 					}
-					return client
+					return client, nil
 				}
 				coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile {
 					if noProfiles {
@@ -134,15 +135,15 @@ func TestCollectorRefreshChangedDeviceInformationReacquires(t *testing.T) {
 	store.Register("job-a", dev)
 	calls := 0
 	fail := false
-	coll.newSnmpClient = func() gosnmp.Handler {
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		calls++
-		client := snmpmock.NewMockHandler(gomock.NewController(t))
+		client := snmpmock.NewMockSession(gomock.NewController(t))
 		if fail {
 			expectTopologyRefreshSNMPClientConnectError(client, dev, errors.New("unreachable"))
 		} else {
 			expectTopologyRefreshSNMPClient(client, dev)
 		}
-		return client
+		return client, nil
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	coll.newDdSnmpColl = func(ddsnmpcollector.Config) ddCollector {
@@ -232,16 +233,16 @@ func TestCollectorRefreshReclassificationCancellationKeepsCommittedCut(t *testin
 	}
 	store.Register("job-a", dev)
 	calls := 0
-	coll.newSnmpClient = func() gosnmp.Handler {
+	coll.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		calls++
-		client := snmpmock.NewMockHandler(gomock.NewController(t))
+		client := snmpmock.NewMockSession(gomock.NewController(t))
 		if calls == 2 {
 			expectTopologyRefreshSNMPClientConnect(client, dev)
 			client.EXPECT().Close().Return(nil).AnyTimes()
 		} else {
 			expectTopologyRefreshSNMPClient(client, dev)
 		}
-		return client
+		return client, nil
 	}
 	coll.topologyProfiles = func(ddsnmp.DeviceConnectionInfo) []*ddsnmp.Profile { return []*ddsnmp.Profile{{}} }
 	ctx, cancel := context.WithCancel(context.Background())

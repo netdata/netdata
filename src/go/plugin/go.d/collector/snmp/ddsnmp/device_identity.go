@@ -3,6 +3,7 @@
 package ddsnmp
 
 import (
+	"context"
 	"errors"
 	"maps"
 	"strings"
@@ -14,7 +15,7 @@ import (
 
 // DeviceMetadataSource acquires profile metadata using caller-owned SNMP state.
 type DeviceMetadataSource interface {
-	CollectDeviceMetadata() (map[string]MetaTag, error)
+	CollectDeviceMetadata(ctx context.Context) (map[string]MetaTag, error)
 }
 
 // DeviceIdentityOptions supplies the address, identity overrides, and label policy.
@@ -39,6 +40,7 @@ type DeviceIdentity struct {
 // A nil source uses system identity alone. The caller owns transport, profile
 // selection, retries, and publication. Inputs are borrowed and are not modified.
 func AcquireDeviceIdentity(
+	ctx context.Context,
 	si *snmputils.SysInfo,
 	source DeviceMetadataSource,
 	opts DeviceIdentityOptions,
@@ -49,7 +51,7 @@ func AcquireDeviceIdentity(
 	var metadata map[string]MetaTag
 	if source != nil {
 		var err error
-		metadata, err = source.CollectDeviceMetadata()
+		metadata, err = source.CollectDeviceMetadata(ctx)
 		if err != nil {
 			return nil, err
 		}

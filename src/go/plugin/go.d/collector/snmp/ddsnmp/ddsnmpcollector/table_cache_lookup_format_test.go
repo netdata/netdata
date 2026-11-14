@@ -3,12 +3,13 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -32,33 +33,33 @@ func TestLookupFormatChangeInvalidatesCachedIdentity(t *testing.T) {
 		return prof
 	}
 	handler := &sourceTestHandler{
-		walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+		walk: func(oid string) ([]gosnmp.VarBind, error) {
 			switch oid {
 			case base + ".1":
-				return []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 10)}, nil
+				return []gosnmp.VarBind{createGauge32PDU(base+".1.1.65", 10)}, nil
 			case base + ".2":
-				return []gosnmp.SnmpPDU{createStringPDU(base+".2.1.9", "A"), createStringPDU(base+".2.2.9", "joined")}, nil
+				return []gosnmp.VarBind{createStringPDU(base+".2.1.9", "A"), createStringPDU(base+".2.2.9", "joined")}, nil
 			default:
 				t.Fatalf("unexpected walk %s", oid)
 				return nil, nil
 			}
 		},
-		get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+		get: func(oids []string) (*gosnmp.Message, error) {
 			require.Equal(t, []string{base + ".1.1.65"}, oids)
-			return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 11)}}, nil
+			return &gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(base+".1.1.65", 11)}}, nil
 		},
 	}
-	cached := newTableCollector(handler, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(io.Discard), false)
-	first, err := cached.collect(profile(""), &ddsnmp.CollectionStats{})
+	cached := newTableCollector(handler, requestConfig{version: gosnmp.Version2c, maxOIDs: 1}, 0, make(map[string]bool), newTableCache(time.Hour, 0), logger.NewWithWriter(io.Discard), false)
+	first, err := cached.collect(context.Background(), profile(""), &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, first, 1)
 	require.Empty(t, first[0].Tags)
 	stats := &ddsnmp.CollectionStats{}
-	changed, err := cached.collect(profile("octet_string"), stats)
+	changed, err := cached.collect(context.Background(), profile("octet_string"), stats)
 	require.NoError(t, err)
 	require.Len(t, changed, 1)
-	fresh := newTableCollector(handler, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(io.Discard), false)
-	reference, err := fresh.collect(profile("octet_string"), &ddsnmp.CollectionStats{})
+	fresh := newTableCollector(handler, requestConfig{version: gosnmp.Version2c, maxOIDs: 1}, 0, make(map[string]bool), newTableCache(0, 0), logger.NewWithWriter(io.Discard), false)
+	reference, err := fresh.collect(context.Background(), profile("octet_string"), &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	require.Len(t, reference, 1)
 	require.Equal(t, "joined", reference[0].Tags["name"])
@@ -67,7 +68,7 @@ func TestLookupFormatChangeInvalidatesCachedIdentity(t *testing.T) {
 	reloaded := profile("octet_string")
 	reloaded.Definition = reloaded.Definition.Clone()
 	stats = &ddsnmp.CollectionStats{}
-	repeated, err := cached.collect(reloaded, stats)
+	repeated, err := cached.collect(context.Background(), reloaded, stats)
 	require.NoError(t, err)
 	require.Len(t, repeated, 1)
 	require.Equal(t, reference[0].Tags, repeated[0].Tags)
@@ -97,25 +98,25 @@ func TestConcurrentLookupFormatsRetainCachedIdentity(t *testing.T) {
 	ddsnmp.FinalizeProfiles([]*ddsnmp.Profile{prof})
 	require.Len(t, prof.Definition.Metrics, 3)
 	handler := &sourceTestHandler{
-		walk: func(oid string) ([]gosnmp.SnmpPDU, error) {
+		walk: func(oid string) ([]gosnmp.VarBind, error) {
 			switch oid {
 			case base + ".1":
-				return []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 10)}, nil
+				return []gosnmp.VarBind{createGauge32PDU(base+".1.1.65", 10)}, nil
 			case base + ".2":
-				return []gosnmp.SnmpPDU{createStringPDU(base+".2.1.9", "A"), createStringPDU(base+".2.2.9", "joined")}, nil
+				return []gosnmp.VarBind{createStringPDU(base+".2.1.9", "A"), createStringPDU(base+".2.2.9", "joined")}, nil
 			default:
 				t.Fatal(oid)
 				return nil, nil
 			}
 		},
-		get: func(oids []string) (*gosnmp.SnmpPacket, error) {
+		get: func(oids []string) (*gosnmp.Message, error) {
 			require.Equal(t, []string{base + ".1.1.65"}, oids)
-			return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(base+".1.1.65", 11)}}, nil
+			return &gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(base+".1.1.65", 11)}}, nil
 		},
 	}
-	collector := New(Config{SnmpClient: handler, Profiles: []*ddsnmp.Profile{prof}, Log: logger.NewWithWriter(io.Discard)})
+	collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: handler, Profiles: []*ddsnmp.Profile{prof}, Log: logger.NewWithWriter(io.Discard)})
 	for cycle := 0; cycle < 2; cycle++ {
-		results, err := collector.Collect()
+		results, err := collector.Collect(context.Background())
 		require.NoError(t, err)
 		require.Len(t, results, 1)
 		require.Len(t, results[0].Metrics, 2)

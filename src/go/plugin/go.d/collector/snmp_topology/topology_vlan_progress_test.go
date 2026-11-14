@@ -6,14 +6,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmpdiag "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologydiag"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 func TestVLANPreClientCancellationDoesNotReportCollectionFailure(t *testing.T) {
@@ -28,11 +28,9 @@ func TestVLANPreClientCancellationDoesNotReportCollectionFailure(t *testing.T) {
 }
 
 func TestNonstandardPacketStatusSurvivesArchive(t *testing.T) {
-	handler := snmpmock.NewMockHandler(gomock.NewController(t))
-	handler.EXPECT().MaxOids().Return(20)
-	handler.EXPECT().Version().Return(gosnmp.Version2c)
-	handler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Error: gosnmp.SNMPError(255), ErrorIndex: 2}, nil)
-	_, err := snmputils.GetSysInfo(handler)
+	handler := snmpmock.NewMockSession(gomock.NewController(t))
+	handler.EXPECT().Get(gomock.Any(), gomock.Any()).Return(nil, &gosnmp.StatusError{Status: gosnmp.ErrorStatus(255), Index: 2})
+	_, err := snmputils.GetSysInfo(context.Background(), handler, gosnmp.Version2c, 20)
 	require.Error(t, err)
 	failure := snmputils.ClassifyFailure(err)
 	require.EqualValues(t, 255, failure.PacketStatus)

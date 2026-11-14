@@ -828,6 +828,10 @@ func (c *acquisitionProfileCollection) syncTableRoutes() {
 					route.FailureClass = AcquisitionFailureClassDependency
 				}
 				setAcquisitionRouteCounts(route, observation.rows, observation.values, observation.rejected)
+				// The walk's source operation keeps the error-status that ended it.
+				if request.route.partial() && route.Outcome == AcquisitionRouteOutcomeValues {
+					route.Outcome = AcquisitionRouteOutcomePartial
+				}
 			}
 		}
 	}

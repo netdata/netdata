@@ -20,6 +20,8 @@ const (
 	MaxReceiveBuffer        = 256 * 1024 * 1024
 	defaultDynamicEngineMax = 4096
 	minSNMPv3PassphraseLen  = 8
+	// RFC 3414 section 2.4: msgUserName is an SnmpAdminString of up to 32 octets.
+	maxSNMPv3UserNameLen    = 32
 	defaultRateLimitPPS     = 1000
 	defaultRateLimitMode    = "drop"
 	defaultRateLimitSources = 10000
@@ -211,6 +213,9 @@ func ValidateUSMUsers(users []USMUser, dynamic bool) error {
 	for i, user := range users {
 		if user.Username == "" {
 			return fmt.Errorf("usm_users[%d]: username is required", i)
+		}
+		if len(user.Username) > maxSNMPv3UserNameLen {
+			return fmt.Errorf("usm_users[%d]: username must be at most %d octets", i, maxSNMPv3UserNameLen)
 		}
 		if user.EngineID == "" {
 			if !dynamic {

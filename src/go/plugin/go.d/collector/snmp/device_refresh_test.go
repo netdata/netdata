@@ -10,9 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -20,38 +18,38 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 const refreshTestTable = "1.3.6.1.4.1.99999.100"
 
 // refreshTestDevice answers from source state independently of collector caches.
 type refreshTestDevice struct {
-	gosnmp.Handler
-	values     map[string]gosnmp.SnmpPDU
+	snmputils.Session
+	values     map[string]gosnmp.VarBind
 	probes     int
 	walks      int
 	closes     int
 	probeErr   error
-	probePDUs  []gosnmp.SnmpPDU
+	probePDUs  []gosnmp.VarBind
 	tableErr   error
 	failOID    string
 	omittedOID string
 }
 
-func (*refreshTestDevice) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*refreshTestDevice) MaxOids() int                { return 20 }
-func (d *refreshTestDevice) Close() error              { d.closes++; return nil }
-func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (d *refreshTestDevice) Close() error { d.closes++; return nil }
+func (d *refreshTestDevice) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	if slices.Equal(oids, sysInfoOIDsForTest()) {
 		d.probes++
 		if d.probeErr != nil {
 			return nil, d.probeErr
 		}
 		if d.probePDUs != nil {
-			return &gosnmp.SnmpPacket{
-				Variables: slices.Clone(d.probePDUs),
+			return &gosnmp.Message{
+				VarBinds: slices.Clone(d.probePDUs),
 			}, nil
 		}
 	}
@@ -65,43 +63,42 @@ func (d *refreshTestDevice) Get(oids []string) (*gosnmp.SnmpPacket, error) {
 			}
 		}
 	}
-	packet := &gosnmp.SnmpPacket{}
+	packet := &gosnmp.Message{}
 	for _, oid := range oids {
 		if oid == d.omittedOID {
 			continue
 		}
 		pdu, ok := d.values[strings.TrimPrefix(oid, ".")]
 		if !ok {
-			pdu = gosnmp.SnmpPDU{
-				Name: oid,
-				Type: gosnmp.NoSuchInstance,
+			pdu = gosnmp.VarBind{
+				Name:  oid,
+				Value: gosnmp.NoSuchInstanceValue(),
 			}
 		}
-		packet.Variables = append(packet.Variables, pdu)
+		packet.VarBinds = append(packet.VarBinds, pdu)
 	}
 	return packet, nil
 }
 
-func (d *refreshTestDevice) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
+func (d *refreshTestDevice) BulkWalkAll(ctx context.Context, root string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	d.walks++
 	if root == refreshTestTable && d.tableErr != nil {
-		return nil, d.tableErr
+		return nil, gosnmp.WalkEnd{}, d.tableErr
 	}
-	var pdus []gosnmp.SnmpPDU
+	var pdus []gosnmp.VarBind
 	for oid, pdu := range d.values {
 		if strings.HasPrefix(oid, root+".") && oid != d.omittedOID {
 			pdus = append(pdus, pdu)
 		}
 	}
-	slices.SortFunc(pdus, func(a, b gosnmp.SnmpPDU) int { return strings.Compare(a.Name, b.Name) })
-	return pdus, nil
+	slices.SortFunc(pdus, func(a, b gosnmp.VarBind) int { return strings.Compare(a.Name, b.Name) })
+	return pdus, gosnmp.WalkEnd{}, nil
 }
 
 func (d *refreshTestDevice) setText(oid, text string) {
-	d.values[oid] = gosnmp.SnmpPDU{
+	d.values[oid] = gosnmp.VarBind{
 		Name:  oid,
-		Type:  gosnmp.OctetString,
-		Value: []byte(text),
+		Value: gosnmp.OctetStringValue([]byte(text)),
 	}
 }
 
@@ -120,13 +117,12 @@ func newRefreshTestCollectorWithObjectID(
 ) (*Collector, *refreshTestDevice, *time.Time) {
 	t.Helper()
 	d := &refreshTestDevice{
-		values: map[string]gosnmp.SnmpPDU{
+		values: map[string]gosnmp.VarBind{
 			snmputils.OidSysObject: {
 				Name:  snmputils.OidSysObject,
-				Type:  gosnmp.ObjectIdentifier,
-				Value: sysObjectID,
+				Value: gosnmp.ObjectIdentifierValue(sysObjectID),
 			},
-			refreshTestTable + ".1.1": {Name: refreshTestTable + ".1.1", Type: gosnmp.Counter64, Value: uint64(42)},
+			refreshTestTable + ".1.1": {Name: refreshTestTable + ".1.1", Value: gosnmp.Counter64Value(42)},
 		},
 	}
 	d.setText(snmputils.OidSysName, "before")
@@ -137,7 +133,7 @@ func newRefreshTestCollectorWithObjectID(
 	c.Config = prepareV2Config()
 	c.CreateVnode = true
 	c.Ping.Enabled = false
-	c.snmpClient = d
+	c.snmpSession, c.snmpClient = d, d
 	c.snmpProfiles = []*ddsnmp.Profile{{
 		SourceFile: "refresh.yaml",
 		Definition: &ddprofiledefinition.ProfileDefinition{
@@ -201,18 +197,15 @@ func newSystemChangeTest(t *testing.T) *systemChangeTest {
 	t.Helper()
 	c, device, now := newRefreshTestCollectorWithObjectID(t, systemChangeTestObjectID)
 	st := &systemChangeTest{c: c, device: device, now: now}
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		st.clients++
-		client := snmpmock.NewMockHandler(gomock.NewController(t))
+		client := snmpmock.NewMockSession(gomock.NewController(t))
 		// Register the concrete protocol before the shared helper's permissive getter.
-		client.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
-		setMockClientSetterExpect(client)
-		client.EXPECT().Connect().Return(st.connectErr).AnyTimes()
+		client.EXPECT().Connect(gomock.Any()).Return(st.connectErr).AnyTimes()
 		client.EXPECT().Close().DoAndReturn(func() error { st.closes++; return nil }).AnyTimes()
-		client.EXPECT().MaxOids().Return(20).AnyTimes()
-		client.EXPECT().Get(gomock.Any()).DoAndReturn(device.Get).AnyTimes()
-		client.EXPECT().BulkWalkAll(gomock.Any()).DoAndReturn(device.BulkWalkAll).AnyTimes()
-		return client
+		client.EXPECT().Get(gomock.Any(), gomock.Any()).DoAndReturn(device.Get).AnyTimes()
+		client.EXPECT().BulkWalkAll(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(device.BulkWalkAll).AnyTimes()
+		return client, nil
 	}
 	var profiles []*ddsnmp.Profile
 	c.newDdSnmpColl = func(cfg ddsnmpcollector.Config) ddCollector {
@@ -338,10 +331,9 @@ func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T)
 	assert.Equal(t, 1, st.clients, "the rebuild retries on the next system check")
 
 	// A classification change during the retries makes the incumbent incompatible.
-	device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+	device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 		Name:  snmputils.OidSysObject,
-		Type:  gosnmp.ObjectIdentifier,
-		Value: replacementTestObjectID,
+		Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 	}
 	assert.Empty(t, st.collectAfter(time.Minute))
 	assert.True(t, c.rebuildPending)
@@ -366,9 +358,9 @@ func TestCollectorRuntimeSystemChangeRebuildFailureKeepsCollecting(t *testing.T)
 func TestCollectorRuntimeSystemChangeWithoutProfilesKeepsCollecting(t *testing.T) {
 	// The stock catalog has no profile for this sysObjectID.
 	c, device, now := newRefreshTestCollectorWithObjectID(t, "1.3.6.1.2.1.999")
-	c.newSnmpClient = func() gosnmp.Handler {
+	c.newSnmpClient = func(gosnmp.Config) (snmputils.Session, error) {
 		t.Fatal("no candidate connection is needed without profiles")
-		return nil
+		return nil, nil
 	}
 	require.NotEmpty(t, c.Collect(context.Background()))
 	dd := c.ddSnmpColl
@@ -459,10 +451,9 @@ func TestCollectorRuntimeUnpreparedDeviceIsNotPublished(t *testing.T) {
 		c, device := st.c, st.device
 		withModel(st)
 		require.NotEmpty(t, c.Collect(context.Background()))
-		device.values[snmputils.OidSysObject] = gosnmp.SnmpPDU{
+		device.values[snmputils.OidSysObject] = gosnmp.VarBind{
 			Name:  snmputils.OidSysObject,
-			Type:  gosnmp.ObjectIdentifier,
-			Value: replacementTestObjectID,
+			Value: gosnmp.ObjectIdentifierValue(replacementTestObjectID),
 		}
 		device.setText(snmputils.OidSysName, "replacement")
 		device.failOID = modelOID
@@ -508,9 +499,9 @@ func TestCollectorRuntimeUnansweredFieldsAreNotChanges(t *testing.T) {
 	st := newSystemChangeTest(t)
 	c, device := st.c, st.device
 	require.NotEmpty(t, c.Collect(context.Background()))
-	device.probePDUs = []gosnmp.SnmpPDU{
+	device.probePDUs = []gosnmp.VarBind{
 		device.values[snmputils.OidSysObject],
-		{Name: snmputils.OidSysName, Type: gosnmp.NoSuchInstance},
+		{Name: snmputils.OidSysName, Value: gosnmp.NoSuchInstanceValue()},
 	}
 	require.NotEmpty(t, st.collectAfter(time.Minute))
 	assert.Equal(t, 2, device.probes)
@@ -544,9 +535,9 @@ func TestCollectorRuntimeProbeFailureRetainsCollection(t *testing.T) {
 }
 
 func TestCollectorRuntimeUnusableObjectIDDoesNotRebuild(t *testing.T) {
-	for name, pdu := range map[string]gosnmp.SnmpPDU{
-		"missing": {Name: snmputils.OidSysObject, Type: gosnmp.NoSuchObject},
-		"invalid": {Name: snmputils.OidSysObject, Type: gosnmp.OctetString, Value: []byte("not-an-oid")},
+	for name, pdu := range map[string]gosnmp.VarBind{
+		"missing": {Name: snmputils.OidSysObject, Value: gosnmp.NoSuchObjectValue()},
+		"invalid": {Name: snmputils.OidSysObject, Value: gosnmp.OctetStringValue([]byte("not-an-oid"))},
 	} {
 		t.Run(name, func(t *testing.T) {
 			c, device, now := newRefreshTestCollector(t)
@@ -634,11 +625,11 @@ type refreshSelectiveFailure struct {
 	fail      bool
 }
 
-func (d *refreshSelectiveFailure) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (d *refreshSelectiveFailure) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	if d.fail && slices.Contains(oids, d.failedOID) {
 		return nil, errors.New("synthetic profile input timeout")
 	}
-	return d.refreshTestDevice.Get(oids)
+	return d.refreshTestDevice.Get(ctx, oids)
 }
 
 func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {
@@ -648,17 +639,16 @@ func TestCollectorRuntimeInitialProfileMetadataRecovery(t *testing.T) {
 			const inputOID = "1.3.6.1.4.1.99999.80.0"
 			const metricOID = "1.3.6.1.4.1.99999.81.0"
 			device.setText(inputOID, "recovered-"+field)
-			device.values[metricOID] = gosnmp.SnmpPDU{
+			device.values[metricOID] = gosnmp.VarBind{
 				Name:  metricOID,
-				Type:  gosnmp.Integer,
-				Value: 7,
+				Value: gosnmp.IntegerValue(7),
 			}
 			transport := &refreshSelectiveFailure{
 				refreshTestDevice: device,
 				failedOID:         inputOID,
 				fail:              true,
 			}
-			c.snmpClient = transport
+			c.snmpSession, c.snmpClient = transport, transport
 			c.snmpProfiles = append(c.snmpProfiles, &ddsnmp.Profile{
 				SourceFile: "recovering.yaml",
 				Definition: &ddprofiledefinition.ProfileDefinition{

@@ -9,7 +9,7 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 )
 
 // Failure contains only allowlisted diagnostic fields, never an error message.
@@ -51,15 +51,20 @@ func WithFailure(err error, operation, reason string) error {
 	return WithFailureDetail(err, f)
 }
 
-func WithPacketFailure(err error, operation string, packet *gosnmp.SnmpPacket) error {
+// WithPacketFailure annotates err with the error-status and index of the
+// agent's answer, status.
+func WithPacketFailure(err error, operation string, status *gosnmp.StatusError) error {
 	if err == nil {
 		return nil
 	}
-	if packet == nil || packet.Error == gosnmp.NoError {
+	if status == nil {
 		return WithFailure(err, operation, "")
 	}
-	f := Failure{Operation: operation, Reason: "packet_error", PacketStatus: uint8(packet.Error), ErrorIndex: uint32(packet.ErrorIndex)}
-	return WithFailureDetail(err, f)
+	return WithFailureDetail(err, packetFailure(operation, status))
+}
+
+func packetFailure(operation string, status *gosnmp.StatusError) Failure {
+	return Failure{Operation: operation, Reason: "packet_error", PacketStatus: uint8(status.Status), ErrorIndex: uint32(status.Index)}
 }
 
 func ClassifyFailure(err error) Failure {
@@ -69,6 +74,10 @@ func ClassifyFailure(err error) Failure {
 	var classified *classifiedFailure
 	if errors.As(err, &classified) {
 		return classified.failure
+	}
+	var status *gosnmp.StatusError
+	if errors.As(err, &status) {
+		return packetFailure("", status)
 	}
 	f := Failure{Reason: "unknown"}
 	switch {
@@ -104,6 +113,16 @@ func ClassifyFailure(err error) Failure {
 		f.Reason = "unknown_pdu_handler"
 	case errors.Is(err, gosnmp.ErrUnknownReportPDU):
 		f.Reason = "unknown_report"
+	case errors.Is(err, gosnmp.ErrNotInTimeWindow):
+		f.Reason = "not_in_time_window"
+	case errors.Is(err, gosnmp.ErrUnknownEngineID):
+		f.Reason = "unknown_engine_id"
+	case errors.Is(err, gosnmp.ErrASNParse):
+		f.Reason = "parse_error"
+	case errors.Is(err, gosnmp.ErrBadVersion):
+		f.Reason = "bad_version"
+	case errors.Is(err, gosnmp.ErrUnmatchedReply):
+		f.Reason = "unmatched_reply"
 	default:
 		var dns *net.DNSError
 		var network net.Error
@@ -146,6 +165,11 @@ func (f Failure) Valid() bool {
 		"invalid_message",
 		"unknown_pdu_handler",
 		"unknown_report",
+		"not_in_time_window",
+		"unknown_engine_id",
+		"parse_error",
+		"bad_version",
+		"unmatched_reply",
 		"dns",
 		"dns_not_found",
 		"timeout",
@@ -201,16 +225,13 @@ func WithFailureDetail(err error, f Failure) error {
 	return &classifiedFailure{cause: err, failure: f}
 }
 
-// ClassifyGetFailure preserves the decoded response status, including vendor or
-// malformed numeric values accepted by the SNMP decoder.
-func ClassifyGetFailure(packet *gosnmp.SnmpPacket, err error) Failure {
+// ClassifyGetFailure classifies a Get's outcome: the answer's error-status,
+// including vendor or malformed numeric values accepted by the SNMP decoder,
+// comes in a *gosnmp.StatusError, and a client fake may answer nothing.
+func ClassifyGetFailure(packet *gosnmp.Message, err error) Failure {
 	f := ClassifyFailure(err)
-	if err == nil {
-		if packet == nil {
-			f.Reason = "nil_response"
-		} else if packet.Error != gosnmp.NoError {
-			f = Failure{Reason: "packet_error", PacketStatus: uint8(packet.Error), ErrorIndex: uint32(packet.ErrorIndex)}
-		}
+	if err == nil && packet == nil {
+		f.Reason = "nil_response"
 	}
 	if f.Reason != "" {
 		f.Operation = "get"

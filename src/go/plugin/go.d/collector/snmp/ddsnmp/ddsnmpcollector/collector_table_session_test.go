@@ -3,6 +3,7 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"fmt"
 	"runtime"
 	"slices"
@@ -58,7 +59,7 @@ func TestTableCollectionSession_CanonicalTableRoutes(t *testing.T) {
 			if test.missingOwner {
 				missingOIDs[test.ownerOIDs[0]] = true
 			}
-			collector := newTableCollector(nil, missingOIDs, newTableCache(time.Hour, 0), logger.New(), false)
+			collector := newTableCollector(nil, testRequests, 0, missingOIDs, newTableCache(time.Hour, 0), logger.New(), false)
 
 			var profiles []*ddsnmp.Profile
 			for i, oid := range test.ownerOIDs {
@@ -106,7 +107,7 @@ func BenchmarkTableCollectorCachedAuxiliaryRoutingScaling(b *testing.B) {
 			}
 
 			profile := createTestProfile("cached-auxiliary-scaling.yaml", configs)
-			collector := newTableCollector(nil, make(map[string]bool), cache, logger.New(), false)
+			collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), cache, logger.New(), false)
 			identity := buildTableIdentity([]*ddsnmp.Profile{profile})
 
 			b.ReportAllocs()
@@ -115,8 +116,8 @@ func BenchmarkTableCollectorCachedAuxiliaryRoutingScaling(b *testing.B) {
 				var stats ddsnmp.CollectionStats
 				session := newTableCollectionSession(collector, identity)
 				scope := session.addScope(profile, tableSymbolModeValue, &stats)
-				session.resolve()
-				metrics, err := session.collectScope(scope)
+				session.resolve(context.Background())
+				metrics, err := session.collectScope(context.Background(), scope)
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -137,7 +138,7 @@ func BenchmarkTableCollectionSessionDisabledCacheRollback(b *testing.B) {
 			state: tableRouteFresh,
 		}
 	}
-	collector := newTableCollector(nil, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
+	collector := newTableCollector(nil, testRequests, 0, make(map[string]bool), newTableCache(0, 0), logger.New(), false)
 	session := newTableCollectionSession(collector, nil)
 
 	b.ReportAllocs()
