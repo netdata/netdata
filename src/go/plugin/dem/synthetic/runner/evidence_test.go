@@ -330,3 +330,135 @@ func TestStopContextRedactionAndSnapshotOwnership(t *testing.T) {
 	snapshot.evidence.StopContext.Path[0].Location.File = "changed"
 	assert.Equal(t, "journey.spec.ts", sink.snapshot().evidence.StopContext.Path[0].Location.File)
 }
+
+// TestEvidenceWireBounds accepts each failure_evidence.v1 budget at its limit
+// and invalidates the feature one past it. Text budgets count encoded JSON
+// bytes, quotes included.
+func TestEvidenceWireBounds(t *testing.T) {
+	text := func(n int) string { return strings.Repeat("x", n-2) }
+	ended := func(test synthetic.EvidenceTest) synthetic.EvidenceTest {
+		test.Status, test.ReportingComplete = "failed", true
+		return test
+	}
+	chain := func(n int) []synthetic.EvidenceStep {
+		path := make([]synthetic.EvidenceStep, n)
+		for i := range path {
+			path[i] = evidenceStep(fmt.Sprintf("p%d", i), "")
+			if i > 0 {
+				path[i].ParentID = path[i-1].ID
+			}
+		}
+		return path
+	}
+	// The serialized-step budget binds before the field budgets; size the
+	// message so the whole step encodes to exactly n bytes.
+	sizedStep := func(n int) synthetic.EvidenceStep {
+		step := evidenceStep(text(64), "")
+		duration := float64(maxSafeInteger)
+		step.TestID, step.ParentID, step.ParentOmitted = text(128), strings.Repeat("p", 62), true
+		step.Title, step.Category, step.Location.File = text(256), text(64), text(256)
+		step.Location.Line, step.Location.Column = maxSafeInteger, maxSafeInteger
+		step.DurationMS, step.TextTruncated = &duration, true
+		raw, err := json.Marshal(step)
+		require.NoError(t, err)
+		step.Message = strings.Repeat("m", n-len(raw)-len(`,"message":""`))
+		return step
+	}
+	// Every field budget at once still encodes a test far below the 1024-byte
+	// producer bound, so that bound never binds on its own.
+	maximalTest := func() synthetic.EvidenceTest {
+		test := evidenceStart(text(128))
+		duration := float64(maxSafeInteger)
+		test.Title, test.Location.File = text(256), text(256)
+		test.Location.Line, test.Location.Column = maxSafeInteger, maxSafeInteger
+		test.Status, test.ExpectedStatus, test.ReportingComplete = "skipped", "skipped", true
+		test.DurationMS, test.TextTruncated = &duration, true
+		return test
+	}
+	type testCase struct {
+		record, key string
+		value       any
+		want        string
+	}
+	cases := map[string]testCase{
+		"test ID at limit":         {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart(text(128)); return v }(), "partial"},
+		"test ID past limit":       {"test", "test", evidenceStart(text(129)), "invalid"},
+		"title at limit":           {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(256); return v }(), "partial"},
+		"title past limit":         {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(257); return v }(), "invalid"},
+		"source at limit":          {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(256); return v }(), "partial"},
+		"source past limit":        {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(257); return v }(), "invalid"},
+		"test at all budgets":      {"test", "test", maximalTest(), "partial"},
+		"step ID at limit":         {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep(text(64), ""); return v }(), "partial"},
+		"step ID past limit":       {"step", "step", evidenceStep(text(65), ""), "invalid"},
+		"parent ID at limit":       {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", text(64)); v.ParentOmitted = true; return v }(), "partial"},
+		"parent ID past limit":     {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", text(65)); v.ParentOmitted = true; return v }(), "invalid"},
+		"category at limit":        {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(64); return v }(), "partial"},
+		"category past limit":      {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(65); return v }(), "invalid"},
+		"step message at limit":    {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1024); return v }(), "partial"},
+		"step message past limit":  {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1025); return v }(), "invalid"},
+		"step bytes at limit":      {"step", "step", sizedStep(2048), "partial"},
+		"step bytes past limit":    {"step", "step", sizedStep(2049), "invalid"},
+		"path at limit":            {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(16)}, "partial"},
+		"path past limit":          {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(17)}, "invalid"},
+		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit)}, "partial"},
+		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit+1)}, "invalid"},
+		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", TextLimit)}, "partial"},
+		"omitted ancestors safe":   {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger}, "partial"},
+		"omitted ancestors unsafe": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger + 1}, "invalid"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			e, _ := consumeEvidence(t, evidenceInit, evidenceRecord(tc.record, tc.key, tc.value))
+			assert.Equal(t, tc.want, e.ReportingStatus())
+		})
+	}
+}
+
+// TestEvidenceOtherStepPoolTruncates checks the non-user step pool, which is
+// independent of the user-step pool covered above.
+func TestEvidenceOtherStepPoolTruncates(t *testing.T) {
+	lines := []string{evidenceInit}
+	for i := range evidenceOtherStepLimit + 1 {
+		step := evidenceStep(fmt.Sprintf("s%d", i), "")
+		step.Category = "pw:api"
+		lines = append(lines, evidenceRecord("step", "step", step))
+	}
+	e, _ := consumeEvidence(t, lines...)
+	assert.Equal(t, "partial", e.ReportingStatus())
+	assert.Equal(t, []string{"other_steps"}, e.Truncated)
+	assert.Len(t, e.Steps, evidenceOtherStepLimit)
+}
+
+// TestExtensionBodyBound applies the shared 32 KiB body limit to the
+// initialization and extension envelopes alike; exceeding it invalidates
+// every optional feature without failing the attempt.
+func TestExtensionBodyBound(t *testing.T) {
+	sized := func(prefix, pad, suffix string, n int) string {
+		return prefix + strings.Repeat(pad, n-len(prefix)-len(suffix)) + suffix
+	}
+	// Insignificant whitespace pads the frozen-key init body to an exact size.
+	initBody := func(n int) string {
+		return `{"type":"extension_init","extension_init":` + sized(`{"selected":["failure_evidence.v1","browser_summary.v1"]`, " ", `}`, n) + `}`
+	}
+	envelope := func(n int) string {
+		return `{"type":"extension","extension":` + sized(`{"feature":"failure_evidence.v1","data":{"record":"complete","pad":"`, "x", `"}}`, n) + `}`
+	}
+	for name, tc := range map[string]struct {
+		lines []string
+		want  string
+	}{
+		"envelope at limit":   {[]string{browserInit, envelope(32 << 10)}, "complete"},
+		"envelope past limit": {[]string{browserInit, envelope(32<<10 + 1)}, "invalid"},
+		"init at limit":       {[]string{initBody(32 << 10)}, "partial"},
+		"init past limit":     {[]string{initBody(32<<10 + 1)}, "invalid"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := consumeBrowser(t, tc.lines...)
+			require.NoError(t, s.err)
+			assert.Equal(t, tc.want, s.evidence.ReportingStatus())
+			if tc.want == "invalid" {
+				assert.Equal(t, "invalid", s.browser.ReportingStatus())
+			}
+		})
+	}
+}

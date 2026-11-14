@@ -222,3 +222,49 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 		}
 	}
 }
+
+// TestCaptureWireBounds accepts each capture_details.v1 field budget at its
+// limit and invalidates the feature one past it.
+func TestCaptureWireBounds(t *testing.T) {
+	text := func(n int) string { return strings.Repeat("x", n-2) }
+	withTitle := func(n int) map[string]any {
+		record := captureTest("t1", 1, 0)
+		value := record["test"].(synthetic.CaptureTest)
+		value.Title = text(n)
+		record["test"] = value
+		return record
+	}
+	for name, tc := range map[string]struct {
+		lines []string
+		want  string
+	}{
+		"test ID at limit":   {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0))}, "partial"},
+		"test ID past limit": {[]string{captureInit, captureRecord(captureTest(text(129), 1, 0))}, "invalid"},
+		"title at limit":     {[]string{captureInit, captureRecord(withTitle(256))}, "partial"},
+		"title past limit":   {[]string{captureInit, captureRecord(withTitle(257))}, "invalid"},
+		"link test ID limit": {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0)), captureRecord(captureLink("s1", text(128)))}, "partial"},
+		"counts at safe max": {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger, maxSafeInteger))}, "partial"},
+		"counts past safe":   {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger+1, 0))}, "invalid"},
+		"records at limit":   {captureRecords(captureDetailLimit), "partial"},
+		"records past limit": {captureRecords(captureDetailLimit + 1), "partial"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := consumeCaptures(t, tc.lines...)
+			assert.Equal(t, tc.want, s.captures.Reporting)
+		})
+	}
+	s := consumeCaptures(t, captureRecords(captureDetailLimit)...)
+	assert.False(t, s.captures.Truncated)
+	assert.Len(t, s.captures.Tests, captureDetailLimit)
+	s = consumeCaptures(t, captureRecords(captureDetailLimit+1)...)
+	assert.True(t, s.captures.Truncated, "detail past the record budget is truncated, not invalid")
+	assert.Len(t, s.captures.Tests, captureDetailLimit)
+}
+
+func captureRecords(n int) []string {
+	lines := []string{captureInit}
+	for i := range n {
+		lines = append(lines, captureRecord(captureTest(fmt.Sprintf("t%d", i), 1, 0)))
+	}
+	return lines
+}

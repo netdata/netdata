@@ -339,3 +339,241 @@ func TestBrowserEmbeddedURLSanitization(t *testing.T) {
 	assert.Equal(t, "failed https://example.com/assets response", browserSafeText("failed https://user:password@example.com/assets?tracking=private#fragment response", r))
 	assert.Equal(t, "https://example.com/ https://second.example.com/path", browserSafeText("https://first:pass@example.com/?q=1 https://second.example.com/path#private", r))
 }
+
+// browserStream builds cumulative browser_summary.v1 records that are valid
+// unless a case deliberately breaks one bound.
+type browserStream struct {
+	t     *testing.T
+	run   synthetic.BrowserAggregate
+	lines []string
+}
+
+func newBrowserStream(t *testing.T) *browserStream {
+	return &browserStream{t: t, lines: []string{browserInit}}
+}
+
+func (s *browserStream) observe(category string) {
+	switch category {
+	case "uncaught":
+		s.run.Counts.Uncaught++
+	case "console_error":
+		s.run.Counts.ConsoleError++
+	case "transport":
+		s.run.Counts.Transport++
+	case "http_error":
+		s.run.Counts.HTTPError++
+	}
+}
+
+func (s *browserStream) test(id string, samples ...synthetic.BrowserSample) *browserStream {
+	counts := synthetic.BrowserCounts{}
+	var ids []int
+	for i := range samples {
+		samples[i].TestID = id
+		ids = append(ids, samples[i].ID)
+		switch samples[i].Category {
+		case "uncaught":
+			counts.Uncaught++
+		case "console_error":
+			counts.ConsoleError++
+		case "transport":
+			counts.Transport++
+		case "http_error":
+			counts.HTTPError++
+		}
+		s.observe(samples[i].Category)
+	}
+	if counts == (synthetic.BrowserCounts{}) {
+		counts.Uncaught = 1
+		s.observe("uncaught")
+	}
+	s.run.Tests.Observed++
+	data := map[string]any{"record": "test", "run": s.run, "test": synthetic.BrowserTest{ID: id, State: "observed", Counts: &counts, SampleIDs: ids}}
+	if len(samples) > 0 {
+		data["samples"] = samples
+	}
+	s.lines = append(s.lines, browserRecord(s.t, data))
+	return s
+}
+
+func (s *browserStream) rows(n int) *browserStream {
+	for i := range n {
+		s.test(fmt.Sprintf("row%d", i))
+	}
+	return s
+}
+
+func (s *browserStream) late(sample synthetic.BrowserSample) *browserStream {
+	if sample.TestID == "" {
+		sample.TestID = fmt.Sprintf("late%d", sample.ID)
+	}
+	s.run.Tests.Observed++
+	s.observe(sample.Category)
+	s.lines = append(s.lines, browserRecord(s.t, map[string]any{"record": "late_sample", "run": s.run, "sample": sample}))
+	return s
+}
+
+func (s *browserStream) status() string {
+	return consumeBrowser(s.t, s.lines...).browser.ReportingStatus()
+}
+
+func uncaughtSample(id int, message string) synthetic.BrowserSample {
+	return synthetic.BrowserSample{ID: id, Category: "uncaught", Message: message}
+}
+
+func consoleSample(id int, args ...synthetic.BrowserArgument) synthetic.BrowserSample {
+	return synthetic.BrowserSample{ID: id, Category: "console_error", State: "resolved", Args: args}
+}
+
+func consoleTextSample(id int, text string) synthetic.BrowserSample {
+	return synthetic.BrowserSample{ID: id, Category: "console_error", State: "resolved", Text: &text}
+}
+
+func requestSample(id int, category, method, address, errText string) synthetic.BrowserSample {
+	sample := synthetic.BrowserSample{ID: id, Category: category, Method: method, URL: &address, Error: errText}
+	if category == "http_error" {
+		sample.Status = 500
+	}
+	return sample
+}
+
+func categorySamples(firstID, perCategory int) []synthetic.BrowserSample {
+	var samples []synthetic.BrowserSample
+	id := firstID
+	for _, category := range []string{"uncaught", "console_error", "transport", "http_error"} {
+		for range perCategory {
+			switch category {
+			case "uncaught":
+				samples = append(samples, uncaughtSample(id, fmt.Sprint(id)))
+			case "console_error":
+				samples = append(samples, consoleTextSample(id, fmt.Sprint(id)))
+			default:
+				samples = append(samples, requestSample(id, category, "GET", fmt.Sprintf("https://example.com/%d", id), ""))
+			}
+			id++
+		}
+	}
+	return samples
+}
+
+// TestBrowserWireBounds accepts each browser_summary.v1 quota at its limit and
+// invalidates the feature one past it.
+func TestBrowserWireBounds(t *testing.T) {
+	encodedText := func(n int) string { return strings.Repeat("x", n-2) }
+	address := func(n int) string {
+		return "https://example.com/" + strings.Repeat("x", n-2-len("https://example.com/"))
+	}
+	arg := synthetic.BrowserArgument{Value: "a"}
+	cases := map[string]struct {
+		stream func(*browserStream)
+		want   string
+	}{
+		"rows at limit":             {func(s *browserStream) { s.rows(64) }, "partial"},
+		"rows past limit":           {func(s *browserStream) { s.rows(65) }, "invalid"},
+		"record samples at limit":   {func(s *browserStream) { s.test("t", categorySamples(1, 3)...) }, "partial"},
+		"record samples past limit": {func(s *browserStream) { s.test("t", append(categorySamples(1, 3), uncaughtSample(13, "x"))...) }, "invalid"},
+		"record category at limit": {func(s *browserStream) {
+			s.test("t", uncaughtSample(1, "a"), uncaughtSample(2, "b"), uncaughtSample(3, "c"))
+		}, "partial"},
+		"record category past limit": {func(s *browserStream) {
+			s.test("t", uncaughtSample(1, "a"), uncaughtSample(2, "b"), uncaughtSample(3, "c"), uncaughtSample(4, "d"))
+		}, "invalid"},
+		"pool category at limit": {func(s *browserStream) { s.test("a", categorySamples(1, 3)...).test("b", uncaughtSample(13, "x")) }, "partial"},
+		"pool category past limit": {func(s *browserStream) {
+			s.test("a", categorySamples(1, 3)...).test("b", uncaughtSample(13, "x")).test("c", uncaughtSample(14, "y"))
+		}, "invalid"},
+		"pool full": {func(s *browserStream) { s.test("a", categorySamples(1, 3)...).test("b", categorySamples(13, 1)...) }, "partial"},
+		"pool past full": {func(s *browserStream) {
+			s.test("a", categorySamples(1, 3)...).test("b", categorySamples(13, 1)...).test("c", uncaughtSample(17, "x"))
+		}, "invalid"},
+		"sample ID at limit":   {func(s *browserStream) { s.test("t", uncaughtSample(16, "x")) }, "partial"},
+		"sample ID past limit": {func(s *browserStream) { s.test("t", uncaughtSample(17, "x")) }, "invalid"},
+		"sample ID zero":       {func(s *browserStream) { s.test("t", uncaughtSample(0, "x")) }, "invalid"},
+		"late samples at limit": {func(s *browserStream) {
+			s.rows(64)
+			for _, sample := range categorySamples(1, 1) {
+				s.late(sample)
+			}
+		}, "partial"},
+		"late samples past limit": {func(s *browserStream) {
+			s.rows(64)
+			for _, sample := range categorySamples(1, 1) {
+				s.late(sample)
+			}
+			s.late(uncaughtSample(5, "x"))
+		}, "invalid"},
+		"late sample before row cap":   {func(s *browserStream) { s.rows(63).late(uncaughtSample(1, "x")) }, "invalid"},
+		"late sample in used category": {func(s *browserStream) { s.test("a", uncaughtSample(1, "x")).rows(63).late(uncaughtSample(2, "y")) }, "invalid"},
+		"console args at limit":        {func(s *browserStream) { s.test("t", consoleSample(1, arg, arg, arg, arg)) }, "partial"},
+		"console args past limit":      {func(s *browserStream) { s.test("t", consoleSample(1, arg, arg, arg, arg, arg)) }, "invalid"},
+		"message at limit":             {func(s *browserStream) { s.test("t", uncaughtSample(1, encodedText(512))) }, "partial"},
+		"message past limit":           {func(s *browserStream) { s.test("t", uncaughtSample(1, encodedText(513))) }, "invalid"},
+		"console text at limit":        {func(s *browserStream) { s.test("t", consoleTextSample(1, encodedText(512))) }, "partial"},
+		"console text past limit":      {func(s *browserStream) { s.test("t", consoleTextSample(1, encodedText(513))) }, "invalid"},
+		"argument at limit": {func(s *browserStream) {
+			s.test("t", consoleSample(1, synthetic.BrowserArgument{Value: encodedText(512)}))
+		}, "partial"},
+		"argument past limit": {func(s *browserStream) {
+			s.test("t", consoleSample(1, synthetic.BrowserArgument{Value: encodedText(513)}))
+		}, "invalid"},
+		"URL at limit":   {func(s *browserStream) { s.test("t", requestSample(1, "http_error", "GET", address(256), "")) }, "partial"},
+		"URL past limit": {func(s *browserStream) { s.test("t", requestSample(1, "http_error", "GET", address(257), "")) }, "invalid"},
+		"error at limit": {func(s *browserStream) {
+			s.test("t", requestSample(1, "transport", "GET", "https://example.com/", encodedText(128)))
+		}, "partial"},
+		"error past limit": {func(s *browserStream) {
+			s.test("t", requestSample(1, "transport", "GET", "https://example.com/", encodedText(129)))
+		}, "invalid"},
+		"method at limit": {func(s *browserStream) {
+			s.test("t", requestSample(1, "transport", encodedText(16), "https://example.com/", ""))
+		}, "partial"},
+		"method past limit": {func(s *browserStream) {
+			s.test("t", requestSample(1, "transport", encodedText(17), "https://example.com/", ""))
+		}, "invalid"},
+		"row ID at limit":   {func(s *browserStream) { s.test(encodedText(128)) }, "partial"},
+		"row ID past limit": {func(s *browserStream) { s.test(encodedText(129)) }, "invalid"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			s := newBrowserStream(t)
+			tc.stream(s)
+			assert.Equal(t, tc.want, s.status())
+		})
+	}
+}
+
+// TestBrowserWireRejectsNullAndAmbiguousMembers pins encodings the producer
+// never emits but untyped decoding would read as zero or as an absent value.
+func TestBrowserWireRejectsNullAndAmbiguousMembers(t *testing.T) {
+	sample := func(fields string) string {
+		return `{"record":"test","run":{"tests":{"observed":1},"counts":{"console_error":1}},"test":{"id":"t","state":"observed","counts":{"console_error":1},"sample_ids":[1]},"samples":[{"test_id":"t","category":"console_error","state":"resolved",` + fields + `}]}`
+	}
+	cases := map[string]struct {
+		data string
+		want string
+	}{
+		"sparse aggregate":         {`{"record":"complete","run":{"tests":{},"counts":{}}}`, "complete"},
+		"null run counter":         {`{"record":"complete","run":{"tests":{},"counts":{"uncaught":null}}}`, "invalid"},
+		"null test counter":        {`{"record":"complete","run":{"tests":{"observed":null},"counts":{}}}`, "invalid"},
+		"null run tests":           {`{"record":"complete","run":{"tests":null,"counts":{}}}`, "invalid"},
+		"null run counts":          {`{"record":"complete","run":{"tests":{},"counts":null}}`, "invalid"},
+		"missing run counts":       {`{"record":"complete","run":{"tests":{}}}`, "invalid"},
+		"missing run":              {`{"record":"complete"}`, "invalid"},
+		"null row counter":         {`{"record":"test","run":{"tests":{"observed":1},"counts":{"uncaught":1}},"test":{"id":"t","state":"observed","counts":{"uncaught":null}}}`, "invalid"},
+		"null incomplete counts":   {`{"record":"test","run":{"tests":{"incomplete":1},"counts":{}},"test":{"id":"t","state":"incomplete","counts":null}}`, "partial"},
+		"valid sample":             {sample(`"id":1,"args":[{"value":null},{"omitted":"object"}]`), "partial"},
+		"null sample ID":           {sample(`"id":null,"args":[{"value":1}]`), "invalid"},
+		"null args omitted":        {sample(`"id":1,"args":[{"value":1}],"args_omitted":null`), "invalid"},
+		"null status":              {sample(`"id":1,"args":[{"value":1}],"status":null`), "invalid"},
+		"argument without members": {sample(`"id":1,"args":[{}]`), "invalid"},
+		"argument with both":       {sample(`"id":1,"args":[{"value":1,"omitted":"object"}]`), "invalid"},
+		"null omission":            {sample(`"id":1,"args":[{"omitted":null}]`), "invalid"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			line := `{"type":"extension","extension":{"feature":"browser_summary.v1","data":` + tc.data + `}}`
+			s := consumeBrowser(t, browserInit, line)
+			assert.Equal(t, tc.want, s.browser.ReportingStatus())
+		})
+	}
+}
