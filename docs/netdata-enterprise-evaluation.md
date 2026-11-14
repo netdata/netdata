@@ -97,16 +97,7 @@ For high availability configurations, see [Clustering and High Availability of N
 
 ### Netdata Cloud On-Prem
 
-For organizations requiring complete control over their monitoring infrastructure, Netdata Cloud On-Prem provides the full control plane within the datacenter (air-gapped).
-
-Netdata Cloud On-Prem runs on Kubernetes:
-
-| Monitored Nodes | CPU Cores | Memory | Storage | Notes                  |
-|-----------------|-----------|--------|---------|------------------------|
-| 2,000 nodes     | 20 cores  | 45 GB  | 500 GB  | Minimal K8s cluster    |
-| 10,000 nodes    | 100 cores | 200 GB | 2 TB    | Multi-node K8s cluster |
-
-For more information see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) and [Installation Guide](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/installation.md).
+For organizations that need the control plane inside their own network, including air-gapped environments, Netdata Cloud On-Prem runs the full Netdata Cloud on your Kubernetes cluster, installed and upgraded with Helm. A single-host installer gets a proof of concept running without Kubernetes. See [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) for sizing and installation.
 
 ## Rollout / Lifecycle Management
 
@@ -122,12 +113,6 @@ Netdata users have multiple options to deploy Netdata on their systems. Netdata 
 **Note**: Netdata Parents use the same software as Agents with different configuration. All deployment methods apply to both.
 
 For more information about Netdata Agents & Parents installation methods see [Netdata Agent Installation](/packaging/installer/README.md).
-
-### Netdata Cloud On-Prem Installation & Updates
-
-Installation and updates for Netdata Cloud On-Prem are performed manually using Helm.
-
-For more information see [Netdata Cloud On-Prem Installation](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/installation.md).
 
 ### Updates and Backwards Compatibility
 
