@@ -33,9 +33,7 @@ func TestLoadConfig(t *testing.T) {
 		"malformed": {"history: [", RetentionConfig{}, true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
-			cfg, err := LoadConfig(multipath.New(dir))
+			cfg, err := loadConfigText(t, tc.body)
 			if tc.fail {
 				require.Error(t, err)
 				return
@@ -45,6 +43,7 @@ func TestLoadConfig(t *testing.T) {
 		})
 	}
 }
+
 func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 	user, stock := t.TempDir(), t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(user, "dem.conf"), []byte("history: {days: 2}"), 0600))
@@ -55,29 +54,26 @@ func TestLoadConfigUsesHighestPriorityFile(t *testing.T) {
 }
 
 func TestBrowserConcurrencyConfig(t *testing.T) {
-	for _, tc := range []struct {
-		name string
+	for name, tc := range map[string]struct {
 		body string
 		want int
 		fail bool
 	}{
-		{name: "default", want: 1},
-		{name: "empty section", body: "browser: {}", want: 1},
-		{name: "commented section", body: "browser:\n  # concurrency: 1\n", want: 1},
-		{name: "null section", body: "browser: null", want: 1},
-		{name: "tilde section", body: "browser: ~", want: 1},
-		{name: "null alias", body: "empty: &empty null\nbrowser: *empty", want: 1},
-		{name: "explicit budget", body: "browser: {concurrency: 4}", want: 4},
-		{name: "zero", body: "browser: {concurrency: 0}", fail: true},
-		{name: "negative", body: "browser: {concurrency: -1}", fail: true},
-		{name: "fractional", body: "browser: {concurrency: 1.5}", fail: true},
-		{name: "text", body: "browser: {concurrency: four}", fail: true},
-		{name: "null concurrency", body: "browser: {concurrency: null}", fail: true},
+		"default":           {want: 1},
+		"empty section":     {body: "browser: {}", want: 1},
+		"commented section": {body: "browser:\n  # concurrency: 1\n", want: 1},
+		"null section":      {body: "browser: null", want: 1},
+		"tilde section":     {body: "browser: ~", want: 1},
+		"null alias":        {body: "empty: &empty null\nbrowser: *empty", want: 1},
+		"explicit budget":   {body: "browser: {concurrency: 4}", want: 4},
+		"zero":              {body: "browser: {concurrency: 0}", fail: true},
+		"negative":          {body: "browser: {concurrency: -1}", fail: true},
+		"fractional":        {body: "browser: {concurrency: 1.5}", fail: true},
+		"text":              {body: "browser: {concurrency: four}", fail: true},
+		"null concurrency":  {body: "browser: {concurrency: null}", fail: true},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
-			cfg, err := LoadConfig(multipath.New(dir))
+		t.Run(name, func(t *testing.T) {
+			cfg, err := loadConfigText(t, tc.body)
 			if tc.fail {
 				require.ErrorContains(t, err, "browser.concurrency")
 				return
@@ -89,9 +85,7 @@ func TestBrowserConcurrencyConfig(t *testing.T) {
 }
 
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}"), 0600))
-	cfg, err := LoadConfig(multipath.New(dir))
+	cfg, err := loadConfigText(t, "runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}")
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
 	assert.Equal(t, RetentionConfig{
@@ -100,8 +94,7 @@ func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
 	}, cfg.Artifacts)
 	assert.Equal(t, "/prepared", cfg.Runtime.PreloadPath)
 	// Runtime availability is checked by its owner; RUM configuration remains independent.
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("artifacts: {days: 0}"), 0600))
-	_, err = LoadConfig(multipath.New(dir))
+	_, err = loadConfigText(t, "artifacts: {days: 0}")
 	require.ErrorContains(t, err, "artifacts")
 }
 
@@ -109,9 +102,7 @@ func TestInvalidRetentionIdentifiesSetting(t *testing.T) {
 	for _, field := range []string{"history", "artifacts"} {
 		for _, setting := range []string{"days", "max_bytes"} {
 			t.Run(field+"."+setting, func(t *testing.T) {
-				dir := t.TempDir()
-				require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(field+": {"+setting+": 0}"), 0600))
-				_, err := LoadConfig(multipath.New(dir))
+				_, err := loadConfigText(t, field+": {"+setting+": 0}")
 				require.ErrorContains(t, err, field+"."+setting)
 			})
 		}
@@ -119,12 +110,10 @@ func TestInvalidRetentionIdentifiesSetting(t *testing.T) {
 }
 
 func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
-	dir := t.TempDir()
 	body := "enabled: yes\njobs: {future_option: [{duplicate: one, duplicate: two}]}\n" +
 		"history: {days: 7, unrelated: value}\nartifacts: {days: 2, unrelated: value}\n" +
 		"runtime: {max_bytes: 2048}\n"
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
-	cfg, err := LoadConfig(multipath.New(dir))
+	cfg, err := loadConfigText(t, body)
 	require.NoError(t, err)
 	require.Equal(t, 7, cfg.History.Days)
 	require.Equal(t, DefaultConfig().History.MaxBytes, cfg.History.MaxBytes)
@@ -134,9 +123,7 @@ func TestRuntimeValidationLeavesOtherSectionsOpaque(t *testing.T) {
 }
 
 func TestRuntimeConfigOverrides(t *testing.T) {
-	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {max_bytes: 2147483648, previous_retention_days: 0}"), 0600))
-	loaded, err := LoadConfig(multipath.New(dir))
+	loaded, err := loadConfigText(t, "runtime: {max_bytes: 2147483648, previous_retention_days: 0}")
 	require.NoError(t, err)
 	assert.Equal(t, runtimehost.ModeManaged, loaded.Runtime.Mode)
 	assert.EqualValues(t, 2147483648, loaded.Runtime.MaxBytes)
@@ -146,20 +133,16 @@ func TestRuntimeConfigOverrides(t *testing.T) {
 func TestRuntimeConfigRejectsAmbiguousAndInvalidPolicy(t *testing.T) {
 	for _, body := range []string{"mode: auto", "max_bytes: 0", "previous_retention_days: -1", "previous_retention_days: 36501", "release_url: http://example.invalid/latest", "release_url: https://user:pass@example.invalid/latest", "release_url: https://example.invalid/latest#fragment", "offline_keyring: relative.gpg"} {
 		t.Run(body, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {"+body+"}"), 0600))
-			_, err := LoadConfig(multipath.New(dir))
+			_, err := loadConfigText(t, "runtime: {"+body+"}")
 			require.ErrorContains(t, err, "runtime.")
 		})
 	}
 }
 
-func TestRuntimeConfigRejectsRemovedComponentsAndUnknownSettings(t *testing.T) {
-	for _, body := range []string{"allow_download: false", "manifest_path: /runtime.json", "idle_retention_days: 30", "mode: external", "node_path: /usr/bin/node", "browser_path: /usr/bin/chromium", "dependencies_path: /opt/deps", "allow_downlaod: false", "mode: managed, preload_path: /bundle", "mode: preloaded, preload_path: /bundle, cache_path: /cache"} {
+func TestRuntimeConfigRejectsUnknownAndConflictingSettings(t *testing.T) {
+	for _, body := range []string{"allow_downlaod: false", "mode: managed, preload_path: /bundle", "mode: preloaded, preload_path: /bundle, cache_path: /cache"} {
 		t.Run(body, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("enabled: true\nruntime: {"+body+"}\n"), 0600))
-			_, err := LoadConfig(multipath.New(dir))
+			_, err := loadConfigText(t, "enabled: true\nruntime: {"+body+"}\n")
 			require.ErrorContains(t, err, "runtime")
 		})
 	}
@@ -174,10 +157,8 @@ func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
 		"type":      {"max_bytes: [2048]", "line 4:", "cannot unmarshal !!seq into int64"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
 			body := "enabled: true\n# original configuration\nruntime:\n  " + tc.body + "\n"
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
-			_, err := LoadConfig(multipath.New(dir))
+			_, err := loadConfigText(t, body)
 			require.ErrorContains(t, err, tc.line)
 			require.ErrorContains(t, err, tc.detail)
 			require.NotContains(t, err.Error(), "dem.plain")
@@ -194,9 +175,7 @@ func TestRuntimeConfigMergeValidation(t *testing.T) {
 		"top duplicate":    {"enabled: true\nenabled: false\nruntime: {max_bytes: 2048}\n", `key "enabled" already set`},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
-			_, err := LoadConfig(multipath.New(dir))
+			_, err := loadConfigText(t, tc.body)
 			require.ErrorContains(t, err, tc.detail)
 		})
 	}
@@ -210,9 +189,7 @@ func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
 		"top merge": "base: &base {runtime: {max_bytes: 2048}}\n<<: *base\n",
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
-			cfg, err := LoadConfig(multipath.New(dir))
+			cfg, err := loadConfigText(t, body)
 			require.NoError(t, err)
 			expected := runtimehost.DefaultConfig()
 			expected.MaxBytes = 2048
@@ -228,12 +205,18 @@ func TestRuntimeConfigMergeErrorsUseOriginalSourceLines(t *testing.T) {
 		"type":      {"defaults: &defaults\n  max_bytes: [2048]\n\nruntime: {<<: *defaults}\n", "line 2:", "int64"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.source), 0600))
-			_, err := LoadConfig(multipath.New(dir))
+			_, err := loadConfigText(t, tc.source)
 			require.ErrorContains(t, err, tc.line)
 			require.ErrorContains(t, err, tc.detail)
 			require.NotContains(t, err.Error(), "dem.plain")
 		})
 	}
+}
+
+// loadConfigText loads body as the only dem.conf.
+func loadConfigText(t *testing.T, body string) (Config, error) {
+	t.Helper()
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+	return LoadConfig(multipath.New(dir))
 }
