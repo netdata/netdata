@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts_test
 
 import (
@@ -6,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -20,6 +22,7 @@ import (
 )
 
 var run1 = fixtureRunID()
+
 var run2 = fixtureRunID()
 
 func fixtureRunID() string {
@@ -49,6 +52,7 @@ func store(t *testing.T) (*artifacts.Store, string) {
 	})
 	return s, root
 }
+
 func captured(t *testing.T, s *artifacts.Store, id string, content []byte) (string, synthetic.Capture) {
 	t.Helper()
 	work, err := s.Begin(id, "lighthouse:test", "")
@@ -62,6 +66,7 @@ func captured(t *testing.T, s *artifacts.Store, id string, content []byte) (stri
 		Path: "output/report.html",
 	}
 }
+
 func TestPublishFetchAndRestart(t *testing.T) {
 	ctx := context.Background()
 	s, root := store(t)
@@ -95,6 +100,7 @@ func TestPublishFetchAndRestart(t *testing.T) {
 	_, err = reopened.Begin(run1, "lighthouse:test", "")
 	assert.ErrorIs(t, err, artifacts.ErrExists)
 }
+
 func TestStrictCapturePathsAndKinds(t *testing.T) {
 	for _, which := range []string{"escape", "absolute", "clean", "link-file", "link-parent", "directory", "wrong-mime", "wrong-kind", "bad-png", "duplicate"} {
 		t.Run(which, func(t *testing.T) {
@@ -146,6 +152,7 @@ func TestStrictCapturePathsAndKinds(t *testing.T) {
 		})
 	}
 }
+
 func TestPNGCapture(t *testing.T) {
 	s, _ := store(t)
 	work, err := s.Begin(run1, "lighthouse:test", "")
@@ -164,6 +171,7 @@ func TestPNGCapture(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, png, got)
 }
+
 func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
 	for _, trace := range []bool{false, true} {
 		kind, mime, payload := synthetic.ScreenshotCapture, "image/png", png
@@ -297,6 +305,7 @@ func TestFetchRejectsCorruption(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "manifest")
 }
+
 func TestRetentionAndProtectedWork(t *testing.T) {
 	s, root := store(t)
 	_, c := captured(t, s, run1, []byte("retained report"))
@@ -325,6 +334,7 @@ func TestRetentionAndProtectedWork(t *testing.T) {
 	_, _, err = reopened.Fetch(context.Background(), "lighthouse:test", run1, c.ID)
 	assert.ErrorIs(t, err, artifacts.ErrNotFound)
 }
+
 func TestDrainedFailedCaptureCleanupRetries(t *testing.T) {
 	s, root := store(t)
 	work, c := captured(t, s, run1, []byte("invalid candidate"))
@@ -373,6 +383,7 @@ func TestFetchExpiryRace(t *testing.T) {
 	go func() { defer wg.Done(); _, err := s.Enforce(context.Background(), 7, 1); assert.NoError(t, err) }()
 	wg.Wait()
 }
+
 func TestOwnershipIDsAndClose(t *testing.T) {
 	s, root := store(t)
 	other, err := artifacts.Open(root)
@@ -399,6 +410,7 @@ func TestOwnershipIDsAndClose(t *testing.T) {
 	_, err = s.Begin(run2, "lighthouse:test", "")
 	assert.ErrorIs(t, err, artifacts.ErrClosed)
 }
+
 func TestTemporaryClosePreservesUnverifiedWork(t *testing.T) {
 	s, err := artifacts.Open("")
 	require.NoError(t, err)
@@ -453,6 +465,7 @@ func TestInvalidDrainMarkerCannotAuthorizeCleanup(t *testing.T) {
 	_, err = os.Stat(work)
 	assert.NoError(t, err)
 }
+
 func TestFetchExactSizeBoundary(t *testing.T) {
 	for _, trace := range []bool{false, true} {
 		name, signature := "report", ""
@@ -493,6 +506,7 @@ func TestShortAliasKeepsLongPrivateWork(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "long-path report", string(raw))
 }
+
 func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
 	s, root := store(t)
 	alias := filepath.Join("/tmp", "nd-dem-"+run1)
@@ -509,6 +523,7 @@ func TestExistingAliasIsNeverAdoptedOrRemoved(t *testing.T) {
 	_, err = os.Stat(filepath.Join(root, "work", run1))
 	assert.ErrorIs(t, err, os.ErrNotExist, "failed setup must remove its new empty work")
 }
+
 func TestMismatchedAliasBlocksDrainedCleanup(t *testing.T) {
 	s, root := store(t)
 	work, c := captured(t, s, run1, []byte("candidate"))
@@ -719,4 +734,93 @@ func TestDiscoveryKeepsUnclassifiedPublishedDataVisible(t *testing.T) {
 	assert.True(t, reopened.HasObservedPublished())
 	_, err = reopened.Manifest(t.Context(), "lighthouse:test", run1)
 	require.Error(t, err, "discovery must not bypass manifest validation")
+}
+
+func TestArtifactAssociationSurvivesRestart(t *testing.T) {
+	for _, trace := range []bool{false, true} {
+		kind, mime, payload := synthetic.ScreenshotCapture, "image/png", png
+		if trace {
+			kind, mime, payload = synthetic.TraceCapture, "application/zip", []byte("PK\x03\x04fixture")
+		}
+		t.Run(string(kind), func(t *testing.T) {
+			s, root := store(t)
+			work, c := captured(t, s, run1, payload)
+			c.Kind, c.MIME = kind, mime
+			c.Test = synthetic.ArtifactTest{ID: "test1", Title: "Checkout", TextTruncated: true}
+			_, err := s.Finalize(t.Context(), run1, []synthetic.Capture{c})
+			require.NoError(t, err)
+			_, err = os.Stat(work)
+			assert.ErrorIs(t, err, os.ErrNotExist)
+			require.NoError(t, s.Close())
+			s, err = artifacts.Open(root)
+			require.NoError(t, err)
+			defer s.Close()
+			meta, body, err := s.Fetch(t.Context(), "lighthouse:test", run1, c.ID)
+			require.NoError(t, err)
+			assert.Equal(t, c.Test, meta.Test)
+			assert.Equal(t, payload, body)
+			filename := filepath.Join(root, "runs", run1, "manifest.json")
+			raw, err := os.ReadFile(filename)
+			require.NoError(t, err)
+			var manifest map[string]any
+			require.NoError(t, json.Unmarshal(raw, &manifest))
+			assert.Equal(t, float64(2), manifest["version"])
+			// Unassociated captures are written without test metadata.
+			entry := manifest["artifacts"].([]any)[0].(map[string]any)
+			delete(entry, "test")
+			raw, err = json.Marshal(manifest)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filename, raw, 0600))
+			metadata, _, err := s.Fetch(t.Context(), "lighthouse:test", run1, c.ID)
+			require.NoError(t, err)
+			assert.Empty(t, metadata.Test.ID)
+			entry["bytes"] = "corrupt authoritative metadata"
+			raw, err = json.Marshal(manifest)
+			require.NoError(t, err)
+			require.NoError(t, os.WriteFile(filename, raw, 0600))
+			_, _, err = s.Fetch(t.Context(), "lighthouse:test", run1, c.ID)
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestCatalogueSnapshotsSiteWithoutChangingOwnership(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	s, err := artifacts.Open(root)
+	require.NoError(t, err)
+	ids := []string{fixtureRunID(), fixtureRunID(), fixtureRunID()}
+	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
+		work, err := s.Begin(ids[i], "lighthouse:home", site)
+		require.NoError(t, err)
+		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report"), []byte("<html>report</html>"), 0600))
+		_, err = s.Finalize(ctx, ids[i], []synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report"}})
+		require.NoError(t, err)
+	}
+	require.NoError(t, s.Close())
+	s, err = artifacts.Open(root)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, s.Close()) })
+	filtered, err := s.Catalogue(ctx, artifacts.Filter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "lighthouse:home", Limit: 1})
+	require.NoError(t, err)
+	require.Len(t, filtered.Sets, 1)
+	assert.Equal(t, ids[0], filtered.Sets[0].RunID)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", filtered.Sets[0].VnodeGUID)
+	mismatch, err := s.Catalogue(ctx, artifacts.Filter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "journey:home", Limit: 10})
+	require.NoError(t, err)
+	assert.Empty(t, mismatch.Sets)
+	all, err := s.Catalogue(ctx, artifacts.Filter{Limit: 10})
+	require.NoError(t, err)
+	require.Len(t, all.Sets, 3)
+	assert.Equal(t, 3, all.Status.Inventory.KnownSets)
+	assert.Equal(t, 1, all.Status.Inventory.KnownJobs)
+	manifest, err := s.Manifest(ctx, "lighthouse:home", ids[2])
+	require.NoError(t, err)
+	assert.Empty(t, manifest.VnodeGUID)
+	_, _, err = s.Fetch(ctx, "journey:home", ids[0], "report")
+	assert.ErrorIs(t, err, artifacts.ErrOwnerMismatch)
+	_, body, err := s.Fetch(ctx, "lighthouse:home", ids[0], "report")
+	require.NoError(t, err)
+	assert.Equal(t, "<html>report</html>", string(body))
 }

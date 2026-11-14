@@ -14,16 +14,18 @@ import (
 	"testing"
 	"time"
 
-	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
-
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	functions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
+	history "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	registry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -50,10 +52,12 @@ func (s *source) Snapshot(now time.Time) []syntheticregistry.Job {
 	}
 	return s.hub.Snapshot(now)
 }
+
 func (s *source) QueryRuns(ctx context.Context, f synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
 	s.filter = f
 	return s.page, s.queryErr
 }
+
 func (s *source) GetRun(ctx context.Context, jobID, runID string) (model.Run, error) {
 	s.getCalls++
 	r, ok := s.history[jobID+"/"+runID]
@@ -62,18 +66,21 @@ func (s *source) GetRun(ctx context.Context, jobID, runID string) (model.Run, er
 	}
 	return r, nil
 }
+
 func (s *source) Manifest(ctx context.Context, jobID, runID string) (artifacts.Manifest, error) {
 	if s.artifacts == nil {
 		return artifacts.Manifest{}, artifacts.ErrNotFound
 	}
 	return s.artifacts.Manifest(ctx, jobID, runID)
 }
+
 func (s *source) Fetch(ctx context.Context, jobID, runID, artifactID string) (model.Artifact, []byte, error) {
 	if s.fetchErr != nil {
 		return model.Artifact{}, nil, s.fetchErr
 	}
 	return s.artifacts.Fetch(ctx, jobID, runID, artifactID)
 }
+
 func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
 		return syntheticfunctions.New(nil, nil)
@@ -104,6 +111,7 @@ func call(h *syntheticfunctions.Handler, method string, args ...string) *funcapi
 		Permissions: "0x7b",
 	})
 }
+
 func responseData(t *testing.T, r *funcapi.FunctionResponse) [][]any {
 	t.Helper()
 	require.NotNil(t, r.RawResponse, r.Message)
@@ -112,6 +120,7 @@ func responseData(t *testing.T, r *funcapi.FunctionResponse) [][]any {
 	require.True(t, ok)
 	return rows
 }
+
 func rowValues(t *testing.T, r *funcapi.FunctionResponse, row []any) map[string]any {
 	t.Helper()
 	columns := r.RawResponse["columns"].(map[string]any)
@@ -123,6 +132,7 @@ func rowValues(t *testing.T, r *funcapi.FunctionResponse, row []any) map[string]
 	}
 	return out
 }
+
 func validate(t *testing.T, r *funcapi.FunctionResponse) {
 	t.Helper()
 	raw, err := os.ReadFile("../../../../../plugins.d/FUNCTION_UI_SCHEMA.json")
@@ -693,4 +703,123 @@ func TestTerminationReasonIsIndependentOfFirstError(t *testing.T) {
 	detail := got.RawResponse["run"].(map[string]any)
 	assert.Equal(t, run.TerminationReason, detail["termination_reason"])
 	assert.Equal(t, run.Error, detail["error"])
+}
+
+func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
+	for _, rich := range []bool{false, true} {
+		name := "without optional outputs"
+		if rich {
+			name = "rich history"
+		}
+		t.Run(name, func(t *testing.T) {
+			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step", Title: "observed step"}}}
+			if rich {
+				run.Captures = &model.CaptureReport{Reporting: "partial", Unpublished: []model.CaptureOmission{{ID: "s1", Reason: "not_in_final_report"}}}
+				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Tests: model.BrowserTestCounts{Observed: 1}, Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
+				run.FailureEvidence = &model.FailureEvidence{
+					Availability: "supported", Truncated: []string{"user_steps"},
+					Steps:        []model.EvidenceStep{{ID: "s1", TestID: "t", Title: "pending submit", State: "running"}},
+					FirstFailure: &model.FailureDetail{Test: model.EvidenceTest{ID: "t", Title: "checkout", Status: "failed", ExpectedStatus: "passed"}, Message: "expected receipt", PathIncomplete: true},
+					StopContext:  &model.FailureDetail{Test: model.EvidenceTest{ID: "later", Title: "login", Status: "interrupted", ExpectedStatus: "passed"}, PathIncomplete: true},
+				}
+			}
+			src := &source{history: map[string]model.Run{"journey:a/r": run}, page: synthetichistory.RunPage{Runs: []model.Run{run}}}
+			h := newHandler(src)
+			detailResponse := call(h, "synthetics-run", "job_id:journey:a", "run_id:r")
+			rows := responseData(t, detailResponse)
+			require.Len(t, rows, 1)
+			assert.Equal(t, "observed step", rowValues(t, detailResponse, rows[0])["title"])
+			detail := detailResponse.RawResponse["run"].(map[string]any)
+			status := "not_recorded"
+			if rich {
+				status = "partial"
+			}
+			assert.Equal(t, map[string]any{
+				"id": "r", "job_id": "journey:a", "kind": model.Journey,
+				"vnode_guid": "", "name": "", "target": "",
+				"started_us": nil, "scheduled_us": nil, "queued_us": nil, "completed_us": nil,
+				"duration_ms": nil, "outcome": model.Timeout, "termination_reason": model.ExecutionBudget,
+				"error": "core error", "tests": (*model.TestCounts)(nil),
+				"capture_state": model.CaptureState(""), "artifacts": []model.Artifact(nil), "history_error": "",
+				"captures":       run.Captures,
+				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
+				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,
+				"browser_summary": run.BrowserSummary, "browser_summary_status": status,
+			}, detail)
+			validate(t, detailResponse)
+			listResponse := call(h, "synthetics-runs")
+			listRows := responseData(t, listResponse)
+			require.Len(t, listRows, 1)
+			values := rowValues(t, listResponse, listRows[0])
+			assert.Equal(t, run.FailureEvidence.ReportingStatus(), values["failure_evidence_status"])
+			assert.Equal(t, run.FailureEvidence.FailureSummary(), values["first_failure"])
+			if rich {
+				assert.Contains(t, values["first_failure"], "[path incomplete]")
+			}
+			assert.Equal(t, run.FailureEvidence.LastObservedStepSummary(), values["last_observed_step"])
+			assert.Equal(t, run.FailureEvidence.StopSummary(), values["stop_context"])
+			assert.Equal(t, run.BrowserSummary.ReportingStatus(), values["browser_summary_status"])
+			if rich {
+				assert.Contains(t, values["browser_errors"], "tests: observed=1")
+				assert.Contains(t, values["browser_errors"], "console_error=2")
+				assert.Contains(t, values["browser_errors"], "[omissions: candidate_limit]")
+			} else {
+				assert.Equal(t, "", values["browser_errors"])
+			}
+			columns := listResponse.RawResponse["columns"].(map[string]any)
+			assert.Equal(t, 15, columns["termination_reason"].(map[string]any)["index"])
+			assert.Equal(t, 16, columns["failure_evidence_status"].(map[string]any)["index"])
+			assert.Equal(t, 17, columns["first_failure"].(map[string]any)["index"])
+			assert.Equal(t, 18, columns["last_observed_step"].(map[string]any)["index"])
+			assert.Equal(t, 19, columns["stop_context"].(map[string]any)["index"])
+			assert.Equal(t, 20, columns["browser_summary_status"].(map[string]any)["index"])
+			assert.Equal(t, 21, columns["browser_errors"].(map[string]any)["index"])
+			validate(t, listResponse)
+		})
+	}
+}
+
+func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *testing.T) {
+	ctx := context.Background()
+	journal, err := demjournal.Open(ctx, t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	store := history.NewStore(journal)
+	hub := registry.New()
+	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
+		name := []string{"checkout", "search", "legacy"}[i]
+		jobID := "journey:" + name
+		job, err := hub.Register(registry.Job{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site})
+		require.NoError(t, err)
+		defer job.Retire()
+		run := model.Run{ID: name, JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site, Outcome: model.Success, StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro()}
+		if i == 0 {
+			run.VnodeGUID = "33333333-3333-4333-8333-333333333333"
+		}
+		_, err = store.AppendRun(ctx, "complete", run)
+		require.NoError(t, err)
+		job.Complete(run)
+	}
+	h := functions.New(query.New(hub, store, nil, nil), nil)
+	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
+	rows := responseData(t, checks)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", rowValues(t, checks, rows[0])["vnode_guid"])
+	validate(t, checks)
+	assert.Empty(t, responseData(t, call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "job_id:journey:search")))
+	runs := call(h, "synthetics-runs", "vnode_guid:33333333-3333-4333-8333-333333333333", "kind:journey", "job_id:journey:checkout")
+	rows = responseData(t, runs)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "33333333-3333-4333-8333-333333333333", rowValues(t, runs, rows[0])["vnode_guid"])
+	validate(t, runs)
+	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "vnode_guid:11111111-1111-4111-8111-111111111111")))
+	assert.Len(t, responseData(t, call(h, "synthetics-runs", "vnode_guid:")), 3)
+	detail := call(h, "synthetics-run", "job_id:journey:checkout", "run_id:checkout")
+	require.NotNil(t, detail.RawResponse)
+	assert.Equal(t, "33333333-3333-4333-8333-333333333333", detail.RawResponse["run"].(map[string]any)["vnode_guid"])
+	for _, method := range []string{"synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
+		assert.Equal(t, 400, call(h, method, "vnode_guid:INVALID").Status)
+		denied := h.HandleRaw(ctx, funcapi.RawMethodRequest{Method: method, Args: []string{"vnode_guid:11111111-1111-4111-8111-111111111111"}, Permissions: "0"})
+		assert.Equal(t, 403, denied.Status)
+	}
 }

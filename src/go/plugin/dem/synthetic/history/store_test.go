@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package history_test
 
 import (
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -411,4 +413,103 @@ func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, run.TerminationReason, retained.TerminationReason)
 	assert.Equal(t, run.Error, retained.Error)
+}
+
+func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
+	ctx := t.Context()
+	root := t.TempDir()
+	journal, err := demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	now := time.Now().UnixMicro()
+	duration := 5.25
+	location := &synthetic.EvidenceLocation{File: "checkout.spec.js", Line: 12, Column: 3}
+	test := synthetic.EvidenceTest{ID: "t", Title: "checkout", Location: location, Status: "failed", ExpectedStatus: "passed", DurationMS: &duration, ReportingComplete: true}
+	step := synthetic.EvidenceStep{ID: "s1", TestID: "t", Title: "submit", Category: "test.step", Location: location, State: "running"}
+	evidence := &synthetic.FailureEvidence{Availability: "supported", ReporterComplete: false, Truncated: []string{"other_steps", "text"}, Tests: []synthetic.EvidenceTest{test}, Steps: []synthetic.EvidenceStep{step}, FirstFailure: &synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}, Message: "expected receipt", Location: location, TextTruncated: true}}
+	stopped := test
+	stopped.ID, stopped.Status = "stopped", "interrupted"
+	pending := step
+	pending.TestID = stopped.ID
+	evidence.StopContext = &synthetic.FailureDetail{Test: stopped, Path: []synthetic.EvidenceStep{pending}, PathIncomplete: true}
+	runs := []synthetic.Run{
+		{ID: "old", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now, CompletedUS: now + 1, Outcome: synthetic.Failed},
+		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence, BrowserSummary: &synthetic.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &synthetic.BrowserAggregate{Counts: synthetic.BrowserCounts{ConsoleError: 2}}, Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}}, Samples: []synthetic.BrowserSample{{ID: 1, TestID: "t", Category: "console_error", State: "pending"}}}},
+	}
+	for _, run := range runs {
+		_, err = history.NewStore(journal).AppendRun(ctx, "complete", run)
+		require.NoError(t, err)
+	}
+	require.NoError(t, journal.Sync(ctx))
+	require.NoError(t, journal.Close())
+	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	defer func() { require.NoError(t, journal.Close()) }()
+	store := history.NewStore(journal)
+	for _, run := range runs {
+		retained, err := store.GetRun(ctx, run.JobID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, run, retained)
+	}
+	page, err := store.QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, page.Runs, 2)
+	assert.Equal(t, runs[1], page.Runs[0])
+	assert.Nil(t, page.Runs[1].FailureEvidence)
+}
+
+func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
+	root := t.TempDir()
+	j, err := journal.Open(t.Context(), root)
+	require.NoError(t, err)
+	test := synthetic.ArtifactTest{ID: "t1", Title: "Checkout"}
+	run := synthetic.Run{ID: "capture-run", JobID: "journey:test", Kind: synthetic.Journey, Name: "test", StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Failed, CaptureState: "unavailable",
+		Captures: &synthetic.CaptureReport{Reporting: "complete", Trace: "supported", Tests: []synthetic.CaptureTest{{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1}}, Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}, {ID: "trace1", TestID: "t1"}}, Unpublished: []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}}},
+	}
+	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
+	require.NoError(t, err)
+	require.NoError(t, j.Close())
+	j, err = journal.Open(t.Context(), root)
+	require.NoError(t, err)
+	defer j.Close()
+	got, err := history.NewStore(j).GetRun(t.Context(), run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.Captures, got.Captures)
+}
+
+func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	journal, err := demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	store := history.NewStore(journal)
+	now := time.Now().UnixMicro()
+	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
+		run := synthetic.Run{ID: []string{"before-move", "after-move"}[i], JobID: "journey:checkout", Kind: synthetic.Journey, VnodeGUID: site, StartedUS: now + int64(i), Outcome: synthetic.Unknown}
+		_, err = store.AppendRun(ctx, "start", run)
+		require.NoError(t, err)
+		run.CompletedUS = run.StartedUS + 100
+		run.Outcome = synthetic.Success
+		_, err = store.AppendRun(ctx, "complete", run)
+		require.NoError(t, err)
+	}
+	require.NoError(t, journal.Close())
+	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	store = history.NewStore(journal)
+	upper := now/1e6 + 1
+	filtered, err := store.QueryRuns(ctx, history.RunFilter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "journey:checkout", Kind: synthetic.Journey, Outcome: synthetic.Success, After: now / 1e6, Before: &upper})
+	require.NoError(t, err)
+	require.Len(t, filtered.Runs, 1)
+	assert.Equal(t, "before-move", filtered.Runs[0].ID)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", filtered.Runs[0].VnodeGUID)
+	filtered, err = store.QueryRuns(ctx, history.RunFilter{VnodeGUID: "11111111-1111-4111-8111-111111111111", Kind: synthetic.Lighthouse})
+	require.NoError(t, err)
+	assert.Empty(t, filtered.Runs)
+	all, err := store.QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, all.Runs, 2)
+	detail, err := store.GetRun(ctx, "journey:checkout", "before-move")
+	require.NoError(t, err)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.VnodeGUID)
 }
