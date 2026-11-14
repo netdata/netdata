@@ -21,8 +21,8 @@ func TestNativeSyntheticVnodeAttributionAndChartRouting(t *testing.T) {
 	forEachKind(t, func(t *testing.T, module string, k kind) {
 		hub := registry.New()
 		e := syntheticjobtest.Executor{
-			ExecuteFunc: func(_ context.Context, _ synthetic.Request, state func(string)) synthetic.Execution {
-				state("running")
+			ExecuteFunc: func(_ context.Context, _ synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
+				state(synthetic.JobRunning)
 				return synthetic.Execution{
 					Drained: true,
 					Run: synthetic.Run{

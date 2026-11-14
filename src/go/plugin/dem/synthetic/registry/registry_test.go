@@ -20,7 +20,7 @@ type completingExecutor struct{ run synthetic.Run }
 func (e completingExecutor) ExecuteScheduled(
 	_ context.Context,
 	_ synthetic.Request,
-	_ func(string),
+	_ func(synthetic.JobState),
 	admitted func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	admitted(time.Now())

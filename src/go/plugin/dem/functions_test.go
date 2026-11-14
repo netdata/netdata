@@ -80,10 +80,10 @@ func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
 func (e inventoryExecutor) ExecuteScheduled(
 	ctx context.Context,
 	_ synthetic.Request,
-	state func(string),
+	state func(synthetic.JobState),
 	_ func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
-	state("waiting")
+	state(synthetic.JobWaiting)
 	close(e.waiting)
 	<-ctx.Done()
 	return synthetic.Execution{

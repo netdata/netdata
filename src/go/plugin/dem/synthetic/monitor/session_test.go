@@ -28,7 +28,7 @@ type controlledExecutor struct {
 func (e *controlledExecutor) ExecuteScheduled(
 	ctx context.Context,
 	request synthetic.Request,
-	state func(string),
+	state func(synthetic.JobState),
 	admitted func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	c := &controlledCall{
@@ -38,13 +38,13 @@ func (e *controlledExecutor) ExecuteScheduled(
 		finish:    make(chan synthetic.Execution),
 		cancelled: make(chan struct{}),
 	}
-	state("waiting")
+	state(synthetic.JobWaiting)
 	e.calls <- c
 	select {
 	case now := <-c.admission:
 		// Report the phase before handing the schedule back, so a test that received it observes running.
 		schedule := admitted(now)
-		state("running")
+		state(synthetic.JobRunning)
 		c.schedule <- schedule
 	case <-ctx.Done():
 		close(c.cancelled)
@@ -546,12 +546,12 @@ func TestCancelledBeforeStartAndSecondRun(t *testing.T) {
 	require.ErrorContains(t, s.Run(ctx), "already started")
 }
 
-type executorFunc func(context.Context, synthetic.Request, func(string), func(time.Time) synthetic.Schedule) synthetic.Execution
+type executorFunc func(context.Context, synthetic.Request, func(synthetic.JobState), func(time.Time) synthetic.Schedule) synthetic.Execution
 
 func (f executorFunc) ExecuteScheduled(
 	ctx context.Context,
 	req synthetic.Request,
-	state func(string),
+	state func(synthetic.JobState),
 	admitted func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	return f(ctx, req, state, admitted)
@@ -561,14 +561,14 @@ func TestAdmissionRacingStopRetainsOccurrenceUntilJoin(t *testing.T) {
 	entered, release := make(chan struct{}), make(chan struct{})
 	schedules := make(chan synthetic.Schedule, 1)
 	executor := executorFunc(
-		func(ctx context.Context, _ synthetic.Request, state func(string), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+		func(ctx context.Context, _ synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
 			close(entered)
 			<-ctx.Done()
 			// The owner checked cancellation immediately before invoking admission.
 			// Shutdown must retain its selected occurrence until this call joins.
 			<-release
 			schedules <- admitted(time.Now())
-			state("running")
+			state(synthetic.JobRunning)
 			return synthetic.Execution{
 				Run: synthetic.Run{
 					Outcome:     synthetic.Cancelled,

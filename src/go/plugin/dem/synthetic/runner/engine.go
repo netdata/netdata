@@ -152,7 +152,7 @@ func (e *Engine) execute(ctx context.Context, request synthetic.Request) synthet
 // ExecuteScheduled runs one attempt through admission. admitted, when set,
 // snapshots the latest pending occurrence only after admission. Drained is
 // false when the process tree may still be alive; the slot then stays held.
-func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(string), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
 	a := newAttempt(request)
 	job, err := e.admit(ctx, request.JobID(), state)
 	if err != nil {
@@ -171,11 +171,11 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 
 // admit waits for the job's turn at a browser slot. A slot granted after
 // poisoning or after the caller stopped is released again.
-func (e *Engine) admit(ctx context.Context, jobID string, state func(string)) (*admissionJob, error) {
+func (e *Engine) admit(ctx context.Context, jobID string, state func(synthetic.JobState)) (*admissionJob, error) {
 	if e.isPoisoned() {
 		return nil, ndexec.ErrTreeNotDrained
 	}
-	notify(state, "waiting")
+	notify(state, synthetic.JobWaiting)
 	job, err := e.acquire(ctx, executionKey{jobID: jobID, qualification: e.qualification})
 	if err != nil {
 		return nil, err
@@ -193,7 +193,7 @@ func (e *Engine) admit(ctx context.Context, jobID string, state func(string)) (*
 
 // runAdmitted runs an admitted attempt to completion and reports whether its
 // process tree is known drained. Every drained path records completion once.
-func (e *Engine) runAdmitted(ctx context.Context, a *attempt, state func(string), admitted func(time.Time) synthetic.Schedule) (drained bool) {
+func (e *Engine) runAdmitted(ctx context.Context, a *attempt, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) (drained bool) {
 	admittedAt := time.Now()
 	if admitted != nil {
 		schedule := admitted(admittedAt)
@@ -289,10 +289,10 @@ func (e *Engine) prepareWork(attemptCtx context.Context, a *attempt, admittedAt 
 // launch runs the prepared request and records what the supervisor and the
 // reporter observed. It returns the captures eligible for publication and
 // whether the process tree is known drained.
-func (e *Engine) launch(ctx, attemptCtx context.Context, a *attempt, use Use, raw []byte, state func(string)) ([]synthetic.Capture, bool) {
+func (e *Engine) launch(ctx, attemptCtx context.Context, a *attempt, use Use, raw []byte, state func(synthetic.JobState)) ([]synthetic.Capture, bool) {
 	sink := newSink(a.request, a.redact)
 	started := time.Now()
-	notify(state, "running")
+	notify(state, synthetic.JobRunning)
 	paths := use.Paths()
 	tree, err := e.executeProcess(attemptCtx, paths, use.Completion(), []string{paths.EntryPoint}, raw, sink.consume, sink.stderr)
 	if err != nil {
@@ -456,7 +456,7 @@ func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, a *atte
 	}
 }
 
-func notify(state func(string), value string) {
+func notify(state func(synthetic.JobState), value synthetic.JobState) {
 	if state != nil {
 		state(value)
 	}

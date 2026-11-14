@@ -172,7 +172,7 @@ func (e *admissionTestJourneyExecutor) Check(context.Context) error {
 	return nil
 }
 func (*admissionTestJourneyExecutor) ExecuteScheduled(
-	ctx context.Context, _ synthetic.Request, _ func(string), _ func(time.Time) synthetic.Schedule,
+	ctx context.Context, _ synthetic.Request, _ func(synthetic.JobState), _ func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	<-ctx.Done()
 	return synthetic.Execution{Drained: true}

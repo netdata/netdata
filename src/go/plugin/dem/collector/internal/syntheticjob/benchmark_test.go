@@ -40,7 +40,7 @@ func benchmarkKindCollect(b *testing.B, module string, k kind, events int) {
 		}
 	}
 	e := syntheticjobtest.Executor{
-		ExecuteFunc: func(context.Context, synthetic.Request, func(string)) synthetic.Execution {
+		ExecuteFunc: func(context.Context, synthetic.Request, func(synthetic.JobState)) synthetic.Execution {
 			return synthetic.Execution{
 				Drained: true,
 				Run:     run,

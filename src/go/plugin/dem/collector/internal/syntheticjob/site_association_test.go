@@ -22,7 +22,7 @@ const siteGUID = "11111111-1111-4111-8111-111111111111"
 
 func siteExecutor(t *testing.T, guid string) syntheticjobtest.Executor {
 	return syntheticjobtest.Executor{
-		ExecuteFunc: func(_ context.Context, r synthetic.Request, _ func(string)) synthetic.Execution {
+		ExecuteFunc: func(_ context.Context, r synthetic.Request, _ func(synthetic.JobState)) synthetic.Execution {
 			assert.Equal(t, guid, r.VnodeGUID)
 			run := fixture()
 			run.Outcome = synthetic.Success

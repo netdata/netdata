@@ -28,12 +28,12 @@ import (
 func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	e, h, a := testEngine(t)
 	e.start = starter(t, resultPayload(success()))
-	var states []string
-	execution := e.ExecuteScheduled(context.Background(), journey(), func(state string) { states = append(states, state) }, nil)
+	var states []synthetic.JobState
+	execution := e.ExecuteScheduled(context.Background(), journey(), func(state synthetic.JobState) { states = append(states, state) }, nil)
 	require.True(t, execution.Drained)
 	assert.Equal(t, synthetic.Success, execution.Run.Outcome)
 	require.NotNil(t, execution.Run.DurationMS)
-	assert.Equal(t, []string{"waiting", "running"}, states)
+	assert.Equal(t, []synthetic.JobState{synthetic.JobWaiting, synthetic.JobRunning}, states)
 	assert.Equal(t, int32(1), a.finalized.Load())
 	page, err := a.Catalogue(context.Background(), artifacts.Filter{
 		Limit: 1,

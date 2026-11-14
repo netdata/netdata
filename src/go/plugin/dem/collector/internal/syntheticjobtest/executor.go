@@ -17,7 +17,7 @@ import (
 type Executor struct {
 	CheckFunc func(context.Context) error
 	// ExecuteFunc runs an admitted attempt; ExecuteScheduled completes the run identity and timing it leaves empty.
-	ExecuteFunc  func(context.Context, synthetic.Request, func(string)) synthetic.Execution
+	ExecuteFunc  func(context.Context, synthetic.Request, func(synthetic.JobState)) synthetic.Execution
 	RehearseFunc func(context.Context, synthetic.Request) error
 }
 
@@ -40,10 +40,10 @@ func (e Executor) Rehearse(ctx context.Context, request synthetic.Request) error
 func (e Executor) ExecuteScheduled(
 	ctx context.Context,
 	r synthetic.Request,
-	state func(string),
+	state func(synthetic.JobState),
 	admitted func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
-	state("waiting")
+	state(synthetic.JobWaiting)
 	// Without ExecuteFunc the attempt is genuinely queued work, not an admitted run.
 	if e.ExecuteFunc == nil {
 		<-ctx.Done()

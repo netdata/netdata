@@ -38,10 +38,10 @@ func newSteppedExecutor() *steppedExecutor {
 func (e *steppedExecutor) ExecuteScheduled(
 	ctx context.Context,
 	request model.Request,
-	state func(string),
+	state func(model.JobState),
 	admitted func(time.Time) model.Schedule,
 ) model.Execution {
-	state("waiting")
+	state(model.JobWaiting)
 	e.queued <- struct{}{}
 	select {
 	case <-e.admit:
@@ -56,7 +56,7 @@ func (e *steppedExecutor) ExecuteScheduled(
 	}
 	schedule := admitted(time.Now())
 	e.schedule = schedule
-	state("running")
+	state(model.JobRunning)
 	e.running <- struct{}{}
 	select {
 	case run := <-e.finish:
