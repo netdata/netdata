@@ -15,14 +15,6 @@ import (
 
 const captureInit = `{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1","capture_details.v1","browser_summary.v1"]}}`
 
-func captureRecord(data any) string {
-	raw, err := json.Marshal(map[string]any{"type": "extension", "extension": map[string]any{"feature": captureDetailsFeature, "data": data}})
-	if err != nil {
-		panic(err)
-	}
-	return string(raw)
-}
-
 func captureTest(id string, accepted, unaccepted int64) map[string]any {
 	return map[string]any{"record": "test", "test": synthetic.CaptureTest{ArtifactTest: synthetic.ArtifactTest{ID: id, Title: "Checkout"}, Status: "failed", ExpectedStatus: "passed", Accepted: accepted, Unaccepted: unaccepted}}
 }
@@ -33,17 +25,10 @@ func captureLink(id, testID string) map[string]any {
 
 func consumeCaptures(t *testing.T, lines ...string) sinkSnapshot {
 	t.Helper()
-	r := success()
-	r.CaptureState = "not_needed"
-	terminal, err := json.Marshal(frame{Type: "result", Result: &r})
-	require.NoError(t, err)
-	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true}, newRedactor(map[string]string{"token": "synthetic-secret"}))
-	require.NoError(t, s.consume(strings.NewReader(strings.Join(append(lines, string(terminal)), "\n"))))
-	snap := s.snapshot()
-	require.NoError(t, snap.err)
-	require.NotNil(t, snap.result)
-	assert.Equal(t, synthetic.Success, snap.result.Status)
-	return snap
+	result := success()
+	result.CaptureState = "not_needed"
+	request := synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true}
+	return consumeWithResult(t, request, map[string]string{"token": "synthetic-secret"}, result, lines...)
 }
 
 func TestCaptureReportingNegotiationAndIsolation(t *testing.T) {
@@ -54,13 +39,13 @@ func TestCaptureReportingNegotiationAndIsolation(t *testing.T) {
 		"old runtime":    {nil, "negotiation_not_reported"},
 		"declined":       {[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`}, "unsupported"},
 		"selected":       {[]string{captureInit}, "partial"},
-		"complete":       {[]string{captureInit, captureRecord(map[string]any{"record": "complete"})}, "complete"},
-		"unknown record": {[]string{captureInit, captureRecord(map[string]any{"record": "future"})}, "invalid"},
-		"null body":      {[]string{captureInit, captureRecord(nil)}, "invalid"},
-		"wrong type":     {[]string{captureInit, captureRecord(map[string]any{"record": "test", "test": true})}, "invalid"},
-		"before init":    {[]string{captureRecord(map[string]any{"record": "complete"}), captureInit}, "invalid"},
-		"late record":    {[]string{captureInit, captureRecord(map[string]any{"record": "complete"}), captureRecord(captureTest("late", 0, 0))}, "invalid"},
-		"additive field": {[]string{captureInit, captureRecord(map[string]any{"record": "complete", "future": 42})}, "complete"},
+		"complete":       {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"})}, "complete"},
+		"unknown record": {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "future"})}, "invalid"},
+		"null body":      {[]string{captureInit, extensionLine(captureDetailsFeature, nil)}, "invalid"},
+		"wrong type":     {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "test", "test": true})}, "invalid"},
+		"before init":    {[]string{extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}), captureInit}, "invalid"},
+		"late record":    {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}), extensionLine(captureDetailsFeature, captureTest("late", 0, 0))}, "invalid"},
+		"additive field": {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "complete", "future": 42})}, "complete"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s := consumeCaptures(t, tc.lines...)
@@ -77,7 +62,7 @@ func TestCaptureAssociationRetainsMixedOmissionsAndRedacts(t *testing.T) {
 	value := test["test"].(synthetic.CaptureTest)
 	value.Title = "synthetic-secret " + strings.Repeat("x", 220)
 	test["test"] = value
-	s := consumeCaptures(t, captureInit, captureRecord(test), captureRecord(captureLink("s1", "t1")), captureRecord(captureLink("s2", "t1")), captureRecord(map[string]any{"record": "complete"}))
+	s := consumeCaptures(t, captureInit, extensionLine(captureDetailsFeature, test), extensionLine(captureDetailsFeature, captureLink("s1", "t1")), extensionLine(captureDetailsFeature, captureLink("s2", "t1")), extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 	require.Len(t, s.captures.Tests, 1)
 	require.Len(t, s.captures.Associations, 2)
 	assert.Equal(t, int64(1), s.captures.Tests[0].Unaccepted)
@@ -101,7 +86,7 @@ func TestCaptureAssociationRetainsMixedOmissionsAndRedacts(t *testing.T) {
 
 func TestCaptureConflictingIdentityIsNotRetained(t *testing.T) {
 	for _, conflict := range []map[string]any{captureLink("s1", "t2"), captureTest("t1", 1, 0)} {
-		s := consumeCaptures(t, captureInit, captureRecord(captureTest("t1", 1, 0)), captureRecord(captureTest("t2", 0, 0)), captureRecord(captureLink("s1", "t1")), captureRecord(conflict))
+		s := consumeCaptures(t, captureInit, extensionLine(captureDetailsFeature, captureTest("t1", 1, 0)), extensionLine(captureDetailsFeature, captureTest("t2", 0, 0)), extensionLine(captureDetailsFeature, captureLink("s1", "t1")), extensionLine(captureDetailsFeature, conflict))
 		assert.Equal(t, "invalid", s.captures.Reporting)
 		assert.Empty(t, s.captures.Associations)
 		candidates := []synthetic.Capture{{ID: "s1"}}
@@ -116,10 +101,10 @@ func TestCaptureDetailLimitNeverLimitsCandidateAuthority(t *testing.T) {
 	for i := 0; i < 150; i++ {
 		id := fmt.Sprintf("t%d", i)
 		capture := fmt.Sprintf("s%d", i)
-		lines = append(lines, captureRecord(captureTest(id, 1, 0)), captureRecord(captureLink(capture, id)))
+		lines = append(lines, extensionLine(captureDetailsFeature, captureTest(id, 1, 0)), extensionLine(captureDetailsFeature, captureLink(capture, id)))
 		candidates = append(candidates, synthetic.Capture{ID: capture})
 	}
-	lines = append(lines, captureRecord(map[string]any{"record": "complete"}))
+	lines = append(lines, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 	s := consumeCaptures(t, lines...)
 	assert.Equal(t, "complete", s.captures.Reporting)
 	assert.True(t, s.captures.Truncated)
@@ -163,7 +148,7 @@ func TestTraceSupportReporting(t *testing.T) {
 		"fifth unknown":           {trace: true, lines: []string{strings.Replace(selected, `"failure_trace.v1"]`, `"failure_trace.v1","future.v1"]`, 1)}, want: "invalid"},
 		"duplicate init":          {trace: true, lines: []string{selected, selected}, want: "invalid"},
 		"invalid envelope":        {trace: true, lines: []string{selected, `{"type":"extension","extension":{"data":{}}}`}, want: "invalid"},
-		"invalid capture details": {trace: true, lines: []string{selected, captureRecord(map[string]any{"record": "future"})}, want: "supported"},
+		"invalid capture details": {trace: true, lines: []string{selected, extensionLine(captureDetailsFeature, map[string]any{"record": "future"})}, want: "supported"},
 		"unrequested selection":   {lines: []string{selected}},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -242,13 +227,13 @@ func TestCaptureWireBounds(t *testing.T) {
 		lines []string
 		want  string
 	}{
-		"test ID at limit":   {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0))}, "partial"},
-		"test ID past limit": {[]string{captureInit, captureRecord(captureTest(text(129), 1, 0))}, "invalid"},
-		"title at limit":     {[]string{captureInit, captureRecord(withTitle(256))}, "partial"},
-		"title past limit":   {[]string{captureInit, captureRecord(withTitle(257))}, "invalid"},
-		"link test ID limit": {[]string{captureInit, captureRecord(captureTest(text(128), 1, 0)), captureRecord(captureLink("s1", text(128)))}, "partial"},
-		"counts at safe max": {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger, maxSafeInteger))}, "partial"},
-		"counts past safe":   {[]string{captureInit, captureRecord(captureTest("t1", maxSafeInteger+1, 0))}, "invalid"},
+		"test ID at limit":   {[]string{captureInit, extensionLine(captureDetailsFeature, captureTest(text(128), 1, 0))}, "partial"},
+		"test ID past limit": {[]string{captureInit, extensionLine(captureDetailsFeature, captureTest(text(129), 1, 0))}, "invalid"},
+		"title at limit":     {[]string{captureInit, extensionLine(captureDetailsFeature, withTitle(256))}, "partial"},
+		"title past limit":   {[]string{captureInit, extensionLine(captureDetailsFeature, withTitle(257))}, "invalid"},
+		"link test ID limit": {[]string{captureInit, extensionLine(captureDetailsFeature, captureTest(text(128), 1, 0)), extensionLine(captureDetailsFeature, captureLink("s1", text(128)))}, "partial"},
+		"counts at safe max": {[]string{captureInit, extensionLine(captureDetailsFeature, captureTest("t1", maxSafeInteger, maxSafeInteger))}, "partial"},
+		"counts past safe":   {[]string{captureInit, extensionLine(captureDetailsFeature, captureTest("t1", maxSafeInteger+1, 0))}, "invalid"},
 		"records at limit":   {captureRecords(captureDetailLimit), "partial"},
 		"records past limit": {captureRecords(captureDetailLimit + 1), "partial"},
 	} {
@@ -268,7 +253,7 @@ func TestCaptureWireBounds(t *testing.T) {
 func captureRecords(n int) []string {
 	lines := []string{captureInit}
 	for i := range n {
-		lines = append(lines, captureRecord(captureTest(fmt.Sprintf("t%d", i), 1, 0)))
+		lines = append(lines, extensionLine(captureDetailsFeature, captureTest(fmt.Sprintf("t%d", i), 1, 0)))
 	}
 	return lines
 }

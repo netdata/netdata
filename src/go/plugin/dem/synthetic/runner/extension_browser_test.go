@@ -16,13 +16,6 @@ import (
 
 const browserInit = `{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1","browser_summary.v1"]}}`
 
-func browserRecord(t *testing.T, data any) string {
-	t.Helper()
-	raw, err := json.Marshal(map[string]any{"type": "extension", "extension": map[string]any{"feature": browserSummaryFeature, "data": data}})
-	require.NoError(t, err)
-	return string(raw)
-}
-
 func browserRun(n int64) synthetic.BrowserAggregate {
 	return synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: n}, Counts: synthetic.BrowserCounts{Uncaught: n}}
 }
@@ -33,21 +26,20 @@ func browserTestRecord(n int64) map[string]any {
 
 func consumeBrowser(t *testing.T, lines ...string) sinkSnapshot {
 	t.Helper()
-	s := newSink(synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true}, newRedactor(map[string]string{"DEM_SECRET_X": "secret"}))
-	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
-	return s.snapshot()
+	request := synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true}
+	return consume(t, request, map[string]string{"DEM_SECRET_X": "secret"}, lines...)
 }
 
 func TestBrowserFeatureIsolationAndNegotiation(t *testing.T) {
 	for _, body := range []any{nil, 3, []any{}, map[string]any{"record": "future"}, map[string]any{"record": "complete", "run": 3}, map[string]any{"record": "complete", "run": map[string]any{"tests": map[string]any{"observed": 1.5}}}} {
 		t.Run(fmt.Sprint(body), func(t *testing.T) {
-			s := consumeBrowser(t, browserInit, browserRecord(t, body), evidenceRecord("complete", "", nil))
+			s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, body), evidenceRecord("complete", "", nil))
 			assert.Equal(t, "invalid", s.browser.ReportingStatus())
 			assert.Equal(t, "complete", s.evidence.ReportingStatus())
 			assert.NoError(t, s.err)
 		})
 	}
-	for name, lines := range map[string][]string{"old": {}, "declined": {`{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1"]}}`}, "before init": {browserRecord(t, map[string]any{"record": "complete", "run": browserRun(0)})}, "duplicate init": {browserInit, browserInit}, "shared invalid": {browserInit, `{"type":"extension","extension":{"feature":"browser_summary.v1","future":true,"data":{}}}`}} {
+	for name, lines := range map[string][]string{"old": {}, "declined": {`{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1"]}}`}, "before init": {extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": browserRun(0)})}, "duplicate init": {browserInit, browserInit}, "shared invalid": {browserInit, `{"type":"extension","extension":{"feature":"browser_summary.v1","future":true,"data":{}}}`}} {
 		t.Run(name, func(t *testing.T) {
 			s := consumeBrowser(t, lines...)
 			want := "invalid"
@@ -61,7 +53,7 @@ func TestBrowserFeatureIsolationAndNegotiation(t *testing.T) {
 		})
 	}
 	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+browserRecord(t, 3)+"\n"+evidenceRecord("complete", "", nil))))
+	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+extensionLine(browserSummaryFeature, 3)+"\n"+evidenceRecord("complete", "", nil))))
 	assert.Nil(t, s.snapshot().browser)
 	assert.Equal(t, "complete", s.snapshot().evidence.ReportingStatus())
 }
@@ -80,21 +72,21 @@ func TestBrowserAtomicValidationAndTerminalPreservesPrior(t *testing.T) {
 	}
 	for name, bad := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := consumeBrowser(t, browserInit, browserRecord(t, initial), browserRecord(t, bad))
+			s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, initial), extensionLine(browserSummaryFeature, bad))
 			assert.Equal(t, "invalid", s.browser.ReportingStatus())
 			require.Len(t, s.browser.Tests, 1)
 			assert.Empty(t, s.browser.Samples)
 			assert.Equal(t, browserRun(1), *s.browser.Run)
 		})
 	}
-	s := consumeBrowser(t, browserInit, browserRecord(t, map[string]any{"record": "complete", "run": browserRun(0)}), browserRecord(t, map[string]any{"record": "complete", "run": browserRun(0)}))
+	s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": browserRun(0)}), extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": browserRun(0)}))
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 	assert.False(t, s.browser.ReporterComplete)
 }
 
 func TestBrowserRedactionSamplesAndSnapshots(t *testing.T) {
 	raw := map[string]any{"record": "test", "run": synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: synthetic.BrowserCounts{HTTPError: 1, ConsoleError: 1}}, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &synthetic.BrowserCounts{HTTPError: 1, ConsoleError: 1}, SampleIDs: []int{1, 2}}, "samples": []any{map[string]any{"id": 1, "test_id": "t", "category": "http_error", "method": "GET", "url": "https://user:pass@example.com/private?q=secret#frag", "status": 1200}, map[string]any{"id": 2, "test_id": "t", "category": "console_error", "state": "resolved", "args": []any{map[string]any{"value": "secret"}, map[string]any{"value": nil}, map[string]any{"omitted": "unrepresentable"}}}}}
-	s := consumeBrowser(t, browserInit, browserRecord(t, raw))
+	s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, raw))
 	require.Equal(t, "partial", s.browser.ReportingStatus())
 	require.Len(t, s.browser.Samples, 2)
 	assert.Equal(t, "https://example.com/private", *s.browser.Samples[0].URL)
@@ -128,8 +120,8 @@ func TestBrowserUnusableURLPreservesEvidenceAndCompletion(t *testing.T) {
 				sample["error"] = "connection refused"
 			}
 			s := consumeBrowser(t, browserInit,
-				browserRecord(t, map[string]any{"record": "test", "run": run, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts, SampleIDs: []int{1}}, "samples": []any{sample}}),
-				browserRecord(t, map[string]any{"record": "complete", "run": run}), evidenceRecord("complete", "", nil))
+				extensionLine(browserSummaryFeature, map[string]any{"record": "test", "run": run, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts, SampleIDs: []int{1}}, "samples": []any{sample}}),
+				extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": run}), evidenceRecord("complete", "", nil))
 			require.Equal(t, "complete", s.browser.ReportingStatus())
 			assert.Equal(t, "complete", s.evidence.ReportingStatus())
 			assert.Equal(t, run, *s.browser.Run)
@@ -148,15 +140,15 @@ func TestBrowserUnusableURLPreservesEvidenceAndCompletion(t *testing.T) {
 func TestBrowserRowsPoolAndLateSamples(t *testing.T) {
 	lines := []string{browserInit}
 	for n := int64(1); n <= 64; n++ {
-		lines = append(lines, browserRecord(t, browserTestRecord(n)))
+		lines = append(lines, extensionLine(browserSummaryFeature, browserTestRecord(n)))
 	}
 	sample := synthetic.BrowserSample{ID: 1, TestID: "late", Category: "uncaught", Message: "late error"}
-	lines = append(lines, browserRecord(t, map[string]any{"record": "late_sample", "run": browserRun(65), "sample": sample}))
+	lines = append(lines, extensionLine(browserSummaryFeature, map[string]any{"record": "late_sample", "run": browserRun(65), "sample": sample}))
 	s := consumeBrowser(t, lines...)
 	require.Equal(t, "partial", s.browser.ReportingStatus())
 	require.Len(t, s.browser.Tests, 64)
 	require.Len(t, s.browser.Samples, 1)
-	lines = append(lines, browserRecord(t, map[string]any{"record": "late_sample", "run": browserRun(66), "sample": synthetic.BrowserSample{ID: 2, TestID: "other", Category: "uncaught", Message: "another"}}))
+	lines = append(lines, extensionLine(browserSummaryFeature, map[string]any{"record": "late_sample", "run": browserRun(66), "sample": synthetic.BrowserSample{ID: 2, TestID: "other", Category: "uncaught", Message: "another"}}))
 	s = consumeBrowser(t, lines...)
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 	assert.Len(t, s.browser.Samples, 1)
@@ -183,7 +175,7 @@ func TestBrowserFieldAndSemanticBudgets(t *testing.T) {
 		"URL contradiction":        map[string]any{"id": 1, "test_id": "t1", "category": "http_error", "method": "GET", "url": "https://example.com", "url_omitted": "too_long", "status": 400},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := consumeBrowser(t, browserInit, browserRecord(t, base(sample)))
+			s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, base(sample)))
 			assert.Equal(t, "invalid", s.browser.ReportingStatus())
 			assert.Nil(t, s.browser.Run)
 			assert.Empty(t, s.browser.Samples)
@@ -193,7 +185,7 @@ func TestBrowserFieldAndSemanticBudgets(t *testing.T) {
 	// integer when summed, but no reported field may exceed that boundary.
 	counts := synthetic.BrowserCounts{Uncaught: maxSafeInteger, ConsoleError: maxSafeInteger}
 	aggregate := synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: counts}
-	s := consumeBrowser(t, browserInit, browserRecord(t, map[string]any{"record": "test", "run": aggregate, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts}}))
+	s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, map[string]any{"record": "test", "run": aggregate, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts}}))
 	assert.Equal(t, "partial", s.browser.ReportingStatus())
 }
 
@@ -269,7 +261,7 @@ func TestBrowserRepresentativePoolAndReferenceOwnership(t *testing.T) {
 		row.SampleIDs = []int{int(n)}
 		record["test"] = row
 		record["samples"] = []synthetic.BrowserSample{{ID: int(n), TestID: row.ID, Category: "uncaught", Message: fmt.Sprint(n)}}
-		lines = append(lines, browserRecord(t, record))
+		lines = append(lines, extensionLine(browserSummaryFeature, record))
 	}
 	s := consumeBrowser(t, lines...)
 	require.Equal(t, "partial", s.browser.ReportingStatus())
@@ -279,20 +271,20 @@ func TestBrowserRepresentativePoolAndReferenceOwnership(t *testing.T) {
 	row.SampleIDs = []int{5}
 	fifth["test"] = row
 	fifth["samples"] = []synthetic.BrowserSample{{ID: 5, TestID: row.ID, Category: "uncaught", Message: "new"}}
-	s = consumeBrowser(t, append(lines, browserRecord(t, fifth))...)
+	s = consumeBrowser(t, append(lines, extensionLine(browserSummaryFeature, fifth))...)
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 	assert.Len(t, s.browser.Tests, 4)
 	assert.Len(t, s.browser.Samples, 4)
 	fifth["samples"] = nil
 	row.SampleIDs = []int{1}
 	fifth["test"] = row
-	s = consumeBrowser(t, append(lines, browserRecord(t, fifth))...)
+	s = consumeBrowser(t, append(lines, extensionLine(browserSummaryFeature, fifth))...)
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 }
 
 func TestBrowserPeerInvalidityAndUnknownAdditiveFields(t *testing.T) {
 	complete := map[string]any{"record": "complete", "run": browserRun(1), "future": strings.Repeat("secret", 1024)}
-	s := consumeBrowser(t, browserInit, evidenceRecord("unknown", "", nil), browserRecord(t, complete))
+	s := consumeBrowser(t, browserInit, evidenceRecord("unknown", "", nil), extensionLine(browserSummaryFeature, complete))
 	assert.Equal(t, "invalid", s.evidence.ReportingStatus())
 	assert.Equal(t, "complete", s.browser.ReportingStatus())
 	raw, err := json.Marshal(s.browser)
@@ -302,7 +294,7 @@ func TestBrowserPeerInvalidityAndUnknownAdditiveFields(t *testing.T) {
 
 func TestBrowserAdditionalRedactionMayConvergeRepresentatives(t *testing.T) {
 	record := map[string]any{"record": "test", "run": synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: synthetic.BrowserCounts{Uncaught: 2}}, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &synthetic.BrowserCounts{Uncaught: 2}, SampleIDs: []int{1, 2}}, "samples": []synthetic.BrowserSample{{ID: 1, TestID: "t", Category: "uncaught", Message: "token=first"}, {ID: 2, TestID: "t", Category: "uncaught", Message: "token=second"}}}
-	s := consumeBrowser(t, browserInit, browserRecord(t, record))
+	s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, record))
 	require.Equal(t, "partial", s.browser.ReportingStatus())
 	require.Len(t, s.browser.Samples, 2)
 	assert.Equal(t, "token=[REDACTED]", s.browser.Samples[0].Message)
@@ -314,7 +306,7 @@ func TestBrowserWholeTextOmission(t *testing.T) {
 		return map[string]any{"record": "test", "run": synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: synthetic.BrowserCounts{ConsoleError: 1}}, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &synthetic.BrowserCounts{ConsoleError: 1}, SampleIDs: []int{1}}, "samples": []synthetic.BrowserSample{sample}}
 	}
 	sample := synthetic.BrowserSample{ID: 1, TestID: "t", Category: "console_error", State: "unavailable", TextOmitted: "too_long"}
-	s := consumeBrowser(t, browserInit, browserRecord(t, record(sample)))
+	s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, record(sample)))
 	require.Equal(t, "partial", s.browser.ReportingStatus())
 	assert.Equal(t, "too_long", s.browser.Samples[0].TextOmitted)
 	for name, bad := range map[string]synthetic.BrowserSample{
@@ -325,7 +317,7 @@ func TestBrowserWholeTextOmission(t *testing.T) {
 		"invented args":  {ID: 1, TestID: "t", Category: "console_error", State: "unavailable", TextOmitted: "too_long", Args: []synthetic.BrowserArgument{{Value: "no"}}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := consumeBrowser(t, browserInit, browserRecord(t, record(bad)))
+			s := consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, record(bad)))
 			assert.Equal(t, "invalid", s.browser.ReportingStatus())
 			assert.Empty(t, s.browser.Samples)
 		})
@@ -336,7 +328,7 @@ func TestBrowserWholeTextOmission(t *testing.T) {
 	text := strings.Repeat("secret", 80)
 	sample = synthetic.BrowserSample{ID: 1, TestID: "t", Category: "console_error", State: "resolved", Text: &text}
 	complete := map[string]any{"record": "complete", "run": synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: synthetic.BrowserCounts{ConsoleError: 1}}}
-	s = consumeBrowser(t, browserInit, browserRecord(t, record(sample)), browserRecord(t, complete))
+	s = consumeBrowser(t, browserInit, extensionLine(browserSummaryFeature, record(sample)), extensionLine(browserSummaryFeature, complete))
 	require.Equal(t, "complete", s.browser.ReportingStatus())
 	require.Len(t, s.browser.Samples, 1)
 	assert.Nil(t, s.browser.Samples[0].Text)
@@ -404,7 +396,7 @@ func (s *browserStream) test(id string, samples ...synthetic.BrowserSample) *bro
 	if len(samples) > 0 {
 		data["samples"] = samples
 	}
-	s.lines = append(s.lines, browserRecord(s.t, data))
+	s.lines = append(s.lines, extensionLine(browserSummaryFeature, data))
 	return s
 }
 
@@ -421,7 +413,7 @@ func (s *browserStream) late(sample synthetic.BrowserSample) *browserStream {
 	}
 	s.run.Tests.Observed++
 	s.observe(sample.Category)
-	s.lines = append(s.lines, browserRecord(s.t, map[string]any{"record": "late_sample", "run": s.run, "sample": sample}))
+	s.lines = append(s.lines, extensionLine(browserSummaryFeature, map[string]any{"record": "late_sample", "run": s.run, "sample": sample}))
 	return s
 }
 

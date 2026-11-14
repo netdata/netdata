@@ -3,7 +3,6 @@
 package runner
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -21,11 +20,7 @@ func evidenceRecord(record string, key string, value any) string {
 	if key != "" {
 		data[key] = value
 	}
-	raw, err := json.Marshal(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": data}})
-	if err != nil {
-		panic(err)
-	}
-	return string(raw)
+	return extensionLine(failureEvidenceFeature, data)
 }
 
 func evidenceStart(id string) synthetic.EvidenceTest {
@@ -38,16 +33,8 @@ func evidenceStep(id, parent string) synthetic.EvidenceStep {
 
 func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence, sinkSnapshot) {
 	t.Helper()
-	terminal, err := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
-	require.NoError(t, err)
-	lines = append(lines, string(terminal))
-	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
-	snap := s.snapshot()
-	require.NotNil(t, snap.result)
-	require.Equal(t, synthetic.Success, snap.result.Status, "optional diagnostics must not rewrite core truth")
-	require.NoError(t, snap.err)
-	return snap.evidence, snap
+	snapshot := consumeWithResult(t, synthetic.Request{Kind: synthetic.Journey}, nil, success(), lines...)
+	return snapshot.evidence, snapshot
 }
 
 func TestEvidenceNegotiationAndOptionalErrors(t *testing.T) {
@@ -106,8 +93,7 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 		})
 	}
 	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	raw, _ := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
-	require.ErrorContains(t, s.consume(strings.NewReader(string(raw)+"\n"+evidenceInit)), "after its terminal")
+	require.ErrorContains(t, s.consume(strings.NewReader(resultLine(success())+"\n"+evidenceInit)), "after its terminal")
 }
 
 func TestEvidenceUpsertsAndPreservesFirstFailureAcrossLaterInterruption(t *testing.T) {
@@ -237,25 +223,6 @@ func TestEvidencePayloadAndSourceBoundsAreNonfatal(t *testing.T) {
 
 // Baseline and extended streams use the same core parser. Benchmark separately
 // so optional-field overhead and requested evidence work remain attributable.
-func BenchmarkFailureEvidenceStream(b *testing.B) {
-	var baseline bytes.Buffer
-	for i := 0; i < 30; i++ {
-		emit(&baseline, frame{Type: "event", Event: &synthetic.Event{Kind: "step", AtMS: 1, Title: "normal step", Status: "passed"}})
-	}
-	emit(&baseline, frame{Type: "result", Result: pointerResult(success())})
-	for name, input := range map[string]string{"baseline": baseline.String(), "extended": evidenceInit + "\n" + evidenceRecord("test", "test", evidenceStart("t1")) + "\n" + evidenceRecord("step", "step", evidenceStep("s1", "")) + "\n" + baseline.String()} {
-		b.Run(name, func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-				if err := s.consume(strings.NewReader(input)); err != nil {
-					b.Fatal(err)
-				}
-				_ = s.snapshot()
-			}
-		})
-	}
-}
 
 func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 	test := evidenceStart("t1")

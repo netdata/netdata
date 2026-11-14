@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -270,4 +271,10 @@ func (u *observedUse) finished() []bool {
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	return append([]bool(nil), u.finishes...)
+}
+
+// checkReply answers --check for the fixture release as the current identity.
+func checkReply(out *os.File) ndexec.TreeResult {
+	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+	return ndexec.TreeResult{Drained: true, Err: err}
 }

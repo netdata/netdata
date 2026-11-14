@@ -52,7 +52,7 @@ func TestEngineOptionalCorruptionDoesNotCancelOrOverrideResult(t *testing.T) {
 		fmt.Fprintln(out, evidenceRecord("test", "test", evidenceStart("t1")))
 		fmt.Fprintln(out, `{"type":"extension","extension":false}`)
 		assert.NoError(t, ctx.Err())
-		emit(out, frame{Type: "result", Result: pointerResult(success())})
+		emit(out, frame{Type: "result", Result: new(success())})
 		return ndexec.TreeResult{Drained: true}
 	})
 	execution := engine.execute(context.Background(), journey())

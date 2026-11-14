@@ -866,17 +866,17 @@ func TestConstructorRequiresOwnersAndPositiveConcurrency(t *testing.T) {
 }
 
 func TestJourneyStopAtKeepsAdmissionBudget(t *testing.T) {
-	for _, tc := range []struct {
-		name                           string
+	tests := map[string]struct {
 		budget, startup, wantRemaining time.Duration
 	}{
-		{"default", 120 * time.Second, 2 * time.Second, 113 * time.Second},
-		{"earlier caller", 2 * time.Second, 100 * time.Millisecond, 1500 * time.Millisecond},
-		{"startup exhausted work", time.Second, 900 * time.Millisecond, -100 * time.Millisecond},
-		{"short budget", 5 * time.Millisecond, 0, 4 * time.Millisecond},
-		{"long budget", time.Duration(1<<63-1) - time.Hour, 0, time.Duration(1<<63-1) - time.Hour - 5*time.Second},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"default":                {120 * time.Second, 2 * time.Second, 113 * time.Second},
+		"earlier caller":         {2 * time.Second, 100 * time.Millisecond, 1500 * time.Millisecond},
+		"startup exhausted work": {time.Second, 900 * time.Millisecond, -100 * time.Millisecond},
+		"short budget":           {5 * time.Millisecond, 0, 4 * time.Millisecond},
+		"long budget":            {time.Duration(1<<63-1) - time.Hour, 0, time.Duration(1<<63-1) - time.Hour - 5*time.Second},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			now, err := monotonicNow()
 			require.NoError(t, err)
 			admitted := time.Now().Add(-tc.startup)
@@ -888,18 +888,18 @@ func TestJourneyStopAtKeepsAdmissionBudget(t *testing.T) {
 }
 
 func TestBudgetStopCapturePolicyAfterDrain(t *testing.T) {
-	for _, tc := range []struct {
-		name     string
+	tests := map[string]struct {
 		reason   synthetic.TerminationReason
 		outcome  synthetic.Outcome
 		captures int
 	}{
-		{"budget", synthetic.ExecutionBudget, synthetic.Timeout, 2},
-		{"cancelled", synthetic.CallerCancelled, synthetic.Cancelled, 1},
-		{"hard deadline", synthetic.ExecutionDeadline, synthetic.Timeout, 1},
-		{"caller deadline", synthetic.CallerDeadline, synthetic.Timeout, 1},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"budget":          {synthetic.ExecutionBudget, synthetic.Timeout, 2},
+		"cancelled":       {synthetic.CallerCancelled, synthetic.Cancelled, 1},
+		"hard deadline":   {synthetic.ExecutionDeadline, synthetic.Timeout, 1},
+		"caller deadline": {synthetic.CallerDeadline, synthetic.Timeout, 1},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			e, history, a := testEngine(t)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
@@ -973,23 +973,23 @@ func TestBudgetStopCapturePolicyAfterDrain(t *testing.T) {
 }
 
 func TestTerminalTerminationReasonsAndInterruptedCandidates(t *testing.T) {
-	for _, tc := range []struct {
-		name        string
+	tests := map[string]struct {
 		status      synthetic.Outcome
 		reason      synthetic.TerminationReason
 		interrupted bool
 		valid       bool
 	}{
-		{"budget", synthetic.Timeout, synthetic.ExecutionBudget, true, true},
-		{"native test", synthetic.Timeout, synthetic.TestTimeout, false, true},
-		{"native suite", synthetic.Timeout, synthetic.SuiteTimeout, false, true},
-		{"cancel", synthetic.Cancelled, synthetic.CallerCancelled, false, true},
-		{"cancel capture", synthetic.Cancelled, synthetic.CallerCancelled, true, false},
-		{"native capture cannot be interrupted", synthetic.Timeout, synthetic.TestTimeout, true, false},
-		{"runner cannot claim hard deadline", synthetic.Timeout, synthetic.ExecutionDeadline, false, false},
-		{"reason contradicts outcome", synthetic.Failed, synthetic.ExecutionBudget, false, false},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
+		"budget":                               {synthetic.Timeout, synthetic.ExecutionBudget, true, true},
+		"native test":                          {synthetic.Timeout, synthetic.TestTimeout, false, true},
+		"native suite":                         {synthetic.Timeout, synthetic.SuiteTimeout, false, true},
+		"cancel":                               {synthetic.Cancelled, synthetic.CallerCancelled, false, true},
+		"cancel capture":                       {synthetic.Cancelled, synthetic.CallerCancelled, true, false},
+		"native capture cannot be interrupted": {synthetic.Timeout, synthetic.TestTimeout, true, false},
+		"runner cannot claim hard deadline":    {synthetic.Timeout, synthetic.ExecutionDeadline, false, false},
+		"reason contradicts outcome":           {synthetic.Failed, synthetic.ExecutionBudget, false, false},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
 			r := reporterResult{Status: tc.status, TerminationReason: tc.reason, CaptureState: "unavailable"}
 			if tc.interrupted {
 				r.InterruptedArtifacts = []synthetic.Capture{{ID: "screenshot", Path: "shot.png", Kind: "screenshot", MIME: "image/png"}}

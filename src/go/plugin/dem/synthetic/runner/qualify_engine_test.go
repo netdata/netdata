@@ -139,3 +139,42 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 	assert.Empty(t, history.runs)
 	assert.Equal(t, "release-a", e.source.(fixtureRuntime).Paths.Identity.Version)
 }
+
+func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	e, _, _ := testEngineSlots(t, 2)
+	monitoring, qualified, release := make(chan struct{}, 1), make(chan struct{}, 1), make(chan struct{})
+	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+		if slices.Contains(args, "--check") {
+			return checkReply(out)
+		}
+		var r wireRequest
+		if err := json.Unmarshal(raw, &r); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		if r.Script == "monitor" {
+			monitoring <- struct{}{}
+			<-release
+		} else if r.Kind == synthetic.Journey {
+			qualified <- struct{}{}
+		}
+		result := success()
+		if r.Kind == synthetic.Lighthouse {
+			result.Tests = nil
+			score := 100.0
+			result.Metrics = &synthetic.LabMetrics{Performance: &score}
+		}
+		return resultPayload(result)(ctx, args, raw, out, stderr)
+	})
+	monitorDone := make(chan synthetic.Execution, 1)
+	go func() { monitorDone <- e.execute(t.Context(), namedRequest("runtime-qualification", "monitor")) }()
+	receive(t, monitoring)
+	qualification := make(chan error, 1)
+	go func() { _, err := e.Qualify(t.Context(), e.source); qualification <- err }()
+	receive(t, qualified)
+	require.NoError(t, receive(t, qualification))
+	close(release)
+	require.Equal(t, synthetic.Success, receive(t, monitorDone).Run.Outcome)
+}
