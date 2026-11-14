@@ -572,3 +572,27 @@ volume_manager_total_volumes{plugin_name="kubernetes.io/host-path",state="actual
 volume_manager_total_volumes{plugin_name="kubernetes.io/host-path",state="desired_state_of_world"} 15
 volume_manager_total_volumes{plugin_name="kubernetes.io/secret",state="actual_state_of_world"} 4
 volume_manager_total_volumes{plugin_name="kubernetes.io/secret",state="desired_state_of_world"} 4
+# HELP kubelet_volume_stats_available_bytes [ALPHA] Number of available bytes in the volume
+# TYPE kubelet_volume_stats_available_bytes gauge
+kubelet_volume_stats_available_bytes{namespace="app",persistentvolumeclaim="cache"} 1.5e+06
+kubelet_volume_stats_available_bytes{namespace="app",persistentvolumeclaim="data-db-0"} 450000
+# HELP kubelet_volume_stats_capacity_bytes [ALPHA] Capacity in bytes of the volume
+# TYPE kubelet_volume_stats_capacity_bytes gauge
+kubelet_volume_stats_capacity_bytes{namespace="app",persistentvolumeclaim="cache"} 2e+06
+kubelet_volume_stats_capacity_bytes{namespace="app",persistentvolumeclaim="data-db-0"} 1e+06
+# HELP kubelet_volume_stats_inodes [ALPHA] Maximum number of inodes in the volume
+# TYPE kubelet_volume_stats_inodes gauge
+kubelet_volume_stats_inodes{namespace="app",persistentvolumeclaim="cache"} 2000
+kubelet_volume_stats_inodes{namespace="app",persistentvolumeclaim="data-db-0"} 1000
+# HELP kubelet_volume_stats_inodes_free [ALPHA] Number of free inodes in the volume
+# TYPE kubelet_volume_stats_inodes_free gauge
+kubelet_volume_stats_inodes_free{namespace="app",persistentvolumeclaim="cache"} 1800
+kubelet_volume_stats_inodes_free{namespace="app",persistentvolumeclaim="data-db-0"} 900
+# HELP kubelet_volume_stats_inodes_used [ALPHA] Number of used inodes in the volume
+# TYPE kubelet_volume_stats_inodes_used gauge
+kubelet_volume_stats_inodes_used{namespace="app",persistentvolumeclaim="cache"} 200
+kubelet_volume_stats_inodes_used{namespace="app",persistentvolumeclaim="data-db-0"} 100
+# HELP kubelet_volume_stats_used_bytes [ALPHA] Number of used bytes in the volume
+# TYPE kubelet_volume_stats_used_bytes gauge
+kubelet_volume_stats_used_bytes{namespace="app",persistentvolumeclaim="cache"} 500000
+kubelet_volume_stats_used_bytes{namespace="app",persistentvolumeclaim="data-db-0"} 450000

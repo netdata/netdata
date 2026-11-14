@@ -4,9 +4,14 @@ package k8s_kubelet
 
 import (
 	"context"
+	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -158,14 +163,28 @@ func TestCollector_Collect(t *testing.T) {
 		"kubelet_runtime_operations_status":                                          279,
 		"kubelet_runtime_operations_stop_podsandbox":                                 14,
 		"kubelet_runtime_operations_version":                                         190,
-		"rest_client_requests_200":                                                   177,
+		"pvc_app_cache_inodes_available":                                             1800,
+		"pvc_app_cache_inodes_reserved":                                              0,
+		"pvc_app_cache_inodes_used":                                                  200,
+		"pvc_app_cache_space_available":                                              1500000,
+		"pvc_app_cache_space_reserved":                                               0,
+		"pvc_app_cache_space_used":                                                   500000,
+		"pvc_app_cache_space_utilization":                                            2500,
+		"pvc_app_data-db-0_inodes_available":                                         900,
+		"pvc_app_data-db-0_inodes_reserved":                                          0,
+		"pvc_app_data-db-0_inodes_used":                                              100,
+		"pvc_app_data-db-0_space_available":                                          450000,
+		"pvc_app_data-db-0_space_reserved":                                           100000,
+		"pvc_app_data-db-0_space_used":                                               450000,
+		"pvc_app_data-db-0_space_utilization":                                        5000,
+		"rest_client_requests_200":                                                   368,
 		"rest_client_requests_201":                                                   43,
 		"rest_client_requests_403":                                                   2,
 		"rest_client_requests_409":                                                   1,
-		"rest_client_requests_<error>":                                               8,
-		"rest_client_requests_GET":                                                   37,
+		"rest_client_requests_<error>":                                               45,
+		"rest_client_requests_GET":                                                   230,
 		"rest_client_requests_PATCH":                                                 177,
-		"rest_client_requests_POST":                                                  8,
+		"rest_client_requests_POST":                                                  52,
 		"token_count":                                                                0,
 		"token_fail_count":                                                           0,
 		"volume_manager_plugin_kubernetes.io/configmap_state_actual":                 3,
@@ -177,6 +196,352 @@ func TestCollector_Collect(t *testing.T) {
 	}
 
 	assert.Equal(t, expected, collr.Collect(context.Background()))
+}
+
+func TestCollector_Collect_VolumeStats(t *testing.T) {
+	type pvcChart struct {
+		ctx    string
+		labels map[string]string
+	}
+	labels := func(pvc string) map[string]string {
+		return map[string]string{"k8s_namespace": "app", "k8s_pvc_name": pvc}
+	}
+	spaceCharts := func(id, pvc string) map[string]pvcChart {
+		return map[string]pvcChart{
+			"pvc_" + id + "_space_usage":       {ctx: "k8s_kubelet.pvc_space_usage", labels: labels(pvc)},
+			"pvc_" + id + "_space_utilization": {ctx: "k8s_kubelet.pvc_space_utilization", labels: labels(pvc)},
+		}
+	}
+	inodesCharts := func(id, pvc string) map[string]pvcChart {
+		return map[string]pvcChart{
+			"pvc_" + id + "_inodes_usage": {ctx: "k8s_kubelet.pvc_inodes_usage", labels: labels(pvc)},
+		}
+	}
+	merge := func(ms ...map[string]pvcChart) map[string]pvcChart {
+		out := make(map[string]pvcChart)
+		for _, m := range ms {
+			maps.Copy(out, m)
+		}
+		return out
+	}
+
+	tests := map[string]struct {
+		series      []volumeStatsSeries
+		wantMetrics map[string]int64
+		wantCharts  map[string]pvcChart
+	}{
+		"no volume stats": {
+			wantMetrics: map[string]int64{},
+			wantCharts:  map[string]pvcChart{},
+		},
+		"all series reported": {
+			series: volumeStats("data", 1000, 600, 300, 100, 40, 60),
+			wantMetrics: map[string]int64{
+				"pvc_app_data_space_available":   300,
+				"pvc_app_data_space_used":        600,
+				"pvc_app_data_space_reserved":    100,
+				"pvc_app_data_space_utilization": 6666,
+				"pvc_app_data_inodes_available":  60,
+				"pvc_app_data_inodes_used":       40,
+				"pvc_app_data_inodes_reserved":   0,
+			},
+			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+		},
+		"empty volume is real data": {
+			series: volumeStats("data", 1000, 0, 1000, 100, 0, 100),
+			wantMetrics: map[string]int64{
+				"pvc_app_data_space_available":   1000,
+				"pvc_app_data_space_used":        0,
+				"pvc_app_data_space_reserved":    0,
+				"pvc_app_data_space_utilization": 0,
+				"pvc_app_data_inodes_available":  100,
+				"pvc_app_data_inodes_used":       0,
+				"pvc_app_data_inodes_reserved":   0,
+			},
+			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+		},
+		"zero inodes (SMB share): no inode chart": {
+			series: volumeStats("share", 1000, 600, 400, 0, 0, 0),
+			wantMetrics: map[string]int64{
+				"pvc_app_share_space_available":   400,
+				"pvc_app_share_space_used":        600,
+				"pvc_app_share_space_reserved":    0,
+				"pvc_app_share_space_utilization": 6000,
+			},
+			wantCharts: spaceCharts("app_share", "share"),
+		},
+		"capacity only (block volume): no charts": {
+			series:      volumeStats("disk", 1000, 0, 0, 0, 0, 0),
+			wantMetrics: map[string]int64{},
+			wantCharts:  map[string]pvcChart{},
+		},
+		"missing series: no chart for its group": {
+			series: slices.DeleteFunc(volumeStats("data", 1000, 600, 300, 100, 40, 60), func(s volumeStatsSeries) bool {
+				return s.name == "kubelet_volume_stats_used_bytes"
+			}),
+			wantMetrics: map[string]int64{
+				"pvc_app_data_inodes_available": 60,
+				"pvc_app_data_inodes_used":      40,
+				"pvc_app_data_inodes_reserved":  0,
+			},
+			wantCharts: inodesCharts("app_data", "data"),
+		},
+		"used + available above capacity: reserved clamped at 0": {
+			series: volumeStats("data", 100, 80, 30, 100, 40, 60),
+			wantMetrics: map[string]int64{
+				"pvc_app_data_space_available":   30,
+				"pvc_app_data_space_used":        80,
+				"pvc_app_data_space_reserved":    0,
+				"pvc_app_data_space_utilization": 7272,
+				"pvc_app_data_inodes_available":  60,
+				"pvc_app_data_inodes_used":       40,
+				"pvc_app_data_inodes_reserved":   0,
+			},
+			wantCharts: merge(spaceCharts("app_data", "data"), inodesCharts("app_data", "data")),
+		},
+		"names differing only in '.' and '-' get distinct charts": {
+			series: slices.Concat(
+				volumeStats("data.0", 1000, 600, 400, 0, 0, 0),
+				volumeStats("data-0", 2000, 500, 1500, 0, 0, 0),
+			),
+			wantMetrics: map[string]int64{
+				"pvc_app_data_0_space_available":   400,
+				"pvc_app_data_0_space_used":        600,
+				"pvc_app_data_0_space_reserved":    0,
+				"pvc_app_data_0_space_utilization": 6000,
+				"pvc_app_data-0_space_available":   1500,
+				"pvc_app_data-0_space_used":        500,
+				"pvc_app_data-0_space_reserved":    0,
+				"pvc_app_data-0_space_utilization": 2500,
+			},
+			wantCharts: merge(spaceCharts("app_data_0", "data.0"), spaceCharts("app_data-0", "data-0")),
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, setScrape := newVolumeStatsCollector(t)
+			setScrape(test.series)
+
+			mx := collr.Collect(context.Background())
+			require.NotNil(t, mx)
+
+			assert.Equal(t, test.wantMetrics, pvcMetricsOf(mx))
+			charts := make(map[string]pvcChart)
+			for _, chart := range *collr.Charts() {
+				if strings.HasPrefix(chart.ID, "pvc_") {
+					charts[chart.ID] = pvcChart{ctx: chart.Ctx, labels: chartLabels(chart)}
+				}
+			}
+			assert.Equal(t, test.wantCharts, charts)
+			collecttest.TestMetricsHasAllChartsDimsSkip(t, collr.Charts(), mx, func(chart *Chart, _ *Dim) bool {
+				return !strings.HasPrefix(chart.ID, "pvc_")
+			})
+		})
+	}
+}
+
+// The utilization chart Div (pvcUtilizationPrecision) must match the multiplier in pvcSpaceMetrics.Utilization's stm
+// tag, or the chart renders the percentage scaled.
+func TestCollector_Collect_VolumeStatsUtilizationPrecision(t *testing.T) {
+	tests := map[string]struct {
+		series []volumeStatsSeries
+		want   float64
+	}{
+		"quarter used":       {series: volumeStats("data", 1000, 250, 750, 0, 0, 0), want: 25},
+		"two decimal places": {series: volumeStats("data", 1000, 600, 300, 0, 0, 0), want: 66.66},
+		"full":               {series: volumeStats("data", 1000, 1000, 0, 0, 0, 0), want: 100},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr, setScrape := newVolumeStatsCollector(t)
+			setScrape(test.series)
+
+			mx := collr.Collect(context.Background())
+			require.NotNil(t, mx)
+
+			chart := collr.Charts().Get("pvc_app_data_space_utilization")
+			require.NotNil(t, chart)
+			require.Len(t, chart.Dims, 1)
+			dim := chart.Dims[0]
+			require.Positive(t, dim.Div)
+			value, ok := mx[dim.ID]
+			require.True(t, ok, dim.ID)
+
+			assert.Equal(t, test.want, float64(value)/float64(dim.Div))
+		})
+	}
+}
+
+func TestCollector_Collect_VolumeStatsChartLifecycle(t *testing.T) {
+	collr, setScrape := newVolumeStatsCollector(t)
+
+	data := volumeStats("data", 1000, 600, 300, 100, 40, 60)
+	cache := volumeStats("cache", 2000, 500, 1500, 200, 20, 180)
+	// a name containing "space" must not be mistaken for the "_space_" metric suffix
+	space := volumeStats("my.space", 3000, 300, 2700, 300, 30, 270)
+
+	// chart ID => state of each chart with that ID, in creation order; removed charts stay in the list until the
+	// job runtime prunes them, so a re-added PVC has a removed and an active entry
+	chartStates := func() map[string][]string {
+		states := make(map[string][]string)
+		for _, chart := range *collr.Charts() {
+			if !strings.HasPrefix(chart.ID, "pvc_") {
+				continue
+			}
+			state := "active"
+			if chart.IsRemoved() {
+				require.True(t, chart.Obsolete, chart.ID)
+				require.False(t, chart.IsCreated(), chart.ID)
+				state = "removed"
+			}
+			states[chart.ID] = append(states[chart.ID], state)
+		}
+		return states
+	}
+	allCharts := func(dataState, cacheState, spaceState []string) map[string][]string {
+		return map[string][]string{
+			"pvc_app_data_space_usage":           dataState,
+			"pvc_app_data_space_utilization":     dataState,
+			"pvc_app_data_inodes_usage":          dataState,
+			"pvc_app_cache_space_usage":          cacheState,
+			"pvc_app_cache_space_utilization":    cacheState,
+			"pvc_app_cache_inodes_usage":         cacheState,
+			"pvc_app_my_space_space_usage":       spaceState,
+			"pvc_app_my_space_space_utilization": spaceState,
+			"pvc_app_my_space_inodes_usage":      spaceState,
+		}
+	}
+
+	steps := []struct {
+		name       string
+		series     []volumeStatsSeries
+		wantPVCs   []string
+		wantCharts map[string][]string
+	}{
+		{
+			name:       "all PVCs",
+			series:     slices.Concat(data, cache, space),
+			wantPVCs:   []string{"app_cache", "app_data", "app_my_space"},
+			wantCharts: allCharts([]string{"active"}, []string{"active"}, []string{"active"}),
+		},
+		{
+			name:       "cache disappears",
+			series:     slices.Concat(data, space),
+			wantPVCs:   []string{"app_data", "app_my_space"},
+			wantCharts: allCharts([]string{"active"}, []string{"removed"}, []string{"active"}),
+		},
+		{
+			name:       "all disappear",
+			wantCharts: allCharts([]string{"removed"}, []string{"removed"}, []string{"removed"}),
+		},
+		{
+			name:       "cache reappears",
+			series:     cache,
+			wantPVCs:   []string{"app_cache"},
+			wantCharts: allCharts([]string{"removed"}, []string{"removed", "active"}, []string{"removed"}),
+		},
+	}
+
+	for _, step := range steps {
+		// the job runtime marks emitted charts as created; a removed chart must reset it to send the obsolete CHART
+		for _, chart := range *collr.Charts() {
+			if !chart.IsRemoved() {
+				chart.SetCreated(true)
+			}
+		}
+		setScrape(step.series)
+		mx := collr.Collect(context.Background())
+		require.NotNil(t, mx, step.name)
+
+		var pvcs []string
+		for key := range pvcMetricsOf(mx) {
+			// the PVC ID ends at the last metric group ("_space_" or "_inodes_"): the ID itself may contain either
+			end := max(strings.LastIndex(key, "_space_"), strings.LastIndex(key, "_inodes_"))
+			require.Positive(t, end, key)
+			pvc := key[len("pvc_"):end]
+			if !slices.Contains(pvcs, pvc) {
+				pvcs = append(pvcs, pvc)
+			}
+		}
+		slices.Sort(pvcs)
+		assert.Equal(t, step.wantPVCs, pvcs, step.name)
+		assert.Equal(t, step.wantCharts, chartStates(), step.name)
+	}
+}
+
+type volumeStatsSeries struct {
+	name  string
+	pvc   string
+	value float64
+}
+
+func volumeStats(pvc string, capacity, used, available, inodes, inodesUsed, inodesFree float64) []volumeStatsSeries {
+	return []volumeStatsSeries{
+		{name: "kubelet_volume_stats_capacity_bytes", pvc: pvc, value: capacity},
+		{name: "kubelet_volume_stats_used_bytes", pvc: pvc, value: used},
+		{name: "kubelet_volume_stats_available_bytes", pvc: pvc, value: available},
+		{name: "kubelet_volume_stats_inodes", pvc: pvc, value: inodes},
+		{name: "kubelet_volume_stats_inodes_used", pvc: pvc, value: inodesUsed},
+		{name: "kubelet_volume_stats_inodes_free", pvc: pvc, value: inodesFree},
+	}
+}
+
+// newVolumeStatsCollector returns a collector scraping the shared sample without its volume stats, plus the given
+// volume stats series.
+func newVolumeStatsCollector(t *testing.T) (*Collector, func([]volumeStatsSeries)) {
+	var base strings.Builder
+	for _, line := range strings.SplitAfter(string(dataMetrics), "\n") {
+		if !strings.Contains(line, "kubelet_volume_stats_") {
+			base.WriteString(line)
+		}
+	}
+
+	var mu sync.Mutex
+	var scrape []byte
+	ts := httptest.NewServer(
+		http.HandlerFunc(
+			func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				defer mu.Unlock()
+				_, _ = w.Write(scrape)
+			}))
+	t.Cleanup(ts.Close)
+
+	collr := New()
+	collr.BearerTokenFile = ""
+	collr.URL = ts.URL + "/metrics"
+	require.NoError(t, collr.Init(context.Background()))
+
+	return collr, func(series []volumeStatsSeries) {
+		var b strings.Builder
+		b.WriteString(base.String())
+		for _, s := range series {
+			_, _ = fmt.Fprintf(&b, "%s{namespace=\"app\",persistentvolumeclaim=%q} %g\n", s.name, s.pvc, s.value)
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		scrape = []byte(b.String())
+	}
+}
+
+func pvcMetricsOf(mx map[string]int64) map[string]int64 {
+	out := make(map[string]int64)
+	for k, v := range mx {
+		if strings.HasPrefix(k, "pvc_") {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func chartLabels(chart *Chart) map[string]string {
+	labels := make(map[string]string)
+	for _, l := range chart.Labels {
+		labels[l.Key] = l.Value
+	}
+	return labels
 }
 
 func TestCollector_Collect_ReceiveInvalidResponse(t *testing.T) {

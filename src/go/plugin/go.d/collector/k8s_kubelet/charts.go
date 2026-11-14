@@ -2,7 +2,17 @@
 
 package k8s_kubelet
 
-import "github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+)
+
+const (
+	labelKeyNamespace = "k8s_namespace"
+	labelKeyPVCName   = "k8s_pvc_name"
+)
 
 type (
 	// Charts is an alias for collectorapi.Charts
@@ -232,5 +242,85 @@ func newVolumeManagerChart(name string) *Chart {
 			{ID: "volume_manager_plugin_" + name + "_state_actual", Name: "actual"},
 			{ID: "volume_manager_plugin_" + name + "_state_desired", Name: "desired"},
 		},
+	}
+}
+
+var (
+	pvcSpaceChartsTmpl = Charts{
+		pvcSpaceUsageChartTmpl.Copy(),
+		pvcSpaceUtilizationChartTmpl.Copy(),
+	}
+	pvcInodesChartsTmpl = Charts{
+		pvcInodesUsageChartTmpl.Copy(),
+	}
+)
+
+var (
+	pvcSpaceUsageChartTmpl = Chart{
+		ID:    "pvc_%s_space_usage",
+		Title: "PVC Space Usage",
+		Units: "B",
+		Fam:   "pvc",
+		Ctx:   "k8s_kubelet.pvc_space_usage",
+		Type:  collectorapi.Stacked,
+		Dims: Dims{
+			{ID: "pvc_%s_space_available", Name: "available"},
+			{ID: "pvc_%s_space_used", Name: "used"},
+			{ID: "pvc_%s_space_reserved", Name: "reserved"},
+		},
+	}
+	pvcSpaceUtilizationChartTmpl = Chart{
+		ID:    "pvc_%s_space_utilization",
+		Title: "PVC Space Utilization",
+		Units: "%",
+		Fam:   "pvc",
+		Ctx:   "k8s_kubelet.pvc_space_utilization",
+		Dims: Dims{
+			{ID: "pvc_%s_space_utilization", Name: "utilization", Div: pvcUtilizationPrecision},
+		},
+	}
+	pvcInodesUsageChartTmpl = Chart{
+		ID:    "pvc_%s_inodes_usage",
+		Title: "PVC Inodes Usage",
+		Units: "inodes",
+		Fam:   "pvc",
+		Ctx:   "k8s_kubelet.pvc_inodes_usage",
+		Type:  collectorapi.Stacked,
+		Dims: Dims{
+			{ID: "pvc_%s_inodes_available", Name: "available"},
+			{ID: "pvc_%s_inodes_used", Name: "used"},
+			{ID: "pvc_%s_inodes_reserved", Name: "reserved"},
+		},
+	}
+)
+
+// pvcID builds the chart and dimension ID part of a PVC. Namespaces cannot contain '.' or '_' and PVC names cannot
+// contain '_', so replacing the PVC name's dots with '_' keeps IDs unique and leaves a single '.' in "type.id".
+func pvcID(namespace, pvc string) string {
+	return namespace + "_" + strings.ReplaceAll(pvc, ".", "_")
+}
+
+func newPVCCharts(tmpl Charts, namespace, pvc string) *Charts {
+	id := pvcID(namespace, pvc)
+	charts := tmpl.Copy()
+
+	for _, chart := range *charts {
+		chart.ID = fmt.Sprintf(chart.ID, id)
+		chart.Labels = []collectorapi.Label{
+			{Key: labelKeyNamespace, Value: namespace, Source: collectorapi.LabelSourceK8s},
+			{Key: labelKeyPVCName, Value: pvc, Source: collectorapi.LabelSourceK8s},
+		}
+		for _, dim := range chart.Dims {
+			dim.ID = fmt.Sprintf(dim.ID, id)
+		}
+	}
+
+	return charts
+}
+
+func removePVCCharts(charts *Charts) {
+	for _, chart := range *charts {
+		chart.MarkRemove()
+		chart.MarkNotCreated()
 	}
 }

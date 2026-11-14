@@ -167,13 +167,31 @@ func (d *kubeDiscovery) setupDiscoverers(ctx context.Context) []discoverer {
 		},
 	}, d.client)
 
-	return []discoverer{
+	discoverers := []discoverer{
 		newNodeDiscoverer(cache.NewSharedInformer(nodeWatcher, &corev1.Node{}, resyncPeriod), d.Logger),
 		newPodDiscoverer(cache.NewSharedInformer(podWatcher, &corev1.Pod{}, resyncPeriod), d.Logger),
 		newDeploymentDiscoverer(cache.NewSharedInformer(deployWatcher, &appsv1.Deployment{}, resyncPeriod), d.Logger),
 		newCronJobDiscoverer(cache.NewSharedInformer(cjWatcher, &batchv1.CronJob{}, resyncPeriod), d.Logger),
 		newJobDiscoverer(cache.NewSharedInformer(jobsWatcher, &batchv1.Job{}, resyncPeriod), d.Logger),
 	}
+
+	// Optional: it needs a permission the service account may not have, see canListWatchPVCs.
+	if d.canListWatchPVCs(ctx) {
+		pvc := d.client.CoreV1().PersistentVolumeClaims(corev1.NamespaceAll)
+		pvcWatcher := cache.ToListWatcherWithWatchListSemantics(&cache.ListWatch{
+			ListWithContextFunc: func(_ context.Context, options metav1.ListOptions) (runtime.Object, error) {
+				return pvc.List(ctx, options)
+			},
+			WatchFuncWithContext: func(_ context.Context, options metav1.ListOptions) (watch.Interface, error) {
+				return pvc.Watch(ctx, options)
+			},
+		}, d.client)
+
+		informer := cache.NewSharedInformer(pvcWatcher, &corev1.PersistentVolumeClaim{}, resyncPeriod)
+		discoverers = append(discoverers, newPVCDiscoverer(informer, d.Logger))
+	}
+
+	return discoverers
 }
 
 func enqueue(queue *workqueue.Typed[string], obj any) {
