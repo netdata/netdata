@@ -63,3 +63,15 @@ fn data_point_round_trip() {
     assert_eq!(back.timestamp_ms, 42);
     assert_eq!(back.items, vec![[1, 2, 3], [4, 5, 6]]);
 }
+
+/// The info descriptor advertises a history-capable v3 function, matching
+/// the data responses: MCP and other callers read `has_history` and `v`
+/// from it to decide whether timeframe params may be forwarded.
+#[test]
+fn info_response_advertises_history_and_v3() {
+    let v = serde_json::to_value(InfoResponse::default()).unwrap();
+    assert_eq!(v["has_history"], true);
+    assert_eq!(v["v"], 3);
+    assert_eq!(v["version"], 1);
+    assert_eq!(v["status"], 200);
+}
