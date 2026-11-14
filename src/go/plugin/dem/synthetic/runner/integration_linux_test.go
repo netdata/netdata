@@ -68,7 +68,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	consumer, err := store.AcquireSelected()
 	require.NoError(t, err)
 	require.Equal(t, manifest, consumer.Manifest(), "selected release must match the supplied trusted descriptor")
-	expectedIdentity := synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}
+	expectedIdentity := manifest.Identity()
 	base, err := os.MkdirTemp("", "dem-real-runtime-")
 	require.NoError(t, err)
 	safe := true
@@ -608,8 +608,7 @@ func (s selectedRuntime) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := s.consumer.Manifest()
-	return selectedUse{use: use, identity: synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}}, nil
+	return selectedUse{use: use, identity: s.consumer.Manifest().Identity()}, nil
 }
 
 type selectedUse struct {
