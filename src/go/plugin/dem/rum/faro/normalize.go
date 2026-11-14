@@ -142,9 +142,11 @@ func eventAttrRule(kind beacon.EventKind, name, key string) attrRule {
 		case "fromView", "toView":
 			return nativeAttr(attrByKey)
 		}
-	}
-	if key == "target" && beacon.IsFrustration(name) {
-		return nativeAttr(attrByKey)
+	case beacon.EventCustom:
+		// Frustration signals are custom events; their target is the element.
+		if key == "target" && beacon.IsFrustration(name) {
+			return nativeAttr(attrByKey)
+		}
 	}
 	return attrRule{}
 }

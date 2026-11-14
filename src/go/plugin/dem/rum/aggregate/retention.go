@@ -116,6 +116,8 @@ func newReceiptIndex[K comparable, V any]() receiptIndex[K, V] {
 }
 func (x *receiptIndex[K, V]) len() int                      { return len(x.byKey) }
 func (x *receiptIndex[K, V]) get(key K) *receiptEntry[K, V] { return x.byKey[key] }
+
+// add retains an absent key; put replaces a retained one.
 func (x *receiptIndex[K, V]) add(received time.Time, key K, v V) {
 	x.byKey[key] = x.order.add(received, key, v)
 }
