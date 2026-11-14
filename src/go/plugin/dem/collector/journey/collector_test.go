@@ -42,6 +42,14 @@ func configured() *Collector {
 	return c
 }
 
+// request builds the execution request Init validates for the current configuration.
+func request(t *testing.T, c *Collector) model.Request {
+	t.Helper()
+	r, err := c.newRequest("")
+	require.NoError(t, err)
+	return r
+}
+
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
 		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":true,"trace_on_failure":true,"browser_error_summary":true}`,
@@ -202,20 +210,20 @@ func TestBrowserErrorSummaryOption(t *testing.T) {
 					require.NoError(t, err)
 					require.NoError(t, codec.decode(raw, c))
 					require.NoError(t, c.Init(context.Background()))
-					assert.Equal(t, enabled, c.request.BrowserErrorSummary)
+					assert.Equal(t, enabled, request(t, c).BrowserErrorSummary)
 					raw, err = codec.encode(c.Configuration())
 					require.NoError(t, err)
 					copy := configured()
 					require.NoError(t, codec.decode(raw, copy))
 					require.NoError(t, copy.Init(context.Background()))
-					assert.Equal(t, enabled, copy.request.BrowserErrorSummary)
+					assert.Equal(t, enabled, request(t, copy).BrowserErrorSummary)
 				})
 			}
 		})
 	}
 	c := configured()
 	require.NoError(t, c.Init(context.Background()))
-	assert.False(t, c.request.BrowserErrorSummary)
+	assert.False(t, request(t, c).BrowserErrorSummary)
 }
 
 func TestTraceRequestAndDependency(t *testing.T) {
@@ -225,6 +233,6 @@ func TestTraceRequestAndDependency(t *testing.T) {
 	require.EqualError(t, c.Init(t.Context()), "trace_on_failure requires screenshot_on_failure")
 	c.ScreenshotOnFailure = true
 	require.NoError(t, c.Init(t.Context()))
-	assert.True(t, c.request.Trace)
-	assert.True(t, c.request.Capture)
+	assert.True(t, request(t, c).Trace)
+	assert.True(t, request(t, c).Capture)
 }

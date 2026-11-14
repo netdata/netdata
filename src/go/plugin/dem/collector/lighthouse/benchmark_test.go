@@ -16,6 +16,9 @@ import (
 type benchmarkExecutor struct{ result model.Execution }
 
 func (e benchmarkExecutor) Check(context.Context, model.Kind) error { return nil }
+func (e benchmarkExecutor) Rehearse(context.Context, model.Request) error {
+	panic("unexpected rehearsal")
+}
 
 func (e benchmarkExecutor) ExecuteScheduled(
 	_ context.Context,

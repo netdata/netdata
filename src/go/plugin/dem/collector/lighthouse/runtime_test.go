@@ -37,6 +37,7 @@ func (e executor) Check(ctx context.Context, k model.Kind) error {
 	}
 	return nil
 }
+func (e executor) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
 
 func (e executor) ExecuteScheduled(
 	ctx context.Context,
@@ -87,7 +88,7 @@ func (e executor) ExecuteScheduled(
 	return result
 }
 func ptr(v float64) *float64 { return &v }
-func newLighthouse(e lighthouse.Executor, hub *syntheticregistry.Registry) *lighthouse.Collector {
+func newLighthouse(e executor, hub *syntheticregistry.Registry) *lighthouse.Collector {
 	c := lighthouse.New(lighthouse.Dependencies{
 		Executor: e,
 		Registry: hub,
@@ -635,6 +636,5 @@ func TestCollectionRequiresActivationAndHonorsCancellation(t *testing.T) {
 	require.ErrorIs(t, c.Collect(ctx), context.Canceled)
 }
 
-var _ lighthouse.Executor = executor{}
 var _ collectorapi.CollectorV2 = (*lighthouse.Collector)(nil)
 var _ collectorapi.CollectorV2Runner = (*lighthouse.Collector)(nil)

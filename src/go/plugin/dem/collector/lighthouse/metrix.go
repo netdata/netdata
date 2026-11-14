@@ -5,6 +5,7 @@ import (
 	"math"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjob"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
@@ -17,7 +18,7 @@ type metrics struct {
 	cls         metrix.SnapshotGauge
 }
 
-func newMetrics(m metrix.SnapshotMeter) metrics {
+func newMetrics(m metrix.SnapshotMeter) syntheticjob.Metrics {
 	return metrics{
 		performance: m.Gauge("performance", metrix.WithFloat(true)),
 		fcp:         m.Gauge("fcp", metrix.WithFloat(true)),
@@ -27,7 +28,7 @@ func newMetrics(m metrix.SnapshotMeter) metrics {
 		cls:         m.Gauge("cls", metrix.WithFloat(true)),
 	}
 }
-func (m metrics) write(run monitor.Observation) {
+func (m metrics) Write(run monitor.Observation) {
 	if v := run.Metrics; run.HasMetrics {
 		observe(m.performance, v.Performance)
 		observe(m.fcp, v.FCPMS)
