@@ -416,7 +416,7 @@ What makes this layer predictable:
 
 ## Startup and shutdown
 
-`cmd/demplugin/main.go` builds the process in a fixed order and tears it down only after a clean exit:
+`dem.Open` (`process.go`) builds the process in a fixed order; the command tears it down only after a clean exit:
 
 ```mermaid
 flowchart TD
@@ -424,7 +424,7 @@ flowchart TD
     Journal("Open journal<br/>verify files · apply retention")
     Art("Open capture store<br/>first cleanup")
     RT("Open browser runtime<br/>build the runner")
-    Compose("dem.New<br/>registries · collectors · Functions · retention")
+    Compose("Compose components<br/>registries · collectors · Functions · retention")
     Run("agenthost.Run<br/>framework runs jobs and Functions")
     Clean{"Clean exit?"}
     Close("Close runtime → captures → journal")
@@ -456,10 +456,11 @@ flowchart TD
 ## Package map
 
 The root `dem` package composes the plugin and owns its process-level policy: it loads and validates `dem.conf`
-(`config.go`), acquires the selected installation or sealed preload (`runtime_setup.go`), runs the retention worker
-(`retention.go`), and wires native collectors, process Function providers, query services and retention
-(`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function tables. The
-command creates and closes the shared resources across framework generations.
+(`config.go`), opens the journal, capture store, browser runtime and runner in order and closes them (`process.go`), runs
+the retention worker (`retention.go`), and wires native collectors, process Function providers, query services and
+retention (`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function
+tables. The command parses its arguments, runs the Agent across framework generations and closes the process only after
+a clean exit.
 
 Shared and process-wide packages:
 
@@ -501,7 +502,7 @@ Synthetic packages:
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
 | `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |
-| `synthetic/runtimehost` | Fixed startup selection, dependency readiness and process maintenance |
+| `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
 Deeper package guides: [runtime store](synthetic/runtime/README.md), [runtime host](synthetic/runtimehost/README.md),
