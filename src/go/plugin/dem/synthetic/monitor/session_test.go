@@ -42,8 +42,10 @@ func (e *controlledExecutor) ExecuteScheduled(
 	e.calls <- c
 	select {
 	case now := <-c.admission:
-		c.schedule <- admitted(now)
+		// Report the phase before handing the schedule back, so a test that received it observes running.
+		schedule := admitted(now)
 		state("running")
+		c.schedule <- schedule
 	case <-ctx.Done():
 		close(c.cancelled)
 		return <-c.finish
