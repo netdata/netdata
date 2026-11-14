@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package history
 
 import (
@@ -25,11 +26,13 @@ func newFakeCounters() *fakeCounters {
 		values: map[string]uint64{},
 	}
 }
+
 func (c *fakeCounters) Add(key string, n uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.values[key] += n
 }
+
 func (c *fakeCounters) get(key string) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -41,6 +44,7 @@ type eventWriterFunc func(context.Context, EventRecord) (bool, error)
 func (f eventWriterFunc) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	return f(ctx, r)
 }
+
 func (eventWriterFunc) Sync(context.Context) error { return nil }
 
 func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background()); cancel(); w.Run(ctx) }
@@ -98,6 +102,34 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	assert.EqualValues(t, 2, counters.get(CounterWritten))
 	assert.Zero(t, counters.get(CounterDropped))
 }
+
+func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
+	store, _ := newTestStore(t)
+	writer := NewWriter(store, newFakeCounters())
+	now := time.Now().UnixMicro()
+	records := []aggregate.HistoryEvent{
+		{Site: "shop", SessionID: "session", ObservedUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
+	}
+	for _, record := range records {
+		writer.Event(record)
+	}
+	drain(writer)
+	events, err := store.QuerySessionEvents(context.Background(), "shop", "session", "")
+	require.NoError(t, err)
+	require.Equal(t, []SessionEventRecord{
+		{Site: "shop", SessionID: "session", ObservedUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 1, Type: "view", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", Revision: 2},
+		{Site: "shop", SessionID: "session", ObservedUS: now + 2, Type: "vital", Page: "/entry", ExperienceID: "document", View: "payment", ViewID: "view-two", MetricID: "metric", Revision: 3},
+	}, events)
+	sessions, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+1, 10, "")
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	require.EqualValues(t, 1, sessions[0].Pageviews)
+	require.EqualValues(t, 1, sessions[0].ApplicationViews)
+}
+
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter(nil, counters)
@@ -114,6 +146,19 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	assert.EqualValues(t, queueCap, counters.get(CounterWritten))
 	assert.EqualValues(t, 7, counters.get(CounterDropped))
 }
+
+func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
+	counters := newFakeCounters()
+	w := NewWriter(nil, counters)
+	for range queueCap + 1 {
+		w.Event(aggregate.HistoryEvent{
+			Site: "site",
+		})
+	}
+	assert.EqualValues(t, 1, counters.get(CounterDropped), "a full queue counts without waiting for a flush")
+	assert.Zero(t, counters.get(CounterWritten))
+}
+
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter(nil, counters)
@@ -145,6 +190,7 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	assert.EqualValues(t, maxBatch+7, counters.get(CounterWritten))
 	assert.Zero(t, counters.get(CounterDropped))
 }
+
 func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
@@ -179,6 +225,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 		})
 	}
 }
+
 func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter(nil, counters)
@@ -213,21 +260,10 @@ func (w *recordingEventWriter) AppendEvent(context.Context, EventRecord) (bool, 
 	w.appends++
 	return true, nil
 }
+
 func (w *recordingEventWriter) Sync(context.Context) error {
 	w.syncs++
 	return w.syncErr
-}
-
-func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
-	counters := newFakeCounters()
-	w := NewWriter(nil, counters)
-	for range queueCap + 1 {
-		w.Event(aggregate.HistoryEvent{
-			Site: "site",
-		})
-	}
-	assert.EqualValues(t, 1, counters.get(CounterDropped), "a full queue counts without waiting for a flush")
-	assert.Zero(t, counters.get(CounterWritten))
 }
 
 func TestEmptyFlushSkipsJournalSync(t *testing.T) {
@@ -254,6 +290,7 @@ func (w *cancelLastAppendWriter) AppendEvent(context.Context, EventRecord) (bool
 	}
 	return true, nil
 }
+
 func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -261,6 +298,7 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 	w.synced = true
 	return nil
 }
+
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -279,6 +317,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	assert.Equal(t, maxBatch, disk.appends)
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
+
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 	w := NewWriter(nil, newFakeCounters())
 	disk := &recordingEventWriter{
