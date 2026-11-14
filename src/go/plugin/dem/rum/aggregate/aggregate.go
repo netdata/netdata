@@ -23,10 +23,6 @@ const (
 	KindVersion = "version"
 )
 
-// Kinds lists the breakdowns in emission order. Application views carry
-// activity and error counts, without document-scoped vital distributions.
-var Kinds = []string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
-
 // versionTopN is the fixed top-N for the version breakdown ("top-10 by pageviews"); unlike page/country it has no per-site config.
 const versionTopN = 10
 

@@ -148,6 +148,18 @@ func TestRatings(t *testing.T) {
 	}
 }
 
+// Read slots follow the emission order, so a slot index names its vital.
+func TestVitalSlotsFollowEmissionOrder(t *testing.T) {
+	require.Len(t, beacon.Vitals, vitalCount)
+	for slot, name := range beacon.Vitals {
+		index, ok := vitalIndex(name)
+		require.True(t, ok, name)
+		assert.Equal(t, slot, index, name)
+	}
+	_, ok := vitalIndex("unsupported")
+	assert.False(t, ok)
+}
+
 func TestLatestRevisionAndExplicitActivations(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	b := mk(*now, "s1", "/entry", v(beacon.CLS, .1))

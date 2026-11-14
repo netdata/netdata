@@ -75,10 +75,10 @@ func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 }
 
 // Session and sessionless errors persist the same complete record: the site's
-// configured vnode, the arrival context and bounded error detail. Only a
-// session timeline defaults an empty page group to "/".
+// configured vnode, the arrival context and the decoder-bounded error detail.
+// Only a session timeline defaults an empty page group to "/".
 func TestErrorHistoryRecordIsComplete(t *testing.T) {
-	message, stack := strings.Repeat("m", 250), strings.Repeat("s", errMaxStackBytes+100)
+	message, stack := strings.Repeat("m", 250), strings.Repeat("s", 4096)
 	tests := map[string]struct {
 		session, page string
 	}{
@@ -130,7 +130,7 @@ func TestErrorHistoryRecordIsComplete(t *testing.T) {
 				Fingerprint:  "fingerprint",
 				ErrorType:    "TypeError",
 				Message:      message,
-				SampleStack:  stack[:errMaxStackBytes],
+				SampleStack:  stack,
 			}}, sink.events)
 		})
 	}

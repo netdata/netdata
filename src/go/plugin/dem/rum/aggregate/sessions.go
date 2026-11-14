@@ -298,7 +298,7 @@ func newErrorEvent(err beacon.Error, ts time.Time, page string) (sessionEvent, s
 		fingerprint: err.Fingerprint,
 		typ:         err.Type,
 		message:     err.Message,
-		stack:       truncateStack(err.Stack),
+		stack:       err.Stack, // bounded by the decoder
 	}
 	return event, detail
 }

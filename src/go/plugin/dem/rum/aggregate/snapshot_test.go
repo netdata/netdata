@@ -48,7 +48,7 @@ func TestReadsPreserveEveryVitalAndEmptyPopulation(t *testing.T) {
 			assert.Equal(t, wantVitals, snap.Vitals)
 			assert.EqualValues(t, 2, snap.PageviewsWindow)
 			assert.Equal(t, 3, snap.ObservedSessions)
-			for _, kind := range Kinds {
+			for _, kind := range facetKinds {
 				groups := snap.Breakdowns[kind]
 				require.Len(t, groups, 1, kind)
 				if kind == KindView {

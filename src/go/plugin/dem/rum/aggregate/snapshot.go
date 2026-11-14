@@ -3,6 +3,7 @@
 package aggregate
 
 import (
+	"maps"
 	"sort"
 	"time"
 
@@ -48,6 +49,8 @@ const (
 	facetCount
 )
 
+// facetKinds lists the breakdowns in emission order. Application views carry
+// activity and error counts, without document-scoped vital distributions.
 var facetKinds = [facetCount]string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
 
 type facetValue struct {
@@ -94,7 +97,7 @@ type windowRead struct {
 	groups         [facetCount]map[string]*population
 	load, dcl, api []float64
 	resourceGroups map[hostKey]*resourcePopulation
-	errorGroups    map[errorKey]*errorPopulation
+	errorGroups    map[string]*errorPopulation // by fingerprint
 	sessions       int
 }
 
@@ -134,7 +137,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	st.expire(now)
 	r := &windowRead{
 		resourceGroups: map[hostKey]*resourcePopulation{},
-		errorGroups:    map[errorKey]*errorPopulation{},
+		errorGroups:    map[string]*errorPopulation{},
 	}
 	// Count the same retained population before copying. This extra traversal
 	// trades slice growth/copying for exact buffers without persistent accounting.
@@ -243,7 +246,7 @@ func (a *Aggregator) Snapshot() Snapshot {
 	snap := Snapshot{
 		Name:                   cfg.Name,
 		DisplayName:            cfg.DisplayName,
-		Counters:               map[string]uint64{},
+		Counters:               maps.Clone(st.counters),
 		ObservedSessions:       r.sessions,
 		ResourcesSeen:          st.resourcesSeen,
 		FirstPartyResources:    st.firstPartyResources,
@@ -252,9 +255,6 @@ func (a *Aggregator) Snapshot() Snapshot {
 		PageviewsWindow:        r.global.documents,
 		JSErrorsWindow:         r.global.errors,
 		ApplicationViewsWindow: r.global.views,
-	}
-	for k, v := range st.counters {
-		snap.Counters[k] = v
 	}
 	a.mu.Unlock()
 
@@ -272,7 +272,7 @@ func (a *Aggregator) Snapshot() Snapshot {
 }
 func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	out := make(map[string]VitalStats, len(beacon.Vitals))
-	for index, name := range vitalNames {
+	for index, name := range beacon.Vitals {
 		if p.vitalValues == nil {
 			out[name] = VitalStats{}
 		} else {

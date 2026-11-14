@@ -3,10 +3,8 @@ package aggregate
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/assert"
@@ -48,9 +46,4 @@ func TestErrorsRankCurrentWindowAndFoldComplement(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "current", groups[0].Fingerprint)
 	assert.EqualValues(t, 1, groups[0].Count)
-}
-func TestTruncateStackKeepsValidUTF8(t *testing.T) {
-	s := truncateStack(strings.Repeat("界", errMaxStackBytes))
-	assert.True(t, utf8.ValidString(s))
-	assert.LessOrEqual(t, len(s), errMaxStackBytes)
 }

@@ -16,8 +16,9 @@ const (
 	navDCLName  = "__nav_dcl"
 )
 
-// Read distributions use fixed slots for the five supported vitals. Canonical
-// ingestion still owns named observations; only query-owned values use slots.
+// Read distributions use fixed slots for the five supported vitals, in
+// beacon.Vitals order. Canonical ingestion still owns named observations; only
+// query-owned values use slots.
 const (
 	lcpIndex = iota
 	fcpIndex
@@ -26,8 +27,6 @@ const (
 	clsIndex
 	vitalCount
 )
-
-var vitalNames = [vitalCount]string{beacon.LCP, beacon.FCP, beacon.TTFB, beacon.INP, beacon.CLS}
 
 func vitalIndex(name string) (int, bool) {
 	switch name {
