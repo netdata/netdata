@@ -3,8 +3,6 @@
 package syntheticjob
 
 import (
-	"math"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
@@ -71,11 +69,9 @@ func (m attemptMetrics) write(s monitor.Snapshot) {
 		state = string(synthetic.JobStale)
 	}
 	m.outcome.Enable(state)
+	// The engine measures durations, so they are finite.
 	if s.Fresh && s.Latest.DurationMS.Present {
-		v := s.Latest.DurationMS.Value
-		if !math.IsNaN(v) && !math.IsInf(v, 0) {
-			m.duration.Observe(v)
-		}
+		m.duration.Observe(s.Latest.DurationMS.Value)
 	}
 	if s.HasObservation && s.ObservationAge >= 0 {
 		m.age.Observe(s.ObservationAge.Seconds())

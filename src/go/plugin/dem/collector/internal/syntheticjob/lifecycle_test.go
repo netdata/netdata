@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -210,10 +209,8 @@ func TestLaterObservationWithMissingValuesCreatesGaps(t *testing.T) {
 					run.Outcome = synthetic.Error
 					run.DurationMS = nil
 					run.Tests = nil
-					run.Metrics = &synthetic.LabMetrics{
-						Performance: new(math.NaN()),
-						LCPMS:       new(math.Inf(1)),
-					}
+					// A measurement object without values is a gap, not a zero.
+					run.Metrics = &synthetic.LabMetrics{}
 				}
 				return synthetic.Execution{
 					Drained: true,
