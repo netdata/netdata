@@ -10,13 +10,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-func (a *Aggregator) Reject(site, reason string) {
+// Reject counts one request the receiver refused for this site.
+func (a *Aggregator) Reject(reason string) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := &a.site
-	if site != st.cfg.Name {
-		return
-	}
 	now := a.now()
 	st.expireActivityIfDue(now)
 	st.counters[reason]++
@@ -29,10 +27,10 @@ func (a *Aggregator) Reject(site, reason string) {
 }
 
 // Result carries the newly admitted observations for investigation/export.
-// Observation is non-nil for an accepted batch, including a replay with no new measurements.
+// Observation is never nil, including for a replay with no new measurements.
 type Result struct {
-	Accepted, PageView, Investigated bool
-	Observation                      *beacon.Beacon
+	PageView, Investigated bool
+	Observation            *beacon.Beacon
 }
 
 // Ingest never changes its input. Duplicate checks are O(1); accepted receipt
@@ -42,9 +40,6 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	st := &a.site
-	if b.Site != st.cfg.Name {
-		return Result{}
-	}
 	clock := a.now()
 	st.expireMeasurements(clock)
 	st.expireActivityIfDue(clock)
@@ -267,7 +262,6 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	}
 	a.appendLive(&obs, pageView, now)
 	return Result{
-		Accepted:     true,
 		PageView:     pageView,
 		Investigated: investigated,
 		Observation:  &obs,

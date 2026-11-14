@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package beacon
+package faro
 
 import "testing"
 
@@ -31,8 +31,8 @@ func TestNormalizeMessage(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := NormalizeMessage(tc.in); got != tc.want {
-				t.Fatalf("NormalizeMessage(%q) = %q want %q", tc.in, got, tc.want)
+			if got := normalizeMessage(tc.in); got != tc.want {
+				t.Fatalf("normalizeMessage(%q) = %q want %q", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -40,8 +40,8 @@ func TestNormalizeMessage(t *testing.T) {
 
 func TestFingerprintStability(t *testing.T) {
 	// Same shape, volatile details differ: must fingerprint identically.
-	a := Fingerprint("TypeError", "Cannot read property 'x' of undefined (id 42)", "onClick@app.js")
-	b := Fingerprint("TypeError", "Cannot read property 'x' of undefined (id 99)", "onClick@app.js")
+	a := fingerprint("TypeError", "Cannot read property 'x' of undefined (id 42)", "onClick@app.js")
+	b := fingerprint("TypeError", "Cannot read property 'x' of undefined (id 99)", "onClick@app.js")
 	if a != b {
 		t.Fatalf("expected stable fingerprint across volatile numbers: %q != %q", a, b)
 	}
@@ -58,12 +58,12 @@ func TestFingerprintDistinguishesShape(t *testing.T) {
 		"other frame": {"TypeError", "x is undefined", "b@f.js"},
 		"empty frame": {"TypeError", "x is undefined", ""},
 	}
-	base := Fingerprint(tests["base"].typ, tests["base"].msg, tests["base"].frame)
+	base := fingerprint(tests["base"].typ, tests["base"].msg, tests["base"].frame)
 	for name, tc := range tests {
 		if name == "base" {
 			continue
 		}
-		if got := Fingerprint(tc.typ, tc.msg, tc.frame); got == base {
+		if got := fingerprint(tc.typ, tc.msg, tc.frame); got == base {
 			t.Fatalf("%s: expected a different fingerprint from base, got the same %q", name, got)
 		}
 	}

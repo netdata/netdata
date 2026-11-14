@@ -114,14 +114,12 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 	extra.Scope = "other-scope"
 	extra.ScopeVersion = "2"
 	first.Spans = append(first.Spans, extra, first.Spans[0])
-	e.Ingest(first, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  first,
-		Accepted:     true,
 		Investigated: true,
 	})
-	e.Ingest(second, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  second,
-		Accepted:     true,
 		Investigated: true,
 	})
 	ctx, cancel := context.WithCancel(context.Background())

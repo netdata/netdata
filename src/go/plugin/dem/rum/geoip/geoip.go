@@ -16,6 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 // Paths are injected from the Agent's runtime or compiled data roots.
@@ -233,7 +235,7 @@ type geoRecord struct {
 
 // Lookup returns only validated fields. A record decode failure loses this lookup,
 // not the entire source; a mapped-read fault retires the unsafe source instead.
-func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64, hasGeo bool) {
+func (r *Resolver) Lookup(ipStr string) (loc beacon.Location) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return
@@ -257,19 +259,20 @@ func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64,
 		return
 	}
 	invalid := false
-	country = rec.Country.ISOCode
+	country := rec.Country.ISOCode
 	if country != "" &&
 		(len(country) != 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z') {
 		country = ""
 		invalid = true
 	}
-	city = trimCityAnnex(rec.City.Names.En)
+	loc.Country = country
+	loc.City = trimCityAnnex(rec.City.Names.En)
 	if rec.Location.Latitude != nil && rec.Location.Longitude != nil {
 		a, b := *rec.Location.Latitude, *rec.Location.Longitude
 		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 && !math.IsNaN(b) && !math.IsInf(b, 0) &&
 			b >= -180 &&
 			b <= 180 {
-			lat, lon, hasGeo = round1(a), round1(b), true
+			loc.Lat, loc.Lon, loc.HasGeo = round1(a), round1(b), true
 		} else {
 			invalid = true
 		}

@@ -22,7 +22,7 @@ func (discardCounters) Add(string, uint64) {}
 // accounting and one batch sync per full batch. Cost is O(batch) with no
 // allocation. Timings are local trends, not CI gates.
 func BenchmarkWriterFlush(b *testing.B) {
-	w := NewWriter("shop", nil, discardCounters{})
+	w := NewWriter(nil, discardCounters{})
 	w.st = discardEventWriter{}
 	batch := make([]aggregate.HistoryEvent, maxBatch)
 	for i := range batch {

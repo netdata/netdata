@@ -98,13 +98,12 @@ func BenchmarkConsoleIngest(b *testing.B) {
 			event.Logs = []beacon.Log{log}
 			result := aggregate.Result{
 				Observation:  event,
-				Accepted:     true,
 				Investigated: true,
 			}
 			b.ReportAllocs()
 			b.ResetTimer()
 			for b.Loop() {
-				e.Ingest(event, result)
+				e.Ingest(result)
 				<-e.ch
 			}
 		})

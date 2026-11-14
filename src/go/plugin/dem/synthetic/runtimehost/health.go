@@ -5,6 +5,8 @@ package runtimehost
 import (
 	"errors"
 	"fmt"
+
+	"github.com/netdata/netdata/go/plugins/logger"
 )
 
 // Each operation owns its error slot. A successful sweep cannot erase an
@@ -15,8 +17,30 @@ type healthChange struct {
 	changed   bool
 }
 
+func trackHealth(operation string, previous, current error) healthChange {
+	return healthChange{operation: operation, err: current, changed: errorText(previous) != errorText(current)}
+}
+
+func (c healthChange) log(log *logger.Logger) {
+	if !c.changed {
+		return
+	}
+	if c.err != nil {
+		log.Warningf("DEM runtime %s failed: %v", c.operation, c.err)
+	} else {
+		log.Noticef("DEM runtime %s recovered", c.operation)
+	}
+}
+
+func labelled(operation string, err error) error {
+	if err == nil {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", operation, err)
+}
+
 func (h *Host) updateMaintenanceLocked(operation string, err error) healthChange {
-	change := healthChange{operation: operation, err: err, changed: errorText(h.maintenance[operation]) != errorText(err)}
+	change := trackHealth(operation, h.maintenance[operation], err)
 	if err == nil {
 		delete(h.maintenance, operation)
 	} else {
@@ -28,31 +52,18 @@ func (h *Host) setMaintenance(operation string, err error) {
 	h.mu.Lock()
 	change := h.updateMaintenanceLocked(operation, err)
 	h.mu.Unlock()
-	h.logHealth(change)
-}
-func (h *Host) logHealth(change healthChange) {
-	if !change.changed {
-		return
-	}
-	if change.err != nil {
-		h.log.Warningf("DEM runtime %s failed: %v", change.operation, change.err)
-	} else {
-		h.log.Noticef("DEM runtime %s recovered", change.operation)
-	}
+	change.log(h.log)
 }
 func (h *Host) recordFinishError(err error) {
 	h.mu.Lock()
 	h.finishVersion++
 	change := h.updateMaintenanceLocked("execution completion", err)
 	h.mu.Unlock()
-	h.logHealth(change)
+	change.log(h.log)
 }
 func (h *Host) maintenanceErrorLocked() error {
-	var result error
-	for _, operation := range []string{"cleanup", "execution completion", "update"} {
-		if err := h.maintenance[operation]; err != nil {
-			result = errors.Join(result, fmt.Errorf("%s: %w", operation, err))
-		}
-	}
-	return result
+	return errors.Join(
+		labelled("cleanup", h.maintenance["cleanup"]),
+		labelled("execution completion", h.maintenance["execution completion"]),
+	)
 }

@@ -485,7 +485,11 @@ if [ -d .agents/skills ]; then
   done < <(git ls-files -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
              | while IFS= read -r skill_file; do
                  [ -f "$skill_file" ] || continue
-                 case "$skill_file" in *.md) src=$(md_markdown_lines "$skill_file") ;; *) src=$(cat "$skill_file") ;; esac
+                 # Leading "(" on the patterns: bash 3.2 (macOS /bin/bash) ends the enclosing <( ) at a bare ")".
+                 case "$skill_file" in
+                   (*.md) src=$(md_markdown_lines "$skill_file") ;;
+                   (*) src=$(cat "$skill_file") ;;
+                 esac
                  printf '%s\n' "$src" | grep -o -E '[A-Za-z0-9_./-]+\.md#[A-Za-z0-9_-]+' \
                    | sed "s|^|$skill_file\||"
                done | sort -u)
@@ -494,6 +498,22 @@ if [ -d .agents/skills ]; then
   fi
 else
   warn "no .agents/skills directory"
+fi
+
+section "portable mktemp templates"
+# BSD/macOS mktemp randomizes only the trailing run of X's, so a template that continues after it is one literal name
+# and the second concurrent run fails with "File exists". GNU mktemp accepts the suffix, which hides it on Linux.
+# The bracket lists the characters that legitimately close a template. X{3,} keeps this line from matching itself.
+mktemp_re='mktemp.*X{3,}[^X"'\''`[:space:]);|&<>}]'
+mktemp_hits=$(git grep -n -E "$mktemp_re" -- .agents docs/netdata-ai) && mktemp_rc=0 || mktemp_rc=$?
+if [ "$mktemp_rc" -gt 1 ]; then
+  fail "git grep failed while scanning mktemp templates (exit $mktemp_rc)"
+elif [ -n "$mktemp_hits" ]; then
+  while IFS= read -r hit; do
+    fail "mktemp template continues after its X's; end it in the X's: $hit"
+  done <<< "$mktemp_hits"
+else
+  ok "every mktemp template under .agents/ and docs/netdata-ai/ ends in its X's"
 fi
 
 section "sensitive data"

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"context"
@@ -14,28 +14,50 @@ import (
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 )
 
-// RuntimeConfig is administrator-owned process configuration, never monitor input.
-// Protected preloads are borrowed for the process lifetime and are outside cache GC.
-type RuntimeConfig struct {
-	Mode                  string `yaml:"mode" json:"mode"`
-	CachePath             string `yaml:"cache_path" json:"cache_path,omitempty"`
-	MaxBytes              int64  `yaml:"max_bytes" json:"max_bytes"`
-	PreviousRetentionDays int    `yaml:"previous_retention_days" json:"previous_retention_days"`
-	PreloadPath           string `yaml:"preload_path" json:"preload_path,omitempty"`
-	ReleaseURL            string `yaml:"release_url" json:"release_url,omitempty"`
-	OfflineKeyring        string `yaml:"offline_keyring" json:"offline_keyring,omitempty"`
-}
+// Mode selects who owns the browser runtime files.
+type Mode string
 
-// DefaultRuntimeMode is set to native by DEB/RPM builds. Other installations use
+const (
+	// ModeManaged runs explicitly installed releases from the DEM-managed cache.
+	ModeManaged Mode = "managed"
+	// ModeNative runs the package-manager-owned netdata-dem-runtime payload.
+	ModeNative Mode = "native"
+	// ModePreloaded runs an administrator-sealed preload at its final root.
+	ModePreloaded Mode = "preloaded"
+)
+
+// DefaultMode is set to native by DEB/RPM builds. Other installations use
 // explicitly installed managed bundles unless an administrator selects a preload.
-var DefaultRuntimeMode = "managed"
+// It stays a plain string because the linker's -X flag only sets string variables.
+var DefaultMode = string(ModeManaged)
 
-func DefaultRuntimeConfig() RuntimeConfig {
-	return RuntimeConfig{Mode: DefaultRuntimeMode, MaxBytes: runtime.DefaultMaxBytes, PreviousRetentionDays: 7}
+const day = 24 * time.Hour
+
+// Config is administrator-owned process configuration, never monitor input.
+// Protected preloads are borrowed for the process lifetime and are outside cache GC.
+type Config struct {
+	Mode                  Mode   `yaml:"mode"`
+	CachePath             string `yaml:"cache_path"`
+	MaxBytes              int64  `yaml:"max_bytes"`
+	PreviousRetentionDays int    `yaml:"previous_retention_days"`
+	PreloadPath           string `yaml:"preload_path"`
+	ReleaseURL            string `yaml:"release_url"`
+	OfflineKeyring        string `yaml:"offline_keyring"`
 }
 
-func (c RuntimeConfig) validate() error {
-	if c.Mode != "managed" && c.Mode != "preloaded" && c.Mode != "native" {
+// DefaultConfig takes the store allowance and previous-generation grace from the runtime store defaults.
+func DefaultConfig() Config {
+	return Config{
+		Mode:                  Mode(DefaultMode),
+		MaxBytes:              runtime.DefaultMaxBytes,
+		PreviousRetentionDays: int(runtime.DefaultPreviousRetention / day),
+	}
+}
+
+func (c Config) Validate() error {
+	switch c.Mode {
+	case ModeManaged, ModeNative, ModePreloaded:
+	default:
 		return errors.New("mode must be managed, native or preloaded")
 	}
 	if c.MaxBytes <= 0 {
@@ -44,10 +66,10 @@ func (c RuntimeConfig) validate() error {
 	if c.PreviousRetentionDays < 0 || c.PreviousRetentionDays > 36500 {
 		return errors.New("previous_retention_days must be between 0 and 36500")
 	}
-	if c.Mode != "preloaded" && c.PreloadPath != "" {
+	if c.Mode != ModePreloaded && c.PreloadPath != "" {
 		return errors.New("preload_path requires mode: preloaded")
 	}
-	if c.Mode != "managed" && c.CachePath != "" {
+	if c.Mode != ModeManaged && c.CachePath != "" {
 		return errors.New("cache_path is only valid in managed mode")
 	}
 	if c.ReleaseURL != "" {
@@ -65,7 +87,7 @@ func (c RuntimeConfig) validate() error {
 // ReleaseLoader selects canonical online trust only with network consent.
 // Offline imports require an explicit administrator-provisioned public keyring.
 // Call it under installation exclusion, never before checking update consent.
-func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
+func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.Release, error) {
 	return func(ctx context.Context) (runtime.Release, error) {
 		if path == "" {
 			if !networkAllowed {
@@ -107,7 +129,7 @@ func (c RuntimeConfig) ReleaseLoader(path string, networkAllowed bool) func(cont
 
 // StoreConfig resolves only explicit installation paths; debug mode cannot create
 // an implicit persistent cache in the working directory or temporary storage.
-func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
+func (c Config) StoreConfig(varLibPath string) (runtime.Config, error) {
 	path := c.CachePath
 	if path == "" {
 		if !filepath.IsAbs(varLibPath) {
@@ -118,6 +140,9 @@ func (c RuntimeConfig) StoreConfig(varLibPath string) (runtime.Config, error) {
 	if !filepath.IsAbs(path) {
 		return runtime.Config{}, errors.New("runtime.cache_path must be absolute")
 	}
-	return runtime.Config{Path: path, MaxBytes: c.MaxBytes,
-		PreviousRetention: time.Duration(c.PreviousRetentionDays) * 24 * time.Hour}, nil
+	return runtime.Config{
+		Path:              path,
+		MaxBytes:          c.MaxBytes,
+		PreviousRetention: time.Duration(c.PreviousRetentionDays) * day,
+	}, nil
 }

@@ -87,6 +87,7 @@ type faroPayload struct {
 // Bounds on client-supplied strings (cardinality and record size).
 const (
 	maxPathLen    = 512
+	maxGroupLen   = 200
 	maxUserIDLen  = 128
 	maxSelector   = 200
 	maxNameLen    = 64
@@ -96,6 +97,10 @@ const (
 	maxAttrLen    = 256
 	maxItems      = 500 // per array; the body cap bounds the rest
 )
+
+// tabletViewportMinWidth is the viewport width (CSS px) at or above which a
+// mobile:true beacon is classified as tablet rather than mobile.
+const tabletViewportMinWidth = 600
 
 // vitalKeys maps Faro web-vitals value keys to beacon vital names.
 var vitalKeys = map[string]string{
@@ -108,17 +113,13 @@ var vitalKeys = map[string]string{
 type Options struct {
 	Site               string
 	Now                time.Time
-	Country            string
-	City               string
-	Lat                float64
-	Lon                float64
-	HasGeo             bool
+	Location           beacon.Location
 	EventLogs          bool
 	FrustrationSignals bool
 	Redactor           *redact.Redactor
 	ConsoleLogs        bool
 	Tracing            bool
-	PathRules          []beacon.PathRule
+	PathRules          []PathRule
 }
 
 const (
@@ -151,11 +152,11 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		BrowserVersion: opt.text(p.Meta.Browser.Version, maxNameLen),
 		OS:             opt.text(p.Meta.Browser.OS, maxNameLen),
 		Device:         beacon.DeviceDesktop,
-		Country:        opt.Country,
-		City:           opt.City,
-		Lat:            opt.Lat,
-		Lon:            opt.Lon,
-		HasGeo:         opt.HasGeo,
+		Country:        opt.Location.Country,
+		City:           opt.Location.City,
+		Lat:            opt.Location.Lat,
+		Lon:            opt.Location.Lon,
+		HasGeo:         opt.Location.HasGeo,
 		View:           opt.view(p.Meta.View.Name),
 		AppVersion:     opt.text(p.Meta.App.Version, maxNameLen),
 		UserID:         opt.text(p.Meta.User.ID, maxUserIDLen),
@@ -166,14 +167,14 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		// Tablet needs a viewport width the SDK actually reported; an unparsable/absent width keeps the mobile|desktop
 		// split unchanged.
 		if w, err := strconv.Atoi(strings.TrimSpace(p.Meta.Browser.ViewportWidth)); err == nil &&
-			w >= beacon.TabletViewportMinWidth {
+			w >= tabletViewportMinWidth {
 			b.Device = beacon.DeviceTablet
 		}
 	}
 	pageURL := opt.cleanURL(p.Meta.Page.URL)
-	b.Path = beacon.Path(pageURL)
+	b.Path = urlPath(pageURL)
 	b.PageHost = pageHost(pageURL)
-	b.PageGroup = beacon.PageGroup(b.Path)
+	b.PageGroup = pageGroup(b.Path)
 
 	for i, m := range p.Measurements {
 		if i >= maxItems {
@@ -222,9 +223,9 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		b.Errors = append(b.Errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       beacon.Truncate(stack.String(), maxStackLen),
+			Stack:       truncate(stack.String(), maxStackLen),
 			Time:        flexTime(e.Timestamp, now),
-			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
+			Fingerprint: fingerprint(typ, msg, firstFrame),
 		})
 	}
 
@@ -233,7 +234,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			break
 		}
 		// Classification uses protocol names, before free-text transformation.
-		name := beacon.Clean(ev.Name, len(ev.Name))
+		name := clean(ev.Name, len(ev.Name))
 		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
 			continue
 		}
@@ -247,7 +248,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				if len(attrs) >= maxEventAttrs {
 					break
 				}
-				k = beacon.Clean(k, len(k))
+				k = clean(k, len(k))
 				nativeAttr := keepEventAttr(kind, name, k)
 				if !opt.EventLogs && !nativeAttr {
 					continue
@@ -336,7 +337,7 @@ func (o Options) attributedElement(vital string, ctx map[string]any) string {
 }
 
 // pageHost is the page URL's host (first-party resource
-// classification), independent of beacon.Path's query/fragment stripping.
+// classification), independent of urlPath's query/fragment stripping.
 // "" when the URL has no host (relative path, unparsable).
 func pageHost(raw string) string {
 	u, err := url.Parse(strings.TrimSpace(raw))
@@ -346,17 +347,11 @@ func pageHost(raw string) string {
 	return strings.ToLower(u.Hostname())
 }
 
-// parseNavigationAttrs reads the two navigation-timing attributes the
-// navigation measurements need from a faro.performance.navigation
-// event's attributes. Field names verified against a captured Faro 2.11
-// beacon and pinned by TestParseFaro in decode_test.go:
-// "pageLoadTime" (fetchStart..domComplete, the SDK's own "page load"
-// metric — there is no separate "time to DOMContentLoaded from
-// navigation start" attribute) and "domContentLoadHandlerTime" (the
-// DOMContentLoaded handler's own duration) — the same two fields
-// Grafana's own Faro-based Frontend Observability product charts as
-// "page load" and "DOM content loaded". A missing/unparsable attribute
-// (the SDK omits it rather than sending a placeholder) leaves Has* false.
+// parseNavigationAttrs reads the two navigation-timing attributes Faro 2.11
+// sends on faro.performance.navigation events (pinned by TestParseFaro):
+// pageLoadTime (fetchStart to domComplete, the SDK's page-load metric) and
+// domContentLoadHandlerTime (the DOMContentLoaded handler's own duration).
+// The SDK omits an unavailable attribute, which leaves its Has* flag false.
 func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 	if len(attrs) == 0 {
 		return nil
@@ -379,7 +374,7 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
 		Host:      strings.ToLower(attrs["httpHost"]),
-		Initiator: beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Initiator: clean(attrs["initiatorType"], maxNameLen),
 		Self:      isCollectorRequest(attrs["name"]),
 	}
 	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
@@ -478,5 +473,5 @@ func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
 			break
 		}
 	}
-	return typ, beacon.Truncate(stack.String(), maxStackLen)
+	return typ, truncate(stack.String(), maxStackLen)
 }

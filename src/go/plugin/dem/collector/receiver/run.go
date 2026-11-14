@@ -71,14 +71,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			status:         200,
 		}
 		handler.ServeHTTP(rw, r)
-		switch {
-		case rw.status < 400:
-			c.requests[0].Add(1)
-		case rw.status < 500:
-			c.requests[1].Add(1)
-		default:
-			c.requests[2].Add(1)
-		}
+		c.requests.observe(rw.status)
 	})
 	serving := make(chan error, 1)
 	go func() {

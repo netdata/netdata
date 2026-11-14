@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
@@ -46,17 +45,15 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 				KeepErrors: true,
 			},
 		})
-		w := history.NewWriter(job, store, discardCounters{})
+		w := history.NewWriter(store, discardCounters{})
 		a.SetHistorySink(w)
-		d := diagnostics.New()
 		route := httpapi.NewRoute(config.Site{
 			Name: job,
-		}, measurementProcessor{a}, d)
+		}, measurementProcessor{a}, nil)
 		retire, err := hub.Register(job, &rumregistry.Site{
-			Route:       route,
-			Diagnostics: d,
-			Aggregator:  a,
-			Generation:  generation,
+			Route:      route,
+			Aggregator: a,
+			Generation: generation,
 		})
 		require.NoError(t, err)
 		t.Cleanup(retire)
@@ -73,8 +70,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 			Received:     at,
 			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "doc", Revision: 1}},
 		}
-		result := r.a.Ingest(b)
-		require.True(t, result.Accepted)
+		r.a.Ingest(b)
 		assert.Equal(t, "spoofed", b.VnodeGUID, "ingestion must not mutate the browser observation")
 		b.Events = nil
 		b.Received = at.Add(time.Microsecond)

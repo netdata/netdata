@@ -208,7 +208,7 @@ func TestPromotionLastsOnlyWhileSessionIsTracked(t *testing.T) {
 			require.True(t, a.Ingest(mk(*now, "promoted", "/after")).Investigated)
 			switch reset {
 			case "expiry":
-				*now = now.Add(beacon.SessionTTL + time.Second)
+				*now = now.Add(sessionTTL + time.Second)
 				a.Activity()
 			case "eviction":
 				for i := range maxTrackedSessions {

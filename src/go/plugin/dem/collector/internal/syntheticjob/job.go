@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
 // Executor is the process browser capability injected into native synthetic collectors. It owns process-wide
@@ -27,6 +28,9 @@ type Executor interface {
 type Dependencies struct {
 	Executor Executor
 	Registry *registry.Registry
+	// ActivationDependencies names the process browser runtime that jobs wait
+	// for before activation; nil when the runtime mode has no readiness owner.
+	ActivationDependencies func(map[string]any) ([]collectorapi.ActivationDependency, error)
 }
 
 // Metrics publishes the kind-specific values of a fresh observation.

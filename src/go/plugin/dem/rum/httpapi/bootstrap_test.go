@@ -31,9 +31,9 @@ func TestPingAndRejectedOrigin(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("collect from a foreign origin = %d", rec.Code)
 	}
-	got, ok := s.route("shop").diagnostics.LastRejectedOrigin()
-	if !ok || got.Origin != "https://www.shop.example.com" {
-		t.Fatalf("last rejected = %+v %v", got, ok)
+	got := s.route("shop").LastRejectedOrigin()
+	if got.Origin != "https://www.shop.example.com" || got.At.IsZero() {
+		t.Fatalf("last rejected = %+v", got)
 	}
 }
 

@@ -35,7 +35,7 @@ func TestCaptureDefaultsAndRoundTrip(t *testing.T) {
 				for _, candidate := range []Site{site, effective} {
 					require.Equal(t, tc.mode, candidate.GeolocationMode())
 					require.Equal(t, tc.frustration, candidate.FrustrationSignalsOn())
-					require.Empty(t, ValidateSiteExtras(candidate))
+					require.NoError(t, validateWithRequired(candidate))
 					for _, codec := range []struct {
 						marshal   func(any) ([]byte, error)
 						unmarshal func([]byte, any) error

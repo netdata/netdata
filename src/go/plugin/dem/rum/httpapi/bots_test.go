@@ -28,7 +28,7 @@ func TestCollectFiltersBots(t *testing.T) {
 		t.Fatalf("snippet-flagged bot status %d", resp.StatusCode)
 	}
 	n, rejects := sink.snapshot()
-	if n != 0 || rejects["shop/"+beacon.RejectBot] != 3 {
+	if n != 0 || rejects[beacon.RejectBot] != 3 {
 		t.Fatalf("ingested %d, rejects %v", n, rejects)
 	}
 	if resp := post(t, ts, "/rum/shop/collect", faroBody, map[string]string{"Origin": origin}); resp.StatusCode != 202 {

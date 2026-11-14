@@ -23,18 +23,19 @@ type LabMetrics struct {
 	CLS         Scalar
 }
 
-// Observation is the bounded metric projection of one verified completed run.
-// History and the observer retain per-run evidence; snapshots never copy it.
+// Observation is the scalar projection of the latest verified run. The session and history retain the run's
+// events, evidence and captures; snapshots never copy them.
 type Observation struct {
-	ID          string
-	Outcome     synthetic.Outcome
-	StartedUS   int64
-	CompletedUS int64
-	DurationMS  Scalar
-	Tests       synthetic.TestCounts
-	HasTests    bool
-	Metrics     LabMetrics
-	HasMetrics  bool
+	ID           string
+	Outcome      synthetic.Outcome
+	CompletedUS  int64
+	DurationMS   Scalar
+	Error        string
+	HistoryError string
+	Tests        synthetic.TestCounts
+	HasTests     bool
+	Metrics      LabMetrics
+	HasMetrics   bool
 }
 
 type Outcomes struct {
@@ -50,7 +51,6 @@ type Outcomes struct {
 // Status describes this native activation, including occurrences that never ran.
 // QueuedUS is the oldest queue time of the outstanding ExecuteScheduled call;
 // replacing its selected pending occurrence does not change its admission turn.
-// QueueAge is calculated by Snapshot; observers derive it from QueuedUS when read.
 // SchedulingDelay retains the latest admitted occurrence's delay after completion.
 type Status struct {
 	Scheduled       uint64
@@ -59,21 +59,32 @@ type Status struct {
 	Outcomes        Outcomes
 	Pending         bool
 	Active          bool
-	PendingDueUS    int64
 	QueuedUS        int64
-	ActiveDueUS     int64
-	ActiveQueuedUS  int64
 	AdmittedUS      int64
-	QueueAge        time.Duration
 	SchedulingDelay time.Duration
 }
 
+// Snapshot is a session's state at one instant: identity, schedule status and the current-association
+// observation. Status counters continue across vnode changes; the observation fields reset.
 type Snapshot struct {
+	JobID     string
+	Kind      synthetic.Kind
+	Name      string
+	VnodeGUID string
+	Interval  time.Duration
 	Status
+	// QueueAge is the wait of the outstanding executor call while QueuedUS is set.
+	QueueAge time.Duration
+	// State is the executor-reported attempt phase or the latest outcome; it is stale when the
+	// observation is not fresh and no attempt waits or runs.
+	State          synthetic.JobState
 	Latest         Observation
 	HasObservation bool
 	ObservationAge time.Duration
-	Fresh          bool
+	// Fresh reports an observation completed within the last two check intervals.
+	Fresh         bool
+	LastSuccessUS int64
+	LastFailureUS int64
 }
 
 func scalar(v *float64) Scalar {
@@ -88,11 +99,12 @@ func scalar(v *float64) Scalar {
 
 func observe(run synthetic.Run) Observation {
 	o := Observation{
-		ID:          run.ID,
-		Outcome:     run.Outcome,
-		StartedUS:   run.StartedUS,
-		CompletedUS: run.CompletedUS,
-		DurationMS:  scalar(run.DurationMS),
+		ID:           run.ID,
+		Outcome:      run.Outcome,
+		CompletedUS:  run.CompletedUS,
+		DurationMS:   scalar(run.DurationMS),
+		Error:        run.Error,
+		HistoryError: run.HistoryError,
 	}
 	if run.Tests != nil {
 		o.Tests, o.HasTests = *run.Tests, true

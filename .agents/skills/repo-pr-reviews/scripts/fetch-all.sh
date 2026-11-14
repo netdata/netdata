@@ -144,7 +144,8 @@ echo -e "${PR_GRAY}[fetch-all] review-threads (GraphQL)${PR_NC}" >&2
 owner="${SLUG%%/*}"
 name="${SLUG##*/}"
 
-threads_tmp="$(mktemp "${TMPDIR:-/tmp}/pr-threads-XXXXXX.json")"
+# BSD/macOS mktemp randomizes only trailing X's, so the template must end in them.
+threads_tmp="$(mktemp "${TMPDIR:-/tmp}/pr-threads.XXXXXX")"
 PR_TMP_FILES+=("${threads_tmp}")
 
 cursor=""

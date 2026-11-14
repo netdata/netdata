@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	registry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -38,12 +37,10 @@ func TestSiteInstallURLUsesOnlyExplicitConfiguration(t *testing.T) {
 			a := aggregate.New(time.Minute, aggregate.SiteCfg{
 				Name: "shop",
 			})
-			state := diagnostics.New()
 			retire, err := hub.Register("shop", &registry.Site{
-				Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
-				Diagnostics: state,
-				Aggregator:  a,
-				Generation:  "runtime",
+				Route:      httpapi.NewRoute(cfg, measurementProcessor{a}, nil),
+				Aggregator: a,
+				Generation: "runtime",
 			})
 			require.NoError(t, err)
 			defer retire()

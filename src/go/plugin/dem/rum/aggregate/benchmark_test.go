@@ -120,7 +120,7 @@ func BenchmarkIngestErrors(b *testing.B) {
 				Type:        "TypeError",
 				Message:     "checkout failed",
 				Stack:       "at checkout()",
-				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+				Fingerprint: "6c0f3e2a91d4",
 			},
 		},
 	}
@@ -154,7 +154,7 @@ func BenchmarkIngestSessionlessErrors(b *testing.B) {
 				Type:        "TypeError",
 				Message:     "checkout failed",
 				Stack:       "at checkout()",
-				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+				Fingerprint: "6c0f3e2a91d4",
 			},
 		},
 	}

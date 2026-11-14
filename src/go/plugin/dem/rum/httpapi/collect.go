@@ -56,8 +56,8 @@ func ping(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) rejectOrigin(route *Route, r *http.Request) {
-	route.processor.Reject(route.policy.key, beacon.RejectOrigin)
-	route.diagnostics.RejectOrigin(r.Header.Get("Origin"), s.now())
+	route.processor.Reject(beacon.RejectOrigin)
+	route.rejectOrigin(r.Header.Get("Origin"), s.now())
 }
 
 func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
@@ -67,6 +67,7 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	}
 	defer release()
 	st := route.policy
+	cfg := &route.config
 	snap := s.snap
 	w.Header().Set("Cache-Control", "no-store")
 	if !s.cors(w, r, st) {
@@ -78,19 +79,19 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	ip := snap.clientIP(r)
 	ipKey := ip.String()
 	if !s.ips.allow(ipKey, now) || !route.allowSite(s.siteRate, now) {
-		route.processor.Reject(st.key, beacon.RejectRate)
+		route.processor.Reject(beacon.RejectRate)
 		w.Header().Set("Retry-After", "1")
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
 	if r.ContentLength > snap.maxBody {
-		route.processor.Reject(st.key, beacon.RejectSize)
+		route.processor.Reject(beacon.RejectSize)
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
 		return
 	}
-	bot := r.URL.Query().Get("bot") == "1" || beacon.IsBot(r.Header.Get("User-Agent"))
-	if bot && !st.includeBots {
-		route.processor.Reject(st.key, beacon.RejectBot)
+	bot := r.URL.Query().Get("bot") == "1" || faro.IsBot(r.Header.Get("User-Agent"))
+	if bot && !cfg.IncludesBots() {
+		route.processor.Reject(beacon.RejectBot)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -108,46 +109,43 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			route.processor.Reject(st.key, beacon.RejectSize)
+			route.processor.Reject(beacon.RejectSize)
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
-		route.processor.Reject(st.key, beacon.RejectInvalid)
+		route.processor.Reject(beacon.RejectInvalid)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	// Preserve admission and body-size checks for stale pages and custom
 	// producers, but intentional exclusion is neither acceptance nor loss.
-	if st.measureRate == 0 {
+	if cfg.MeasureRate() == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var country, city string
-	var lat, lon float64
-	var hasGeo bool
-	if route.config.GeolocationMode() != config.GeolocationOff && s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
-		country, city, lat, lon, hasGeo = s.geo.Lookup(ipKey)
+	var location beacon.Location
+	mode := cfg.GeolocationMode()
+	if mode != config.GeolocationOff && s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
+		location = s.geo.Lookup(ipKey)
 	}
-	if route.config.GeolocationMode() != config.GeolocationCity {
-		city, lat, lon, hasGeo = "", 0, 0, false
+	if mode != config.GeolocationCity {
+		location = beacon.Location{
+			Country: location.Country,
+		}
 	}
 	b, err := faro.Decode(body, faro.Options{
-		Site:               st.key,
+		Site:               cfg.Name,
 		Now:                now,
-		Country:            country,
-		City:               city,
-		Lat:                lat,
-		Lon:                lon,
-		HasGeo:             hasGeo,
-		EventLogs:          route.config.EventLogsOn(),
-		FrustrationSignals: route.config.FrustrationSignalsOn(),
-		Redactor:           st.redactor,
-		ConsoleLogs:        route.config.ConsoleLogsOn(),
-		Tracing:            st.tracing,
+		Location:           location,
+		EventLogs:          cfg.EventLogsOn(),
+		FrustrationSignals: cfg.FrustrationSignalsOn(),
+		Redactor:           route.redactor,
+		ConsoleLogs:        cfg.ConsoleLogsOn(),
+		Tracing:            cfg.TracingOn(),
 		PathRules:          st.pathRules,
 	})
 	if err != nil {
-		route.processor.Reject(st.key, beacon.RejectInvalid)
+		route.processor.Reject(beacon.RejectInvalid)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

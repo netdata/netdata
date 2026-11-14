@@ -69,7 +69,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		page = "/"
 	}
 	var sd *sessionDetail
-	if el := st.sessIdx[id]; el != nil && now.Sub(el.Value.(*sessionDetail).lastSeen) > beacon.SessionTTL {
+	if el := st.sessIdx[id]; el != nil && now.Sub(el.Value.(*sessionDetail).lastSeen) > sessionTTL {
 		st.dropSession(el)
 	}
 	if el, ok := st.sessIdx[id]; ok {
@@ -83,7 +83,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 			id:           id,
 			started:      now,
 			entryPage:    page,
-			investigated: beacon.SessionSampled(id, st.cfg.Investigate.Rate),
+			investigated: SessionSampled(id, st.cfg.Investigate.Rate),
 		}
 		st.sessIdx[id] = st.sess.PushFront(sd)
 	}
@@ -132,7 +132,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	}
 
 	for _, v := range b.Vitals {
-		if v.Poor() {
+		if poorVital(v) {
 			origin := context
 			originPage := page
 			if attrs := v.Origin; attrs != nil {
@@ -341,7 +341,7 @@ func truncateRunes(s string, n int) string {
 func (st *siteState) evictSessions(now time.Time) {
 	for el := st.sess.Back(); el != nil; {
 		previous := el.Prev()
-		if now.Sub(el.Value.(*sessionDetail).lastSeen) > beacon.SessionTTL {
+		if now.Sub(el.Value.(*sessionDetail).lastSeen) > sessionTTL {
 			st.dropSession(el)
 		}
 		el = previous

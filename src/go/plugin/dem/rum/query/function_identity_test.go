@@ -24,7 +24,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	retained := history.NewStore(journalStore)
 	sites := registry.New()
-	fingerprint := beacon.Fingerprint("TypeError", "failed", "app.js")
+	fingerprint := "a1b2c3d4e5f6"
 	for _, site := range []string{"a", "b"} {
 		owner, _ := addSite(t, sites, site, "first")
 		page(owner, site, "/shared")
@@ -84,7 +84,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	retained := history.NewStore(journalStore)
 	sites := registry.New()
 	owner, retire := addSite(t, sites, "shop", "first")
-	writer := history.NewWriter("shop", retained, discardCounters{})
+	writer := history.NewWriter(retained, discardCounters{})
 	owner.SetHistorySink(writer)
 	// A shared SDK session can contain login, logout, and another login.
 	ids := []string{"550e8400-e29b-41d4-a716-446655440000", "", "123456"}

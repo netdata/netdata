@@ -10,9 +10,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 )
 
 // snapshot is the immutable, compiled receiver configuration used by
@@ -23,17 +22,13 @@ type snapshot struct {
 	maxBody int64
 }
 
+// site is the compiled part of one site's policy; scalar settings are read
+// from the route's config.
 type site struct {
-	key         string
-	origins     []originRule
-	measureRate float64 // collection sampling for the snippet and receiver zero gate
-	includeBots bool    // bots: include
-	// tracing enables browser spans. propagate lists cross-origin trace
-	// header patterns.
-	tracing   bool
+	origins []originRule
+	// propagate lists cross-origin trace header patterns.
 	propagate []string
-	pathRules []beacon.PathRule // redact_paths
-	redactor  *redact.Redactor
+	pathRules []faro.PathRule // redact_paths
 }
 
 // originRule is one allowed_origins entry: scheme + host[:port], with
@@ -59,21 +54,8 @@ func compile(cfg *config.Receiver) *snapshot {
 }
 
 func compileSite(sc config.Site) *site {
-	st := &site{
-		key:         sc.Name,
-		measureRate: sc.MeasureRate(),
-		includeBots: sc.IncludesBots(),
-	}
-	var secrets []string
-	if sc.EventLogs != nil {
-		secrets = append(secrets, sc.EventLogs.Destination.AuthToken)
-	}
-	if sc.Tracing != nil {
-		secrets = append(secrets, sc.Tracing.Destination.AuthToken)
-	}
-	st.redactor = redact.NewRedactor(secrets...)
+	st := &site{}
 	if sc.TracingOn() {
-		st.tracing = true
 		for _, o := range sc.Tracing.PropagateTo {
 			st.propagate = append(st.propagate, "^"+regexp.QuoteMeta(strings.TrimRight(o, "/"))+"(/|$)")
 		}
@@ -83,7 +65,7 @@ func compileSite(sc config.Site) *site {
 			continue // an empty pattern would match everywhere
 		}
 		if re, err := regexp.Compile(pr.Pattern); err == nil {
-			st.pathRules = append(st.pathRules, beacon.PathRule{
+			st.pathRules = append(st.pathRules, faro.PathRule{
 				Re:      re,
 				Replace: pr.Replace,
 			})

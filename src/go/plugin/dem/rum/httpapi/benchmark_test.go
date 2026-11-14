@@ -14,7 +14,7 @@ import (
 type benchmarkSink struct{}
 
 func (benchmarkSink) Ingest(*beacon.Beacon) {}
-func (benchmarkSink) Reject(string, string) {}
+func (benchmarkSink) Reject(string)         {}
 
 type benchmarkResponseWriter struct{ http.ResponseWriter }
 

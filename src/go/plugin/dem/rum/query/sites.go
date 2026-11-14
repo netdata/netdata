@@ -25,7 +25,7 @@ func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
 		if publicBase != "" {
 			scriptURL = strings.TrimRight(publicBase, "/") + "/rum/" + cfg.Name + ".js"
 		}
-		rejected, _ := site.Diagnostics.LastRejectedOrigin()
+		rejected := site.Route.LastRejectedOrigin()
 		redact := siteRedactor(site)
 		rejected.Origin = redact.Apply(rejected.Origin)
 		cfg.DisplayName = redact.Apply(cfg.DisplayName)

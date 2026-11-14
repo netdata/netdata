@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,9 +15,15 @@ import (
 
 type captureGeo struct{ calls int }
 
-func (g *captureGeo) Lookup(string) (string, string, float64, float64, bool) {
+func (g *captureGeo) Lookup(string) beacon.Location {
 	g.calls++
-	return "GR", "Example City", 37.9, 23.7, true
+	return beacon.Location{
+		Country: "GR",
+		City:    "Example City",
+		Lat:     37.9,
+		Lon:     23.7,
+		HasGeo:  true,
+	}
 }
 
 func TestCaptureGeolocationAtReceiver(t *testing.T) {

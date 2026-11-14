@@ -8,7 +8,6 @@ import (
 	_ "embed"
 	"errors"
 	"sync"
-	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
@@ -43,7 +42,7 @@ type Collector struct {
 	geoPaths      geoip.Paths
 	publicationMu sync.Mutex
 	publication   *rumregistry.ReceiverRegistration
-	requests      [3]atomic.Uint64
+	requests      requestCounts
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {

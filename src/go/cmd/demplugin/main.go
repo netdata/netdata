@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 
@@ -23,15 +22,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/terminal"
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -90,64 +83,17 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initializing secrets: %v\n", err)
 		os.Exit(1)
 	}
-	path, err := historyPath(pluginconfig.VarLibDir(), debug)
+	process, err := dem.Open(dem.Options{
+		Config:     cfg,
+		LoadConfig: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
+		VarLibDir:  pluginconfig.VarLibDir(),
+		Private:    debug,
+		GeoIPPaths: geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
+		Warnings:   os.Stderr,
+	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "initializing DEM history: %v\n", err)
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
-	}
-	history, err := demjournal.Open(context.Background(), path)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "opening DEM history: %v\n", err)
-		os.Exit(1)
-	}
-	// Apply the configured budget before any producer can append.
-	if err := history.EnforceHistoryRetention(context.Background(), cfg.History.Days, cfg.History.MaxBytes); err != nil {
-		_ = history.Close()
-		fmt.Fprintf(os.Stderr, "initializing DEM history policy: %v\n", err)
-		os.Exit(1)
-	}
-	artifactPath := ""
-	if !debug {
-		artifactPath = filepath.Join(pluginconfig.VarLibDir(), "dem", "artifacts")
-	}
-	captures, err := artifacts.Open(artifactPath)
-	if err != nil {
-		_ = history.Close()
-		fmt.Fprintf(os.Stderr, "opening DEM artifacts: %v\n", err)
-		os.Exit(1)
-	}
-	if _, err = captures.Enforce(context.Background(), cfg.Artifacts.Days, cfg.Artifacts.MaxBytes); err != nil {
-		// Inventory/cleanup failure does not invalidate the owned store or stop runs.
-		// Process maintenance retries it, and the catalogue exposes its status.
-		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
-	}
-	runtimeHandle := dem.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
-	executor, err := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures, cfg.Browser.Concurrency)
-	if err != nil {
-		_ = history.Close()
-		fmt.Fprintf(os.Stderr, "initializing DEM browser execution: %v\n", err)
-		os.Exit(1)
-	}
-	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
-		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
-	}
-	components := dem.New(
-		dem.Dependencies{
-			History:        history,
-			GeoIPPaths:     geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
-			Artifacts:      captures,
-			Executor:       executor,
-			Runtime:        runtimeHandle.Host,
-			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
-		},
-		cfg,
-	)
-	services := []composition.ProcessService{components.Retention}
-	if runtimeHandle.Host != nil {
-		services = append(services, runtimeHandle.Host)
-	}
-	if runtimeHandle.Updater != nil {
-		services = append(services, runtimeHandle.Updater)
 	}
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,
@@ -155,9 +101,9 @@ func main() {
 		CollectorsConfigDir:       pluginconfig.CollectorsDir(),
 		CollectorsConfigWatchPath: pluginconfig.CollectorsConfigWatchPaths(),
 		VarLibDir:                 pluginconfig.VarLibDir(),
-		ModuleRegistry:            components.Collectors,
-		ProcessFunctions:          components.Functions,
-		Services:                  services,
+		ModuleRegistry:            process.Collectors,
+		ProcessFunctions:          process.Functions,
+		Services:                  process.Services,
 		Secrets:                   secrets,
 		IsInsideK8s:               hostinfo.IsInsideK8sCluster(),
 		RunModePolicy:             policy.Agent(isTerminal),
@@ -173,13 +119,13 @@ func main() {
 	var result agenthost.Result
 	select {
 	case result = <-completed:
-	case err := <-executor.Fatal():
+	case err := <-process.Fatal():
 		a.Errorf("plugin exiting with retained unverified synthetic work: %v", err)
 		os.Exit(1)
 	}
 	// A completed Agent and a simultaneous poison must still fail-stop.
 	select {
-	case err := <-executor.Fatal():
+	case err := <-process.Fatal():
 		a.Errorf("unverified synthetic completion: %v", err)
 		os.Exit(1)
 	default:
@@ -193,25 +139,8 @@ func main() {
 	if result.ExitRequired {
 		os.Exit(0)
 	}
-	if err := runtimeHandle.Close(); err != nil {
-		a.Errorf("closing DEM runtime: %v", err)
+	if err := process.Close(); err != nil {
+		a.Errorf("%v", err)
 		os.Exit(1)
 	}
-	if err := captures.Close(); err != nil {
-		a.Errorf("closing DEM artifacts: %v", err)
-		os.Exit(1)
-	}
-	if err := history.Close(); err != nil {
-		a.Errorf("closing DEM history: %v", err)
-		os.Exit(1)
-	}
-}
-func historyPath(varLib string, debug bool) (string, error) {
-	if debug {
-		return "", nil
-	}
-	if strings.TrimSpace(varLib) == "" {
-		return "", fmt.Errorf("NETDATA_LIB_DIR is required outside terminal/debug mode")
-	}
-	return filepath.Join(varLib, "dem", "journal"), nil
 }

@@ -32,7 +32,7 @@ import (
 )
 
 type source struct {
-	hub       *syntheticregistry.Registry
+	active    query.Observations
 	history   map[string]model.Run
 	filter    synthetichistory.RunFilter
 	page      synthetichistory.RunPage
@@ -44,13 +44,6 @@ type source struct {
 
 func (s *source) Catalogue(ctx context.Context, filter artifacts.Filter) (artifacts.Page, error) {
 	return s.artifacts.Catalogue(ctx, filter)
-}
-
-func (s *source) Snapshot(now time.Time) []syntheticregistry.Job {
-	if s.hub == nil {
-		return nil
-	}
-	return s.hub.Snapshot(now)
 }
 
 func (s *source) QueryRuns(ctx context.Context, f synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
@@ -85,11 +78,20 @@ func newHandler(s *source) *syntheticfunctions.Handler {
 	if s == nil {
 		return syntheticfunctions.New(nil, nil)
 	}
-	var active query.Observations
-	if s.hub != nil {
-		active = s.hub
-	}
-	return syntheticfunctions.New(query.New(active, s, s, nil), nil)
+	return syntheticfunctions.New(query.New(s.active, s, s, nil), nil)
+}
+
+// activeJobs is a fixed set of active jobs and their latest runs, keyed by job ID.
+type activeJobs struct {
+	jobs []syntheticregistry.Job
+	runs map[string]model.Run
+}
+
+func (a activeJobs) Snapshot(time.Time) []syntheticregistry.Job { return a.jobs }
+
+func (a activeJobs) Latest(jobID, runID string) (model.Run, bool) {
+	run, ok := a.runs[jobID]
+	return run, ok && run.ID == runID
 }
 
 func ptr(n float64) *float64 { return &n }
@@ -243,42 +245,41 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 	)
 }
 
-func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
-	hub := syntheticregistry.New()
-	registration, err := hub.Register(
-		syntheticregistry.Job{
-			JobID:          "journey:checkout",
-			Name:           "checkout",
-			Kind:           model.Journey,
-			CadenceSeconds: 1,
-		},
-	)
-	require.NoError(t, err)
+func TestChecksRowPresentsTheActiveSnapshot(t *testing.T) {
 	completed := time.Now().Add(-time.Minute).UnixMicro()
-	evidence := model.Run{
-		ID:           "r",
-		JobID:        "journey:checkout",
-		Outcome:      model.Failed,
-		CompletedUS:  completed,
-		DurationMS:   ptr(500.25),
-		Error:        "afterAll failed",
-		HistoryError: "history write failed",
-	}
-	registration.Complete(evidence)
-	registration.SetSchedule(
-		monitor.Status{
-			Scheduled:       12,
-			Admitted:        2,
-			Coalesced:       9,
-			Pending:         true,
-			Active:          true,
-			AdmittedUS:      completed,
-			SchedulingDelay: 3 * time.Second,
+	job := syntheticregistry.Job{
+		Snapshot: monitor.Snapshot{
+			JobID:    "journey:checkout",
+			Kind:     model.Journey,
+			Name:     "checkout",
+			Interval: time.Second,
+			Status: monitor.Status{
+				Scheduled:       12,
+				Admitted:        2,
+				Coalesced:       9,
+				Pending:         true,
+				Active:          true,
+				AdmittedUS:      completed,
+				SchedulingDelay: 3 * time.Second,
+			},
+			State: model.JobRunning,
+			Latest: monitor.Observation{
+				ID:          "r",
+				Outcome:     model.Failed,
+				CompletedUS: completed,
+				DurationMS: monitor.Scalar{
+					Value:   500.25,
+					Present: true,
+				},
+				Error:        "afterAll failed",
+				HistoryError: "history write failed",
+			},
+			HasObservation: true,
+			LastFailureUS:  completed,
 		},
-	)
-	registration.SetState("running")
+	}
 	h := newHandler(&source{
-		hub: hub,
+		active: activeJobs{jobs: []syntheticregistry.Job{job}},
 	})
 	got := call(h, "synthetics-checks")
 	rows := responseData(t, got)
@@ -313,40 +314,22 @@ func TestActiveSnapshotPreservesStaleFailureDuringRunning(t *testing.T) {
 	)
 	validate(t, got)
 	require.Empty(t, responseData(t, call(h, "synthetics-checks", "kind:lighthouse")))
-	registration.Retire()
-	require.Empty(t, responseData(t, call(h, "synthetics-checks")))
-	next, err := hub.Register(
-		syntheticregistry.Job{
-			JobID:          "journey:checkout",
-			Name:           "checkout",
-			Kind:           model.Journey,
-			CadenceSeconds: 1,
-		},
-	)
-	require.NoError(t, err)
-	defer next.Retire()
-	got = call(h, "synthetics-checks")
-	row := rowValues(t, got, responseData(t, got)[0])
-	assert.Nil(t, row["completed_us"])
-	assert.Nil(t, row["last_failure_us"])
-	assert.Equal(t, false, row["fresh"])
 }
 
 func TestInventoryTruncation(t *testing.T) {
-	hub := syntheticregistry.New()
+	var active activeJobs
 	for _, name := range []string{"a", "b"} {
-		_, err := hub.Register(
-			syntheticregistry.Job{
-				JobID:          "journey:" + name,
-				Name:           name,
-				Kind:           model.Journey,
-				CadenceSeconds: 900,
+		active.jobs = append(active.jobs, syntheticregistry.Job{
+			Snapshot: monitor.Snapshot{
+				JobID:    "journey:" + name,
+				Name:     name,
+				Kind:     model.Journey,
+				Interval: 900 * time.Second,
 			},
-		)
-		require.NoError(t, err)
+		})
 	}
 	got := call(newHandler(&source{
-		hub: hub,
+		active: active,
 	}), "synthetics-checks", "limit:1")
 	assert.Len(t, responseData(t, got), 1)
 	assert.Equal(t, true, got.RawResponse["truncated"])
@@ -487,14 +470,7 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	)
 	validate(t, got)
 	// Current failed journal writes are still diagnosable through their exact ID.
-	src.hub = syntheticregistry.New()
-	registration, err := src.hub.Register(syntheticregistry.Job{
-		JobID:          run.JobID,
-		CadenceSeconds: 900,
-	})
-	require.NoError(t, err)
-	defer registration.Retire()
-	registration.Complete(run)
+	src.active = activeJobs{runs: map[string]model.Run{run.JobID: run}}
 	call(newHandler(src), "synthetics-run", "job_id:journey:a", "run_id:r")
 	assert.Equal(t, 1, src.getCalls, "active exact run avoids a second history read")
 }
@@ -740,7 +716,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				"started_us": nil, "scheduled_us": nil, "queued_us": nil, "completed_us": nil,
 				"duration_ms": nil, "outcome": model.Timeout, "termination_reason": model.ExecutionBudget,
 				"error": "core error", "tests": (*model.TestCounts)(nil),
-				"capture_state": model.CaptureState(""), "artifacts": []model.Artifact(nil), "history_error": "",
+				"capture_state": model.CaptureState(""), "artifacts": []model.Artifact{}, "history_error": "",
 				"captures":       run.Captures,
 				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
 				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,
@@ -785,22 +761,20 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	store := history.NewStore(journal)
-	hub := registry.New()
+	active := activeJobs{runs: map[string]model.Run{}}
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		name := []string{"checkout", "search", "legacy"}[i]
 		jobID := "journey:" + name
-		job, err := hub.Register(registry.Job{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site})
-		require.NoError(t, err)
-		defer job.Retire()
+		active.jobs = append(active.jobs, registry.Job{Snapshot: monitor.Snapshot{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site}})
 		run := model.Run{ID: name, JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site, Outcome: model.Success, StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro()}
 		if i == 0 {
 			run.VnodeGUID = "33333333-3333-4333-8333-333333333333"
 		}
 		_, err = store.AppendRun(ctx, "complete", run)
 		require.NoError(t, err)
-		job.Complete(run)
+		active.runs[jobID] = run
 	}
-	h := functions.New(query.New(hub, store, nil, nil), nil)
+	h := functions.New(query.New(active, store, nil, nil), nil)
 	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)

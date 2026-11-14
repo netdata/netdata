@@ -54,16 +54,13 @@ func (c *Collector) Collect(context.Context) error {
 				Value: g.Value,
 			}, bucketLabel(g.Other))
 			prefix := "breakdown_" + kind + "_"
-			if kind != aggregate.KindView {
-				gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
-			}
-			gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 			if kind == aggregate.KindView {
+				gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 				gm.Gauge(prefix + "application_views").Observe(float64(g.ApplicationViews))
-			}
-			if kind == aggregate.KindView {
 				continue
 			}
+			gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
+			gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 			for _, vital := range beacon.Vitals {
 				st := g.Vitals[vital]
 				name := prefix + strings.ToLower(vital)

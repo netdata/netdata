@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 )
 
 func permitted(value string, required uint64) bool {
@@ -60,9 +60,9 @@ func validKind(value string) error {
 	return nil
 }
 
-func runFilter(args map[string]string, now int64) (query.RunFilter, error) {
+func runFilter(args map[string]string, now int64) (history.RunFilter, error) {
 	before := now
-	f := query.RunFilter{
+	f := history.RunFilter{
 		JobID:     args["job_id"],
 		VnodeGUID: args["vnode_guid"],
 		Kind:      model.Kind(args["kind"]),

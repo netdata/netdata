@@ -15,8 +15,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -263,9 +263,9 @@ func TestRuntimeSetupPlanValidatesEnvironmentAndCanonicalPath(t *testing.T) {
 }
 
 func TestRuntimeSetupPlanBuildOwnershipCannotBeChangedByRuntimeConfig(t *testing.T) {
-	previous := dem.DefaultRuntimeMode
-	t.Cleanup(func() { dem.DefaultRuntimeMode = previous })
-	dem.DefaultRuntimeMode = "native"
+	previous := runtimehost.DefaultMode
+	t.Cleanup(func() { runtimehost.DefaultMode = previous })
+	runtimehost.DefaultMode = "native"
 	dir := t.TempDir()
 	root := filepath.Join(dir, "runtime")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)), 0600))

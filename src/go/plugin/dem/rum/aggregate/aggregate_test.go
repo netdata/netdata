@@ -46,7 +46,7 @@ func mk(now time.Time, session, page string, vitals ...beacon.Vital) *beacon.Bea
 		Received:  now,
 		SessionID: session,
 		Path:      page,
-		PageGroup: beacon.PageGroup(page),
+		PageGroup: page,
 		Browser:   "Chrome",
 		Device:    "desktop",
 		Country:   "GR",
@@ -301,14 +301,6 @@ func TestPopulationExpiresByEachReceipt(t *testing.T) {
 	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
 }
 
-func TestMismatchedIdentityHasNoEffects(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.LCP, 10))
-	b.Site = "other"
-	assert.False(t, a.Ingest(b).Accepted)
-	assert.Empty(t, a.Snapshot().Counters)
-	assert.Empty(t, a.Pages(""))
-}
 func itoa(i int) string { return fmt.Sprint(i) }
 
 func TestApplicationViewsAreSeparateAndRequireExplicitEvents(t *testing.T) {

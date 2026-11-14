@@ -58,11 +58,8 @@ func NewTraces(
 	}, nil
 }
 
-func (e *Traces) Ingest(b *beacon.Beacon, result aggregate.Result) {
-	if !result.Accepted || !result.Investigated || b.Site != e.siteName {
-		return
-	}
-	if result.Observation == nil || len(result.Observation.Spans) == 0 {
+func (e *Traces) Ingest(result aggregate.Result) {
+	if !result.Investigated || len(result.Observation.Spans) == 0 {
 		return
 	}
 	rs := e.resourceSpans(result.Observation)

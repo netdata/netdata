@@ -135,7 +135,7 @@ The four collector modules (the journeys below show them in action):
 | Module | Job shape | Defaults | Owns while running |
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
-| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters, transport counters |
+| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, history writer, optional exporters, transport counters |
 | `journey` | One job per journey script (`script` or `script_path`) | Checks every 900 s, 120 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 | `lighthouse` | One job per audited URL | Checks every 1800 s, 180 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 
@@ -282,9 +282,8 @@ Each site job builds its own objects; nothing is shared between sites:
 | Object | Package | Built in | Notes |
 |---|---|---|---|
 | Aggregator | `rum/aggregate` | `Init` | One site's rolling measurements and investigation state, behind one lock |
-| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text |
-| Diagnostics state | `rum/diagnostics` | `Run` | Last rejected origin |
-| Route | `rum/httpapi` | `Run` | The site's policy and processor, admitted through the registry |
+| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text; handed to the route and exporters |
+| Route | `rum/httpapi` | `Run` | The site's policy, processor, redactor and last rejected origin, admitted through the registry |
 | History writer | `rum/history` | `Run` | Queued, batched journal appends |
 | Event-log exporter | `rum/otlp` | `Run` | Only when `event_logs` is enabled |
 | Browser-trace exporter | `rum/otlp` | `Run` | Only when `tracing` is enabled |
@@ -416,7 +415,8 @@ What makes this layer predictable:
 
 ## Startup and shutdown
 
-`cmd/demplugin/main.go` builds the process in a fixed order and tears it down only after a clean exit:
+The command loads `dem.conf`, then `dem.Open` (`process.go`) builds the process in a fixed order; the command tears it
+down only after a clean exit:
 
 ```mermaid
 flowchart TD
@@ -424,7 +424,7 @@ flowchart TD
     Journal("Open journal<br/>verify files · apply retention")
     Art("Open capture store<br/>first cleanup")
     RT("Open browser runtime<br/>build the runner")
-    Compose("dem.New<br/>registries · collectors · Functions · retention")
+    Compose("Compose components<br/>registries · collectors · Functions · retention")
     Run("agenthost.Run<br/>framework runs jobs and Functions")
     Clean{"Clean exit?"}
     Close("Close runtime → captures → journal")
@@ -443,7 +443,7 @@ flowchart TD
 ```
 
 - The journal opens first, and the configured history budget applies before any producer can append.
-- The browser runtime is either a managed host holding the installed startup selection or an administrator preload.
+- The browser runtime is either a host holding the managed or native startup selection or an administrator preload.
   The host maintains storage but never downloads or changes its selection. The runner owns the shared configured
   admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
@@ -456,10 +456,11 @@ flowchart TD
 ## Package map
 
 The root `dem` package composes the plugin and owns its process-level policy: it loads and validates `dem.conf`
-(`config.go`), acquires the selected installation or sealed preload (`runtime_setup.go`), runs the retention worker
-(`retention.go`), and wires native collectors, process Function providers, query services and retention
-(`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function tables. The
-command creates and closes the shared resources across framework generations.
+(`config.go`), opens the journal, capture store, browser runtime and runner in order and closes them (`process.go`), runs
+the retention worker (`retention.go`), and wires native collectors, process Function providers, query services and
+retention (`plugin.go`). It does not decode domain journal records, reduce investigation results or serialize Function
+tables. The command parses its arguments, runs the Agent across framework generations and closes the process only after
+a clean exit.
 
 Shared and process-wide packages:
 
@@ -476,12 +477,11 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 
 | Role | Package | Responsibility |
 |---|---|---|
-| Processing | `rum/beacon` | Normalized browser observations, event kinds and pure sampling and normalization rules |
+| Processing | `rum/beacon` | Normalized browser observation model: event kinds, device and vital names, reject reasons |
 | Processing | `rum/config` | Receiver/site declarations, validation and effective capture and sampling policy |
-| Processing | `rum/faro` | Faro wire decoding, spans, event classification and pinned bootstrap rendering/assets |
-| Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, caching and demo responses |
-| Processing | `rum/diagnostics` | Last rejected-origin observation owned by one site runtime |
-| Processing | `rum/aggregate` | One site's rolling measurements and investigation state, behind one lock |
+| Processing | `rum/faro` | Faro wire decoding and input policy (normalization, redaction, error fingerprints, bot classification), spans, event classification and pinned bootstrap rendering/assets |
+| Processing | `rum/httpapi` | HTTP endpoints, exact route leases, origin/proxy/body/rate policy, last rejected origin, caching and demo responses |
+| Processing | `rum/aggregate` | One site's rolling measurements, Core Web Vitals ratings, session sampling and investigation state, behind one lock |
 | Processing | `rum/otlp` | RUM log/span mapping, export queues, transport and drainage |
 | Processing | `rum/geoip` | Receiver-owned geographic sources, snapshots and validated lookups |
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
@@ -494,14 +494,15 @@ Synthetic packages:
 | Package | Responsibility |
 |---|---|
 | `synthetic` | Shared request, run, event, capture and optional-output status values with their vocabularies, plus request and job ID validation |
-| `synthetic/registry` | Copied active-job observations, generation fencing and freshness |
+| `synthetic/monitor` | One active job's cadence and state: schedule status, current state, latest run, freshness and queue age |
+| `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
 | `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |
-| `synthetic/runtimehost` | Fixed startup selection, dependency readiness and process maintenance |
+| `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
 Deeper package guides: [runtime store](synthetic/runtime/README.md), [runtime host](synthetic/runtimehost/README.md),
@@ -524,7 +525,7 @@ flowchart LR
     H --> J("journal")
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
-    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip")
+    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip · monitor")
     Reg --> Dom
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
@@ -533,7 +534,10 @@ flowchart LR
 
 Dependency direction:
 
-- Function adapters depend on query results and shared domain values.
+- RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
+  through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
+  `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
+  store dependency.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
@@ -541,10 +545,10 @@ Dependency direction:
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.
 - HTTP never imports the registry or collectors; its small `Processor` and `Routes` interfaces describe its consumers.
-- Diagnostics does not depend on HTTP.
-- Faro is a pure protocol adapter. Its embedded bootstrap template requires no frontend build.
-- Configuration policy does not read the hostname or generate UI prose. Diagnostics derives fallback addresses and
-  Functions owns presentation.
+- Faro is an I/O-free protocol adapter that owns input policy. Its embedded bootstrap template requires no frontend
+  build.
+- Configuration policy does not read the hostname or generate UI prose. The sites query derives the fallback install
+  address and Functions own presentation.
 
 File layout within packages:
 
@@ -605,16 +609,16 @@ Receiver:
 
 Sites:
 
-- Each site initializes its immutable policy, then independently admits its aggregator, route, redactor and runtime
-  generation.
+- Each site initializes its immutable policy, then independently admits its aggregator, route (carrying the site
+  redactor) and runtime generation.
 - Site readiness does not depend on receiver readiness.
-- One RUM job constructs one aggregator, diagnostic state, route and history writer. It also constructs an event-log
+- One RUM job constructs one aggregator, route and history writer. It also constructs an event-log
   exporter when `event_logs` is enabled and a browser-trace exporter when `tracing` is enabled. Both default to
   disabled.
 - These objects have no site inventory or reconfiguration API.
 - The registry admits references to those exact owners; it does not construct them.
-- The route records address/rejection observations in the separate diagnostic state.
-- Aggregation and each exporter reject an observation for another site before changing state.
+- The route records the last rejected origin; a replacement runtime starts without it.
+- One site job feeds only its own aggregator, exporters and history writer, so they do not re-check the site name.
 - Native `Name` identifies the site; `DisplayName` is presentation metadata.
 
 ### Installation bootstrap
@@ -760,7 +764,7 @@ Vital attribution:
 Processing order:
 
 - The collector's processor calls aggregation and then each enabled exporter directly.
-- Aggregation leaves the normalized Beacon unchanged and returns acceptance/detail decisions plus a filtered
+- Aggregation leaves the normalized Beacon unchanged and returns page-view/detail decisions plus a filtered
   observation containing only newly eligible reports.
 - Exporters consume that filtered observation, including when it is empty. They MUST NOT fall back to the input batch.
 - History enqueue remains nonblocking under the aggregate lock and does not call back into it.
@@ -1030,7 +1034,7 @@ Draft rehearsal:
   an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
   disabled. The monitoring engine cannot be constructed without its history and artifact owners; standalone runtime
   administration qualifies through its own one-slot scope instead.
-- Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
+- Rehearsal never calls collector `Run` or `Collect`, registers a monitor session, or writes metrics.
   After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
   or polling API exists.
 - Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
@@ -1038,8 +1042,9 @@ Draft rehearsal:
 
 Registration:
 
-- `Run` registers one observation generation before readiness.
-- The monitor session publishes current-association outcomes through that exact registration; `Collect` reads its scalar snapshot.
+- `Run` registers its monitor session before readiness. The registry indexes sessions and keeps no copy of their state.
+- The session owns schedule status, current state, the latest verified run and last success/failure times. `Collect`
+  and `synthetics-checks` read its scalar snapshot; active-first run detail copies only the requested latest run.
 - Session owns a monotonic association epoch under its mutex. At execution-queue submission it captures both the
   prepared request (including vnode GUID) and epoch by value. Later admission may choose a newer pending due time,
   but MUST NOT replace the captured identity. History and artifacts retain this GUID regardless of reassignment.
@@ -1047,11 +1052,11 @@ Registration:
   success/failure timestamps. Same-GUID hostname/label updates preserve them. Old-epoch state/completion callbacks
   MUST NOT refill current observations, including A-to-B-to-A transitions. Changes count when delivered by the
   framework's configured-vnode snapshot; unobserved intermediate config edits are not association transitions.
-- Placement, state and completion callbacks are serialized under Session's mutex, with lock order Session then
-  Registry and no callback reentry. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state
-  and queue diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
+- Placement, state and completion updates are serialized under Session's mutex; the registry never holds its own lock
+  while reading a session. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state and queue
+  diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
   checks; fencing current publication MUST NOT hide unsafe execution or delete historical evidence.
-- Retirement cancels and joins the session and executor call before retiring its registration; late callbacks remain fenced.
+- Retirement cancels and joins the session and executor call before removing the session from the registry.
 
 Failure handling:
 
@@ -1155,7 +1160,8 @@ Protected preloads and shutdown:
 - Identity detail retains active-first diagnosis.
 - Summary reduction is O(selected runs) memory and stores no full timelines. SDK snapshots use bounded buffers per
   retained file.
-- Current synthetic registry registrations own copied generation observations and reset to unknown on replacement.
+- Current synthetic observations belong to each monitor session; a new activation or a vnode reassignment starts
+  unknown.
 - Freshness is two browser check intervals and remains independent of an in-flight attempt. History does not drive current
   incidents.
 

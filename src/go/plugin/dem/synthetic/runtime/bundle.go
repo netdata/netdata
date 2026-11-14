@@ -67,6 +67,11 @@ func localName(name string) bool {
 		!strings.ContainsAny(name, "\\\x00\r\n")
 }
 
+// Identity names this release in run results, qualification and status.
+func (m Manifest) Identity() synthetic.RuntimeIdentity {
+	return synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
+}
+
 func (m Manifest) Validate() error {
 	if m.Format != 1 || m.Version == "" || (m.Platform != "linux/amd64" && m.Platform != "linux/arm64") || !validID(m.Archive.SHA256) {
 		return errors.New("invalid runtime identity or platform")

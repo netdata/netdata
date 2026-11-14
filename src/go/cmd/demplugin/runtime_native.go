@@ -224,8 +224,7 @@ func verifyNativeQualification(data []byte, target runtime.Manifest) error {
 	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney || !qualification.SandboxedLocalLighthouse || !qualification.ProcessTreeDrained || qualification.Runtime == nil {
 		return errors.New("native service did not confirm complete, drained qualification")
 	}
-	identity := qualification.Runtime
-	if identity.Version != target.Version || identity.SHA256 != target.Archive.SHA256 || identity.Contract != target.Contract {
+	if *qualification.Runtime != target.Identity() {
 		return errors.New("native qualification identity differs from admitted target")
 	}
 	return nil
