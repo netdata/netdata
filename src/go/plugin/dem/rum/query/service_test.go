@@ -19,11 +19,6 @@ import (
 
 type measurementProcessor struct{ *aggregate.Aggregator }
 
-// discardCounters ignores history writer accounting, which these reads do not check.
-type discardCounters struct{}
-
-func (discardCounters) Add(string, uint64) {}
-
 func (p measurementProcessor) Ingest(b *beacon.Beacon) { p.Aggregator.Ingest(b) }
 
 func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*aggregate.Aggregator, func()) {
