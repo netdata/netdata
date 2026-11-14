@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"context"
@@ -34,7 +34,7 @@ func DefaultRuntimeConfig() RuntimeConfig {
 	return RuntimeConfig{Mode: DefaultRuntimeMode, MaxBytes: runtime.DefaultMaxBytes, PreviousRetentionDays: 7}
 }
 
-func (c RuntimeConfig) validate() error {
+func (c RuntimeConfig) Validate() error {
 	if c.Mode != "managed" && c.Mode != "preloaded" && c.Mode != "native" {
 		return errors.New("mode must be managed, native or preloaded")
 	}

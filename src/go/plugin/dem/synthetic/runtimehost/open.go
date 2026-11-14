@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"errors"
@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -19,10 +18,10 @@ import (
 // it must not run while a supervised browser invocation may still use the cache.
 type RuntimeHandle struct {
 	Source     runner.Source
-	Host       *runtimehost.Host
+	Host       *Host
 	Store      *runtime.Store
 	Native     *runtime.Native
-	Updater    *runtimehost.Updater
+	Updater    *Updater
 	Manifest   *runtime.Manifest
 	SetupError error
 	closeOnce  sync.Once
@@ -31,7 +30,7 @@ type RuntimeHandle struct {
 
 func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 	result := &RuntimeHandle{}
-	if err := cfg.validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		result.SetupError = err
 	}
 	if cfg.Mode == "preloaded" && !filepath.IsAbs(cfg.PreloadPath) {
@@ -59,7 +58,7 @@ func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 		if result.SetupError == nil {
 			result.Native, result.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
 		}
-		result.Host = runtimehost.New(runtimehost.Config{Native: result.Native, Mode: "native", Unavailable: result.SetupError})
+		result.Host = New(Config{Native: result.Native, Mode: "native", Unavailable: result.SetupError})
 		result.SetupError = result.Host.Ready()
 		result.Source = result.Host
 		return result
@@ -71,7 +70,7 @@ func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 		}
 		result.SetupError = err
 	}
-	result.Host = runtimehost.New(runtimehost.Config{Store: result.Store, Unavailable: result.SetupError})
+	result.Host = New(Config{Store: result.Store, Unavailable: result.SetupError})
 	result.SetupError = result.Host.Ready()
 	result.Source = result.Host
 	return result

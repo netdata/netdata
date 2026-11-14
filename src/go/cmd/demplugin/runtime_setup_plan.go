@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
 
 // setup-plan is a read-only, bounded protocol for the administrator-owned host
@@ -100,7 +101,7 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 	// Native packaging fixes this build default. Runtime configuration may change
 	// the selected mode, but must not change who owns automatic host setup.
 	var delivery string
-	switch dem.DefaultRuntimeMode {
+	switch runtimehost.DefaultRuntimeMode {
 	case "managed":
 		delivery = "standalone"
 	case "native":

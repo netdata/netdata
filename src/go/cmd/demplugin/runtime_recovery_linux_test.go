@@ -11,8 +11,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
-	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +25,7 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	manifest, archive = adminBundleFixture(t)
 	root = t.TempDir()
 	writeAdminTrust(t, root, "")
-	cfg := dem.DefaultRuntimeConfig()
+	cfg := runtimehost.DefaultRuntimeConfig()
 	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
 	cache = filepath.Join(root, "cache")
 	store, err := runtime.Open(runtime.DefaultConfig(cache))

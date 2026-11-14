@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"gopkg.in/yaml.v2"
 )
 
@@ -35,10 +36,10 @@ func (c *BrowserConfig) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 type Config struct {
-	History   RetentionConfig `yaml:"history"`
-	Artifacts RetentionConfig `yaml:"artifacts"`
-	Runtime   RuntimeConfig   `yaml:"runtime"`
-	Browser   BrowserConfig   `yaml:"browser"`
+	History   RetentionConfig           `yaml:"history"`
+	Artifacts RetentionConfig           `yaml:"artifacts"`
+	Runtime   runtimehost.RuntimeConfig `yaml:"runtime"`
+	Browser   BrowserConfig             `yaml:"browser"`
 }
 
 func DefaultConfig() Config {
@@ -48,7 +49,7 @@ func DefaultConfig() Config {
 			Days:     7,
 			MaxBytes: 2 << 30,
 		},
-		Runtime: DefaultRuntimeConfig(),
+		Runtime: runtimehost.DefaultRuntimeConfig(),
 		History: RetentionConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
@@ -79,7 +80,7 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	// Decode the original document strictly for runtime settings, including merges
 	// and aliases, while leaving other sections opaque to this schema.
 	runtimeInput := struct {
-		Runtime RuntimeConfig                `yaml:"runtime"`
+		Runtime runtimehost.RuntimeConfig    `yaml:"runtime"`
 		Other   map[string]opaqueConfigValue `yaml:",inline"`
 	}{Runtime: cfg.Runtime}
 	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
@@ -95,7 +96,7 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	if err = cfg.Artifacts.validate(1); err != nil {
 		return cfg, fmt.Errorf("artifacts.%w", err)
 	}
-	if err = cfg.Runtime.validate(); err != nil {
+	if err = cfg.Runtime.Validate(); err != nil {
 		return cfg, fmt.Errorf("runtime.%w", err)
 	}
 	// yaml.v2 zeroes a null section without calling BrowserConfig.UnmarshalYAML.

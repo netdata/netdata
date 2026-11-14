@@ -2,7 +2,7 @@
 
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"context"

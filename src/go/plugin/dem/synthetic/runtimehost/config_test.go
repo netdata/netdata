@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"bytes"
@@ -12,12 +12,49 @@ import (
 	goruntime "runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRuntimeConfigDefaults(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	assert.Equal(t, "managed", cfg.Mode)
+	store, err := cfg.StoreConfig("/var/lib/netdata")
+	require.NoError(t, err)
+	assert.Equal(t, "/var/lib/netdata/dem/runtime", store.Path)
+	assert.Equal(t, int64(4<<30), store.MaxBytes)
+	assert.Equal(t, 7*24*time.Hour, store.PreviousRetention)
+}
+
+func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	cfg.Mode = "native"
+	require.NoError(t, cfg.Validate())
+	cfg.CachePath = "/alternate/proof"
+	require.ErrorContains(t, cfg.Validate(), "cache_path is only valid in managed mode")
+	cfg.CachePath = ""
+	cfg.PreloadPath = "/alternate/payload"
+	require.ErrorContains(t, cfg.Validate(), "preload_path requires mode: preloaded")
+}
+
+func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
+	cfg := DefaultRuntimeConfig()
+	for _, path := range []string{"", "relative"} {
+		_, err := cfg.StoreConfig(path)
+		require.Error(t, err)
+	}
+	cfg.CachePath = "relative"
+	_, err := cfg.StoreConfig("/var/lib/netdata")
+	require.Error(t, err)
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
+	store, err := cfg.StoreConfig("")
+	require.NoError(t, err)
+	assert.Equal(t, cfg.CachePath, store.Path)
+}
 
 func trustedFixture() runtime.Manifest {
 	return runtime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + goruntime.GOARCH,
@@ -89,35 +126,6 @@ func TestInstalledReleaseRejectsOtherArchitecture(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, raw, 0600))
 	_, err = cfg.ReleaseLoader(path, false)(context.Background())
 	require.ErrorContains(t, err, "does not match this architecture")
-}
-
-func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cache := filepath.Join(t.TempDir(), "cache")
-	cfg.CachePath = cache
-	handle := OpenRuntime(cfg, "")
-	require.Error(t, handle.SetupError)
-	require.NotNil(t, handle.Source)
-	require.NotNil(t, handle.Host)
-	assert.Contains(t, []string{"unavailable", "missing"}, handle.Host.Status().State)
-	_, err := handle.Source.BeginUse()
-	require.Error(t, err)
-	require.NoError(t, handle.Close())
-	require.NoError(t, handle.Close())
-}
-func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "preloaded"
-	cfg.PreloadPath = filepath.Join(t.TempDir(), "not-created")
-	handle := OpenRuntime(cfg, "")
-	require.Error(t, handle.SetupError)
-	require.Nil(t, handle.Host)
-	require.Nil(t, handle.Store)
-	_, err := handle.Source.BeginUse()
-	require.Error(t, err)
-	require.NoError(t, handle.Close())
-	_, err = os.Stat(cfg.PreloadPath)
-	require.True(t, os.IsNotExist(err))
 }
 
 func TestReleaseLoaderRejectsInvalidConfiguredKeys(t *testing.T) {

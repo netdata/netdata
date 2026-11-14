@@ -163,7 +163,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			}
 			return true, errors.New("install/update/repair/uninstall require runtime.mode: managed")
 		}
-		handle := dem.OpenRuntime(cfg, "")
+		handle := runtimehost.OpenRuntime(cfg, "")
 		defer func() {
 			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
 				retErr = errors.Join(retErr, handle.Close())
