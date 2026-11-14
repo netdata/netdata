@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -18,6 +19,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
+// checkTimeout bounds each caller's wait and each runtime contract probe.
+const checkTimeout = 10 * time.Second
+
+// checkReplyLimit caps the stdout read from `run.mjs --check`. Its reply is
+// one JSON object with the release contract, version, uid and gid
+// (src/dem-runtime/runner/runtime.mjs checkRuntime); the cap keeps a
+// misbehaving runtime from growing Agent memory.
+const checkReplyLimit = 4096
+
+// A failing check writes {"error": text} to stderr with text clipped to
+// textLimit characters (src/dem-runtime/runner/protocol.cjs); the Agent keeps
+// at most textLimit bytes of it as the check error's diagnostic.
+const checkDiagnosticLimit = textLimit
+
 func runtimeAllowed() error {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		return errors.New("DEM browser execution requires prepared Linux amd64 or arm64 runtime")
@@ -30,10 +45,9 @@ func runtimeAllowed() error {
 	return nil
 }
 
-func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
-	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
-		return errors.New("unsupported synthetic kind")
-	}
+// checkFiles verifies the acquired release identity and its executable files
+// before anything is launched.
+func checkFiles(paths Paths) error {
 	if paths.Identity.Contract != synthetic.ExecutionContract {
 		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d)", paths.Identity.Contract, synthetic.ExecutionContract)
 	}
@@ -59,26 +73,10 @@ func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
 	return nil
 }
 
-type checkOwner struct {
-	mu     sync.Mutex
-	flight *checkFlight
-}
-
-type checkFlight struct {
-	done     chan struct{}
-	cancel   context.CancelFunc
-	waiters  int
-	retiring bool
-	err      error
-}
-
 // Check verifies the release contract through its own bounded supervised check.
 // Component versions and private dependency checks belong to the runtime release.
-// It never loads the configured workflow or launches a browser session.
-func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
-	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
-		return errors.New("unsupported synthetic kind")
-	}
+// It never loads a workflow or launches a browser session.
+func (e *Engine) Check(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -88,78 +86,119 @@ func (e *Engine) Check(ctx context.Context, kind synthetic.Kind) error {
 	if err := e.platform(); err != nil {
 		return err
 	}
-	waiterCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, checkTimeout)
 	defer cancel()
-	owner := e.checks
+	return e.checks.do(ctx, e.poisoned, e.check)
+}
+
+// checkOwner coalesces the concurrent checks of one source view into one
+// probe. Probes run outside browser slots, so this also keeps at most one
+// probe per view running.
+type checkOwner struct {
+	mu     sync.Mutex
+	flight *checkFlight
+}
+
+type checkFlight struct {
+	done   chan struct{} // closed once the probe returned and its tree joined
+	cancel context.CancelFunc
+	// waiters counts callers still waiting. A flight left with none is
+	// retiring: its last caller cancelled it and waits for its join.
+	waiters int
+	err     error
+}
+
+// do returns the result of a probe shared with concurrent callers. Each caller
+// keeps its own deadline. The last caller to leave cancels the probe and
+// returns only after it joined, so its runtime use is released by then, and no
+// replacement probe starts before that join.
+func (o *checkOwner) do(ctx context.Context, poisoned <-chan struct{}, probe func(context.Context) error) error {
 	for {
-		owner.mu.Lock()
-		flight := owner.flight
-		if flight != nil && flight.retiring {
-			owner.mu.Unlock()
-			// The last waiter owns cancellation and physical join. A replacement
-			// cannot acquire another runtime use until that join is complete.
-			select {
-			case <-flight.done:
-				continue
-			case <-waiterCtx.Done():
-				return waiterCtx.Err()
-			case <-e.poisoned:
-				return ndexec.ErrTreeNotDrained
+		o.mu.Lock()
+		f := o.flight
+		if f != nil && f.waiters == 0 {
+			o.mu.Unlock()
+			if err := awaitCheck(ctx, poisoned, f.done); err != nil {
+				return err
 			}
+			continue
 		}
-		if err := waiterCtx.Err(); err != nil {
-			owner.mu.Unlock()
+		if err := ctx.Err(); err != nil {
+			o.mu.Unlock()
 			return err
 		}
-		if e.isPoisoned() {
-			owner.mu.Unlock()
+		if closed(poisoned) {
+			o.mu.Unlock()
 			return ndexec.ErrTreeNotDrained
 		}
-		if flight == nil {
-			probeCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
-			flight = &checkFlight{done: make(chan struct{}), cancel: stop}
-			owner.flight = flight
-			go func(f *checkFlight) {
-				err := e.check(probeCtx, kind)
-				stop()
-				owner.mu.Lock()
-				f.err = err
-				owner.flight = nil
-				close(f.done)
-				owner.mu.Unlock()
-			}(flight)
+		if f == nil {
+			f = o.start(ctx, probe)
 		}
-		flight.waiters++
-		owner.mu.Unlock()
-		var err error
-		select {
-		case <-flight.done:
-			return flight.err
-		case <-waiterCtx.Done():
-			err = waiterCtx.Err()
-		case <-e.poisoned:
-			err = ndexec.ErrTreeNotDrained
+		f.waiters++
+		o.mu.Unlock()
+		if err := awaitCheck(ctx, poisoned, f.done); err != nil {
+			// Completion may race this departure: the caller still reports its
+			// own stop, while other waiters keep the joined result.
+			return o.leave(f, err)
 		}
-		owner.mu.Lock()
-		// Completion may race cancellation. The caller still owns its deadline,
-		// while the joined physical result remains available to other waiters.
-		flight.waiters--
-		last := flight.waiters == 0
-		if last {
-			flight.retiring = true
-			flight.cancel()
-		}
-		owner.mu.Unlock()
-		if last {
-			<-flight.done
-		}
-		return err
+		return f.err
 	}
 }
 
-func (e *Engine) check(checkCtx context.Context, kind synthetic.Kind) error {
+// start launches a probe under o.mu. The probe outlives its first caller's
+// cancellation and stops at checkTimeout or when its last caller leaves.
+func (o *checkOwner) start(ctx context.Context, probe func(context.Context) error) *checkFlight {
+	probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), checkTimeout)
+	f := &checkFlight{done: make(chan struct{}), cancel: cancel}
+	o.flight = f
+	go func() {
+		err := probe(probeCtx)
+		cancel()
+		o.mu.Lock()
+		f.err, o.flight = err, nil
+		close(f.done)
+		o.mu.Unlock()
+	}()
+	return f
+}
+
+func (o *checkOwner) leave(f *checkFlight, err error) error {
+	o.mu.Lock()
+	f.waiters--
+	last := f.waiters == 0
+	if last {
+		f.cancel()
+	}
+	o.mu.Unlock()
+	if last {
+		<-f.done
+	}
+	return err
+}
+
+func awaitCheck(ctx context.Context, poisoned, done <-chan struct{}) error {
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-poisoned:
+		return ndexec.ErrTreeNotDrained
+	}
+}
+
+func closed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+		return false
+	}
+}
+
+func (e *Engine) check(checkCtx context.Context) error {
 	var identity synthetic.RuntimeIdentity
-	output, err := e.probe(checkCtx, kind, func(paths Paths) []string {
+	output, err := e.probe(checkCtx, func(paths Paths) []string {
 		identity = paths.Identity
 		return []string{paths.EntryPoint, "--check"}
 	})
@@ -191,7 +230,7 @@ func (e *Engine) beginUse() (Use, error) {
 	return e.source.BeginUse()
 }
 
-func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(Paths) []string) ([]byte, error) {
+func (e *Engine) probe(ctx context.Context, arguments func(Paths) []string) ([]byte, error) {
 	use, err := e.beginUse()
 	if err != nil {
 		return nil, err
@@ -199,7 +238,7 @@ func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(
 	drained := true
 	defer func() { _ = use.Finish(drained) }()
 	paths := use.Paths()
-	if err := e.checkFiles(kind, paths); err != nil {
+	if err := checkFiles(paths); err != nil {
 		return nil, err
 	}
 
@@ -207,13 +246,13 @@ func (e *Engine) probe(ctx context.Context, kind synthetic.Kind, arguments func(
 	var parseErr error
 	var diagnostic string
 	result, err := e.executeProcess(ctx, paths, use.Completion(), arguments(paths), nil, func(reader io.Reader) error {
-		output, parseErr = io.ReadAll(io.LimitReader(reader, 4097))
-		if len(output) > 4096 {
-			parseErr = errors.New("runtime check response exceeds 4096 bytes")
+		output, parseErr = io.ReadAll(io.LimitReader(reader, checkReplyLimit+1))
+		if len(output) > checkReplyLimit {
+			parseErr = fmt.Errorf("runtime check response exceeds %d bytes", checkReplyLimit)
 		}
 		return parseErr
 	}, func(reader io.Reader) {
-		raw, _ := io.ReadAll(io.LimitReader(reader, 2001))
+		raw, _ := io.ReadAll(io.LimitReader(reader, checkDiagnosticLimit))
 		diagnostic = clip(string(raw))
 		_, _ = io.Copy(io.Discard, reader)
 	})

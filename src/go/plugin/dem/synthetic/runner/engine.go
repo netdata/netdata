@@ -223,7 +223,7 @@ func (e *Engine) runAdmitted(ctx context.Context, a *attempt, state func(string)
 	}
 	defer func() { _ = use.Finish(drained) }()
 	paths := use.Paths()
-	if err := e.checkFiles(a.request.Kind, paths); err != nil {
+	if err := checkFiles(paths); err != nil {
 		e.failBeforeStart(a, err)
 		return true
 	}

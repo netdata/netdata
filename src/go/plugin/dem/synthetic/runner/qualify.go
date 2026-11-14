@@ -52,7 +52,7 @@ func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, er
 // environment; it does not certify another daemon's security policy.
 func qualify(ctx context.Context, engine *Engine) (*Qualification, error) {
 	result := &Qualification{Scope: fmt.Sprintf("Current process uid=%d gid=%d and environment: release contract check, sandboxed local Playwright journey and desktop Lighthouse audit on loopback content; does not certify other process confinement or hosts/platforms.", os.Geteuid(), os.Getegid())}
-	if err := engine.Check(ctx, synthetic.Journey); err != nil {
+	if err := engine.Check(ctx); err != nil {
 		return result, err
 	}
 	result.ExecutionContract = true

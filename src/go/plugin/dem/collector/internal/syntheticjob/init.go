@@ -40,12 +40,12 @@ func (j *Job) Init(
 	return nil
 }
 
-// Check verifies browser preparation for the request kind without running or registering the job.
+// Check verifies browser preparation without running or registering the job.
 func (j *Job) Check(ctx context.Context) error {
 	if !j.initialized {
 		return errNotInitialized
 	}
 	ctx, cancel := context.WithTimeout(ctx, preparationTimeout)
 	defer cancel()
-	return j.deps.Executor.Check(ctx, j.request.Kind)
+	return j.deps.Executor.Check(ctx)
 }

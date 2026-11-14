@@ -29,9 +29,8 @@ func TestPreparationDoesNotRunOrRegister(t *testing.T) {
 		hub := registry.New()
 		calls := 0
 		c := k.new(syntheticjobtest.Executor{
-			CheckFunc: func(ctx context.Context, kind synthetic.Kind) error {
+			CheckFunc: func(ctx context.Context) error {
 				calls++
-				assert.Equal(t, k.kind, kind)
 				deadline, ok := ctx.Deadline()
 				assert.True(t, ok)
 				assert.LessOrEqual(t, time.Until(deadline), 15*time.Second)

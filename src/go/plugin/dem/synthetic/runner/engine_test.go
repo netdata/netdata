@@ -536,7 +536,7 @@ func TestCheckIsSupervisedWithoutWorkflowInput(t *testing.T) {
 		fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
 		return ndexec.TreeResult{Drained: true}
 	})
-	require.NoError(t, e.Check(context.Background(), synthetic.Journey))
+	require.NoError(t, e.Check(context.Background()))
 	assert.Equal(t, 1, calls)
 	assert.Zero(t, a.finalized.Load())
 }
@@ -756,7 +756,7 @@ func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
 				fmt.Fprintf(out, `{"version":%q,"contract":%d,"uid":%d,"gid":%d}`, tc.version, tc.contract, tc.uid, tc.gid)
 				return ndexec.TreeResult{Drained: true}
 			})
-			err := e.Check(context.Background(), synthetic.Journey)
+			err := e.Check(context.Background())
 			if tc.valid {
 				require.NoError(t, err)
 			} else {

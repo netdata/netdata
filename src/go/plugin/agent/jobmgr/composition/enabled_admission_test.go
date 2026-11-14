@@ -164,7 +164,7 @@ func (*admissionTestJourneyExecutor) Rehearse(context.Context, synthetic.Request
 	panic("unexpected journey rehearsal during activation")
 }
 
-func (e *admissionTestJourneyExecutor) Check(context.Context, synthetic.Kind) error {
+func (e *admissionTestJourneyExecutor) Check(context.Context) error {
 	e.checks.Add(1)
 	if !e.ready.Load() {
 		return errors.New("browser probe unavailable")

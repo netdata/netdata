@@ -29,7 +29,7 @@ func checkWaiters(t *testing.T, e *Engine, n int, retiring bool) {
 		e.checks.mu.Lock()
 		defer e.checks.mu.Unlock()
 		f := e.checks.flight
-		return f != nil && f.waiters == n && f.retiring == retiring
+		return f != nil && f.waiters == n && (n == 0) == retiring
 	}, time.Second, time.Millisecond)
 }
 func checkReply(out *os.File) ndexec.TreeResult {
@@ -53,22 +53,16 @@ func TestConcurrentChecksShareOneProbeAndLaterCheckIsFresh(t *testing.T) {
 	const n = 16
 	done := make(chan error, n)
 	for i := 0; i < n; i++ {
-		kind := synthetic.Journey
-		if i%2 == 1 {
-			kind = synthetic.Lighthouse
-		}
-		go func() { done <- e.Check(t.Context(), kind) }()
+		go func() { done <- e.Check(t.Context()) }()
 	}
 	receive(t, started)
-	checkWaiters(t, e, n, false)
-	require.ErrorContains(t, e.Check(t.Context(), synthetic.Kind("invalid")), "unsupported synthetic kind")
 	checkWaiters(t, e, n, false)
 	assert.Equal(t, int32(1), calls.Load())
 	close(release)
 	for i := 0; i < n; i++ {
 		require.NoError(t, receive(t, done))
 	}
-	require.NoError(t, e.Check(t.Context(), synthetic.Journey))
+	require.NoError(t, e.Check(t.Context()))
 	assert.Equal(t, int32(2), calls.Load())
 	e.checks.mu.Lock()
 	assert.Nil(t, e.checks.flight)
@@ -107,9 +101,9 @@ func TestCheckWaitersCancelIndependentlyAndLastWaiterJoinsBeforeReplacement(t *t
 	ctx2, cancel2 := context.WithCancel(t.Context())
 	defer cancel2()
 	first, second, replacement := make(chan error, 1), make(chan error, 1), make(chan error, 1)
-	go func() { first <- e.Check(ctx1, synthetic.Journey) }()
+	go func() { first <- e.Check(ctx1) }()
 	receive(t, started)
-	go func() { second <- e.Check(ctx2, synthetic.Lighthouse) }()
+	go func() { second <- e.Check(ctx2) }()
 	checkWaiters(t, e, 2, false)
 	cancel1()
 	require.ErrorIs(t, receive(t, first), context.Canceled)
@@ -131,10 +125,10 @@ func TestCheckWaitersCancelIndependentlyAndLastWaiterJoinsBeforeReplacement(t *t
 		t.Fatal("last waiter returned before physical completion")
 	default:
 	}
-	go func() { replacement <- e.Check(t.Context(), synthetic.Journey) }()
+	go func() { replacement <- e.Check(t.Context()) }()
 	expired, expire := context.WithCancel(t.Context())
 	expire()
-	require.ErrorIs(t, e.Check(expired, synthetic.Journey), context.Canceled)
+	require.ErrorIs(t, e.Check(expired), context.Canceled)
 	assert.Equal(t, int32(1), calls.Load())
 	close(join)
 	require.ErrorIs(t, receive(t, second), context.Canceled)
@@ -167,7 +161,7 @@ func TestLoneCheckDeadlineJoinsAndDoesNotCacheFailure(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { done <- e.Check(ctx, synthetic.Journey) }()
+	go func() { done <- e.Check(ctx) }()
 	receive(t, started)
 	receive(t, cancelled)
 	select {
@@ -177,7 +171,7 @@ func TestLoneCheckDeadlineJoinsAndDoesNotCacheFailure(t *testing.T) {
 	}
 	close(joined)
 	require.ErrorIs(t, receive(t, done), context.DeadlineExceeded)
-	require.NoError(t, e.Check(t.Context(), synthetic.Lighthouse))
+	require.NoError(t, e.Check(t.Context()))
 	assert.Equal(t, int32(2), calls.Load())
 }
 func TestCandidateCheckFlightIsIndependentEvenForMatchingReleaseIdentity(t *testing.T) {
@@ -195,12 +189,12 @@ func TestCandidateCheckFlightIsIndependentEvenForMatchingReleaseIdentity(t *test
 	})
 	candidate := e.unrecordedView(e.source, a)
 	monitorDone, candidateDone := make(chan error, 2), make(chan error, 2)
-	go func() { monitorDone <- e.Check(t.Context(), synthetic.Journey) }()
+	go func() { monitorDone <- e.Check(t.Context()) }()
 	receive(t, started)
-	go func() { candidateDone <- candidate.Check(t.Context(), synthetic.Lighthouse) }()
+	go func() { candidateDone <- candidate.Check(t.Context()) }()
 	receive(t, started)
-	go func() { monitorDone <- e.Check(t.Context(), synthetic.Lighthouse) }()
-	go func() { candidateDone <- candidate.Check(t.Context(), synthetic.Journey) }()
+	go func() { monitorDone <- e.Check(t.Context()) }()
+	go func() { candidateDone <- candidate.Check(t.Context()) }()
 	checkWaiters(t, e, 2, false)
 	checkWaiters(t, candidate, 2, false)
 	assert.Equal(t, int32(2), calls.Load())
@@ -223,16 +217,16 @@ func TestUnverifiedCheckDrainPoisonsCoalescedWaitersAndAllViews(t *testing.T) {
 	})
 	candidate := e.unrecordedView(e.source, a)
 	done := make(chan error, 2)
-	go func() { done <- candidate.Check(t.Context(), synthetic.Journey) }()
+	go func() { done <- candidate.Check(t.Context()) }()
 	receive(t, started)
-	go func() { done <- candidate.Check(t.Context(), synthetic.Lighthouse) }()
+	go func() { done <- candidate.Check(t.Context()) }()
 	checkWaiters(t, candidate, 2, false)
 	close(release)
 	for i := 0; i < 2; i++ {
 		assert.ErrorIs(t, receive(t, done), ndexec.ErrTreeNotDrained)
 	}
 	assert.ErrorIs(t, receive(t, e.Fatal()), ndexec.ErrTreeNotDrained)
-	assert.ErrorIs(t, e.Check(t.Context(), synthetic.Journey), ndexec.ErrTreeNotDrained)
+	assert.ErrorIs(t, e.Check(t.Context()), ndexec.ErrTreeNotDrained)
 	assert.False(t, e.execute(t.Context(), journey()).Drained)
 	assert.Equal(t, int32(1), calls.Load())
 }
@@ -302,7 +296,7 @@ func TestCheckResponseBounds(t *testing.T) {
 				}
 				return ndexec.TreeResult{Drained: true}
 			})
-			err := e.Check(t.Context(), synthetic.Journey)
+			err := e.Check(t.Context())
 			if tc.err == "" {
 				assert.NoError(t, err)
 			} else {

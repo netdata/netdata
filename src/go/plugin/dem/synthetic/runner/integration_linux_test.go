@@ -104,7 +104,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		require.NotNil(t, response.RawResponse, response.Message)
 		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
 	}
-	require.NoError(t, engine.Check(context.Background(), synthetic.Journey))
+	require.NoError(t, engine.Check(context.Background()))
 
 	var mu sync.Mutex
 	var descriptors []int
@@ -438,7 +438,7 @@ test('selected entry',async({message},info)=>{
 	t.Run("setup-inability", func(t *testing.T) {
 		unavailable, err := runner.New(nil, synthetichistory.NewStore(history), captures, 1)
 		require.NoError(t, err)
-		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
+		require.Error(t, unavailable.Check(context.Background()))
 		got := unavailable.ExecuteScheduled(
 			context.Background(),
 			synthetic.Request{
@@ -533,7 +533,7 @@ test('selected entry',async({message},info)=>{
 		assert.Equal(t, synthetic.Success, next.Run.Outcome)
 	})
 	t.Run("Lighthouse-desktop-report", func(t *testing.T) {
-		require.NoError(t, engine.Check(context.Background(), synthetic.Lighthouse))
+		require.NoError(t, engine.Check(context.Background()))
 		got := engine.ExecuteScheduled(
 			context.Background(),
 			synthetic.Request{

@@ -109,7 +109,7 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 					return child(ctx, opts, bin, args...)
 				}
 				if probe {
-					result, err := e.probe(context.Background(), synthetic.Journey, func(Paths) []string { return []string{"--version"} })
+					result, err := e.probe(context.Background(), func(Paths) []string { return []string{"--version"} })
 					if tc.metadataFailure {
 						require.NoError(t, err)
 						assert.Equal(t, "version", string(result))
@@ -159,7 +159,7 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}
-	require.NoError(t, e.Check(context.Background(), synthetic.Journey))
+	require.NoError(t, e.Check(context.Background()))
 	require.Len(t, uses, 1)
 	assert.Equal(t, []bool{true}, uses[0].finished())
 }
@@ -223,7 +223,7 @@ func TestUnavailableSourceDoesNotLaunch(t *testing.T) {
 			return nil, nil
 		}
 		if probe {
-			require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "runtime unavailable")
+			require.ErrorContains(t, e.Check(context.Background()), "runtime unavailable")
 		} else {
 			got := e.execute(context.Background(), journey())
 			assert.True(t, got.Drained)
@@ -281,7 +281,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 	case got := <-done:
 		t.Fatalf("execution returned before starting the concurrent fixture: %+v", got)
 	}
-	checkErr := e.Check(context.Background(), synthetic.Journey)
+	checkErr := e.Check(context.Background())
 	close(release)
 	got := <-done
 	require.NoError(t, checkErr)

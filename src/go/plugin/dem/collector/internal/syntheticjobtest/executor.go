@@ -15,7 +15,7 @@ import (
 // Executor fakes the process browser capability. Nil hooks accept preparation, keep scheduled attempts queued until
 // cancellation and panic on rehearsal.
 type Executor struct {
-	CheckFunc func(context.Context, synthetic.Kind) error
+	CheckFunc func(context.Context) error
 	// ExecuteFunc runs an admitted attempt; ExecuteScheduled completes the run identity and timing it leaves empty.
 	ExecuteFunc  func(context.Context, synthetic.Request, func(string)) synthetic.Execution
 	RehearseFunc func(context.Context, synthetic.Request) error
@@ -23,9 +23,9 @@ type Executor struct {
 
 var _ syntheticjob.Executor = Executor{}
 
-func (e Executor) Check(ctx context.Context, kind synthetic.Kind) error {
+func (e Executor) Check(ctx context.Context) error {
 	if e.CheckFunc != nil {
-		return e.CheckFunc(ctx, kind)
+		return e.CheckFunc(ctx)
 	}
 	return nil
 }
