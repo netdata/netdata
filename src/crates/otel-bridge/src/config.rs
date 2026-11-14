@@ -2,25 +2,19 @@
 //! workers: [`PluginConfig`] for the ingestor and ledger workers,
 //! [`LegacyLogsConfig`] for the legacy-logs viewer.
 //!
-//! The supervisor resolves the config (otel-plugin's `config` module layers
-//! the stock, user, then env YAML sources, then validates) and sends the
-//! result to each worker in its `Configure` handshake ([`crate::IngestorRequest::Configure`]
-//! / [`crate::LedgerRequest::Configure`]). The same types therefore serve two
+//! The supervisor resolves the config and sends the result to each worker in
+//! its `Configure` handshake ([`crate::IngestorRequest::Configure`] /
+//! [`crate::LedgerRequest::Configure`]). The same types therefore serve two
 //! serializations: human-readable YAML on disk and bincode over the ferryboat
 //! IPC link. Fields keep human-friendly types (`ByteSize`, `Duration`); the
 //! `duration` / `opt_duration` / `opt_bytesize` serde helpers in this file
 //! switch the wire form per format (humantime string for YAML, compact
 //! tuple/integer for bincode).
 //!
-//! Operators set one mandatory [`PluginConfig::base_dir`] plus per-signal
-//! tuning; positions are derived — [`PluginConfig::lifecycle_for`] yields each
-//! signal's `{base_dir}/{signal}/...` subtree as the [`LifecycleConfig`] the
-//! file-lifecycle substrate consumes, while remote storage and auth are
-//! process-global. Every YAML section rejects unknown keys, so a typo in a
-//! config file refuses startup instead of silently keeping defaults. A
-//! malformed rotation/retention policy is rejected at deserialize, so a
-//! resolved value is always complete and [`RotationPolicy::resolve`] /
-//! [`RetentionPolicy::resolve`] cannot fail.
+//! Every YAML section rejects unknown keys, so a typo in a config file refuses
+//! startup instead of silently keeping defaults. A malformed rotation/retention
+//! policy is rejected at deserialize, so a resolved value is always complete
+//! and [`RotationPolicy::resolve`] / [`RetentionPolicy::resolve`] cannot fail.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -82,8 +76,7 @@ pub struct PluginConfig {
     /// distinct identity). Runtime-only: `None` after YAML load; the supervisor
     /// resolves the machine GUID and generates the instance id, setting this to
     /// `Some` before configuring any worker. Workers therefore always observe
-    /// `Some`. The `file_registry::Identity` newtypes make the pair
-    /// non-nil and un-transposable by construction.
+    /// `Some`.
     #[serde(default)]
     pub identity: Option<file_registry::Identity>,
 }
@@ -94,9 +87,8 @@ impl PluginConfig {
     /// its key. Empty for a config with none, as the stock one.
     ///
     /// They are not errors: what `otel.yaml` accepts does not change, and a
-    /// plugin that ran with such a value still starts. The config load calls
-    /// this once, on the config of all layers, and logs each sentence as a
-    /// warning (`otel-plugin`, `ConfigResolver::resolve`).
+    /// plugin that ran with such a value still starts. Call this once, on the
+    /// config of all layers, and log each sentence as a warning.
     ///
     /// - A 0 in a rotation limit (every export request would make files and
     ///   indexing operations of its own) or in the new-chart limit (no chart
@@ -105,10 +97,6 @@ impl PluginConfig {
     ///   never gets such a 0.
     /// - An ingest window longer than the retention age is only reported: no
     ///   value is the right one to put in its place.
-    ///
-    /// The values that only the ingestor can judge (against its sweep
-    /// interval) are warned about there (`otel-ingestor`,
-    /// `warn_signal_config`).
     pub fn correct_harmful_values(&mut self) -> Vec<String> {
         let mut found = Vec::new();
 
@@ -127,16 +115,10 @@ impl PluginConfig {
     }
 
     /// The signal-neutral file-lifecycle view for one signal: the WAL, index, and
-    /// catalog settings (with derived dirs) the content-agnostic ledger substrate
-    /// consumes. The derived directory layout (`{base_dir}/{signal}/...`) is
-    /// combined with the per-signal tuning. `remote_storage` and `auth` are excluded —
-    /// both are global to the process (the coordinator shell owns remote storage;
-    /// auth is tenant-scoped), not per-signal file-lifecycle concerns.
-    ///
-    /// Exhaustive over [`Signal`]: the signal axis is a closed enum, so there
-    /// is no unknown-signal error path here (a bad numeric `pipeline_id` is
-    /// rejected earlier, at the [`Signal::try_from`](crate::signals::Signal)
-    /// boundary).
+    /// catalog settings, with derived dirs. The derived directory layout
+    /// (`{base_dir}/{signal}/...`) is combined with the per-signal tuning.
+    /// `remote_storage` and `auth` are excluded because both are global to the
+    /// process.
     pub fn lifecycle_for(&self, signal: Signal) -> LifecycleConfig {
         let tuning = match signal {
             Signal::Logs => &self.logs,
@@ -304,8 +286,7 @@ pub struct MetricsConfig {
 
 /// The new-chart budget of the stock file, which is what a
 /// `max_new_charts_per_request` of 0 is read as
-/// ([`PluginConfig::correct_harmful_values`]). The otel-plugin test of the
-/// shipped stock file pins it against the shipped value.
+/// ([`PluginConfig::correct_harmful_values`]).
 pub const DEFAULT_MAX_NEW_CHARTS_PER_REQUEST: usize = 100;
 
 impl SignalConfig {
@@ -424,10 +405,9 @@ impl Default for CatalogTuning {
 /// at ingestion and reported via OTLP `partial_success`. Global for the
 /// signal — not per-tenant.
 ///
-/// Logs judge each record's RESOLVED timestamp against the window; traces
-/// judge the span's whole `[start, effective end]` interval (see
-/// `ng_flatten::normalize_trace_request` — synthesized starts are exempt,
-/// and only a raw client end faces the future bound).
+/// Logs judge each record's resolved timestamp against the window. Traces
+/// judge the span's whole `[start, effective end]` interval
+/// (`ng_flatten::normalize_trace_request`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct IngestConfig {
@@ -477,11 +457,10 @@ impl IngestConfig {
 }
 
 /// Signal-neutral file-lifecycle configuration: the per-signal WAL, index, and
-/// catalog settings the ledger substrate needs to manage a signal's file
-/// lifecycle. Built by [`PluginConfig::lifecycle_for`] (derived dirs + per-signal
-/// tuning); the substrate ascribes no signal meaning to it. Remote storage is
-/// process-global and owned by the coordinator shell, NOT carried here. Runtime-only
-/// — never serialized.
+/// catalog settings that manage a signal's file lifecycle. Built by
+/// [`PluginConfig::lifecycle_for`] (derived dirs + per-signal tuning). Remote
+/// storage is process-global and not carried here. Runtime-only: never
+/// serialized.
 #[derive(Debug, Clone)]
 pub struct LifecycleConfig {
     /// WAL file configuration (derived dir, rotation, crc/compression).
@@ -651,7 +630,7 @@ pub struct RotationConfig {
 /// complete, so [`RotationPolicy::resolve`] cannot panic. A malformed
 /// or missing default is rejected at deserialize (parse-don't-validate), not at first
 /// runtime resolve. Serializes back to the `{ "default": {...}, "<tenant>": {...} }`
-/// map shape, so operator YAML, JSON logging, and IPC are unchanged.
+/// map shape.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     try_from = "HashMap<String, RotationEntry>",
@@ -755,8 +734,7 @@ impl RotationPolicy {
         unset
     }
 
-    /// Patch this policy from a partial override map (the config override
-    /// layer: `otel-plugin`'s user-file/env merge): the `"default"` entry's
+    /// Patch this policy from a partial override map: the `"default"` entry's
     /// set fields patch the complete default; any other key upserts a partial
     /// tenant override. Only `Some` fields replace, so the default stays
     /// complete and the policy stays valid.
@@ -817,8 +795,7 @@ fn default_rotation_max_file_duration() -> Duration {
 }
 
 /// Code default mirroring the shipped stock logs rotation (plus the hidden
-/// `max_file_duration`), used when a signal section is absent from YAML. The
-/// otel-plugin stock-file test pins these against the shipped values.
+/// `max_file_duration`), used when a signal section is absent from YAML.
 impl Default for RotationPolicy {
     fn default() -> Self {
         Self {
@@ -907,8 +884,7 @@ pub struct RetentionConfig {
     pub max_age: Duration,
     /// Catalog retention horizon (see [`RetentionEntry::horizon`]). Kept
     /// strictly greater than `max_age` in day units by
-    /// [`RetentionPolicy::validate`], which the supervisor's config load calls
-    /// after every override layer.
+    /// [`RetentionPolicy::validate`].
     pub horizon: Duration,
 }
 
@@ -918,7 +894,7 @@ pub struct RetentionConfig {
 /// patching, and `Default` (the absent-signal fallback) — each keeps the
 /// `default` complete — so [`RetentionPolicy::resolve`] cannot panic. A malformed or
 /// missing default is rejected at deserialize, not at first runtime resolve.
-/// Serializes back to the map shape, so operator YAML / logging / IPC are unchanged.
+/// Serializes back to the map shape.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(
     try_from = "HashMap<String, RetentionEntry>",
@@ -991,8 +967,7 @@ impl RetentionPolicy {
         Ok(())
     }
 
-    /// Patch this policy from a partial override map (the config override
-    /// layer: `otel-plugin`'s user-file/env merge): the `"default"` entry's
+    /// Patch this policy from a partial override map: the `"default"` entry's
     /// set fields patch the complete default; any other key upserts a partial
     /// tenant override. Only `Some` fields replace, so the default stays
     /// complete.
@@ -1048,7 +1023,7 @@ impl TryFrom<HashMap<String, RetentionEntry>> for RetentionPolicy {
                 .max_age
                 .ok_or_else(|| "default retention must set max_age".to_string())?,
             // `horizon` is optional in the stock/operator file: an absent value
-            // takes the code default so pre-P5 retention blocks keep parsing.
+            // takes the code default so retention blocks without it keep parsing.
             // The catalog >= sfst invariant is enforced separately by `validate`.
             horizon: d.horizon.unwrap_or_else(default_retention_horizon),
         };
@@ -1378,8 +1353,6 @@ traces:
         // Tuning carried from the logs section.
         assert!(!logs.wal.compression_enabled);
         assert_eq!(logs.catalog.rotation_count, 7);
-        // Storage is NOT carried per-signal — it is global on PluginConfig,
-        // owned by the coordinator shell.
 
         let traces = c.lifecycle_for(Signal::Traces);
         assert_eq!(
@@ -1455,9 +1428,9 @@ traces:
 
     #[test]
     fn ingest_config_survives_bincode_ipc() {
-        // PluginConfig travels ingestor/ledger over bincode (ferryboat); the
-        // `duration` helper must round-trip a NON-human-readable format — a bare
-        // humantime string would not. Mirrors the opt_duration contract.
+        // PluginConfig travels from the supervisor to the workers over bincode
+        // (ferryboat). The `duration` helper must round-trip a format that is
+        // not human-readable; a bare humantime string would not.
         let c = IngestConfig {
             max_age: Duration::from_secs(3605),
             future_skew: Duration::from_millis(1500),

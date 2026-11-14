@@ -1,24 +1,31 @@
-//! OTel ledger: the logs + traces content bindings over the content-agnostic
-//! `file-lifecycle` substrate. It owns the `Ledger` coordinator (run-loop,
-//! supervisor/writer IPC, shared workers), the Function-call dispatch and the
-//! `otel-logs`/`otel-traces` query handlers over the wire-neutral `sfsq`
-//! engines (`ledger::rpc`), and the shared indexer component (`indexer`,
-//! spawned per signal; its indexing operations run in child processes,
-//! `index_child`, with that signal's `ng-index` indexing function —
-//! `index_logs_file` for logs, `index_traces_file` for traces). The
-//! reusable machinery (registry, catalog, upload/download, cache, recovery,
-//! the per-signal `Pipeline` shell) lives in `file-lifecycle`.
+//! OTel ledger: the ledger worker process of the OTel plugin, for logs and
+//! traces. It receives WAL file events from the ingestor over the writer
+//! socket, indexes closed WAL files, uploads and retains files, and answers
+//! the `otel-logs` and `otel-traces` Function calls. The reusable machinery
+//! (registry, catalog, upload/download, cache, recovery, the per-signal
+//! `Pipeline` shell) lives in `file-lifecycle`.
 //!
-//! One ledger worker process per plugin run: the supervisor re-execs the
-//! plugin binary as a `worker ledger` subprocess and its main dispatches to
-//! [`run_worker`] (`otel-plugin/src/main.rs` `run_worker` — the crate's only
-//! importer),
-//! alongside the `otel-ingestor` producer that writes the per-tenant WALs and
-//! forwards their events over the writer socket this crate accepts.
-//! `event`/`indexer` are reached only via `crate::` from `ledger/`, and
-//! `Ledger` has no external importer either (grep-verified): the crate's
-//! external surface is [`run_worker`] and [`index_child`], the body of
-//! `otel-plugin index`.
+//! The entry points are [`run_worker`], the body of the `worker ledger`
+//! process, and [`index_child`], the body of `otel-plugin index`.
+//!
+//! Modules:
+//! - `ledger`: the `Ledger`, its run loop, one handler per kind of event, and
+//!   the per-signal pipeline builders. `ledger::rpc` holds the Function-call
+//!   dispatch and the query handlers.
+//! - `indexer`: the indexer component, one per signal pipeline. Each indexing
+//!   operation runs in a child process (`index_child`).
+//! - `event`: the events the run loop waits on.
+//! - `indexing_charts`, `storage_charts`: the charts the ledger sends.
+//!
+//! Routing: each signal has a fixed `pipeline_id`. A raw `pipeline_id` is
+//! decoded to a `Signal` where it enters the ledger; past that point routing
+//! cannot miss.
+//! - writer events go to the pipeline of the event's `pipeline_id`;
+//! - cleaner and uploader responses go to the pipeline whose `pipeline_id`
+//!   they carry;
+//! - per-pipeline worker responses (indexer, catalog builder) are forwarded
+//!   into one merged channel, tagged with the owning `Signal`;
+//! - Function calls go to the pipeline whose declared function name matches.
 
 pub mod event;
 pub mod index_child;
@@ -39,11 +46,9 @@ use otel_bridge::{LedgerRequest, LedgerResponse};
 
 /// Ledger worker entry point.
 ///
-/// Spawned by the supervisor re-exec (`worker ledger --socket …`,
-/// `otel-plugin/src/supervisor.rs` `spawn_worker`). Connects to the
-/// supervisor's IPC socket, performs the Configure → Ready handshake —
-/// `Configure` received
-/// here, `Ready` sent from `Ledger::new` — then runs the ledger event loop.
+/// Connects to the supervisor's IPC socket, performs the Configure → Ready
+/// handshake (`Configure` received here, `Ready` sent from `Ledger::new`),
+/// then runs the ledger event loop.
 pub async fn run_worker(socket_path: &str) -> Result<()> {
     tracing::info!("connecting to supervisor socket={socket_path}");
 
@@ -65,13 +70,13 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     // The supervisor always resolves the identity before configuring a worker;
     // its absence here is a supervisor bug, not a runtime condition. The ledger
-    // needs the machine id to filter every remote LIST to its own objects (D6).
+    // needs the machine id to filter every remote LIST to its own objects.
     let identity = config
         .identity
         .context("plugin config reached the ledger without a resolved identity")?;
 
     // `Ledger::new` runs the full supervisor handshake; see its docs for the
-    // step order and what `Ready` claims. Each signal's lifecycle config is
+    // step order. Each signal's lifecycle config is
     // derived from the shared `PluginConfig` via `lifecycle_for` (one base dir
     // → `{base}/{signal}/...` dirs + per-signal tuning). The ingestor's per-signal
     // WAL writers derive their dirs the same way, so the two processes agree on
@@ -95,15 +100,13 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // Log the error while `ledger` is still in scope: returning drops its
     // supervisor connection. The supervisor treats a worker disconnect as
     // fatal (`Supervisor::run` in `otel-plugin/src/supervisor.rs`) and tears
-    // the whole plugin down — graceful `Shutdown` + a bounded exit wait
-    // (`shutdown_workers`), ChildGuard SIGKILL only as last resort — so an
-    // error logged after the drop (e.g. in `main`) races that teardown and
-    // may never be recorded.
+    // the whole plugin down, so an error logged after the drop (e.g. in
+    // `main`) races that teardown and may never be recorded.
     let result = ledger.run().await;
     if let Err(e) = &result {
         tracing::error!("ledger event loop error: {e:#}");
     }
-    // Signal shutdown to the cancellation-driven tasks on BOTH exit
+    // Signal shutdown to the cancellation-driven tasks on both exit
     // paths. They get no time after it: the caller drops the runtime, and
     // work that a component still has in flight (an upload) is cut. The
     // next start recovers it.

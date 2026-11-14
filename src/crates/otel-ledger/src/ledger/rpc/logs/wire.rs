@@ -5,9 +5,7 @@
 //! the function-call JSON: `info` selects a capability descriptor,
 //! `files` a storage inventory, anything else is a log query whose
 //! response ([`OtelLogsResponse`] / [`LogsResult`]) serializes back into
-//! the v3 function-table envelope the cloud-frontend renders. The
-//! mapping to and from the engine's neutral types lives in
-//! [`super::adapter`].
+//! the v3 function-table envelope the cloud-frontend renders.
 //!
 //! What the cloud-frontend reads from a query response:
 //!
@@ -22,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use sfsq::logs::Direction;
 
-// ── Request ─────────────────────────────────────────────────────────
+// Request.
 
 /// Request param names accepted by this function, advertised to the UI
 /// in [`InfoResponse::accepted_params`] and echoed in each
@@ -32,7 +30,7 @@ use sfsq::logs::Direction;
 /// it is how the stream selector's picks ([`STREAM_SELECTION_PARAM`])
 /// travel.
 ///
-/// `data_only` is deliberately **omitted**: the UI derives its
+/// `data_only` is deliberately omitted: the UI derives its
 /// `dataOnly` flag from this list's membership, so omission forces the
 /// full-response mode (fresh columns / facets / pagination on every
 /// call). `if_modified_since`, `delta`, `tail`, and `sampling` are
@@ -63,18 +61,16 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
 /// falls back to its `#[serde(default)]` value when the UI omits it.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OtelLogsRequest {
-    /// `info: true` asks for the capability descriptor ([`InfoResponse`]);
-    /// the default `false` asks for a data query — data POSTs omit the
-    /// field, so omission must deserialize as `false`. GETs carry no
-    /// body: the logs GET shim (`rpc::patch_args_into_payload`)
-    /// synthesizes `info` from the literal `info` URL token.
+    /// `info: true` asks for the capability descriptor ([`InfoResponse`]).
+    /// The default `false` asks for a data query. Data POSTs omit the
+    /// field, so omission must deserialize as `false`.
     #[serde(default)]
     pub info: bool,
     /// `files: true` asks for a snapshot of the storage files the ledger
     /// is tracking (WAL / SFST / catalog) instead of a log query — see
     /// [`FilesResponse`]. Defaults to `false`; `info` wins when both are
-    /// set. POST-body only: the GET shim never synthesizes it, and it is
-    /// absent from [`ACCEPTED_PARAMS`], so UI traffic never sends it.
+    /// set. POST-body only: it is absent from [`ACCEPTED_PARAMS`], so UI
+    /// traffic never sends it.
     #[serde(default)]
     pub files: bool,
     /// Window start, unix seconds.
@@ -121,12 +117,11 @@ pub struct OtelLogsRequest {
     /// the query path.
     #[serde(default)]
     pub timeout: Option<u32>,
-    /// Tenant whose data the query reads. A **scoping selector** supplied
-    /// by the caller, not a security boundary; omitted / invalid falls
-    /// back to the literal `"default"` tenant
-    /// ([`file_registry::TenantId::DEFAULT`] — what ingest uses when auth
-    /// is disabled), never an implicit all-tenant union
-    /// (`resolve_query_tenant` in `super::handler`).
+    /// Tenant whose data the query reads. A scoping selector supplied by
+    /// the caller, not a security boundary. Omitted / invalid falls back to
+    /// the literal `"default"` tenant ([`file_registry::TenantId::DEFAULT`]),
+    /// never an implicit all-tenant union (`resolve_query_tenant` in
+    /// `super::handler`).
     #[serde(default)]
     pub tenant: Option<String>,
 }
@@ -139,8 +134,7 @@ fn default_last() -> usize {
 /// The two anchor forms the UI sends. A JSON string is an opaque row
 /// cursor ([`sfsq::logs::Cursor`]); a JSON number is a microsecond
 /// timestamp from a histogram-bar click. Untagged so the JSON type alone
-/// selects the variant — cursor strings always contain `:`, so they
-/// never collide with a bare integer.
+/// selects the variant.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum AnchorParam {
@@ -148,7 +142,7 @@ pub enum AnchorParam {
     TimestampUs(u64),
 }
 
-// ── Response ────────────────────────────────────────────────────────
+// Response.
 
 /// One of three response shapes, per the request's mode: `Info` for
 /// capability discovery, `Files` for the storage inventory, `Logs` for
@@ -162,8 +156,8 @@ pub enum OtelLogsResponse {
     Files(FilesResponse),
 }
 
-/// The `info: true` capability descriptor. The handler answers every
-/// info request with the [`Default`] value — nothing in it is dynamic.
+/// The `info: true` capability descriptor. Nothing in it is dynamic, so
+/// the [`Default`] value is the whole answer.
 #[derive(Debug, Serialize)]
 pub struct InfoResponse {
     version: u32,
@@ -185,7 +179,7 @@ impl Default for InfoResponse {
     }
 }
 
-// ── Files inventory (the `files: true` mode) ─────────────────────────
+// Files inventory (the `files: true` mode).
 
 /// Snapshot of the storage files the ledger is tracking, per tenant,
 /// read from the in-memory registries — including the `rotated` /
@@ -224,7 +218,7 @@ pub struct WalFileEntry {
     pub status: &'static str,
     pub size: u64,
     pub entry_count: u64,
-    /// Log-data time range in unix **nanoseconds**. Both 0 for a WAL recovered
+    /// Log-data time range in unix nanoseconds. Both 0 for a WAL recovered
     /// from disk (the WAL format has no footer; only live files carry it).
     pub min_ts_ns: u64,
     pub max_ts_ns: u64,
@@ -240,7 +234,7 @@ pub struct SfstFileEntry {
     /// Wire-compatibility name: clients see `total_logs`; internally this is
     /// `FileSummary::record_count` (the substrate's content-neutral name).
     pub total_logs: u32,
-    /// Log-data time range in unix **seconds** (from the SFST summary).
+    /// Log-data time range in unix seconds (from the SFST summary).
     pub min_ts_s: u32,
     pub max_ts_s: u32,
     /// Has a catalog entry in a closed catalog file — locally, or (subsuming
@@ -248,7 +242,7 @@ pub struct SfstFileEntry {
     pub rotated: bool,
     /// Confirmed uploaded to remote object storage.
     pub uploaded: bool,
-    /// Confirmed present in the remote catalog (gates local eviction).
+    /// Confirmed present in the remote catalog.
     pub remote_cataloged: bool,
     /// Queued for retention eviction (still tracked until removed).
     pub pending_deletion: bool,
@@ -260,20 +254,18 @@ pub struct CatalogFileEntry {
     pub date: String,
     pub max_seq: u64,
     pub size: u64,
-    /// Union time range of the file's entries, unix **seconds**.
+    /// Union time range of the file's entries, unix seconds.
     pub min_ts_s: u32,
     pub max_ts_s: u32,
     pub pending_deletion: bool,
 }
 
-// ── Top-level envelope ───────────────────────────────────────────────
+// Top-level envelope.
 
 /// The v3 function-table envelope for a log query. Everything is
-/// recomputed per call — `columns` / `data` shaped from the page by
-/// `super::adapter::build_table`, the rest from the engine result — and
-/// several fields are fixed legacy-envelope constants. `required_params`
-/// is left empty here; the handler fills it with the stream selector on
-/// every data response, cancellation path included.
+/// recomputed per call, and several fields are fixed legacy-envelope
+/// constants. `required_params` carries the stream selector on every data
+/// response.
 #[derive(Debug, Serialize)]
 pub struct LogsResult {
     /// Always 100 in this final payload; incremental progress travels
@@ -309,7 +301,7 @@ impl Default for Version {
     }
 }
 
-// ── Facets ──────────────────────────────────────────────────────────
+// Facets.
 
 /// One sidebar facet: a field with its value options and match counts.
 #[derive(Debug, Serialize)]
@@ -328,7 +320,7 @@ pub struct FacetOption {
     pub count: usize,
 }
 
-// ── Histogram ───────────────────────────────────────────────────────
+// Histogram.
 
 /// A field the UI can switch the histogram to — its `id` is what the
 /// request's `histogram` param carries.
@@ -450,7 +442,7 @@ impl<'de> serde::Deserialize<'de> for DataPoint {
     }
 }
 
-// ── Items / pagination ──────────────────────────────────────────────
+// Items / pagination.
 
 /// Pagination footer counts. `evaluated` / `estimated` mirror `matched`
 /// and `unsampled` is always 0 — this function does no sampling.
@@ -492,21 +484,18 @@ impl Default for Pagination {
     }
 }
 
-// ── Required params (the stream selector) ───────────────────────────
+// Required params (the stream selector).
 
-/// Reserved `selections` key carrying the stream-selector picks. The
-/// handler removes it from `selections` before building the engine query
-/// (so the engine never treats it as a row facet) and decodes the picks
-/// into the file-pruning `file_registry::Query::partition_keys`. Also the
-/// `id` of the advertised [`MultiSelection`] control, so the UI echoes
-/// picks back under this key. The `__` prefix follows the systemd-journal
-/// `__logs_sources` convention for plugin-reserved selection keys.
+/// Reserved `selections` key carrying the stream-selector picks. The picks
+/// prune files by `file_registry::Query::partition_keys` and are never a
+/// row facet. Also the `id` of the advertised [`MultiSelection`] control,
+/// so the UI echoes picks back under this key. The `__` prefix follows the
+/// systemd-journal `__logs_sources` convention for plugin-reserved
+/// selection keys.
 pub const STREAM_SELECTION_PARAM: &str = "__streams";
 
-/// A `required_params` entry. The otel-logs function emits at most one —
-/// the [`MultiSelection`] stream selector — when the tenant has any
-/// stream; a tenant with no streams emits `Vec::new()`. Untagged, so the
-/// inner control serializes directly as the object the UI renders.
+/// A `required_params` entry. Untagged, so the inner control serializes
+/// directly as the object the UI renders.
 #[derive(Debug, Serialize)]
 #[serde(untagged)]
 pub enum RequiredParam {
@@ -514,9 +503,8 @@ pub enum RequiredParam {
 }
 
 /// A multiselect control the UI renders in the filter sidebar. The UI
-/// pre-selects every option marked `defaultSelected` (here: all of them,
-/// so the default view spans all streams) and returns the picked option
-/// `id`s under `selections[self.id]`.
+/// pre-selects every option marked `defaultSelected` and returns the
+/// picked option `id`s under `selections[self.id]`.
 #[derive(Debug, Serialize)]
 pub struct MultiSelection {
     pub id: &'static str,

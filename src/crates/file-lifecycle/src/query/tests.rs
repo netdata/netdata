@@ -3,28 +3,6 @@
 //! the registry APIs. No tokio runtime and no content-plane identity codec:
 //! streams are opaque `(namespace, name)` fixtures from `test_helpers`.
 //!
-//! - Remote-only selection (`remote_plan_input` + `plan`): a range's
-//!   remote-only entries are its window's catalog entries with no servable
-//!   local copy, keyed by full `SeqKey` identity — a local SFST under the
-//!   same identity masks the entry, a foreign identity's file at the same
-//!   seq does not, and neither does a WAL with no durable prefix (the same
-//!   servable set `query_snapshot` serves).
-//! - The window-scoped, remote-inclusive stream selector
-//!   (`Registry::local_streams` + `LocalStreams::with_catalog` over the
-//!   plan's remote-only entries): window-scoped listing, local and
-//!   remote-only streams listed together, and same-seq local/remote and
-//!   WAL/remote dedup keyed on the folded seqs rather than the servable
-//!   mask.
-//! - The two-step plan: each range takes only its window of the shared hull,
-//!   the union holds each identity+seq once across overlapping ranges and
-//!   doubly-cataloged seqs (output sorted by seq), `plan_within` stops with
-//!   `TooLarge` the moment the union exceeds the capacity (`at_least` a
-//!   lower bound, an exact fit passes), an unreadable catalog is reported
-//!   while the rest still plans, a catalog removed after step 1 is skipped,
-//!   and step 1 reads no file.
-//! - An unknown tenant's `TenantRegistries::remote_plan_input` plans
-//!   nothing.
-//!
 //! Not pinned here: partition filtering (every query runs with empty
 //! `partition_keys`), entry fields beyond id and size, and the known-tenant
 //! path through `TenantRegistries::remote_plan_input`.
@@ -157,7 +135,7 @@ fn full_range_query() -> Query {
     }
 }
 
-// ── remote-only selection (the evicted-but-cataloged set the read cache fetches) ──
+// remote-only selection (the evicted-but-cataloged set the read cache fetches)
 
 fn seqs(entries: &[otel_catalog::CatalogEntry]) -> Vec<u64> {
     entries.iter().map(|e| e.id.seq).collect()
@@ -194,15 +172,15 @@ fn remote_only_excludes_locally_present_seqs() {
 #[test]
 fn remote_only_not_masked_by_different_identity_local_file() {
     // The query-time mask is keyed by full identity: a remote catalog entry at
-    // seq X under identity A must NOT be hidden by a local SFST at the SAME seq
+    // seq X under identity A must not be hidden by a local SFST at the same seq
     // under identity B (the post-restore reused-seq shape). Contrast with
-    // `remote_only_excludes_locally_present_seqs`, where the SAME identity
+    // `remote_only_excludes_locally_present_seqs`, where the same identity
     // masks. Guards the query-plane SeqKey dedup (local_servable_seqs +
     // the planner's selection).
     let mut reg = make_registry();
     track_remote(&mut reg, 5, 100, 200); // remote entry under ident()
 
-    // A local SFST at seq 5 under a DIFFERENT identity (same machine, other
+    // A local SFST at seq 5 under a different identity (same machine, other
     // instance) — its FileId carries the foreign identity.
     let other = file_registry::Identity::new(
         machine(),
@@ -224,7 +202,7 @@ fn remote_only_not_masked_by_different_identity_local_file() {
     // The remote entry survives — the foreign-identity local copy does not mask it.
     assert_eq!(seqs(&remote_only(&reg, &full_range_query())), vec![5]);
 
-    // The mask itself holds the OTHER identity's key, not the remote entry's.
+    // The mask itself holds the other identity's key, not the remote entry's.
     let servable = reg.local_servable_seqs(&full_range_query());
     assert!(servable.contains(&file_registry::SeqKey::new(other, 5)));
     assert!(!servable.contains(&file_registry::SeqKey::new(ident(), 5)));
@@ -234,7 +212,7 @@ fn remote_only_not_masked_by_different_identity_local_file() {
 fn remote_only_kept_when_wal_has_no_durable_prefix() {
     // A WAL with no durable prefix (`valid_up_to == 0`, as `track_wal`
     // produces) is not a servable local copy — `query_snapshot` skips it too —
-    // so it must NOT mask the remote entry for the same seq: the remote plan's
+    // so it must not mask the remote entry for the same seq: the remote plan's
     // mask agrees with `query_snapshot`'s servable set.
     let mut reg = make_registry();
     track_wal(&mut reg, 2, 300, 400);
@@ -270,12 +248,11 @@ fn remote_only_empty_registry() {
     assert!(remote_only(&reg, &full_range_query()).is_empty());
 }
 
-// ── the window-scoped, remote-inclusive stream selector ──
+// the window-scoped, remote-inclusive stream selector
 
-/// Drive the selector the way the logs handler does: the local half from the
-/// registry, the remote-only half from a plan over the same window, then decode +
-/// sort by `(namespace, name)` the way the rpc adapter does for display (the
-/// substrate orders by `partition_key`).
+/// Drive the selector: the local half from the registry, the remote-only half
+/// from a plan over the same window, then decode + sort by `(namespace, name)`.
+/// The order by `partition_key` is not checked here.
 fn enumerate(reg: &Registry, q: &Query) -> Vec<crate::registry::PartitionStat> {
     let mut parts = reg.local_streams(q).with_catalog(&remote_only(reg, q));
     parts.sort_by_key(|p| crate::test_helpers::decode_opaque(&p.content_meta));
@@ -330,7 +307,7 @@ fn stream_selector_lists_local_and_remote_only_together() {
 #[test]
 fn stream_selector_dedups_local_and_remote_same_seq() {
     let mut reg = make_registry();
-    // Uploaded-but-not-yet-evicted: same seq exists locally AND in the catalog.
+    // Uploaded-but-not-yet-evicted: same seq exists locally and in the catalog.
     track_sfst(&mut reg, 1, 100, 200);
     track_remote(&mut reg, 1, 100, 200);
     let streams = enumerate(&reg, &window(50, 250));
@@ -343,7 +320,7 @@ fn stream_selector_dedups_local_and_remote_same_seq() {
 fn stream_selector_dedups_wal_and_remote_same_seq() {
     let mut reg = make_registry();
     // `track_wal` produces a `valid_up_to == 0` WAL (Created+Closed, no
-    // Synced), which is NOT in the servable mask. A catalog entry for the SAME
+    // Synced), which is not in the servable mask. A catalog entry for the same
     // seq+stream must still be skipped because the WAL was folded — the dedup
     // keys on the folded seqs, not the servable mask (a servable-mask dedup
     // would double-count to file_count == 2). Robustness guard: the
@@ -357,7 +334,7 @@ fn stream_selector_dedups_wal_and_remote_same_seq() {
     assert_eq!(streams[0].file_count, 1);
 }
 
-// ── the two-step remote plan ────────────────────────────────────────
+// the two-step remote plan
 
 /// A catalog entry for `seq` under `identity`, stream `("ns", "a")`.
 fn remote_entry(

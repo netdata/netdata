@@ -12,14 +12,13 @@
 //! verbatim.
 //!
 //! The submodules carry the crate's other shared contracts: `config` (the
-//! types sent in `Configure`), `function` (the handler engine the ledger and
-//! legacy-logs workers run), and `signals` (the OTel signal axis).
+//! types sent in `Configure`), `driver` (function-call bookkeeping for a
+//! worker run loop), `function` (the handler engine), `shutdown` (the time
+//! budgets of a stop), and `signals` (the OTel signal axis).
 //!
 //! This module covers only the supervisor↔worker links. The ingestor's direct
 //! WAL-event socket to the ledger (`writer_socket_path`) is a separate
-//! ferryboat link carrying `wal::Message`: the ledger accepts via
-//! `file_lifecycle::ipc::accept_writer`, the ingestor connects via its
-//! `LedgerSender`.
+//! ferryboat link carrying `wal::Message`.
 //!
 //! Ferryboat bincode-serializes these messages, so variant order and field
 //! shapes are wire contracts between the supervisor and the workers it spawns
@@ -90,8 +89,8 @@ use config::{LegacyLogsConfig, PluginConfig};
 /// refuses, killing the connection. Doubles ferryboat's 8 MiB default.
 /// Function results (rows + facets + histogram) are the largest messages on
 /// these links; an oversized one is degraded to a small error result by the
-/// sending worker instead of failing the link (the ledger and legacy-logs
-/// workers do this), so the ceiling is headroom, not a correctness bound.
+/// sending worker instead of failing the link, so the ceiling is headroom,
+/// not a correctness bound.
 pub const IPC_MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 
 // --- Ingestor subprocess ---
@@ -112,10 +111,7 @@ pub enum IngestorRequest {
     /// in seconds, forwarded verbatim; the bridge engine does not enforce it
     /// — a call runs until it finishes or `Cancel` arrives. `name` must match
     /// a name declared in `Ready`; `args` and `payload` are forwarded
-    /// unchanged.
-    ///
-    /// The ingestor serves `topology:tracing` (when its service map started)
-    /// and answers any other name with a 404 `Result`.
+    /// unchanged. An undeclared `name` is answered with a 404 `Result`.
     Call {
         transaction: String,
         timeout: u32,
@@ -171,10 +167,7 @@ pub enum LedgerRequest {
     /// and ignored.
     Configure(Box<PluginConfig>),
     /// Execute a function — same fields and semantics as
-    /// [`IngestorRequest::Call`]. The ledger routes by `name` to the pipeline
-    /// whose handler declared it and runs the call through the
-    /// `otel_bridge::function` engine; an undeclared `name` is answered with a
-    /// 404 `Result`.
+    /// [`IngestorRequest::Call`].
     Call {
         transaction: String,
         timeout: u32,

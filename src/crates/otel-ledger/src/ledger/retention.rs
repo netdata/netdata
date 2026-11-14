@@ -2,17 +2,13 @@
 //! tenant's policy limits and catalog files past the archive horizon, handing
 //! the deletions to the shared cleaner.
 //!
-//! `evaluate_retention` runs for a tenant on the ledger's indexer response
-//! path after every WAL rotation of that tenant (both call sites in
-//! `Ledger::handle_indexer_resp`, `ledger/indexer.rs`), which is when the
-//! tenant's files can pass a count or a size limit. It also runs for every
-//! tenant on the ledger's periodic timer, because a file passes its age
+//! Call `evaluate_retention` for a tenant after each of its WAL rotations,
+//! which is when the tenant's files can pass a count or a size limit. Call
+//! it for every tenant periodically too, because a file passes its age
 //! limit by time alone: a tenant with no new data has no rotation. Each
 //! pass takes the write lock of the signal's registries once: it decides, marks each
 //! entry pending deletion and sends its `CleanerRequest` under that one
-//! hold. The cleaner's response handler completes the flow — success removes
-//! the entry from the registry, failure un-marks it
-//! (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
+//! hold.
 
 use file_registry::{SeqKey, TenantId};
 use otel_bridge::signals::Signal;
@@ -74,9 +70,7 @@ impl Ledger {
     /// Each mark, its send and the rollback of a failed send happen under
     /// one hold of the registries' lock with no `.await` in between: the
     /// send only queues (`ComponentHandle::send`,
-    /// `file-lifecycle/src/component.rs`). The cleaner's answer completes
-    /// the flow: success removes the entry, failure takes the mark back
-    /// (`Ledger::handle_cleaner_resp`, `ledger/cleaner.rs`).
+    /// `file-lifecycle/src/component.rs`).
     pub(super) async fn evaluate_retention(
         &mut self,
         signal: Signal,
@@ -104,11 +98,8 @@ impl Ledger {
             return 0;
         };
 
-        // Index files. The resolved config is lowered onto sfst's plain-data
-        // policy (`sfst_retention_policy`, `file-lifecycle/src/helpers.rs`);
-        // the registry walks the files oldest-first and says which to evict,
-        // and which it would evict if their catalog entry were already
-        // confirmed on the remote (`Registry::index_evictions`).
+        // Index files. The registry says which to evict, and which it would
+        // evict if their catalog entry were already confirmed on the remote.
         let evictions = registry.index_evictions(
             &sfst_retention_policy(&retention),
             now_ns(),
@@ -145,11 +136,7 @@ impl Ledger {
             }
         }
 
-        // Catalog files. Day count from the tenant's remote-archive `horizon`
-        // (decoupled from SFST `max_age`; config load enforces horizon >
-        // max_age in day units so a catalog file always outlives the SFSTs it
-        // gates) — see `catalog_retention_days`. A catalog file is evicted
-        // when its date is strictly older than `today - max_days`.
+        // Catalog files.
         let expired = registry
             .catalog_files
             .evaluate_retention(catalog_days, today);

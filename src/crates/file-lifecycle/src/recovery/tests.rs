@@ -1,40 +1,12 @@
-//! Integration tests for startup recovery. Each test pins one contract of the
-//! passes documented in `recovery/{mod,local,remote,startup}.rs`, at the seams
-//! where those passes meet the components and remote storage:
-//!
-//! - `startup` (P7 required diff-sync): `startup_sync_*` pins the recursive
-//!   LIST → parse/sanitize + own-machine (D6) filter → high-water seed →
-//!   bounded, short-circuiting diff-download-and-install pipeline: restore
-//!   after a wipe (incl. the auth-off `default` tenant), zero downloads when
-//!   everything is local, filename-only high-water seeding, hostile-key and
-//!   invalid-body skipping, a failed attempt on every LIST/transport/timeout
-//!   failure (never a partial high-water write), and the repeat of the
-//!   attempt until the remote answers. The `validate_catalog_*` tests pin
-//!   the install oracle's per-entry arm priority;
-//!   `rotated_catalog_passes_validate_catalog` pins a real builder-rotation
-//!   round-trip.
-//! - `local` (per-tenant replay): `recover_unindexed_*` pins skip-and-orphan
-//!   on a failed indexing operation plus the `holds_seq` routing predicate;
-//!   `recover_retention_*` pins SFST eviction gated on `is_remote_cataloged`
-//!   (ungated with storage disabled); `seed_*` pins replay of local catalogs
-//!   into uploaded/rotated state and the D-P8.1 corrupt-catalog matrix
-//!   (heal/quarantine, storage-disabled leave-in-place, future-version
-//!   leave-in-place, reboot with zero downloads).
-//! - `remote` (per-tenant reconcile, storage enabled): `reconcile_remote_*`
-//!   pins LIST-driven upload marking — D6 filter, prior-instance objects
-//!   marked under their own identity, the identity splice guard, and
-//!   `AddEntry` counts asserted through `catalog_builder.pending()`
-//!   (component.rs's pending counter); `reconcile_local_catalog_*` pins the
-//!   per-catalog stat confirm/re-upload pass, its per-identity seq floor, and
-//!   the `remote_cataloged` seeds that gate `recover_retention` eviction.
+//! Integration tests for startup recovery, at the seams where the passes
+//! meet the components and remote storage.
 //!
 //! `recover_wals_*` runs the three WAL passes with the real cleaner and
-//! pins their end state (it does not tell every wrong order apart).
+//! checks their end state. It does not tell every wrong order apart.
 //!
-//! Not pinned here: `recover_unuploaded` has no direct test, and the caller wiring
-//! (otel-ledger `build_pipeline`: pass order, STARTUP_REMOTE_BUDGET, the
-//! remote_ok skip policy) is exercised only through the Err/skip contracts the
-//! passes themselves expose.
+//! Not tested here: `recover_unuploaded` has no direct test, and the
+//! caller's wiring (pass order, startup budget, skip policy) is exercised
+//! only through the `Err` and skip contracts the passes expose.
 use super::*;
 
 fn machine() -> file_registry::MachineId {
@@ -111,9 +83,8 @@ fn write_catalog_file(
     path
 }
 
-/// Pass 4 (`seed_from_catalog_files`): valid local catalogs seed every entry
-/// into BOTH `is_uploaded` and `is_rotated`; with storage disabled this is a
-/// pure local scan — no heal path runs.
+/// Valid local catalogs seed every entry into both `is_uploaded` and
+/// `is_rotated`.
 #[tokio::test]
 async fn seed_from_catalog_files_populates_both_sets() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -143,8 +114,8 @@ async fn seed_from_catalog_files_populates_both_sets() {
     }
 }
 
-/// D-P8.1 test 3 — storage disabled: a corrupt catalog is logged and skipped,
-/// left in place (NOT renamed) as the operator's evidence, and not seeded.
+/// Storage disabled: a corrupt catalog is skipped, left in place (not
+/// renamed) as the operator's evidence, and not seeded.
 #[tokio::test]
 async fn seed_storage_disabled_skips_corrupt_without_rename() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -195,7 +166,7 @@ fn quarantine_exists(original: &std::path::Path) -> bool {
         })
 }
 
-/// D-P8.1 test 1 — corrupt local + good remote: the file is quarantined to
+/// Corrupt local, good remote: the file is quarantined to
 /// `.corrupt`, the remote replacement is installed byte-identical, and its
 /// entries are seeded.
 #[tokio::test]
@@ -208,8 +179,8 @@ async fn seed_heals_corrupt_catalog_from_remote() {
     // Good remote object for seqs [1, 2] (fold → max_seq=2, min=100, max=200).
     let (key, good_bytes) = catalog_object(&tenant, date, ident(), &[1, 2]);
 
-    // Corrupt local catalog at the canonical path: valid NAME (so recover()
-    // tracks it), garbage BODY.
+    // Corrupt local catalog at the canonical path: valid name (so recover()
+    // tracks it), garbage body.
     let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
     std::fs::create_dir_all(&dir).unwrap();
     let local = dir.join(otel_catalog::filename(ident(), 2, 100, 200));
@@ -239,8 +210,8 @@ async fn seed_heals_corrupt_catalog_from_remote() {
     }
 }
 
-/// D-P8.1 test 2 — corrupt local + remote unreachable: the quarantine stands,
-/// boot continues, and other good catalogs still seed.
+/// Corrupt local, remote unreachable: the quarantine stands, boot continues,
+/// and other good catalogs still seed.
 #[tokio::test]
 async fn seed_heal_failure_quarantines_and_continues() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -280,8 +251,8 @@ async fn seed_heal_failure_quarantines_and_continues() {
     assert!(!reg.is_uploaded(sk(2)), "unhealed catalog not seeded");
 }
 
-/// D-P8.1 test 4 — a healed file passes a subsequent boot with ZERO downloads:
-/// the reinstalled catalog parses, so no re-fetch is attempted.
+/// A healed file passes a subsequent boot with no download: the reinstalled
+/// catalog parses, so no re-fetch is attempted.
 #[tokio::test]
 async fn seed_after_heal_reboots_with_zero_downloads() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -348,7 +319,7 @@ fn future_version_catalog_bytes(version: u32) -> Vec<u8> {
     out
 }
 
-/// D-P8.1 (#2) — a newer, unsupported FORMAT version is NOT corruption: the file
+/// A newer, unsupported FORMAT version is not corruption: the file
 /// stays in place (no quarantine, no re-fetch) so a re-upgrade can read it, and
 /// boot continues seeding the rest.
 #[tokio::test]
@@ -367,7 +338,7 @@ async fn seed_future_version_left_in_place_not_healed() {
     std::fs::write(&future, future_version_catalog_bytes(7)).unwrap();
     reg.catalog_files.recover();
 
-    // Storage counts reads: the version mismatch must NOT trigger a re-fetch.
+    // Storage counts reads: the version mismatch must not trigger a re-fetch.
     let storage = crate::storage::MockStorage::default();
     seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
 
@@ -393,8 +364,8 @@ async fn seed_future_version_left_in_place_not_healed() {
     assert!(!reg.is_uploaded(sk(2)), "future-version catalog not seeded");
 }
 
-/// D-P8.1 (#4) — validate_catalog rejects an entry whose `remote_key` points at a
-/// DIFFERENT date than the catalog envelope (a tampered body must not redirect a
+/// validate_catalog rejects an entry whose `remote_key` points at a
+/// different date than the catalog envelope (a tampered body must not redirect a
 /// fetch into another day's SFST directory).
 #[test]
 fn validate_catalog_rejects_cross_date_entry() {
@@ -402,7 +373,7 @@ fn validate_catalog_rejects_cross_date_entry() {
     let cat_date = d(17);
 
     // Entry whose remote_key is well-formed on the right machine/tenant/signal
-    // and FileId, but on a DIFFERENT date (d18 != the catalog's d17).
+    // and FileId, but on a different date (d18 != the catalog's d17).
     let (partition_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
     let id = file_registry::FileId::new(ident(), 0, 5, partition_key);
     let mut catalog = Catalog::new(tenant.clone(), cat_date, ident());
@@ -467,10 +438,10 @@ fn validate_one_entry_key(remote_key: String) -> Result<(), String> {
     super::startup::validate_catalog(&bytes, &parsed, machine(), "logs")
 }
 
-/// Each per-entry rejection arm fires, AND the documented diagnostic priority
+/// Each per-entry rejection arm fires, and the documented diagnostic priority
 /// (foreign-machine > wrong-tenant > FileId-mismatch > wrong-date > malformed)
 /// holds: the foreign-machine, wrong-tenant, and FileId-mismatch keys are
-/// crafted to ALSO match a lower-priority arm, so their asserted reason proves
+/// crafted to also match a lower-priority arm, so their asserted reason proves
 /// the higher-priority arm won.
 #[test]
 fn validate_catalog_rejection_arm_priority() {
@@ -484,7 +455,7 @@ fn validate_catalog_rejection_arm_priority() {
     let foreign = file_registry::Identity::new(machine2(), instance());
 
     // (name, remote_key, expected-substring). The first three keys are crafted
-    // to also match a LOWER-priority arm, so their asserted substring proves
+    // to also match a lower-priority arm, so their asserted substring proves
     // the priority order.
     let cases: Vec<(&str, String, &str)> = vec![
         // foreign machine + wrong FileId (seq 6) → arm 1 must win over arm 3.
@@ -574,7 +545,7 @@ fn evict_all_retention() -> otel_bridge::config::RetentionConfig {
 
 #[tokio::test]
 async fn recover_retention_evicts_only_remote_cataloged() {
-    // The eviction gate is `is_remote_cataloged`, NOT `is_rotated`: local
+    // The eviction gate is `is_remote_cataloged`, not `is_rotated`: local
     // rotation alone is not enough — the catalog must be confirmed on the
     // remote before its SFST can be evicted locally.
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -584,10 +555,10 @@ async fn recover_retention_evicts_only_remote_cataloged() {
         let id = file_registry::FileId::new(ident(), 0, seq, 0);
         reg.sfst.track(id, ByteSize(1), empty_summary());
     }
-    // seq=2: rotated AND confirmed present on the remote -> evictable.
+    // seq=2: rotated and confirmed present on the remote -> evictable.
     reg.mark_rotated(sk(2));
     reg.mark_remote_cataloged([sk(2)]);
-    // seq=3: rotated locally but NOT confirmed on the remote -> must defer.
+    // seq=3: rotated locally but not confirmed on the remote -> must defer.
     reg.mark_rotated(sk(3));
     // seq=1: neither rotated nor remote-cataloged -> must defer.
 
@@ -656,7 +627,7 @@ async fn recover_retention_evicts_all_when_storage_disabled() {
     assert!(reg.sfst.get(2).is_none());
 }
 
-// ── reconcile_local_catalog_uploads tests ────────────────────
+// reconcile_local_catalog_uploads tests
 
 /// An OpenDAL operator backed by a fresh tempdir, plus the `TempDir` guard
 /// the caller must keep alive for the test's duration. `services-fs` is the
@@ -877,10 +848,9 @@ async fn an_index_file_that_is_not_local_does_not_hold_its_catalog_back() {
     cancel.cancel();
 }
 
-/// The only test that drives a real `UploadCatalog` through the `Uploader`:
-/// a catalog missing from the remote, whose index file is there (its upload
-/// was cut by a stop), is re-uploaded, its response is `CatalogUploaded`,
-/// and the remote bytes match the local file.
+/// A catalog missing from the remote, whose index file is there (its upload
+/// was cut by a stop), is re-uploaded through the real `Uploader`: its
+/// response is `CatalogUploaded`, and the remote bytes match the local file.
 #[tokio::test]
 async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -1012,9 +982,9 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
         reg.is_remote_cataloged(sk(10)),
         "confirmed-present catalog must seed remote_cataloged"
     );
-    // Integration check: this seq was never separately `mark_rotated` (the setup
-    // only places a local catalog), yet remote-cataloging it through the real
-    // reconcile caller makes it report rotated — the structural subsumption.
+    // This seq was never separately `mark_rotated` (the setup only places a
+    // local catalog), yet remote-cataloging it through the reconcile makes it
+    // report rotated.
     assert!(
         reg.is_rotated(sk(10)),
         "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
@@ -1081,7 +1051,7 @@ async fn reconcile_local_catalog_uploads_skips_catalogs_of_evicted_sfsts() {
 async fn reconcile_confirms_old_catalog_of_still_local_sfst_so_it_can_evict() {
     // Regression guard for the eviction wedge: after downtime longer than
     // max_age, an SFST past max_age is still local and its catalog is old. The
-    // confirm-scan MUST still stat that old catalog (it gates a local SFST), or
+    // confirm-scan must still stat that old catalog (it gates a local SFST), or
     // the SFST can never become remote_cataloged and never evicts. A date-bounded
     // scan would strand it; the seq-bounded scan confirms it.
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -1229,7 +1199,7 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
 
     // A transient (non-NotFound) stat error on a catalog must be skipped, not
     // treated as "missing" (which would re-upload) nor "present" (which would
-    // confirm it for eviction). The pass continues to the next file.
+    // confirm it for eviction).
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
@@ -1267,7 +1237,7 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
     .await
     .unwrap();
 
-    // Nothing enqueued for upload, and the seq is NOT confirmed remote-cataloged.
+    // Nothing enqueued for upload, and the seq is not confirmed remote-cataloged.
     assert_eq!(uploader.pending(), 0);
     assert!(
         !reg.is_remote_cataloged(sk(10)),
@@ -1326,8 +1296,8 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
         reg.is_remote_cataloged(sk(10)),
         "present catalog must seed remote_cataloged"
     );
-    // Same subsumption check at the integration boundary: never separately
-    // mark_rotated, yet remote-cataloging via reconcile makes it report rotated.
+    // Never separately mark_rotated, yet remote-cataloging via reconcile makes
+    // it report rotated.
     assert!(
         reg.is_rotated(sk(10)),
         "remote-cataloged via reconcile must imply rotated (Remote subsumes RotatedLocal)"
@@ -1336,13 +1306,11 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
     cancel.cancel();
 }
 
-// ── reconcile_remote_uploads tests (mock-driven LIST) ─────────
+// reconcile_remote_uploads tests (mock-driven LIST)
 
 /// Retention whose `horizon` rounds to a 0-day catalog window, so
-/// `reconcile_remote_uploads` issues exactly one LIST (today) — keeps these
-/// single-day tests focused on one prefix. (`reconcile_remote_uploads` bounds
-/// its LIST window by the horizon-derived `catalog_retention_days`, clamped by
-/// `ingest.reconcile_days`.)
+/// `reconcile_remote_uploads` issues exactly one LIST (today). That keeps
+/// these single-day tests focused on one prefix.
 fn today_window_retention() -> otel_bridge::config::RetentionConfig {
     otel_bridge::config::RetentionConfig {
         max_files: 100,
@@ -1390,7 +1358,7 @@ async fn reconcile_remote_uploads_marks_uploaded_and_enqueues_add_entry() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
-    // A remote SFST whose local file IS tracked and is not yet rotated.
+    // A remote SFST whose local file is tracked and is not yet rotated.
     let (id, key) = remote_sfst_key(10);
     reg.sfst.track(id, ByteSize(1), empty_summary());
 
@@ -1471,7 +1439,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
-    // Remote has the SFST, but it is NOT tracked locally (no registry summary to
+    // Remote has the SFST, but it is not tracked locally (no registry summary to
     // rebuild its catalog entry from).
     let (_id, key) = remote_sfst_key(10);
 
@@ -1510,9 +1478,7 @@ async fn reconcile_remote_uploads_skips_when_local_sfst_missing() {
 
 #[tokio::test]
 async fn reconcile_remote_uploads_propagates_list_error() {
-    // A failed LIST must abort the pass with Err so the caller (otel-ledger's
-    // `build_pipeline`) sets remote_ok = false, skips the stat-based catalog
-    // reconcile, and still queues the local upload backlog.
+    // A failed LIST must abort the pass with Err.
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
@@ -1589,7 +1555,7 @@ async fn reconcile_remote_uploads_skips_unparseable_key() {
     cancel.cancel();
 }
 
-// ── recover_unindexed: skip-and-orphan on indexing failure ──────────────
+// recover_unindexed: skip-and-orphan on indexing failure
 
 /// Indexer mock that fails every request — drives the skip-and-orphan path
 /// without needing an undecodable fixture.
@@ -1738,12 +1704,6 @@ async fn recover_wals_deletes_the_indexed_wal_indexes_the_other_and_owes_the_cle
 
 #[tokio::test]
 async fn recover_unindexed_orphans_unindexable_wals() {
-    // Pins `recover_unindexed`'s orphan policy on a failed indexing
-    // operation: the pass returns Ok (not fatal), the WAL entry is
-    // untracked (the planner never sees it), the seq is not routable
-    // (`holds_seq`), the bytes stay on disk, and the next restart
-    // re-discovers and re-orphans the file.
-    //
     // Setup: a real archived WAL file, tracked by directory recovery.
     let wal_dir = tempfile::tempdir().unwrap();
     let seq_alloc = std::sync::Arc::new(wal::SeqAllocator::ephemeral(0));
@@ -1798,7 +1758,7 @@ async fn recover_unindexed_orphans_unindexable_wals() {
         .await
         .expect("indexing failures are skipped, not fatal");
 
-    // The entry is untracked (the planner never sees it)...
+    // The entry is untracked...
     assert!(registry.wal.get(seq).is_none(), "WAL entry untracked");
     assert!(registry.unindexed_ids().is_empty());
     // ...the routing predicate drops it (no dangling seq_to_tenant entry)...
@@ -1832,8 +1792,7 @@ async fn recover_unindexed_orphans_unindexable_wals() {
     cancel.cancel();
 }
 
-/// The routing predicate the pipeline's post-recovery filter keys on: a WAL
-/// entry alone suffices, an SFST entry alone suffices, neither means the seq
+/// The routing predicate `holds_seq`: a WAL entry alone suffices, an SFST entry alone suffices, neither means the seq
 /// must not be routed (a flipped `||` or a dropped arm fails here).
 #[test]
 fn holds_seq_tracks_wal_or_sfst_artifacts() {
@@ -1860,9 +1819,8 @@ fn holds_seq_tracks_wal_or_sfst_artifacts() {
     assert!(registry.holds_seq(7), "an SFST entry alone suffices");
 }
 
-// ── P6: multi-identity coverage ──────────────────────────────
-// The fixtures above are single-identity; these exercise the identity boundary
-// (D6 filter, splice guard, per-identity floor, mark round-trip).
+// Multi-identity coverage
+// The fixtures above are single-identity; these exercise the identity boundary.
 
 fn machine2() -> file_registry::MachineId {
     file_registry::MachineId::new(uuid::Uuid::from_u128(
@@ -1878,8 +1836,9 @@ fn instance2() -> file_registry::InstanceId {
     .unwrap()
 }
 
-/// Remote SFST object key for `seq` under `identity` (today's prefix — the D6
-/// layout puts identity in the FILENAME, so every identity shares one prefix).
+/// Remote SFST object key for `seq` under `identity`, under today's prefix.
+/// The key layout puts the identity in the filename, so every identity shares
+/// one prefix.
 fn remote_sfst_key_for(
     identity: file_registry::Identity,
     seq: u64,
@@ -1951,15 +1910,15 @@ fn spawn_mock_uploader(
     )
 }
 
-/// Acceptance 2: a stale remote object at a reused seq (same machine/prior
-/// instance, and a different machine) must not falsely mark a new local SFST
-/// uploaded — it stays in the unuploaded set.
+/// A stale remote object at a reused seq (same machine/prior instance, and a
+/// different machine) must not falsely mark a new local SFST uploaded. It
+/// stays in the unuploaded set.
 #[tokio::test]
 async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
-    // A brand-new, never-uploaded local SFST at seq 5 under the CURRENT identity.
+    // A brand-new, never-uploaded local SFST at seq 5 under the current identity.
     reg.sfst.track(
         file_registry::FileId::new(ident(), 0, 5, 0),
         ByteSize(1),
@@ -2008,8 +1967,8 @@ async fn reconcile_remote_does_not_falsely_mark_local_sfst_at_reused_seq() {
     cancel.cancel();
 }
 
-/// Acceptance 3: two machines' objects interleaved in one LIST — only own-machine
-/// keys mutate state; the foreign machine's object is inert.
+/// Two machines' objects interleaved in one LIST: only own-machine keys
+/// mutate state, and the foreign machine's object is inert.
 #[tokio::test]
 async fn reconcile_remote_ignores_foreign_machine_objects() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -2053,7 +2012,7 @@ async fn reconcile_remote_ignores_foreign_machine_objects() {
     cancel.cancel();
 }
 
-/// The splice guard: a listed object whose seq exists locally under a DIFFERENT
+/// The splice guard: a listed object whose seq exists locally under a different
 /// identity must not be spliced into a catalog entry (local FileId + foreign
 /// remote_key). It is marked under its own identity, and no AddEntry is built.
 #[tokio::test]
@@ -2067,7 +2026,7 @@ async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
         ByteSize(1),
         empty_summary(),
     );
-    // Listed remote object: same machine, PRIOR instance, same seq 7.
+    // Listed remote object: same machine, prior instance, same seq 7.
     let prior = file_registry::Identity::new(machine(), instance2());
     let (_p, prior_key) = remote_sfst_key_for(prior, 7);
 
@@ -2105,7 +2064,7 @@ async fn reconcile_remote_splice_guard_rejects_identity_mismatch() {
 }
 
 /// The catalog-confirm seq floor is per-identity: a catalog of an identity with
-/// NO local SFSTs is skipped even when its `max_seq` clears the global-min floor
+/// no local SFSTs is skipped even when its `max_seq` clears the global-min floor
 /// of another identity's local files.
 #[tokio::test]
 async fn reconcile_local_catalog_floor_is_per_identity() {
@@ -2122,7 +2081,7 @@ async fn reconcile_local_catalog_floor_is_per_identity() {
     place_local_catalog_for(&mut reg, date, ident(), 5, 100, 200);
 
     // A prior identity's catalog at seq 50 — above the global-min floor (5) but
-    // with NO local SFSTs of that identity. Per-identity floor must skip it.
+    // with no local SFSTs of that identity. Per-identity floor must skip it.
     let prior = file_registry::Identity::new(machine(), instance2());
     place_local_catalog_for(&mut reg, date, prior, 50, 100, 200);
 
@@ -2156,10 +2115,8 @@ async fn reconcile_local_catalog_floor_is_per_identity() {
     cancel.cancel();
 }
 
-/// A confirmed prior-instance catalog marks its seqs under ITS OWN identity, not
-/// the running process's — the stat-confirm arm keys `mark_remote_cataloged` on
-/// the catalog file's own identity (the same one a re-upload's `UploadCatalog`
-/// request would carry).
+/// A confirmed prior-instance catalog marks its seqs under its own identity,
+/// not the running process's.
 #[tokio::test]
 async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
     let catalog_dir = tempfile::tempdir().unwrap();
@@ -2205,7 +2162,7 @@ async fn reconcile_local_catalog_marks_under_catalog_own_identity() {
     cancel.cancel();
 }
 
-// ── P7: startup catalog diff-sync ────────────────────────────
+// Startup catalog diff-sync
 
 /// A `Storage` whose every op never resolves — solely for the timeout
 /// fail-closed test (`std::future::pending()`).
@@ -2306,12 +2263,12 @@ fn d(day: u32) -> NaiveDate {
     NaiveDate::from_ymd_opt(2026, 4, day).unwrap()
 }
 
-/// Acceptance 1 — restore after wipe, fs-backed. TWO tenants × TWO dates of
-/// own-machine catalogs, plus a foreign-machine catalog and a garbage key, are
-/// synced from EMPTY local dirs. Uses a REAL OpendalStorage over nested
-/// date/tenant dirs — this is the recursive-LIST regression guard: a
-/// silently-non-recursive `list()` surfaces only the top-level date-dir
-/// placeholders, not the nested object keys, so every install assert fails.
+/// Restore after a wipe, fs-backed. Two tenants × two dates of own-machine
+/// catalogs, plus a foreign-machine catalog and a garbage key, are synced
+/// from empty local dirs. It uses a real OpendalStorage over nested
+/// date/tenant dirs, so it guards the recursive LIST: a silently
+/// non-recursive `list()` surfaces only the top-level date-dir placeholders,
+/// not the nested object keys, so every install assert fails.
 #[tokio::test]
 async fn startup_sync_restores_after_wipe() {
     let (op, _op_tmp) = fs_operator();
@@ -2325,7 +2282,7 @@ async fn startup_sync_restores_after_wipe() {
         catalog_object(&t2, d(17), ident(), &[30]),
         catalog_object(&t2, d(18), ident(), &[40, 41, 42]),
     ];
-    // Foreign machine (skipped by D6) and a garbage key (skipped by sanitizer).
+    // Foreign machine (skipped by the own-machine filter) and a garbage key (skipped by sanitizer).
     let foreign = file_registry::Identity::new(machine2(), instance());
     objs.push(catalog_object(&t1, d(17), foreign, &[99]));
     for (key, bytes) in &objs {
@@ -2350,9 +2307,7 @@ async fn startup_sync_restores_after_wipe() {
     .await
     .unwrap();
 
-    // Both own tenants discovered. The foreign machine's t1 catalog is
-    // D6-filtered before tenant discovery, so t1 comes from own-machine keys
-    // only.
+    // Both own tenants discovered.
     assert!(tenants.contains(&t1) && tenants.contains(&t2));
 
     // All four own catalogs installed byte-identical; the foreign one is absent.
@@ -2417,7 +2372,7 @@ async fn startup_sync_restores_after_wipe() {
     );
 }
 
-/// Acceptance 7 — fail-closed: LIST error, download transport error, and a hang
+/// Fail-closed: LIST error, download transport error, and a hang
 /// each fail the attempt as a remote error (not a warn/skip).
 #[tokio::test]
 async fn startup_sync_fails_closed_on_list_error() {
@@ -2573,7 +2528,7 @@ async fn startup_sync_noop_when_all_local() {
         .join(otel_catalog::filename(parsed.identity, 7, 100, 200));
     file_registry::durable::write_atomic(&path, &bytes).unwrap();
 
-    // Pre-seed highwater ABOVE the remote max (7) so no write happens.
+    // Pre-seed highwater above the remote max (7) so no write happens.
     let hw = tempfile::tempdir().unwrap();
     let hw_path = hw.path().join("hw");
     wal::write_seq_highwater(&hw_path, 1000).unwrap();
@@ -2607,8 +2562,8 @@ async fn startup_sync_noop_when_all_local() {
     );
 }
 
-/// Validation rejects: each malformed body is NOT installed (loud log), the
-/// phase continues, and a valid sibling IS installed.
+/// Validation rejects: each malformed body is not installed, the phase
+/// continues, and a valid sibling is installed.
 #[tokio::test]
 async fn startup_sync_rejects_invalid_bodies() {
     let t1 = TenantId::from("t1");
@@ -2817,7 +2772,7 @@ async fn startup_sync_short_circuits_on_first_download_error() {
     );
 }
 
-/// End-to-end fold guard: drive a REAL `CatalogBuilder` rotation, then run the
+/// End-to-end fold guard: drive a real `CatalogBuilder` rotation, then run the
 /// written file through `validate_catalog`. The builder's filename and the
 /// validator both derive the fold `(max_seq, min_ts, max_ts)` from
 /// `Catalog::fold`, so any future divergence (a filename encoding fields the

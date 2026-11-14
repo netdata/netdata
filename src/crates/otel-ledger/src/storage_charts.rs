@@ -15,9 +15,7 @@
 //! for a retry, and how many succeeded and failed. They are where a remote that
 //! is unreachable, or too slow for the host, shows.
 //!
-//! The ledger's periodic retention pass takes the totals ([`IndexTotals`]),
-//! its event loop keeps the upload numbers ([`UploadTotals`]), and both leave
-//! them in [`StorageTotals`]; [`run`] charts them every second.
+//! [`run`] charts the totals in [`StorageTotals`] every second.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

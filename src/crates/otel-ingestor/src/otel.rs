@@ -2,14 +2,6 @@
 //! needs: a total order + normalization for OTLP values (canonical attribute
 //! ordering), the [`MetricIdentityHash`] trait behind chart identity hashing,
 //! and the per-metric [`DataPointRef`]/[`DataPointIter`] abstraction.
-//!
-//! Consumers: `metrics_service.rs::process_request` normalizes every export
-//! with [`normalize_request`] before chart matching, so attribute order does
-//! not affect the resulting hashes or chart names; `iter.rs` drives
-//! [`MetricIdentityHash`] through its `MetricIdentityHasher` and iterates each
-//! metric's points via [`DataPointIterExt`]. Note that `iter.rs` defines a
-//! same-named request-level `DataPointIter`; this file's is the per-metric
-//! iterator (`otel::DataPointIter` there).
 
 use opentelemetry_proto::tonic::{
     collector::metrics::v1::ExportMetricsServiceRequest,
@@ -71,8 +63,7 @@ impl Compare for Value {
 
 /// The value an `AnyValue` carries for ordering and identity. OTLP says
 /// signals other than profiling process `string_value_strindex` (a reference
-/// into the profiles string table) as an absent value, as flatten-otel does
-/// for the chart labels.
+/// into the profiles string table) as an absent value.
 fn present_value(any_value: &AnyValue) -> Option<&Value> {
     match &any_value.value {
         Some(Value::StringValueStrindex(_)) | None => None,
@@ -325,8 +316,7 @@ impl Normalize for Metric {
 }
 
 /// Normalize a whole export request: resource and scope attributes, metric
-/// metadata, and every data point's attributes (see `Normalize`). Called by
-/// `metrics_service.rs::process_request` before chart matching and hashing.
+/// metadata, and every data point's attributes (see `Normalize`).
 pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
     for rm in &mut request.resource_metrics {
         rm.resource.normalize();
@@ -345,10 +335,9 @@ pub fn normalize_request(request: &mut ExportMetricsServiceRequest) {
 
 /// Hash the *identity* of an OTLP object — the fields that distinguish one
 /// series from another (names, types, attribute keys and values, temporality)
-/// — while skipping measurements and timestamps. `iter.rs` feeds this into
-/// its `MetricIdentityHasher` to build chart identity hashes. Vecs hash in
-/// slice order, so hash only normalized (sorted) structures for
-/// order-independent results.
+/// — while skipping measurements and timestamps. Vecs hash in slice order,
+/// so hash only normalized (sorted) structures for order-independent
+/// results.
 pub trait MetricIdentityHash {
     fn identity_hash<H: Hasher>(&self, state: &mut H);
 }
@@ -480,8 +469,7 @@ impl MetricIdentityHash for Metric {
  */
 
 /// Borrowed view over one of the four OTLP data-point shapes. `Number` covers
-/// both Gauge and Sum, which share `NumberDataPoint`; `metrics_service.rs`
-/// pattern-matches the Histogram and Summary variants for decomposition.
+/// both Gauge and Sum, which share `NumberDataPoint`.
 pub enum DataPointRef<'a> {
     Number(&'a NumberDataPoint),
     Histogram(&'a HistogramDataPoint),

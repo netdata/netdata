@@ -8,9 +8,6 @@
 //! plain HTTP, but rejects every `https://` URL in-process with a scheme
 //! error — S3/STS become unreachable with no network-level hint of why. This
 //! test fails loudly in that case instead.
-//!
-//! The manifests' own comments point back here: the workspace `opendal`
-//! entry and this crate's `[dev-dependencies]` reqwest entry.
 
 use std::time::Duration;
 

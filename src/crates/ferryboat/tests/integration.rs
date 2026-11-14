@@ -3,35 +3,6 @@
 //! Tests stay independent: in-process channel names and IPC socket paths
 //! are unique per test (the IPC helper appends the process id; the fixed
 //! nonexistent path in the retry-exhaustion test is the only exception).
-//!
-//! Pinned behaviors and the contracts they guard:
-//!
-//! - Round-trips over both transports, including several messages in
-//!   sequence and several clients on one listener. In-process values move
-//!   through mpsc channels with no serialization; IPC messages are
-//!   bincode-serialized and sent as one length-delimited frame (the
-//!   crate's framing contract).
-//! - Disconnect: when the server side drops its connection, the client's
-//!   next `recv` returns `Error::ConnectionClosed`; on RPC, a dropped
-//!   client ends `serve` with `Ok(())`, and a dropped server session
-//!   fails the client's calls.
-//! - Registry: a channel name is tagged with the listener's message types,
-//!   so a client built from a different pair fails with
-//!   `Error::TypeMismatch`; connect retries until the listener binds, so
-//!   either start order works; the name is bindable again after the
-//!   listener is dropped.
-//! - Size limit (IPC): a send exceeding `max_message_size` fails with
-//!   `Error::MessageTooLarge` at serialize time, before any byte is
-//!   written; both ends of the link must set the same limit.
-//! - Compression (IPC): with `compress(true)` on both ends — the flag is
-//!   part of the wire contract — small and large payloads round-trip
-//!   intact.
-//! - Connect retries: exhausting the budget without a peer returns the
-//!   last `Error::Io` over IPC and `Error::ConnectionClosed` in-process.
-//! - RPC (`mux.rs`): `RpcClient`/`RpcServer` round-trips over both
-//!   transports; clones share one connection and its dispatch task, so
-//!   concurrent calls multiplex and responses match by frame id regardless
-//!   of completion order; the server serves several clients concurrently.
 use std::time::Duration;
 
 use ferryboat::{Connection, Endpoint, Error, Listener, RpcClient, RpcServer};
@@ -51,8 +22,6 @@ fn ipc_endpoint(name: &str) -> Endpoint {
         std::process::id()
     ))
 }
-
-// --- In-process tests ---
 
 #[tokio::test]
 async fn in_process_send_recv() {
@@ -138,7 +107,7 @@ async fn in_process_connection_closed_on_drop() {
 
 // The registry entry is tagged with the listener's message types: a
 // client built from a different pair fails with Error::TypeMismatch on
-// its first attempt, without spending the retry budget.
+// its first attempt.
 #[tokio::test]
 async fn in_process_type_mismatch() {
     let name = "test-type-mismatch";
@@ -216,8 +185,6 @@ async fn in_process_multi_client() {
 
     server.await.unwrap();
 }
-
-// --- IPC tests ---
 
 #[tokio::test]
 async fn ipc_send_recv() {
@@ -403,8 +370,6 @@ async fn ipc_connect_before_bind() {
     assert_eq!(conn.recv().await.unwrap(), 99);
 }
 
-// --- Compression tests ---
-
 #[tokio::test]
 async fn ipc_compressed_send_recv() {
     let ep = ipc_endpoint("compress");
@@ -481,8 +446,6 @@ async fn ipc_compressed_large_payload() {
     server.await.unwrap();
 }
 
-// --- IPC connection closed ---
-
 #[tokio::test]
 async fn ipc_connection_closed_on_drop() {
     let ep = ipc_endpoint("conn-closed");
@@ -515,8 +478,6 @@ async fn ipc_connection_closed_on_drop() {
     assert!(matches!(result, Err(Error::ConnectionClosed)));
 }
 
-// --- In-process rebind after listener drop ---
-
 #[tokio::test]
 async fn in_process_rebind_after_drop() {
     let name = "test-rebind";
@@ -542,8 +503,6 @@ async fn in_process_rebind_after_drop() {
     assert_eq!(conn.recv().await.unwrap(), 7);
 }
 
-// --- Retry behavior ---
-
 // Exhausting the retry budget over IPC returns the last connect error
 // (Error::Io); the in-process twin below pins Error::ConnectionClosed.
 #[tokio::test]
@@ -568,8 +527,6 @@ async fn in_process_connect_fails_after_max_retries() {
 
     assert!(matches!(result, Err(Error::ConnectionClosed)));
 }
-
-// --- Multiplexed RPC tests ---
 
 #[tokio::test]
 async fn rpc_in_process_basic() {
@@ -626,8 +583,8 @@ async fn rpc_ipc_basic() {
     assert_eq!(client.call("hello".into()).await.unwrap(), "echo: hello");
 }
 
-// Clones share one connection and its dispatch task; responses match by
-// frame id even though the handler delays the even inputs.
+// Responses match by frame id even though the handler delays the even
+// inputs.
 #[tokio::test]
 async fn rpc_concurrent_calls() {
     let name = "rpc-concurrent";

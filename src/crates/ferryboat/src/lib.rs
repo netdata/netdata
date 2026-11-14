@@ -1,5 +1,5 @@
 //! A transport-agnostic messaging library for inter-process and in-process
-//! communication under the OTel plugin family.
+//! communication.
 //!
 //! [`Listener`] accepts bidirectional [`Connection`]s; a connection sends
 //! values of type `S` and receives values of type `R`, and the two ends of a
@@ -143,12 +143,11 @@
 //! IPC messages cross the wire as one `tokio_util::codec::LengthDelimitedCodec`
 //! frame: a 4-byte big-endian length prefix followed by the payload (the
 //! tokio-util defaults). The payload is the `bincode::config::standard()`
-//! encoding of the value, optionally LZ4-compressed with a prepended size —
-//! so enum variant order, field shapes, and the compression flag are
-//! cross-process contracts: both ends of a link must be built from the same
-//! type definitions and the same builder settings. The supervisor↔worker
-//! message contracts live in `otel-bridge/src/lib.rs`; the socket
-//! lifecycle (bind, accept, stale-file removal, pipe instance handling) in
+//! encoding of the value, optionally LZ4-compressed with a prepended size.
+//! So enum variant order, field shapes, and the compression flag are
+//! cross-process contracts. Both ends of a link must be built from the same
+//! type definitions and the same builder settings. The socket lifecycle
+//! (bind, accept, stale-file removal, pipe instance handling) is in
 //! `transport/unix.rs` and `transport/windows.rs`.
 //!
 //! The message-size limit is enforced at three points keyed to the same
@@ -157,12 +156,9 @@
 //! `max_frame_length` in both directions, and after decompression on receive.
 //! Both ends must set the same limit: a mismatch means one side accepts
 //! frames the other refuses, and the link dies on the first oversized
-//! message. Production usage: the supervisor↔worker links set
-//! `otel_bridge::IPC_MAX_MESSAGE_SIZE` (16 MiB) on both ends; the ingestor→ledger
-//! WAL-event link runs at this crate's 8 MiB default on both ends. On the
-//! compressed path the check lands after decompression — `lz4_flex` allocates
-//! the embedded size up front — so the limit bounds the accepted message, not
-//! the peak allocation.
+//! message. On the compressed path the check lands after decompression, and
+//! `lz4_flex` allocates the embedded size up front. So the limit bounds the
+//! accepted message, not the peak allocation.
 //!
 //! There is no internal send queue: `send` awaits the bounded in-process
 //! channel or the socket, so a reader that stops draining applies
@@ -172,42 +168,23 @@
 //!
 //! [`Connection::send`] fails with `Error::Encode` or `Error::MessageTooLarge`
 //! before touching the socket (IPC), or `Error::ConnectionClosed` when the
-//! in-process peer is gone; transport failures surface as `Error::Io`.
+//! in-process peer is gone. Transport failures surface as `Error::Io`.
 //! [`Connection::recv`] fails with `Error::Decode`, `Error::MessageTooLarge`
-//! (post-decompress) or `Error::Io` — a compression-setting mismatch between
-//! the two ends and an oversized frame both arrive as `Error::Io` — and
+//! (post-decompress) or `Error::Io`. A compression-setting mismatch between
+//! the two ends and an oversized frame both arrive as `Error::Io`. `recv`
 //! returns `Error::ConnectionClosed` when the peer closed the connection
 //! cleanly. Connect retry exhaustion returns the last `Error::Io` (IPC) or
-//! `Error::ConnectionClosed` (in-process); `Error::TypeMismatch` is returned
+//! `Error::ConnectionClosed` (in-process). `Error::TypeMismatch` is returned
 //! immediately, never retried.
 //!
 //! # Lifecycle and thread-safety
 //!
-//! Builders are plain values consumed by `open()`: `ListenerBuilder::open` is
-//! synchronous (bind or registry insert only), `ConnectionBuilder::open` is
-//! async (it retries until the peer is reachable or the retry budget is
-//! spent). `Connection` and `Listener` methods take `&mut self`, so each
-//! belongs to one task; everything runs on tokio (the Windows named-pipe open
-//! inside `transport::connect` is the one synchronous call), and the
-//! in-process registry's `std::sync::Mutex` is never held across an await.
-//! Dropping a `Connection` closes the channel or socket; the peer observes
-//! that as `Error::ConnectionClosed` on the next recv (and on in-process
-//! sends).
-//!
-//! # Consumers in this tree
-//!
-//! Direct dependents (workspace `src/crates/Cargo.toml`): `otel-plugin` — the
-//! supervisor binds one socket per worker and spawns them
-//! (`src/crates/otel-plugin/src/supervisor.rs`); the worker crates
-//! `otel-ingestor`, `otel-ledger` and `otel-legacy-logs`, which connect back
-//! to the supervisor and speak the `otel-bridge` enum pairs; and `file-lifecycle`
-//! (`ipc.rs`), whose ledger accepts the ingestor's WAL-event connection
-//! carrying `wal::Message` (`src/crates/otel-ingestor/src/ledger_sender.rs`
-//! is the connecting side). The `otel-bridge` crate defines the message contracts
-//! but does not depend on ferryboat; `file-registry`, `otel-catalog`, `wal`,
-//! `sfst` and `sfsq` do not use ferryboat directly. The [`RpcClient`] /
-//! [`RpcServer`] layer and the in-process transport have no production users
-//! in this tree yet — only this crate's integration tests exercise them.
+//! Builders are plain values consumed by `open()`. `ListenerBuilder::open` is
+//! synchronous (bind or registry insert only). `ConnectionBuilder::open` is
+//! async: it retries until the peer is reachable or the retry budget is
+//! spent. `Connection` and `Listener` methods take `&mut self`, so each
+//! belongs to one task. The in-process registry's `std::sync::Mutex` is never
+//! held across an await.
 
 mod mux;
 mod transport;
@@ -230,8 +207,7 @@ use transport::{ConnectionStream, Listener as TransportListener};
 pub use mux::{RpcClient, RpcClientBuilder, RpcServer, RpcServerBuilder, RpcSession};
 
 /// Default IPC message-size limit (8 MiB); see the module docs for the three
-/// enforcement points. Supervisor↔worker links override it with
-/// `otel_bridge::IPC_MAX_MESSAGE_SIZE`.
+/// enforcement points.
 const DEFAULT_MAX_MESSAGE_SIZE: usize = 8 * 1024 * 1024;
 
 // Capacity of the mpsc channels backing in-process connections.
@@ -315,8 +291,6 @@ fn registry() -> &'static Mutex<HashMap<String, Box<dyn Any + Send + Sync>>> {
     INSTANCE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-// --- Error type ---
-
 /// The crate's error type, returned by every fallible call: [`Connection::send`],
 /// [`Connection::recv`], the builders' `open()`s, and the accept/serve entry points.
 #[derive(Debug, thiserror::Error)]
@@ -362,8 +336,6 @@ pub enum Error {
 /// Convenience alias for `std::result::Result<T, ferryboat::Error>`.
 pub type Result<T> = std::result::Result<T, Error>;
 
-// --- Endpoint ---
-
 /// Selects the transport for a [`Connection`] or [`Listener`].
 #[derive(Clone)]
 pub enum Endpoint {
@@ -384,8 +356,6 @@ impl Endpoint {
         Endpoint::Ipc(path.into())
     }
 }
-
-// --- Connection ---
 
 /// Send half of an in-process listener's accept queue: each connecting client
 /// deposits a `(Sender<S>, Receiver<R>)` pair — the listener's send and
@@ -622,8 +592,6 @@ where
         }
     }
 }
-
-// --- Listener ---
 
 /// Server-side listener that accepts bidirectional [`Connection`]s.
 ///

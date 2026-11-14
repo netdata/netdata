@@ -1,17 +1,5 @@
 //! Tests for the cleaner: `process` called directly on real temp dirs — no
-//! tokio runtime, no `Component` run loop — pinning the parent module's
-//! contract.
-//!
-//! - A `DeleteCatalogFile` answers `CatalogFileDeleted` when the file is
-//!   gone and when it was never there: `NotFound` counts as success, so a
-//!   retried delete is harmless (the parent deletion-idempotency contract).
-//! - A successful delete prunes the emptied ancestors of the
-//!   `{base}/{date}/{tenant}/` layout, stopping at the first non-empty one
-//!   and never touching the base dir (`max_levels = 2`): a surviving
-//!   sibling catalog in the same tenant dir leaves the tenant and date
-//!   dirs in place, another tenant's dir keeps the date dir, and an
-//!   already-missing file prunes nothing when its sibling-bearing dir
-//!   survives.
+//! tokio runtime, no `Component` run loop.
 //!
 //! Not pinned here: the WAL and index delete variants, the `*Failed`
 //! responses, and the run loop's cancel and closed-channel exits.

@@ -18,7 +18,7 @@
 //!   itself; the derives expect them nested under `value`.
 //!
 //! Worst of all, `Metric.data` and `NumberDataPoint.value` are
-//! `#[serde(flatten)] Option<oneof>`, and serde turns ANY error inside a
+//! `#[serde(flatten)] Option<oneof>`, and serde turns any error inside a
 //! flattened `Option` into `None`: a histogram the derives cannot read
 //! vanishes from an otherwise successful decode.
 //!
@@ -149,9 +149,7 @@ fn from_value<T: DeserializeOwned>(root: Value) -> Result<T, String> {
     serde_json::from_value(root).map_err(|e| e.to_string())
 }
 
-// ---------------------------------------------------------------------------
 // Signal-independent rewrites
-// ---------------------------------------------------------------------------
 
 /// Signal-independent rewrites, applied to the whole tree: drop `null`
 /// entries (proto3 JSON's "default value"), and fill the `values` of an
@@ -220,9 +218,7 @@ fn single_value(object: &Object) -> Result<(), String> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // Metrics rewrites
-// ---------------------------------------------------------------------------
 
 /// What the decoded metrics request must contain, in traversal order: for
 /// each metric, whether the JSON carried its data, and for each gauge/sum
@@ -371,9 +367,7 @@ fn normalize_exemplar(exemplar: &mut Object) -> Result<(), String> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // Loss check
-// ---------------------------------------------------------------------------
 
 /// A metric (or one of its number points) that the JSON carried but the
 /// decode returned empty.
@@ -480,9 +474,7 @@ fn json_pointer(path: &str) -> String {
         .fold(String::new(), |acc, part| acc + "/" + &part)
 }
 
-// ---------------------------------------------------------------------------
 // Field helpers
-// ---------------------------------------------------------------------------
 
 /// The object elements of the array under `key`, with their indexes. A
 /// missing key or non-array value yields nothing: the decode reports type

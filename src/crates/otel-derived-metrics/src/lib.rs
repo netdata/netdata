@@ -4,13 +4,10 @@
 //! health (self-monitoring).
 //!
 //! Each of these is a metric set that owns its aggregator behind its own
-//! lock, so recording from export requests never waits on another set, nor on
-//! the OTLP metrics `ChartManager` lock. An export request records into a
-//! request-local batch ([`SpansBatch`], [`LogsBatch`]) while it prepares its
-//! frames and commits the batch only after its write is durable, so a retried
-//! request is not counted twice. The ingestor calls [`DerivedMetrics::emit`]
-//! once per second; the chunks it returns travel to the supervisor as chart
-//! data.
+//! lock, so recording from export requests never waits on another set. An
+//! export request records into a request-local batch ([`SpansBatch`],
+//! [`LogsBatch`]) while it prepares its frames and commits the batch only
+//! after its write is durable, so a retried request is not counted twice.
 
 mod self_monitoring;
 mod service;
@@ -158,9 +155,9 @@ impl DerivedMetrics {
             .record_metric_data_points(accepted, rejected, unix_now());
     }
 
-    /// The counter of the ingestor's queue of WAL file events to the ledger,
-    /// for the sender of those events to keep: `netdata.otel.wal_events_queued`
-    /// charts it.
+    /// The counter of the queue of WAL file events to the ledger.
+    /// `netdata.otel.wal_events_queued` charts it, and the caller keeps it
+    /// current.
     pub fn wal_events_queued(&self) -> Arc<std::sync::atomic::AtomicU64> {
         self.ingest_outcomes.wal_events_queued()
     }

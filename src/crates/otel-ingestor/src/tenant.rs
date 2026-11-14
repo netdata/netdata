@@ -1,13 +1,9 @@
-//! Tenant routing for the two multi-tenant OTLP export services (logs +
-//! traces): resolves the `TenantId` that keys a request's per-tenant WAL
-//! and is forwarded to the ledger. The metrics service shares the
-//! transports but is not tenant-scoped and does not use this path.
+//! Tenant routing for logs and traces export requests: resolves the
+//! `TenantId` that keys a request's per-tenant WAL.
 //!
-//! Both transports — the gRPC wrappers and the OTLP/HTTP front end —
-//! resolve through one shared inner function, so the tenant policy exists
-//! exactly once. The id's validation policy lives on
-//! `TenantId::validate_ingest` (file-registry); this module only extracts
-//! the header and maps the outcomes onto transport errors.
+//! The id's validation policy lives on `TenantId::validate_ingest`
+//! (file-registry); this module only extracts the header and maps the
+//! outcomes onto transport errors.
 
 use file_registry::TenantId;
 use otel_bridge::config::AuthConfig;
@@ -65,8 +61,5 @@ fn resolve_tenant(raw: Option<&[u8]>, auth: &AuthConfig) -> Result<TenantId, Sta
     let raw = raw.ok_or_else(|| Status::unauthenticated("missing tenant header"))?;
     let tenant = std::str::from_utf8(raw)
         .map_err(|_| Status::invalid_argument("tenant header must be valid UTF-8"))?;
-    // The strict id policy (it becomes a per-tenant directory name) lives on
-    // `TenantId::validate_ingest`; this layer only wraps its reason as the
-    // transport error.
     TenantId::validate_ingest(tenant).map_err(Status::invalid_argument)
 }

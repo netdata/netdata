@@ -8,8 +8,7 @@
 //! closes files faster than it can index them shows.
 //!
 //! [`run`] samples the numbers every second and hands the chart text to the
-//! ledger's event loop, which sends it to the supervisor as
-//! [`LedgerResponse::ChartData`].
+//! ledger's event loop as [`LedgerResponse::ChartData`].
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 

@@ -6,9 +6,7 @@
 //! indexed files, either installed as local SFSTs or stored as remote
 //! objects behind `TestRemote`'s `fs://` store and download cache. One
 //! corpus carries the tests: files 1-2 under one test identity, traces
-//! A/B/C/E across a 100 s window. The mode contracts themselves — page
-//! and aggregate semantics, pagination, error shapes — are pinned in
-//! `tests.rs`; nothing here re-tests them.
+//! A/B/C/E across a 100 s window.
 //!
 //! Not pinned here: cancellation, the planning-task panic error, and the
 //! live-WAL sources a real query walks beside remote files.
@@ -232,8 +230,8 @@ async fn an_unreadable_catalog_is_reported() {
 #[tokio::test]
 async fn a_query_too_large_for_the_download_cache_is_a_bad_request() {
     let (h, remote, _) = evicted_setup(100).await;
-    // Any fixture file alone exceeds the 100 B cache, so every query
-    // shape fails at remote planning, before anything downloads. The
+    // Any fixture file alone exceeds the 100 B cache, so each query
+    // below fails at remote planning, before anything downloads. The
     // caller fixes it with a narrower window: a 400, whose body carries
     // the advice.
 
@@ -459,8 +457,7 @@ async fn an_unreadable_catalog_in_the_completion_slack_spares_the_aggregate() {
 
 /// Traces read catalog files only after releasing the registry read lock. A
 /// catalog that blocks its reader (a FIFO not yet written) must not keep the
-/// write lock — which the ledger loop takes on every WAL event — from being
-/// granted.
+/// write lock from being granted.
 #[cfg(unix)]
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn catalogs_are_read_off_the_registry_lock() {

@@ -212,12 +212,10 @@ pub(crate) struct TenantWriters {
     file_stamp: wal::FileStamp,
     /// Each tenant's WAL files live in `config.dir/<tenant>`.
     config: otel_bridge::config::WalConfig,
-    /// The global seq allocator (lib.rs hands the same one to the logs and
-    /// traces services), so file `seq` is unique across signals.
+    /// The global seq allocator, shared with the other signal's writers, so
+    /// file `seq` is unique across signals.
     seq_allocator: Arc<wal::SeqAllocator>,
-    /// Identity stamped into every WAL FileId (the machine GUID resolved by the
-    /// supervisor plus its self-generated per-process instance id; see
-    /// `otel_bridge::config::PluginConfig::identity`).
+    /// Identity stamped into every WAL FileId.
     instance_identity: Identity,
     /// Shared with the other signal's writers: the writer → ledger IPC
     /// accepts exactly one connection, so every signal's events MUST funnel
@@ -307,7 +305,7 @@ impl TenantWriters {
     ///   per-frame `ingestion_ns` tick) cannot form an AB-BA cycle with it;
     /// - snapshot the writer handles under the map lock (held only for the
     ///   clone), so exports and new-tenant creation are not blocked by the sweep;
-    /// - per writer: lock it, rotate, then drain AND send UNDER that lock (see
+    /// - per writer: lock it, rotate, then drain and send under that lock (see
     ///   the module docs). The sweep does not take the sync turn: a round's
     ///   `finish_sync` skips a file the sweep sealed meanwhile.
     pub(crate) fn rotate_expired(&self, now_ns: TimestampNs) {
@@ -326,7 +324,7 @@ impl TenantWriters {
             let (result, forwarded) = {
                 let mut writer = tenant_writer.lock();
                 let result = writer.rotate_expired(now_ns);
-                // Drain UNCONDITIONALLY, even when the rotation errored: it is
+                // Drain unconditionally, even when the rotation errored: it is
                 // best-effort per stream, so it may have already sealed earlier
                 // streams and queued their `Closed` events — those must still
                 // reach the ledger.
@@ -437,8 +435,7 @@ mod tests {
         )
     }
 
-    /// The queue to the ledger has no bound; its length is counted for the
-    /// chart `netdata.otel.wal_events_queued`.
+    /// The queue to the ledger has no bound; its length is counted.
     #[tokio::test]
     async fn the_events_that_wait_for_the_ledger_are_counted() {
         use std::sync::atomic::{AtomicU64, Ordering};

@@ -1,4 +1,4 @@
-//! Content-plane identity for OTel **logs**.
+//! Content-plane identity for OTel logs.
 //!
 //! This crate owns the OTel-logs notion of "which stream a file belongs to" —
 //! the `(service.namespace, service.name)` pair ([`ServiceStream`]) — and how
@@ -6,48 +6,27 @@
 //! serialized into the substrate's opaque per-file metadata blob.
 //!
 //! It is the content-plane counterpart to the content-agnostic substrate
-//! (`file-registry`/`wal`/`sfst`/`otel-catalog`): the substrate carries an
+//! (`file-registry`/`wal`/`sfst`/`otel-catalog`). The substrate carries an
 //! opaque `partition_key: u64` (in the file's `FileId`/filename, the single
 //! source of truth) and an opaque `content_meta: Vec<u8>` (in the per-file
 //! summary) and never interprets either. This crate is the one place that gives
-//! them meaning for logs: the producer (`otel-ingestor`) encodes the identity
-//! here before writing, and the query layer (`otel-ledger`) decodes it here for
-//! display. Traces reuse only the *unattributed* convention defined here — the
-//! `("", "")` stream `otel-ingestor`'s `trace_service` writes (`partition_key`
-//! 0 + the version-tagged empty-fields blob) — the single seam a future
-//! per-service traces scheme would replace; a sibling traces identity crate,
-//! and a shared home for the hash primitive, would arrive with that switch. The
-//! boundary runs the other way too: `file-lifecycle/tests/dep_guard.rs` bars
-//! the content-agnostic substrate from depending on this log-content crate.
-//! Consumers (grep-verified): `otel-ingestor` `logs_service` (extracts the
-//! stream from OTLP resource attributes, groups frames per stream, writes
-//! `partition_key` + `content_meta`) and `trace_service`; `otel-ledger`'s
-//! `rpc/logs` handler + adapter (`decode_content_meta_or_empty` for the stream
-//! names shown to the UI, the "Services" selector included); `sfsq-cli`
-//! `discover`/`lib` (derives the query partition key from the CLI
-//! namespace/name via `ns_hash` to filter offline WAL/SFST candidates);
-//! `otel-ledger`'s test helpers and fixture tests (`sfsq-cli`, `ng-index`).
+//! them meaning for logs.
 
 use std::hash::Hasher;
 
 use serde::{Deserialize, Serialize};
 use twox_hash::XxHash64;
 
-// ---------------------------------------------------------------------------
-// ServiceStream — the OTel-logs stream identity (owned here, content plane)
-// ---------------------------------------------------------------------------
-
 /// `(namespace, name)` pair identifying a log stream.
 ///
 /// This is the canonical OTel-logs stream identifier. The content plane derives
 /// it into the substrate's opaque `partition_key` (via [`partition_key`]) and
 /// serializes it into the opaque `content_meta` blob (via
-/// [`encode_content_meta`]); the substrate (`wal`/`sfst`/`otel-catalog`) never
-/// sees this type.
+/// [`encode_content_meta`]).
 ///
 /// Absent equals empty: a missing attribute is stored as an empty string, so a
 /// stream that carries no `service.namespace` and one that carries an
-/// empty-string namespace are the *same* stream (OpenTelemetry treats a
+/// empty-string namespace are the same stream (OpenTelemetry treats a
 /// zero-length namespace as unspecified). The derived `PartialEq`/`Hash` then
 /// compare the stored strings byte-for-byte, with no case-folding or trimming,
 /// so `("Prod", "api")` and `("prod", "api")` remain distinct.
@@ -76,7 +55,7 @@ impl ServiceStream {
     ///
     /// An empty field is treated as absent before hashing, so a stream that
     /// carries no `service.namespace` and one that carries an empty-string
-    /// namespace resolve to the *same* `ns_hash`. This matches the
+    /// namespace resolve to the same `ns_hash`. This matches the
     /// OpenTelemetry rule that a zero-length namespace equals an unspecified
     /// one, and keeps a single file partition per logical stream. An all-empty
     /// stream therefore hashes to the `0` "no attribution" sentinel.
@@ -164,8 +143,7 @@ pub fn partition_key(stream: &ServiceStream) -> u64 {
 ///
 /// Layout: a 1-byte [`CONTENT_META_VERSION`] tag, then each field as a
 /// little-endian `u16` byte-length prefix followed by its UTF-8 bytes
-/// (`namespace` then `name`). The substrate stores these bytes verbatim and
-/// never parses them; only this crate does. The encoder is fallible (mirroring
+/// (`namespace` then `name`). The encoder is fallible (mirroring
 /// the decoder) so an over-long, attacker-controlled identity is rejected by
 /// the caller rather than panicking the write path.
 ///
@@ -197,7 +175,7 @@ pub fn encode_content_meta(stream: &ServiceStream) -> Option<Vec<u8>> {
 /// bytes, or non-UTF-8 fields. This gives *structural* integrity only — it does
 /// not detect content corruption that preserves structure (a bit-flip into
 /// different valid UTF-8 decodes fine); byte-level integrity is the framing
-/// layers' job (the WAL frames already CRC32 their payloads), not this codec's.
+/// layers' job, not this codec's.
 /// Rejection reasons are not distinguished — every invalid blob is the same
 /// `None`; a typed error enum is worth adding only when a caller needs to tell
 /// them apart.
@@ -250,8 +228,6 @@ mod tests {
 
     #[test]
     fn partition_key_matches_ns_hash_and_distinguishes_streams() {
-        // The cross-component invariant the file naming + Services selector
-        // rely on: partition_key IS exactly ServiceStream::ns_hash.
         let s = ServiceStream::new("prod", "api");
         assert_eq!(partition_key(&s), s.ns_hash());
         // Distinct streams resolve to distinct keys.
@@ -346,8 +322,6 @@ mod tests {
         assert_eq!(decode_content_meta_or_empty(&[0xff, 0xff, 0xff]), empty);
     }
 
-    // ── compute_ns_hash / ServiceStream::ns_hash semantics ──────────────
-
     #[test]
     fn service_stream_serde_roundtrip() {
         for s in [
@@ -404,7 +378,7 @@ mod tests {
     #[test]
     fn ns_hash_empty_field_collapses_to_absent() {
         // The absent-equals-empty rule `ServiceStream::ns_hash` enforces, on
-        // BOTH fields: an empty-string field hashes the same as an absent one.
+        // both fields: an empty-string field hashes the same as an absent one.
         assert_eq!(
             ServiceStream::new("", "api").ns_hash(),
             compute_ns_hash(None, Some("api"))
@@ -428,7 +402,7 @@ mod tests {
 
     #[test]
     fn ns_hash_differs_from_literal_empty_namespace_primitive() {
-        // The collapse means an empty-namespace stream does NOT hash like the
+        // The collapse means an empty-namespace stream does not hash like the
         // raw `Some("")` primitive — the digest is a stability contract:
         // changing the collapse re-partitions already-written files, whose
         // `partition_key` is baked into the `FileId` filename.

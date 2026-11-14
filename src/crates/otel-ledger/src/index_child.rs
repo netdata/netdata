@@ -14,9 +14,7 @@
 //!
 //! A child that dies midway leaves the WAL file untouched and at most a
 //! temporary file beside the index path: the indexing functions write through
-//! `file_registry`'s atomic file. The ledger removes that file when the child
-//! did not end well, and startup recovery removes it when the ledger was gone
-//! too.
+//! `file_registry`'s atomic file.
 
 use std::ffi::OsString;
 use std::io::Write;

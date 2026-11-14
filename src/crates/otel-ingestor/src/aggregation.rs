@@ -1,8 +1,8 @@
 //! Aggregation state machines that map OpenTelemetry's event-based metrics to
-//! Netdata's fixed-interval collection model. The only consumer is chart.rs:
-//! it quantizes each data point's timestamp into an `update_every`-second
-//! slot and owns slot readiness, gap-fill cadence, and the per-second rate
-//! division applied to the sum flavors' output.
+//! Netdata's fixed-interval collection model. `crate::chart` quantizes each
+//! data point's timestamp into an `update_every`-second slot and owns slot
+//! readiness, gap-fill cadence, and the per-second rate division applied to
+//! the sum flavors' output.
 //!
 //! Per (dimension, slot) pair a [`SlotAccumulator`] collects the slot's data
 //! points (Gauge: latest value; DeltaSum: summed deltas; CumulativeSum:
@@ -19,7 +19,7 @@ pub trait SlotAccumulator: Default + std::fmt::Debug {
     /// Record a data point into this slot's accumulator.
     fn record(&mut self, value: f64, timestamp_ns: u64, start_time_ns: u64);
 
-    /// Whether any data was recorded; no in-repo caller (chart.rs checks the slot map instead).
+    /// Whether any data was recorded; no in-repo caller.
     #[allow(dead_code)]
     fn has_data(&self) -> bool;
 }
@@ -52,9 +52,7 @@ pub trait CrossSlotContext: Default + std::fmt::Debug {
     fn reset(&mut self);
 }
 
-// ---------------------------------------------------------------------------
 // Gauge
-// ---------------------------------------------------------------------------
 
 /// Per-slot state for Gauge metrics: keeps the latest value by timestamp;
 /// points at or before the current one are ignored, so ties keep the first
@@ -116,9 +114,7 @@ impl CrossSlotContext for GaugeContext {
     }
 }
 
-// ---------------------------------------------------------------------------
 // Delta Sum
-// ---------------------------------------------------------------------------
 
 /// Per-slot state for Delta Sum metrics.
 ///
@@ -165,9 +161,7 @@ impl CrossSlotContext for DeltaSumContext {
     fn reset(&mut self) {}
 }
 
-// ---------------------------------------------------------------------------
 // Cumulative Sum
-// ---------------------------------------------------------------------------
 
 /// Per-slot state for Cumulative Sum metrics.
 ///

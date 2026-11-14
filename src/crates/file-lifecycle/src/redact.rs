@@ -2,30 +2,13 @@
 //!
 //! [`redact`] is the crate's single text-level redaction pass: a pure string
 //! transform, aware of no error type. Remote-storage errors embed full
-//! request URLs, and AWS-style requests carry credentials in the query
-//! string — the raw web-identity JWT on the STS `AssumeRoleWithWebIdentity`
-//! call, `X-Amz-Signature` / `X-Amz-Security-Token` on query-signed requests
-//! — so no query string can be trusted in a journal. [`redact`] drops query
+//! request URLs. AWS-style requests carry credentials in the query string:
+//! the raw web-identity JWT on the STS `AssumeRoleWithWebIdentity` call, and
+//! `X-Amz-Signature` / `X-Amz-Security-Token` on query-signed requests. So no
+//! query string can be trusted in a journal. [`redact`] drops query
 //! strings wholesale, covering future credential parameter names by
 //! construction at the cost of hiding benign query params; the scheme, host,
 //! and path stay visible for diagnosis.
-//!
-//! Journal safety is enforced through [`crate::storage::StorageError`]'s
-//! `Display`, which renders the full error chain (anyhow's `{:#}` alternate)
-//! through [`redact`]: a log line that renders a `StorageError` is redacted
-//! by construction, and the opendal retry layer's notify in `storage.rs`
-//! passes raw `opendal::Error` display text through [`redact`] directly. A
-//! `StorageError` converted into another error type MUST be flattened
-//! through that `Display`, never re-wrapped raw — the contract
-//! `remote_read.rs`'s `read_error_to_anyhow` implements, pinned by
-//! `storage.rs`'s `display_renders_redacted_full_chain` and
-//! `remote_read/tests.rs`'s `read_errors_reach_the_cache_log_redacted`. The
-//! deliberate counterpart: `Debug` is derived unredacted, for test
-//! assertions only (storage.rs's enum docs own that contract).
-//!
-//! Crate-private (`pub(crate)`); grep-verified, `storage.rs` is the only
-//! importer, and every other consumer reaches [`redact`] through the
-//! `Display` above (e.g. the uploader's `put_file` failure strings).
 
 /// Replace the query string of every URL in `text` with `[REDACTED]`,
 /// keeping the `?`: `https://host/path?a=b` becomes
@@ -33,17 +16,16 @@
 ///
 /// A `?` starts a query string only when the same whitespace-delimited token
 /// already contained `://` (prose like "failed?" and bare paths are
-/// untouched). The query is dropped up to the token's end or up to — not
-/// including — a terminator, so the terminator is preserved and surrounding
-/// punctuation from formats like reqwest's `… for url (https://…)` survives;
-/// terminators are whitespace and `"`, `'`, `)`, `]`, `>`, `,`. The scan
-/// re-arms at the next `://`, so every URL in the text is redacted.
+/// untouched). The query is dropped up to the token's end or up to a
+/// terminator. The terminator is kept, so surrounding punctuation from
+/// formats like reqwest's `… for url (https://…)` survives. Terminators are
+/// whitespace and `"`, `'`, `)`, `]`, `>`, `,`. The scan re-arms at the next
+/// `://`, so every URL in the text is redacted.
 ///
-/// Scope assumptions (fine for the error text reqwest/opendal produce, stated
-/// so nobody assumes universal coverage): a URL must carry an explicit
-/// `scheme://` (a bare `host:port/?…` passes through), and a URL split across
-/// error-chain levels (whitespace between `://` and `?`) would not be caught —
-/// reqwest renders each URL as a single unbroken token.
+/// Scope assumptions, fine for the error text reqwest and opendal produce: a
+/// URL must carry an explicit `scheme://` (a bare `host:port/?…` passes
+/// through). A URL split across error-chain levels (whitespace between `://`
+/// and `?`) is not caught.
 pub(crate) fn redact(text: &str) -> String {
     let chars: Vec<char> = text.chars().collect();
     let mut out = String::with_capacity(text.len());

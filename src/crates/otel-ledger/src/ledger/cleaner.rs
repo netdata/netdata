@@ -1,21 +1,10 @@
 //! Cleaner response handling.
 //!
-//! The ledger's half of the shared-cleaner contract: a `*Deleted` response
-//! means the file is gone from disk (or never was), and this mirrors that
-//! into the owning pipeline's tenant registries — WAL → `wal.remove_by_seq`;
-//! SFST → `evict_seq` (all per-seq state) plus `forget_seq` (the seq→tenant
-//! route); catalog → `catalog_files.remove` (path-keyed, scanned across
-//! tenants). A `*Failed` response only logs, then clears the entry's
-//! `pending_deletion` flag (SFST/catalog) so the file becomes an eviction
-//! candidate again; the WAL registry has no pending flag, so a failed WAL
-//! delete needs no rollback.
-//!
-//! Senders: the indexer-response handler (`ledger/indexer.rs`: WAL deletes
-//! once a WAL is indexed; an empty WAL also deletes its empty index),
-//! retention (`retention.rs`: SFST and catalog evictions), and startup
-//! recovery (`file-lifecycle/src/recovery/local.rs`), which drains its own
-//! responses before this run loop starts. Responses arrive on the run-loop's
-//! `CleanerResp` arm — this is their only steady-state handler.
+//! A `*Deleted` response means the file is gone from disk (or never was),
+//! and this mirrors that into the owning pipeline's tenant registries. A
+//! `*Failed` response logs and clears the entry's `pending_deletion` flag
+//! (SFST/catalog), so the file becomes an eviction candidate again. The WAL
+//! registry has no pending flag, so a failed WAL delete needs no rollback.
 
 use file_lifecycle::ipc::CleanerResponse;
 use otel_bridge::signals::Signal;
@@ -46,9 +35,8 @@ impl Ledger {
         match resp {
             CleanerResponse::WalFileDeleted { sequence, .. } => {
                 // The seq→tenant route stays: an index eviction for this seq
-                // may still follow (an empty WAL deletes its empty index right
-                // behind the WAL), and a still-live SFST's upload confirms
-                // route by bare seq — until the index eviction below drops it.
+                // may still follow, and a still-live SFST's upload confirms
+                // route by bare seq. The index eviction below drops it.
                 if let Some((_, registry)) = registries.for_seq_mut(sequence) {
                     registry.wal.remove_by_seq(sequence);
                 }

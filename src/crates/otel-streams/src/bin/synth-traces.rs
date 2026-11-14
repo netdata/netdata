@@ -1,7 +1,7 @@
-//! Send a deterministic synthetic batch of OTLP **traces** to an endpoint — the
-//! traces analogue of the `synth` bin. Generates real trace trees with events,
-//! links, and (behind explicit knobs) the edge cases the read path must survive
-//! (orphans, extra roots, resends) — see [`otel_streams::synth_traces`].
+//! Send a deterministic synthetic batch of OTLP traces to an endpoint, the
+//! traces counterpart of the `synth` bin. It generates trace trees with events
+//! and links, and, behind explicit knobs, orphans, extra roots and resends. See
+//! [`otel_streams::synth_traces`].
 //! Self-contained (does not reuse the logs `Sender`, which is
 //! `LogsServiceClient`-typed): it connects a `TraceServiceClient` and exports
 //! the spans in `--batch-size` chunks, one export request per chunk.

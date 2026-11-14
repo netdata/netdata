@@ -10,75 +10,21 @@
 //! tenant routing table that dispatches seq-keyed component responses
 //! (indexer, cleaner, uploader) back to the owning tenant.
 //!
-//! The ledger's per-signal `Pipeline` (otel-ledger) holds the
-//! [`TenantRegistries`] behind `Arc<tokio::sync::RwLock<...>>`, shared between
-//! the run loop (write) and the query handlers (read). Every method is
-//! synchronous; readers return **owned** data — paths, summaries, and ranges
-//! copied under the lock — so a query drops the read lock before any file
-//! I/O: catalog reads, WAL chunk indexing and tail scans, and remote plans
-//! all run after it.
-//!
-//! ## The life of one file
-//!
-//! One file (one seq of one tenant of one signal) goes through the states
-//! below. No single record holds "the state of a file": each state is a
-//! fact in the container that owns that step, and memory is rebuilt from
-//! the disk and the remote at every start. "Running" is what moves the file
-//! on in a running plugin; "At start" is what brings the state back.
-//!
-//! | State | Held in (key) | Running | At start |
-//! |---|---|---|---|
-//! | WAL file open | the ingestor's `wal::Writer` stream; here an `Active` entry of [`wal::Registry`] (bare seq) and the seq's route | `Created` and `Synced` events ([`TenantRegistries::apply_wal_event`]) | never: a file that was open comes back as closed |
-//! | WAL file closed, to be indexed | an `Archived` entry of [`wal::Registry`] (bare seq) | the `Closed` event; the ledger sends the file to the indexer | [`wal::Registry::recover`]: every readable WAL file; `recovery::recover_wals` indexes those with no index |
-//! | indexing | the indexer's running operations (otel-ledger) and a temporary file | the indexer's response | the temporary file is swept ([`Registry::recover`]); the file is "closed" again |
-//! | indexing failed | the WAL entry stays (not tried again in this run) | `IndexFailed` | the file is "closed" again and is indexed again; when that fails too, the entry is dropped and the file stays on the disk for the next start |
-//! | indexed, WAL file not deleted yet | an [`sfst::Registry`] entry and the WAL entry (bare seq) | `Indexed`, then `WalFileDeleted` drops the WAL entry | `recovery::recover_wals` deletes the WAL file |
-//! | index file local, not uploaded | no `SeqState`, or `NotUploaded` ([`SeqKey`]); the request is with the uploader | `helpers::sfst_upload_request` | `recovery::recover_unuploaded`, the same request |
-//! | upload failed, waiting | [`crate::upload_retry::UploadRetry`] (`SeqKey` or remote key) | `UploadFailed`; a timer sends it again | not kept: "not uploaded" again |
-//! | uploaded, in no catalog file yet | `SeqState::upload`; the entry is with the catalog builder | `Uploaded`: [`Registry::mark_uploaded`] and `AddEntry` | `recovery::reconcile_remote_uploads` (a LIST of the remote) |
-//! | in a local catalog file | `CatalogStage::RotatedLocal`; the file in [`otel_catalog::Registry`] (path) | the builder's `Rotated`: [`Registry::mark_rotated_many`], then the catalog's upload | `recovery::seed_from_catalog_files`; [`Registry::forget_catalog_claims`] takes it back for index files that the remote lacks |
-//! | catalog entry on the remote | `CatalogStage::Remote` | `CatalogUploaded`: [`Registry::mark_remote_cataloged`] | `recovery::reconcile_local_catalog_uploads` |
-//! | deletion on its way | the `pending_deletion` flag of the [`sfst::Registry`] entry; the request is with the cleaner | retention, through [`Registry::index_evictions`] | `recovery::recover_retention`, the same function, with no flag (it waits for the cleaner) |
-//! | gone locally | nothing: [`Registry::evict_seq`] and [`TenantRegistries::forget_seq`]; with remote storage the seq lives on as a catalog entry | `IndexFileDeleted` | [`Registry::evict_seq`] |
-//!
-//! Without remote storage a file goes from "index file local" straight to
-//! "deletion on its way". An indexing operation that finds no records
-//! leaves nothing tracked: its index file and its WAL file are deleted.
-//!
-//! Two key spaces meet here: the WAL and index registries and the routes
-//! use the bare seq, the per-seq state and the retries use [`SeqKey`]. They
-//! agree because one seq allocator serves the whole plugin and starts above
-//! every seq on the disk, so a bare seq names at most one local file.
-//!
-//! The running path and the start-up path differ on purpose in two places:
-//! a failed indexing operation keeps the WAL entry while the plugin runs
-//! (the file stays queryable), and one that fails at start drops it (the
-//! file is tried again at the next start); and start-up recovery
-//! sets no `pending_deletion` flag, because it waits for each answer of
-//! the cleaner before it goes on.
+//! Every method is synchronous. Readers return owned data (paths,
+//! summaries, and ranges copied under the lock), so a query can drop the
+//! read lock before any file I/O.
 //!
 //! Errors: [`TenantRegistries::apply_wal_event`] surfaces `wal::Registry`'s
-//! event-bookkeeping rejections, which the caller logs and drops;
-//! [`Registry::recover`] is the one fatal site (a WAL directory-scan failure
-//! panics — per-file failures are skipped inside `wal::Registry`).
-//!
-//! Consumers (grep-verified): otel-ledger's `ledger/*` (pipeline build,
-//! discovery and route seeding, event application, the indexer/uploader/
-//! cleaner/catalog-builder lifecycle marks, retention's eviction gate) and
-//! its `rpc/logs` + `rpc/traces` handlers (snapshot, stream selector, remote
-//! plan); file-lifecycle's `recovery` (candidate sets, reconciliation marks)
-//! and `query` (the remote plan built on [`Registry::local_servable_seqs`]).
+//! event-bookkeeping rejections; [`Registry::recover`] is the one fatal site
+//! (a WAL directory-scan failure panics — per-file failures are skipped
+//! inside `wal::Registry`).
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::PathBuf;
 
 use file_registry::{FileId, SeqKey, TenantId};
 
 /// An active (or sealed-but-unindexed) WAL file overlapping a query window —
-/// owned, so it outlives the registry read lock. The query layer resolves it
-/// off the lock into chunk SFSTs plus a row-scanned tail over the durable
-/// prefix `[HEADER_SIZE, valid_up_to)` (partitioned by `wal::prefix`, chunk
-/// indexing memoized by [`crate::chunk::ChunkCache`]), each chunk's indexed
-/// record count cross-checked against its frame-scan count.
+/// owned, so it outlives the registry read lock.
 #[derive(Debug)]
 pub struct WalDesc {
     /// The WAL's full identity: query layers name its sources by it, so a
@@ -99,8 +45,7 @@ pub struct WalDesc {
 ///
 /// The substrate folds in-window files per `partition_key` and carries each
 /// partition's opaque `content_meta` through verbatim; it never decodes the
-/// identity. The signal's query layer (for logs, the rpc adapter) decodes
-/// `content_meta` and builds its own display-typed selector option.
+/// identity.
 ///
 /// Window-scoped and remote-inclusive: only files overlapping the query
 /// window contribute, and a stream whose in-window data is evicted locally
@@ -115,8 +60,7 @@ pub struct PartitionStat {
     /// back).
     pub partition_key: u64,
     /// The partition's opaque content-plane identity blob, carried verbatim
-    /// from the files' summaries. The substrate never decodes it; the signal's
-    /// query layer does (for logs, into `(service.namespace, service.name)`).
+    /// from the files' summaries. The substrate never decodes it.
     pub content_meta: Vec<u8>,
     /// Sum of file sizes for this partition (the size pill).
     pub total_size: u64,
@@ -177,7 +121,7 @@ enum UploadState {
 /// rotated" structurally true (a `Remote` seq always reports `is_rotated`), instead
 /// of relying on caller ordering.
 ///
-/// ORDER MATTERS: the `PartialOrd`/`Ord` derive ranks variants by declaration
+/// Order matters: the `PartialOrd`/`Ord` derive ranks variants by declaration
 /// position. The ordering is pinned at compile time by the const assert below;
 /// do not reorder.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
@@ -187,7 +131,7 @@ enum CatalogStage {
     NotRotated,
     /// The entry is in a closed local catalog file. Tracked so remote
     /// reconciliation can skip re-`AddEntry`ing already-cataloged seqs; this is
-    /// NOT the eviction gate (a local catalog file is not a durable remote one).
+    /// not the eviction gate (a local catalog file is not a durable remote one).
     RotatedLocal,
     /// The catalog entry is confirmed present in remote object storage. When
     /// storage is enabled, eviction is deferred until a seq reaches this stage,
@@ -229,8 +173,8 @@ pub struct Registry {
     /// at startup and kept current by [`wal::FileEvent`]s applied through
     /// [`TenantRegistries::apply_wal_event`] — see `wal::registry`.
     pub wal: wal::Registry,
-    /// The tenant's sealed SFST files (`{index_base}/{tenant}/*.sfst`),
-    /// tracked by the indexer-response path and recovery — see `sfst::registry`.
+    /// The tenant's sealed SFST files (`{index_base}/{tenant}/*.sfst`) — see
+    /// `sfst::registry`.
     pub sfst: sfst::Registry,
     /// Catalog files present on local disk — path-keyed, the
     /// `{catalog_base}/{date}/{tenant}/` layout; see `otel_catalog`.
@@ -294,16 +238,14 @@ impl Registry {
     }
 
     /// Whether any artifact for `seq` is still tracked (a WAL entry or an
-    /// SFST entry). The post-recovery routing filter keys on this: a seq
-    /// recovery dropped entirely (an orphan that cannot be indexed, an
-    /// empty WAL drained after indexing) must not be routed, or its
-    /// `seq_to_tenant` entry dangles for the process lifetime.
+    /// SFST entry). A seq recovery dropped entirely (an orphan that cannot be
+    /// indexed, an empty WAL drained after indexing) must not be routed, or
+    /// its `seq_to_tenant` entry dangles for the process lifetime.
     pub fn holds_seq(&self, seq: u64) -> bool {
         self.wal.get(seq).is_some() || self.sfst.get(seq).is_some()
     }
 
-    /// Returns FileIds of archived WAL files that have no corresponding index —
-    /// the set startup recovery re-indexes (`recovery::local::recover_unindexed`).
+    /// Returns FileIds of archived WAL files that have no corresponding index.
     pub fn unindexed_ids(&self) -> Vec<FileId> {
         self.wal
             .archived_files()
@@ -325,8 +267,7 @@ impl Registry {
     }
 
     /// Returns FileIds of indexed files that have not yet been uploaded to
-    /// remote object storage — what recovery's remote reconciliation queues
-    /// for upload.
+    /// remote object storage.
     pub fn unuploaded_ids(&self) -> Vec<FileId> {
         self.sfst
             .values()
@@ -342,9 +283,7 @@ impl Registry {
         self.seqs.entry(key).or_default()
     }
 
-    /// Mark this SFST's bytes as uploaded to remote object storage. Called by
-    /// the uploader's `Uploaded` handler and by recovery's local-catalog
-    /// seeding and remote LIST reconciliation.
+    /// Mark this SFST's bytes as uploaded to remote object storage.
     pub fn mark_uploaded(&mut self, key: SeqKey) {
         self.seq_mut(key).upload = UploadState::Uploaded;
     }
@@ -384,10 +323,9 @@ impl Registry {
     }
 
     /// Mark these SFSTs as confirmed present in a remote catalog — on a
-    /// completed catalog upload (the uploader's response handler) or when
-    /// recovery confirms a local catalog's remote presence. `Remote` subsumes
-    /// `RotatedLocal`, so this also makes [`is_rotated`](Self::is_rotated)
-    /// true.
+    /// completed catalog upload or when recovery confirms a local catalog's
+    /// remote presence. `Remote` subsumes `RotatedLocal`, so this also makes
+    /// [`is_rotated`](Self::is_rotated) true.
     pub fn mark_remote_cataloged(&mut self, keys: impl IntoIterator<Item = SeqKey>) {
         for key in keys {
             self.seq_mut(key).catalog = CatalogStage::Remote;
@@ -429,7 +367,7 @@ impl Registry {
 
     /// Whether this SFST's catalog entry is confirmed present in remote
     /// storage. [`Self::index_evictions`] consults this before a local SFST
-    /// may be deleted; the files inventory reports it.
+    /// may be deleted.
     pub fn is_remote_cataloged(&self, key: SeqKey) -> bool {
         // `>=` (not `==`) for the "reaches Remote" semantics, mirroring
         // `is_rotated`; equivalent today since `Remote` is the max stage, but
@@ -459,20 +397,16 @@ impl Registry {
 /// tenant subdirectory) plus the seq → tenant routing table used to dispatch
 /// seq-keyed component responses back to the owning tenant.
 ///
-/// The ledger's `Pipeline` holds one instance per signal behind
-/// `Arc<tokio::sync::RwLock<TenantRegistries>>`, shared between the run loop
-/// (event application, lifecycle confirmations, retention) and the query
-/// handlers (read-only snapshots). Population: discovery + per-tenant
-/// `recover` at startup (see [`TenantRegistries::discover_tenants`]), then
-/// `apply_wal_event` and the worker response handlers at runtime.
+/// Population: discovery + per-tenant `recover` at startup (see
+/// [`TenantRegistries::discover_tenants`]), then `apply_wal_event` and the
+/// worker response handlers at runtime.
 pub struct TenantRegistries {
     pub tenants: HashMap<TenantId, Registry>,
     /// Maps an SFST sequence number to the tenant that owns it. Populated
-    /// as files are created / discovered on disk and consumed by every
-    /// seq-keyed response handler.
+    /// as files are created / discovered on disk.
     ///
-    /// STAYS bare-seq (not [`SeqKey`]-keyed) by design: it indexes only
-    /// files physically routed on THIS process instance, where a seq is
+    /// Stays bare-seq (not [`SeqKey`]-keyed) by design: it indexes only
+    /// files physically routed on this process instance, where a seq is
     /// unique (correct seeding guarantees local uniqueness; a post-wipe reseed
     /// cannot collide because the old local files are gone). Identity safety is
     /// enforced one layer down, at the [`SeqState`] marks — a response routed by
@@ -513,10 +447,9 @@ impl TenantRegistries {
     /// Errors are `wal::Registry::apply_event`'s bookkeeping rejections
     /// (`Error::DuplicateSequence` for a replayed `Created`,
     /// `Error::UnknownSequence` for a `Synced`/`Closed` whose `Created` was
-    /// never applied, `Error::AlreadyClosed` for a second `Closed`); the caller
-    /// (otel-ledger's ingestor) logs and drops the event. A refused event
-    /// leaves no route: a route says that the tenant's registry tracks the
-    /// file.
+    /// never applied, `Error::AlreadyClosed` for a second `Closed`). A refused
+    /// event leaves no route: a route says that the tenant's registry tracks
+    /// the file.
     pub fn apply_wal_event(
         &mut self,
         tenant_id: &TenantId,
@@ -555,10 +488,9 @@ impl TenantRegistries {
     }
 
     /// Get or lazily create the `Registry` for a tenant (one subdirectory
-    /// under each of the three base dirs). The new registry is **not**
+    /// under each of the three base dirs). The new registry is not
     /// recovered from disk — callers that need on-disk state must call
-    /// [`Registry::recover`] themselves (startup recovery does; event-driven
-    /// creation does not).
+    /// [`Registry::recover`] themselves.
     pub fn get_or_create(&mut self, tenant_id: &TenantId) -> &mut Registry {
         if !self.tenants.contains_key(tenant_id) {
             let wal_dir = self.wal_base_dir.join(tenant_id.as_str());
@@ -583,8 +515,7 @@ impl TenantRegistries {
     /// Discover tenants by scanning the WAL and SFST base directories for
     /// subdirectories and recovering each discovered tenant's registry from
     /// disk. The catalog base is not scanned — it is date-partitioned
-    /// (`{date}/{tenant}/`), so it cannot name tenants; tenants that exist
-    /// only remotely are instantiated by the startup catalog sync. Directory
+    /// (`{date}/{tenant}/`), so it cannot name tenants. Directory
     /// names become [`TenantId`]s verbatim, without re-validation (the dirs
     /// were created from validated ids).
     ///
@@ -718,9 +649,8 @@ impl Registry {
     /// Seqs in `q`'s window with a servable local copy: every local SFST, plus
     /// every WAL with a durable prefix (`valid_up_to != 0`) — the same servable
     /// set [`TenantRegistries::query_snapshot`] builds. This is the mask that
-    /// hides a remote catalog entry whose data is already local; a remote plan
-    /// computes it per range ([`Registry::remote_plan_input`]). Keyed by
-    /// [`SeqKey`] so the mask hides a remote entry only when THIS identity holds
+    /// hides a remote catalog entry whose data is already local. Keyed by
+    /// [`SeqKey`] so the mask hides a remote entry only when this identity holds
     /// the local copy — a remote entry of a prior instance / other machine at an
     /// equal seq is not masked by a current-identity local file.
     pub fn local_servable_seqs(&self, q: &file_registry::Query) -> HashSet<SeqKey> {
@@ -798,8 +728,7 @@ impl LocalStreams {
     /// Complete the selector with the remote-only streams of `catalog` (the
     /// window's catalog entries, read off the lock): entries whose identity+seq
     /// was not folded locally, one per identity+seq. Sorted by the opaque
-    /// `partition_key`; the signal's query layer decodes `content_meta` and
-    /// re-sorts for display.
+    /// `partition_key`.
     pub fn with_catalog(mut self, catalog: &[otel_catalog::CatalogEntry]) -> Vec<PartitionStat> {
         for e in catalog {
             if !self.folded.insert(SeqKey::from(&e.id)) {

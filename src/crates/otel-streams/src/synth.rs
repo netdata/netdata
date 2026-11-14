@@ -1,12 +1,10 @@
 //! Deterministic synthetic OTLP log generation, for verifying the otel-logs
 //! subsystem with known-exact corpora.
 //!
-//! Unlike the live sources (certstream/jetstream/github), this generates a
-//! fixed, reproducible batch of `LogRecord`s from parameters — so a test can
-//! push exactly N records with controlled timestamps, severities, and field
-//! cardinalities, then assert the query results across forced rotation /
-//! eviction boundaries. Generation is pure (no RNG, no clock): record `i` is a
-//! deterministic function of `i` + params.
+//! Unlike the live sources, this generates a fixed, reproducible batch of
+//! `LogRecord`s from parameters, so a caller gets exactly N records with
+//! controlled timestamps, severities, and field cardinalities. Generation uses
+//! no RNG and no clock: record `i` is a function of `i` and the params.
 
 use opentelemetry_proto::tonic::logs::v1::LogRecord;
 

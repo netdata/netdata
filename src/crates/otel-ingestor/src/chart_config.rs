@@ -9,12 +9,6 @@
 //! and user files from otel.yaml's `metrics.chart_configs_dir`; the user layer
 //! wins. Global timing defaults come from otel.yaml's `metrics.interval_secs` /
 //! `grace_period_secs` / `expiry_duration_secs`.
-//!
-//! Consumers: `iter.rs` attaches the matching config to each metric during
-//! request iteration (`find_matching_config`), driving dimension naming and
-//! chart identity; `metrics_service.rs` resolves each chart's timing via
-//! [`ChartConfigManager::resolve_chart_config`]. The logs and traces services
-//! do not consult this module.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -506,7 +500,7 @@ mod tests {
         fn explicit_expiry_not_bumped_when_grace_exceeds_it() {
             // Global explicitly sets expiry=100. Per-metric sets
             // grace=200 which exceeds it. Since expiry is explicit,
-            // it should NOT be bumped — validation fails → fallback.
+            // it should not be bumped — validation fails → fallback.
             let m = manager_with_defaults(None, None, Some(100));
             let mc = metric_config(Some(10), Some(200));
             let cfg = m.resolve_chart_config(Some(&mc));

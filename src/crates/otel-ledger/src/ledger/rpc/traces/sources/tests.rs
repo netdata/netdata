@@ -1,14 +1,13 @@
 //! Tests for the traces source assembly ([`super`]): what
 //! `TracesSourceSupplier::capture` hands the engine for a tenant's
 //! registry state — sealed files, WAL chunks + tail, downloaded remote
-//! files. Identities, WAL coverage, window pruning, ordering, progress
-//! totals, and failure/cancellation behavior are pinned at the
-//! registry boundary: registry state in, engine sources out.
+//! files. The tests work at the registry boundary: registry state in,
+//! engine sources out.
 //!
 //! Fixture strategy ([`crate::ledger::rpc::traces::fixtures`]): sealed
-//! files are tracked in the registry WITHOUT bytes on disk — capture
+//! files are tracked in the registry without bytes on disk — capture
 //! never opens sealed files, so registry summaries pass through and
-//! the engine opens files later — while WAL tests write REAL trace
+//! the engine opens files later — while WAL tests write real trace
 //! WALs (OTLP → ng-flatten trace frames) so chunk indexing runs the
 //! actual traces indexing.
 //!
@@ -118,9 +117,7 @@ async fn sealed_file_maps_to_an_identity_named_file_source() {
 
 #[tokio::test]
 async fn copies_are_structurally_identical() {
-    // Search hands both of its roles source vectors from ONE capture —
-    // its window ⊆ completion check matches sources by id — so the
-    // copies must be the same sources in the same order.
+    // The copies must be the same sources in the same order.
     let supplier = make_supplier();
     install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
     install_sfst(&supplier.registries, "default", 2, 2000, 2005).await;
@@ -161,7 +158,7 @@ async fn window_pruning_is_file_granular() {
         .unwrap()
         .sets;
     let sources = sets.pop().unwrap();
-    // Pin WHICH file survives, not just the count — an inverted pruning
+    // Pin which file survives, not just the count — an inverted pruning
     // predicate keeping the wrong file must fail here.
     assert_eq!(
         source_ids(&sources),
@@ -267,8 +264,8 @@ async fn wal_below_min_entries_is_all_tail() {
 #[tokio::test]
 async fn corrupt_wal_is_refused_whole_but_sealed_files_still_serve() {
     // Corrupt everything past the WAL header: the boundary scan fails
-    // and the WHOLE WAL is refused for this capture, while the sealed
-    // file keeps serving (the logs failure policy).
+    // and the whole WAL is refused for this capture, while the sealed
+    // file keeps serving.
     let supplier = make_supplier_with_min_entries(4);
     install_sfst(&supplier.registries, "default", 3, 1000, 1005).await;
     let path = install_wal(
@@ -391,8 +388,7 @@ async fn capture_is_tenant_scoped() {
 async fn source_ids_do_not_depend_on_the_directory() {
     // The same files installed under two different base directories
     // name the same sources and carry the same coverage: a file keeps
-    // its identity wherever its bytes are served from (a local path
-    // today, a download-cache path once remote files are read back).
+    // its identity wherever its bytes are served from.
     let mut captured = Vec::new();
     let mut sealed_paths = Vec::new();
     for _ in 0..2 {
@@ -477,8 +473,7 @@ async fn chunk_ids_order_numerically() {
 
 #[tokio::test]
 async fn capture_sets_the_progress_total_to_the_distinct_ranges_sources() {
-    // Search's two roles share one range and only one of them ticks, so a
-    // range captured twice counts once; a distinct range counts on its own.
+    // A range captured twice counts once; a distinct range counts on its own.
     let supplier = make_supplier();
     install_sfst(&supplier.registries, "default", 1, 1000, 1005).await;
     install_sfst(&supplier.registries, "default", 2, 5000, 5005).await;
@@ -663,8 +658,7 @@ async fn a_cancelled_capture_downloads_nothing() {
 #[tokio::test]
 async fn remote_sources_are_named_like_local_sealed_files() {
     // One name wherever a file's bytes come from: the downloaded file
-    // and the failed one both carry `<stem>.sfst`, so the engine's
-    // duplicate check and id order see what a local file would present.
+    // and the failed one both carry `<stem>.sfst`.
     let registries = make_registries();
     let remote = TestRemote::new(64 * 1024 * 1024);
     for seq in 1..=2 {

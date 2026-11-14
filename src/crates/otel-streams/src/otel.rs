@@ -76,11 +76,9 @@ pub fn build_export_request(
     scope_name: &str,
     scope_version: &str,
 ) -> ExportLogsServiceRequest {
-    // service.name always; service.namespace only when set. The OTLP ingestor
-    // derives a file's single (namespace, name) stream from these two
-    // resource attributes; this builder emits one ResourceLogs, so a request
-    // carries exactly one identity (callers vary it per invocation to create
-    // distinct streams).
+    // service.name always; service.namespace only when set. This builder
+    // emits one ResourceLogs, so a request carries exactly one
+    // (namespace, name) identity.
     let mut attributes = vec![kv("service.name", str_val(service_name))];
     if let Some(namespace) = service_namespace {
         attributes.push(kv("service.namespace", str_val(namespace)));

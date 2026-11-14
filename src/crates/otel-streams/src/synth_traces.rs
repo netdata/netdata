@@ -1,16 +1,14 @@
-//! Deterministic synthetic OTLP **trace** generation — the traces analogue of
-//! [`crate::synth`]. Pure (no RNG, no clock): span `i` is a deterministic
-//! function of `i` + params, so the same params always produce the same corpus.
+//! Deterministic synthetic OTLP trace generation, the traces counterpart of
+//! [`crate::synth`]. It uses no RNG and no clock. Span `i` is a function of `i`
+//! and the params, so the same params always produce the same corpus.
 //!
-//! Generates real trace *trees* (a root plus a binary-ish tree of children),
-//! span events (exception-shaped and annotation-shaped), links across traces,
-//! and — behind explicit knobs — the edge cases the read path must survive:
-//! orphan spans (parent absent from the trace), extra roots, and resent
-//! (duplicated) spans. `spans_per_trace = 1` degenerates to the original flat
-//! corpus (per-span-unique names, no status/trace_state), keeping existing
-//! callers' shape unchanged — with ONE deliberate deviation: trace/span ids now
-//! ride a never-all-zero derivation (the old scheme emitted the UNSET all-zero
-//! span id for index 0 with seed 0, which the reader skips as invalid).
+//! It generates trace trees (a root plus a binary-ish tree of children), span
+//! events (exception-shaped and annotation-shaped), and links across traces.
+//! Behind explicit knobs it also generates edge cases: orphan spans (parent
+//! absent from the trace), extra roots, and resent (duplicated) spans.
+//!
+//! `spans_per_trace = 1` gives a flat corpus: per-span-unique names, no status
+//! and no `trace_state`. Trace ids and span ids are never all-zero.
 
 use opentelemetry_proto::tonic::{
     collector::trace::v1::ExportTraceServiceRequest,
@@ -46,17 +44,16 @@ pub struct SynthTraceParams {
     /// are annotation-shaped.
     pub events_per_span: usize,
     /// Every Nth span (globally, `0` = never) links to the previous trace's
-    /// root — the producer↔consumer correlation shape.
+    /// root, the producer↔consumer correlation shape.
     pub links_every: usize,
     /// Every Nth trace's last span (`0` = never) gets a parent id that exists
-    /// nowhere — an orphan the reader must promote to a root.
+    /// nowhere: an orphan.
     pub orphan_every: usize,
     /// Every Nth trace's last span (`0` = never) gets an empty parent — a
     /// second root in the same trace. An orphan wins when both knobs select
     /// the same trace.
     pub extra_root_every: usize,
-    /// Every Nth span (globally, `0` = never) is emitted twice — a resend the
-    /// reader must collapse.
+    /// Every Nth span (globally, `0` = never) is emitted twice: a resend.
     pub resend_every: usize,
 }
 
@@ -97,12 +94,12 @@ fn span_id(t: u64, j: u64) -> Vec<u8> {
 
 /// Build the deterministic span batch. Spans are grouped into traces of
 /// `spans_per_trace`: position 0 is the root (`SERVER`), position `j > 0`
-/// parents on position `(j - 1) / 2` (`CLIENT`/`INTERNAL` alternating) — a
-/// binary-ish tree with depth ~log2 and fanout 2. Start times are globally
-/// monotonic; a span's duration scales with its distance from the trace's
-/// tail so parents envelope their children. Roots of every 7th trace carry an
-/// `ERROR` status + message; roots of every 5th trace carry a `trace_state` —
-/// so the deferred scalar fields flow through any corpus with `count ≥ ~10`.
+/// parents on position `(j - 1) / 2` (`CLIENT`/`INTERNAL` alternating). That
+/// is a binary-ish tree with depth ~log2 and fanout 2. Start times are
+/// globally monotonic. A span's duration scales with its distance from the
+/// trace's tail, so parents envelope their children. Roots of every 7th trace
+/// carry an `ERROR` status and message. Roots of every 5th trace carry a
+/// `trace_state`.
 pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
     let m = p.spans_per_trace.max(1) as u64;
     let mut out: Vec<Span> = Vec::with_capacity(p.count);
@@ -127,11 +124,8 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             SpanKind::Internal
         };
 
-        // The span's full extent (see end_time_unix_nano below): events
-        // clamp to it so they stay span-contained at any events_per_span
-        // (unclamped, an event landed past a leaf span's end whenever
-        // (k+1)*(duration/4+1) > extent — at the default duration that
-        // is k >= 3; at small or zero durations, earlier).
+        // The span's full extent (see end_time_unix_nano below). Events
+        // clamp to it so they stay inside the span at any events_per_span.
         let extent = p.duration_nanos.saturating_add(
             (m - 1 - j).saturating_mul(p.spacing_nanos.saturating_add(p.duration_nanos)),
         );
@@ -164,7 +158,7 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             })
             .collect();
 
-        // Every Nth span links to the PREVIOUS trace's root (skipping the very
+        // Every Nth span links to the previous trace's root (skipping the very
         // first trace of this run, which has no predecessor).
         let links = if p.links_every > 0 && i % p.links_every as u64 == 0 && t > p.seed {
             vec![Link {
@@ -179,8 +173,8 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             Vec::new()
         };
 
-        // Tree mode only: flat mode (m == 1) preserves the original corpus shape
-        // (no status, no trace_state, per-span-unique names below).
+        // Tree mode only: flat mode (m == 1) has no status, no trace_state,
+        // and per-span-unique names below.
         let status = if is_root && m > 1 && t % 7 == 3 {
             Some(Status {
                 code: StatusCode::Error as i32,
@@ -195,8 +189,8 @@ pub fn generate(p: &SynthTraceParams) -> Vec<Span> {
             String::new()
         };
 
-        // Flat mode names by GLOBAL index (the original per-span-unique shape);
-        // tree mode names by in-trace position so siblings across traces align.
+        // Flat mode names by global index, so each name is unique. Tree mode
+        // names by in-trace position, so siblings across traces align.
         let name = if m == 1 {
             format!("synthetic-span-{i}")
         } else {
@@ -348,8 +342,8 @@ mod tests {
         );
         let ids: BTreeSet<_> = spans.iter().map(|s| s.span_id.clone()).collect();
         assert_eq!(ids.len(), 5);
-        // Flat corpus preserves the original shape: every span its own root
-        // with a per-span-unique name; no events/links/status/trace_state.
+        // Flat corpus: every span is its own root, with a unique name and no
+        // events, links, status or trace_state.
         assert!(spans.iter().all(|s| s.parent_span_id.is_empty()));
         let names: BTreeSet<_> = spans.iter().map(|s| s.name.clone()).collect();
         assert_eq!(names.len(), 5, "flat names are per-span unique");
@@ -429,7 +423,7 @@ mod tests {
             assert_eq!(link.span_id.len(), 8);
             assert_eq!(link.trace_state, "synth=1");
         }
-        // Deferred scalars flow: some root carries status/message, some trace_state.
+        // Some root carries a status and message, some root a trace_state.
         assert!(spans.iter().any(|s| s.status.is_some()));
         assert!(spans.iter().any(|s| !s.trace_state.is_empty()));
     }

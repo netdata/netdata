@@ -2,14 +2,13 @@
 //!
 //! The agent runs the plugin as `otel-plugin <update_every>` (no subcommand;
 //! see `main.rs`), which enters [`run`]. The supervisor re-execs the same
-//! binary as three worker subprocesses — ingestor, ledger, legacy-logs
-//! (`WorkerKind` in `main.rs`) — over ferryboat Unix-socket IPC using the
-//! typed messages from the `otel-bridge` crate (the Configure → Ready handshake
-//! contract is documented there), and owns the agent connection: it
+//! binary as three worker subprocesses: ingestor, ledger, and legacy-logs
+//! (`WorkerKind` in `main.rs`). It talks to them over ferryboat Unix-socket
+//! IPC with the typed messages from the `otel-bridge` crate, which documents
+//! the Configure → Ready handshake. It owns the agent connection: it
 //! translates pluginsd stdin/stdout (`netdata_plugin_protocol`) into
 //! Configure/Call/Cancel/Shutdown per worker and relays results, progress,
-//! and raw chart data back. The workers themselves live in the
-//! `otel-ingestor`, `otel-ledger`, and `otel-legacy-logs` crates.
+//! and raw chart data back.
 //!
 //! Lifecycle: resolve identity + config, spawn and handshake each worker,
 //! then one event loop ([`Supervisor::run`]) until the agent sends QUIT,
@@ -373,8 +372,8 @@ impl Supervisor {
     }
 
     /// Send Configure to the ingestor and return the functions it reports
-    /// (`topology:tracing` when its service map started; the caller
-    /// registers them after the last handshake, see `register_declarations`).
+    /// (the caller registers them after the last handshake, see
+    /// `register_declarations`).
     /// The ingestor sends Ready only once its gRPC endpoint is bound and every
     /// startup step succeeded, so a failure here (typically the port already
     /// in use) surfaces before anything has been declared to the agent.
@@ -1018,9 +1017,9 @@ pub async fn run() -> anyhow::Result<()> {
     // Instance id: a fresh UUID per process. The agent restarts a crashed
     // plugin without changing NETDATA_INVOCATION_ID, so that value cannot tell
     // two plugin processes apart; a self-generated id gives each process a
-    // distinct WAL identity. The agent invocation id is now informational only
-    // — logged for correlation, never stamped into files — so a missing or
-    // malformed value warns but does not abort startup.
+    // distinct WAL identity. The agent invocation id is informational only:
+    // it is logged for correlation and never stamped into files. So a missing
+    // or malformed value warns but does not abort startup.
     let instance_id = InstanceId::generate();
     plugin_config.identity = Some(Identity::new(machine_id, instance_id));
     match nd_env.invocation_id.as_deref().map(str::trim) {

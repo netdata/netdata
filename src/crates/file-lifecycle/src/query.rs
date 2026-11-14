@@ -17,24 +17,7 @@
 //! local file at the same seq does not hide the remote entry (the
 //! post-restore reused-seq shape), and a WAL with no durable prefix is not
 //! servable, so it masks nothing — the plan masks exactly the set
-//! `query_snapshot` serves. This is the servable-mask dedup; the stream
-//! selector's remote half (`registry.rs::LocalStreams::with_catalog`)
-//! dedups on folded seqs instead, so it folds away a remote entry whose
-//! unsynced WAL was folded locally. `query/tests.rs` pins the distinction.
-//!
-//! Consumers (grep-verified): otel-ledger's two rpc handlers.
-//! `rpc/logs/handler.rs` plans two ranges under one read lock (0 = the
-//! stream selector's window, 1 = the fetch), runs the unbounded
-//! [`RemotePlanInput::plan`] under `spawn_blocking`, and feeds
-//! `per_range[0]` to `LocalStreams::with_catalog` and `per_range[1]` to
-//! [`crate::remote_read::RemoteRead::fetch`]. `rpc/traces/sources.rs` plans the
-//! distinct capture ranges with [`RemotePlanInput::plan_within`] bounded
-//! by the download cache's capacity, turns [`RemotePlan::unreadable`]
-//! catalogs overlapping a range into unavailable sources over their span,
-//! and downloads the [`RemotePlan::union`] once for all copies. Without
-//! remote storage the handlers skip planning; the traces capture stands in
-//! with [`RemotePlan::default`], the empty plan. Recovery's tests plan a
-//! query to assert remote presence.
+//! `query_snapshot` serves.
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -48,9 +31,7 @@ use crate::registry::{Registry, TenantRegistries};
 ///
 /// Step 1 filters on those bounds alone — a catalog outside the hull is
 /// skipped without opening it — and they are the caller's handle for
-/// attributing an unreadable catalog to the ranges it may affect: the
-/// traces handler builds each overlapped range's unavailable source from
-/// them (`rpc/traces/sources.rs`).
+/// attributing an unreadable catalog to the ranges it may affect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogFile {
     pub path: PathBuf,
@@ -83,8 +64,7 @@ pub struct RemotePlanInput {
 }
 
 /// A remote plan: what each range needs from remote storage. `Default` is
-/// the empty plan, which the traces capture stands in with when remote
-/// storage is off.
+/// the empty plan.
 #[derive(Debug, Default)]
 pub struct RemotePlan {
     /// Per range (in input order), its remote-only entries: in its window

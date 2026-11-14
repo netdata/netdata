@@ -124,8 +124,7 @@ impl ServiceRequests {
 }
 
 /// Whether `span` is a request: a trace root (no parent id, or the all-zero
-/// one, which storage also treats as unset), or a span of kind SERVER or
-/// CONSUMER.
+/// one), or a span of kind SERVER or CONSUMER.
 fn is_request(span: &Span) -> bool {
     let is_root = span.parent_span_id.iter().all(|&byte| byte == 0);
     is_root || matches!(span.kind(), SpanKind::Server | SpanKind::Consumer)

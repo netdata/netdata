@@ -3,25 +3,18 @@
 //! remote object storage, plus the local registry tracking them on disk.
 //!
 //! Modules:
-//! - [`catalog`] — the `Catalog` value type, filling both roles: the catalog
-//!   builder's in-memory accumulator (file-lifecycle `catalog_builder.rs`)
-//!   and the parsed body of every durable catalog file; the `Envelope` wire
-//!   schema, the container round trip, `fold` and `find`.
-//! - [`entry`] — the catalog's row type: one uploaded SFST as the remote
-//!   catalog records it (`remote_key` lifecycle, summary fields, upload
-//!   metadata).
-//! - [`registry`] — the registry of locally-present catalog files: recover,
-//!   overlap selection, the `read_entries` query parse, `scan_max_sequence`
-//!   (the seq seed), retention marking and evaluation.
+//! - [`catalog`] — the `Catalog` value type, its JSON schema and the
+//!   container round trip.
+//! - [`entry`] — the catalog's row type: one uploaded SFST.
+//! - [`registry`] — the registry of locally-present catalog files and the
+//!   catalog filename codec.
 //!
 //! Ownership: this crate owns the data model, the wire schema and the read
-//! side of catalog files on disk; serialization stops at in-memory bytes —
+//! side of catalog files on disk. Serialization stops at in-memory bytes:
 //! nothing here writes or uploads a catalog file, and the only disk mutation
-//! is `Registry::recover`'s stale-`.tmp` sweep. Catalog policy lives in
-//! file-lifecycle (building and rotating, upload/reconciliation planning,
-//! recovery, retention), driven by otel-ledger (rotation handling, retention,
-//! cleanup); the container framing itself is chunk-file's, the shared
-//! id/stem/query vocabulary is file-registry's.
+//! is `Registry::recover`'s stale-`.tmp` sweep. The container framing itself
+//! is chunk-file's, and the shared id/stem/query vocabulary is
+//! file-registry's.
 //!
 //! Contracts:
 //! - NCAT envelope: every durable catalog byte is
@@ -30,24 +23,6 @@
 //!   both are checked before any payload field is deserialized
 //!   ([`Error::Container`] for framing problems, then
 //!   [`Error::UnsupportedVersion`] or [`Error::Json`] from the payload).
-//! - [`Catalog::fold`] is the single source of the filename fields
-//!   `(max_seq, min_ts, max_ts)`: the builder stamps them into the rotation
-//!   filename and the remote catalog key, and recovery's `validate_catalog`
-//!   recomputes them from a downloaded body to check it against its key.
-//! - Eviction gate chain: an SFST is not evicted until its catalog entry is
-//!   confirmed present on the remote (`is_remote_cataloged`, file-lifecycle
-//!   `registry.rs`, applied by otel-ledger `ledger/retention.rs`) — the
-//!   catalog is the remote-durability evidence, so a failed catalog upload
-//!   must not orphan the remote SFST. Catalog files themselves evict on date
-//!   age alone, through the mark → send → clear-on-send-failure chain of
-//!   otel-ledger `ledger/retention.rs`.
-//!
-//! Consumers (grep-verified): file-lifecycle (builder, helpers, query,
-//! registry, remote_keys, remote_read, ipc, recovery), otel-ledger (rotation
-//! tracking, retention mark/clear, rpc handlers) and otel-ingestor (startup
-//! seq seed). Query filtering uses `file_registry::Query` — the same type
-//! the SFST and WAL registries accept, so a single query value flows through
-//! the whole planner stack.
 
 pub mod catalog;
 pub mod entry;

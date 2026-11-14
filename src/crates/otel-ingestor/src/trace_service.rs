@@ -1,28 +1,19 @@
 //! The OTLP traces ingestion service: receives `ExportTraceServiceRequest`s
-//! and lands them in per-tenant WALs — the span analog of
-//! [`crate::logs_service::NetdataLogsService`]. The logic is
-//! transport-agnostic — it lives on the [`NetdataTracesService::export_traces`]
-//! core, which both the gRPC `TraceService` wrapper and the OTLP/HTTP front
-//! end call. Same export structure: prepare
-//! every frame lock-free (normalize + interval time bounds + flatten +
-//! encode, all owned by `ng_flatten::prepare_trace_frame_with`; `Some(bounds)`
-//! here — production enforces the window, while the `ng-ingest` dev tool and
-//! the tests pass `None`), write the frames under the tenant's writer lock
-//! only, then, without the lock and in a task of its own, wait for a sync
-//! round that covers them (`TenantWriter::make_durable`) and count the spans.
+//! and lands them in per-tenant WALs. The logic is transport-agnostic: it
+//! lives on the [`NetdataTracesService::export_traces`] core.
+//!
+//! An export prepares every frame without holding a writer lock
+//! (`ng_flatten::prepare_trace_frame_with`). It writes the frames under the
+//! tenant's writer lock only. Then, without the lock and in a task of its
+//! own, it waits for a sync round that covers them
+//! (`TenantWriter::make_durable`) and counts the spans.
 //!
 //! ## Partitioning
 //!
-//! Traces are currently **unpartitioned**: [`partition_spans`] routes every
-//! span to the logs-convention *unattributed* stream — the exact stream the
-//! per-service scheme produces for spans with no `service.namespace`/
-//! `service.name` (`partition_key = 0`, `content_meta` = the version-tagged
-//! empty `ServiceStream` blob). That function is the single seam a future
-//! switch to per-service partitioning replaces (extract the stream per
-//! resource, group, encode-or-drop, collision-check — the logs service is the
-//! working template); everything downstream of it already handles N groups, and
-//! files written today ARE the unattributed stream under the future scheme, so
-//! old and new files coexist with no migration.
+//! Traces are not partitioned: [`partition_spans`] routes every span to the
+//! unattributed stream of the logs identity convention. See that function
+//! for why files written today need no migration when per-service
+//! partitioning arrives.
 //!
 //! ## Rejections
 //!
@@ -33,12 +24,6 @@
 //! `ng_flatten::normalize_trace_request`). Rejected spans are reported via
 //! OTLP `partial_success.rejected_spans`; the RPC still succeeds, and the ack
 //! is returned only after the WAL sync.
-//!
-//! Consumers: the ledger's per-signal indexer turns sealed WAL files into
-//! SFST indexes (`ng-index`), reacting to the fire-and-forget lifecycle
-//! events ([`LedgerSender`]); between exports, the periodic
-//! [`NetdataTracesService::sweep_expired_rotations`] seals quiet streams so
-//! they still get indexed (and uploaded, with remote storage).
 
 use std::sync::{Arc, Mutex};
 
@@ -71,17 +56,17 @@ fn count_spans(req: &ExportTraceServiceRequest) -> usize {
 
 /// What a group's spans are at each point of the export.
 enum Payload {
-    /// As received (still an OTLP request — the frame recipe consumes it).
+    /// As received: still an OTLP request, which `flatten` consumes.
     Spans(ExportTraceServiceRequest),
-    /// Flattened and encoded lock-free (phase 1): one WAL frame, awaiting the
-    /// serialized write region (phase 2). Holds at least one span.
+    /// Flattened and encoded lock-free (phase 1): one WAL frame, waiting for
+    /// the write under the writer lock (phase 2). Holds at least one span.
     Frame(ng_flatten::PreparedTraceFrame),
     /// Every span fell outside the ingestion window: nothing to write.
     OutOfWindow,
 }
 
 /// One group of spans bound for a single WAL stream, from partitioning to the
-/// WAL write: the substrate's opaque partition key, the stream's encoded
+/// WAL write: the WAL's opaque partition key, the stream's encoded
 /// `content_meta` blob, and the spans. [`Self::flatten`] turns `payload` from
 /// spans into a frame, and [`Self::write_to`] appends that frame under
 /// `partition_key` and `content_meta`.
@@ -184,21 +169,19 @@ struct Flattened {
     out_of_window: usize,
 }
 
-/// THE traces partitioning seam.
+/// The traces partitioning seam.
 ///
-/// Today: unpartitioned — the whole request becomes ONE group on the
-/// *unattributed* stream, reusing the logs identity convention
-/// (`ServiceStream` `("", "")` → `partition_key` `0`, version-tagged
-/// empty-fields `content_meta`). This is deliberately the stream the
-/// per-service scheme assigns to spans without service identity, so flipping
-/// this seam later re-interprets nothing: existing files simply ARE the
+/// Today the whole request becomes one group on the unattributed stream of
+/// the logs identity convention (`ServiceStream` `("", "")` → `partition_key`
+/// `0`, version-tagged empty-fields `content_meta`). This is deliberately the
+/// stream the per-service scheme assigns to spans without service identity,
+/// so flipping this seam later re-interprets nothing: existing files are the
 /// unattributed stream.
 ///
-/// Switching to per-service partitioning means reimplementing ONLY this
-/// function (per-resource stream extraction, grouping, encode-or-drop,
-/// collision table — see `logs_service.rs` for each piece) plus adding the
-/// identity rejection classes to [`build_partial_success`]. The export loop
-/// below already writes N groups; nothing else in this file assumes one.
+/// Switching to per-service partitioning means reimplementing only this
+/// function, plus adding the identity rejection classes to
+/// [`build_partial_success`]. The export loop below already writes N groups.
+/// Nothing else in this file assumes one.
 fn partition_spans(request: ExportTraceServiceRequest) -> Vec<StorableSpans> {
     let unattributed = ServiceStream::new("", "");
     let content_meta = otel_logs_identity::encode_content_meta(&unattributed)
@@ -212,9 +195,7 @@ fn partition_spans(request: ExportTraceServiceRequest) -> Vec<StorableSpans> {
 
 /// Build the OTLP `partial_success` payload from a request's rejected spans.
 /// `None` only when nothing was rejected (full success). Out-of-window is the
-/// single rejection class while unpartitioned; the identity classes the
-/// logs service reports (collision, oversized) gain entries here when the
-/// partitioning seam is switched.
+/// single rejection class while unpartitioned.
 fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSuccess> {
     if out_of_window == 0 {
         return None;
@@ -231,16 +212,14 @@ fn build_partial_success(out_of_window: usize) -> Option<ExportTracePartialSucce
 }
 
 /// Transport-agnostic sink for OTLP span exports: appends flattened frames to
-/// per-tenant WALs and forwards lifecycle events to the ledger. The gRPC
-/// path reaches it via the thin `TraceService` wrapper; the OTLP/HTTP front
-/// end calls the same core. See the module docs for the request flow.
+/// per-tenant WALs and forwards lifecycle events to the ledger. See the
+/// module docs for the request flow.
 pub struct NetdataTracesService {
     /// The per-tenant WAL writers of this signal.
     writers: TenantWriters,
     /// Process-wide monotonic clock, shared across tenants, streams, and
-    /// signals (lib.rs creates one instance for logs + traces): the WAL writer
-    /// stamps per-frame `ingestion_ns` from it, so one clock keeps frame
-    /// ordering consistent across every stream and signal.
+    /// signals: the WAL writer stamps per-frame `ingestion_ns` from it, so one
+    /// clock keeps frame ordering consistent across every stream and signal.
     clock: Arc<Mutex<MonotonicClock>>,
     /// Global ingestion time-bounds: reject spans whose `[start, effective
     /// end]` interval falls outside `[now - max_age, now + future_skew]`.
@@ -314,12 +293,11 @@ impl NetdataTracesService {
 
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
     /// threshold as of now, without a new frame (the idle-rotation sweep).
-    /// lib.rs calls it periodically per signal, off the write path and off the
-    /// async worker pool (it does serial fsyncs), so a quiet stream still
-    /// seals, gets indexed, and (with remote storage) uploaded.
+    /// Call it periodically, off the write path and off the async worker pool
+    /// (it does serial fsyncs), so a quiet stream still seals.
     ///
-    /// The clock is read ONCE here and its guard dropped before any writer is
-    /// locked; the rest of the lock discipline is on
+    /// The clock is read once here, and its guard is dropped before any
+    /// writer is locked. The rest of the lock discipline is on
     /// [`TenantWriters::rotate_expired`].
     pub fn sweep_expired_rotations(&self) {
         let now_ns = self.clock.lock().unwrap().now_ns();
@@ -327,11 +305,8 @@ impl NetdataTracesService {
     }
 
     /// The transport-agnostic OTLP traces export core: everything between
-    /// "tenant resolved, request decoded" and the response. The gRPC
-    /// `TraceService::export` wrapper resolves the tenant from tonic
-    /// metadata and calls this; the OTLP/HTTP front end resolves the tenant
-    /// from HTTP headers and calls the same code — one behavior for both
-    /// transports. The caller owns transport concerns (metadata/headers,
+    /// "tenant resolved, request decoded" and the response. The caller owns
+    /// transport concerns (metadata/headers,
     /// request decoding, response framing); this core owns every rejection,
     /// ordering, and durability decision.
     pub(crate) async fn export_traces(
@@ -356,10 +331,10 @@ impl NetdataTracesService {
 
         let mut storable_spans = partition_spans(request);
 
-        // Phase 1 — prepare every frame WITHOUT holding any writer lock:
+        // Phase 1: prepare every frame without holding any writer lock.
         // `prepare_trace_frame` consumes an owned request and needs nothing
         // shared, so concurrent exports overlap all of this CPU work. The clock
-        // tick here is the base for synthesized fallback start times AND the
+        // tick here is the base for synthesized fallback start times and the
         // reference "now" for the ingestion window; read once per request so
         // every group shares one window and one fallback base. The frame
         // header's `ingestion_ns` is ticked separately at write time, inside
@@ -412,7 +387,7 @@ impl NetdataTracesService {
             ));
         }
 
-        // Phase 2 — the writes, under THIS TENANT's writer lock only (the
+        // Phase 2: the writes, under this tenant's writer lock only (the
         // map lock is held just for lookup/insert). All sync code: no
         // `.await` while the guard is held.
         let tenant_writer = self.writers.writer_for(tenant_id).map_err(|e| {
@@ -470,8 +445,7 @@ impl NetdataTracesService {
 }
 
 /// Count the `kept` spans of an export that could not be stored: its answer
-/// is [`storage_unavailable`], and the sender sends them again. They show as
-/// `failed` on `netdata.otel.spans`.
+/// is [`storage_unavailable`], and the sender sends them again.
 fn count_failed(derived_metrics: Option<&DerivedMetrics>, kept: usize) {
     if let Some(derived_metrics) = derived_metrics {
         derived_metrics.record_ingest_failed(Signal::Traces, kept as u64);
@@ -550,7 +524,7 @@ mod tests {
     /// so the unconnected sender doesn't block the service.
     fn test_service(wal_dir: std::path::PathBuf) -> NetdataTracesService {
         // Effectively-unbounded window; the window itself is exercised by
-        // ng-flatten's bounds tests and the out-of-window export tests below.
+        // the out-of-window export tests below.
         test_service_with_ingest(
             wal_dir,
             otel_bridge::config::IngestConfig {
@@ -977,8 +951,8 @@ mod tests {
         assert_eq!(groups.len(), 1, "unpartitioned: exactly one group");
         let g = &groups[0];
         // The logs identity convention for "no service attribution":
-        // partition_key 0 and a decodable version-tagged empty-fields blob —
-        // NOT an empty blob.
+        // partition_key 0 and a decodable version-tagged empty-fields blob,
+        // not an empty blob.
         assert_eq!(g.partition_key, 0);
         assert_eq!(
             otel_logs_identity::decode_content_meta(&g.content_meta),

@@ -2,27 +2,23 @@
 //!
 //! The transport layer between the netdata function protocol and the
 //! wire-neutral `sfsq::traces` engine. One Function view plus four
-//! explicit peer modes, each selected by exactly one top-level
-//! sub-object — `info`, `trace`, `suggest`, `explore` — the mode's params
-//! self-contained in its object. A request without a selector is the
-//! Functions view (the trace list): standard Functions parameters
-//! around the search page, wrapped as `type: "traces"`. Explicit modes keep their native
-//! response shapes. Mixing the two request forms or naming more than one
-//! selector is a client error, and so is an unknown key inside a mode
-//! object or a condition. An unknown TOP-LEVEL key is ignored: generic
-//! Functions clients (the dashboard's shared request builder, the
-//! Agent's MCP tool) build the top level and add keys of their own, such
-//! as `timeout`, so [`ACCEPTED_PARAMS`] is the contract there, not a
-//! rejection.
+//! explicit peer modes. Each mode is selected by exactly one top-level
+//! sub-object (`info`, `trace`, `suggest`, `explore`) that holds all of the
+//! mode's params. A request without a selector is the Functions view (the
+//! trace list): standard Functions parameters around the search page,
+//! wrapped as `type: "traces"`. Explicit modes keep their native response
+//! shapes. Mixing the two request forms or naming more than one selector
+//! is a client error, and so is an unknown key inside a mode object or a
+//! condition. An unknown top-level key is ignored. Generic Functions
+//! clients (the dashboard's shared request builder, the Agent's MCP tool)
+//! build the top level and add keys of their own, such as `timeout`. So
+//! [`ACCEPTED_PARAMS`] is the contract there, not a rejection.
 //!
 //! Nanosecond values (`*_ns`, `time_unix_nano`) are JSON numbers and
-//! exceed 2^53: JavaScript consumers read them with ~256 ns granularity
-//! — fine for display, not for arithmetic needing ns exactness. The one
+//! exceed 2^53. JavaScript consumers read them with ~256 ns granularity:
+//! fine for display, not for arithmetic needing ns exactness. The one
 //! value a client must echo back exactly (the pagination cursor) is a
-//! STRING for that reason.
-//!
-//! Consumers: the mode dispatcher is [`super::handler`], the engine
-//! mapping is [`super::adapter`].
+//! string for that reason.
 
 use std::collections::BTreeMap;
 
@@ -30,14 +26,14 @@ use serde::{Deserialize, Serialize};
 
 use sfsq::traces::{PartialReason, QueryStatus};
 
-// ── Request ─────────────────────────────────────────────────────────
+// Request.
 
 /// Request param names accepted by this function, advertised to the UI
-/// in `InfoResponse::accepted_params`. The rule: the list carries
-/// exactly the TOP-LEVEL keys — the mode selectors, `tenant`, and every
+/// in `InfoResponse::accepted_params`. The rule: the list carries exactly
+/// the top-level keys. These are the mode selectors, `tenant`, and every
 /// field the implicit Functions view reads: its window and cursor, the
-/// search bar's `conditions` and `text`, and `skip_overview`. A field the implicit view
-/// honours but this list omits is unreachable.
+/// search bar's `conditions` and `text`, and `skip_overview`. A field the
+/// implicit view honours but this list omits is unreachable.
 ///
 /// A top-level key outside this list is ignored, never an error.
 /// `timeout` is one such key: generic clients send it, and execution
@@ -72,9 +68,8 @@ pub const ACCEPTED_PARAMS: &[&str] = &[
 /// ignored (see the module doc). The mode objects stay strict.
 #[derive(Debug, Deserialize)]
 struct RawOtelTracesRequest {
-    /// The capability-discovery selector. `{"info": {}}` — the strict
-    /// empty object, validated by [`InfoParams`]; the traces GET shim
-    /// synthesizes exactly this for the `info` URL token.
+    /// The capability-discovery selector. `{"info": {}}`, the strict
+    /// empty object, validated by [`InfoParams`].
     #[serde(default, deserialize_with = "present")]
     info: Option<serde_json::Value>,
     /// The single-trace mode (dumb span list by trace id).
@@ -101,13 +96,12 @@ struct RawOtelTracesRequest {
     text: Option<serde_json::Value>,
     #[serde(default, deserialize_with = "present")]
     skip_overview: Option<serde_json::Value>,
-    /// Tenant whose data the query reads — a scoping selector supplied
-    /// by the caller, not a security boundary; omitted or invalid falls
-    /// back to the default tenant
-    /// (`file_registry::TenantId::resolve_query`), never an implicit
-    /// all-tenant union. Top-level because it scopes the CALL in every
-    /// data mode (`info` ignores it — capability discovery reads no
-    /// data).
+    /// Tenant whose data the query reads. A scoping selector supplied by
+    /// the caller, not a security boundary. Omitted or invalid falls back
+    /// to the default tenant (`file_registry::TenantId::resolve_query`),
+    /// never an implicit all-tenant union. Top-level because it scopes the
+    /// call in every data mode. `info` ignores it, because capability
+    /// discovery reads no data.
     #[serde(default)]
     tenant: Option<String>,
 }
@@ -115,11 +109,11 @@ struct RawOtelTracesRequest {
 /// Request payload: exactly one mode, its params self-contained, plus
 /// the optional call-scoping `tenant`. `Deserialize` is manual so the
 /// top level can be held to a JSON object (arrays and scalars are
-/// client errors): the object streams through `RawOtelTracesRequest`'s
-/// derived visitor, keeping duplicate-key rejection for the TOP-LEVEL
-/// keys it knows (inside a mode object, duplicates collapse last-wins
-/// at the `Value` capture — a known serde_json DOM property). No
-/// `Serialize`: tests build JSON bodies directly.
+/// client errors). The object streams through `RawOtelTracesRequest`'s
+/// derived visitor, which keeps duplicate-key rejection for the top-level
+/// keys it knows. Inside a mode object, duplicates collapse last-wins at
+/// the `Value` capture, a known serde_json DOM property. No `Serialize`:
+/// tests build JSON bodies directly.
 #[derive(Debug, Clone)]
 pub struct OtelTracesRequest {
     pub tenant: Option<String>,
@@ -167,8 +161,8 @@ impl<'de> Deserialize<'de> for OtelTracesRequest {
 impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
     type Error = String;
 
-    /// Mode resolution then the typed parse, in that order: ALL present
-    /// selectors are counted BEFORE any selector value is decoded, so a
+    /// Mode resolution then the typed parse, in that order: all present
+    /// selectors are counted before any selector value is decoded, so a
     /// conflicting body reports the conflict even when one selector is
     /// also malformed (`{"trace": null, "info": {}}` is a conflict,
     /// not an invalid trace selector).
@@ -262,7 +256,7 @@ impl TryFrom<RawOtelTracesRequest> for OtelTracesRequest {
 pub struct FunctionsParams {
     /// Match window, unix seconds, with the standard Functions
     /// conventions: `0` means "unspecified" (the search page's
-    /// defaults apply) and a NEGATIVE value is relative — `before`
+    /// defaults apply) and a negative value is relative: `before`
     /// counted back from now, `after` from the resolved `before`.
     #[serde(default)]
     pub after: i64,
@@ -286,7 +280,7 @@ pub struct FunctionsParams {
     pub conditions: Vec<ConditionParams>,
     /// The search bar's free-text tokens: each matches a trace with a
     /// span whose name, status message, event name or any attribute
-    /// VALUE contains it, case-insensitively (never a field name, the
+    /// value contains it, case-insensitively (never a field name, the
     /// kind or the status). At least 3 characters, at most
     /// [`REQUEST_TEXT_MAX_BYTES`].
     #[serde(default)]
@@ -302,7 +296,7 @@ pub struct FunctionsParams {
 }
 
 /// Resolve a Functions-convention window (unix seconds; `0` means
-/// "unspecified", a NEGATIVE value is relative: `before` counted back
+/// "unspecified", a negative value is relative: `before` counted back
 /// from `now`, `after` from the resolved `before`) into absolute seconds,
 /// `0` still meaning "unspecified" (the adapter's `resolve_window`
 /// defaults apply).
@@ -366,11 +360,9 @@ struct InfoParams {}
 /// window resolution; never deserialized.
 #[derive(Debug, Clone)]
 pub struct SearchParams {
-    /// Match window, unix seconds; `0` means "unspecified" (`before` 0
-    /// → now, `after` 0 → before − 900 — the adapter's
-    /// `resolve_window`). IGNORED on an anchor page: the cursor carries
-    /// the original page's frozen window (the rank is window-dependent,
-    /// so a narrowed window would re-rank).
+    /// Match window, unix seconds; `0` means "unspecified" (the adapter's
+    /// `resolve_window` defaults apply). Ignored on an anchor page: the
+    /// cursor carries the original page's frozen window.
     pub after: u32,
     pub before: u32,
     /// Result limit (top-K most-recent-first).
@@ -395,7 +387,7 @@ pub struct SearchParams {
 /// - `op`: `=` `!=` `=~` `!~` `>` `>=` `<` `<=` `^=` `!^=`. A `!` op means
 ///   NOT EXISTS: no span of the trace matches the positive form (for a
 ///   trace-level key: the trace does not). `=~` is a regex over the
-///   WHOLE value (Rust dialect); `^=` is "starts with", for picking a
+///   whole value (Rust dialect); `^=` is "starts with", for picking a
 ///   suggestion the response cut.
 /// - `values`: JSON strings or numbers (at most
 ///   [`CONDITION_VALUES_MAX`]); several OR (any may match). Durations
@@ -484,10 +476,9 @@ pub struct SuggestParams {
     #[serde(default)]
     pub max_items: Option<usize>,
     /// Keys only (with `key` it is a client error): the keys whose tier,
-    /// as the visited sources rate them, is this one; every one, never
-    /// cut, and the walk does not stop at sources that add no key (one
-    /// may still raise a tier). The span view's "Stack by" list asks
-    /// `low`.
+    /// as the visited sources rate them, is this one. Every one is listed,
+    /// never cut. The walk does not stop at sources that add no key,
+    /// because one may still raise a tier.
     #[serde(default)]
     pub tier: Option<TierWire>,
 }
@@ -501,13 +492,13 @@ pub struct SuggestParams {
 pub struct ExploreParams {
     /// Window, unix seconds, with the Functions conventions of
     /// [`FunctionsParams::after`]: `0` unspecified (`before` now, `after`
-    /// 900 s earlier), a NEGATIVE value relative. Aligned outward to the
-    /// grid; IGNORED on an anchored page (the anchor carries its window).
+    /// 900 s earlier), a negative value relative. Aligned outward to the
+    /// grid. Ignored on an anchored page (the anchor carries its window).
     #[serde(default)]
     pub after: i64,
     #[serde(default)]
     pub before: i64,
-    /// The search bar's chips, read PER SPAN: chips AND on the same span,
+    /// The search bar's chips, read per span: chips AND on the same span,
     /// and a `!` op keeps the spans that do not match its positive form.
     /// `trace_id` selects the spans of the given traces. The trace-level
     /// keys (`root_name`, `root_service_name`, `trace_duration`,
@@ -586,9 +577,9 @@ pub struct TraceParams {
     pub text: Vec<String>,
 }
 
-// ── Response ────────────────────────────────────────────────────────
+// Response.
 
-/// Response shapes. The enum is untagged AND serialize-only (no serde
+/// Response shapes. The enum is untagged and serialize-only (no serde
 /// routing exists); every shape self-describes through its leading
 /// `mode` field instead.
 #[derive(Debug, Serialize)]
@@ -624,7 +615,7 @@ impl FunctionsTracesResponse {
     }
 }
 
-// ── Overview section ────────────────────────────────────────────────
+// Overview section.
 
 #[derive(Debug, Serialize)]
 pub struct OverviewGridWire {
@@ -634,10 +625,10 @@ pub struct OverviewGridWire {
     pub bucket_width_s: u32,
     /// The duration bins' labels, index-parallel to each cell row.
     pub duration_bins: Vec<&'static str>,
-    /// Per time bucket, the per-duration-bin TRACE counts (each trace
+    /// Per time bucket, the per-duration-bin trace counts (each trace
     /// bins by its merged envelope).
     pub cells: Vec<Vec<u64>>,
-    /// Per time bucket, the binned traces' STORED ERROR-status spans —
+    /// Per time bucket, the binned traces' stored ERROR-status spans,
     /// index-parallel to `cells`. It counts spans, not traces: a bucket
     /// holding one trace with three failed spans reads 3, not 1.
     pub error_spans: Vec<u64>,
@@ -661,7 +652,7 @@ pub struct OverviewGridWire {
 ///
 /// Nearest-rank values over each bucket's population from a fixed-size
 /// log-linear histogram: within 1/32 of the exact duration and inside
-/// the bucket's observed range. NEVER interpolate these from
+/// the bucket's observed range. Do not interpolate these from
 /// `duration_bins`, whose decade-wide edges cannot resolve better than
 /// an order of magnitude.
 #[derive(Debug, Serialize)]
@@ -673,7 +664,7 @@ pub struct OverviewPercentilesWire {
 
 /// Totals are trace-envelope-aligned, not span-window-aligned: a trace
 /// whose merged envelope starts before the window is clipped from the
-/// grid AND these totals (even though `search` returns its in-window
+/// grid and these totals (even though `search` returns its in-window
 /// spans).
 #[derive(Debug, Serialize)]
 pub struct OverviewTotals {
@@ -900,10 +891,10 @@ impl From<TierWire> for sfst::FieldTier {
     }
 }
 
-// ── Search page ─────────────────────────────────────────────────────
+// Search page.
 
 /// One search page: bounded most-recent-first trace summaries. Summary
-/// numbers count STORED rows (a resent span counts each time it was
+/// numbers count stored rows (a resent span counts each time it was
 /// stored), read from the files' trace rollups over the match window
 /// widened by the completion slack (at least 1 h per side). A trace
 /// touching a file sealed before the rollup stats is assembled instead
@@ -921,26 +912,25 @@ pub struct SearchResult {
     pub status: StatusWire,
     pub items: SearchItems,
     pub traces: Vec<TraceSummaryWire>,
-    /// Present only when the page is FULL (`returned == max_to_return`)
-    /// — a short page means the window is exhausted. Echo `next` back as
+    /// Present only when the page is full (`returned == max_to_return`).
+    /// A short page means the window is exhausted. Echo `next` back as
     /// the `anchor` param for the following page; treat it as opaque.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub anchor: Option<AnchorWire>,
     /// The window aggregate, composed from a second engine pass in this
-    /// same request under the page's chips and text — all but the
-    /// trace-duration chips (duration is the grid's own axis). Absent
-    /// (never `null`) when not composed, so a
-    /// consumer detects it by PRESENCE.
+    /// same request under the page's chips and text, all but the
+    /// trace-duration and trace-start chips (the grid's own axes). Absent
+    /// (never `null`) when not composed, so a consumer detects it by
+    /// presence.
     ///
-    /// Present on a FIRST page only: a request carrying an anchor
-    /// ([`FunctionsParams::anchor`]) gets NO `overview` key at all.
-    /// Such a page reruns the same query (same chips and text) over the
-    /// cursor's frozen window, so recomposing the aggregate would
-    /// repeat the section the first page already delivered — one extra
-    /// full-window pass per page of a walk, for identical numbers. A
-    /// consumer therefore keeps the first page's section for the whole
-    /// walk, and only re-reads it on a request without an anchor (the
-    /// only kind that can move the window).
+    /// Present on a first page only: a request carrying an anchor
+    /// ([`FunctionsParams::anchor`]) gets no `overview` key at all. Such a
+    /// page reruns the same query (same chips and text) over the cursor's
+    /// frozen window. Recomposing the aggregate would repeat the section
+    /// the first page already delivered, at the cost of one extra
+    /// full-window pass per page of a walk. A consumer therefore keeps the
+    /// first page's section for the whole walk, and only re-reads it on a
+    /// request without an anchor (the only kind that can move the window).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub overview: Option<OverviewSection>,
 }
@@ -968,36 +958,37 @@ pub struct AnchorWire {
 }
 
 /// The search response's embedded full-window aggregate: the
-/// TRACE-density grid (time buckets × log-scale duration bins; a trace
-/// bins by its cross-source merged envelope, straddling traces count
-/// once), its totals, the grid's own `coverage`, and its OWN `status`. Sources sealed before the rollup chunk
-/// existed are EXCLUDED under the `rollup_absent` partial — units are
-/// never mixed. Carried by a Functions
-/// FIRST page only — a request with an anchor
-/// ([`FunctionsParams::anchor`]) omits the section rather than
-/// recompute an identical one, so a paginating consumer must hold on
-/// to the section it was given. See [`SearchResult::overview`].
+/// trace-density grid, its totals, the grid's own `coverage`, and its own
+/// `status`. The grid is time buckets × log-scale duration bins. A trace
+/// bins by its cross-source merged envelope, so straddling traces count
+/// once. Sources sealed before the rollup chunk existed are excluded under
+/// the `rollup_absent` partial, so units are never mixed. Carried by a
+/// Functions first page only. A request with an anchor
+/// ([`FunctionsParams::anchor`]) omits the section rather than recompute
+/// an identical one, so a paginating consumer must hold on to the section
+/// it was given. See [`SearchResult::overview`].
 ///
-/// Its population is NOT the page's, which a caption must respect: the
-/// grid and totals are TRACE-ENVELOPE-aligned over the whole window (a
-/// trace whose envelope starts before the window is clipped from here
-/// even though `search` returns its in-window spans, so a returned row
-/// can have no cell).
+/// Its population is not the page's, which a caption must respect: the
+/// grid and totals are aligned to trace envelopes over the whole window.
+/// A trace whose envelope starts before the window is clipped from here,
+/// even though `search` returns its in-window spans, so a returned row can
+/// have no cell.
 ///
-/// How the section's population relates to the page's: it applies the
-/// page's chips and text except the trace-duration and trace-start ones, with
-/// stored-row semantics, like every other number in the section — a
-/// span-local chip holds when ANY stored copy of a span starting inside
-/// the grid matches (a `!` chip when none does), a root chip reads the
-/// roots the sources recorded. The list beside it can differ at the
-/// edges: it shows a trace whose envelope starts before the
-/// grid while the grid's bin-by-envelope-start rule drops it, the
-/// grid's window is the page's aligned to whole buckets, so a match in
-/// the widened band bins a trace the page excludes, root chips read ANY
-/// source's recorded root in the grid (a positive chip passes on any
-/// match, a negated one fails on any match or any withheld claim) while
-/// the page reads the earliest claim, and a `trace_fragments` grid
-/// counts some traces per file.
+/// The section applies the page's chips and text except the
+/// trace-duration and trace-start ones, with stored-row semantics like
+/// every other number in the section. A span-local chip holds when any
+/// stored copy of a span starting inside the grid matches (a `!` chip when
+/// none does). A root chip reads the roots the sources recorded. The list
+/// beside it can differ at the edges:
+///
+/// - the list shows a trace whose envelope starts before the grid, while
+///   the grid's bin-by-envelope-start rule drops it;
+/// - the grid's window is the page's aligned to whole buckets, so a match
+///   in the widened band bins a trace the page excludes;
+/// - root chips read any source's recorded root in the grid (a positive
+///   chip passes on any match, a negated one fails on any match or any
+///   withheld claim), while the page reads the earliest claim;
+/// - a `trace_fragments` grid counts some traces per file.
 #[derive(Debug, Serialize)]
 pub struct OverviewSection {
     /// The section's own version, independent of the enclosing result's.
@@ -1005,14 +996,14 @@ pub struct OverviewSection {
     /// What the counts count. Always `"traces"` here — render verbatim,
     /// never hardcode.
     pub unit: &'static str,
-    /// The AGGREGATE's completeness. Separate from the page's because
-    /// the reasons do not overlap: `overview_ceiling`, `rollup_absent`
-    /// and `trace_fragments` can only come from this pass and only ever
-    /// affect these numbers, while the page's `size_cap` can only come
-    /// from its own assembly — one merged array would name a reason
-    /// without naming the number it hit.
+    /// The aggregate's completeness. Separate from the page's because the
+    /// reasons do not overlap: `overview_ceiling`, `rollup_absent` and
+    /// `trace_fragments` can only come from this pass and only ever affect
+    /// these numbers, while the page's `size_cap` can only come from its
+    /// own assembly. One merged array would name a reason without naming
+    /// the number it hit.
     pub status: StatusWire,
-    /// The GRID's window, unix seconds: the request's window snapped
+    /// The grid's window, unix seconds: the request's window snapped
     /// outward to wall-clock bucket multiples. Deliberately not the
     /// page's completion range (the same window widened by assembly
     /// slack, ≥ 1h per side).
@@ -1038,7 +1029,7 @@ pub struct TraceSummaryWire {
     /// Envelope start (earliest stored span start).
     pub start_ns: i64,
     /// The rank key — what the most-recent-first ordering sorts by: the
-    /// newest matching span's start, and with several chips the OLDEST
+    /// newest matching span's start, and with several chips the oldest
     /// of each chip's newest match (a trace is as recent as its least
     /// recent required match); without span chips, the newest span in
     /// the window. Can be much newer than the envelope `start_ns`.
@@ -1083,11 +1074,10 @@ pub struct ServiceSpansWire {
     pub spans: u64,
 }
 
-// ── Trace mode response ─────────────────────────────────────────────
+// Trace mode response.
 
-/// One assembled trace: the dumb span list plus the parent/child graph
-/// — everything the UI needs to render a plain span table (a proper
-/// waterfall is deliberately future work).
+/// One assembled trace: the dumb span list plus the parent/child graph,
+/// everything the UI needs to render a plain span table.
 ///
 /// The graph is node-index adjacency over `spans`: walk from `roots`
 /// via `children`; `children` can carry cycle edges (pathological
@@ -1102,13 +1092,12 @@ pub struct TraceResult {
     /// The assembly bounds actually used, unix seconds: only files
     /// overlapping this range were probed for spans. Absent request
     /// bounds declare the literal full range `{after: 0, before:
-    /// 4294967295}`. Spans beyond the declared range are UNKNOWN, not
-    /// absent — the honesty is the declaration (file granularity can
-    /// only extend real coverage past the declared range, never
-    /// shrink it).
+    /// 4294967295}`. Spans beyond the declared range are unknown, not
+    /// absent. File granularity can only extend real coverage past the
+    /// declared range, never shrink it.
     pub coverage: CoverageWire,
-    /// Query-level completeness. An absent id yields a COMPLETE empty
-    /// trace (zero spans) — "nothing stored" is an answer, not an error.
+    /// Query-level completeness. An absent id yields a complete empty
+    /// trace (zero spans): "nothing stored" is an answer, not an error.
     pub status: StatusWire,
     pub items: TraceItems,
     /// The display root: an index into `spans` — the earliest span
@@ -1247,8 +1236,8 @@ pub struct LinkWire {
 pub struct InfoResponse {
     /// The response's self-description: always `"info"`.
     pub mode: &'static str,
-    /// This info response's own schema version (1; the handler answers
-    /// with the [`Default`] value — nothing in it is dynamic).
+    /// This info response's own schema version (1). Nothing in the
+    /// response is dynamic, so the [`Default`] value is the whole answer.
     version: u32,
     status: u32,
     #[serde(rename = "type")]
@@ -1278,14 +1267,13 @@ impl Default for InfoResponse {
     }
 }
 
-// ── Status ──────────────────────────────────────────────────────────
+// Status.
 
 /// Wire form of the engine's [`QueryStatus`]: `{"complete": true}` or
 /// `{"partial": ["size_cap", ...]}`.
 /// Untagged — the distinct field names select the variant.
-/// Every data-mode response carries one beside its data; defined (and
-/// pinned by round-trip tests) here so the data modes share one
-/// serialization.
+/// Every data-mode response carries one beside its data. It is defined
+/// here so the data modes share one serialization.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum StatusWire {

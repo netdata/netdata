@@ -1,44 +1,29 @@
-//! Recovery module root: the startup passes that reconcile local disk, the
-//! in-memory registries and remote storage after a shutdown or crash, before
-//! the run loop starts. The ledger's pipeline assembly drives them per signal
-//! (`otel-ledger/src/ledger/pipeline.rs`, which also fixes the order):
+//! The startup passes that reconcile the local disk, the in-memory
+//! registries and remote storage after a shutdown or crash, before the run
+//! loop starts. The caller runs them per signal, in this order:
 //!
-//! 1. `startup` — with storage enabled, before tenant discovery: the
-//!    required catalog diff-sync (`startup::startup_catalog_sync`, P7)
-//!    makes the local catalog set complete — LIST the remote, raise the WAL
-//!    seq high-water to the remote max, download every own-machine catalog
-//!    missing locally — and returns the remote-discovered tenant set.
-//! 2. `local` — per tenant: local-disk replay through the normal component
-//!    path ([`crate::component::batch_recover`] /
-//!    [`crate::component::drain_pending`], so recovery and steady state share
-//!    one code path): delete WALs that already have an SFST, index WALs that
-//!    do not (unindexable ones stay on disk as untracked orphans), drain the
-//!    cleaner's WAL-delete responses, seed uploaded/rotated state from local
-//!    catalog files, and evict per retention policy.
-//! 3. `remote` — per tenant, only with storage enabled: object-storage
-//!    reconciliation — LIST the remote to mark uploaded SFSTs and re-send
-//!    uploaded-but-uncataloged ones as `AddEntry`, queue un-uploaded SFST
-//!    uploads fire-and-forget (never blocks startup), and re-upload local
-//!    catalogs missing from the remote while seeding the `remote_cataloged`
-//!    set that gates SFST eviction.
+//! 1. With storage enabled, before tenant discovery:
+//!    `startup_catalog_sync` makes the local catalog set complete. It
+//!    lists the remote, raises the WAL seq high-water to the remote maximum,
+//!    downloads every own-machine catalog missing locally, and returns the
+//!    tenants it found on the remote.
+//! 2. Per tenant, from the local disk: `recover_wals`, then
+//!    `seed_from_catalog_files`.
+//! 3. Per tenant, only with storage enabled: `reconcile_remote_uploads`,
+//!    `reconcile_local_catalog_uploads`, then `recover_unuploaded`.
+//! 4. Per tenant: `recover_retention`. It needs the `remote_cataloged`
+//!    marks of step 3.
 //!
-//! This file owns only the namespace and the shared pieces:
+//! `recover_wals` and `recover_retention` send their work through the normal
+//! component path ([`crate::component::batch_recover`] /
+//! [`crate::component::drain_pending`]), so recovery and steady state share
+//! one code path.
 //!
-//! - The glob re-exports below flatten the three submodules, so consumers
-//!   import `file_lifecycle::recovery::<item>` directly (pipeline.rs does).
-//! - [`now_ns`], the wall-clock nanos helper the recovery passes and the
-//!   ledger's steady-state retention scan and uploader share (its doc lists
-//!   the grep-verified consumers).
-//! - The `#[cfg(test)]` import block below: test scaffolding, not a public
-//!   contract; `tests` is its only reader (see the comment above it).
-//!
-//! Error semantics are per phase: a closed worker channel during component
-//! replay is a fatal `anyhow` error that fails startup; the diff-sync
-//! repeats until the remote answers and fails startup only on a local error
-//! (its own contract); the remote reconciles return typed
-//! [`crate::storage::StorageError`] under a caller-side startup budget that
-//! skips remote-dependent recovery on failure while local replay and upload
-//! queueing still run. Each submodule doc carries its phase's full contract.
+//! Error semantics are per phase. A closed worker channel during component
+//! replay is a fatal `anyhow` error that fails startup. The catalog sync
+//! repeats until the remote answers and fails startup only on a local error.
+//! The remote reconciles return a typed [`crate::storage::StorageError`].
+//! Each submodule doc carries its phase's full contract.
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -67,11 +52,7 @@ pub use local::*;
 pub use remote::*;
 pub use startup::*;
 
-/// Wall-clock nanos since the Unix epoch: the timestamp source shared by the
-/// recovery passes (retention age cutoffs, catalog `uploaded_at` stamping,
-/// corrupt-catalog quarantine names) and, in steady state, by the ledger's
-/// retention scan and uploader (`otel-ledger/src/ledger/{retention,uploader}.rs`,
-/// grep-verified consumers).
+/// Wall-clock nanos since the Unix epoch.
 ///
 /// `Duration::as_nanos()` returns `u128`; the `u64` cast is safe until year
 /// 2554 (current nanos are ~1.7e18, `u64::MAX` is ~1.8e19).

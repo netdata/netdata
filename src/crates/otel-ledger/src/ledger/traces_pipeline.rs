@@ -1,26 +1,14 @@
-//! The traces binding — the twin of the logs binding in
-//! [`super::pipeline`]. It pre-spawns the shared
-//! [`crate::indexer::Indexer`] for the **traces** signal, whose indexing
-//! operations run [`ng_index::index_traces_file`] (full span columns,
-//! `TIDX` trace-id index, `TBLM` trace-id bloom, `EVNB`/`LNKB` event/link
-//! chunks), and delegates the rest to [`super::pipeline::build_pipeline`].
-//! Only the signal, the handler, and the GET shim differ from logs.
+//! The traces binding, the twin of the logs binding in
+//! [`super::pipeline`]. It spawns the shared [`crate::indexer::Indexer`] for
+//! the traces signal and delegates the rest to
+//! [`super::pipeline::build_pipeline`]. Only the signal, the handler, and the
+//! GET shim differ from logs.
 //!
-//! The handler is [`OtelTracesHandler`] (`rpc/traces/`), the `otel-traces`
-//! Function. It shares the logs pipeline's chunk cache (seqs are
-//! process-global, so `(seq, index)` keys never collide across signals) and
-//! the shared download cache, but installs its own GET shim
-//! ([`super::rpc::patch_traces_args_into_payload`]): it synthesizes a
-//! payload only for the literal `info` token — the `{"info": {}}`
-//! capability-discovery selector. A data GET is not rejected: the
-//! bridge deserializes the absent payload from `{}` into the
-//! selector-less `TracesMode::Functions` default view (every param
-//! has a serde default, `last` via a custom `default_limit` fn) and
-//! silently drops the GET's window args.
-//!
-//! Consumers: `Ledger::new` (`mod.rs`) builds this pipeline right after the
-//! logs one; the registry/catalog/recovery machinery is
-//! [`super::pipeline::build_pipeline`]'s, reused unchanged.
+//! The handler is [`OtelTracesHandler`], the `otel-traces` Function. It
+//! shares the logs pipeline's chunk cache (seqs are process-global, so
+//! `(seq, index)` keys never collide across signals) and the shared download
+//! cache, but installs its own GET shim
+//! ([`super::rpc::patch_traces_args_into_payload`]).
 
 use otel_bridge::config::LifecycleConfig;
 use otel_bridge::function::{HandlerAdapter, RawFunctionHandler};
@@ -70,9 +58,6 @@ pub(crate) async fn build_traces_pipeline(
     indexing_operations: &IndexingOperations,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    // The traces indexer: its indexing operations decode ng-flatten trace
-    // frames (payload format 3) into a trace SFST (full span columns + TIDX +
-    // TBLM + EVNB/LNKB).
     let indexer = ComponentHandle::spawn::<Indexer>(
         (signal, indexing_operations.clone()),
         cancel.child_token(),
@@ -102,9 +87,6 @@ pub(crate) async fn build_traces_pipeline(
             let traces_handler = OtelTracesHandler::new(registries, chunk_cache, prefixes, remote);
             let handler: Arc<dyn RawFunctionHandler> =
                 Arc::new(HandlerAdapter::new(traces_handler));
-            // The traces-own GET shim: the literal `info` token →
-            // `{"info": {}}`, anything else → no payload (the bridge then
-            // deserializes `{}` into the default Functions view).
             (
                 handler,
                 super::rpc::patch_traces_args_into_payload as ArgShim,

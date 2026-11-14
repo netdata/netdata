@@ -1,19 +1,11 @@
 //! Tests for the two GET arg→payload shims in `mod.rs`:
-//! `patch_args_into_payload` — the logs pipeline's shim, replicating
-//! the netdata-plugin-rt one — and `patch_traces_args_into_payload` — the
-//! traces pipeline's strict-shape variant (wired per-signal in
-//! pipeline.rs / traces_pipeline.rs). Pure functions over
-//! `(args, payload)`, so there are no fixtures: each test calls a
-//! shim directly (the synthesis cases parse the bytes back to a
-//! `serde_json::Value`).
+//! `patch_args_into_payload` for logs and `patch_traces_args_into_payload`
+//! for traces. Both are pure functions over `(args, payload)`, so there are
+//! no fixtures: each test calls a shim directly (the synthesis cases parse
+//! the bytes back to a `serde_json::Value`).
 //!
-//! Each test pins one synthesis contract, commented inline. Not
-//! pinned here: parsing of the synthesized shapes into each signal's
-//! request type — traces/wire pins `{"info": {}}`, logs/handler's
-//! `patched_args_payload_parses_as_a_logs_request` parses the logs
-//! shim's actual output — and dispatch's shim-result-wins precedence
-//! (`dispatch.rs`), of which only the shims' refuse-over-payload
-//! guards are exercised here.
+//! Not tested here: parsing of the synthesized payloads into each signal's
+//! request type.
 
 use super::{patch_args_into_payload, patch_traces_args_into_payload};
 use serde_json::{Value, json};
@@ -27,10 +19,9 @@ fn patched(args: &[&str]) -> Value {
 
 #[test]
 fn data_request_args_synthesize_window_with_info_false() {
-    // No `info` token: a data request, so the synthesized flag must
-    // be `false` — the handler runs the data path, not capability
-    // discovery. Unknown tokens (`slice:true`) are dropped from
-    // synthesis: only info/after/before reach the payload.
+    // No `info` token, so the synthesized flag is `false`. Unknown
+    // tokens (`slice:true`) are dropped from synthesis: only
+    // info/after/before reach the payload.
     assert_eq!(
         patched(&["after:100", "before:200", "slice:true"]),
         json!({"info": false, "after": 100, "before": 200})
@@ -62,8 +53,7 @@ fn out_of_range_window_tokens_are_skipped_like_non_numeric_ones() {
 #[test]
 fn no_synthesis_without_args_or_over_an_existing_payload() {
     // No args: nothing to synthesize. An existing payload (a POST
-    // body, or the upstream netdata-plugin-rt shim's output) is never overwritten:
-    // the shim returns None and the caller falls back to it.
+    // body) is never overwritten: the shim returns None.
     assert!(patch_args_into_payload(&[], None).is_none());
     assert!(patch_args_into_payload(&["info".to_string()], Some(b"{}")).is_none());
 }
@@ -87,10 +77,7 @@ fn traces_shim_synthesizes_only_the_strict_info_object() {
 #[test]
 fn traces_shim_synthesizes_nothing_for_data_gets() {
     let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-    // No info token: no payload. The bridge then deserializes the
-    // absent payload from `{}` into the selector-less Functions view
-    // with default params — a default query; the GET's window args
-    // are dropped, not rejected with a 400.
+    // No info token: no payload. The GET's window args are dropped.
     assert!(patch_traces_args_into_payload(&args(&[]), None).is_none());
     assert!(patch_traces_args_into_payload(&args(&["after:100", "before:200"]), None).is_none());
     // The payload guard is load-bearing: dispatch gives synthesized

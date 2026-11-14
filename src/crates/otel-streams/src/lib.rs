@@ -12,8 +12,8 @@ pub mod sender;
 pub mod sse;
 pub mod synth;
 // Deterministic synthetic-traces generator: regression-test tooling for edge
-// cases (orphans, multi-root, skew, resends); real development traffic comes
-// from the OTel demo (plan decision D6).
+// cases (orphans, multi-root, skew, resends). Real development traffic comes
+// from the OTel demo.
 pub mod synth_traces;
 pub mod wikimedia;
 pub mod ws;

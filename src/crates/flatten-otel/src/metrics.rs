@@ -1,10 +1,7 @@
 //! Flattens an OTel `ExportMetricsServiceRequest` into one JSON map per
-//! gauge/sum data point or histogram bucket, in encounter order. lib.rs
-//! re-exports the entry point as [`flatten_metrics_request`]; data-point
+//! gauge/sum data point or histogram bucket, in encounter order. Data-point
 //! attributes, resource, and scope flattening reuse the lib.rs helpers, so
-//! lib.rs's contracts (dot-joined keys, object stripping, last-wins
-//! duplicates, non-finite doubles → `0`, bytes → base64, missing values →
-//! `null`, `resource.*`/`scope.*` prefixes) apply here unchanged.
+//! their rules apply here unchanged.
 //!
 //! # Keys
 //!
@@ -23,7 +20,7 @@
 //! bucket bound is exposed as a string under the bare key `bucket`
 //! (`+Inf` for the overflow bucket) and marked as the dimension identity
 //! by the pseudo-attribute `metric.attributes._nd_dimension` (a Netdata
-//! marker, not a real attribute; nothing in-repo reads it).
+//! marker, not a real attribute).
 //!
 //! # Semantics
 //!
@@ -33,12 +30,9 @@
 //! `null` here instead of the `0` attribute flattening produces.
 //!
 //! Dropped input: gauge/sum data points without a value, histogram data
-//! points without buckets, metrics without `data`, and
-//! `ExponentialHistogram`/`Summary` metrics, which are dropped whole with
-//! a warning printed to stderr.
-//!
-//! [`flatten_metrics_request`] has no in-repo caller today; see the
-//! lib.rs module docs for the consumer picture.
+//! points with empty `bucket_counts` or `explicit_bounds`, metrics without
+//! `data`, and `ExponentialHistogram`/`Summary` metrics, which are dropped
+//! whole with a warning printed to stderr.
 use serde_json::{Map as JsonMap, Value as JsonValue, json};
 
 use opentelemetry_proto::tonic::{

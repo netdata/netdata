@@ -1,8 +1,7 @@
-//! Shared fixtures for the traces rpc test suites (sources/tests.rs,
-//! handler/tests.rs, handler/remote_tests.rs): OTLP request builders,
-//! registry installers, REAL trace-WAL bytes (OTLP → ng-flatten trace
+//! Shared fixtures for the traces rpc test suites: OTLP request builders,
+//! registry installers, real trace-WAL bytes (OTLP → ng-flatten trace
 //! frames) so engine chunk indexing runs the actual traces indexing,
-//! REAL sealed-SFST bytes written by that same indexing, and the
+//! real sealed-SFST bytes written by that same indexing, and the
 //! remote-storage [`TestRemote`]. Test-only (`#[cfg(test)]` at the
 //! module decl).
 
@@ -28,8 +27,7 @@ pub(crate) fn make_registries() -> Arc<RwLock<TenantRegistries>> {
 }
 
 /// A hand-set `sfst::Summary` with empty `content_meta` — only
-/// [`install_sfst`] needs one. The count 6 is not arbitrary: the
-/// sources suite asserts it passes through capture unchanged.
+/// [`install_sfst`] needs one.
 pub(crate) fn summary(record_count: u32, min_s: u32, max_s: u32) -> sfst::Summary {
     sfst::Summary {
         min_timestamp_s: min_s,
@@ -47,11 +45,7 @@ pub(crate) fn test_file_id(seq: u64) -> FileId {
 
 /// Track a sealed SFST under `tenant` and return its registry path.
 /// Registry state only — no file is ever written: the tracked size is
-/// a flat 1 KiB and the summary comes from [`summary`]. Tests lean on
-/// that shortcut two ways: sources capture maps registry state without
-/// opening sealed files (the missing bytes are invisible to it), and
-/// handler tests expect a probe of the missing file to fail as
-/// `source_failure`.
+/// a flat 1 KiB and the summary comes from [`summary`].
 pub(crate) async fn install_sfst(
     registries: &Arc<RwLock<TenantRegistries>>,
     tenant: &str,
@@ -75,8 +69,7 @@ pub(crate) fn otlp_req(trace_byte: u8, span_count: u8, base_ns: u64) -> ExportTr
     otlp_req_svc(trace_byte, span_count, base_ns, "svc")
 }
 
-/// Like [`otlp_req`], with an explicit `service.name` resource attribute
-/// — the search filter tests select on it.
+/// Like [`otlp_req`], with an explicit `service.name` resource attribute.
 pub(crate) fn otlp_req_svc(
     trace_byte: u8,
     span_count: u8,
@@ -115,8 +108,7 @@ pub(crate) fn otlp_req_svc(
     }
 }
 
-/// Like [`otlp_req_svc`], with span 1 carrying an OTLP ERROR status —
-/// feeds the overview/grid error totals and the status-selection tests.
+/// Like [`otlp_req_svc`], with span 1 carrying an OTLP ERROR status.
 pub(crate) fn otlp_req_err(
     trace_byte: u8,
     span_count: u8,
@@ -131,9 +123,9 @@ pub(crate) fn otlp_req_err(
     req
 }
 
-/// One trace whose spans start at the EXACT given times (ns) — for
+/// One trace whose spans start at the exact given times (ns) — for
 /// tests where a trace's envelope start differs materially from its
-/// newest span (the search rank key). Span 1 is the root.
+/// newest span. Span 1 is the root.
 pub(crate) fn otlp_req_at(
     trace_byte: u8,
     span_starts_ns: &[u64],

@@ -2,23 +2,7 @@
 //!
 //! [`UploadRetry`] is a passive, in-memory queue of uploader requests the
 //! remote rejected. It persists nothing: after a restart, recovery's
-//! `recover_unuploaded` re-derives the backlog from disk. `otel-ledger`'s
-//! `Ledger` drives it — `record_failure` on `*Failed` uploader responses
-//! (only while the local file still exists; an evicted file can never
-//! upload), `take_due` on its 30-second retry timer with due requests
-//! re-sent through the uploader channel, and the `clear_*` methods once an
-//! upload succeeds.
-//!
-//! Before this queue, `*Failed` responses were logged and dropped, so a
-//! transient remote outage stranded those files until the next process
-//! restart re-drove `recover_unuploaded`. Capped exponential backoff now
-//! re-issues failed SFST and catalog uploads automatically once the remote
-//! recovers.
-//!
-//! Per project decision, a *persistently* failing remote is allowed to
-//! accumulate local files without bound (no disk ceiling); the operator is
-//! the one responsible for fixing the remote, alerted via the warn/error
-//! logs the retry tick emits.
+//! `recover_unuploaded` re-derives the backlog from disk.
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -82,8 +66,7 @@ impl UploadRetry {
         waiting
     }
 
-    /// Highest attempt count across pending items (0 if empty); drives the
-    /// retry tick's warn→error escalation at [`PERSISTENT_FAILURE_ATTEMPTS`].
+    /// Highest attempt count across pending items (0 if empty).
     pub fn max_attempts(&self) -> u32 {
         self.items.values().map(|i| i.attempts).max().unwrap_or(0)
     }

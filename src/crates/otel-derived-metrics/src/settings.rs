@@ -2,7 +2,7 @@
 //! replace them.
 //!
 //! The variables are an escape hatch, not configuration: the usual values
-//! are meant to fit every install, and `otel.yaml` has no section for them.
+//! are meant to fit every install.
 
 use std::ffi::OsStr;
 

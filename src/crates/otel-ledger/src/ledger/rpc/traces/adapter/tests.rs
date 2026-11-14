@@ -1,40 +1,12 @@
 //! Tests for the otel-traces wire adapter ([`super::adapter`]) — the
 //! pure mapping between the `otel-traces` wire types and the
-//! wire-neutral [`sfsq::traces`] engine, consumed by `handler.rs`.
+//! wire-neutral [`sfsq::traces`] engine.
 //! Fixtures are synthetic `sfst` spans/summaries and hand-written
 //! cursor strings; `now` is always an argument, so nothing here
 //! touches the clock, files, or a runtime.
 //!
-//! Pins:
-//!
-//! - [`parse_trace_id`]: trim + case-insensitive accept with a
-//!   canonical lowercase echo, the "32 hex" rejection message, and
-//!   the all-zero id parsing here (its rejection is the handler's
-//!   pin);
-//! - [`to_trace_result`]: the whole wire envelope — echoed lowercase
-//!   id, coverage echo, status, items, summary_root, roots/children,
-//!   an ABSENT `parent_span_id` for roots, event/link sub-shapes with
-//!   full attribute keys, the one `field_kinds` map over attribute keys
-//!   with each set in canonical order — plus the empty-trace degenerate;
-//!   the emission rule (keys and `trace_state` only; internal copies
-//!   never; names outside the vocabulary dropped with `dropped_fields`);
-//!   the resource table (each resource once, by index, in first-use
-//!   order, lossless); the byte budget's accounting;
-//! - the keys: every key the wire takes, pinned literally (the UI
-//!   spells exactly these), and the rejections with their messages;
-//! - the cursor codec: encode/parse round-trip, malformed
-//!   rejections, over-cap walks advised to narrow;
-//! - window canonicalization: the now-derived default window, the
-//!   anchor-frozen window, inverted explicit bounds;
-//! - search pagination: a cursor only for a full complete page,
-//!   after-key filtering with tie runs and no straddling duplicates,
-//!   served accumulation + cap, partial statuses ending the walk
-//!   with the reason on the wire, the service breakdown, and the
-//!   cursor's frozen window.
-//!
-//! Not pinned here: `validate_trace_bounds` and the overview
-//! converter (covered end-to-end by the
-//! handler tests) and request deserialization (the wire tests).
+//! Not pinned here: `validate_trace_bounds`, the overview converter, and
+//! request deserialization.
 use super::*;
 use serde_json::json;
 use sfsq::traces::{FieldKinds, QueryStatus};
@@ -67,8 +39,7 @@ fn rejects_wrong_length_and_non_hex() {
 #[test]
 fn unset_id_parses_here_and_is_the_engines_call() {
     // The all-zero sentinel is syntactically valid hex and parses
-    // here; rejecting the lookup is the ENGINE's job (its precise
-    // message is pinned in the handler tests).
+    // here; rejecting the lookup is the engine's job.
     let id = parse_trace_id("00000000000000000000000000000000").unwrap();
     assert!(id.is_unset());
 }
@@ -570,9 +541,9 @@ fn window_defaults_to_the_recent_span_and_anchors_freeze_it() {
     assert_eq!(w.start_ns, 9_100_000_000_000);
     assert_eq!(w.end_ns, 10_000_000_000_000);
 
-    // An anchor page uses the cursor's FROZEN window verbatim — the
-    // request's own bounds and the drifted `now` are ignored, so every
-    // page of one walk ranks the same corpus.
+    // An anchor page uses the cursor's frozen window verbatim — the
+    // drifted `now` is ignored, so every page of one walk ranks the
+    // same corpus.
     let c = cursor(9_000, 9_800, 9_500_000_000_000, 0x01, 2);
     let w = resolve_window(0, 0, 99_999, Some(&c)).unwrap();
     assert_eq!(w.capture, 9_000..9_800);
@@ -589,7 +560,7 @@ fn summary(id_byte: u8, start_ns: i64) -> sfsq::traces::TraceSummary {
     summary_ranked(id_byte, start_ns, start_ns)
 }
 
-/// A summary whose envelope start and RANK key (newest matched-span
+/// A summary whose envelope start and rank key (newest matched-span
 /// start) differ — the shape real multi-span traces have.
 fn summary_ranked(id_byte: u8, envelope_ns: i64, rank_ns: i64) -> sfsq::traces::TraceSummary {
     sfsq::traces::TraceSummary {
@@ -635,7 +606,7 @@ fn completion_capture_range_clamps_and_saturates() {
     );
 }
 
-// The page-1 cursor carries the MATCH window, never the widened
+// The page-1 cursor carries the match window, never the widened
 // completion range.
 #[test]
 fn cursor_freezes_the_original_window() {
@@ -717,9 +688,8 @@ fn anchor_page_drops_everything_at_or_above_the_after_key() {
 
 #[test]
 fn straddling_trace_does_not_duplicate_below_the_boundary() {
-    // The review-caught flaw of the first (window-narrowing) design:
-    // trace F matched spans at ranks 70 and 10; page 1 served it at
-    // rank 70 with tail U at 50. The next page reruns the SAME
+    // Trace F matched spans at ranks 70 and 10; page 1 served it at
+    // rank 70 with tail U at 50. The next page reruns the same
     // window, so F still ranks 70 — at-or-above the key — and drops
     // instead of re-entering at rank 10.
     let c = cursor(WIN.0, WIN.1, 50, 0x1A, 2); // tail U(50), served F+U
@@ -1062,8 +1032,8 @@ impl sfst::trace_combine::SpanSource for VecSource {
     }
 }
 
-/// Merge `spans` as the trace handler does (the wire shaper and its
-/// budget), then shape the engine's result into the wire.
+/// Merge `spans` through the wire shaper and its budget, then shape the
+/// engine's result into the wire.
 fn shaped_trace(spans: Vec<sfst::TraceSpan>) -> TraceResult {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut source = VecSource(spans);
@@ -1201,8 +1171,7 @@ fn pairs(list: &[(&str, &str)]) -> Vec<(String, String)> {
 /// order: one more pair, or the same pairs in another order, is another
 /// entry. A span without resource attributes names none. Expanding a span
 /// (its entry's pairs, then its fields) gives back exactly the pairs the
-/// emission rule left on it before resources were shared, since every
-/// source stores a span's resource pairs first.
+/// emission rule left on it before resources were shared.
 #[test]
 fn each_resource_goes_out_once_and_expands_losslessly() {
     let front = pairs(&[
@@ -1269,9 +1238,8 @@ fn each_resource_goes_out_once_and_expands_losslessly() {
     }
 }
 
-/// A layout no source writes, resource pairs after other pairs, still
-/// shares by the pairs in order and expands with its resource pairs
-/// first.
+/// A layout with resource pairs after other pairs still shares by the
+/// pairs in order and expands with its resource pairs first.
 #[test]
 fn resource_pairs_out_of_front_still_share_by_their_order() {
     let mut first = span(1, None, 1_000);
@@ -1296,8 +1264,7 @@ fn resource_pairs_out_of_front_still_share_by_their_order() {
     );
 }
 
-/// Merge `spans` as the trace handler does: the engine with the wire
-/// shaper and its budget.
+/// Merge `spans` through the engine with the wire shaper and its budget.
 fn merged(spans: Vec<sfst::TraceSpan>) -> sfst::trace_combine::CombineOutcome {
     let trace_id = parse_trace_id("11111111111111111111111111111111").unwrap();
     let mut source = VecSource(spans);

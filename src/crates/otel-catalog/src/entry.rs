@@ -1,35 +1,7 @@
 //! The catalog's row type: one uploaded SFST as the remote catalog records it.
 //!
-//! `CatalogEntry` is the row type behind both roles of `Catalog` (sibling
-//! `catalog.rs`): the file-lifecycle catalog builder accumulates rows and
-//! serializes them into the `Envelope`'s `entries` array, and every reader
-//! parses them back out of it. Production construction goes through
-//! file-lifecycle `helpers::build_catalog_entry`, the only production
-//! constructor: it copies `id`, the summary fields and `size` from the
-//! registered `sfst::File`, and stamps the upload's `remote_key`,
-//! `uploaded_at_ns` and `remote_etag`. The remote-LIST reconcile
-//! (file-lifecycle `recovery/remote.rs`) is the second caller — the
-//! flush-failure repair re-cataloging uploaded-but-uncataloged SFSTs —
-//! stamping "now" and `None` when the true upload metadata is unknown.
-//!
 //! Serde: entries serialize under their Rust field names inside the `JSON`
-//! chunk; `remote_etag` is the only `#[serde(default)]` field, and this
-//! module's roundtrip test pins a lossless serialize↔parse round trip.
-//! Parse failures surface as `Error::Json` through `Catalog::from_json`; a
-//! well-formed body with wrong values is not checked here — recovery's
-//! `validate_catalog` rejects it by cross-checking every entry against its
-//! catalog and remote key.
-//!
-//! Consumers (grep-verified): sibling `catalog.rs` (map values, `find`
-//! yields) and `registry.rs` (`read_entries` returns them); file-lifecycle
-//! `query.rs` (remote-plan selection), `remote_read.rs` (fetch-back:
-//! downloads through `remote_key`, returns `summary()` results as
-//! `SelectedFile`s), `registry.rs::with_catalog` (folds `content_meta` into
-//! the stream selector), `ipc.rs` (`AddEntry` carries a row) and
-//! `recovery/startup.rs` (`validate_catalog` parses each entry's
-//! `remote_key`); otel-ledger `ledger/uploader.rs` (constructs through the
-//! helper) and its rpc handlers (consume the remote plan; traces
-//! `rpc/traces/sources.rs` also calls `summary()`).
+//! chunk. A well-formed body with wrong values is not checked here.
 use file_registry::{ByteSize, FileId, TimestampNs};
 use serde::{Deserialize, Serialize};
 
@@ -43,66 +15,42 @@ use serde::{Deserialize, Serialize};
 pub struct CatalogEntry {
     /// The SFST's full identity (`FileId` — see file-registry `types.rs`) and
     /// the map key of `Catalog::entries`: one entry per `FileId` per catalog.
-    /// `id.partition_key` is the partition `Query::partition_keys` filters on;
-    /// `id.seq` sorts remote-plan output and, with the identity, forms the
-    /// `SeqKey` lifecycle key.
+    /// `id.partition_key` is the partition `Query::partition_keys` filters on.
     pub id: FileId,
-    /// The remote object key of the SFST's bytes, built at upload-request
-    /// time by file-lifecycle `remote_keys::sfst` and echoed back on
-    /// `Uploaded`. The fetch-back path downloads through it
-    /// (`remote_read.rs`), and recovery's `validate_catalog` requires it to
-    /// parse as an SFST key of this machine, tenant and signal, dated like
-    /// its catalog, whose embedded `FileId` equals `id`.
+    /// The remote object key of the SFST's bytes.
     pub remote_key: String,
     /// Earliest record timestamp in the file, seconds since the Unix epoch.
-    /// From the SFST summary; drives the inclusive `[min, max]` overlap
-    /// filter in `Catalog::find` and the min-ts filename field
-    /// `Catalog::fold` computes.
+    /// From the SFST summary.
     pub min_timestamp_s: u32,
     /// Latest record timestamp in the file, seconds since the Unix epoch.
-    /// From the SFST summary; the max-ts of the range `Catalog::fold`
-    /// computes.
+    /// From the SFST summary.
     pub max_timestamp_s: u32,
     /// Number of records (rows) the file holds, from the SFST summary.
-    /// Production entries are never empty: otel-ledger deletes an empty
-    /// index before upload, so nothing with `record_count == 0` is cataloged.
     pub record_count: u32,
-    /// Opaque content-plane identity blob, stored verbatim and never parsed
-    /// by the catalog; the content plane decodes it for display. Carried
-    /// through `summary()` and the stream selector's fold, so the query layer
-    /// sees the blob the file was written with. The partition key is NOT
-    /// stored here — it lives only in `id`, the single source of truth.
+    /// Opaque stream identity blob, stored verbatim and never parsed by the
+    /// catalog. Carried through `summary()`. The partition key is not stored
+    /// here; it lives only in `id`.
     pub content_meta: Vec<u8>,
-    /// The SFST's file size in bytes, from the registered `sfst::File`.
-    /// Sums into the remote plan's footprint (`RemotePlanInput::plan_within`)
-    /// and bounds the fetch-back download (`remote_read.rs` sizes the
-    /// deadline from it, and the download cache verifies the returned bytes
-    /// against it).
+    /// The SFST's file size in bytes.
     pub size: ByteSize,
     /// Nanoseconds since the Unix epoch, stamped at entry construction: the
     /// upload-completion time on the normal path, "now" on the remote-LIST
-    /// rebuild (the true upload time is unknown). Recorded but not read by
-    /// any production code today.
+    /// rebuild (the true upload time is unknown).
     pub uploaded_at_ns: TimestampNs,
     /// Remote object validator (the S3 ETag, when the backend returns one)
-    /// captured at upload time: the uploader forwards the `Storage` upload
-    /// metadata and `build_catalog_entry` stamps it; `None` when the backend
-    /// returned none and for entries rebuilt from a remote LIST. No
-    /// production code reads it today — recorded for future integrity/scrub
-    /// use. `#[serde(default)]` covers a same-version catalog whose writer
-    /// omitted the key (it parses as `None`); it is NOT a cross-version
-    /// compat mechanism — catalogs of any other `FORMAT_VERSION` are
-    /// hard-rejected before any field is deserialized. Serialization always
-    /// writes the key (`null` when `None`).
+    /// captured at upload time. `None` when the backend returned none and for
+    /// entries rebuilt from a remote LIST. `#[serde(default)]` covers a
+    /// same-version catalog whose writer omitted the key (it parses as
+    /// `None`). It is not a cross-version compat mechanism: catalogs of any
+    /// other `FORMAT_VERSION` are rejected before any field is deserialized.
+    /// Serialization always writes the key (`null` when `None`).
     #[serde(default)]
     pub remote_etag: Option<String>,
 }
 
 impl CatalogEntry {
     /// Rebuild the content-agnostic `file_registry::FileSummary` from the
-    /// entry's own fields — the inverse of what `build_catalog_entry` copied
-    /// in, so a fetch-back hands the query layer the same summary the SFST
-    /// carried (`remote_read.rs`, traces `rpc/traces/sources.rs`).
+    /// entry's own fields.
     pub fn summary(&self) -> file_registry::FileSummary {
         file_registry::FileSummary {
             min_timestamp_s: self.min_timestamp_s,
@@ -115,11 +63,9 @@ impl CatalogEntry {
 
 /// Deterministic opaque partition key for tests. The catalog treats
 /// `partition_key` as an opaque `u64` and never decodes it, so tests fabricate
-/// distinct keys per logical stream without depending on the content-plane
-/// identity codec — same label → same key, different label → (almost surely)
-/// different key. A `pub(crate)` fixture for the sibling tests (`catalog.rs`,
-/// `registry.rs`); the same helper is mirrored in file-lifecycle
-/// (`test_helpers.rs`), `wal` and `sfst`.
+/// distinct keys per logical stream without depending on the stream identity
+/// codec — same label → same key, different label → (almost surely)
+/// different key.
 #[cfg(test)]
 pub(crate) fn opaque_partition_key(namespace: &str, name: &str) -> u64 {
     use std::hash::{Hash, Hasher};
@@ -147,10 +93,8 @@ mod tests {
             min_timestamp_s: 1_700_000_000,
             max_timestamp_s: 1_700_003_600,
             record_count: 1234,
-            // A hand-built blob for ("prod", "api") in the content codec's
-            // layout: version 1, u16-LE-len-prefixed namespace then name —
-            // a reader with the codec would decode it, while the catalog
-            // itself never parses it. The partition key lives in `id` above.
+            // A hand-built blob for ("prod", "api"); the catalog itself
+            // never parses it. The partition key lives in `id` above.
             content_meta: vec![1, 4, 0, b'p', b'r', b'o', b'd', 3, 0, b'a', b'p', b'i'],
             size: ByteSize(9876),
             uploaded_at_ns: TimestampNs(1_700_003_700_000_000_000),
@@ -160,8 +104,8 @@ mod tests {
         let parsed: CatalogEntry = serde_json::from_slice(&json).unwrap();
         assert_eq!(parsed, entry);
 
-        // The stored name of the partition key is part of the catalog format:
-        // catalogs written before the Rust field was renamed must still parse.
+        // The stored name of the partition key is part of the catalog format,
+        // so renaming the Rust field must not change it.
         let text = String::from_utf8(json).unwrap();
         assert!(text.contains(r#""part_key":42"#), "{text}");
         assert!(!text.contains("partition_key"), "{text}");

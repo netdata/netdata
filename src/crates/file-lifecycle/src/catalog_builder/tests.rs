@@ -1,28 +1,5 @@
 //! Tests for the catalog builder: each test spawns the real `CatalogBuilder`
-//! through `ComponentHandle` and drives it with the requests the ledger sends,
-//! pinning the parent module's contract end to end.
-//!
-//! - `AddEntry` below `rotation_count` is accepted and writes no catalog file;
-//!   at `rotation_count` the scope rotates to a file at its `scope_path`
-//!   location that parses back through `Catalog::from_container_bytes` and
-//!   holds exactly that scope's entries.
-//! - Rotation drains the accumulator: the next rotation holds only the
-//!   post-rotation entries, under a new filename.
-//! - A rotation that gives the name of an existing file replaces it and
-//!   holds only its own entries (each comes from a confirmed upload; an
-//!   older file's entries are not carried over).
-//! - A `rotation_count` of 1 rotates on every `AddEntry`.
-//! - A failed rotation returns `RotationFailed` and keeps the accumulator; the
-//!   next trigger retries with every entry still in it.
-//! - Scopes `(tenant, date, machine, instance)` accumulate and rotate
-//!   independently: a foreign-identity entry neither joins nor triggers
-//!   another scope's rotation.
-//! - The time trigger rotates a non-empty scope once its age reaches
-//!   `rotation_period`, on a check tick; the count trigger needs no clock
-//!   progress — both pinned on a paused tokio clock.
-//! - `Flush` rotates every non-empty scope and then replies `FlushComplete`
-//!   exactly once — on an idle builder too, and after a `RotationFailed`
-//!   ("done", not "all succeeded").
+//! through `ComponentHandle` and drives it with the requests the ledger sends.
 use super::*;
 use crate::component::ComponentHandle;
 use file_registry::FileId;

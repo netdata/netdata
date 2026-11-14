@@ -1,18 +1,9 @@
 //! The `otel-traces` Function handler pinned end to end through
-//! `on_call`: every mode's wire contract (info, trace, search, the
-//! enumeration pair, and the Functions view's embedded window
-//! aggregate), window canonicalization, tie-safe
-//! pagination, the scope gates, tenant scoping, and the transport
-//! status boundary (shape errors 400, semantic errors 500).
+//! `on_call`.
 //!
 //! Fixtures are real traces: OTLP requests written into real WALs or
 //! indexed by the production indexing, installed through the shared
-//! `fixtures` module into fresh registries over throwaway dirs. What
-//! the lower layers already pin is not re-tested here: wire shapes in
-//! `wire/tests.rs`, adapter mappings and window resolution in
-//! `adapter/tests.rs`, source capture in `sources/tests.rs`, engine
-//! semantics in the `sfsq` traces suites, and the remote read-back
-//! path in `handler/remote_tests.rs`.
+//! `fixtures` module into fresh registries over throwaway dirs.
 use super::*;
 use crate::ledger::rpc::traces::fixtures::{
     indexed_traces, install_sealed, install_sfst, install_wal, make_registries, otlp_req,
@@ -93,8 +84,8 @@ async fn info_returns_the_descriptor() {
 }
 
 /// A request with no mode selector (top-level Functions params only)
-/// IS the Functions view: the search page wrapped as `{type, data}`. On
-/// an empty agent that's an empty COMPLETE page, never an error.
+/// is the Functions view: the search page wrapped as `{type, data}`. On
+/// an empty agent that's an empty complete page, never an error.
 #[tokio::test]
 async fn a_mode_less_request_wraps_the_search_page_as_traces() {
     let resp = call(json!({"after": -3600, "before": 0, "last": 7}))
@@ -133,12 +124,11 @@ async fn every_mode_is_implemented_an_empty_agent_answers_them_all() {
     }
 }
 
-// Conflicting/malformed selector bodies never reach on_call — they
-// fail request DESERIALIZATION (pinned in the wire tests) and the
-// bridge maps them to transport 400s (pinned by the raw-transport
-// tests at the end of this file).
+// Conflicting or malformed selector bodies fail request deserialization,
+// so they never reach on_call. The raw-transport tests at the end of
+// this file pin the transport 400s.
 
-/// The Function declaration the bridge advertises: global visibility,
+/// The Function declaration: global visibility,
 /// the `traces` tag, and the SIGNED_ID | SAME_SPACE | COMMERCIAL_SPACE |
 /// SENSITIVE_DATA access mask.
 #[test]
@@ -778,9 +768,9 @@ fn empty_field_kinds() -> serde_json::Value {
 
 #[tokio::test]
 async fn semantically_invalid_trace_requests_are_clean_client_errors() {
-    // SHAPE errors (null/array selectors, missing/unknown fields) fail
-    // request deserialization and are pinned in the wire tests; what
-    // stays here is the SEMANTIC validation the handler owns.
+    // Shape errors (null/array selectors, missing/unknown fields) fail
+    // request deserialization. Only semantic validation is exercised
+    // here.
     for (body, needle) in [
         (json!({"trace": {"id": "xyz"}}), "32 hex"),
         // The unset sentinel: rejected pre-capture with the engine
@@ -1150,7 +1140,7 @@ async fn search_completion_captures_slack_files_and_skips_beyond_slack() {
     )
     .await;
     // Tracked, never written: a probe is observable as source_failure.
-    // Inside the slack band (30min past the window edge).
+    // Inside the slack band (the file starts 30 min after the window start).
     install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
     let h = make_handler_over(registries);
     let v = list(&h, window_body()).await.unwrap();
@@ -1224,7 +1214,7 @@ async fn chips_narrow_by_service_operation_and_attributes() {
 
 /// The OTel defaults are selectable by name: `status: UNSET` matches
 /// the spans that carry no status, `kind: UNSPECIFIED` the spans with
-/// no kind — the proto default IS the stored value.
+/// no kind — the proto default is the stored value.
 #[tokio::test]
 async fn the_otel_defaults_are_selectable_in_the_functions_view() {
     use crate::ledger::rpc::traces::fixtures::otlp_req_err;
@@ -1350,8 +1340,7 @@ async fn invalid_list_requests_are_clean_client_errors() {
 async fn pagination_survives_a_trace_whose_envelope_predates_its_rank() {
     // F's spans start at T+15s and T+45s: envelope 15, rank 45 (its
     // newest span). With an envelope-anchored cursor, page 2's window
-    // would end at 15s+1 and U (rank 30s) would be gapped out — the
-    // live-demo failure this pins.
+    // would end at 15s+1 and U (rank 30s) would be gapped out.
     use crate::ledger::rpc::traces::fixtures::otlp_req_at;
     let registries = make_registries();
     install_wal(
@@ -1423,7 +1412,7 @@ async fn anchor_pages_ignore_the_requests_own_window() {
     let v1 = list(&h, body).await.unwrap();
     let next = v1["anchor"]["next"].clone();
 
-    // Page 2 with a WRONG window — the frozen one must win.
+    // Page 2 with a wrong window — the frozen one must win.
     let v2 = list(
         &h,
         json!({"after": 1, "before": 2, "limit": 2, "anchor": next}),
@@ -1435,8 +1424,8 @@ async fn anchor_pages_ignore_the_requests_own_window() {
 
 #[tokio::test]
 async fn late_arrivals_above_the_key_shorten_pages_but_never_duplicate() {
-    // The documented live-data caveat: traces arriving INTO the frozen
-    // window ABOVE the after-key consume the over-fetch allowance —
+    // The documented live-data caveat: traces arriving into the frozen
+    // window above the after-key consume the over-fetch allowance —
     // pages can come up short (here: early walk end) — but nothing
     // duplicates and nothing already-served reappears.
     let registries = make_registries();
@@ -1518,7 +1507,7 @@ async fn heatmap_of(h: &OtelTracesHandler) -> serde_json::Value {
 #[tokio::test]
 async fn the_heatmap_matches_the_corpus_distribution() {
     // 100s window → 1s buckets aligned to [T_S, T_S+100). The corpus's
-    // 5 TRACES (A=1 span, B=2, C=1, D=1, E=3 — 8 stored spans), every
+    // 5 traces (A=1 span, B=2, C=1, D=1, E=3 — 8 stored spans), every
     // envelope sub-1ms (bin 0), binned at each trace's start second.
     let h = handler_with_search_corpus().await;
     let v = heatmap_of(&h).await;
@@ -1540,7 +1529,7 @@ async fn the_heatmap_matches_the_corpus_distribution() {
         .sum();
     assert_eq!(sum, 5, "cell sums equal totals.traces");
     // A starts at second 10, B at 20; the C/D pair share second 30
-    // (two traces, one cell); E is ONE trace at second 40.
+    // (two traces, one cell); E is one trace at second 40.
     assert_eq!(cells[10][0], 1);
     assert_eq!(cells[20][0], 1);
     assert_eq!(cells[30][0], 2);
@@ -1649,7 +1638,7 @@ async fn progress_of(h: &OtelTracesHandler, body: serde_json::Value) -> (usize, 
 async fn every_mode_sets_its_progress_total_and_completes_it() {
     // The corpus WAL resolves to two chunks at min_entries 4; every pass
     // ticks once per source it walks. The Functions view walks the
-    // completion range for its page AND the grid's window for its
+    // completion range for its page and the grid's window for its
     // aggregate.
     let h = handler_with_search_corpus().await;
     let windowed = |mode: &str, extra: serde_json::Value| {
@@ -1686,7 +1675,7 @@ async fn the_functions_view_aggregates_the_whole_window_beside_the_page() {
         json!({"returned": 2, "max_to_return": 2})
     );
     assert_eq!(ids(&v["data"]), ["0e", "0c"]);
-    // ...and the aggregate describes the WINDOW, not the page.
+    // ...and the aggregate describes the window, not the page.
     let o = &v["data"]["overview"];
     assert_eq!(o["version"], 1);
     assert_eq!(o["unit"], "traces");
@@ -1785,7 +1774,7 @@ async fn skip_overview_drops_the_aggregate() {
 #[tokio::test]
 async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
     let h = handler_with_search_corpus().await;
-    // A service chip AND a duration chip: the list honours both (E is
+    // A service chip and a duration chip: the list honours both (E is
     // the only svc-a trace with a ≥1µs envelope), the grid honours the
     // service chip alone — duration is its own axis.
     let mut body = functions_body(20);
@@ -1808,9 +1797,9 @@ async fn the_aggregate_follows_the_chips_but_never_the_duration_ones() {
 }
 
 /// Every trace-level word the engine owns (`trace_level_target`) but
-/// `trace_duration` (the grid's own axis), as the wire spells it, with
-/// a value an `=` chip can apply and the ids the list then shows
-/// (newest first).
+/// `trace_duration` (the grid's own axis) and `trace_start` (it has its
+/// own test), as the wire spells it, with a value an `=` chip can apply
+/// and the ids the list then shows (newest first).
 const TRACE_LEVEL_CHIPS: [(&str, &str, &[&str]); 3] = [
     ("root_service_name", "svc-a", &["0e", "0c", "0a"]),
     ("root_name", "span-1", &["0e", "0c", "0d", "0b", "0a"]),
@@ -1820,8 +1809,7 @@ const TRACE_LEVEL_CHIPS: [(&str, &str, &[&str]); 3] = [
 #[tokio::test]
 async fn trace_level_chips_filter_the_grid_too() {
     let h = handler_with_search_corpus().await;
-    // Root words read the roots the sources recorded and `trace_id`
-    // pins: the grid bins the traces the list shows.
+    // The grid bins the traces the list shows.
     for (word, value, listed) in TRACE_LEVEL_CHIPS {
         let mut body = functions_body(20);
         body["conditions"] = json!([{"key": word, "op": "=", "values": [value]}]);
@@ -1883,7 +1871,7 @@ async fn the_aggregate_captures_the_aligned_window_and_carries_its_own_status() 
     )
     .await;
     // Tracked, never written: a probe is observable as source_failure.
-    // 30 minutes past the window edge — inside the page's completion
+    // 30 minutes after the window start — inside the page's completion
     // slack (1h per side), outside the grid's aligned window.
     install_sfst(&registries, "default", 2, T_S + 1_800, T_S + 1_900).await;
     let h = make_handler_over(registries);
@@ -1906,9 +1894,7 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
     assert_eq!(v1["data"]["overview"]["totals"], json!({"traces": 5}));
     let next1 = v1["data"]["anchor"]["next"].clone();
 
-    // Page 2: the tie partner D, then B, and its own cursor. Asserted
-    // BEFORE the section, so the red run proves the page is what it
-    // always was and only the aggregate changed.
+    // Page 2: the tie partner D, then B, and its own cursor.
     let mut body = functions_body(2);
     body["anchor"] = next1.clone();
     let v2 = serde_json::to_value(call_on(&h, body.clone()).await.unwrap()).unwrap();
@@ -1923,9 +1909,7 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
         "a full anchor page still hands out its own cursor"
     );
 
-    // The same cursor through the legacy mode — which never composed an
-    // aggregate — yields the identical page: proof the omission
-    // perturbs nothing the client reads off it.
+    // The same cursor through `list` yields the identical page.
     let mut legacy = window_body();
     legacy["limit"] = json!(2);
     legacy["anchor"] = next1;
@@ -1934,10 +1918,10 @@ async fn an_anchor_page_carries_no_aggregate_and_walks_the_corpus_unchanged() {
     assert_eq!(l2["items"], v2["data"]["items"]);
     assert_eq!(l2["anchor"], v2["data"]["anchor"]);
 
-    // An anchor page reruns the cursor's FROZEN window, so its
+    // An anchor page reruns the cursor's frozen window, so its
     // aggregate would be a byte-for-byte repeat of the one the client
     // already holds: the second engine pass is skipped and the key is
-    // ABSENT, not null — `get` returning None distinguishes the two.
+    // absent, not null — `get` returning None distinguishes the two.
     assert!(
         v2["data"].get("overview").is_none(),
         "an anchor page repeats the first page's window: no second pass"
@@ -1970,7 +1954,7 @@ async fn tenant_scoping_isolates_and_defaults() {
     // Default tenant: tenant-a's data is invisible.
     let v = list(&h, body.clone()).await.unwrap();
     assert_eq!(v["items"]["returned"], 0);
-    // The owning tenant sees it — `tenant` rides at the TOP level.
+    // The owning tenant sees it — `tenant` rides at the top level.
     let mut wrapped = body.clone();
     wrapped["tenant"] = json!("tenant-a");
     let v = list(&h, wrapped).await.unwrap();
@@ -2013,11 +1997,10 @@ async fn tenant_scoping_isolates_and_defaults() {
 
 // ── The transport status boundary ───────────────────────────────────
 //
-// Shape errors fail request DESERIALIZATION in the bridge; the
-// handler's own validation rejects the rest. Both answer 400 with the
-// published `error_response` body, so the message reaches the UI as
-// `errorMessage`. These cross `HandlerAdapter::handle_raw` — the same
-// path the live bridge runs.
+// Shape errors fail request deserialization; the handler's own
+// validation rejects the rest. Both answer 400 with the published
+// `error_response` body, so the message reaches the UI as
+// `errorMessage`. These tests call `HandlerAdapter::handle_raw`.
 
 /// The `errorMessage` of a 400 body, which must be exactly
 /// `{"status": 400, "errorMessage": …}`.
@@ -2117,8 +2100,8 @@ fn capture_failures_split_between_the_caller_and_the_agent() {
 #[tokio::test]
 async fn requests_the_handler_rejects_are_400s_too() {
     // The handler's own validation (zero limit, one-sided trace
-    // bounds, bad trace id, a bad chip, a short suggest term) answers
-    // the same body as a shape error.
+    // bounds, bad trace id, a bad chip, a suggest for `trace_id`)
+    // answers the same body as a shape error.
     for (payload, needle) in [
         (&br#"{"last": 0}"#[..], "zero 'last'"),
         (
@@ -2172,8 +2155,8 @@ async fn absent_and_empty_object_payloads_use_the_functions_view() {
     assert!(bad_request_message(&body).contains("EOF"), "{body}");
 }
 
-/// Every explicit mode's response serializes its `mode` discriminator,
-/// one assertion each.
+/// The info, trace and suggest responses each serialize their `mode`
+/// discriminator, one assertion each.
 #[tokio::test]
 async fn every_response_shape_declares_its_mode() {
     let h = handler_with_search_corpus().await;
@@ -2469,8 +2452,8 @@ async fn chips_and_text_filter_the_list_and_the_grid() {
 
 /// Every chip op reaches the engine with its wire meaning: negated
 /// regex and prefix ops are NOT EXISTS, ordering ops compare numbers,
-/// root and `trace_id` chips select whole traces, and all of them
-/// filter the grid too.
+/// root and `trace_id` chips select whole traces, and all but
+/// `trace_duration` filter the grid too.
 #[tokio::test]
 async fn every_chip_op_reaches_the_engine() {
     let h = handler_with_search_corpus().await;
@@ -2540,7 +2523,7 @@ async fn every_chip_op_reaches_the_engine() {
     }
 }
 
-/// A malformed chip or text is a client error before admission.
+/// A malformed chip or text is a client error.
 #[tokio::test]
 async fn bad_chips_and_text_are_client_errors() {
     let h = handler_with_search_corpus().await;

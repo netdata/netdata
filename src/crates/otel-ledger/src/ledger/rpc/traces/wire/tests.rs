@@ -10,37 +10,10 @@
 //! cannot go (duplicate top-level keys). One test reads the published
 //! `FUNCTION_UI_SCHEMA.json` — the only file fixture.
 //!
-//! Pins:
-//!
-//! - mode selection: no selector means the implicit Functions view,
-//!   each of the three selectors its own mode, `tenant` riding beside
-//!   a selector;
-//! - leniency: a top-level key this build does not know is ignored in
-//!   every mode;
-//! - strictness: an unknown key inside a mode object, a selector mixed
-//!   with Functions parameters, conflicting selectors (reported even
-//!   when one is also malformed), selector values that are not objects,
-//!   present-but-null selectors, duplicate top-level keys, and a
-//!   non-object top level — all client errors, with the message
-//!   fragments clients match on;
-//! - the implicit view's parameter mapping through
-//!   `FunctionsParams::search_params`: defaults, relative-window
-//!   resolution, and the chips and text forwarding;
-//! - per-mode param objects: self-contained windows;
-//! - `InfoResponse`'s exact descriptor JSON and the untagged response
-//!   envelope;
-//! - `StatusWire` serialization: the two status shapes, deterministic
-//!   partial-reason order, the round trip, the unrepresentable
-//!   `{"complete": false}`, and every reason present in the published
-//!   UI schema.
-//!
-//! Not pinned here: the anchor's format (an opaque string on the wire —
-//! cursor parsing and the "malformed anchor" rejections are the
-//! adapter's pin, `rpc/traces/adapter.rs`), the chip key grammar
-//! (also the adapter's), semantic validation beyond deserialization
-//! (trace-id shape, limit caps, window bounds — the handler's and
-//! engine's job), and data-mode response semantics (the handler tests,
-//! end to end).
+//! Not pinned here: the anchor's format (an opaque string on the wire),
+//! the chip key grammar, semantic validation beyond deserialization
+//! (trace-id shape, limit caps, window bounds), and data-mode response
+//! semantics.
 use super::*;
 use serde_json::json;
 use sfsq::traces::StatusBuilder;
@@ -100,7 +73,7 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
 #[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
-    // Bools (the old wire's two forms), junk scalars, null, arrays,
+    // Bools, junk scalars, null, arrays,
     // and non-empty objects are all malformed selectors — a malformed
     // selector must not silently select.
     for body in [
@@ -307,7 +280,7 @@ fn conflicting_selectors_are_a_client_error() {
         err.contains("conflicting mode selectors: trace, suggest"),
         "{err}"
     );
-    // info is a PEER selector — no precedence.
+    // info is a peer selector — no precedence.
     let err = req_err(json!({"info": {}, "trace": {"id": "00"}}));
     assert!(
         err.contains("conflicting mode selectors: info, trace"),
@@ -461,8 +434,8 @@ fn complete_status_serializes_as_complete_true() {
 
 #[test]
 fn partial_status_serializes_reason_names_deterministically() {
-    // Insertion order must not matter — the engine's BTreeSet renders
-    // deterministically, and the wire names are pinned snake_case.
+    // Insertion order must not matter, and the wire names are
+    // snake_case.
     let mut b = StatusBuilder::new();
     b.add(PartialReason::SourceFailure);
     b.add(PartialReason::SizeCap);

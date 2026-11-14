@@ -14,21 +14,11 @@
 //!   whole `ExportMetricsServiceRequest` into one map per data point,
 //!   keyed with `metric.*` names.
 //!
-//! # Consumers
-//!
-//! `otel-ingestor` is the crate's only in-repo dependent
-//! (src/crates/otel-ingestor/Cargo.toml). Its `src/iter.rs` `chart_labels()`
-//! builds chart-definition label sets with the three helpers above and
-//! relies on those prefixes for consistent key naming;
-//! [`flatten_metrics_request`] currently has no in-repo caller. This crate
-//! only shapes keys: the ingestor renders chart text itself and hands its
-//! records to `wal::Writer` frames (the wal crate documents that side).
-//!
 //! # Contract
 //!
 //! Stateless synchronous functions, infallible — no `Result`: missing or
-//! unsupported values become `null`, and non-finite doubles collapse to
-//! `0`. Flattening rules: `flatten_and_strip`.
+//! unsupported values become `null`, and non-finite attribute doubles
+//! collapse to `0`. Flattening rules: `flatten_and_strip`.
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use serde_json::{Map as JsonMap, Value as JsonValue};
 

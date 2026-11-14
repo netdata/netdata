@@ -1,14 +1,13 @@
 //! OTel ingestor worker: the production OTLP receiver of the otel-plugin
-//! pipeline. It serves the three OpenTelemetry Collector services —
-//! metrics, logs, traces — on TWO transports with one shared set of
+//! pipeline. It serves the three OpenTelemetry Collector services
+//! (metrics, logs, traces) on two transports with one shared set of
 //! ingestion cores, and splits them by signal:
 //!
-//! - **Logs + traces** — each export request is normalized, flattened, and
+//! - Logs + traces: each export request is normalized, flattened, and
 //!   encoded into a WAL frame by `ng_flatten` (`prepare_log_frame` /
-//!   `prepare_trace_frame`), then appended to a per-tenant WAL; file events
-//!   stream to the ledger over a dedicated writer socket (`ledger_sender`)
-//!   for sealing into SFSTs by `ng-index`.
-//! - **Metrics** — aggregated into Netdata charts and emitted once per second
+//!   `prepare_trace_frame`), then appended to a per-tenant WAL. File events
+//!   stream to the ledger over a dedicated writer socket (`ledger_sender`).
+//! - Metrics: aggregated into Netdata charts and emitted once per second
 //!   as chart data over ferryboat IPC to the supervisor (`aggregation` →
 //!   `chart` → `output`).
 //!
@@ -19,11 +18,10 @@
 //!
 //! - Services: `logs_service` and `trace_service` (WAL writers),
 //!   `metrics_service` (chart emission); `tenant_writers` (the WAL writers
-//!   of one signal, one per tenant: the wait for durable frames and the
-//!   lifecycle events to the ledger, shared by logs and traces); `tenant`
-//!   (tenant extraction from the `X-Scope-OrgID` header). Each service
-//!   exposes a transport-agnostic core that the gRPC wrappers and the
-//!   OTLP/HTTP front end both call.
+//!   of one signal, one per tenant, used by logs and traces); `tenant`
+//!   (tenant extraction from the `X-Scope-OrgID` header; metrics carry no
+//!   tenant). Each service exposes a transport-agnostic core that the gRPC
+//!   wrappers and the OTLP/HTTP front end both call.
 //! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
 //!   with protobuf + JSON codecs on `receivers.otlp.protocols.http`) and
 //!   `otlp_json` (its OTLP/JSON decoding over the `opentelemetry-proto`
@@ -90,7 +88,7 @@ use trace_service::NetdataTracesService;
 pub(crate) const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
 
 /// How often the idle-rotation sweep runs. Fixed, no config knob: it bounds
-/// only the *idle*-stream rotation latency — active streams still rotate
+/// only the rotation latency of idle streams. Active streams still rotate
 /// precisely on the next write. A no-op tick is cheap (one lock + arithmetic
 /// per tenant, no I/O).
 const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
@@ -126,11 +124,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         }
     };
 
-    // Best-effort: log immediately on return, before the supervisor (which
-    // stops every worker when one of them closes its connection, and kills
-    // one that is still there after its wait) can react to the dropped
-    // connection. `conn` is owned by `run_ingestor`, so unlike the
-    // ledger we can't log strictly before the drop.
+    // Best-effort: log immediately on return, before the supervisor can
+    // react to the dropped connection. `conn` is owned by `run_ingestor`, so
+    // we can't log strictly before the drop.
     run_ingestor(config, conn)
         .await
         .inspect_err(|e| tracing::error!("ingestor event loop error: {e:#}"))
@@ -140,7 +136,7 @@ async fn run_ingestor(
     config: PluginConfig,
     mut conn: Connection<IngestorResponse, IngestorRequest>,
 ) -> Result<()> {
-    // Bind the enabled listeners FIRST, before this worker's disk setup: a port
+    // Bind the enabled listeners first, before this worker's disk setup: a port
     // conflict is the most likely startup failure (another listener, or another
     // agent in a shared network namespace), and binding here fails fast
     // (strict, for both transports), before the ingestor touches its WAL
@@ -260,7 +256,7 @@ async fn run_ingestor(
         }
     });
 
-    // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
+    // Set up the logs + traces pipelines. They share one writer→ledger sender
     // and one global seq allocator: the ledger accepts a single writer
     // connection, and file `seq` must be globally unique across signals.
     //
@@ -340,7 +336,7 @@ async fn run_ingestor(
     // Idle-rotation sweeps: a periodic task per signal closes WAL streams that
     // have passed their duration threshold with no new frames, so quiet streams
     // still get indexed (and, with remote storage, uploaded). Each signal gets
-    // its OWN task: the sweeps do serial fsyncs, so sharing one task would let
+    // its own task: the sweeps do serial fsyncs, so sharing one task would let
     // a slow traces sweep delay the next logs sweep tick (and vice versa) — the
     // signals' writer registries are independent, so nothing is shared.
     let logs_sweep_handle = spawn_sweep("logs", Arc::clone(&logs_service), |s| {
@@ -362,7 +358,7 @@ async fn run_ingestor(
         None => None,
     };
 
-    // The OTLP/HTTP front end over the SAME service cores. `None` means the
+    // The OTLP/HTTP front end over the same service cores. `None` means the
     // receiver is disabled; the pending future keeps the select! arm shape
     // uniform either way.
     let http_server = http_listener.map(|listener| {
@@ -542,8 +538,8 @@ fn start_service_map(
 /// `LedgerSender` (the ledger accepts a single writer connection) and one
 /// global `SeqAllocator` (file `seq` is globally unique across signals).
 ///
-/// The seq is GLOBAL across signals (one allocator → one highwater file), so the
-/// seed scans BOTH signals' dirs and takes the max. Seeding from one signal alone
+/// The seq is global across signals (one allocator → one highwater file), so the
+/// seed scans both signals' dirs and takes the max. Seeding from one signal alone
 /// would let a restart reissue a seq still live as another signal's SFST, making
 /// a new file look "older" than a retained one and triggering wrong eviction. The
 /// single highwater file is signal-neutral (`{base_dir}/shared/seq_highwater`),
@@ -800,18 +796,18 @@ impl DirScan {
 
 /// Scan one signal's WAL, index, and catalog dirs for the highest seq.
 ///
-/// Looking at WAL alone is unsafe: post-restart the cleaner may have pruned every
-/// WAL but SFSTs at higher seqs still sit on disk; starting low would make new
-/// files appear "older" than retained ones and trigger immediate eviction by the
-/// seq-ordered retention loop. Catalogs outlive the SFSTs they describe, so they
-/// bound the seed when the data files are gone. Together the scans guarantee what
-/// correctness needs: no new seq collides with a surviving local file (the
+/// Looking at WAL alone is unsafe. After a restart the cleaner may have pruned
+/// every WAL while SFSTs at higher seqs still sit on disk. Starting low would make
+/// new files appear "older" than retained ones and trigger immediate eviction by
+/// the seq-ordered retention loop. Catalogs outlive the SFSTs they describe, so
+/// they bound the seed when the data files are gone. Together the scans guarantee
+/// what correctness needs: no new seq collides with a surviving local file (the
 /// invariant of the bare-seq-keyed registries). The caller additionally folds in
 /// the persisted high-water mark, which extends monotonicity across seqs whose
-/// files are gone entirely (age-evicted, or wiped with a remote archive) — reuse
-/// there cannot corrupt (identities are per-process and cross-identity state is
-/// identity-keyed), it only degrades seq as a creation-order proxy. A missing dir
-/// scans as 0.
+/// files are gone entirely (age-evicted, or wiped with a remote archive). Reuse
+/// there cannot corrupt anything, because identities are per-process and
+/// cross-identity state is identity-keyed. It only makes seq a worse proxy for
+/// creation order. A missing dir scans as 0.
 fn scan_seq_dirs(
     wal_dir: &std::path::Path,
     index_dir: &std::path::Path,
