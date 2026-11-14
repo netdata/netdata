@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,7 +51,7 @@ func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background());
 
 func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, "")
+	st, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()

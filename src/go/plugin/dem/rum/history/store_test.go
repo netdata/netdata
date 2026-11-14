@@ -11,7 +11,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
 	"github.com/stretchr/testify/assert"
@@ -21,7 +21,7 @@ import (
 func newTestStore(t *testing.T) (*Store, string) {
 	t.Helper()
 	root := t.TempDir()
-	owner, err := demjournal.Open(context.Background(), root)
+	owner, err := journalstore.Open(context.Background(), root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })
 	return NewStore(owner), root
@@ -79,7 +79,7 @@ func storedEventFields(r EventRecord) []journal.Field {
 func TestJournalReopen(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "history")
-	owner, err := demjournal.Open(ctx, path)
+	owner, err := journalstore.Open(ctx, path)
 	s := NewStore(owner)
 	require.NoError(t, err)
 	event := EventRecord{
@@ -98,11 +98,11 @@ func TestJournalReopen(t *testing.T) {
 	}
 	appendEvent(t, s, event)
 	require.NoError(t, s.Sync(ctx))
-	require.NoError(t, s.journal.Close())
-	owner, err = demjournal.Open(ctx, path)
+	require.NoError(t, s.store.Close())
+	owner, err = journalstore.Open(ctx, path)
 	s = NewStore(owner)
 	require.NoError(t, err)
-	defer s.journal.Close()
+	defer s.store.Close()
 	events, err := s.QuerySessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Len(t, events, 1)
@@ -165,7 +165,7 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	require.NoError(t, err)
 	sequenceID, sequence := first.Header().SeqnumID(), first.Header().TailEntrySeqnum()
 	require.NoError(t, first.Close())
-	owner, err := demjournal.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root)
 	s := NewStore(owner)
 	require.NoError(t, err)
 	appendEvent(t, s, EventRecord{
@@ -180,11 +180,11 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	assert.Equal(t, sequenceID, second.Header().SeqnumID())
 	assert.Equal(t, sequence+1, second.Header().HeadEntrySeqnum())
 	assert.Equal(t, host.BootID(), second.Header().TailEntryBootID())
-	require.NoError(t, s.journal.Close())
-	owner, err = demjournal.Open(ctx, root)
+	require.NoError(t, s.store.Close())
+	owner, err = journalstore.Open(ctx, root)
 	s = NewStore(owner)
 	require.NoError(t, err)
-	defer s.journal.Close()
+	defer s.store.Close()
 	sessions, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0, "")
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
@@ -207,14 +207,14 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 		},
 		old,
 	)
-	owner, err := demjournal.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root)
 	s := NewStore(owner)
 	require.NoError(t, err)
-	defer s.journal.Close()
+	defer s.store.Close()
 	sessions, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0, "")
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 1, demjournal.MinHistoryBytes))
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
 	sessions, err = s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0, "")
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "expiry must run without a new event or enabled site")
@@ -248,16 +248,16 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 			Type:       "pageview",
 			ObservedUS: time.Now().UnixMicro(),
 		})
-		reader, release, err := s.journal.OpenReader(ctx)
+		reader, release, err := s.store.OpenReader(ctx)
 		require.NoError(t, err)
 		defer release()
 		time.Sleep(48 * time.Hour)
-		require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 1, demjournal.MinHistoryBytes))
+		require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
 		files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
 		require.NoError(t, err)
 		assert.Empty(t, files, "expired idle history is unlinked")
 		var retained int
-		require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { retained++; return nil }))
+		require.NoError(t, reader.VisitMatch("DEM_SESSION_ID", "s", func(*journal.SnapshotEntry) error { retained++; return nil }))
 		assert.Equal(t, 1, retained, "opened snapshot survives archive unlink")
 		sessions, err := s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0, "")
 		require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		require.Len(t, files, 1, "a new append creates a protected active file")
 		info, err := os.Stat(files[0])
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, info.Size(), int64(demjournal.MinHistoryBytes), "file lengths include allocation space")
+		assert.GreaterOrEqual(t, info.Size(), int64(journalstore.MinHistoryBytes), "file lengths include allocation space")
 		sessions, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0, "")
 		require.NoError(t, err)
 		require.Len(t, sessions, 1)
@@ -289,7 +289,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
 	s, root := newTestStore(t)
 	ctx := context.Background()
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
 	appendEvent(t, s, EventRecord{
 		Site:       "shop",
 		SessionID:  "s",
@@ -297,11 +297,11 @@ func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
 		ObservedUS: time.Now().UnixMicro(),
 	})
 	active := activeJournal(t, root)
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
 	files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
 	require.NoError(t, err)
 
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
 	after, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
 	require.NoError(t, err)
 	assert.Empty(t, files, "healthy idle maintenance must not force an archive")
@@ -322,14 +322,14 @@ func TestRetentionRetriesAfterInventoryDirectoryFailure(t *testing.T) {
 	moved := filepath.Join(t.TempDir(), "moved-machine")
 	require.NoError(t, os.Rename(machineDir, moved))
 	require.NoError(t, os.WriteFile(machineDir, []byte("obstruction"), 0600))
-	cleanupErr := s.journal.EnforceHistoryRetention(ctx, 30, 1<<30)
+	cleanupErr := s.store.EnforceHistoryRetention(ctx, 30, 1<<30)
 	attempted, appendErr := s.AppendEvent(ctx, EventRecord{
 		Site:       "shop",
 		SessionID:  "s",
 		Type:       "pageview",
 		ObservedUS: time.Now().UnixMicro(),
 	})
-	status, statusErr := s.journal.Status(ctx)
+	status, statusErr := s.store.Status(ctx)
 	require.NoError(t, os.Remove(machineDir))
 	require.NoError(t, os.Rename(moved, machineDir))
 	require.Error(t, cleanupErr)
@@ -340,8 +340,8 @@ func TestRetentionRetriesAfterInventoryDirectoryFailure(t *testing.T) {
 	assert.NotEmpty(t, status.Cleanup.Error)
 	assert.NotEmpty(t, status.InventoryError)
 	assert.Nil(t, status.Inventory)
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 30, 1<<30))
-	status, err := s.journal.Status(ctx)
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
+	status, err := s.store.Status(ctx)
 	require.NoError(t, err)
 	assert.Empty(t, status.Cleanup.Error)
 	rows, err := s.QuerySessions(ctx, "shop", "", 0, time.Now().Unix()+5, 0, "")
@@ -353,7 +353,7 @@ func TestRetentionRetriesAfterInventoryDirectoryFailure(t *testing.T) {
 func TestAppendReportsAttemptedOnFilesystemFailure(t *testing.T) {
 	s, root := newTestStore(t)
 	ctx := context.Background()
-	require.NoError(t, s.journal.EnforceHistoryRetention(ctx, 1, demjournal.MinHistoryBytes))
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
 	// Obstruct creation of the first lazy file, before any writer mutation.
 	moved := filepath.Join(t.TempDir(), "moved-root")
 	require.NoError(t, os.Rename(root, moved))
@@ -422,8 +422,8 @@ func TestDamagedJournalIsReportedAndUnrelatedSourcesAreIgnored(t *testing.T) {
 		SessionID: "fresh",
 		Type:      "activity",
 	})
-	require.Error(t, s.journal.EnforceHistoryRetention(context.Background(), 1, 100000000))
-	status, statusErr := s.journal.Status(context.Background())
+	require.Error(t, s.store.EnforceHistoryRetention(context.Background(), 1, 100000000))
+	status, statusErr := s.store.Status(context.Background())
 	require.NoError(t, statusErr)
 	assert.NotEmpty(t, status.Cleanup.Error)
 	assert.Empty(t, status.WriterError)

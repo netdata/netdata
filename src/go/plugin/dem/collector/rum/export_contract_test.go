@@ -16,7 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
@@ -90,7 +90,7 @@ func contractReceiver(t *testing.T, reject bool) (string, *contractLogs, *contra
 }
 func contractSite(t *testing.T) (*rum.Collector, *rumregistry.Registry, *history.Store) {
 	t.Helper()
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub, store := rumregistry.New(), history.NewStore(db)

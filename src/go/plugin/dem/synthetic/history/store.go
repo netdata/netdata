@@ -5,20 +5,20 @@ package history
 import (
 	"context"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 // Store encodes and queries synthetic runs in the command-owned journal.
 // It borrows the journal; only the command may close it or enforce retention.
-type Store struct{ journal *demjournal.Store }
+type Store struct{ store *journalstore.Store }
 
-func NewStore(journal *demjournal.Store) *Store {
+func NewStore(store *journalstore.Store) *Store {
 	return &Store{
-		journal: journal,
+		store: store,
 	}
 }
-func (s *Store) Sync(ctx context.Context) error { return s.journal.Sync(ctx) }
+func (s *Store) Sync(ctx context.Context) error { return s.store.Sync(ctx) }
 
 type RunFilter struct {
 	JobID     string

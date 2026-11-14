@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package journal owns the command-wide DEM journal, snapshots and retention.
-package journal
+// Package journalstore owns the command-wide DEM journal, snapshots and retention.
+package journalstore
 
 import (
 	"context"
@@ -139,27 +139,24 @@ func (s *Store) Close() error {
 
 // HasObservedKind is a prompt Function-discovery hint, not a retention inventory.
 // It stays true for this store's lifetime once startup or an append observes the kind.
-func (s *Store) HasObservedKind(kind string) bool {
-	if s == nil {
-		return false
-	}
+func (s *Store) HasObservedKind(kind Kind) bool {
 	switch kind {
-	case "rum":
+	case KindRUM:
 		return s.observedRUM.Load()
-	case "synthetic":
+	case KindSynthetic:
 		return s.observedSynthetic.Load()
 	default:
 		return false
 	}
 }
 
-func (s *Store) observeKind(kind string) {
+func (s *Store) observeKind(kind Kind) {
 	switch kind {
-	case "rum":
+	case KindRUM:
 		if !s.observedRUM.Load() {
 			s.observedRUM.Store(true)
 		}
-	case "synthetic":
+	case KindSynthetic:
 		if !s.observedSynthetic.Load() {
 			s.observedSynthetic.Store(true)
 		}

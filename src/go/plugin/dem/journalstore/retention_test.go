@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-package journal
+package journalstore
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 	"testing/synctest"
 	"time"
 
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -39,13 +39,13 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 			root := t.TempDir()
 			host, err := journalhost.Load(journalhost.LoadOptions{StateDir: filepath.Join(root, "identity")})
 			require.NoError(t, err)
-			machine, err := sdk.ParseUUID("11111111111111111111111111111111")
+			machine, err := journal.ParseUUID("11111111111111111111111111111111")
 			require.NoError(t, err)
 			require.NotEqual(t, host.MachineID(), machine)
 			dir := filepath.Join(root, machine.String())
 			require.NoError(t, os.MkdirAll(dir, 0750))
 			path := filepath.Join(dir, "dem.journal")
-			writer, err := sdk.Create(path, sdk.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
+			writer, err := journal.Create(path, journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
 			require.NoError(t, err)
 			fields, _, err := appendEnvelope(testFields())
 			require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 			require.NoError(t, writer.Close())
 			if !active {
 				// Finalize through the public Log lifecycle; caller owns the file.
-				log, err := sdk.NewLog(root, sdk.LogConfig{Source: "dem", StrictSystemdNaming: true, Options: sdk.Options{MachineID: machine, BootID: host.BootID(), Compact: true}})
+				log, err := journal.NewLog(root, journal.LogConfig{Source: "dem", StrictSystemdNaming: true, Options: journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true}})
 				require.NoError(t, err)
 				require.NoError(t, log.CloseWithoutRetention())
 			}
@@ -175,8 +175,8 @@ func appendNamed(t *testing.T, s *Store, kind, name string) {
 	if kind == "synthetic" {
 		clock = "DEM_STARTED_US"
 	}
-	attempted, err := s.Append(context.Background(), []sdk.Field{
-		sdk.StringField("DEM_KIND", kind), sdk.StringField(clock, "123456789"), sdk.StringField("MESSAGE", name),
+	attempted, err := s.Append(context.Background(), []journal.Field{
+		journal.StringField("DEM_KIND", kind), journal.StringField(clock, "123456789"), journal.StringField("MESSAGE", name),
 	})
 	require.True(t, attempted)
 	require.NoError(t, err)
@@ -193,7 +193,7 @@ func retainedNames(t *testing.T, s *Store) []string {
 func snapshotNames(t *testing.T, reader *Snapshot) []string {
 	t.Helper()
 	var names []string
-	require.NoError(t, reader.VisitEntries(func(entry *sdk.SnapshotEntry) error {
+	require.NoError(t, visitEntries(reader, func(entry *journal.SnapshotEntry) error {
 		return entry.VisitPayloads(func(payload []byte) error {
 			name, value, _ := bytes.Cut(payload, []byte("="))
 			if string(name) == "MESSAGE" {

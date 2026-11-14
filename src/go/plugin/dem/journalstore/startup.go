@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package journal
+package journalstore
 
 import (
 	"context"
@@ -25,13 +25,13 @@ func (s *Store) verifyStartup(ctx context.Context) error {
 				return fmt.Errorf("verify active history %q: %w", path, err)
 			}
 		}
-		file, err := openSnapshot(ctx, path, journal.StringField("DEM_KIND", "rum"), journal.StringField("DEM_KIND", "synthetic"))
+		file, err := openSnapshot(ctx, path, journal.StringField(FieldKind, string(KindRUM)), journal.StringField(FieldKind, string(KindSynthetic)))
 		if err != nil {
 			return err
 		}
 		empty := file.EntryCount() == 0
-		for _, kind := range []string{"rum", "synthetic"} {
-			value, err := file.CapturedValue([]byte("DEM_KIND"), []byte(kind))
+		for _, kind := range []Kind{KindRUM, KindSynthetic} {
+			value, err := file.CapturedValue([]byte(FieldKind), []byte(kind))
 			if err != nil {
 				_ = file.Close()
 				return err

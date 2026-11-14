@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"testing"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/stretchr/testify/require"
 )
@@ -18,10 +18,10 @@ import (
 func BenchmarkSyntheticRuns(b *testing.B) {
 	const runCount = 10000
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, b.TempDir())
+	journalStore, err := journalstore.Open(ctx, b.TempDir())
 	require.NoError(b, err)
-	b.Cleanup(func() { require.NoError(b, journal.Close()) })
-	store := NewStore(journal)
+	b.Cleanup(func() { require.NoError(b, journalStore.Close()) })
+	store := NewStore(journalStore)
 	const start = int64(1700000000000000)
 	for i := range runCount {
 		run := synthetic.Run{

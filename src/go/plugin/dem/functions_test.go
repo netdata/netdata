@@ -16,7 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -52,9 +52,9 @@ func syntheticHandler(t *testing.T, components dem.Components) *syntheticfunc.Ha
 }
 
 // privateHistory and privateCaptures are the temporary stores debug runs use.
-func privateHistory(t *testing.T) *demjournal.Store {
+func privateHistory(t *testing.T) *journalstore.Store {
 	t.Helper()
-	history, err := demjournal.Open(t.Context(), "")
+	history, err := journalstore.Open(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	return history
@@ -213,7 +213,7 @@ func TestFunctionAvailabilityFromRetainedHistory(t *testing.T) {
 	for _, kind := range []string{"rum", "synthetic"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
-			history, err := demjournal.Open(t.Context(), root)
+			history, err := journalstore.Open(t.Context(), root)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			captures := privateCaptures(t)
@@ -246,7 +246,7 @@ func TestFunctionAvailabilityFromRetainedHistory(t *testing.T) {
 			require.NoError(t, err)
 			assertAvailability(t, components, kind == "rum", kind == "synthetic")
 			require.NoError(t, history.Close())
-			history, err = demjournal.Open(t.Context(), root)
+			history, err = journalstore.Open(t.Context(), root)
 			require.NoError(t, err)
 			restarted := dem.New(dem.Dependencies{
 				History:   history,
@@ -300,7 +300,7 @@ func TestFunctionAvailabilityFromCapturesAlone(t *testing.T) {
 }
 
 func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
-	journalStore, err := demjournal.Open(context.Background(), "")
+	journalStore, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	st := rumhistory.NewStore(journalStore)
@@ -344,12 +344,12 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 // Retained grouping must work with no live collector, receiver or browser runtime.
 func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	now := time.Now().Add(-time.Minute).UnixMicro()
-	rum := rumhistory.NewStore(journal)
-	runs := synthetichistory.NewStore(journal)
+	rum := rumhistory.NewStore(journalStore)
+	runs := synthetichistory.NewStore(journalStore)
 	for i, association := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		_, err := rum.AppendEvent(ctx, rumhistory.EventRecord{
 			Site: "browser-traffic", VnodeGUID: association, SessionID: "same-session",
@@ -364,7 +364,7 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, runs.Sync(ctx))
-	components := dem.New(dem.Dependencies{History: journal, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
+	components := dem.New(dem.Dependencies{History: journalStore, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
 	for name, tc := range map[string]struct {
 		method string
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse

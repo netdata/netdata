@@ -20,7 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
@@ -123,7 +123,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
 			historyRoot := t.TempDir()
-			history, err := demjournal.Open(ctx, historyRoot)
+			history, err := journalstore.Open(ctx, historyRoot)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			cfg := dem.DefaultConfig()
@@ -161,7 +161,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, captures.Close()) })
 			require.NoError(t, history.Close())
-			history, err = demjournal.Open(ctx, historyRoot)
+			history, err = journalstore.Open(ctx, historyRoot)
 			require.NoError(t, err)
 			require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
 			components := dem.New(dem.Dependencies{
@@ -322,7 +322,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 }
 
 func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
-	history, err := demjournal.Open(t.Context(), "")
+	history, err := journalstore.Open(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	captures, err := artifacts.Open("")

@@ -15,7 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ var keptArtifacts = artifactRetentionFunc(func(context.Context, int, int64) (art
 })
 
 type observedRetention struct {
-	*demjournal.Store
+	*journalstore.Store
 	swept chan error
 }
 
@@ -48,7 +48,7 @@ func (r *observedRetention) EnforceHistoryRetention(ctx context.Context, days in
 
 func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, "")
+	st, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
@@ -132,7 +132,7 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dem.conf")
-	history, err := demjournal.Open(context.Background(), "")
+	history, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	components := New(
@@ -366,7 +366,7 @@ func TestRetentionMaintainsHourlySweep(t *testing.T) {
 
 func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 	ctx := context.Background()
-	store, err := demjournal.Open(ctx, "")
+	store, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	initial := DefaultConfig()

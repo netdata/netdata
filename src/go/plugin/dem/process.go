@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
@@ -42,7 +42,7 @@ type Process struct {
 	executor *runner.Engine
 	runtime  *runtimehost.Handle
 	captures *artifacts.Store
-	history  *journal.Store
+	history  *journalstore.Store
 }
 
 // Open opens the journal first and applies the configured history budget
@@ -55,7 +55,7 @@ func Open(opts Options) (*Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initializing DEM history: %w", err)
 	}
-	history, err := journal.Open(context.Background(), path)
+	history, err := journalstore.Open(context.Background(), path)
 	if err != nil {
 		return nil, fmt.Errorf("opening DEM history: %w", err)
 	}
