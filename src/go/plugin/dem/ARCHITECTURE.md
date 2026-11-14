@@ -787,7 +787,7 @@ OTLP export:
 - OTLP exports only newly selected observations. Prior exports and asynchronously arriving spans are not reconstructed.
 - The trace exporter preserves each beacon's trace resource attributes.
 - The history writer and each enabled exporter account for their own queues in the site job's transport counters.
-  They live outside the aggregator, so a vnode change that resets measurements leaves them intact.
+  The counters live outside the aggregator, so a vnode change that resets measurements leaves them intact.
 - Shared receiver/site policy and destination declarations belong to `rum/config`. `rum/otlp` implements transport
   security, signal mapping and drainage.
 - Runtime export failure does not stop native aggregation or history.
@@ -879,6 +879,8 @@ Alerts:
 - Live queries merge per-site stream heads by receipt time while preserving each stream's sequence prefix; concurrent
   receipt and ingestion order can differ.
 - All-site Errors, Pages and Sessions use a separate site-scoped row key without replacing their filter values.
+- Session events merge the live ring with persisted history by counting equal rows. Both sources project the same
+  history record through one function, so an event present in both compares equal.
 
 ### Site retirement and history writes
 

@@ -6,7 +6,8 @@ import "sync"
 
 // transportCounters accumulates the job's history-writer and OTLP-exporter
 // accounting. It describes the job's asynchronous transports, not measured
-// traffic, so a vnode change that resets measurements leaves it intact.
+// traffic, so a vnode change that resets measurements leaves it intact. The
+// history writer calls Add under the aggregator lock, so mu must stay a leaf lock.
 type transportCounters struct {
 	mu     sync.Mutex
 	values map[string]uint64

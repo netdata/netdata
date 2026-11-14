@@ -355,8 +355,8 @@ func (st *siteState) dropSession(el *list.Element) {
 
 // ---- rum-session-events FUNCTION read ----
 
-// SessionEvents returns one session's event ring (oldest first) as the records
-// history persists for them, so live and persisted reads share one projection.
+// SessionEvents returns one session's event ring (oldest first) projected as
+// history records, so live and persisted reads share one projection.
 // ok is false when the session id is unknown (caller: 404).
 func (a *Aggregator) SessionEvents(sessionID string) ([]HistoryEvent, bool) {
 	a.mu.Lock()
