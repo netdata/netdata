@@ -173,6 +173,10 @@ func (o *checkOwner) leave(f *checkFlight, err error) error {
 	o.mu.Unlock()
 	if last {
 		<-f.done
+		// An undrained probe may still hold the runtime; callers must see it.
+		if errors.Is(f.err, ndexec.ErrTreeNotDrained) {
+			return errors.Join(err, f.err)
+		}
 	}
 	return err
 }

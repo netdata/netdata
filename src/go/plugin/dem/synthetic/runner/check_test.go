@@ -173,3 +173,22 @@ func TestCheckPoisonReleasesCallers(t *testing.T) {
 		assert.Equal(t, int32(1), p.runs.Load())
 	})
 }
+
+// TestCheckLastCallerReportsUndrainedProbe keeps an undrained probe's error for
+// the caller that cancelled and joined it, so the caller does not release the
+// runtime as if it were idle.
+func TestCheckLastCallerReportsUndrainedProbe(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		o, poisoned := &checkOwner{}, make(chan struct{})
+		probe := func(ctx context.Context) error {
+			<-ctx.Done()
+			return ndexec.ErrTreeNotDrained
+		}
+		c := callCheck(t.Context(), o, poisoned, probe)
+		c.cancel()
+		synctest.Wait()
+		require.True(t, c.returned())
+		assert.ErrorIs(t, c.err, context.Canceled)
+		assert.ErrorIs(t, c.err, ndexec.ErrTreeNotDrained)
+	})
+}
