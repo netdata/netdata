@@ -28,7 +28,7 @@ func (s *Store) AppendRun(ctx context.Context, phase synthetic.HistoryPhase, run
 	if err != nil {
 		return false, err
 	}
-	return s.journal.Append(ctx, []journal.Field{
+	return s.store.Append(ctx, []journal.Field{
 		journal.StringField("DEM_KIND", "synthetic"), journal.StringField("DEM_PHASE", string(phase)),
 		journal.StringField("DEM_JOB_ID", run.JobID), journal.StringField("DEM_RUN_ID", run.ID),
 		journal.StringField("DEM_STARTED_US", strconv.FormatInt(run.StartedUS, 10)),

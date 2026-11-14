@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package journal owns the command-wide DEM journal, snapshots and retention.
-package journal
+// Package journalstore owns the command-wide DEM journal, snapshots and retention.
+package journalstore
 
 import (
 	"context"

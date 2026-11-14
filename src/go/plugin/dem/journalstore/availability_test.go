@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package journal
+package journalstore
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"testing/synctest"
 	"time"
 
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestObservedKindIgnoresRejectedAppend(t *testing.T) {
 	s := newTestStore(t)
-	_, err := s.Append(t.Context(), []sdk.Field{sdk.StringField("DEM_KIND", "rum")})
+	_, err := s.Append(t.Context(), []journal.Field{journal.StringField("DEM_KIND", "rum")})
 	require.Error(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()

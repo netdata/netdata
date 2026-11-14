@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"math"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
 func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, visit func(synthetic.HistoryPhase, synthetic.Run)) error {
@@ -22,7 +22,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 	if f.After < 0 || before < f.After {
 		return fmt.Errorf("invalid synthetic start-time range")
 	}
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 	if reader == nil {
 		return ctx.Err()
 	}
-	candidate := func(entry *sdk.SnapshotEntry) error {
+	candidate := func(entry *journal.SnapshotEntry) error {
 		phase, run, syntheticEntry, err := decodeSynthetic(entry)
 		if err != nil {
 			return err
@@ -63,8 +63,8 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 
 // Both phases carry their immutable start clock, so indexed membership includes
 // a retained completion even when it was written after the selected interval.
-func decodeSynthetic(entry *sdk.SnapshotEntry) (synthetic.HistoryPhase, synthetic.Run, bool, error) {
-	var envelope demjournal.Envelope
+func decodeSynthetic(entry *journal.SnapshotEntry) (synthetic.HistoryPhase, synthetic.Run, bool, error) {
+	var envelope journalstore.Envelope
 	var phase, jobID, runID string
 	var run synthetic.Run
 	var seen uint8

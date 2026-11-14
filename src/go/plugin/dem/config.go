@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"gopkg.in/yaml.v2"
 )
@@ -90,7 +90,7 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
 	cfg.Runtime = runtimeInput.Runtime
-	if err = cfg.History.validate(journal.MinHistoryBytes); err != nil {
+	if err = cfg.History.validate(journalstore.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
 	}
 	if err = cfg.Artifacts.validate(1); err != nil {

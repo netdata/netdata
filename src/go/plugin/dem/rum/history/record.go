@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strconv"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
@@ -108,7 +108,7 @@ func eventFields(r EventRecord) []journal.Field {
 // The prior record owns its strings; equal values can reuse them across callbacks.
 func decodeEvent(entry *journal.SnapshotEntry, previous *EventRecord) (EventRecord, bool, error) {
 	var r EventRecord
-	var envelope demjournal.Envelope
+	var envelope journalstore.Envelope
 	var revision string
 	var seen uint32
 	err := entry.VisitPayloads(func(payload []byte) error {

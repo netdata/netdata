@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -18,7 +18,7 @@ import (
 // The history store reports cancellation before reading; the query service
 // must return that error rather than an empty result.
 func TestSessionsReturnHistoryCancellation(t *testing.T) {
-	journalStore, err := journal.Open(context.Background(), "")
+	journalStore, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	ctx, cancel := context.WithCancel(context.Background())

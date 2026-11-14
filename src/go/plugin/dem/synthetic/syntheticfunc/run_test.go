@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
@@ -21,7 +21,7 @@ import (
 // A retained run without events or artifacts reads back with null lists; synthetics-run shows them as empty.
 func TestStoredRunWithoutEventsOrArtifactsShowsEmptyLists(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journal, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	store := synthetichistory.NewStore(journal)

@@ -17,7 +17,7 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 	if after < 0 || before < after {
 		return fmt.Errorf("invalid RUM observation range")
 	}
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 
 // matchSession reads identity postings across all retained time.
 func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID string, visit func(EventRecord)) error {
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}

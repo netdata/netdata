@@ -250,7 +250,7 @@ func TestSelectedDomainScalarsAreValidated(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			s, _ := newTestStore(t)
 			fields := eventFields(EventRecord{Site: "shop", SessionID: "session", Type: "pageview", ObservedUS: 1_000_000, Page: "/page"})
-			_, err := s.journal.Append(context.Background(), tc.mutate(fields))
+			_, err := s.store.Append(context.Background(), tc.mutate(fields))
 			require.NoError(t, err)
 			rows, err := s.QuerySessions(context.Background(), "shop", "", 1, 1, 0, "")
 			require.Error(t, err)

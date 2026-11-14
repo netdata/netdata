@@ -8,14 +8,14 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type statusFunc func(context.Context) (journal.Status, error)
+type statusFunc func(context.Context) (journalstore.Status, error)
 
-func (f statusFunc) Status(ctx context.Context) (journal.Status, error) { return f(ctx) }
+func (f statusFunc) Status(ctx context.Context) (journalstore.Status, error) { return f(ctx) }
 func request() funcapi.RawMethodRequest {
 	return funcapi.RawMethodRequest{
 		Method:      method.ID,
@@ -24,16 +24,16 @@ func request() funcapi.RawMethodRequest {
 }
 func TestStatusPreservesIndependentFacts(t *testing.T) {
 	now := time.Unix(1000, 0)
-	h := New(statusFunc(func(context.Context) (journal.Status, error) {
-		return journal.Status{
-			Policy: &journal.RetentionPolicy{
+	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
+		return journalstore.Status{
+			Policy: &journalstore.RetentionPolicy{
 				Days:     30,
 				MaxBytes: 1 << 30,
 			},
 			ObservedAt:     now,
 			InventoryError: "header unavailable",
 			WriterError:    "writer failed",
-			Cleanup: journal.CleanupStatus{
+			Cleanup: journalstore.CleanupStatus{
 				AttemptedAt:      now,
 				LastSuccessfulAt: now.Add(-time.Hour),
 				Error:            "unlink failed",
@@ -48,9 +48,9 @@ func TestStatusPreservesIndependentFacts(t *testing.T) {
 	assert.Equal(t, []any{30, int64(1 << 30), nil, nil, now.UnixMicro(), "header unavailable", now.UnixMicro(), now.Add(-time.Hour).UnixMicro(), "unlink failed", "writer failed", "invalid edited policy"}, rows[0])
 }
 func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
-	for _, inventory := range []*journal.Inventory{nil, {Bytes: 0, Files: 0}} {
-		h := New(statusFunc(func(context.Context) (journal.Status, error) {
-			return journal.Status{
+	for _, inventory := range []*journalstore.Inventory{nil, {Bytes: 0, Files: 0}} {
+		h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
+			return journalstore.Status{
 				Inventory: inventory,
 			}, nil
 		}), func() string { return "" })
@@ -70,9 +70,9 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 	}
 }
 func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
-	h := New(statusFunc(func(context.Context) (journal.Status, error) {
+	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
 		t.Fatal("unexpected storage I/O")
-		return journal.Status{}, nil
+		return journalstore.Status{}, nil
 	}), func() string { t.Fatal("unexpected reload state read"); return "" })
 	cases := []struct {
 		name string
@@ -120,10 +120,10 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 }
 func TestCancellationReachesStorage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	h := New(statusFunc(func(got context.Context) (journal.Status, error) {
+	h := New(statusFunc(func(got context.Context) (journalstore.Status, error) {
 		assert.Same(t, ctx, got)
 		cancel()
-		return journal.Status{}, got.Err()
+		return journalstore.Status{}, got.Err()
 	}), func() string { return "" })
 	assert.Equal(t, 499, h.HandleRaw(ctx, request()).Status)
 }
@@ -138,8 +138,8 @@ func TestStorageErrorStatuses(t *testing.T) {
 		"storage":   {err: errors.New("journal closed"), want: funcapi.UnavailableResponse("journal closed")},
 	} {
 		t.Run(name, func(t *testing.T) {
-			h := New(statusFunc(func(context.Context) (journal.Status, error) {
-				return journal.Status{}, tc.err
+			h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
+				return journalstore.Status{}, tc.err
 			}), func() string { return "" })
 			assert.Equal(t, tc.want, h.HandleRaw(context.Background(), request()))
 		})

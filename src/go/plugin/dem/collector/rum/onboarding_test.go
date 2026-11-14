@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
@@ -19,7 +19,7 @@ import (
 
 func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 	hub := registry.New()
-	db, err := journal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	var previous string

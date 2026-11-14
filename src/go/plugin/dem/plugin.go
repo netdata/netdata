@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
@@ -30,7 +30,7 @@ import (
 // generations and closes them after the components stop.
 type Dependencies struct {
 	GeoIPPaths geoip.Paths
-	History    *journal.Store
+	History    *journalstore.Store
 	Artifacts  *artifacts.Store
 	Executor   journey.Executor
 	// BrowserActivation names the process browser runtime that synthetic jobs

@@ -12,7 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
@@ -28,7 +28,7 @@ func BenchmarkCollect(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			ctx := context.Background()
-			db, err := demjournal.Open(ctx, "")
+			db, err := journalstore.Open(ctx, "")
 			require.NoError(b, err)
 			defer db.Close()
 			hub := rumregistry.New()

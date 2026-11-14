@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
@@ -615,7 +615,7 @@ func TestCaptureAbsenceStates(t *testing.T) {
 
 func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journal, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	run := model.Run{
@@ -641,7 +641,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 
 func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journal, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	retained := synthetichistory.NewStore(journal)
@@ -766,7 +766,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 
 func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *testing.T) {
 	ctx := context.Background()
-	journal, err := demjournal.Open(ctx, t.TempDir())
+	journal, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	store := synthetichistory.NewStore(journal)
@@ -810,7 +810,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 // emptyHistory is a real run history holding no runs.
 func emptyHistory(t *testing.T) *synthetichistory.Store {
 	t.Helper()
-	store, err := demjournal.Open(t.Context(), "")
+	store, err := journalstore.Open(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	return synthetichistory.NewStore(store)

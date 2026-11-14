@@ -33,7 +33,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
@@ -72,7 +72,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	base, err := os.MkdirTemp("", "dem-real-runtime-")
 	require.NoError(t, err)
 	safe := true
-	history, err := demjournal.Open(context.Background(), filepath.Join(base, "history"))
+	history, err := journalstore.Open(context.Background(), filepath.Join(base, "history"))
 	require.NoError(t, err)
 	captures, err := artifacts.Open(filepath.Join(base, "captures"))
 	require.NoError(t, err)

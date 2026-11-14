@@ -470,7 +470,7 @@ Shared and process-wide packages:
 |---|---|
 | `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication; journey and lighthouse embed the shared synthetic job and keep request building and their own metrics |
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
-| `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
+| `journalstore` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
@@ -525,7 +525,7 @@ flowchart LR
     Q --> Reg("*/registry")
     Q --> H("*/history")
     Q --> A("synthetic/artifacts")
-    H --> J("journal")
+    H --> J("journalstore")
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
     Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip · monitor")
@@ -543,7 +543,7 @@ Dependency direction:
   store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
-- The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
+- The history adapters borrow one `journalstore.Store`. They cannot close it or independently apply retention.
 - Journal knows SDK fields and snapshots, not RUM or synthetic schemas.
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.

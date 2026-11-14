@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,7 +27,7 @@ import (
 func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join(t.TempDir(), "history")
-	st, err := demjournal.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	old := time.Now().Add(-24 * time.Hour).UnixMicro()
@@ -79,7 +79,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, st.Sync(ctx))
 	require.NoError(t, st.Close())
-	st, err = demjournal.Open(ctx, root)
+	st, err = journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	page, err := history.NewStore(st).
 		QueryRuns(ctx, history.RunFilter{
@@ -116,7 +116,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 
 func TestSyntheticHistoryOptionalUpperBound(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	run := synthetic.Run{
@@ -148,7 +148,7 @@ func TestSyntheticHistoryOptionalUpperBound(t *testing.T) {
 // Whole-second membership must resolve final evidence regardless of finish time.
 func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	historyStore := history.NewStore(st)
@@ -283,7 +283,7 @@ func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 
 func TestSyntheticRejectsInvalidProducerRecordBeforeAppend(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	for name, test := range map[string]struct {
@@ -351,7 +351,7 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			st, err := demjournal.Open(ctx, t.TempDir())
+			st, err := journalstore.Open(ctx, t.TempDir())
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, st.Close()) })
 			run := synthetic.Run{
@@ -376,10 +376,10 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 				keys = append(keys, key)
 			}
 			sort.Strings(keys)
-			var encoded []sdk.Field
+			var encoded []journal.Field
 			for _, key := range keys {
 				for _, value := range fields[key] {
-					encoded = append(encoded, sdk.StringField(key, value))
+					encoded = append(encoded, journal.StringField(key, value))
 				}
 			}
 			attempted, err := st.Append(ctx, encoded)
@@ -398,19 +398,19 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join(t.TempDir(), "history")
-	journal, err := demjournal.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	run := synthetic.Run{ID: "timeout", JobID: "journey:test", Kind: synthetic.Journey,
 		StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Timeout,
 		TerminationReason: synthetic.ExecutionBudget, Error: "earlier assertion failed"}
-	_, err = history.NewStore(journal).AppendRun(ctx, "complete", run)
+	_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	require.NoError(t, journal.Sync(ctx))
-	require.NoError(t, journal.Close())
-	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, st.Sync(ctx))
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root)
 	require.NoError(t, err)
-	defer func() { require.NoError(t, journal.Close()) }()
-	retained, err := history.NewStore(journal).GetRun(ctx, run.JobID, run.ID)
+	defer func() { require.NoError(t, st.Close()) }()
+	retained, err := history.NewStore(st).GetRun(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, run.TerminationReason, retained.TerminationReason)
 	assert.Equal(t, run.Error, retained.Error)
@@ -419,7 +419,7 @@ func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	ctx := t.Context()
 	root := t.TempDir()
-	journal, err := demjournal.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	now := time.Now().UnixMicro()
 	duration := 5.25
@@ -437,15 +437,15 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence, BrowserSummary: &synthetic.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &synthetic.BrowserAggregate{Counts: synthetic.BrowserCounts{ConsoleError: 2}}, Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}}, Samples: []synthetic.BrowserSample{{ID: 1, TestID: "t", Category: "console_error", State: "pending"}}}},
 	}
 	for _, run := range runs {
-		_, err = history.NewStore(journal).AppendRun(ctx, "complete", run)
+		_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
 		require.NoError(t, err)
 	}
-	require.NoError(t, journal.Sync(ctx))
-	require.NoError(t, journal.Close())
-	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, st.Sync(ctx))
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root)
 	require.NoError(t, err)
-	defer func() { require.NoError(t, journal.Close()) }()
-	store := history.NewStore(journal)
+	defer func() { require.NoError(t, st.Close()) }()
+	store := history.NewStore(st)
 	for _, run := range runs {
 		retained, err := store.GetRun(ctx, run.JobID, run.ID)
 		require.NoError(t, err)
@@ -460,7 +460,7 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 
 func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	root := t.TempDir()
-	j, err := demjournal.Open(t.Context(), root)
+	j, err := journalstore.Open(t.Context(), root)
 	require.NoError(t, err)
 	test := synthetic.ArtifactTest{ID: "t1", Title: "Checkout"}
 	run := synthetic.Run{ID: "capture-run", JobID: "journey:test", Kind: synthetic.Journey, Name: "test", StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Failed, CaptureState: "unavailable",
@@ -469,7 +469,7 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
 	require.NoError(t, err)
 	require.NoError(t, j.Close())
-	j, err = demjournal.Open(t.Context(), root)
+	j, err = journalstore.Open(t.Context(), root)
 	require.NoError(t, err)
 	defer j.Close()
 	got, err := history.NewStore(j).GetRun(t.Context(), run.JobID, run.ID)
@@ -480,9 +480,9 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	journal, err := demjournal.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
-	store := history.NewStore(journal)
+	store := history.NewStore(st)
 	now := time.Now().UnixMicro()
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
 		run := synthetic.Run{ID: []string{"before-move", "after-move"}[i], JobID: "journey:checkout", Kind: synthetic.Journey, VnodeGUID: site, StartedUS: now + int64(i), Outcome: synthetic.Unknown}
@@ -493,11 +493,11 @@ func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 		_, err = store.AppendRun(ctx, "complete", run)
 		require.NoError(t, err)
 	}
-	require.NoError(t, journal.Close())
-	journal, err = demjournal.Open(ctx, root)
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root)
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
-	store = history.NewStore(journal)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	store = history.NewStore(st)
 	upper := now/1e6 + 1
 	filtered, err := store.QueryRuns(ctx, history.RunFilter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "journey:checkout", Kind: synthetic.Journey, Outcome: synthetic.Success, After: now / 1e6, Before: &upper})
 	require.NoError(t, err)
@@ -524,9 +524,9 @@ func storedEntries(t *testing.T, root string) []map[string][]string {
 	require.NoError(t, err)
 	var entries []map[string][]string
 	for _, path := range paths {
-		file, err := sdk.OpenIndexedSnapshot(context.Background(), path, sdk.IndexedSnapshotOptions{})
+		file, err := journal.OpenIndexedSnapshot(context.Background(), path, journal.IndexedSnapshotOptions{})
 		require.NoError(t, err)
-		err = file.VisitEntries(context.Background(), func(entry *sdk.SnapshotEntry) error {
+		err = file.VisitEntries(context.Background(), func(entry *journal.SnapshotEntry) error {
 			fields := map[string][]string{}
 			entries = append(entries, fields)
 			return entry.VisitPayloads(func(payload []byte) error {
@@ -547,7 +547,7 @@ func storedEntries(t *testing.T, root string) []map[string][]string {
 func TestStoredRunEntryContract(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	st, err := demjournal.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	run := synthetic.Run{
