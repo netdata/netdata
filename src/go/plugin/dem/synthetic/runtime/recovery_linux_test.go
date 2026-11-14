@@ -71,8 +71,9 @@ func damageRuntime(t *testing.T, s *Store, old, selected Manifest, damage string
 		content = "{\"release\":null} {}"
 	case "invalid-selection":
 		content = "{\"release\":{}}"
-	case "legacy-uninstalled-selection":
-		content = "{\"manifest\":null}"
+	case "legacy-selection-variant":
+		// Only the exact empty record earlier builds wrote means uninstalled.
+		content = "{\"manifest\":null,\"release\":null}\n"
 	case "unknown-selection-field":
 		content = "{\"unexpected\":true}"
 	case "invalid-prepared-fields":
@@ -92,7 +93,7 @@ var metadataDamageCases = []string{
 	"unknown-selection-field",
 	"mismatched-selection",
 	"legacy-selection",
-	"legacy-uninstalled-selection",
+	"legacy-selection-variant",
 	"missing-selected",
 	"missing-prepared",
 	"invalid-prepared",

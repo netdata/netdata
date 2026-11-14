@@ -67,6 +67,31 @@ func installFixture(t *testing.T, s *Store, label string) Manifest {
 	return m
 }
 
+func TestLegacyEmptySelectionIsUninstalled(t *testing.T) {
+	s, _ := testStore(t)
+	path := filepath.Join(s.path, "selection.json")
+	require.NoError(t, os.WriteFile(path, []byte(legacyEmptySelection), 0600))
+	_, err := s.AcquireSelected()
+	require.ErrorIs(t, err, ErrUnavailable)
+	require.NotErrorIs(t, err, ErrDamaged)
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Nil(t, status.Selected)
+	require.Empty(t, status.SelectionError)
+	// Reads never rewrite the record; the next selection replaces it.
+	data, err := os.ReadFile(path)
+	require.NoError(t, err)
+	require.Equal(t, legacyEmptySelection, string(data))
+	selected := installFixture(t, s, "after-legacy")
+	consumer, err := s.AcquireSelected()
+	require.NoError(t, err)
+	require.Equal(t, selected, consumer.Manifest())
+	require.NoError(t, consumer.Close())
+	data, err = os.ReadFile(path)
+	require.NoError(t, err)
+	require.NotEqual(t, legacyEmptySelection, string(data))
+}
+
 func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	s, now := testStore(t)
 	s.config.MaxBytes = 128 << 10

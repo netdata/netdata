@@ -76,6 +76,11 @@ func (s *Store) readSelection() (*Manifest, error) {
 	return record.manifest(), nil
 }
 
+// legacyEmptySelection is the exact record earlier builds wrote for a new or
+// uninstalled store. It still means nothing is selected; every other former
+// shape is damage. The next selection write replaces it.
+const legacyEmptySelection = "{\"manifest\":null}\n"
+
 func (s *Store) readSelectionRecord() (selection, error) {
 	// Only an explicit null means uninstalled. Missing fields or a missing
 	// record must not silently discard an installed release's protection.
@@ -84,6 +89,8 @@ func (s *Store) readSelectionRecord() (selection, error) {
 	}
 	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
 		return record, damagedMetadata("selection.json", err)
+	} else if isMetadataDamage(err) && s.isLegacyEmptySelection() {
+		return selection{}, nil
 	} else if err != nil {
 		return record, err
 	}
@@ -91,6 +98,11 @@ func (s *Store) readSelectionRecord() (selection, error) {
 		return record, damagedMetadata("selection.json", err)
 	}
 	return record, nil
+}
+
+func (s *Store) isLegacyEmptySelection() bool {
+	data, err := s.root.ReadFile("selection.json")
+	return err == nil && string(data) == legacyEmptySelection
 }
 
 func (s *Store) selectLocked(record selection) error {
