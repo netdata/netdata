@@ -41,7 +41,10 @@ func hostBoot() bootIdentity {
 	if err != nil || len(data) != 37 || !validBootID(id) {
 		return bootIdentity{}
 	}
-	return bootIdentity{ID: id, Verified: true}
+	return bootIdentity{
+		ID:       id,
+		Verified: true,
+	}
 }
 
 // Match the opened FD, not merely the apparent pathname. Container managers can

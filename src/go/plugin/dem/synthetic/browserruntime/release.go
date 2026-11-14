@@ -81,7 +81,13 @@ func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
 	if !bytes.HasPrefix(signedPayload, []byte(releaseSignatureDomain)) {
 		return nil, errors.New("invalid release signing domain")
 	}
-	envelope, err := json.Marshal(releaseEnvelope{Format: 1, Payload: signedPayload[len(releaseSignatureDomain):], Signature: signature})
+	envelope, err := json.Marshal(
+		releaseEnvelope{
+			Format:    1,
+			Payload:   signedPayload[len(releaseSignatureDomain):],
+			Signature: signature,
+		},
+	)
 	if err == nil && len(envelope) > ReleaseEnvelopeLimit {
 		return nil, errors.New("runtime release descriptor exceeds protocol size limit")
 	}
@@ -124,7 +130,9 @@ func VerifyRelease(data []byte, trusted *ReleaseTrust) (VerifiedRelease, error) 
 	if err := result.Validate(); err != nil {
 		return VerifiedRelease{}, err
 	}
-	return VerifiedRelease{release: result}, nil
+	return VerifiedRelease{
+		release: result,
+	}, nil
 }
 
 func decodeReleaseJSON(data []byte, target any) error {
@@ -172,7 +180,9 @@ func FetchRelease(ctx context.Context, address string, trusted *ReleaseTrust) (V
 		return VerifiedRelease{}, err
 	}
 	if !ValidHTTPSURL(address) {
-		return VerifiedRelease{}, errors.New("runtime release discovery requires HTTPS without credentials or a fragment")
+		return VerifiedRelease{}, errors.New(
+			"runtime release discovery requires HTTPS without credentials or a fragment",
+		)
 	}
 	body, err := openDownload(ctx, address, downloadIdleTimeout)
 	if err != nil {

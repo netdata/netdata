@@ -48,7 +48,19 @@ func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	cache := filepath.Join(root, "cache")
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--cache", cache, "--archive", archive)
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"install",
+		"--config-dir",
+		root,
+		"--release",
+		manifest,
+		"--cache",
+		cache,
+		"--archive",
+		archive,
+	)
 	require.Error(t, err)
 	assert.Equal(t, "unavailable", report.State)
 	assert.Equal(t, "prepared", report.CandidateState)
@@ -66,7 +78,18 @@ func TestRuntimePreloadRequiresQualifiedArchiveAndFreshRoot(t *testing.T) {
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	final := filepath.Join(root, "preloaded")
-	args := []string{"runtime", "preload", "--config-dir", root, "--release", manifest, "--archive", archive, "--root", final}
+	args := []string{
+		"runtime",
+		"preload",
+		"--config-dir",
+		root,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--root",
+		final,
+	}
 	report, err := runtimeCommand(t, args...)
 	require.Error(t, err)
 	assert.Nil(t, report.PreloadedConfig)
@@ -80,7 +103,19 @@ func TestRuntimeInstallDigestFailureNeverReportsPrepared(t *testing.T) {
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"install",
+		"--config-dir",
+		root,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--cache",
+		filepath.Join(root, "cache"),
+	)
 	require.Error(t, err)
 	assert.Equal(t, "unavailable", report.State)
 	assert.NotEmpty(t, report.SetupError)
@@ -109,7 +144,17 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Candidate.SHA256))
 	require.NoDirExists(t, wrongCache)
 	overrideCache := filepath.Join(t.TempDir(), "override-cache")
-	report, err = runtimeCommand(t, "runtime", "install", "--release", manifest, "--archive", archive, "--cache", overrideCache)
+	report, err = runtimeCommand(
+		t,
+		"runtime",
+		"install",
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--cache",
+		overrideCache,
+	)
 	require.Error(t, err)
 	require.Equal(t, overrideCache, report.CachePath)
 	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Candidate.SHA256))
@@ -119,10 +164,18 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 // This opt-in test uses authentic release descriptors and archives through the
 // production CLI acquisition, qualification and publication path.
 func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
-	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	manifest, archive, helper := os.Getenv(
+		"DEM_RUNTIME_TEST_RELEASE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_ARCHIVE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_HELPER",
+	)
 	publicKey := os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
-		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
+		t.Skip(
+			"requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER",
+		)
 	}
 	require.NotZero(t, os.Geteuid())
 	restore := ndexec.SetRunnerPathsForTests(helper, "")

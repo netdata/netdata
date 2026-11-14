@@ -13,12 +13,26 @@ func TestBrowserSummaryCoveragePresentation(t *testing.T) {
 	var absent *BrowserSummary
 	assert.Equal(t, "not_recorded", absent.ReportingStatus())
 	assert.Empty(t, absent.Summary())
-	value := &BrowserSummary{Availability: "supported", Coverage: "fixture_context", ReporterComplete: true, Run: &BrowserAggregate{Tests: BrowserTestCounts{NoSummary: 2}}}
+	value := &BrowserSummary{
+		Availability:     "supported",
+		Coverage:         "fixture_context",
+		ReporterComplete: true,
+		Run: &BrowserAggregate{
+			Tests: BrowserTestCounts{
+				NoSummary: 2,
+			},
+		},
+	}
 	assert.Contains(t, value.Summary(), "no observed fixture contexts")
 	assert.Contains(t, value.Summary(), "no_summary=2")
 	assert.NotContains(t, value.Summary(), "uncaught=0")
 	value.ReporterComplete = false
-	value.Run.Tests = BrowserTestCounts{Observed: 1, Incomplete: 2, Invalid: 3, NoSummary: 4}
+	value.Run.Tests = BrowserTestCounts{
+		Observed:   1,
+		Incomplete: 2,
+		Invalid:    3,
+		NoSummary:  4,
+	}
 	value.Run.Counts.ConsoleError = 5
 	value.Run.Omissions = []string{"pending"}
 	assert.Contains(t, value.Summary(), "partial")
@@ -36,7 +50,11 @@ func TestBrowserSummaryCoveragePresentation(t *testing.T) {
 func TestBrowserStoredJSONRoundTrip(t *testing.T) {
 	var a BrowserAggregate
 	require.NoError(t, json.Unmarshal([]byte(`{"tests":{"observed":1},"counts":{}}`), &a))
-	assert.Equal(t, BrowserAggregate{Tests: BrowserTestCounts{Observed: 1}}, a)
+	assert.Equal(t, BrowserAggregate{
+		Tests: BrowserTestCounts{
+			Observed: 1,
+		},
+	}, a)
 	for _, raw := range []string{`{"value":null}`, `{"value":false}`, `{"value":1.25}`, `{"value":"text"}`, `{"omitted":"unrepresentable"}`} {
 		var arg BrowserArgument
 		require.NoError(t, json.Unmarshal([]byte(raw), &arg))

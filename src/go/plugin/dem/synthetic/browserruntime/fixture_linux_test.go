@@ -57,7 +57,14 @@ func publishedRelease(m Manifest, sequence uint64) Release {
 // that VerifyRelease authenticated, so fixtures take the same path as published
 // ones. Helper processes create their own publisher.
 var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
-	key, err := openpgp.NewEntity("Runtime fixture", "", "fixture@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	key, err := openpgp.NewEntity(
+		"Runtime fixture",
+		"",
+		"fixture@example.invalid",
+		&packet.Config{
+			Algorithm: packet.PubKeyAlgoEdDSA,
+		},
+	)
 	if err != nil {
 		return fixtureKeys{}, err
 	}
@@ -66,7 +73,10 @@ var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
 		return fixtureKeys{}, err
 	}
 	trust, err := ParseReleaseKeyring(public.Bytes())
-	return fixtureKeys{key: key, trust: trust}, err
+	return fixtureKeys{
+		key:   key,
+		trust: trust,
+	}, err
 })
 
 type fixtureKeys struct {
@@ -107,7 +117,11 @@ func (s *Store) beginRelease(ctx context.Context, release Release, operation Rel
 		Operation: operation,
 		Updates:   ManualUpdates,
 	}
-	candidate, err := s.BeginPublishedInstall(ctx, options, func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) })
+	candidate, err := s.BeginPublishedInstall(
+		ctx,
+		options,
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) },
+	)
 	if err == nil && candidate == nil {
 		err = errors.New("fixture installation was an unexpected no-op")
 	}
@@ -122,7 +136,11 @@ func installRelease(t *testing.T, s *Store, release Release, archive string, pol
 		Operation: InstallRelease,
 		Updates:   policy,
 	}
-	candidate, err := s.BeginPublishedInstall(context.Background(), options, func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) })
+	candidate, err := s.BeginPublishedInstall(
+		context.Background(),
+		options,
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) },
+	)
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
 	require.NoError(t, candidate.Import(context.Background(), archive))
@@ -143,7 +161,10 @@ func publishedFixture(t *testing.T, sequence uint64) (Release, string, func(cont
 	t.Helper()
 	m, archive := bundleFixture(t, strings.Repeat("release", int(sequence)))
 	release := publishedRelease(m, sequence)
-	return release, archiveFile(t, archive), func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) }
+	return release, archiveFile(
+		t,
+		archive,
+	), func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) }
 }
 
 func installPublishedFixture(t *testing.T, s *Store, sequence uint64, policy UpdatePolicy) Release {

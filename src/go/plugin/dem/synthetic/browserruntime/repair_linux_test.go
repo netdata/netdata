@@ -327,7 +327,12 @@ func TestRepairRetryAfterCallerExit(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			s, _ := testStore(t)
 			m := installFixture(t, s, "selected")
-			output, exit := runHelper(t, "TestRepairWriterExitProcess", "DEM_REPAIR_EXIT_MODE="+mode, "DEM_REPAIR_EXIT_STORE="+s.path)
+			output, exit := runHelper(
+				t,
+				"TestRepairWriterExitProcess",
+				"DEM_REPAIR_EXIT_MODE="+mode,
+				"DEM_REPAIR_EXIT_STORE="+s.path,
+			)
 			require.Equal(t, helperCrashExit, exit, string(output))
 			candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 			require.NoError(t, err)

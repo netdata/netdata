@@ -27,7 +27,11 @@ func TestReleaseRequiresCurrentSignerValidity(t *testing.T) {
 	atPast := func() time.Time { return past }
 	for _, kind := range []string{"primary-expiry", "primary-revocation", "subkey-expiry", "subkey-revocation", "signature-expiry", "future-signature"} {
 		t.Run(kind, func(t *testing.T) {
-			config := &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, DefaultHash: crypto.SHA256, Time: atPast}
+			config := &packet.Config{
+				Algorithm:   packet.PubKeyAlgoEdDSA,
+				DefaultHash: crypto.SHA256,
+				Time:        atPast,
+			}
 			if kind == "primary-expiry" {
 				config.KeyLifetimeSecs = 60
 			}
@@ -70,9 +74,25 @@ func TestHistoricalInvalidOtherKeysDoNotRejectValidSigner(t *testing.T) {
 	signed, err := pgptest.Release(release, key)
 	require.NoError(t, err)
 	past := time.Now().Add(-time.Hour)
-	expired, err := openpgp.NewEntity("Old", "", "old@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA, Time: func() time.Time { return past }, KeyLifetimeSecs: 1})
+	expired, err := openpgp.NewEntity(
+		"Old",
+		"",
+		"old@example.invalid",
+		&packet.Config{
+			Algorithm:       packet.PubKeyAlgoEdDSA,
+			Time:            func() time.Time { return past },
+			KeyLifetimeSecs: 1,
+		},
+	)
 	require.NoError(t, err)
-	revoked, err := openpgp.NewEntity("Revoked", "", "revoked@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
+	revoked, err := openpgp.NewEntity(
+		"Revoked",
+		"",
+		"revoked@example.invalid",
+		&packet.Config{
+			Algorithm: packet.PubKeyAlgoEdDSA,
+		},
+	)
 	require.NoError(t, err)
 	require.NoError(t, revoked.Revoke(packet.KeyCompromised, "test", nil))
 	ring := append(pgptest.Public(t, expired), pgptest.Public(t, revoked)...)
@@ -103,15 +123,39 @@ func TestReleaseSignaturePolicyAndPacketBounds(t *testing.T) {
 	hiddenBody := append(bytes.Clone(signature[headerSize:]), 0xca, 3, 'P', 'G', 'P')
 	hiddenPacket := append([]byte{0xc2, 0xff, 0, 0, byte(len(hiddenBody) >> 8), byte(len(hiddenBody))}, hiddenBody...)
 	var text bytes.Buffer
-	require.NoError(t, openpgp.DetachSignWithParams(&text, []*openpgp.Entity{key}, bytes.NewReader(payload), &openpgp.SignParams{TextSig: true, Config: &packet.Config{DefaultHash: crypto.SHA256}}))
+	require.NoError(
+		t,
+		openpgp.DetachSignWithParams(
+			&text,
+			[]*openpgp.Entity{key},
+			bytes.NewReader(payload),
+			&openpgp.SignParams{
+				TextSig: true,
+				Config: &packet.Config{
+					DefaultHash: crypto.SHA256,
+				},
+			},
+		),
+	)
 	// Use the packet signer directly: the high-level signer deliberately upgrades
 	// a weak requested digest to a preferred strong digest.
-	weakPacket := &packet.Signature{SigType: packet.SigTypeBinary, PubKeyAlgo: key.PrimaryKey.PubKeyAlgo, Hash: crypto.SHA1, CreationTime: time.Now(), IssuerKeyId: &key.PrimaryKey.KeyId}
+	weakPacket := &packet.Signature{
+		SigType:      packet.SigTypeBinary,
+		PubKeyAlgo:   key.PrimaryKey.PubKeyAlgo,
+		Hash:         crypto.SHA1,
+		CreationTime: time.Now(),
+		IssuerKeyId:  &key.PrimaryKey.KeyId,
+	}
 	weakHash := sha1.New()
 	_, err = weakHash.Write(payload)
 	require.NoError(t, err)
 	randomize := false
-	require.NoError(t, weakPacket.Sign(weakHash, key.PrivateKey, &packet.Config{NonDeterministicSignaturesViaNotation: &randomize}))
+	require.NoError(
+		t,
+		weakPacket.Sign(weakHash, key.PrivateKey, &packet.Config{
+			NonDeterministicSignaturesViaNotation: &randomize,
+		}),
+	)
 	var weakBuffer bytes.Buffer
 	require.NoError(t, weakPacket.Serialize(&weakBuffer))
 	weak := weakBuffer.Bytes()
@@ -172,7 +216,11 @@ func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) {
 		calls++
 		require.Equal(t, ReleaseKeyringURL, r.URL.String())
-		return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(body)), Header: make(http.Header)}, nil
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
 	})
 	_, err := FetchReleaseKeyring(context.Background())
 	require.NoError(t, err)
@@ -184,7 +232,9 @@ func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	body = bytes.Repeat([]byte(" "), releaseKeyringLimit+1)
 	_, err = FetchReleaseKeyring(context.Background())
 	require.ErrorContains(t, err, "size limit")
-	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) { <-r.Context().Done(); return nil, r.Context().Err() })
+	http.DefaultTransport = trustTransport(
+		func(r *http.Request) (*http.Response, error) { <-r.Context().Done(); return nil, r.Context().Err() },
+	)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = FetchReleaseKeyring(ctx)

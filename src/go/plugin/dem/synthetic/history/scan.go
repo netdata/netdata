@@ -14,7 +14,12 @@ import (
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, visit func(synthetic.HistoryPhase, synthetic.Run)) error {
+func (s *Store) scanSynthetic(
+	ctx context.Context,
+	f RunFilter,
+	runID string,
+	visit func(synthetic.HistoryPhase, synthetic.Run),
+) error {
 	before := int64(math.MaxInt64)
 	if f.Before != nil {
 		before = *f.Before

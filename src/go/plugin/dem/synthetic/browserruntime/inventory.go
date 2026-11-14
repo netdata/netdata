@@ -94,7 +94,10 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		case inv.generationErrors[id] != nil:
 			inv.selectionError = inv.generationErrors[id]
 		case !sameExecutable(g.Manifest, *inv.selected):
-			inv.selectionError = damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from selected release"))
+			inv.selectionError = damagedMetadata(
+				"selection.json",
+				errors.New("prepared runtime manifest differs from selected release"),
+			)
 		}
 	}
 	// Corruption is not ordinary inactivity. Only a healthy inventory may
@@ -182,7 +185,10 @@ func (inv inventory) damageError() error {
 }
 
 func (inv inventory) protected(id string) bool {
-	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
+	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 ||
+		inv.candidates[id] > 0 ||
+		inv.preparing[id] > 0 ||
+		inv.uses[id] > 0
 }
 
 // inUse reports consumers, candidates, executions or reservations that block

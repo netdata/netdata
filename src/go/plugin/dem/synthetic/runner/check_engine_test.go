@@ -31,8 +31,16 @@ func TestCheckIsSupervisedWithoutWorkflowInput(t *testing.T) {
 		calls++
 		assert.Empty(t, raw)
 		assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
-		fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
-		return ndexec.TreeResult{Drained: true}
+		fmt.Fprintf(
+			out,
+			`{"version":%q,"contract":2,"uid":%d,"gid":%d}`,
+			paths.Identity.Version,
+			os.Geteuid(),
+			os.Getegid(),
+		)
+		return ndexec.TreeResult{
+			Drained: true,
+		}
 	})
 	require.NoError(t, e.Check(context.Background()))
 	assert.Equal(t, 1, calls)
@@ -64,8 +72,17 @@ func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
 				calls++
 				assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
 				assert.Empty(t, raw)
-				fmt.Fprintf(out, `{"version":%q,"contract":%d,"uid":%d,"gid":%d}`, tc.version, tc.contract, tc.uid, tc.gid)
-				return ndexec.TreeResult{Drained: true}
+				fmt.Fprintf(
+					out,
+					`{"version":%q,"contract":%d,"uid":%d,"gid":%d}`,
+					tc.version,
+					tc.contract,
+					tc.uid,
+					tc.gid,
+				)
+				return ndexec.TreeResult{
+					Drained: true,
+				}
 			})
 			err := e.Check(context.Background())
 			if tc.valid {
@@ -90,10 +107,24 @@ func TestCheckResponseBounds(t *testing.T) {
 		failed         bool
 		err            string
 	}{
-		"reply at limit":       {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
-		"reply over limit":     {stdout: reply + strings.Repeat(" ", 4097-len(reply)), err: "prepared runtime check: runtime check response exceeds 4096 bytes"},
-		"clipped diagnostic":   {stderr: strings.Repeat("z", 3*textLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", textLimit) + ")"},
-		"multibyte diagnostic": {stderr: "a" + strings.Repeat("é", 1500), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (a" + strings.Repeat("é", 1000) + ")"},
+		"reply at limit": {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
+		"reply over limit": {
+			stdout: reply + strings.Repeat(" ", 4097-len(reply)),
+			err:    "prepared runtime check: runtime check response exceeds 4096 bytes",
+		},
+		"clipped diagnostic": {
+			stderr: strings.Repeat("z", 3*textLimit),
+			failed: true,
+			err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat(
+				"z",
+				textLimit,
+			) + ")",
+		},
+		"multibyte diagnostic": {
+			stderr: "a" + strings.Repeat("é", 1500),
+			failed: true,
+			err:    "prepared runtime check: runtime check failed: exit status 1 (a" + strings.Repeat("é", 1000) + ")",
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -102,9 +133,14 @@ func TestCheckResponseBounds(t *testing.T) {
 				_, _ = io.WriteString(out, tc.stdout)
 				_, _ = io.WriteString(stderr, tc.stderr)
 				if tc.failed {
-					return ndexec.TreeResult{Drained: true, Err: errors.New("exit status 1")}
+					return ndexec.TreeResult{
+						Drained: true,
+						Err:     errors.New("exit status 1"),
+					}
 				}
-				return ndexec.TreeResult{Drained: true}
+				return ndexec.TreeResult{
+					Drained: true,
+				}
 			})
 			err := e.Check(t.Context())
 			if tc.err == "" {
@@ -151,7 +187,10 @@ func TestUnverifiedCheckDrainPoisonsAllViews(t *testing.T) {
 	var calls atomic.Int32
 	e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
 		calls.Add(1)
-		return ndexec.TreeResult{Drained: false, Err: ndexec.ErrTreeNotDrained}
+		return ndexec.TreeResult{
+			Drained: false,
+			Err:     ndexec.ErrTreeNotDrained,
+		}
 	})
 	candidate := e.unrecordedView(e.source, a)
 	assert.ErrorIs(t, candidate.Check(t.Context()), ndexec.ErrTreeNotDrained)

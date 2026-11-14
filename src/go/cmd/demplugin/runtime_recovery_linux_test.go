@@ -83,7 +83,19 @@ func TestRuntimeFailedRepairReportsSelectedStateSeparately(t *testing.T) {
 				requested.Archive.SHA256 = strings.Repeat("b", 64)
 				writeAdminRelease(t, manifest, requested)
 			}
-			report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", manifest, "--archive", archive)
+			report, err := runtimeCommand(
+				t,
+				"runtime",
+				"repair",
+				"--config-dir",
+				root,
+				"--cache",
+				cache,
+				"--release",
+				manifest,
+				"--archive",
+				archive,
+			)
 			require.Error(t, err)
 			require.NotNil(t, report.Candidate)
 			assert.Equal(t, requested.Archive.SHA256, report.Candidate.SHA256)
@@ -130,7 +142,19 @@ func TestRuntimeRepairValidatesTrustBeforeChangingDamagedStore(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(releasePath, data, 0600))
 			}
-			report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", releasePath, "--archive", archive)
+			report, err := runtimeCommand(
+				t,
+				"runtime",
+				"repair",
+				"--config-dir",
+				root,
+				"--cache",
+				cache,
+				"--release",
+				releasePath,
+				"--archive",
+				archive,
+			)
 			require.Error(t, err)
 			assert.Nil(t, report.Candidate)
 			assert.Nil(t, report.Qualification)
@@ -156,10 +180,18 @@ func TestRuntimeStatusReportsUnknownWhenSafetyStructureIsMissing(t *testing.T) {
 // Only authentic release inputs can establish both workload qualifications.
 func realAdminInputs(t *testing.T) (manifest, archive, publicKey string) {
 	t.Helper()
-	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	manifest, archive, helper := os.Getenv(
+		"DEM_RUNTIME_TEST_RELEASE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_ARCHIVE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_HELPER",
+	)
 	publicKey = os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
-		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
+		t.Skip(
+			"requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER",
+		)
 	}
 	require.NotZero(t, os.Geteuid())
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
@@ -175,7 +207,19 @@ func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, store.Close())
 	require.NoError(t, os.WriteFile(filepath.Join(cache, "selection.json"), []byte("{broken"), 0600))
-	report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", manifest, "--archive", archive)
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"repair",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+	)
 	require.NoError(t, err)
 	assert.Equal(t, "installed", report.State)
 	assert.Equal(t, "selected", report.CandidateState)
@@ -224,7 +268,10 @@ func TestRuntimeStatusReportsIncompleteOwnershipInventory(t *testing.T) {
 	claims, err := os.ReadDir(filepath.Join(cache, "claims"))
 	require.NoError(t, err)
 	require.Len(t, claims, 1)
-	require.NoError(t, os.WriteFile(filepath.Join(cache, "claims", claims[0].Name(), "owner.json"), []byte("{broken"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(cache, "claims", claims[0].Name(), "owner.json"), []byte("{broken"), 0600),
+	)
 	report, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
 	require.Error(t, err)
 	assert.Equal(t, "unknown", report.State)

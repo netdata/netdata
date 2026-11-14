@@ -103,7 +103,8 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
 					return availableFunctions(syntheticfunc.Declarations(), func() bool {
-						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind(journalstore.KindSynthetic) ||
+						return syntheticRegistry.HasJobs() ||
+							deps.History.HasObservedKind(journalstore.KindSynthetic) ||
 							deps.Artifacts.HasObservedPublished()
 					})
 				},

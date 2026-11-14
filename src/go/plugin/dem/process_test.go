@@ -26,7 +26,12 @@ func processConfig(t *testing.T) Config {
 func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 	varLib := t.TempDir()
 	var warnings bytes.Buffer
-	process, err := Open(Options{Config: processConfig(t), VarLibDir: varLib, Private: true, Warnings: &warnings})
+	process, err := Open(Options{
+		Config:    processConfig(t),
+		VarLibDir: varLib,
+		Private:   true,
+		Warnings:  &warnings,
+	})
 	require.NoError(t, err)
 	for _, module := range []string{"receiver", "rum"} {
 		require.Contains(t, process.Collectors, module)
@@ -59,7 +64,11 @@ func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 
 func TestProcessKeepsLiveStoresUnderStateDirectory(t *testing.T) {
 	varLib := t.TempDir()
-	process, err := Open(Options{Config: processConfig(t), VarLibDir: varLib, Warnings: io.Discard})
+	process, err := Open(Options{
+		Config:    processConfig(t),
+		VarLibDir: varLib,
+		Warnings:  io.Discard,
+	})
 	require.NoError(t, err)
 	require.NoError(t, process.Close())
 	for _, store := range []string{"journal", "artifacts"} {
@@ -68,6 +77,9 @@ func TestProcessKeepsLiveStoresUnderStateDirectory(t *testing.T) {
 }
 
 func TestProcessRequiresStateDirectoryOutsidePrivateRuns(t *testing.T) {
-	_, err := Open(Options{Config: processConfig(t), Warnings: io.Discard})
+	_, err := Open(Options{
+		Config:   processConfig(t),
+		Warnings: io.Discard,
+	})
 	require.ErrorContains(t, err, "initializing DEM history: NETDATA_LIB_DIR is required outside terminal/debug mode")
 }

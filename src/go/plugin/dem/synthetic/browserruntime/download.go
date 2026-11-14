@@ -74,7 +74,10 @@ func (a *downloadActivity) failure(err error) error {
 	if errors.Is(context.Cause(a.ctx), errDownloadInactive) {
 		// Report inactivity as a download failure, never as context
 		// cancellation: callers treat cancellation as their own decision.
-		return &downloadError{cause: errDownloadInactive, detail: "network inactivity timeout"}
+		return &downloadError{
+			cause:  errDownloadInactive,
+			detail: "network inactivity timeout",
+		}
 	}
 	if err == nil || err == io.EOF {
 		return err
@@ -101,19 +104,25 @@ func (b *downloadBody) Close() error {
 
 func openDownload(ctx context.Context, address string, idle time.Duration) (io.ReadCloser, error) {
 	requestCtx, cancel := context.WithCancelCause(ctx)
-	activity := &downloadActivity{ctx: requestCtx, cancel: cancel, idle: idle}
+	activity := &downloadActivity{
+		ctx:    requestCtx,
+		cancel: cancel,
+		idle:   idle,
+	}
 	request, err := http.NewRequestWithContext(requestCtx, http.MethodGet, address, nil)
 	if err != nil {
 		activity.close()
 		return nil, errors.New("invalid runtime download request")
 	}
-	client := &http.Client{CheckRedirect: func(req *http.Request, via []*http.Request) error {
-		if len(via) >= 10 || req.URL.Scheme != "https" || req.URL.User != nil {
-			return errDownloadRedirect
-		}
-		activity.arm()
-		return nil
-	}}
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 || req.URL.Scheme != "https" || req.URL.User != nil {
+				return errDownloadRedirect
+			}
+			activity.arm()
+			return nil
+		},
+	}
 	activity.arm()
 	response, err := client.Do(request)
 	activity.disarm()
@@ -129,7 +138,10 @@ func openDownload(ctx context.Context, address string, idle time.Duration) (io.R
 		response.Body.Close()
 		return nil, fmt.Errorf("runtime download returned HTTP %d", response.StatusCode)
 	}
-	return &downloadBody{ReadCloser: response.Body, activity: activity}, nil
+	return &downloadBody{
+		ReadCloser: response.Body,
+		activity:   activity,
+	}, nil
 }
 
 var errDownloadRedirect = errors.New("unsafe runtime download redirect")

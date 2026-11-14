@@ -48,7 +48,9 @@ func ParseReleaseKeyring(data []byte) (*ReleaseTrust, error) {
 	if bytes.HasPrefix(trimmed, []byte("-----BEGIN")) {
 		const begin = "-----BEGIN PGP PUBLIC KEY BLOCK-----"
 		const end = "-----END PGP PUBLIC KEY BLOCK-----"
-		if !bytes.HasPrefix(trimmed, []byte(begin)) || !bytes.HasSuffix(trimmed, []byte(end)) || bytes.Count(trimmed, []byte(begin)) != 1 || bytes.Count(trimmed, []byte(end)) != 1 {
+		if !bytes.HasPrefix(trimmed, []byte(begin)) || !bytes.HasSuffix(trimmed, []byte(end)) ||
+			bytes.Count(trimmed, []byte(begin)) != 1 ||
+			bytes.Count(trimmed, []byte(end)) != 1 {
 			return nil, errors.New("expected one public OpenPGP armor block")
 		}
 		block, err := armor.Decode(bytes.NewReader(trimmed))
@@ -84,7 +86,9 @@ func ParseReleaseKeyring(data []byte) (*ReleaseTrust, error) {
 	if err != nil || len(entities) == 0 {
 		return nil, errors.New("invalid public OpenPGP keyring")
 	}
-	return &ReleaseTrust{binary: bytes.Clone(binary)}, nil
+	return &ReleaseTrust{
+		binary: bytes.Clone(binary),
+	}, nil
 }
 
 func ReadReleaseKeyring(path string) (*ReleaseTrust, error) {
@@ -144,8 +148,15 @@ func verifyReleaseSignature(payload, signature []byte, trust *ReleaseTrust) erro
 		return errors.New("invalid runtime release verification keyring")
 	}
 	now := time.Now()
-	config := &packet.Config{Time: func() time.Time { return now }}
-	_, signer, err := openpgp.VerifyDetachedSignature(entities, bytes.NewReader(payload), bytes.NewReader(signature), config)
+	config := &packet.Config{
+		Time: func() time.Time { return now },
+	}
+	_, signer, err := openpgp.VerifyDetachedSignature(
+		entities,
+		bytes.NewReader(payload),
+		bytes.NewReader(signature),
+		config,
+	)
 	if err != nil {
 		return fmt.Errorf("runtime release is not signed by a trusted key: %w", err)
 	}

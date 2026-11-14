@@ -57,17 +57,46 @@ func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
 }
 
 func trustedFixture() browserruntime.Manifest {
-	return browserruntime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + runtime.GOARCH,
-		Archive:  browserruntime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
-		Layout:   browserruntime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
-		Bindings: []browserruntime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
+	return browserruntime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  "test",
+		Platform: "linux/" + runtime.GOARCH,
+		Archive: browserruntime.Archive{
+			SHA256:        strings.Repeat("a", 64),
+			Bytes:         100,
+			TarBytes:      10240,
+			ExpandedBytes: 200,
+			Entries:       2,
+		},
+		Layout: browserruntime.Layout{
+			EntryPoint:   "runtime.mjs",
+			Node:         "node",
+			Dependencies: "dependencies",
+			Browser:      "browser",
+			Loader:       "loader",
+			Fonts:        "fonts",
+		},
+		Bindings: []browserruntime.Binding{
+			{Path: "node", Expected: []byte("loader\x00")},
+			{Path: "browser", Expected: []byte("loader\x00")},
+		},
+	}
 }
 func signedSetupFixture(t *testing.T) (Config, browserruntime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
 	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
-	release := browserruntime.Release{Format: 1, Sequence: 1, Manifest: manifest,
-		Sources: browserruntime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 1}}
+	release := browserruntime.Release{
+		Format:   1,
+		Sequence: 1,
+		Manifest: manifest,
+		Sources: browserruntime.ReleaseSource{
+			URL:    "https://example.invalid/sources.tar.zst",
+			SHA256: strings.Repeat("b", 64),
+			Bytes:  1,
+		},
+	}
 	key := pgptest.Key(t, 19)
 	raw, err := pgptest.Release(release, key)
 	require.NoError(t, err)
@@ -153,7 +182,11 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 		if fail {
 			status = http.StatusServiceUnavailable
 		}
-		return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(body)), Header: make(http.Header)}, nil
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(bytes.NewReader(body)),
+			Header:     make(http.Header),
+		}, nil
 	})
 	// Local descriptor plus download consent must use fresh canonical online trust,
 	// ignoring the offline keyring even when that administrator file is malformed.
@@ -171,7 +204,12 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	fail = true
 	_, err = cfg.ReleaseLoader(path, true)(context.Background())
 	require.ErrorContains(t, err, "503")
-	require.Equal(t, []string{browserruntime.ReleaseKeyringURL}, requests, "failed canonical refresh must not fall back to the offline ring")
+	require.Equal(
+		t,
+		[]string{browserruntime.ReleaseKeyringURL},
+		requests,
+		"failed canonical refresh must not fall back to the offline ring",
+	)
 	requests = nil
 	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, pgptest.Public(t, pgptest.Key(t, 19)), 0600))
 	got, err = cfg.ReleaseLoader(path, false)(context.Background())
@@ -199,7 +237,11 @@ func TestReleaseLoaderRequiresDiscoveryURLBeforeNetworkAccess(t *testing.T) {
 	requests := 0
 	http.DefaultTransport = releaseSetupTransport(func(r *http.Request) (*http.Response, error) {
 		requests++
-		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: http.NoBody, Header: make(http.Header)}, nil
+		return &http.Response{
+			StatusCode: http.StatusServiceUnavailable,
+			Body:       http.NoBody,
+			Header:     make(http.Header),
+		}, nil
 	})
 	_, err := cfg.ReleaseLoader("", true)(context.Background())
 	require.ErrorContains(t, err, "runtime.release_url")

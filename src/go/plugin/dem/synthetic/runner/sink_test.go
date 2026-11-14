@@ -17,15 +17,36 @@ import (
 func BenchmarkSinkConsume(b *testing.B) {
 	var core strings.Builder
 	for range 30 {
-		emit(&core, frame{Type: "event", Event: &synthetic.Event{Kind: "step", AtMS: 1, Title: "normal step", Status: "passed"}})
+		emit(
+			&core,
+			frame{
+				Type: "event",
+				Event: &synthetic.Event{
+					Kind:   "step",
+					AtMS:   1,
+					Title:  "normal step",
+					Status: "passed",
+				},
+			},
+		)
 	}
-	emit(&core, frame{Type: "result", Result: new(success())})
+	emit(&core, frame{
+		Type:   "result",
+		Result: new(success()),
+	})
 	browser := []string{browserInit}
 	for n := int64(1); n <= 64; n++ {
 		browser = append(browser, extensionLine(browserSummaryFeature, browserTestRecord(n)))
 	}
-	browser = append(browser, extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": browserRun(64)}))
-	evidence := []string{evidenceInit, evidenceRecord("test", "test", evidenceStart("t1")), evidenceRecord("step", "step", evidenceStep("s1", ""))}
+	browser = append(
+		browser,
+		extensionLine(browserSummaryFeature, map[string]any{"record": "complete", "run": browserRun(64)}),
+	)
+	evidence := []string{
+		evidenceInit,
+		evidenceRecord("test", "test", evidenceStart("t1")),
+		evidenceRecord("step", "step", evidenceStep("s1", "")),
+	}
 	// status checks that each stream still reaches the path it measures.
 	tests := map[string]struct {
 		request synthetic.Request
@@ -34,22 +55,29 @@ func BenchmarkSinkConsume(b *testing.B) {
 		want    string
 	}{
 		"core": {
-			request: synthetic.Request{Kind: synthetic.Journey},
-			input:   core.String(),
-			status:  func(s sinkSnapshot) string { return s.evidence.ReportingStatus() },
-			want:    "unavailable",
+			request: synthetic.Request{
+				Kind: synthetic.Journey,
+			},
+			input:  core.String(),
+			status: func(s sinkSnapshot) string { return s.evidence.ReportingStatus() },
+			want:   "unavailable",
 		},
 		"failure evidence": {
-			request: synthetic.Request{Kind: synthetic.Journey},
-			input:   strings.Join(evidence, "\n") + "\n" + core.String(),
-			status:  func(s sinkSnapshot) string { return s.evidence.ReportingStatus() },
-			want:    "partial",
+			request: synthetic.Request{
+				Kind: synthetic.Journey,
+			},
+			input:  strings.Join(evidence, "\n") + "\n" + core.String(),
+			status: func(s sinkSnapshot) string { return s.evidence.ReportingStatus() },
+			want:   "partial",
 		},
 		"browser summary 64 rows": {
-			request: synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true},
-			input:   strings.Join(browser, "\n") + "\n" + core.String(),
-			status:  func(s sinkSnapshot) string { return s.browser.ReportingStatus() },
-			want:    "complete",
+			request: synthetic.Request{
+				Kind:                synthetic.Journey,
+				BrowserErrorSummary: true,
+			},
+			input:  strings.Join(browser, "\n") + "\n" + core.String(),
+			status: func(s sinkSnapshot) string { return s.browser.ReportingStatus() },
+			want:   "complete",
 		},
 	}
 	for name, tc := range tests {
@@ -63,7 +91,11 @@ func BenchmarkSinkConsume(b *testing.B) {
 				}
 				snapshot := s.snapshot()
 				if snapshot.err != nil || snapshot.result == nil || tc.status(snapshot) != tc.want {
-					b.Fatalf("stream did not reach the measured path: err=%v status=%q", snapshot.err, tc.status(snapshot))
+					b.Fatalf(
+						"stream did not reach the measured path: err=%v status=%q",
+						snapshot.err,
+						tc.status(snapshot),
+					)
 				}
 			}
 		})
@@ -74,19 +106,40 @@ func BenchmarkSinkConsume(b *testing.B) {
 // stream in stream-key order, which also decides the tails the event cap keeps.
 func TestStreamEndFlushOrder(t *testing.T) {
 	line := func(event synthetic.Event) string {
-		raw, err := json.Marshal(frame{Type: "event", Event: &event})
+		raw, err := json.Marshal(frame{
+			Type:  "event",
+			Event: &event,
+		})
 		require.NoError(t, err)
 		return string(raw)
 	}
 	var tails []string
 	for _, source := range []struct{ kind, phase string }{{"stdout", "worker"}, {"stderr", "cli"}, {"stdout", "future"}, {"stderr", "worker"}, {"stdout", "cli"}} {
-		tails = append(tails, line(synthetic.Event{Kind: source.kind, Phase: source.phase, Message: source.kind + "/" + source.phase + " unterminated"}))
+		tails = append(
+			tails,
+			line(
+				synthetic.Event{
+					Kind:    source.kind,
+					Phase:   source.phase,
+					Message: source.kind + "/" + source.phase + " unterminated",
+				},
+			),
+		)
 	}
 	// Keys are kind:source; unknown phases share the protocol stream.
-	order := []string{"stderr/cli unterminated\n", "stderr/worker unterminated\n", "stdout/cli unterminated\n", "stdout/future unterminated\n", "stdout/worker unterminated\n"}
+	order := []string{
+		"stderr/cli unterminated\n",
+		"stderr/worker unterminated\n",
+		"stdout/cli unterminated\n",
+		"stdout/future unterminated\n",
+		"stdout/worker unterminated\n",
+	}
 	var filler []string
 	for range eventLimit - 2 {
-		filler = append(filler, line(synthetic.Event{Kind: "step", Title: "filler"}))
+		filler = append(filler, line(synthetic.Event{
+			Kind:  "step",
+			Title: "filler",
+		}))
 	}
 	tests := map[string]struct {
 		lines   []string
@@ -100,7 +153,9 @@ func TestStreamEndFlushOrder(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// Map iteration would vary between runs; repeat to catch it.
 			for range 30 {
-				snapshot := consume(t, synthetic.Request{Kind: synthetic.Journey}, nil, tc.lines...)
+				snapshot := consume(t, synthetic.Request{
+					Kind: synthetic.Journey,
+				}, nil, tc.lines...)
 				var flushed []string
 				for _, event := range snapshot.events[len(snapshot.events)-len(tc.kept):] {
 					flushed = append(flushed, event.Message)

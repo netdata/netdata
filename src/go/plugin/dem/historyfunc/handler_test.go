@@ -45,7 +45,23 @@ func TestStatusPreservesIndependentFacts(t *testing.T) {
 	assert.Nil(t, response.RawResponse)
 	rows := response.Data.([][]any)
 	require.Len(t, rows, 1)
-	assert.Equal(t, []any{30, int64(1 << 30), nil, nil, now.UnixMicro(), "header unavailable", now.UnixMicro(), now.Add(-time.Hour).UnixMicro(), "unlink failed", "writer failed", "invalid edited policy"}, rows[0])
+	assert.Equal(
+		t,
+		[]any{
+			30,
+			int64(1 << 30),
+			nil,
+			nil,
+			now.UnixMicro(),
+			"header unavailable",
+			now.UnixMicro(),
+			now.Add(-time.Hour).UnixMicro(),
+			"unlink failed",
+			"writer failed",
+			"invalid edited policy",
+		},
+		rows[0],
+	)
 }
 func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 	for _, inventory := range []*journalstore.Inventory{nil, {Bytes: 0, Files: 0}} {
@@ -106,7 +122,10 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 		}, 404},
 	}
 	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) { assert.Equal(t, tc.want, h.HandleRaw(context.Background(), tc.req).Status) })
+		t.Run(
+			tc.name,
+			func(t *testing.T) { assert.Equal(t, tc.want, h.HandleRaw(context.Background(), tc.req).Status) },
+		)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

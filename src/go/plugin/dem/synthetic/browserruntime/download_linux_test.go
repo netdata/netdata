@@ -24,16 +24,28 @@ func TestDownloadReportsCauseWithoutRequestCredentials(t *testing.T) {
 		cause error
 		want  string
 	}{
-		"DNS":        {&net.DNSError{Err: "no such host", Name: "runtime.invalid", IsNotFound: true}, "DNS name not found"},
-		"TLS":        {&tls.CertificateVerificationError{Err: errors.New("untrusted certificate")}, "TLS certificate verification failed"},
-		"nested URL": {&url.Error{Op: "Get", URL: "https://user:private-password@runtime.invalid/?token=private-query", Err: errors.New("opaque private-query")}, "HTTP request failed"},
+		"DNS": {&net.DNSError{
+			Err:        "no such host",
+			Name:       "runtime.invalid",
+			IsNotFound: true,
+		}, "DNS name not found"},
+		"TLS": {&tls.CertificateVerificationError{
+			Err: errors.New("untrusted certificate"),
+		}, "TLS certificate verification failed"},
+		"nested URL": {&url.Error{
+			Op:  "Get",
+			URL: "https://user:private-password@runtime.invalid/?token=private-query",
+			Err: errors.New("opaque private-query"),
+		}, "HTTP request failed"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			s, _ := testStore(t)
 			m, _ := bundleFixture(t, "download-diagnostic")
 			m.Archive.URL = "https://runtime.invalid/archive?token=private-query"
 			previous := http.DefaultTransport
-			http.DefaultTransport = downloadTransport(func(*http.Request) (*http.Response, error) { return nil, tc.cause })
+			http.DefaultTransport = downloadTransport(
+				func(*http.Request) (*http.Response, error) { return nil, tc.cause },
+			)
 			defer func() { http.DefaultTransport = previous }()
 			err := s.download(context.Background(), m)
 			require.ErrorIs(t, err, tc.cause)

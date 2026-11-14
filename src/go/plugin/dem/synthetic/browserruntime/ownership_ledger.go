@@ -91,11 +91,18 @@ func (s *ownershipLedger) claimLocked(id, kind string) (*claim, error) {
 	if !validID(id) {
 		return nil, errors.New("invalid runtime identity")
 	}
-	name, lock, err := s.newOwner("claims", claimRecord{Generation: id, Kind: kind})
+	name, lock, err := s.newOwner("claims", claimRecord{
+		Generation: id,
+		Kind:       kind,
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &claim{ledger: s, name: name, lock: lock}, nil
+	return &claim{
+		ledger: s,
+		name:   name,
+		lock:   lock,
+	}, nil
 }
 
 func (c *claim) Close() error {
@@ -230,7 +237,12 @@ func (s *ownershipLedger) newUseLocked(resource string) (_ *executionLease, resu
 		return nil, errors.Join(err, completion.Close())
 	}
 	lock := flock.New(filepath.Join(s.path, name, "owner.lock"), flock.SetFlag(os.O_RDWR))
-	lease := &executionLease{ledger: s, name: name, Completion: completion, lock: lock}
+	lease := &executionLease{
+		ledger:     s,
+		name:       name,
+		Completion: completion,
+		lock:       lock,
+	}
 	defer func() {
 		if result != nil {
 			result = errors.Join(result, lease.abortLocked())
@@ -239,7 +251,11 @@ func (s *ownershipLedger) newUseLocked(resource string) (_ *executionLease, resu
 	if err := lock.Lock(); err != nil {
 		return nil, err
 	}
-	record := useRecord{Generation: resource, Invocation: completion.ID(), Boot: s.boot}
+	record := useRecord{
+		Generation: resource,
+		Invocation: completion.ID(),
+		Boot:       s.boot,
+	}
 	if err := saveJSON(s.root, filepath.Join(name, "owner.json"), record); err != nil {
 		return nil, err
 	}

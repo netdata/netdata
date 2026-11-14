@@ -110,13 +110,22 @@ func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 		update bool
 		err    string
 	}{
-		"same release":                      {},
-		"new publication":                   {change: func(r *Release) { r.Sequence++ }, update: true},
-		"replayed older release":            {change: func(r *Release) { r.Sequence-- }, err: "regress"},
-		"reused sequence":                   {change: func(r *Release) { r.Manifest.Version += ".changed" }, err: "reused"},
-		"changed binding with same archive": {change: func(r *Release) { r.Manifest.Bindings[0].Offset++ }, err: "reused"},
-		"other architecture":                {change: func(r *Release) { r.Manifest.Platform = "linux/amd64" }, err: "platform differs"},
-		"missing publication order":         {change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
+		"same release":           {},
+		"new publication":        {change: func(r *Release) { r.Sequence++ }, update: true},
+		"replayed older release": {change: func(r *Release) { r.Sequence-- }, err: "regress"},
+		"reused sequence": {
+			change: func(r *Release) { r.Manifest.Version += ".changed" },
+			err:    "reused",
+		},
+		"changed binding with same archive": {
+			change: func(r *Release) { r.Manifest.Bindings[0].Offset++ },
+			err:    "reused",
+		},
+		"other architecture": {
+			change: func(r *Release) { r.Manifest.Platform = "linux/amd64" },
+			err:    "platform differs",
+		},
+		"missing publication order": {change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
 	}
 	for name, scenario := range scenarios {
 		t.Run(name, func(t *testing.T) {

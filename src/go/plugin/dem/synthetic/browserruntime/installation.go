@@ -49,7 +49,11 @@ type ReleaseInstallOptions struct {
 // The returned candidate owns installer exclusion through qualification and
 // publication. A nil candidate is a successful no-op: disabled automatic updates
 // or an unchanged release. No download can resurrect an uninstalled selection.
-func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (VerifiedRelease, error)) (*Candidate, error) {
+func (s *Store) BeginPublishedInstall(
+	ctx context.Context,
+	options ReleaseInstallOptions,
+	load func(context.Context) (VerifiedRelease, error),
+) (*Candidate, error) {
 	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
 	return candidate, err
 }
@@ -59,11 +63,25 @@ func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstal
 // qualification or changing its update policy. The returned manifest is a
 // snapshot; exclusion is released before return. Damage requires explicit repair.
 // A new candidate enables automatic preparation only when successfully selected.
-func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (VerifiedRelease, error)) (*Candidate, *Manifest, error) {
-	return s.beginPublishedInstall(ctx, ReleaseInstallOptions{Operation: ensureRelease, Updates: AutomaticUpdates}, load)
+func (s *Store) BeginPublishedEnsure(
+	ctx context.Context,
+	load func(context.Context) (VerifiedRelease, error),
+) (*Candidate, *Manifest, error) {
+	return s.beginPublishedInstall(
+		ctx,
+		ReleaseInstallOptions{
+			Operation: ensureRelease,
+			Updates:   AutomaticUpdates,
+		},
+		load,
+	)
 }
 
-func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (VerifiedRelease, error)) (_ *Candidate, _ *Manifest, result error) {
+func (s *Store) beginPublishedInstall(
+	ctx context.Context,
+	options ReleaseInstallOptions,
+	load func(context.Context) (VerifiedRelease, error),
+) (_ *Candidate, _ *Manifest, result error) {
 	switch options.Operation {
 	case InstallRelease, RepairRelease, ensureRelease:
 		if options.Updates != AutomaticUpdates && options.Updates != ManualUpdates {
@@ -127,7 +145,10 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 	if err := release.Validate(); err != nil {
 		return nil, nil, err
 	}
-	next := selection{Release: &release, AutomaticUpdates: current.AutomaticUpdates}
+	next := selection{
+		Release:          &release,
+		AutomaticUpdates: current.AutomaticUpdates,
+	}
 	if options.Operation == InstallRelease || options.Operation == RepairRelease || options.Operation == ensureRelease {
 		next.AutomaticUpdates = options.Updates == AutomaticUpdates
 	}

@@ -51,18 +51,32 @@ func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, er
 // Qualification exercises the normal adapter and sandbox in the caller's
 // environment; it does not certify another daemon's security policy.
 func qualify(ctx context.Context, engine *Engine) (*Qualification, error) {
-	result := &Qualification{Scope: fmt.Sprintf("Current process uid=%d gid=%d and environment: release contract check, sandboxed local Playwright journey and desktop Lighthouse audit on loopback content; does not certify other process confinement or hosts/platforms.", os.Geteuid(), os.Getegid())}
+	result := &Qualification{
+		Scope: fmt.Sprintf(
+			"Current process uid=%d gid=%d and environment: release contract check, sandboxed local Playwright journey and desktop Lighthouse audit on loopback content; does not certify other process confinement or hosts/platforms.",
+			os.Geteuid(),
+			os.Getegid(),
+		),
+	}
 	if err := engine.Check(ctx); err != nil {
 		return result, err
 	}
 	result.ExecutionContract = true
-	execution := engine.execute(ctx, synthetic.Request{Kind: synthetic.Journey, Name: "runtime-qualification", Timeout: 30 * time.Second,
-		Script: `import { test, expect } from '@playwright/test';
+	execution := engine.execute(
+		ctx,
+		synthetic.Request{
+			Kind:    synthetic.Journey,
+			Name:    "runtime-qualification",
+			Timeout: 30 * time.Second,
+			Script: `import { test, expect } from '@playwright/test';
  test('sandboxed local page', async ({ page }) => {
    await page.setContent('<title>DEM runtime qualification</title><h1>ready</h1>');
    await expect(page).toHaveTitle('DEM runtime qualification');
    await expect(page.locator('h1')).toHaveText('ready');
- });`, Capture: false})
+ });`,
+			Capture: false,
+		},
+	)
 	drained := execution.Drained
 	result.ProcessTreeDrained = drained
 	if !drained {
@@ -80,10 +94,15 @@ func qualify(ctx context.Context, engine *Engine) (*Qualification, error) {
 	if err != nil {
 		return result, fmt.Errorf("listen for local runtime qualification: %w", err)
 	}
-	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.WriteString(w, "<!doctype html><html lang=en><head><title>DEM runtime qualification</title><meta name=viewport content='width=device-width,initial-scale=1'></head><body><h1>ready</h1></body></html>")
-	})}
+	server := &http.Server{
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = io.WriteString(
+				w,
+				"<!doctype html><html lang=en><head><title>DEM runtime qualification</title><meta name=viewport content='width=device-width,initial-scale=1'></head><body><h1>ready</h1></body></html>",
+			)
+		}),
+	}
 	served := make(chan struct{})
 	go func() {
 		defer close(served)
@@ -93,7 +112,16 @@ func qualify(ctx context.Context, engine *Engine) (*Qualification, error) {
 		_ = server.Close()
 		<-served
 	}()
-	audit := engine.execute(ctx, synthetic.Request{Kind: synthetic.Lighthouse, Name: "runtime-qualification-audit", URL: "http://" + listener.Addr().String(), Timeout: 90 * time.Second, Capture: false})
+	audit := engine.execute(
+		ctx,
+		synthetic.Request{
+			Kind:    synthetic.Lighthouse,
+			Name:    "runtime-qualification-audit",
+			URL:     "http://" + listener.Addr().String(),
+			Timeout: 90 * time.Second,
+			Capture: false,
+		},
+	)
 	drained = audit.Drained
 	result.ProcessTreeDrained = drained
 	if !drained {

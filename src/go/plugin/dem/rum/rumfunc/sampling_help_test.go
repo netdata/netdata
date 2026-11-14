@@ -108,7 +108,14 @@ func TestHistoryHelpWithoutActiveSites(t *testing.T) {
 	handler := rumfunc.New(samplingFunctionSource{}, nil)
 	for _, method := range []string{"rum-sessions", "rum-errors"} {
 		for _, info := range []bool{false, true} {
-			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Info: info, Permissions: "0x1b"})
+			response := handler.HandleRaw(
+				context.Background(),
+				funcapi.RawMethodRequest{
+					Method:      method,
+					Info:        info,
+					Permissions: "0x1b",
+				},
+			)
 			help := response.Help
 			if !info {
 				require.NotNil(t, response.RawResponse)

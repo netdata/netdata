@@ -30,7 +30,13 @@ func TestReceiptTimeFiltersAndSelectedSummaries(t *testing.T) {
 		},
 		{Site: "shop", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
 		{Site: "shop", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview", Page: "/first", Browser: "early"},
-		{Site: "shop", SessionID: "s", ObservedUS: old.Add(time.Second).UnixMicro(), Type: "frustration", Page: "/first"},
+		{
+			Site:       "shop",
+			SessionID:  "s",
+			ObservedUS: old.Add(time.Second).UnixMicro(),
+			Type:       "frustration",
+			Page:       "/first",
+		},
 		{Site: "shop", SessionID: "activity", ObservedUS: old.UnixMicro(), Type: "activity", Page: "/idle"},
 		{Site: "other", SessionID: "s", ObservedUS: old.UnixMicro(), Type: "pageview"},
 	}

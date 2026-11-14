@@ -73,7 +73,10 @@ func TestReceiverActivityExpiresWithoutPublication(t *testing.T) {
 				a.Reject(beacon.RejectRate)
 				a.Reject(beacon.RejectBot)
 			} else {
-				a.Ingest(&beacon.Beacon{Site: "s", Received: *now})
+				a.Ingest(&beacon.Beacon{
+					Site:     "s",
+					Received: *now,
+				})
 			}
 			// The one-minute cleanup cadence retains at most two activity windows.
 			require.LessOrEqual(t, len(a.site.accepted), 121)

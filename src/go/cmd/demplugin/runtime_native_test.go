@@ -33,7 +33,11 @@ func TestNativeProtocolIsBoundedAndStrict(t *testing.T) {
 		_, err := decodeNativeStatus([]byte(data))
 		require.Error(t, err)
 	}
-	data, err := json.Marshal(browserruntime.NativeStatus{ProcessClaims: 1, UncertainPins: 2, ExecutionPins: 2})
+	data, err := json.Marshal(browserruntime.NativeStatus{
+		ProcessClaims: 1,
+		UncertainPins: 2,
+		ExecutionPins: 2,
+	})
 	require.NoError(t, err)
 	status, err := decodeNativeStatus(data)
 	require.NoError(t, err)
@@ -42,8 +46,24 @@ func TestNativeProtocolIsBoundedAndStrict(t *testing.T) {
 }
 
 func TestNativeQualificationRequiresEveryProofAndExactIdentity(t *testing.T) {
-	target := browserruntime.Manifest{Version: "fixture", Contract: 1, Archive: browserruntime.Archive{SHA256: strings.Repeat("a", 64)}}
-	qualified := runner.Qualification{ExecutionContract: true, SandboxedLocalJourney: true, SandboxedLocalLighthouse: true, ProcessTreeDrained: true, Runtime: &synthetic.RuntimeIdentity{Version: target.Version, Contract: target.Contract, SHA256: target.Archive.SHA256}}
+	target := browserruntime.Manifest{
+		Version:  "fixture",
+		Contract: 1,
+		Archive: browserruntime.Archive{
+			SHA256: strings.Repeat("a", 64),
+		},
+	}
+	qualified := runner.Qualification{
+		ExecutionContract:        true,
+		SandboxedLocalJourney:    true,
+		SandboxedLocalLighthouse: true,
+		ProcessTreeDrained:       true,
+		Runtime: &synthetic.RuntimeIdentity{
+			Version:  target.Version,
+			Contract: target.Contract,
+			SHA256:   target.Archive.SHA256,
+		},
+	}
 	encode := func(value runner.Qualification) []byte {
 		data, err := json.Marshal(value)
 		require.NoError(t, err)
@@ -57,7 +77,11 @@ func TestNativeQualificationRequiresEveryProofAndExactIdentity(t *testing.T) {
 		func(q *runner.Qualification) { q.ProcessTreeDrained = false },
 		func(q *runner.Qualification) { q.Runtime = nil },
 		func(q *runner.Qualification) {
-			q.Runtime = &synthetic.RuntimeIdentity{Version: "different", Contract: 1, SHA256: target.Archive.SHA256}
+			q.Runtime = &synthetic.RuntimeIdentity{
+				Version:  "different",
+				Contract: 1,
+				SHA256:   target.Archive.SHA256,
+			}
 		},
 	} {
 		value := qualified

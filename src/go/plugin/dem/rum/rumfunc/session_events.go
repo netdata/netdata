@@ -26,14 +26,20 @@ var sessionEventsMethod = method{
 
 func (h *Handler) sessionEventsRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
 	if args["session_id"] == "" {
-		return nil, requestError{status: 400, message: "session_id is required"}
+		return nil, requestError{
+			status:  400,
+			message: "session_id is required",
+		}
 	}
 	events, err := h.deps.SessionEvents(ctx, args["site"], args["session_id"], args["vnode_guid"])
 	if err != nil {
 		return nil, err
 	}
 	if len(events) == 0 {
-		return nil, requestError{status: 404, message: "unknown session"}
+		return nil, requestError{
+			status:  404,
+			message: "unknown session",
+		}
 	}
 	rows := make([][]any, 0, len(events))
 	for _, e := range events {

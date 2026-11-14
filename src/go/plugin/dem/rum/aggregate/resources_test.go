@@ -47,7 +47,9 @@ func TestResourceMissingIdentityIsExcluded(t *testing.T) {
 			b := mk(*now, "session", "/")
 			b.Events = nil
 			b.PageHost = "example.com"
-			b.Resources = []beacon.Resource{{ID: "resource", Host: "example.com", HasDuration: true, DurationMS: 100, Initiator: "fetch"}}
+			b.Resources = []beacon.Resource{
+				{ID: "resource", Host: "example.com", HasDuration: true, DurationMS: 100, Initiator: "fetch"},
+			}
 			if missing == "resource" {
 				b.Resources[0].ID = ""
 			} else {
@@ -80,7 +82,9 @@ func TestResourceClassificationSurvivesInputMutation(t *testing.T) {
 	b.Resources[0].Host = "example.net"
 	b.Resources[0].DurationMS = 999
 	first := a.Snapshot()
-	require.Equal(t, VitalStats{N: 1}, first.API, "zero duration is an observed API value")
+	require.Equal(t, VitalStats{
+		N: 1,
+	}, first.API, "zero duration is an observed API value")
 	require.EqualValues(t, 3, first.FirstPartyResources)
 	require.EqualValues(t, 1, first.ThirdPartyResources)
 	require.EqualValues(t, 1, first.Counters[CounterInvalidMeasurements])

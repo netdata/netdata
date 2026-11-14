@@ -57,9 +57,27 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 	ctx := context.Background()
 	store, _ := newTestStore(t)
 	now := time.Now().UnixMicro()
-	groups := []string{"11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111", "", "22222222-2222-4222-8222-222222222222", "22222222-2222-4222-8222-222222222222", "", "11111111-1111-4111-8111-111111111111"}
+	groups := []string{
+		"11111111-1111-4111-8111-111111111111",
+		"11111111-1111-4111-8111-111111111111",
+		"",
+		"22222222-2222-4222-8222-222222222222",
+		"22222222-2222-4222-8222-222222222222",
+		"",
+		"11111111-1111-4111-8111-111111111111",
+	}
 	for i, group := range groups {
-		appendEvent(t, store, EventRecord{Site: "job", VnodeGUID: group, SessionID: "session", Type: "event", ObservedUS: now + int64(i)})
+		appendEvent(
+			t,
+			store,
+			EventRecord{
+				Site:       "job",
+				VnodeGUID:  group,
+				SessionID:  "session",
+				Type:       "event",
+				ObservedUS: now + int64(i),
+			},
+		)
 	}
 	require.NoError(t, store.Sync(ctx))
 	events, err := store.QuerySessionEvents(ctx, "job", "session", "")
@@ -69,7 +87,10 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 		assert.Equal(t, groups[i], event.VnodeGUID, "each persisted event retains its own association")
 	}
 	var scanned []EventRecord
-	require.NoError(t, store.scan(ctx, "job", now/1e6, now/1e6+1, "", func(event EventRecord) { scanned = append(scanned, event) }))
+	require.NoError(
+		t,
+		store.scan(ctx, "job", now/1e6, now/1e6+1, "", func(event EventRecord) { scanned = append(scanned, event) }),
+	)
 	require.Len(t, scanned, len(groups))
 	for i, event := range scanned {
 		assert.Equal(t, groups[i], event.VnodeGUID, "missing fields must not inherit the previous association")

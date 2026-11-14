@@ -124,7 +124,13 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	m := importFixture(t, s, "proof")
 	use, err := s.beginUse(m)
 	require.NoError(t, err)
-	process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
+	process, err := ndexec.StartUnprivilegedProcessTree(
+		context.Background(),
+		ndexec.TreeOptions{
+			Completion: use.Completion,
+		},
+		"/bin/true",
+	)
 	require.NoError(t, err)
 	require.True(t, process.Wait().Drained)
 	// Ignore live Go proof: the next store must recover the helper's receipt.
@@ -148,7 +154,13 @@ func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
 	m := importFixture(t, s, "receipt-race")
 	use, err := s.beginUse(m)
 	require.NoError(t, err)
-	process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
+	process, err := ndexec.StartUnprivilegedProcessTree(
+		context.Background(),
+		ndexec.TreeOptions{
+			Completion: use.Completion,
+		},
+		"/bin/true",
+	)
 	require.NoError(t, err)
 	require.True(t, process.Wait().Drained)
 	require.NoError(t, s.Sweep())
@@ -185,7 +197,11 @@ func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	go func() {
 		defer close(finished)
 		result <- s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
-			return io.NopCloser(io.MultiReader(bytes.NewReader(archive[:len(archive)/2]), &resumeReader{ready: started, resume: resume, tail: bytes.NewReader(archive[len(archive)/2:])})), nil
+			return io.NopCloser(io.MultiReader(bytes.NewReader(archive[:len(archive)/2]), &resumeReader{
+				ready:  started,
+				resume: resume,
+				tail:   bytes.NewReader(archive[len(archive)/2:]),
+			})), nil
 		})
 	}()
 	t.Cleanup(func() {
@@ -279,7 +295,13 @@ func TestRealBundlePreparation(t *testing.T) {
 	s, _ := testStore(t)
 	start := time.Now()
 	require.NoError(t, s.importUnselected(context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
-	t.Logf("prepared archive_bytes=%d expanded_bytes=%d entries=%d duration=%s", m.Archive.Bytes, m.Archive.ExpandedBytes, m.Archive.Entries, time.Since(start))
+	t.Logf(
+		"prepared archive_bytes=%d expanded_bytes=%d entries=%d duration=%s",
+		m.Archive.Bytes,
+		m.Archive.ExpandedBytes,
+		m.Archive.Entries,
+		time.Since(start),
+	)
 	for i := 0; i < 6; i++ {
 		start = time.Now()
 		status, err := s.Inspect()
@@ -294,10 +316,21 @@ func TestRealBundlePreparation(t *testing.T) {
 			program = use.Paths.Browser
 		}
 		if command == "reexec" {
-			args = []string{"-e", "require('node:child_process').execFileSync(process.execPath,['--version'],{stdio:'inherit'})"}
+			args = []string{
+				"-e",
+				"require('node:child_process').execFileSync(process.execPath,['--version'],{stdio:'inherit'})",
+			}
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		process, err := ndexec.StartUnprivilegedProcessTree(ctx, ndexec.TreeOptions{Completion: use.Completion, Stdout: os.Stdout, Stderr: os.Stderr}, program, args...)
+		process, err := ndexec.StartUnprivilegedProcessTree(
+			ctx,
+			ndexec.TreeOptions{
+				Completion: use.Completion,
+				Stdout:     os.Stdout,
+				Stderr:     os.Stderr,
+			},
+			program,
+			args...)
 		require.NoError(t, err)
 		result := process.Wait()
 		cancel()
@@ -357,7 +390,13 @@ func startRuntimeOwner(t *testing.T, s *Store, m Manifest, mode string) func() {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(file, data, 0600))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	cmd := helperCommand(ctx, "TestRuntimeOwnerProcess", "DEM_RUNTIME_OWNER_MODE="+mode, "DEM_RUNTIME_OWNER_STORE="+s.path, "DEM_RUNTIME_OWNER_MANIFEST="+file)
+	cmd := helperCommand(
+		ctx,
+		"TestRuntimeOwnerProcess",
+		"DEM_RUNTIME_OWNER_MODE="+mode,
+		"DEM_RUNTIME_OWNER_STORE="+s.path,
+		"DEM_RUNTIME_OWNER_MANIFEST="+file,
+	)
 	input, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	output, err := cmd.StdoutPipe()
@@ -440,7 +479,13 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		use, err := s.beginUse(m)
 		require.NoError(b, err)
-		process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
+		process, err := ndexec.StartUnprivilegedProcessTree(
+			context.Background(),
+			ndexec.TreeOptions{
+				Completion: use.Completion,
+			},
+			"/bin/true",
+		)
 		require.NoError(b, err)
 		result := process.Wait()
 		require.True(b, result.Drained)

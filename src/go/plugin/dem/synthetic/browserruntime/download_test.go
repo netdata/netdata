@@ -224,11 +224,19 @@ func TestDownloadExactByteEndingPreservesTimeoutAndCancellation(t *testing.T) {
 			file, err := os.CreateTemp(t.TempDir(), "archive")
 			require.NoError(t, err)
 			defer file.Close()
-			archive := Archive{Bytes: int64(len(payload)), SHA256: fmt.Sprintf("%x", sha256.Sum256(payload))}
+			archive := Archive{
+				Bytes:  int64(len(payload)),
+				SHA256: fmt.Sprintf("%x", sha256.Sum256(payload)),
+			}
 			done := make(chan error, 1)
 			go func() { done <- saveArchive(source, file, archive) }()
 			if voluntary {
-				require.Eventually(t, func() bool { info, err := file.Stat(); return err == nil && info.Size() == int64(len(payload)) }, time.Second, time.Millisecond)
+				require.Eventually(
+					t,
+					func() bool { info, err := file.Stat(); return err == nil && info.Size() == int64(len(payload)) },
+					time.Second,
+					time.Millisecond,
+				)
 				cancel()
 			}
 			select {

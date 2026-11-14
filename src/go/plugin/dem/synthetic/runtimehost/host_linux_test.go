@@ -58,8 +58,16 @@ func publishedBundle(t *testing.T, version string, sequence uint64) (browserrunt
 		m.Bindings = append(m.Bindings, browserruntime.Binding(binding))
 	}
 	require.NoError(t, m.Validate())
-	return browserruntime.Release{Format: 1, Sequence: sequence, Manifest: m,
-		Sources: browserruntime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("a", 64), Bytes: 100}}, b.Data
+	return browserruntime.Release{
+		Format:   1,
+		Sequence: sequence,
+		Manifest: m,
+		Sources: browserruntime.ReleaseSource{
+			URL:    "https://artifacts.example.invalid/sources.tar.zst",
+			SHA256: strings.Repeat("a", 64),
+			Bytes:  100,
+		},
+	}, b.Data
 }
 
 // verifiedRelease signs release with the fixture publisher key and authenticates
@@ -76,13 +84,26 @@ func verifiedRelease(t *testing.T, release browserruntime.Release) browserruntim
 	return verified
 }
 
-func selectPublished(t *testing.T, store *browserruntime.Store, release browserruntime.Release, data []byte, policy browserruntime.UpdatePolicy) {
+func selectPublished(
+	t *testing.T,
+	store *browserruntime.Store,
+	release browserruntime.Release,
+	data []byte,
+	policy browserruntime.UpdatePolicy,
+) {
 	t.Helper()
 	verified := verifiedRelease(t, release)
 	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
 	path := filepath.Join(t.TempDir(), "archive.tar.zst")
 	require.NoError(t, os.WriteFile(path, data, 0600))
-	candidate, err := store.BeginPublishedInstall(context.Background(), browserruntime.ReleaseInstallOptions{Operation: browserruntime.InstallRelease, Updates: policy}, func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil })
+	candidate, err := store.BeginPublishedInstall(
+		context.Background(),
+		browserruntime.ReleaseInstallOptions{
+			Operation: browserruntime.InstallRelease,
+			Updates:   policy,
+		},
+		func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil },
+	)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), path))
 	require.NoError(t, candidate.Select())

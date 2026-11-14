@@ -104,7 +104,13 @@ func BenchmarkIngestFullReport(b *testing.B) {
 					{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 5000, Element: "img.hero"},
 					{ID: "cls", Revision: 1, Name: beacon.CLS, Value: .5},
 				},
-				Navigation: &beacon.Navigation{Revision: 1, LoadMS: 900, HasLoad: true, DCLMS: 20, HasDCL: true},
+				Navigation: &beacon.Navigation{
+					Revision: 1,
+					LoadMS:   900,
+					HasLoad:  true,
+					DCLMS:    20,
+					HasDCL:   true,
+				},
 				Resources: []beacon.Resource{
 					{ID: "resource", Host: "cdn.example.com", HasDuration: true, DurationMS: 30, Initiator: "fetch"},
 				},
@@ -113,11 +119,18 @@ func BenchmarkIngestFullReport(b *testing.B) {
 					{Kind: beacon.EventSession, ID: "browser", Revision: 1},
 					{Kind: beacon.EventNavigation, ID: "navigation", Revision: 1},
 					{Kind: beacon.EventResource, ID: "resource", Revision: 1},
-					{Kind: beacon.EventCustom, Name: beacon.RageClickEvent, Attrs: map[string]string{"target": "button#buy"}},
+					{
+						Kind:  beacon.EventCustom,
+						Name:  beacon.RageClickEvent,
+						Attrs: map[string]string{"target": "button#buy"},
+					},
 					{
 						Kind:    beacon.EventRequest,
 						TraceID: "0123456789abcdef0123456789abcdef",
-						Attrs:   map[string]string{"url.full": "https://api.example.com/cart", "http.request.method": "POST"},
+						Attrs: map[string]string{
+							"url.full":            "https://api.example.com/cart",
+							"http.request.method": "POST",
+						},
 					},
 					{Kind: beacon.EventCustom, Name: "add_to_cart"},
 				},

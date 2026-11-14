@@ -205,7 +205,13 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 			data, err := json.Marshal(fixtureRelease(next))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(file, data, 0600))
-			output, status := runHelper(t, "TestSelectionWriterExitProcess", "DEM_SELECTION_EXIT_MODE="+mode, "DEM_SELECTION_EXIT_STORE="+s.path, "DEM_SELECTION_EXIT_RELEASE="+file)
+			output, status := runHelper(
+				t,
+				"TestSelectionWriterExitProcess",
+				"DEM_SELECTION_EXIT_MODE="+mode,
+				"DEM_SELECTION_EXIT_STORE="+s.path,
+				"DEM_SELECTION_EXIT_RELEASE="+file,
+			)
 			require.Zero(t, status, "%s", output)
 			reopened, err := Open(s.config)
 			require.NoError(t, err)

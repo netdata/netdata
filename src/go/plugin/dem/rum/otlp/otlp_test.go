@@ -308,7 +308,12 @@ func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 	require.Equal(t, "metric", update.attrs["metric.id"])
 	require.Equal(t, "2", update.attrs["metric.revision"])
 	require.Equal(t, "0.4", update.attrs["metric.value"])
-	require.Equal(t, "later-route", update.attrs["page.view"], "each revision retains its application view at report time")
+	require.Equal(
+		t,
+		"later-route",
+		update.attrs["page.view"],
+		"each revision retains its application view at report time",
+	)
 	require.Equal(t, "later-view", update.attrs["application.view.id"])
 	require.Equal(t, "Chrome", update.attrs["browser.name"])
 	require.Equal(t, "first-release", update.attrs["app.version"])

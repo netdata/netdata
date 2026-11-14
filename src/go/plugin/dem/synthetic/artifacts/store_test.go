@@ -194,7 +194,10 @@ func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
 					work, err := s.Begin(run1, "journey:test", "")
 					require.NoError(t, err)
 					require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
-					label := synthetic.ArtifactTest{ID: "test", Title: "Checkout"}
+					label := synthetic.ArtifactTest{
+						ID:    "test",
+						Title: "Checkout",
+					}
 					var candidates []synthetic.Capture
 					for _, id := range tc.order {
 						name := "output/" + id + ".png"
@@ -202,7 +205,16 @@ func TestOversizedCapturesPreserveValidSiblings(t *testing.T) {
 						if strings.HasPrefix(id, "large") {
 							require.NoError(t, os.Truncate(filepath.Join(work, name), artifacts.FetchMaxBytes+1))
 						}
-						candidates = append(candidates, synthetic.Capture{ID: id, Kind: kind, MIME: mime, Path: name, Test: label})
+						candidates = append(
+							candidates,
+							synthetic.Capture{
+								ID:   id,
+								Kind: kind,
+								MIME: mime,
+								Path: name,
+								Test: label,
+							},
+						)
 					}
 					published, err := s.Finalize(t.Context(), run1, candidates)
 					require.NoError(t, err)
@@ -257,9 +269,24 @@ func TestOversizeDoesNotHideInvalidCaptures(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(work, "output/large.png"), png, 0600))
 			require.NoError(t, os.Truncate(filepath.Join(work, "output/large.png"), artifacts.FetchMaxBytes+1))
 			require.NoError(t, os.WriteFile(filepath.Join(work, "output/small.png"), png, 0600))
-			large := synthetic.Capture{ID: "large", Kind: "screenshot", MIME: "image/png", Path: "output/large.png"}
-			small := synthetic.Capture{ID: "small", Kind: "screenshot", MIME: "image/png", Path: "output/small.png"}
-			bad := synthetic.Capture{ID: "bad", Kind: "screenshot", MIME: "image/png", Path: "output/missing.png"}
+			large := synthetic.Capture{
+				ID:   "large",
+				Kind: "screenshot",
+				MIME: "image/png",
+				Path: "output/large.png",
+			}
+			small := synthetic.Capture{
+				ID:   "small",
+				Kind: "screenshot",
+				MIME: "image/png",
+				Path: "output/small.png",
+			}
+			bad := synthetic.Capture{
+				ID:   "bad",
+				Kind: "screenshot",
+				MIME: "image/png",
+				Path: "output/missing.png",
+			}
 			switch which {
 			case "large invalid PNG":
 				bad.Path = "output/bad.png"
@@ -474,7 +501,9 @@ func TestFetchExactSizeBoundary(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			s, _ := store(t)
-			payload := append([]byte(signature), []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...)
+			payload := append(
+				[]byte(signature),
+				[]byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...)
 			_, c := captured(t, s, run1, payload)
 			if trace {
 				c.Kind, c.MIME = "trace", "application/zip"
@@ -633,7 +662,12 @@ func TestCaptureGrowingPastFetchLimitIsNotPublished(t *testing.T) {
 		}
 		t.Run(name, func(t *testing.T) {
 			s, root := store(t)
-			work, c := captured(t, s, run1, append([]byte(signature), []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...))
+			work, c := captured(
+				t,
+				s,
+				run1,
+				append([]byte(signature), []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)-len(signature)))...),
+			)
 			if trace {
 				c.Kind, c.MIME = "trace", "application/zip"
 			}
@@ -746,7 +780,11 @@ func TestArtifactAssociationSurvivesRestart(t *testing.T) {
 			s, root := store(t)
 			work, c := captured(t, s, run1, payload)
 			c.Kind, c.MIME = kind, mime
-			c.Test = synthetic.ArtifactTest{ID: "test1", Title: "Checkout", TextTruncated: true}
+			c.Test = synthetic.ArtifactTest{
+				ID:            "test1",
+				Title:         "Checkout",
+				TextTruncated: true,
+			}
 			_, err := s.Finalize(t.Context(), run1, []synthetic.Capture{c})
 			require.NoError(t, err)
 			_, err = os.Stat(work)
@@ -795,22 +833,42 @@ func TestCatalogueSnapshotsSiteWithoutChangingOwnership(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report"), []byte("<html>report</html>"), 0600))
-		_, err = s.Finalize(ctx, ids[i], []synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report"}})
+		_, err = s.Finalize(
+			ctx,
+			ids[i],
+			[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report"}},
+		)
 		require.NoError(t, err)
 	}
 	require.NoError(t, s.Close())
 	s, err = artifacts.Open(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, s.Close()) })
-	filtered, err := s.Catalogue(ctx, artifacts.Filter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "lighthouse:home", Limit: 1})
+	filtered, err := s.Catalogue(
+		ctx,
+		artifacts.Filter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			JobID:     "lighthouse:home",
+			Limit:     1,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, filtered.Sets, 1)
 	assert.Equal(t, ids[0], filtered.Sets[0].RunID)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", filtered.Sets[0].VnodeGUID)
-	mismatch, err := s.Catalogue(ctx, artifacts.Filter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "journey:home", Limit: 10})
+	mismatch, err := s.Catalogue(
+		ctx,
+		artifacts.Filter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			JobID:     "journey:home",
+			Limit:     10,
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, mismatch.Sets)
-	all, err := s.Catalogue(ctx, artifacts.Filter{Limit: 10})
+	all, err := s.Catalogue(ctx, artifacts.Filter{
+		Limit: 10,
+	})
 	require.NoError(t, err)
 	require.Len(t, all.Sets, 3)
 	assert.Equal(t, 3, all.Status.Inventory.KnownSets)

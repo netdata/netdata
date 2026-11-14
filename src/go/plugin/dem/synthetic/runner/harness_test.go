@@ -42,7 +42,9 @@ func success() reporterResult {
 // extensionLine encodes one optional-output frame; json.RawMessage data is
 // passed through as raw JSON.
 func extensionLine(feature string, data any) string {
-	raw, err := json.Marshal(map[string]any{"type": "extension", "extension": map[string]any{"feature": feature, "data": data}})
+	raw, err := json.Marshal(
+		map[string]any{"type": "extension", "extension": map[string]any{"feature": feature, "data": data}},
+	)
 	if err != nil {
 		panic(err)
 	}
@@ -50,7 +52,10 @@ func extensionLine(feature string, data any) string {
 }
 
 func resultLine(result reporterResult) string {
-	raw, err := json.Marshal(frame{Type: "result", Result: &result})
+	raw, err := json.Marshal(frame{
+		Type:   "result",
+		Result: &result,
+	})
 	if err != nil {
 		panic(err)
 	}
@@ -70,7 +75,13 @@ func consume(t *testing.T, request synthetic.Request, secrets map[string]string,
 
 // consumeWithResult ends the frames with result and checks that optional
 // output did not change the core outcome.
-func consumeWithResult(t *testing.T, request synthetic.Request, secrets map[string]string, result reporterResult, lines ...string) sinkSnapshot {
+func consumeWithResult(
+	t *testing.T,
+	request synthetic.Request,
+	secrets map[string]string,
+	result reporterResult,
+	lines ...string,
+) sinkSnapshot {
 	t.Helper()
 	snapshot := consume(t, request, secrets, append(lines, resultLine(result))...)
 	require.NotNil(t, snapshot.result)

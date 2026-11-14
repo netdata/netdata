@@ -25,7 +25,10 @@ func (s borrowedSource) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{use: use, identity: s.consumer.Manifest().Identity()}, nil
+	return managedUse{
+		use:      use,
+		identity: s.consumer.Manifest().Identity(),
+	}, nil
 }
 
 // managedUse is one execution pin on a held claim. The process source records
@@ -63,5 +66,9 @@ func (u preloadedUse) Completion() *ndexec.TreeCompletion { return nil }
 func (u preloadedUse) Finish(bool) error                  { return nil }
 
 func runnerPaths(paths browserruntime.Paths, identity synthetic.RuntimeIdentity) runner.Paths {
-	return runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: identity}
+	return runner.Paths{
+		Node:       paths.Node,
+		EntryPoint: paths.EntryPoint,
+		Identity:   identity,
+	}
 }

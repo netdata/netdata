@@ -186,12 +186,20 @@ func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {
 		require.Nil(t, value("last_rejected_at"))
 		require.Nil(t, value("last_rejected_age_s"))
 		for _, key := range []string{"last_beacon_at", "last_rejected_at"} {
-			require.Equal(t, "datetime_usec", columns[key].(map[string]any)["value_options"].(map[string]any)["transform"])
+			require.Equal(
+				t,
+				"datetime_usec",
+				columns[key].(map[string]any)["value_options"].(map[string]any)["transform"],
+			)
 		}
 		if received {
 			require.Equal(t, int64(1234000000), value("last_beacon_at"))
 			require.Equal(t, 7200, value("last_beacon_age_s"))
-			require.Equal(t, `<script async src="https://receiver.example/a&amp;b/rum/shop.js"></script>`, value("snippet"))
+			require.Equal(
+				t,
+				`<script async src="https://receiver.example/a&amp;b/rum/shop.js"></script>`,
+				value("snippet"),
+			)
 		} else {
 			require.Nil(t, value("last_beacon_at"))
 			require.Nil(t, value("last_beacon_age_s"))

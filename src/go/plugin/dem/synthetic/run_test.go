@@ -16,23 +16,91 @@ func storedRunFixture() Run {
 	score := 87.0
 	text := "console text"
 	url := "https://example.com/path"
-	location := &EvidenceLocation{File: "journey.spec.ts", Line: 4, Column: 7}
-	test := EvidenceTest{ID: "t1", Title: "Checkout", Location: location, Status: "failed", ExpectedStatus: "passed", DurationMS: &duration, ReportingComplete: true, TextTruncated: true}
-	step := EvidenceStep{ID: "s1", TestID: "t1", ParentOmitted: true, Title: "Submit", Category: "test.step", Location: location, State: "running"}
+	location := &EvidenceLocation{
+		File:   "journey.spec.ts",
+		Line:   4,
+		Column: 7,
+	}
+	test := EvidenceTest{
+		ID:                "t1",
+		Title:             "Checkout",
+		Location:          location,
+		Status:            "failed",
+		ExpectedStatus:    "passed",
+		DurationMS:        &duration,
+		ReportingComplete: true,
+		TextTruncated:     true,
+	}
+	step := EvidenceStep{
+		ID:            "s1",
+		TestID:        "t1",
+		ParentOmitted: true,
+		Title:         "Submit",
+		Category:      "test.step",
+		Location:      location,
+		State:         "running",
+	}
 	return Run{
 		Captures: &CaptureReport{
-			Trace: "supported", Reporting: "complete", Truncated: true,
-			Tests:        []CaptureTest{{ArtifactTest: ArtifactTest{ID: "t1", Title: "Checkout", TextTruncated: true}, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 2}},
+			Trace:     "supported",
+			Reporting: "complete",
+			Truncated: true,
+			Tests: []CaptureTest{
+				{
+					ArtifactTest: ArtifactTest{
+						ID:            "t1",
+						Title:         "Checkout",
+						TextTruncated: true,
+					},
+					Status:         "failed",
+					ExpectedStatus: "passed",
+					Accepted:       1,
+					Unaccepted:     2,
+				},
+			},
 			Associations: []CaptureAssociation{{ID: "shot-1", TestID: "t1"}},
 			Unpublished:  []CaptureOmission{{ID: "shot-2", Reason: "too_large"}},
 		},
 		BrowserSummary: &BrowserSummary{
-			Availability: "invalid", Reason: "record_after_completion", ReporterComplete: false, Coverage: "fixture_context",
-			Run:   &BrowserAggregate{Tests: BrowserTestCounts{Observed: 2, NoSummary: 1}, Counts: BrowserCounts{Uncaught: 1, ConsoleError: 1, Transport: 1, HTTPError: 1}, Omissions: []string{"pending"}},
-			Tests: []BrowserTest{{ID: "t1", State: "observed", Counts: &BrowserCounts{Uncaught: 1}, SampleIDs: []int{1, 2}}, {ID: "t2", State: "invalid", Reason: "invalid_annotation"}},
+			Availability:     "invalid",
+			Reason:           "record_after_completion",
+			ReporterComplete: false,
+			Coverage:         "fixture_context",
+			Run: &BrowserAggregate{
+				Tests: BrowserTestCounts{
+					Observed:  2,
+					NoSummary: 1,
+				},
+				Counts: BrowserCounts{
+					Uncaught:     1,
+					ConsoleError: 1,
+					Transport:    1,
+					HTTPError:    1,
+				},
+				Omissions: []string{"pending"},
+			},
+			Tests: []BrowserTest{
+				{ID: "t1", State: "observed", Counts: &BrowserCounts{
+					Uncaught: 1,
+				}, SampleIDs: []int{1, 2}},
+				{ID: "t2", State: "invalid", Reason: "invalid_annotation"},
+			},
 			Samples: []BrowserSample{
 				{ID: 1, TestID: "t1", Category: "uncaught", Message: "boom", TextTruncated: true},
-				{ID: 2, TestID: "t1", Category: "console_error", State: "resolved", Args: []BrowserArgument{{Value: nil}, {Value: "x"}, {Value: 1.5}, {Value: true}, {Omitted: "object"}}, ArgsOmitted: 3},
+				{
+					ID:       2,
+					TestID:   "t1",
+					Category: "console_error",
+					State:    "resolved",
+					Args: []BrowserArgument{
+						{Value: nil},
+						{Value: "x"},
+						{Value: 1.5},
+						{Value: true},
+						{Omitted: "object"},
+					},
+					ArgsOmitted: 3,
+				},
 				{ID: 3, TestID: "t1", Category: "console_error", State: "resolved", Text: &text},
 				{ID: 4, TestID: "t1", Category: "console_error", State: "unavailable", TextOmitted: "too_long"},
 				{ID: 5, TestID: "t1", Category: "http_error", Method: "GET", URL: &url, Status: 503},
@@ -41,30 +109,72 @@ func storedRunFixture() Run {
 			Truncated: []string{"samples"},
 		},
 		FailureEvidence: &FailureEvidence{
-			Availability: "supported", ReporterComplete: true, Truncated: []string{"text"},
-			Tests: []EvidenceTest{test}, Steps: []EvidenceStep{step},
-			FirstFailure: &FailureDetail{PathIncomplete: true, Test: test, Path: []EvidenceStep{step}, OmittedAncestors: 2, Message: "expected receipt", Location: location, TextTruncated: true},
-			StopContext:  &FailureDetail{Test: test, Path: []EvidenceStep{}},
+			Availability:     "supported",
+			ReporterComplete: true,
+			Truncated:        []string{"text"},
+			Tests:            []EvidenceTest{test},
+			Steps:            []EvidenceStep{step},
+			FirstFailure: &FailureDetail{
+				PathIncomplete:   true,
+				Test:             test,
+				Path:             []EvidenceStep{step},
+				OmittedAncestors: 2,
+				Message:          "expected receipt",
+				Location:         location,
+				TextTruncated:    true,
+			},
+			StopContext: &FailureDetail{
+				Test: test,
+				Path: []EvidenceStep{},
+			},
 		},
-		Runtime:     &RuntimeIdentity{Version: "1.0.0", SHA256: "abc", Contract: ExecutionContract},
-		ID:          "0123456789abcdef0123456789abcdef",
-		JobID:       "journey:checkout",
-		Kind:        Journey,
-		Name:        "checkout",
-		VnodeGUID:   "11111111-2222-3333-4444-555555555555",
-		Target:      "https://example.com",
-		ScheduledUS: 1, QueuedUS: 2, StartedUS: 3, CompletedUS: 4,
+		Runtime: &RuntimeIdentity{
+			Version:  "1.0.0",
+			SHA256:   "abc",
+			Contract: ExecutionContract,
+		},
+		ID:                "0123456789abcdef0123456789abcdef",
+		JobID:             "journey:checkout",
+		Kind:              Journey,
+		Name:              "checkout",
+		VnodeGUID:         "11111111-2222-3333-4444-555555555555",
+		Target:            "https://example.com",
+		ScheduledUS:       1,
+		QueuedUS:          2,
+		StartedUS:         3,
+		CompletedUS:       4,
 		DurationMS:        &duration,
 		Outcome:           Failed,
 		TerminationReason: ExecutionBudget,
 		Error:             "failed",
-		Tests:             &TestCounts{Declared: 2, Failed: 1, NotRun: 1},
-		Metrics:           &LabMetrics{Performance: &score},
-		Events:            []Event{{DeclaredTests: &declared, Kind: "suite", AtMS: 1, Phase: "discovery"}, {Kind: "test", AtMS: 2, TestID: "t1", DurationMS: &duration}},
-		DroppedEvents:     1,
-		CaptureState:      "available",
-		Artifacts:         []Artifact{{ID: "shot-1", Kind: "screenshot", MIME: "image/png", Bytes: 10, SHA256: "def", Test: ArtifactTest{ID: "t1", Title: "Checkout"}}},
-		HistoryError:      "sync",
+		Tests: &TestCounts{
+			Declared: 2,
+			Failed:   1,
+			NotRun:   1,
+		},
+		Metrics: &LabMetrics{
+			Performance: &score,
+		},
+		Events: []Event{
+			{DeclaredTests: &declared, Kind: "suite", AtMS: 1, Phase: "discovery"},
+			{Kind: "test", AtMS: 2, TestID: "t1", DurationMS: &duration},
+		},
+		DroppedEvents: 1,
+		CaptureState:  "available",
+		Artifacts: []Artifact{
+			{
+				ID:     "shot-1",
+				Kind:   "screenshot",
+				MIME:   "image/png",
+				Bytes:  10,
+				SHA256: "def",
+				Test: ArtifactTest{
+					ID:    "t1",
+					Title: "Checkout",
+				},
+			},
+		},
+		HistoryError: "sync",
 	}
 }
 
@@ -90,7 +200,10 @@ func TestStoredRunEncodingRoundTrip(t *testing.T) {
 
 func TestCloneRunStoresEmptyListsAsNull(t *testing.T) {
 	// History records an attempt without events or artifacts as null lists.
-	encoded, err := json.Marshal(CloneRun(Run{Events: []Event{}, Artifacts: []Artifact{}}))
+	encoded, err := json.Marshal(CloneRun(Run{
+		Events:    []Event{},
+		Artifacts: []Artifact{},
+	}))
 	require.NoError(t, err)
 	assert.Contains(t, string(encoded), `"events":null`)
 	assert.Contains(t, string(encoded), `"artifacts":null`)

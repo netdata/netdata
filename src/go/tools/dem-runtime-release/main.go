@@ -68,8 +68,11 @@ func run(args []string, diagnostics io.Writer) error {
 	if args[0] == "verify" {
 		return verify(key, descriptor, archive, sources)
 	}
-	if publicKey == "" || manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" || sequence == 0 {
-		return errors.New("sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence")
+	if publicKey == "" || manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" ||
+		sequence == 0 {
+		return errors.New(
+			"sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence",
+		)
 	}
 	m, err := readBuilderManifest(manifest)
 	if err != nil {
@@ -112,7 +115,20 @@ func run(args []string, diagnostics io.Writer) error {
 	if err != nil {
 		return err
 	}
-	command := exec.Command("gpg", "--batch", "--no-tty", "--no-armor", "--no-textmode", "--digest-algo", "SHA256", "--local-user", key, "--detach-sign", "--output", "-")
+	command := exec.Command(
+		"gpg",
+		"--batch",
+		"--no-tty",
+		"--no-armor",
+		"--no-textmode",
+		"--digest-algo",
+		"SHA256",
+		"--local-user",
+		key,
+		"--detach-sign",
+		"--output",
+		"-",
+	)
 	command.Stdin = bytes.NewReader(payload)
 	// Host GPG owns private key access through GNUPGHOME; never echo its output
 	// on failure, since diagnostics can contain private publisher configuration.

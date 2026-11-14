@@ -45,7 +45,10 @@ type Updater struct {
 // NewUpdater attaches automatic release preparation to a managed host, at most
 // once. Host.Status reports its progress and Host.Close joins it before
 // releasing process protection. Hosts without a managed store return nil.
-func (h *Host) NewUpdater(qualifier Qualifier, load func(context.Context) (browserruntime.VerifiedRelease, error)) *Updater {
+func (h *Host) NewUpdater(
+	qualifier Qualifier,
+	load func(context.Context) (browserruntime.VerifiedRelease, error),
+) *Updater {
 	if h.store == nil {
 		return nil
 	}
@@ -124,8 +127,13 @@ func (u *Updater) check(ctx context.Context) error {
 // prepare runs one complete managed transaction. Qualification uses the
 // process's existing execution owner. Without consent or a newer release no
 // candidate is begun.
-func (u *Updater) prepare(ctx context.Context, load func(context.Context) (browserruntime.VerifiedRelease, error)) (result error) {
-	options := browserruntime.ReleaseInstallOptions{Operation: browserruntime.AutomaticReleaseUpdate}
+func (u *Updater) prepare(
+	ctx context.Context,
+	load func(context.Context) (browserruntime.VerifiedRelease, error),
+) (result error) {
+	options := browserruntime.ReleaseInstallOptions{
+		Operation: browserruntime.AutomaticReleaseUpdate,
+	}
 	candidate, err := u.store.BeginPublishedInstall(ctx, options, load)
 	if err != nil || candidate == nil {
 		return err

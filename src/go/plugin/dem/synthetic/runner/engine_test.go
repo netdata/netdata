@@ -29,7 +29,12 @@ func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	e, h, a := testEngine(t)
 	e.start = starter(t, resultPayload(success()))
 	var states []synthetic.JobState
-	execution := e.ExecuteScheduled(context.Background(), journey(), func(state synthetic.JobState) { states = append(states, state) }, nil)
+	execution := e.ExecuteScheduled(
+		context.Background(),
+		journey(),
+		func(state synthetic.JobState) { states = append(states, state) },
+		nil,
+	)
 	require.True(t, execution.Drained)
 	assert.Equal(t, synthetic.Success, execution.Run.Outcome)
 	require.NotNil(t, execution.Run.DurationMS)
@@ -303,7 +308,10 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 		assert.NotContains(t, strings.Join(args, " "), "long-secret")
 		var sent wireRequest
 		if err := json.Unmarshal(raw, &sent); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		assert.Equal(t, request.Secrets, sent.Secrets)
 		for i := 0; i < eventLimit+4; i++ {
@@ -538,7 +546,10 @@ func TestExecutionRecordsAcquiredIdentityBeforeStart(t *testing.T) {
 	expected := e.source.(fixtureRuntime).Paths.Identity
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, errOut *os.File) ndexec.TreeResult {
 		if !assert.Len(t, h.runs, 1) {
-			return ndexec.TreeResult{Drained: true, Err: errors.New("start history was not appended before execution")}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     errors.New("start history was not appended before execution"),
+			}
 		}
 		assert.Equal(t, &expected, h.runs[0].Runtime)
 		var request map[string]any
@@ -612,13 +623,29 @@ func TestExecutionExits(t *testing.T) {
 		admitted  bool
 		completed bool
 	}
-	unstarted := want{completed: true}
-	prelaunch := want{outcome: synthetic.Error, phases: []string{"start", "complete"}, admitted: true, completed: true}
-	launched := want{phases: []string{"start", "complete"}, finalized: 1, work: true, admitted: true, completed: true}
+	unstarted := want{
+		completed: true,
+	}
+	prelaunch := want{
+		outcome:   synthetic.Error,
+		phases:    []string{"start", "complete"},
+		admitted:  true,
+		completed: true,
+	}
+	launched := want{
+		phases:    []string{"start", "complete"},
+		finalized: 1,
+		work:      true,
+		admitted:  true,
+		completed: true,
+	}
 	with := func(base want, change func(*want)) want { change(&base); return base }
 	waitForStop := func(ctx context.Context, _ []string, _ []byte, _, _ *os.File) ndexec.TreeResult {
 		<-ctx.Done()
-		return ndexec.TreeResult{Drained: true, Err: ctx.Err()}
+		return ndexec.TreeResult{
+			Drained: true,
+			Err:     ctx.Err(),
+		}
 	}
 	tests := map[string]struct {
 		setup func(*Engine, *observedArtifacts, *synthetic.Request) context.Context
@@ -678,10 +705,15 @@ func TestExecutionExits(t *testing.T) {
 			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
 				paths := e.source.(fixtureRuntime).Paths
 				paths.Identity.SHA256 = "not-a-digest"
-				e.source = fixtureRuntime{Paths: paths}
+				e.source = fixtureRuntime{
+					Paths: paths,
+				}
 				return t.Context()
 			},
-			want: with(prelaunch, func(w *want) { w.err = "runtime source supplied an invalid trusted release identity" }),
+			want: with(
+				prelaunch,
+				func(w *want) { w.err = "runtime source supplied an invalid trusted release identity" },
+			),
 		},
 		"work directory": {
 			setup: func(_ *Engine, a *observedArtifacts, _ *synthetic.Request) context.Context {
@@ -744,7 +776,9 @@ func TestExecutionExits(t *testing.T) {
 		"no terminal result": {
 			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
 				e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
-					return ndexec.TreeResult{Drained: true}
+					return ndexec.TreeResult{
+						Drained: true,
+					}
 				})
 				return t.Context()
 			},
@@ -777,10 +811,13 @@ func TestExecutionExits(t *testing.T) {
 		"caller cancellation": {
 			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
 				ctx, cancel := context.WithCancel(t.Context())
-				e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
-					cancel()
-					return waitForStop(ctx, args, raw, out, stderr)
-				})
+				e.start = starter(
+					t,
+					func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+						cancel()
+						return waitForStop(ctx, args, raw, out, stderr)
+					},
+				)
 				return ctx
 			},
 			want: with(launched, func(w *want) {
@@ -790,7 +827,9 @@ func TestExecutionExits(t *testing.T) {
 		"undrained tree": {
 			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
 				e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
-					return ndexec.TreeResult{Err: failure}
+					return ndexec.TreeResult{
+						Err: failure,
+					}
 				})
 				return t.Context()
 			},
@@ -873,7 +912,11 @@ func TestJourneyStopAtKeepsAdmissionBudget(t *testing.T) {
 		"earlier caller":         {2 * time.Second, 100 * time.Millisecond, 1500 * time.Millisecond},
 		"startup exhausted work": {time.Second, 900 * time.Millisecond, -100 * time.Millisecond},
 		"short budget":           {5 * time.Millisecond, 0, 4 * time.Millisecond},
-		"long budget":            {time.Duration(1<<63-1) - time.Hour, 0, time.Duration(1<<63-1) - time.Hour - 5*time.Second},
+		"long budget": {
+			time.Duration(1<<63-1) - time.Hour,
+			0,
+			time.Duration(1<<63-1) - time.Hour - 5*time.Second,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -913,42 +956,80 @@ func TestBudgetStopCapturePolicyAfterDrain(t *testing.T) {
 				ctx, expiry = context.WithTimeout(ctx, 200*time.Millisecond)
 				defer expiry()
 			}
-			e.start = starter(t, func(processCtx context.Context, _ []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
-				var req wireRequest
-				if err := json.Unmarshal(raw, &req); !assert.NoError(t, err) {
-					return ndexec.TreeResult{Drained: true, Err: err}
-				}
-				assert.Positive(t, req.StopAtMonotonicMS)
-				if err := os.MkdirAll(filepath.Join(req.WorkDir, "output"), 0700); !assert.NoError(t, err) {
-					return ndexec.TreeResult{Drained: true, Err: err}
-				}
-				var candidates []synthetic.Capture
-				for _, id := range []string{"earlier-failure", "interrupted"} {
-					name := "output/" + id + ".png"
-					f, err := os.Create(filepath.Join(req.WorkDir, name))
-					if !assert.NoError(t, err) {
-						return ndexec.TreeResult{Drained: true, Err: err}
+			e.start = starter(
+				t,
+				func(processCtx context.Context, _ []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
+					var req wireRequest
+					if err := json.Unmarshal(raw, &req); !assert.NoError(t, err) {
+						return ndexec.TreeResult{
+							Drained: true,
+							Err:     err,
+						}
 					}
-					err = png.Encode(f, image.NewRGBA(image.Rect(0, 0, 1, 1)))
-					assert.NoError(t, f.Close())
-					if !assert.NoError(t, err) {
-						return ndexec.TreeResult{Drained: true, Err: err}
+					assert.Positive(t, req.StopAtMonotonicMS)
+					if err := os.MkdirAll(filepath.Join(req.WorkDir, "output"), 0700); !assert.NoError(t, err) {
+						return ndexec.TreeResult{
+							Drained: true,
+							Err:     err,
+						}
 					}
-					candidates = append(candidates, synthetic.Capture{ID: id, Path: name, Kind: "screenshot", MIME: "image/png"})
-				}
-				terminal := reporterResult{Status: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget,
-					Error: "first assertion failed", Tests: &synthetic.TestCounts{Declared: 2, Failed: 1, NotRun: 1},
-					CaptureState: "available", Artifacts: candidates[:1], InterruptedArtifacts: candidates[1:]}
-				emit(out, frame{Type: "result", Result: &terminal})
-				if tc.reason == synthetic.CallerCancelled {
-					cancel()
-				}
-				if tc.reason != synthetic.ExecutionBudget {
-					<-processCtx.Done()
-				}
-				assert.Zero(t, a.finalized.Load(), "terminal reporting cannot publish before drainage")
-				return ndexec.TreeResult{Drained: true}
-			})
+					var candidates []synthetic.Capture
+					for _, id := range []string{"earlier-failure", "interrupted"} {
+						name := "output/" + id + ".png"
+						f, err := os.Create(filepath.Join(req.WorkDir, name))
+						if !assert.NoError(t, err) {
+							return ndexec.TreeResult{
+								Drained: true,
+								Err:     err,
+							}
+						}
+						err = png.Encode(f, image.NewRGBA(image.Rect(0, 0, 1, 1)))
+						assert.NoError(t, f.Close())
+						if !assert.NoError(t, err) {
+							return ndexec.TreeResult{
+								Drained: true,
+								Err:     err,
+							}
+						}
+						candidates = append(
+							candidates,
+							synthetic.Capture{
+								ID:   id,
+								Path: name,
+								Kind: "screenshot",
+								MIME: "image/png",
+							},
+						)
+					}
+					terminal := reporterResult{
+						Status:            synthetic.Timeout,
+						TerminationReason: synthetic.ExecutionBudget,
+						Error:             "first assertion failed",
+						Tests: &synthetic.TestCounts{
+							Declared: 2,
+							Failed:   1,
+							NotRun:   1,
+						},
+						CaptureState:         "available",
+						Artifacts:            candidates[:1],
+						InterruptedArtifacts: candidates[1:],
+					}
+					emit(out, frame{
+						Type:   "result",
+						Result: &terminal,
+					})
+					if tc.reason == synthetic.CallerCancelled {
+						cancel()
+					}
+					if tc.reason != synthetic.ExecutionBudget {
+						<-processCtx.Done()
+					}
+					assert.Zero(t, a.finalized.Load(), "terminal reporting cannot publish before drainage")
+					return ndexec.TreeResult{
+						Drained: true,
+					}
+				},
+			)
 			ex := e.execute(ctx, request)
 			require.True(t, ex.Drained)
 			assert.Equal(t, tc.outcome, ex.Run.Outcome)
@@ -990,9 +1071,15 @@ func TestTerminalTerminationReasonsAndInterruptedCandidates(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			r := reporterResult{Status: tc.status, TerminationReason: tc.reason, CaptureState: "unavailable"}
+			r := reporterResult{
+				Status:            tc.status,
+				TerminationReason: tc.reason,
+				CaptureState:      "unavailable",
+			}
 			if tc.interrupted {
-				r.InterruptedArtifacts = []synthetic.Capture{{ID: "screenshot", Path: "shot.png", Kind: "screenshot", MIME: "image/png"}}
+				r.InterruptedArtifacts = []synthetic.Capture{
+					{ID: "screenshot", Path: "shot.png", Kind: "screenshot", MIME: "image/png"},
+				}
 				r.CaptureState = "available"
 			}
 			err := validateResult(synthetic.Journey, true, false, &r)
@@ -1008,21 +1095,44 @@ func TestTerminalTerminationReasonsAndInterruptedCandidates(t *testing.T) {
 func TestBudgetTerminalWithoutCountsPreservesIncrementalTestFacts(t *testing.T) {
 	e, _, _ := testEngine(t)
 	e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
-		emit(out, frame{Type: "event", Event: &synthetic.Event{
-			Kind: "suite", Phase: "discovery", DeclaredTests: intPointer(2),
-		}})
-		emit(out, frame{Type: "event", Event: &synthetic.Event{
-			Kind: "test", Phase: "end", TestID: "completed", Status: "passed", ExpectedStatus: "passed",
-		}})
-		emit(out, frame{Type: "result", Result: &reporterResult{
-			Status: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget,
-			Error: "Runner exited without a terminal result (SIGINT)", CaptureState: "disabled",
-		}})
-		return ndexec.TreeResult{Drained: true}
+		emit(out, frame{
+			Type: "event",
+			Event: &synthetic.Event{
+				Kind:          "suite",
+				Phase:         "discovery",
+				DeclaredTests: intPointer(2),
+			},
+		})
+		emit(out, frame{
+			Type: "event",
+			Event: &synthetic.Event{
+				Kind:           "test",
+				Phase:          "end",
+				TestID:         "completed",
+				Status:         "passed",
+				ExpectedStatus: "passed",
+			},
+		})
+		emit(out, frame{
+			Type: "result",
+			Result: &reporterResult{
+				Status:            synthetic.Timeout,
+				TerminationReason: synthetic.ExecutionBudget,
+				Error:             "Runner exited without a terminal result (SIGINT)",
+				CaptureState:      "disabled",
+			},
+		})
+		return ndexec.TreeResult{
+			Drained: true,
+		}
 	})
 	ex := e.execute(context.Background(), journey())
 	require.True(t, ex.Drained)
 	assert.Equal(t, synthetic.Timeout, ex.Run.Outcome)
 	require.NotNil(t, ex.Run.Tests)
-	assert.Equal(t, synthetic.TestCounts{Declared: 2, Passed: 1, NotRun: 1}, *ex.Run.Tests)
+	assert.Equal(t, synthetic.TestCounts{
+		Declared: 2,
+		Passed:   1,
+		NotRun:   1,
+	}, *ex.Run.Tests)
 }

@@ -82,7 +82,9 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(data) }))
+	server := httptest.NewTLSServer(
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(data) }),
+	)
 	defer server.Close()
 	previous := http.DefaultTransport
 	http.DefaultTransport = server.Client().Transport
@@ -92,8 +94,10 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	failure := errors.New("sandbox qualification failed")
 	var logs healthLog
 	host.log = logger.NewWithWriter(&logs)
-	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
-		func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedNext, nil })
+	u := host.NewUpdater(
+		qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
+		func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedNext, nil },
+	)
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
 	require.Equal(t, first.Manifest, *status.Storage.Selected)
@@ -104,7 +108,12 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update failed: sandbox qualification failed"))
 	host.sweep()
-	require.Equal(t, "update: sandbox qualification failed", host.Status().MaintenanceError, "storage cleanup cannot clear update health")
+	require.Equal(
+		t,
+		"update: sandbox qualification failed",
+		host.Status().MaintenanceError,
+		"storage cleanup cannot clear update health",
+	)
 	// A later check that finds no newer release clears update health.
 	u.load = func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedFirst, nil }
 	require.NoError(t, u.check(context.Background()))

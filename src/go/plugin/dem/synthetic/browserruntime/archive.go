@@ -45,7 +45,10 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 		return err
 	}
 	defer decoder.Close()
-	bounded := &io.LimitedReader{R: decoder, N: a.TarBytes + 1}
+	bounded := &io.LimitedReader{
+		R: decoder,
+		N: a.TarBytes + 1,
+	}
 	reader := tar.NewReader(bounded)
 	seen := make(map[string]bool)
 	var links []string
@@ -61,7 +64,8 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 		}
 		name := strings.TrimSuffix(h.Name, "/")
 		entries++
-		if entries > a.Entries || !localName(name) || reservedName(name) || seen[name] || h.Size < 0 || h.Mode&07000 != 0 {
+		if entries > a.Entries || !localName(name) || reservedName(name) || seen[name] || h.Size < 0 ||
+			h.Mode&07000 != 0 {
 			return errors.New("invalid, duplicate or excessive runtime archive entry")
 		}
 		seen[name] = true
@@ -85,7 +89,8 @@ func extractArchive(src io.Reader, root *os.Root, a Archive) error {
 			err = extractFile(root, name, reader, h.Size, h.Mode&0111 != 0)
 		case tar.TypeSymlink:
 			// Only internal links; parents are never allowed to traverse links.
-			if path.IsAbs(h.Linkname) || strings.ContainsAny(h.Linkname, "\\\x00\r\n") || !localName(path.Join(path.Dir(name), h.Linkname)) {
+			if path.IsAbs(h.Linkname) || strings.ContainsAny(h.Linkname, "\\\x00\r\n") ||
+				!localName(path.Join(path.Dir(name), h.Linkname)) {
 				return errors.New("runtime symlink escapes its generation")
 			}
 			err = root.Symlink(h.Linkname, name)

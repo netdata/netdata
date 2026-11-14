@@ -65,8 +65,11 @@ func openNativeStaging(output string, config NativeConfig) (string, *os.Root, er
 	}
 	resolved := filepath.Join(parent, filepath.Base(output))
 	for _, installed := range []string{config.PayloadPath, config.ControlPath} {
-		if resolved == installed || strings.HasPrefix(resolved, installed+string(os.PathSeparator)) || strings.HasPrefix(installed, resolved+string(os.PathSeparator)) {
-			return "", nil, errors.New("native package staging must be separate from installed payload and control paths")
+		if resolved == installed || strings.HasPrefix(resolved, installed+string(os.PathSeparator)) ||
+			strings.HasPrefix(installed, resolved+string(os.PathSeparator)) {
+			return "", nil, errors.New(
+				"native package staging must be separate from installed payload and control paths",
+			)
 		}
 	}
 	if err := os.Mkdir(output, 0700); err != nil {

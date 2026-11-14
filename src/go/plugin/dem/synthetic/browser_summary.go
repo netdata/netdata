@@ -122,7 +122,14 @@ func (b *BrowserSummary) Summary() string {
 	}
 	c := b.Run.Counts
 	t := b.Run.Tests
-	text := fmt.Sprintf("fixture_context (%s; tests: observed=%d, incomplete=%d, invalid=%d, no_summary=%d)", b.ReportingStatus(), t.Observed, t.Incomplete, t.Invalid, t.NoSummary)
+	text := fmt.Sprintf(
+		"fixture_context (%s; tests: observed=%d, incomplete=%d, invalid=%d, no_summary=%d)",
+		b.ReportingStatus(),
+		t.Observed,
+		t.Incomplete,
+		t.Invalid,
+		t.NoSummary,
+	)
 	if t.Observed == 0 {
 		text += ": no observed fixture contexts"
 	} else {

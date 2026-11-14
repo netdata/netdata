@@ -23,13 +23,24 @@ func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
 		"absolute":         {{Name: "/outside", Contents: []byte("no"), Mode: 0600}},
 		"hardlink":         {{Name: "alias", Link: "file", Kind: tar.TypeLink}},
 		"external-symlink": {{Name: "alias", Link: "../outside", Kind: tar.TypeSymlink}},
-		"chained-escape":   {{Name: "d", Kind: tar.TypeDir}, {Name: "other", Kind: tar.TypeDir}, {Name: "d/alias", Link: "../other", Kind: tar.TypeSymlink}, {Name: "escape", Link: "d/alias/../../outside", Kind: tar.TypeSymlink}},
-		"symlink-parent":   {{Name: "alias", Link: "inside", Kind: tar.TypeSymlink}, {Name: "alias/file", Contents: []byte("no"), Mode: 0600}},
-		"duplicate":        {{Name: "file", Contents: []byte("first"), Mode: 0600}, {Name: "file", Contents: []byte("last"), Mode: 0600}},
-		"device":           {{Name: "device", Kind: tar.TypeChar, Mode: 0600}},
-		"setuid":           {{Name: "file", Contents: []byte("no"), Mode: 04755}},
-		"reserved":         {{Name: "prepared.json", Contents: []byte("{}"), Mode: 0600}},
-		"native reserved":  {{Name: "native.json", Contents: []byte("{}"), Mode: 0600}},
+		"chained-escape": {
+			{Name: "d", Kind: tar.TypeDir},
+			{Name: "other", Kind: tar.TypeDir},
+			{Name: "d/alias", Link: "../other", Kind: tar.TypeSymlink},
+			{Name: "escape", Link: "d/alias/../../outside", Kind: tar.TypeSymlink},
+		},
+		"symlink-parent": {
+			{Name: "alias", Link: "inside", Kind: tar.TypeSymlink},
+			{Name: "alias/file", Contents: []byte("no"), Mode: 0600},
+		},
+		"duplicate": {
+			{Name: "file", Contents: []byte("first"), Mode: 0600},
+			{Name: "file", Contents: []byte("last"), Mode: 0600},
+		},
+		"device":          {{Name: "device", Kind: tar.TypeChar, Mode: 0600}},
+		"setuid":          {{Name: "file", Contents: []byte("no"), Mode: 04755}},
+		"reserved":        {{Name: "prepared.json", Contents: []byte("{}"), Mode: 0600}},
+		"native reserved": {{Name: "native.json", Contents: []byte("{}"), Mode: 0600}},
 	}
 	for name, entries := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -71,7 +82,10 @@ func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
 }
 
 func TestArchiveZstdIntegrityAndBounds(t *testing.T) {
-	a, compressed := archiveFixture(t, []browserruntimetest.Entry{{Name: "file", Contents: []byte("payload"), Mode: 0600}})
+	a, compressed := archiveFixture(
+		t,
+		[]browserruntimetest.Entry{{Name: "file", Contents: []byte("payload"), Mode: 0600}},
+	)
 	decoder, err := zstd.NewReader(nil)
 	require.NoError(t, err)
 	raw, err := decoder.DecodeAll(compressed, nil)
@@ -88,13 +102,15 @@ func TestArchiveZstdIntegrityAndBounds(t *testing.T) {
 	require.NoError(t, err)
 	defer writer.Close()
 	cases := map[string][]byte{
-		"gzip":                          legacy.Bytes(),
-		"checksum":                      damaged,
-		"truncated checksum":            compressed[:len(compressed)-1],
-		"trailing junk":                 append(append([]byte(nil), compressed...), []byte("junk")...),
-		"trailing byte":                 append(append([]byte(nil), compressed...), 0),
-		"truncated following frame":     append(append([]byte(nil), compressed...), 0x28, 0xb5, 0x2f),
-		"concatenated decoded overflow": append(append([]byte(nil), compressed...), writer.EncodeAll([]byte("extra"), nil)...),
+		"gzip":                      legacy.Bytes(),
+		"checksum":                  damaged,
+		"truncated checksum":        compressed[:len(compressed)-1],
+		"trailing junk":             append(append([]byte(nil), compressed...), []byte("junk")...),
+		"trailing byte":             append(append([]byte(nil), compressed...), 0),
+		"truncated following frame": append(append([]byte(nil), compressed...), 0x28, 0xb5, 0x2f),
+		"concatenated decoded overflow": append(
+			append([]byte(nil), compressed...),
+			writer.EncodeAll([]byte("extra"), nil)...),
 	}
 	for name, data := range cases {
 		t.Run(name, func(t *testing.T) {

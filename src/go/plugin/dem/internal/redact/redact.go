@@ -105,7 +105,10 @@ func (r *Redactor) spans(s string) []span {
 			if j < 0 {
 				break
 			}
-			sp := span{start: i + j, end: i + j + len(v)}
+			sp := span{
+				start: i + j,
+				end:   i + j + len(v),
+			}
 			if overlaps(sp, out[:earlier]) {
 				i += j + 1 // Apply sees a marker there, not the filler
 				continue
@@ -118,13 +121,19 @@ func (r *Redactor) spans(s string) []span {
 	n := len(out)
 	if standalonePattern.MatchString(text) {
 		for _, m := range standalonePattern.FindAllStringIndex(text, -1) {
-			out = append(out, span{start: m[0], end: m[1]})
+			out = append(out, span{
+				start: m[0],
+				end:   m[1],
+			})
 		}
 		text = filled(text, out[n:])
 	}
 	if keyValuePattern.MatchString(text) {
 		for _, m := range keyValuePattern.FindAllStringSubmatchIndex(text, -1) {
-			out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
+			out = append(out, span{
+				start: m[3] + 1,
+				end:   m[1],
+			}) // the value after "key="
 		}
 	}
 	return out
@@ -168,7 +177,10 @@ func keptToSource(spans []span, s string, remove func(rune) bool) []span {
 	for i := 0; i < len(s); {
 		c, n := utf8.DecodeRuneInString(s[i:])
 		if remove(c) {
-			shifts = append(shifts, shift{kept: i - removed, removed: removed + n})
+			shifts = append(shifts, shift{
+				kept:    i - removed,
+				removed: removed + n,
+			})
 			removed += n
 		}
 		i += n
@@ -182,7 +194,10 @@ func keptToSource(spans []span, s string, remove func(rune) bool) []span {
 	}
 	out := make([]span, len(spans))
 	for i, sp := range spans {
-		out[i] = span{start: source(sp.start), end: source(sp.start)}
+		out[i] = span{
+			start: source(sp.start),
+			end:   source(sp.start),
+		}
 		if sp.end > sp.start {
 			out[i].end = source(sp.end-1) + 1
 		}

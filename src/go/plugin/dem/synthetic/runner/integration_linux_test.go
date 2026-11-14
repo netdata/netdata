@@ -85,7 +85,9 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			assert.NoError(t, os.RemoveAll(base))
 		}
 	}()
-	observedHistory := &identityHistory{Store: synthetichistory.NewStore(history)}
+	observedHistory := &identityHistory{
+		Store: synthetichistory.NewStore(history),
+	}
 	engine, err := runner.New(selectedRuntime{consumer}, observedHistory, captures, 1)
 	require.NoError(t, err)
 	verifyIdentity := func(t *testing.T, run synthetic.Run) {
@@ -101,7 +103,14 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		require.Equal(t, &expectedIdentity, retained.Runtime)
 		service := query.New(syntheticregistry.New(), observedHistory, captures, func() string { return "" })
 		handler := syntheticfunc.New(service, nil)
-		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
+		response := handler.HandleRaw(
+			context.Background(),
+			funcapi.RawMethodRequest{
+				Method:      "synthetics-run",
+				Args:        []string{"job_id:" + run.JobID, "run_id:" + run.ID},
+				Permissions: "0x7b",
+			},
+		)
 		require.NotNil(t, response.RawResponse, response.Message)
 		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
 	}
@@ -235,14 +244,19 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		registry := syntheticregistry.New()
 		var collector *journey.Collector
 		makeFactory := func(executor journey.Executor) *joboutput.ConfigModuleFactory {
-			creator := journey.Creator(journey.Dependencies{Executor: executor, Registry: registry})
+			creator := journey.Creator(journey.Dependencies{
+				Executor: executor,
+				Registry: registry,
+			})
 			create := creator.CreateV2
 			creator.CreateV2 = func() collectorapi.CollectorV2 {
 				collector = create().(*journey.Collector)
 				return collector
 			}
 			factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{
-				Modules: collectorapi.Registry{"journey": creator},
+				Modules: collectorapi.Registry{
+					"journey": creator,
+				},
 				Configs: configs,
 			})
 			require.NoError(t, err)
@@ -270,9 +284,11 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, page.Runs, "draft must not enter retained history")
 			require.NotNil(t, collector)
-			collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
-				t.Errorf("draft published metric %s", name)
-			})
+			collector.MetricStore().
+				Read(metrix.ReadRaw(), metrix.ReadFlatten()).
+				ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
+					t.Errorf("draft published metric %s", name)
+				})
 			for _, directory := range []string{"work", "staging", "runs", "drained", "deleting"} {
 				entries, err := os.ReadDir(filepath.Join(base, "captures", directory))
 				require.NoError(t, err)
@@ -396,10 +412,16 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	t.Run("single-entry-helpers-fixtures-and-worker-policy", func(t *testing.T) {
 		input := filepath.Join(base, "script-source")
 		require.NoError(t, os.MkdirAll(input, 0700))
-		require.NoError(t, os.WriteFile(filepath.Join(input, "helper.ts"), []byte(`export const label='fixture ready';`), 0600))
-		require.NoError(t, os.WriteFile(filepath.Join(input, "fixtures.ts"), []byte(`import {test as base} from '@playwright/test';
+		require.NoError(
+			t,
+			os.WriteFile(filepath.Join(input, "helper.ts"), []byte(`export const label='fixture ready';`), 0600),
+		)
+		require.NoError(
+			t,
+			os.WriteFile(filepath.Join(input, "fixtures.ts"), []byte(`import {test as base} from '@playwright/test';
 export const test=base.extend({message:async({},use)=>{await use('fixture ready')}});
-export {expect} from '@playwright/test';`), 0600))
+export {expect} from '@playwright/test';`), 0600),
+		)
 		entry := filepath.Join(input, "chosen.spec.ts")
 		require.NoError(t, os.WriteFile(entry, []byte(`import {test,expect} from './fixtures';
 import {label} from './helper';
@@ -413,15 +435,36 @@ test('selected entry',async({message},info)=>{
  expect(process.env.DEM_SECRET_TEST).toBe('private-fixture-value');
  console.log('private-fixture-value');
 });`), 0600))
-		require.NoError(t, os.WriteFile(filepath.Join(input, "unselected.spec.ts"), []byte(`throw new Error('unselected entry must never load');`), 0600))
+		require.NoError(
+			t,
+			os.WriteFile(
+				filepath.Join(input, "unselected.spec.ts"),
+				[]byte(`throw new Error('unselected entry must never load');`),
+				0600,
+			),
+		)
 		t.Setenv("DEM_RUNTIME_INHERITED", "must-not-reach-worker")
-		got := engine.ExecuteScheduled(context.Background(), synthetic.Request{Kind: synthetic.Journey, Name: "file-contract", ScriptPath: entry, Timeout: 30 * time.Second, Secrets: map[string]string{"DEM_SECRET_TEST": "private-fixture-value"}}, nil, nil)
+		got := engine.ExecuteScheduled(
+			context.Background(),
+			synthetic.Request{
+				Kind:       synthetic.Journey,
+				Name:       "file-contract",
+				ScriptPath: entry,
+				Timeout:    30 * time.Second,
+				Secrets:    map[string]string{"DEM_SECRET_TEST": "private-fixture-value"},
+			},
+			nil,
+			nil,
+		)
 		if !got.Drained {
 			safe = false
 			t.Fatal("file-contract tree not drained")
 		}
 		require.Equal(t, synthetic.Success, got.Run.Outcome, got.Run.Error)
-		require.Equal(t, &synthetic.TestCounts{Declared: 1, Passed: 1}, got.Run.Tests)
+		require.Equal(t, &synthetic.TestCounts{
+			Declared: 1,
+			Passed:   1,
+		}, got.Run.Tests)
 		require.Equal(t, synthetic.CaptureDisabled, got.Run.CaptureState)
 		require.Empty(t, got.Run.Artifacts)
 		encoded, err := json.Marshal(got.Run)
@@ -430,7 +473,14 @@ test('selected entry',async({message},info)=>{
 		verifyIdentity(t, got.Run)
 	})
 	t.Run("capture-disabled-browser-failure", func(t *testing.T) {
-		got := run(t, context.Background(), "no-capture", browserPrefix+"test('fails',async({page})=>{await page.goto("+string(urlJSON)+");expect(1).toBe(2)});", 30*time.Second, false)
+		got := run(
+			t,
+			context.Background(),
+			"no-capture",
+			browserPrefix+"test('fails',async({page})=>{await page.goto("+string(urlJSON)+");expect(1).toBe(2)});",
+			30*time.Second,
+			false,
+		)
 		require.Equal(t, synthetic.Failed, got.Run.Outcome)
 		require.Equal(t, synthetic.CaptureDisabled, got.Run.CaptureState)
 		require.Empty(t, got.Run.Artifacts)
@@ -456,7 +506,9 @@ test('selected entry',async({message},info)=>{
 		assert.Nil(t, got.Run.DurationMS)
 	})
 	t.Run("graceful-budget-with-screenshot", func(t *testing.T) {
-		body := "test('missing action',async({page})=>{await page.goto(" + string(urlJSON) + ");await page.locator('#never-present').click();});"
+		body := "test('missing action',async({page})=>{await page.goto(" + string(
+			urlJSON,
+		) + ");await page.locator('#never-present').click();});"
 		got := run(t, context.Background(), "graceful-budget", browserPrefix+body, 9*time.Second, true)
 		require.Equal(t, synthetic.Timeout, got.Run.Outcome)
 		assert.Equal(t, synthetic.ExecutionBudget, got.Run.TerminationReason)
@@ -609,7 +661,10 @@ func (s selectedRuntime) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return selectedUse{use: use, identity: s.consumer.Manifest().Identity()}, nil
+	return selectedUse{
+		use:      use,
+		identity: s.consumer.Manifest().Identity(),
+	}, nil
 }
 
 type selectedUse struct {
@@ -618,7 +673,11 @@ type selectedUse struct {
 }
 
 func (u selectedUse) Paths() runner.Paths {
-	return runner.Paths{Node: u.use.Paths.Node, EntryPoint: u.use.Paths.EntryPoint, Identity: u.identity}
+	return runner.Paths{
+		Node:       u.use.Paths.Node,
+		EntryPoint: u.use.Paths.EntryPoint,
+		Identity:   u.identity,
+	}
 }
 func (u selectedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
 func (u selectedUse) Finish(drained bool) error          { return u.use.Finish(drained) }
@@ -628,7 +687,11 @@ type identityHistory struct {
 	records map[string][]synthetic.Run
 }
 
-func (h *identityHistory) AppendRun(ctx context.Context, phase synthetic.HistoryPhase, run synthetic.Run) (bool, error) {
+func (h *identityHistory) AppendRun(
+	ctx context.Context,
+	phase synthetic.HistoryPhase,
+	run synthetic.Run,
+) (bool, error) {
 	attempted, err := h.Store.AppendRun(ctx, phase, run)
 	if err == nil {
 		if h.records == nil {

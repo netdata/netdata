@@ -212,7 +212,10 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 			case "claim":
 				claim, err := s.testProcessClaim(m.Archive.SHA256)
 				require.NoError(t, err)
-				closer = &retryOwnerClose{Closer: claim.lock, fail: true}
+				closer = &retryOwnerClose{
+					Closer: claim.lock,
+					fail:   true,
+				}
 				claim.lock = closer
 				require.Error(t, claim.Close())
 			case "staging":
@@ -220,12 +223,18 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 				name, owner, err := s.reserve(other)
 				require.NoError(t, err)
 				require.NotNil(t, owner)
-				closer = &retryOwnerClose{Closer: owner, fail: true}
+				closer = &retryOwnerClose{
+					Closer: owner,
+					fail:   true,
+				}
 				s.finishPreparation(name, closer)
 			default:
 				use, err := s.beginUse(m)
 				require.NoError(t, err)
-				closer = &retryOwnerClose{Closer: use.lock, fail: true}
+				closer = &retryOwnerClose{
+					Closer: use.lock,
+					fail:   true,
+				}
 				use.lock = closer
 				require.Error(t, use.Finish(kind == "use-drained"))
 			}
@@ -255,7 +264,10 @@ func TestStoreCloseRetriesTerminalOwnerRelease(t *testing.T) {
 	m, _ := bundleFixture(t, "store-close-release")
 	claim, err := s.testProcessClaim(m.Archive.SHA256)
 	require.NoError(t, err)
-	closer := &retryOwnerClose{Closer: claim.lock, fail: true}
+	closer := &retryOwnerClose{
+		Closer: claim.lock,
+		fail:   true,
+	}
 	claim.lock = closer
 	require.Error(t, claim.Close())
 	require.ErrorContains(t, s.Close(), "owner unlock failed")

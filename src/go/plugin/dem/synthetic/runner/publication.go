@@ -33,11 +33,23 @@ func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture
 	}
 	for _, candidate := range ineligible {
 		known[candidate.ID] = true
-		run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{ID: candidate.ID, Reason: "not_eligible"})
+		run.Captures.Unpublished = append(
+			run.Captures.Unpublished,
+			synthetic.CaptureOmission{
+				ID:     candidate.ID,
+				Reason: "not_eligible",
+			},
+		)
 	}
 	for _, a := range run.Captures.Associations {
 		if !known[a.ID] {
-			run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{ID: a.ID, Reason: "not_in_final_report"})
+			run.Captures.Unpublished = append(
+				run.Captures.Unpublished,
+				synthetic.CaptureOmission{
+					ID:     a.ID,
+					Reason: "not_in_final_report",
+				},
+			)
 		}
 	}
 }
@@ -53,7 +65,13 @@ func capturePublicationSucceeded(run *synthetic.Run, candidates []synthetic.Capt
 	}
 	for _, c := range candidates {
 		if !published[c.ID] {
-			run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{ID: c.ID, Reason: "too_large"})
+			run.Captures.Unpublished = append(
+				run.Captures.Unpublished,
+				synthetic.CaptureOmission{
+					ID:     c.ID,
+					Reason: "too_large",
+				},
+			)
 		}
 	}
 }
@@ -69,6 +87,9 @@ func capturePublicationFailed(run *synthetic.Run, candidates []synthetic.Capture
 		if tooLarge && failure.ID == c.ID {
 			reason = "too_large"
 		}
-		run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{ID: c.ID, Reason: reason})
+		run.Captures.Unpublished = append(run.Captures.Unpublished, synthetic.CaptureOmission{
+			ID:     c.ID,
+			Reason: reason,
+		})
 	}
 }

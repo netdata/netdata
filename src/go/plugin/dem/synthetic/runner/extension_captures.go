@@ -26,7 +26,10 @@ type captureState struct {
 }
 
 func newCaptureState() *captureState {
-	return &captureState{tests: make(map[string]int), ids: make(map[string]int)}
+	return &captureState{
+		tests: make(map[string]int),
+		ids:   make(map[string]int),
+	}
 }
 
 func (c *captureState) invalid() { c.invalidate("invalid_record") }
@@ -49,7 +52,8 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 	}
 	switch data.Record {
 	case "test":
-		if data.Test == nil || data.Test.Accepted == nil || data.Test.Unaccepted == nil || data.ID != "" || data.TestID != "" {
+		if data.Test == nil || data.Test.Accepted == nil || data.Test.Unaccepted == nil || data.ID != "" ||
+			data.TestID != "" {
 			c.invalid()
 			return
 		}
@@ -62,7 +66,10 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 		if i, ok := c.tests[data.Test.ID]; ok {
 			// A disputed test cannot leave its earlier associations looking valid.
 			c.value.Tests = slices.Delete(c.value.Tests, i, i+1)
-			c.value.Associations = slices.DeleteFunc(c.value.Associations, func(a synthetic.CaptureAssociation) bool { return a.TestID == data.Test.ID })
+			c.value.Associations = slices.DeleteFunc(
+				c.value.Associations,
+				func(a synthetic.CaptureAssociation) bool { return a.TestID == data.Test.ID },
+			)
 			c.invalid()
 			return
 		}
@@ -96,7 +103,13 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 			return
 		}
 		c.ids[data.ID] = len(c.value.Associations)
-		c.value.Associations = append(c.value.Associations, synthetic.CaptureAssociation{ID: data.ID, TestID: data.TestID})
+		c.value.Associations = append(
+			c.value.Associations,
+			synthetic.CaptureAssociation{
+				ID:     data.ID,
+				TestID: data.TestID,
+			},
+		)
 	case "truncated", "complete":
 		if data.Test != nil || data.ID != "" || data.TestID != "" {
 			c.invalid()

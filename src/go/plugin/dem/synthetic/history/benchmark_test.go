@@ -26,8 +26,11 @@ func BenchmarkSyntheticRuns(b *testing.B) {
 	for i := range runCount {
 		run := synthetic.Run{
 			VnodeGUID: "11111111-1111-4111-8111-111111111111",
-			ID:        fmt.Sprintf("run-%08d", i), JobID: "journey:benchmark", Kind: synthetic.Journey,
-			StartedUS: start + int64(i)*60000000, Outcome: synthetic.Unknown,
+			ID:        fmt.Sprintf("run-%08d", i),
+			JobID:     "journey:benchmark",
+			Kind:      synthetic.Journey,
+			StartedUS: start + int64(i)*60000000,
+			Outcome:   synthetic.Unknown,
 		}
 		_, err := store.AppendRun(ctx, "start", run)
 		require.NoError(b, err)
@@ -41,7 +44,11 @@ func BenchmarkSyntheticRuns(b *testing.B) {
 	for name, seconds := range widths {
 		after := start / 1000000
 		before := after + seconds
-		filter := RunFilter{After: after, Before: &before, Limit: 2000}
+		filter := RunFilter{
+			After:  after,
+			Before: &before,
+			Limit:  2000,
+		}
 		expected, err := store.QueryRuns(ctx, filter)
 		require.NoError(b, err)
 		b.Run(name, func(b *testing.B) {

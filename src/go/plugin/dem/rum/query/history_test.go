@@ -23,7 +23,8 @@ func TestSessionsReturnHistoryCancellation(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err = query.New(rumregistry.New(), history.NewStore(journalStore)).Sessions(ctx, "", "", 0, time.Now().Unix(), 2000, "")
+	_, err = query.New(rumregistry.New(), history.NewStore(journalStore)).
+		Sessions(ctx, "", "", 0, time.Now().Unix(), 2000, "")
 	assert.ErrorIs(t, err, context.Canceled)
 }
 

@@ -28,7 +28,11 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	prefix := fixtureRunID()[:31]
 	for i, jobID := range []string{"journey:retired", "lighthouse:renamed", "journey:retired"} {
 		runID := fmt.Sprintf("%s%x", prefix, i+1)
-		work, err := store.Begin(runID, jobID, []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "11111111-1111-4111-8111-111111111111"}[i])
+		work, err := store.Begin(
+			runID,
+			jobID,
+			[]string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "11111111-1111-4111-8111-111111111111"}[i],
+		)
 		require.NoError(t, err)
 		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<html>report</html>"), 0600))
@@ -84,11 +88,28 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", rowValues(t, sitePage, siteRows[0])["vnode_guid"])
 	assert.Equal(t, prefix+"3", rowValues(t, sitePage, siteRows[0])["run_id"])
 	validate(t, sitePage)
-	siteNext := call(h, "synthetics-artifacts", "vnode_guid:11111111-1111-4111-8111-111111111111", "limit:1", "before:"+sitePage.RawResponse["next"].(string))
+	siteNext := call(
+		h,
+		"synthetics-artifacts",
+		"vnode_guid:11111111-1111-4111-8111-111111111111",
+		"limit:1",
+		"before:"+sitePage.RawResponse["next"].(string),
+	)
 	siteRows = responseData(t, siteNext)
 	require.Len(t, siteRows, 1)
 	assert.Equal(t, prefix+"1", rowValues(t, siteNext, siteRows[0])["run_id"])
-	assert.Empty(t, responseData(t, call(h, "synthetics-artifacts", "vnode_guid:11111111-1111-4111-8111-111111111111", "job_id:lighthouse:renamed")))
+	assert.Empty(
+		t,
+		responseData(
+			t,
+			call(
+				h,
+				"synthetics-artifacts",
+				"vnode_guid:11111111-1111-4111-8111-111111111111",
+				"job_id:lighthouse:renamed",
+			),
+		),
+	)
 	detail := call(h, "synthetics-artifact", "job_id:journey:retired", "run_id:"+prefix+"1")
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.RawResponse["vnode_guid"])
 	filteredStatus, err := json.Marshal(filtered.RawResponse["storage"])

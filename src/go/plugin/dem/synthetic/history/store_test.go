@@ -400,9 +400,16 @@ func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "history")
 	st, err := journalstore.Open(ctx, root)
 	require.NoError(t, err)
-	run := synthetic.Run{ID: "timeout", JobID: "journey:test", Kind: synthetic.Journey,
-		StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Timeout,
-		TerminationReason: synthetic.ExecutionBudget, Error: "earlier assertion failed"}
+	run := synthetic.Run{
+		ID:                "timeout",
+		JobID:             "journey:test",
+		Kind:              synthetic.Journey,
+		StartedUS:         time.Now().UnixMicro(),
+		CompletedUS:       time.Now().UnixMicro(),
+		Outcome:           synthetic.Timeout,
+		TerminationReason: synthetic.ExecutionBudget,
+		Error:             "earlier assertion failed",
+	}
 	_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
 	require.NoError(t, st.Sync(ctx))
@@ -423,18 +430,83 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	require.NoError(t, err)
 	now := time.Now().UnixMicro()
 	duration := 5.25
-	location := &synthetic.EvidenceLocation{File: "checkout.spec.js", Line: 12, Column: 3}
-	test := synthetic.EvidenceTest{ID: "t", Title: "checkout", Location: location, Status: "failed", ExpectedStatus: "passed", DurationMS: &duration, ReportingComplete: true}
-	step := synthetic.EvidenceStep{ID: "s1", TestID: "t", Title: "submit", Category: "test.step", Location: location, State: "running"}
-	evidence := &synthetic.FailureEvidence{Availability: "supported", ReporterComplete: false, Truncated: []string{"other_steps", "text"}, Tests: []synthetic.EvidenceTest{test}, Steps: []synthetic.EvidenceStep{step}, FirstFailure: &synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}, Message: "expected receipt", Location: location, TextTruncated: true}}
+	location := &synthetic.EvidenceLocation{
+		File:   "checkout.spec.js",
+		Line:   12,
+		Column: 3,
+	}
+	test := synthetic.EvidenceTest{
+		ID:                "t",
+		Title:             "checkout",
+		Location:          location,
+		Status:            "failed",
+		ExpectedStatus:    "passed",
+		DurationMS:        &duration,
+		ReportingComplete: true,
+	}
+	step := synthetic.EvidenceStep{
+		ID:       "s1",
+		TestID:   "t",
+		Title:    "submit",
+		Category: "test.step",
+		Location: location,
+		State:    "running",
+	}
+	evidence := &synthetic.FailureEvidence{
+		Availability:     "supported",
+		ReporterComplete: false,
+		Truncated:        []string{"other_steps", "text"},
+		Tests:            []synthetic.EvidenceTest{test},
+		Steps:            []synthetic.EvidenceStep{step},
+		FirstFailure: &synthetic.FailureDetail{
+			Test:          test,
+			Path:          []synthetic.EvidenceStep{step},
+			Message:       "expected receipt",
+			Location:      location,
+			TextTruncated: true,
+		},
+	}
 	stopped := test
 	stopped.ID, stopped.Status = "stopped", "interrupted"
 	pending := step
 	pending.TestID = stopped.ID
-	evidence.StopContext = &synthetic.FailureDetail{Test: stopped, Path: []synthetic.EvidenceStep{pending}, PathIncomplete: true}
+	evidence.StopContext = &synthetic.FailureDetail{
+		Test:           stopped,
+		Path:           []synthetic.EvidenceStep{pending},
+		PathIncomplete: true,
+	}
 	runs := []synthetic.Run{
-		{ID: "old", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now, CompletedUS: now + 1, Outcome: synthetic.Failed},
-		{ID: "rich", JobID: "journey:a", Kind: synthetic.Journey, StartedUS: now + 2, CompletedUS: now + 3, Outcome: synthetic.Timeout, TerminationReason: synthetic.ExecutionBudget, FailureEvidence: evidence, BrowserSummary: &synthetic.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &synthetic.BrowserAggregate{Counts: synthetic.BrowserCounts{ConsoleError: 2}}, Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}}, Samples: []synthetic.BrowserSample{{ID: 1, TestID: "t", Category: "console_error", State: "pending"}}}},
+		{
+			ID:          "old",
+			JobID:       "journey:a",
+			Kind:        synthetic.Journey,
+			StartedUS:   now,
+			CompletedUS: now + 1,
+			Outcome:     synthetic.Failed,
+		},
+		{
+			ID:                "rich",
+			JobID:             "journey:a",
+			Kind:              synthetic.Journey,
+			StartedUS:         now + 2,
+			CompletedUS:       now + 3,
+			Outcome:           synthetic.Timeout,
+			TerminationReason: synthetic.ExecutionBudget,
+			FailureEvidence:   evidence,
+			BrowserSummary: &synthetic.BrowserSummary{
+				Availability: "supported",
+				Coverage:     "fixture_context",
+				Run: &synthetic.BrowserAggregate{
+					Counts: synthetic.BrowserCounts{
+						ConsoleError: 2,
+					},
+				},
+				Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}},
+				Samples: []synthetic.BrowserSample{
+					{ID: 1, TestID: "t", Category: "console_error", State: "pending"},
+				},
+			},
+		},
 	}
 	for _, run := range runs {
 		_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
@@ -462,9 +534,28 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	root := t.TempDir()
 	j, err := journalstore.Open(t.Context(), root)
 	require.NoError(t, err)
-	test := synthetic.ArtifactTest{ID: "t1", Title: "Checkout"}
-	run := synthetic.Run{ID: "capture-run", JobID: "journey:test", Kind: synthetic.Journey, Name: "test", StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Failed, CaptureState: "unavailable",
-		Captures: &synthetic.CaptureReport{Reporting: "complete", Trace: "supported", Tests: []synthetic.CaptureTest{{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1}}, Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}, {ID: "trace1", TestID: "t1"}}, Unpublished: []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}}},
+	test := synthetic.ArtifactTest{
+		ID:    "t1",
+		Title: "Checkout",
+	}
+	run := synthetic.Run{
+		ID:           "capture-run",
+		JobID:        "journey:test",
+		Kind:         synthetic.Journey,
+		Name:         "test",
+		StartedUS:    time.Now().UnixMicro(),
+		CompletedUS:  time.Now().UnixMicro(),
+		Outcome:      synthetic.Failed,
+		CaptureState: "unavailable",
+		Captures: &synthetic.CaptureReport{
+			Reporting: "complete",
+			Trace:     "supported",
+			Tests: []synthetic.CaptureTest{
+				{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1},
+			},
+			Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}, {ID: "trace1", TestID: "t1"}},
+			Unpublished:  []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}},
+		},
 	}
 	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
 	require.NoError(t, err)
@@ -485,7 +576,14 @@ func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	store := history.NewStore(st)
 	now := time.Now().UnixMicro()
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
-		run := synthetic.Run{ID: []string{"before-move", "after-move"}[i], JobID: "journey:checkout", Kind: synthetic.Journey, VnodeGUID: site, StartedUS: now + int64(i), Outcome: synthetic.Unknown}
+		run := synthetic.Run{
+			ID:        []string{"before-move", "after-move"}[i],
+			JobID:     "journey:checkout",
+			Kind:      synthetic.Journey,
+			VnodeGUID: site,
+			StartedUS: now + int64(i),
+			Outcome:   synthetic.Unknown,
+		}
 		_, err = store.AppendRun(ctx, "start", run)
 		require.NoError(t, err)
 		run.CompletedUS = run.StartedUS + 100
@@ -499,12 +597,28 @@ func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	store = history.NewStore(st)
 	upper := now/1e6 + 1
-	filtered, err := store.QueryRuns(ctx, history.RunFilter{VnodeGUID: "11111111-1111-4111-8111-111111111111", JobID: "journey:checkout", Kind: synthetic.Journey, Outcome: synthetic.Success, After: now / 1e6, Before: &upper})
+	filtered, err := store.QueryRuns(
+		ctx,
+		history.RunFilter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			JobID:     "journey:checkout",
+			Kind:      synthetic.Journey,
+			Outcome:   synthetic.Success,
+			After:     now / 1e6,
+			Before:    &upper,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, filtered.Runs, 1)
 	assert.Equal(t, "before-move", filtered.Runs[0].ID)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", filtered.Runs[0].VnodeGUID)
-	filtered, err = store.QueryRuns(ctx, history.RunFilter{VnodeGUID: "11111111-1111-4111-8111-111111111111", Kind: synthetic.Lighthouse})
+	filtered, err = store.QueryRuns(
+		ctx,
+		history.RunFilter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			Kind:      synthetic.Lighthouse,
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, filtered.Runs)
 	all, err := store.QueryRuns(ctx, history.RunFilter{})

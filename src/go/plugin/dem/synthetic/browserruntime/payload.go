@@ -17,7 +17,8 @@ import (
 // bindPrefix operates only on unpublished, digest-verified staging files. The
 // interpreter names the final generation, never the staging directory.
 func bindPrefix(root *os.Root, final string, m Manifest) error {
-	if !filepath.IsAbs(final) || filepath.Clean(final) != final || strings.ContainsAny(final, "\x00\r\n") || !utf8.ValidString(final) {
+	if !filepath.IsAbs(final) || filepath.Clean(final) != final || strings.ContainsAny(final, "\x00\r\n") ||
+		!utf8.ValidString(final) {
 		return errors.New("runtime prefix must be a clean absolute UTF-8 path")
 	}
 	// os.Root can traverse paths longer than Linux's absolute pathname limit.
@@ -140,11 +141,15 @@ func boundPaths(prefix string, layout Layout) Paths {
 
 func boundConfiguration(final string, layout Layout) ([]byte, []byte, error) {
 	var fonts bytes.Buffer
-	fonts.WriteString("<?xml version=\"1.0\"?><!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\"><fontconfig><dir>")
+	fonts.WriteString(
+		"<?xml version=\"1.0\"?><!DOCTYPE fontconfig SYSTEM \"urn:fontconfig:fonts.dtd\"><fontconfig><dir>",
+	)
 	if err := xml.EscapeText(&fonts, []byte(filepath.Join(final, layout.Fonts))); err != nil {
 		return nil, nil, err
 	}
-	fonts.WriteString("</dir><cachedir prefix=\"xdg\">fontconfig</cachedir><config><rescan><int>0</int></rescan></config></fontconfig>\n")
+	fonts.WriteString(
+		"</dir><cachedir prefix=\"xdg\">fontconfig</cachedir><config><rescan><int>0</int></rescan></config></fontconfig>\n",
+	)
 	// /bin/sh is an installation prerequisite, not a host Node/libc dependency.
 	launcher := "#!/bin/sh\nexport FONTCONFIG_FILE=" + shellQuote(filepath.Join(final, "fonts.conf")) +
 		"\nexec " + shellQuote(filepath.Join(final, layout.Browser)) + " \"$@\"\n"
@@ -159,7 +164,8 @@ func bindInterpreter(root *os.Root, binding Binding, interpreter []byte) error {
 	if err != nil {
 		return err
 	}
-	if !info.Mode().IsRegular() || binding.Offset > info.Size() || int64(len(binding.Expected)) > info.Size()-binding.Offset {
+	if !info.Mode().IsRegular() || binding.Offset > info.Size() ||
+		int64(len(binding.Expected)) > info.Size()-binding.Offset {
 		return errors.New("interpreter binding lies outside a regular file")
 	}
 	if err := root.Chmod(binding.Path, 0600); err != nil {

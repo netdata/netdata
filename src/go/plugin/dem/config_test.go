@@ -85,7 +85,10 @@ func TestBrowserConcurrencyConfig(t *testing.T) {
 }
 
 func TestArtifactDefaultsAndIndependentPolicy(t *testing.T) {
-	cfg, err := loadConfigText(t, "runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}")
+	cfg, err := loadConfigText(
+		t,
+		"runtime: {mode: preloaded, preload_path: /prepared}\nartifacts: {days: 2, max_bytes: 1024}",
+	)
 	require.NoError(t, err)
 	assert.Equal(t, DefaultConfig().History, cfg.History)
 	assert.Equal(t, RetentionConfig{

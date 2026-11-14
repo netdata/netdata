@@ -18,11 +18,13 @@ func validateNativeConfig(config NativeConfig) error {
 		return errors.New("native browser runtime requires Linux amd64 or arm64")
 	}
 	for _, path := range []string{config.ControlPath, config.PayloadPath} {
-		if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" || strings.ContainsAny(path, "\x00\r\n") {
+		if !filepath.IsAbs(path) || filepath.Clean(path) != path || path == "/" ||
+			strings.ContainsAny(path, "\x00\r\n") {
 			return errors.New("native runtime paths must be clean absolute paths")
 		}
 	}
-	if config.ControlPath == config.PayloadPath || strings.HasPrefix(config.ControlPath, config.PayloadPath+"/") || strings.HasPrefix(config.PayloadPath, config.ControlPath+"/") {
+	if config.ControlPath == config.PayloadPath || strings.HasPrefix(config.ControlPath, config.PayloadPath+"/") ||
+		strings.HasPrefix(config.PayloadPath, config.ControlPath+"/") {
 		return errors.New("native payload and proof/control roots must be separate")
 	}
 	return nil
@@ -44,7 +46,8 @@ func nativeServiceIdentity(state nativeControlRecord) error {
 
 func nativeRootOwned(info os.FileInfo) bool {
 	st, ok := info.Sys().(*syscall.Stat_t)
-	return ok && st.Uid == 0 && info.Mode().Perm()&0022 == 0 && info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) == 0
+	return ok && st.Uid == 0 && info.Mode().Perm()&0022 == 0 &&
+		info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) == 0
 }
 
 // Every ancestor is immutable to the service, including the control/payload
@@ -57,7 +60,10 @@ func nativeProtectedPath(path string) error {
 			return err
 		}
 		if !info.IsDir() || !nativeRootOwned(info) {
-			return fmt.Errorf("native runtime path must be a plain root-owned directory without group/world write access: %s", path)
+			return fmt.Errorf(
+				"native runtime path must be a plain root-owned directory without group/world write access: %s",
+				path,
+			)
 		}
 		if path == "/" {
 			return nil
@@ -116,7 +122,13 @@ func createNativeControl(config NativeConfig, uid, gid int) error {
 	if err := os.Chown(filepath.Join(temporary, "owners"), uid, gid); err != nil {
 		return err
 	}
-	initial := nativeControlRecord{Format: 1, Phase: "initializing", PayloadPath: config.PayloadPath, UID: uid, GID: gid}
+	initial := nativeControlRecord{
+		Format:      1,
+		Phase:       "initializing",
+		PayloadPath: config.PayloadPath,
+		UID:         uid,
+		GID:         gid,
+	}
 	stagedConfig := config
 	stagedConfig.ControlPath = temporary
 	if err := writeNativeControl(stagedConfig, initial); err != nil {
@@ -125,7 +137,8 @@ func createNativeControl(config NativeConfig, uid, gid int) error {
 	if err := errors.Join(syncDirectory(root, "owners"), syncDirectory(root, ".")); err != nil {
 		return err
 	}
-	if err := renameDirectoryExclusive(parent, filepath.Base(temporary), filepath.Base(config.ControlPath)); err != nil && !errors.Is(err, os.ErrExist) {
+	if err := renameDirectoryExclusive(parent, filepath.Base(temporary), filepath.Base(config.ControlPath)); err != nil &&
+		!errors.Is(err, os.ErrExist) {
 		return err
 	}
 	parentRoot, err := os.OpenRoot(parent)

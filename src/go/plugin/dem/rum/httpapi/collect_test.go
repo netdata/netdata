@@ -265,7 +265,9 @@ func TestIngestedBeaconShape(t *testing.T) {
 		BrowserVersion: "120",
 		OS:             "Linux",
 		Device:         "desktop",
-		Vitals:         []beacon.Vital{{ID: "vital-1", Revision: 2, Name: "LCP", Value: 1234.5, Time: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		Vitals: []beacon.Vital{
+			{ID: "vital-1", Revision: 2, Name: "LCP", Value: 1234.5, Time: time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
 	}
 	if got.Site != want.Site || !got.Received.Equal(want.Received) || got.SessionID != want.SessionID ||
 		got.ExperienceID != want.ExperienceID || got.Path != want.Path || got.PageGroup != want.PageGroup || got.Browser != want.Browser ||
@@ -274,7 +276,9 @@ func TestIngestedBeaconShape(t *testing.T) {
 		!got.Vitals[0].Time.Equal(want.Vitals[0].Time) || got.Errors != nil || len(got.Events) != 1 || got.Logs != nil {
 		t.Fatalf("beacon mismatch:\ngot  %+v\nwant %+v", got, want)
 	}
-	if got.Vitals[0].ID != "vital-1" || got.Vitals[0].Revision != 2 || got.Events[0].Kind != beacon.EventDocument || got.Events[0].ID != "document-1" || got.Events[0].Revision != 1 {
+	if got.Vitals[0].ID != "vital-1" || got.Vitals[0].Revision != 2 || got.Events[0].Kind != beacon.EventDocument ||
+		got.Events[0].ID != "document-1" ||
+		got.Events[0].Revision != 1 {
 		t.Fatalf("measurement identity mismatch: %+v", got)
 	}
 }
@@ -413,7 +417,9 @@ func TestCaptureGeolocationAtReceiver(t *testing.T) {
 		t.Run("mode="+mode, func(t *testing.T) {
 			cfg := testCfg()
 			if mode != "" {
-				cfg.Sites[0].Capture = &config.Capture{Geolocation: new(mode)}
+				cfg.Sites[0].Capture = &config.Capture{
+					Geolocation: new(mode),
+				}
 			}
 			sink, geo := newRecSink(), &captureGeo{}
 			handler := newFixture(cfg, sink, geo).Handler()
@@ -458,7 +464,11 @@ func TestCaptureCredentialRedactionPreservesProtocolSemantics(t *testing.T) {
 	for _, token := range []string{"document-1", "navigation-1", "resource-1", "observation_id", "observation_sequence", "unrelated-token", "resource", "duration", "1000", "rage_click", "url.full"} {
 		t.Run(token, func(t *testing.T) {
 			cfg := testCfg()
-			cfg.Sites[0].EventLogs = &config.EventLogs{Destination: config.Destination{AuthToken: token}}
+			cfg.Sites[0].EventLogs = &config.EventLogs{
+				Destination: config.Destination{
+					AuthToken: token,
+				},
+			}
 			sink := newRecSink()
 			handler := newFixture(cfg, sink, nil).Handler()
 			req := httptest.NewRequest(http.MethodPost, "/rum/shop/collect", strings.NewReader(body))

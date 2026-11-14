@@ -81,7 +81,10 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err != nil {
 		return statusError(err)
 	}
-	response.Data = [][]any{statusColumns.Row(statusRow{Status: status, policyError: h.policyError()})}
+	response.Data = [][]any{statusColumns.Row(statusRow{
+		Status:      status,
+		policyError: h.policyError(),
+	})}
 	return response
 }
 func timestamp(t time.Time) any {
@@ -114,7 +117,12 @@ type statusRow struct {
 }
 
 // column declares a visible column. Timestamps are Unix microseconds.
-func column(name, tooltip string, kind funcapi.FieldType, units string, value func(statusRow) any) rawfunc.Column[statusRow] {
+func column(
+	name, tooltip string,
+	kind funcapi.FieldType,
+	units string,
+	value func(statusRow) any,
+) rawfunc.Column[statusRow] {
 	col := rawfunc.Column[statusRow]{
 		Name:    name,
 		Tooltip: tooltip,

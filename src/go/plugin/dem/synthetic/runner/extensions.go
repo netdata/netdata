@@ -94,15 +94,29 @@ func (s *featureState) receive() bool {
 func (s *featureState) status() synthetic.FeatureStatus {
 	switch s.phase {
 	case featureRequested:
-		return synthetic.FeatureStatus{Availability: synthetic.FeatureUnavailable, Reason: "negotiation_not_reported"}
+		return synthetic.FeatureStatus{
+			Availability: synthetic.FeatureUnavailable,
+			Reason:       "negotiation_not_reported",
+		}
 	case featureDeclined:
-		return synthetic.FeatureStatus{Availability: synthetic.FeatureUnsupported, Reason: "runtime_declined"}
+		return synthetic.FeatureStatus{
+			Availability: synthetic.FeatureUnsupported,
+			Reason:       "runtime_declined",
+		}
 	case featureSelected:
-		return synthetic.FeatureStatus{Availability: synthetic.FeatureSupported}
+		return synthetic.FeatureStatus{
+			Availability: synthetic.FeatureSupported,
+		}
 	case featureComplete:
-		return synthetic.FeatureStatus{Availability: synthetic.FeatureSupported, ReporterComplete: true}
+		return synthetic.FeatureStatus{
+			Availability:     synthetic.FeatureSupported,
+			ReporterComplete: true,
+		}
 	default:
-		return synthetic.FeatureStatus{Availability: synthetic.FeatureInvalid, Reason: s.reason}
+		return synthetic.FeatureStatus{
+			Availability: synthetic.FeatureInvalid,
+			Reason:       s.reason,
+		}
 	}
 }
 
@@ -136,7 +150,9 @@ type extensions struct {
 }
 
 func newExtensions(request synthetic.Request) *extensions {
-	e := &extensions{requested: requestedFeatures(request)}
+	e := &extensions{
+		requested: requestedFeatures(request),
+	}
 	for _, feature := range e.requested {
 		switch feature {
 		case failureEvidenceFeature:

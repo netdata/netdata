@@ -64,7 +64,9 @@ func TestRunUsesActiveEvidenceThenRetainedHistory(t *testing.T) {
 	latest := run
 	latest.HistoryError = "completion append outcome uncertain"
 	latest.Events = []synthetic.Event{{Message: "latest detail"}}
-	active := activeRuns{run.JobID: latest}
+	active := activeRuns{
+		run.JobID: latest,
+	}
 	service := query.New(active, retained, emptyArtifacts(t), noPolicyError)
 	got, err := service.Run(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
@@ -105,7 +107,9 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 		CaptureState: "available",
 		CompletedUS:  time.Now().UnixMicro(),
 	}
-	active := activeRuns{run.JobID: run}
+	active := activeRuns{
+		run.JobID: run,
+	}
 	service := query.New(active, emptyHistory(t), captures, noPolicyError)
 	// The manifest owns retained bytes even when the active observation does not
 	// mention them. Arbitrary files and wrong owners never grant membership.
@@ -210,8 +214,17 @@ func TestScreenshotAssociationWithoutHistoryOrActiveJob(t *testing.T) {
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	body := []byte("\x89PNG\r\n\x1a\nfixture")
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output/screenshot.png"), body, 0600))
-	test := synthetic.ArtifactTest{ID: "test1", Title: "Checkout"}
-	_, err = store.Finalize(t.Context(), id, []synthetic.Capture{{ID: "s1", Kind: "screenshot", MIME: "image/png", Path: "output/screenshot.png", Test: test}})
+	test := synthetic.ArtifactTest{
+		ID:    "test1",
+		Title: "Checkout",
+	}
+	_, err = store.Finalize(
+		t.Context(),
+		id,
+		[]synthetic.Capture{
+			{ID: "s1", Kind: "screenshot", MIME: "image/png", Path: "output/screenshot.png", Test: test},
+		},
+	)
 	require.NoError(t, err)
 	require.NoError(t, store.Close())
 	store, err = artifacts.Open(root)
@@ -250,12 +263,14 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 			if damage == "wrong owner" {
 				jobID = "lighthouse:impostor"
 			}
-			active := activeRuns{jobID: {
-				ID:           runID,
-				JobID:        jobID,
-				Artifacts:    entries,
-				CaptureState: "available",
-			}}
+			active := activeRuns{
+				jobID: {
+					ID:           runID,
+					JobID:        jobID,
+					Artifacts:    entries,
+					CaptureState: "available",
+				},
+			}
 			manifestPath := filepath.Join(root, "runs", runID, "manifest.json")
 			switch damage {
 			case "corrupt":

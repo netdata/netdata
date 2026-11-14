@@ -37,7 +37,17 @@ const (
 	browserRecordSampleLimit = len(browserCategories) * browserCandidateLimit
 )
 
-var browserFlags = []string{"args_limit", "rpc_budget", "candidate_limit", "pending", "unavailable", "too_long", "pool_full", "row_limit", "identity_limit"}
+var browserFlags = []string{
+	"args_limit",
+	"rpc_budget",
+	"candidate_limit",
+	"pending",
+	"unavailable",
+	"too_long",
+	"pool_full",
+	"row_limit",
+	"identity_limit",
+}
 
 type browserState struct {
 	featureState
@@ -45,7 +55,11 @@ type browserState struct {
 }
 
 func newBrowserState() *browserState {
-	return &browserState{value: synthetic.BrowserSummary{Coverage: "fixture_context"}}
+	return &browserState{
+		value: synthetic.BrowserSummary{
+			Coverage: "fixture_context",
+		},
+	}
 }
 
 func (b *browserState) snapshot() *synthetic.BrowserSummary {
@@ -220,10 +234,14 @@ func (b *browserState) accept(raw json.RawMessage, r *textRedactor) {
 		case "test":
 			valid = d.Sample == nil && d.Scope == "" && b.acceptTest(run, test, samples, r)
 		case "late_sample":
-			valid = test == nil && len(samples) == 0 && d.Sample != nil && d.Scope == "" && b.acceptLateSample(run, d.Sample.model(), r)
+			valid = test == nil && len(samples) == 0 && d.Sample != nil && d.Scope == "" &&
+				b.acceptLateSample(run, d.Sample.model(), r)
 		case "truncated":
 			valid = test == nil && d.Sample == nil && len(samples) == 0 &&
-				slices.Contains([]string{"tests", "samples", "text"}, d.Scope) && !slices.Contains(b.value.Truncated, d.Scope)
+				slices.Contains(
+					[]string{"tests", "samples", "text"},
+					d.Scope,
+				) && !slices.Contains(b.value.Truncated, d.Scope)
 			if valid {
 				b.value.Truncated = append(b.value.Truncated, d.Scope)
 			}
@@ -245,7 +263,8 @@ func (b *browserState) accept(raw json.RawMessage, r *textRedactor) {
 
 // aggregate checks a record's cumulative run counts against the previous record.
 func (b *browserState) aggregate(a *synthetic.BrowserAggregate) bool {
-	if a == nil || !safeCounts(countValues(a.Counts)) || !safeCounts(testCountValues(a.Tests)) || !validFlags(a.Omissions, browserFlags) {
+	if a == nil || !safeCounts(countValues(a.Counts)) || !safeCounts(testCountValues(a.Tests)) ||
+		!validFlags(a.Omissions, browserFlags) {
 		return false
 	}
 	if _, ok := sumSafe(testCountValues(a.Tests)); !ok {
@@ -262,7 +281,8 @@ func (b *browserState) aggregate(a *synthetic.BrowserAggregate) bool {
 	if old.Tests.Observed == a.Tests.Observed && old.Counts != a.Counts {
 		return false
 	}
-	if !monotonic(countValues(old.Counts), countValues(a.Counts)) || !monotonic(testCountValues(old.Tests), testCountValues(a.Tests)) {
+	if !monotonic(countValues(old.Counts), countValues(a.Counts)) ||
+		!monotonic(testCountValues(old.Tests), testCountValues(a.Tests)) {
 		return false
 	}
 	for _, f := range old.Omissions {
@@ -276,7 +296,12 @@ func (b *browserState) aggregate(a *synthetic.BrowserAggregate) bool {
 // acceptTest admits a new row with the samples it introduces. The row's state
 // class must advance in the run aggregate, and its counts must fit the
 // aggregate's increase.
-func (b *browserState) acceptTest(run *synthetic.BrowserAggregate, t *synthetic.BrowserTest, samples []synthetic.BrowserSample, r *textRedactor) bool {
+func (b *browserState) acceptTest(
+	run *synthetic.BrowserAggregate,
+	t *synthetic.BrowserTest,
+	samples []synthetic.BrowserSample,
+	r *textRedactor,
+) bool {
 	if t == nil || len(b.value.Tests) >= browserRowLimit || !validEvidenceID(t.ID, testIDBytes) ||
 		len(samples) > browserRecordSampleLimit || len(t.SampleIDs) != len(samples) || !validBrowserRow(*t) {
 		return false
@@ -320,7 +345,11 @@ func (b *browserState) acceptTest(run *synthetic.BrowserAggregate, t *synthetic.
 // acceptLateSample admits one sample of a test seen after the rows ran out. It
 // must introduce a category absent from the pool, so there is at most one per
 // category.
-func (b *browserState) acceptLateSample(run *synthetic.BrowserAggregate, sample synthetic.BrowserSample, r *textRedactor) bool {
+func (b *browserState) acceptLateSample(
+	run *synthetic.BrowserAggregate,
+	sample synthetic.BrowserSample,
+	r *textRedactor,
+) bool {
 	if len(b.value.Tests) != browserRowLimit {
 		return false
 	}
@@ -328,7 +357,8 @@ func (b *browserState) acceptLateSample(run *synthetic.BrowserAggregate, sample 
 		return false
 	}
 	late := []synthetic.BrowserSample{sample}
-	if !b.samples(late, sample.TestID, []int{sample.ID}, true, r) || browserCategoryCount(run.Counts, late[0].Category) == 0 {
+	if !b.samples(late, sample.TestID, []int{sample.ID}, true, r) ||
+		browserCategoryCount(run.Counts, late[0].Category) == 0 {
 		return false
 	}
 	b.value.Samples = append(b.value.Samples, late[0])
@@ -350,7 +380,13 @@ func validBrowserRow(t synthetic.BrowserTest) bool {
 }
 
 // samples validates and sanitizes, in place, the samples a record introduces.
-func (b *browserState) samples(samples []synthetic.BrowserSample, testID string, ids []int, late bool, r *textRedactor) bool {
+func (b *browserState) samples(
+	samples []synthetic.BrowserSample,
+	testID string,
+	ids []int,
+	late bool,
+	r *textRedactor,
+) bool {
 	pooled := map[string]int{}
 	seen := map[int]bool{}
 	for _, s := range b.value.Samples {
@@ -368,7 +404,9 @@ func (b *browserState) samples(samples []synthetic.BrowserSample, testID string,
 	for i := range samples {
 		s := &samples[i]
 		if s.ID < 1 || s.ID > browserSampleLimit || seen[s.ID] || !refs[s.ID] || s.TestID != testID || !validEvidenceID(s.TestID, testIDBytes) ||
-			!slices.Contains(browserCategories[:], s.Category) || pooled[s.Category] >= browserCategorySampleLimit || late && pooled[s.Category] > 0 {
+			!slices.Contains(browserCategories[:], s.Category) ||
+			pooled[s.Category] >= browserCategorySampleLimit ||
+			late && pooled[s.Category] > 0 {
 			return false
 		}
 		seen[s.ID] = true
@@ -385,11 +423,14 @@ func (b *browserState) samples(samples []synthetic.BrowserSample, testID string,
 // its text in place: secrets are redacted and URLs lose credentials, query and
 // fragment.
 func validBrowserSample(s *synthetic.BrowserSample, r *textRedactor) bool {
-	if s.TextOmitted != "" && (s.Category != "console_error" || s.State != "unavailable" || s.TextOmitted != "too_long" || s.Text != nil || s.Args != nil) {
+	if s.TextOmitted != "" &&
+		(s.Category != "console_error" || s.State != "unavailable" || s.TextOmitted != "too_long" || s.Text != nil || s.Args != nil) {
 		return false
 	}
-	if s.ArgsOmitted < 0 || s.ArgsOmitted > maxSafeInteger || !boundedJSON(s.Message, browserTextBytes) || !boundedJSON(s.Error, browserErrorBytes) ||
-		s.Text != nil && !boundedJSON(*s.Text, browserTextBytes) || s.URL != nil && !boundedJSON(*s.URL, browserURLBytes) {
+	if s.ArgsOmitted < 0 || s.ArgsOmitted > maxSafeInteger || !boundedJSON(s.Message, browserTextBytes) ||
+		!boundedJSON(s.Error, browserErrorBytes) ||
+		s.Text != nil && !boundedJSON(*s.Text, browserTextBytes) ||
+		s.URL != nil && !boundedJSON(*s.URL, browserURLBytes) {
 		return false
 	}
 	switch s.Category {
@@ -432,7 +473,11 @@ func validConsoleSample(s *synthetic.BrowserSample, r *textRedactor) bool {
 
 func validConsoleArgument(a *synthetic.BrowserArgument, r *textRedactor) bool {
 	if a.Omitted != "" {
-		return a.Value == nil && slices.Contains([]string{"object", "symbol", "function", "unrepresentable", "non_finite", "too_long"}, a.Omitted)
+		return a.Value == nil &&
+			slices.Contains(
+				[]string{"object", "symbol", "function", "unrepresentable", "non_finite", "too_long"},
+				a.Omitted,
+			)
 	}
 	switch v := a.Value.(type) {
 	case nil, bool:
@@ -467,11 +512,14 @@ func validUncaughtSample(s *synthetic.BrowserSample, r *textRedactor) bool {
 // validRequestSample covers transport failures and HTTP error responses. An
 // oversized URL is omitted whole.
 func validRequestSample(s *synthetic.BrowserSample, r *textRedactor) bool {
-	if s.State != "" || s.Args != nil || s.Text != nil || s.ArgsOmitted != 0 || s.Message != "" || !boundedJSON(s.Method, browserMethodBytes) ||
-		s.URL == nil && s.URLOmitted != "too_long" || s.URL != nil && s.URLOmitted != "" {
+	if s.State != "" || s.Args != nil || s.Text != nil || s.ArgsOmitted != 0 || s.Message != "" ||
+		!boundedJSON(s.Method, browserMethodBytes) ||
+		s.URL == nil && s.URLOmitted != "too_long" ||
+		s.URL != nil && s.URLOmitted != "" {
 		return false
 	}
-	if s.Category == "http_error" && (s.Status < 400 || s.Status > maxSafeInteger || s.Error != "") || s.Category == "transport" && s.Status != 0 {
+	if s.Category == "http_error" && (s.Status < 400 || s.Status > maxSafeInteger || s.Error != "") ||
+		s.Category == "transport" && s.Status != 0 {
 		return false
 	}
 	var clipped bool

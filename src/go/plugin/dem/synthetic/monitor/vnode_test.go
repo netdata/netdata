@@ -41,10 +41,15 @@ func TestVnodeChangesFenceObservationsWithoutChangingQueuedIdentity(t *testing.T
 					schedule := receive(t, call.schedule)
 					assert.Equal(t, queued.UnixMicro(), schedule.QueuedUS, "placement does not requeue")
 				}
-				call.finish <- synthetic.Execution{Drained: true, Run: synthetic.Run{
-					ID: "old", VnodeGUID: call.request.VnodeGUID, Outcome: synthetic.Success,
-					CompletedUS: h.Now().UnixMicro(),
-				}}
+				call.finish <- synthetic.Execution{
+					Drained: true,
+					Run: synthetic.Run{
+						ID:          "old",
+						VnodeGUID:   call.request.VnodeGUID,
+						Outcome:     synthetic.Success,
+						CompletedUS: h.Now().UnixMicro(),
+					},
+				}
 				snapshot := h.wait(t, func(s Snapshot) bool { return s.Outcomes.Success == 1 })
 				assert.Equal(t, uint64(1), snapshot.Admitted)
 				assert.Equal(t, name == "same", snapshot.HasObservation)
@@ -53,10 +58,15 @@ func TestVnodeChangesFenceObservationsWithoutChangingQueuedIdentity(t *testing.T
 				assert.Equal(t, changes[len(changes)-1], next.request.VnodeGUID)
 				next.admission <- h.Now()
 				receive(t, next.schedule)
-				next.finish <- synthetic.Execution{Drained: true, Run: synthetic.Run{
-					ID: "new", VnodeGUID: next.request.VnodeGUID, Outcome: synthetic.Failed,
-					CompletedUS: h.Now().UnixMicro(),
-				}}
+				next.finish <- synthetic.Execution{
+					Drained: true,
+					Run: synthetic.Run{
+						ID:          "new",
+						VnodeGUID:   next.request.VnodeGUID,
+						Outcome:     synthetic.Failed,
+						CompletedUS: h.Now().UnixMicro(),
+					},
+				}
 				snapshot = h.wait(t, func(s Snapshot) bool { return s.Outcomes.Failed == 1 })
 				assert.True(t, snapshot.HasObservation)
 				assert.Equal(t, "new", snapshot.Latest.ID)

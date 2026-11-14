@@ -26,7 +26,12 @@ type slotRequest struct {
 func requestSlot(t *testing.T, o *executionOwner, key executionKey) *slotRequest {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
-	r := &slotRequest{t: t, owner: o, cancel: cancel, done: make(chan struct{})}
+	r := &slotRequest{
+		t:      t,
+		owner:  o,
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
 	go func() {
 		defer close(r.done)
 		r.job, r.err = o.acquire(ctx, key)
@@ -35,7 +40,11 @@ func requestSlot(t *testing.T, o *executionOwner, key executionKey) *slotRequest
 	return r
 }
 
-func jobKey(name string) executionKey { return executionKey{jobID: name} }
+func jobKey(name string) executionKey {
+	return executionKey{
+		jobID: name,
+	}
+}
 
 func (r *slotRequest) finished() bool {
 	select {
@@ -95,7 +104,19 @@ func TestAdmissionLimitsActiveAttempts(t *testing.T) {
 func TestAdmissionRunsOneAttemptPerJob(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		o := newExecutionOwner(2)
-		monitor, rehearsal, other := requestSlot(t, o, jobKey("a")), requestSlot(t, o, jobKey("a")), requestSlot(t, o, jobKey("b"))
+		monitor, rehearsal, other := requestSlot(
+			t,
+			o,
+			jobKey("a"),
+		), requestSlot(
+			t,
+			o,
+			jobKey("a"),
+		), requestSlot(
+			t,
+			o,
+			jobKey("b"),
+		)
 		assert.Equal(t, []bool{true, false, true}, granted(monitor, rehearsal, other),
 			"a second request of a running job must not take a free slot")
 		monitor.release()
@@ -166,7 +187,10 @@ func TestAdmissionQualificationDoesNotQueueBehindUserJob(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		o := newExecutionOwner(2)
 		user := requestSlot(t, o, jobKey("runtime-qualification"))
-		qualification := requestSlot(t, o, executionKey{jobID: "runtime-qualification", qualification: true})
+		qualification := requestSlot(t, o, executionKey{
+			jobID:         "runtime-qualification",
+			qualification: true,
+		})
 		assert.Equal(t, []bool{true, true}, granted(user, qualification))
 		user.release()
 		qualification.release()
@@ -179,8 +203,13 @@ func TestAdmissionQualificationDoesNotQueueBehindUserJob(t *testing.T) {
 func TestAdmissionReleasesGrantRacingWithdrawal(t *testing.T) {
 	o := newExecutionOwner(1)
 	key := jobKey("a")
-	job := &admissionJob{key: key}
-	waiter := &admissionWaiter{ready: make(chan struct{}), job: job}
+	job := &admissionJob{
+		key: key,
+	}
+	waiter := &admissionWaiter{
+		ready: make(chan struct{}),
+		job:   job,
+	}
 	job.waiters = []*admissionWaiter{waiter}
 	o.jobs[key] = job
 	o.ready = []*admissionJob{job}

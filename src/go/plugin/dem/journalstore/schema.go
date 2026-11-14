@@ -154,5 +154,9 @@ func appendEnvelope(fields []journal.Field) ([]journal.Field, Kind, error) {
 	default:
 		return nil, "", fmt.Errorf("invalid DEM_KIND %q", env.kind)
 	}
-	return append(fields, journal.StringField(schemaField, schemaVersion), journal.StringField(bucket, strconv.FormatInt(env.timestamp/minuteUS, 10))), env.kind, nil
+	return append(
+		fields,
+		journal.StringField(schemaField, schemaVersion),
+		journal.StringField(bucket, strconv.FormatInt(env.timestamp/minuteUS, 10)),
+	), env.kind, nil
 }

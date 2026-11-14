@@ -87,7 +87,10 @@ func TestOwnershipLedgerReceiptAndBootRecovery(t *testing.T) {
 	for _, proof := range []string{"receipt", "reboot"} {
 		t.Run(proof, func(t *testing.T) {
 			ledger := testOwnershipLedger(t)
-			ledger.boot = bootIdentity{ID: "11111111-1111-1111-1111-111111111111", Verified: true}
+			ledger.boot = bootIdentity{
+				ID:       "11111111-1111-1111-1111-111111111111",
+				Verified: true,
+			}
 			id := strings.Repeat("b", 64)
 			lease := ledgerUse(t, ledger, id)
 			if proof == "receipt" {
@@ -97,13 +100,22 @@ func TestOwnershipLedgerReceiptAndBootRecovery(t *testing.T) {
 					t.Skip("real-helper test requires DEM_RUNTIME_TEST_HELPER")
 				}
 				t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
-				process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: lease.Completion}, "/bin/true")
+				process, err := ndexec.StartUnprivilegedProcessTree(
+					context.Background(),
+					ndexec.TreeOptions{
+						Completion: lease.Completion,
+					},
+					"/bin/true",
+				)
 				require.NoError(t, err)
 				require.True(t, process.Wait().Drained)
 			}
 			require.NoError(t, lease.Finish(false))
 			if proof == "reboot" {
-				ledger.boot = bootIdentity{ID: "22222222-2222-2222-2222-222222222222", Verified: false}
+				ledger.boot = bootIdentity{
+					ID:       "22222222-2222-2222-2222-222222222222",
+					Verified: false,
+				}
 				require.Equal(t, 1, ledgerInventory(t, ledger, true).uncertain[id])
 				ledger.boot.Verified = true
 			}
@@ -120,7 +132,10 @@ func TestOwnershipLedgerMalformedProofFailsClosed(t *testing.T) {
 			lease := ledgerUse(t, ledger, id)
 			require.NoError(t, lease.Finish(false))
 			if record == "owner.json" {
-				require.NoError(t, os.WriteFile(filepath.Join(ledger.path, lease.name, record), []byte("{broken"), 0600))
+				require.NoError(
+					t,
+					os.WriteFile(filepath.Join(ledger.path, lease.name, record), []byte("{broken"), 0600),
+				)
 				require.Error(t, ledger.withLock(func() error { _, err := ledger.inventoryLocked(true); return err }))
 			} else {
 				if record == "malformed-completion" {
@@ -184,7 +199,10 @@ func TestOwnershipLedgerBootstrapAndLayoutIsolation(t *testing.T) {
 	require.NoError(t, os.Chmod(path, 0700))
 	root, err := os.OpenRoot(path)
 	require.NoError(t, err)
-	require.NoError(t, createInitialLayout(root, storeLayout{Format: int(ownershipRootLayout), Phase: "initializing"}))
+	require.NoError(t, createInitialLayout(root, storeLayout{
+		Format: int(ownershipRootLayout),
+		Phase:  "initializing",
+	}))
 	require.NoError(t, root.Close())
 	ledger, err := openOwnershipLedger(path)
 	require.NoError(t, err)
@@ -226,7 +244,10 @@ func TestOwnershipLedgerAbortedPublicationRetainsEmptyProof(t *testing.T) {
 func TestOwnershipLedgerTerminalReleaseAndHealthRetry(t *testing.T) {
 	ledger := testOwnershipLedger(t)
 	lease := ledgerUse(t, ledger, strings.Repeat("e", 64))
-	closer := &retryOwnerClose{Closer: lease.lock, fail: true}
+	closer := &retryOwnerClose{
+		Closer: lease.lock,
+		fail:   true,
+	}
 	lease.lock = closer
 	version := ledger.cleanupErrorVersion
 	require.Error(t, lease.Finish(true))
@@ -237,7 +258,10 @@ func TestOwnershipLedgerTerminalReleaseAndHealthRetry(t *testing.T) {
 	require.NoError(t, ledger.withLock(ledger.retryOwnerReleasesLocked))
 	require.Empty(t, ledgerInventory(t, ledger, true).uses)
 	var names []string
-	require.NoError(t, ledger.withLock(func() error { var err error; names, err = ledger.trashSnapshotLocked(); return err }))
+	require.NoError(
+		t,
+		ledger.withLock(func() error { var err error; names, err = ledger.trashSnapshotLocked(); return err }),
+	)
 	require.NoError(t, ledger.deleteTrash(names))
 	ledger.finishSweep(ledger.cleanupErrorVersion, nil)
 	require.NoError(t, ledger.cleanupError)

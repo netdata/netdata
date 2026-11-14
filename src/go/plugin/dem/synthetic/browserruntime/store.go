@@ -29,7 +29,16 @@ type AllowanceError struct {
 }
 
 func (e *AllowanceError) Error() string {
-	return fmt.Sprintf("%s: need %d bytes, limit %d, used %d, reserved %d, protected %d, reclaimable %d", ErrAllowance, e.NeededBytes, e.Status.LimitBytes, e.Status.UsedBytes, e.Status.ReservedBytes, e.Status.ProtectedBytes, e.Status.ReclaimableBytes)
+	return fmt.Sprintf(
+		"%s: need %d bytes, limit %d, used %d, reserved %d, protected %d, reclaimable %d",
+		ErrAllowance,
+		e.NeededBytes,
+		e.Status.LimitBytes,
+		e.Status.UsedBytes,
+		e.Status.ReservedBytes,
+		e.Status.ProtectedBytes,
+		e.Status.ReclaimableBytes,
+	)
 }
 
 func (e *AllowanceError) Unwrap() error { return ErrAllowance }
@@ -165,7 +174,10 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 		return Paths{}, err
 	}
 	if !sameExecutable(g.Manifest, m) {
-		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
+		return Paths{}, damagedMetadata(
+			"selection.json",
+			errors.New("prepared runtime manifest differs from installed requirement"),
+		)
 	}
 	return boundPaths(filepath.Join(path, "generations", m.Archive.SHA256), m.Layout), nil
 }
@@ -209,7 +221,10 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 		if err := lease.publishLocked(); err != nil {
 			return err
 		}
-		use = &Use{Paths: paths, executionLease: lease}
+		use = &Use{
+			Paths:          paths,
+			executionLease: lease,
+		}
 		return nil
 	})
 	if err != nil && use != nil {

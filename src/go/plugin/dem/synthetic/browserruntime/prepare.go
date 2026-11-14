@@ -75,7 +75,10 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		return err
 	}
 	defer archive.Close()
-	if err := saveArchive(contextReader{ctx: ctx, source: source}, archive, m.Archive); err != nil {
+	if err := saveArchive(contextReader{
+		ctx:    ctx,
+		source: source,
+	}, archive, m.Archive); err != nil {
 		return err
 	}
 	if _, err := archive.Seek(0, io.SeekStart); err != nil {
@@ -89,14 +92,20 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		return err
 	}
 	defer payload.Close()
-	if err := extractArchive(contextReader{ctx: ctx, source: archive}, payload, m.Archive); err != nil {
+	if err := extractArchive(contextReader{
+		ctx:    ctx,
+		source: archive,
+	}, payload, m.Archive); err != nil {
 		return err
 	}
 	final := filepath.Join(s.path, "generations", m.Archive.SHA256)
 	if err := bindPrefix(payload, final, m); err != nil {
 		return err
 	}
-	g := generation{Manifest: m, LastUsed: s.now().UTC()}
+	g := generation{
+		Manifest: m,
+		LastUsed: s.now().UTC(),
+	}
 	if err := saveJSON(payload, "prepared.json", g); err != nil {
 		return err
 	}
@@ -124,7 +133,14 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		if err != nil {
 			return err
 		}
-		return saveJSON(s.root, filepath.Join(name, "owner.json"), reservation{Generation: m.Archive.SHA256, Bytes: remaining})
+		return saveJSON(
+			s.root,
+			filepath.Join(name, "owner.json"),
+			reservation{
+				Generation: m.Archive.SHA256,
+				Bytes:      remaining,
+			},
+		)
 	})
 }
 
@@ -173,13 +189,23 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 			if err != nil {
 				return err
 			}
-			if status.UsedBytes <= s.config.MaxBytes && status.ReservedBytes <= s.config.MaxBytes-status.UsedBytes && needed <= s.config.MaxBytes-status.UsedBytes-status.ReservedBytes {
-				name, owner, err = s.ledger.newOwner("staging", reservation{Generation: m.Archive.SHA256, Bytes: needed})
+			if status.UsedBytes <= s.config.MaxBytes && status.ReservedBytes <= s.config.MaxBytes-status.UsedBytes &&
+				needed <= s.config.MaxBytes-status.UsedBytes-status.ReservedBytes {
+				name, owner, err = s.ledger.newOwner(
+					"staging",
+					reservation{
+						Generation: m.Archive.SHA256,
+						Bytes:      needed,
+					},
+				)
 				return err
 			}
 			ids := s.candidates(inv, true)
 			if len(ids) == 0 {
-				return errors.Join(&AllowanceError{NeededBytes: needed, Status: status}, cleanupErr)
+				return errors.Join(&AllowanceError{
+					NeededBytes: needed,
+					Status:      status,
+				}, cleanupErr)
 			}
 			if err := s.removeOwned(filepath.Join("generations", ids[0])); err != nil {
 				return err
@@ -201,11 +227,18 @@ func (s *Store) preparationBytes(m Manifest) (int64, error) {
 	}
 	// Reserve the longest timestamp representation and temporary metadata copy.
 	stamp := time.Date(9999, 12, 31, 23, 59, 59, 999999999, time.UTC)
-	g, err := json.Marshal(generation{Manifest: m, LastUsed: stamp, Unneeded: stamp})
+	g, err := json.Marshal(generation{
+		Manifest: m,
+		LastUsed: stamp,
+		Unneeded: stamp,
+	})
 	if err != nil {
 		return 0, err
 	}
-	r, err := json.Marshal(reservation{Generation: m.Archive.SHA256, Bytes: math.MaxInt64})
+	r, err := json.Marshal(reservation{
+		Generation: m.Archive.SHA256,
+		Bytes:      math.MaxInt64,
+	})
 	if err != nil {
 		return 0, err
 	}

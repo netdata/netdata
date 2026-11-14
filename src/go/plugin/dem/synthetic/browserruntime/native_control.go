@@ -54,14 +54,21 @@ func OpenNativeControl(config NativeConfig) (*NativeControl, error) {
 	if _, err := readNativeControl(config); err != nil {
 		return nil, err
 	}
-	return &NativeControl{config: config}, nil
+	return &NativeControl{
+		config: config,
+	}, nil
 }
 
 // InitializeNativeControl creates a previously absent permanent control root.
 // initialize invokes InitializeNativeProof as uid/gid while root holds the gate.
 // Interrupted bootstrap resumes only from its initializing record; established
 // state never recreates a missing gate, ledger or ownership namespace.
-func InitializeNativeControl(ctx context.Context, config NativeConfig, uid, gid int, initialize func(context.Context) error) (_ *NativeControl, result error) {
+func InitializeNativeControl(
+	ctx context.Context,
+	config NativeConfig,
+	uid, gid int,
+	initialize func(context.Context) error,
+) (_ *NativeControl, result error) {
 	if err := nativeRootIdentity(); err != nil {
 		return nil, err
 	}
@@ -75,7 +82,10 @@ func InitializeNativeControl(ctx context.Context, config NativeConfig, uid, gid 
 		// First installation closes admission before payload unpack. Existing
 		// package files plus missing control state are lost proof, not bootstrap.
 		if _, err := os.Lstat(config.PayloadPath); !errors.Is(err, os.ErrNotExist) {
-			return nil, errors.Join(errors.New("cannot bootstrap missing native control beside an existing payload"), err)
+			return nil, errors.Join(
+				errors.New("cannot bootstrap missing native control beside an existing payload"),
+				err,
+			)
 		}
 		if err := createNativeControl(config, uid, gid); err != nil {
 			return nil, err
@@ -113,7 +123,9 @@ func InitializeNativeControl(ctx context.Context, config NativeConfig, uid, gid 
 			return nil, err
 		}
 	}
-	return &NativeControl{config: config}, nil
+	return &NativeControl{
+		config: config,
+	}, nil
 }
 
 // CloseAdmission refuses a busy or uncertain installation without changing its
@@ -166,7 +178,10 @@ func (c *NativeControl) QualifyAndReady(ctx context.Context, inspect NativeInspe
 
 // beginQualification records the installed payload as the qualifying target
 // under the exclusive gate. An unchanged ready package needs no qualification.
-func (c *NativeControl) beginQualification(ctx context.Context, inspect NativeInspector) (_ Manifest, qualifying bool, result error) {
+func (c *NativeControl) beginQualification(
+	ctx context.Context,
+	inspect NativeInspector,
+) (_ Manifest, qualifying bool, result error) {
 	gate, err := lockNativeGate(ctx, c.config, true)
 	if err != nil {
 		return Manifest{}, false, err
@@ -198,7 +213,11 @@ func (c *NativeControl) beginQualification(ctx context.Context, inspect NativeIn
 
 // finishQualification opens ordinary admission only while the gate and payload
 // still name the qualified target and qualification left no proof behind.
-func (c *NativeControl) finishQualification(ctx context.Context, inspect NativeInspector, target Manifest) (result error) {
+func (c *NativeControl) finishQualification(
+	ctx context.Context,
+	inspect NativeInspector,
+	target Manifest,
+) (result error) {
 	gate, err := lockNativeGate(ctx, c.config, true)
 	if err != nil {
 		return err

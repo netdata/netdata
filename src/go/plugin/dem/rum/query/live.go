@@ -21,7 +21,12 @@ type liveCursor struct {
 	Sites     map[string]livePosition `json:"sites"`
 }
 
-func (s *Service) Live(ctx context.Context, filter, after string, limit int, vnodeGUID string) ([]LiveEvent, string, error) {
+func (s *Service) Live(
+	ctx context.Context,
+	filter, after string,
+	limit int,
+	vnodeGUID string,
+) ([]LiveEvent, string, error) {
 	cursor := liveCursor{
 		Version: 1,
 		Sites:   map[string]livePosition{},

@@ -22,7 +22,10 @@ type NativeConfig struct {
 
 // DefaultNativeConfig is package wiring, not a per-consumer configuration knob.
 func DefaultNativeConfig() NativeConfig {
-	return NativeConfig{ControlPath: "/var/lib/netdata-dem-runtime", PayloadPath: "/usr/lib/netdata/dem-runtime"}
+	return NativeConfig{
+		ControlPath: "/var/lib/netdata-dem-runtime",
+		PayloadPath: "/usr/lib/netdata/dem-runtime",
+	}
 }
 
 // NativeStatus reports service-owned lifetime proof without requiring a healthy
@@ -82,7 +85,10 @@ func OpenNative(config NativeConfig) (*Native, error) {
 	}
 	// Keep the validated root. An established native owner must never enter
 	// bootstrap through a second open, even if state disappears in between.
-	return &Native{config: config, ledger: newOwnershipLedger(path, root)}, nil
+	return &Native{
+		config: config,
+		ledger: newOwnershipLedger(path, root),
+	}, nil
 }
 
 // InitializeNativeProof is invoked as the service UID only by root bootstrap.
@@ -231,7 +237,13 @@ func (n *Native) acquire(phase string, expected *Manifest) (consumer *NativeCons
 		}
 		return nil, err
 	}
-	return &NativeConsumer{native: n, manifest: m, paths: paths, claim: owner, phase: phase}, nil
+	return &NativeConsumer{
+		native:   n,
+		manifest: m,
+		paths:    paths,
+		claim:    owner,
+		phase:    phase,
+	}, nil
 }
 
 func (c *NativeConsumer) Manifest() Manifest { return c.manifest }
@@ -271,7 +283,10 @@ func (c *NativeConsumer) BeginUse() (use *Use, result error) {
 		if err := lease.publishLocked(); err != nil {
 			return errors.Join(err, lease.abortLocked())
 		}
-		use = &Use{executionLease: lease, Paths: c.paths}
+		use = &Use{
+			executionLease: lease,
+			Paths:          c.paths,
+		}
 		return nil
 	})
 	if err != nil {

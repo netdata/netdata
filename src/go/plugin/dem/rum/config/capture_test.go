@@ -24,7 +24,9 @@ func TestCaptureDefaultsAndRoundTrip(t *testing.T) {
 	} {
 		for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 			t.Run(format+tc.raw, func(t *testing.T) {
-				site := Site{AllowedOrigins: []string{"https://example.org"}}
+				site := Site{
+					AllowedOrigins: []string{"https://example.org"},
+				}
 				require.NoError(t, decode([]byte(tc.raw), &site))
 				before, err := json.Marshal(site)
 				require.NoError(t, err)

@@ -34,7 +34,9 @@ type Handle struct {
 // Open never fails: setup problems leave synthetic jobs waiting or failing
 // with SetupError while the rest of the plugin runs.
 func Open(cfg Config, varLibPath string) *Handle {
-	h := &Handle{SetupError: cfg.Validate()}
+	h := &Handle{
+		SetupError: cfg.Validate(),
+	}
 	if cfg.Mode == ModePreloaded && !filepath.IsAbs(cfg.PreloadPath) {
 		h.SetupError = errors.Join(h.SetupError, errors.New("runtime.preload_path must be absolute"))
 	}

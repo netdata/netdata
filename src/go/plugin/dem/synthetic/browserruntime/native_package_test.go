@@ -97,7 +97,10 @@ func TestPrepareNativePackageFailuresNeverComplete(t *testing.T) {
 			case "bounds":
 				m.Archive.Entries++
 			case "native metadata":
-				m.Archive, data = archiveFixture(t, []browserruntimetest.Entry{{Name: "native.json", Contents: []byte(`{"format":1}`), Mode: 0644}})
+				m.Archive, data = archiveFixture(
+					t,
+					[]browserruntimetest.Entry{{Name: "native.json", Contents: []byte(`{"format":1}`), Mode: 0644}},
+				)
 			}
 			archive := filepath.Join(t.TempDir(), "archive")
 			require.NoError(t, os.WriteFile(archive, data, 0600))

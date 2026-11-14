@@ -52,7 +52,11 @@ func TestPreparationReportsOneCandidateClaim(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		done <- s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
-			return io.NopCloser(&resumeReader{ready: ready, resume: resume, tail: bytes.NewReader(archive)}), nil
+			return io.NopCloser(&resumeReader{
+				ready:  ready,
+				resume: resume,
+				tail:   bytes.NewReader(archive),
+			}), nil
 		})
 	}()
 	joined := false
@@ -105,7 +109,13 @@ func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 	require.NoError(t, err)
 	defer old.Close()
 	next, archive, load := publishedFixture(t, 3)
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	candidate, err := s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), archive))
 	before, err := s.Inspect()
@@ -120,11 +130,25 @@ func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 	require.True(t, status.AutomaticUpdates)
 	require.Equal(t, current.Manifest, old.Manifest(), "running processes activate only on restart")
 	_, _, older := publishedFixture(t, 1)
-	_, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: UpdateRelease}, older)
+	_, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{
+		Operation: UpdateRelease,
+	}, older)
 	require.ErrorContains(t, err, "regress")
-	_, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, older)
+	_, err = s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		older,
+	)
 	require.ErrorContains(t, err, "regress")
-	unchanged, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	unchanged, err := s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	require.Nil(t, unchanged)
 }
@@ -140,10 +164,16 @@ func TestAutomaticReleaseDoesNotDiscoverWithoutConsent(t *testing.T) {
 				installPublishedFixture(t, s, 1, AutomaticUpdates)
 				require.NoError(t, s.Uninstall(context.Background()))
 			}
-			candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, func(context.Context) (VerifiedRelease, error) {
-				t.Fatal("automatic update discovered a release without installed consent")
-				return VerifiedRelease{}, nil
-			})
+			candidate, err := s.BeginPublishedInstall(
+				context.Background(),
+				ReleaseInstallOptions{
+					Operation: AutomaticReleaseUpdate,
+				},
+				func(context.Context) (VerifiedRelease, error) {
+					t.Fatal("automatic update discovered a release without installed consent")
+					return VerifiedRelease{}, nil
+				},
+			)
 			require.NoError(t, err)
 			require.Nil(t, candidate)
 		})
@@ -161,11 +191,17 @@ func TestPublishedDiscoverySerializesUninstallAndCancellation(t *testing.T) {
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
-		_, err := s.BeginPublishedInstall(ctx, ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, func(ctx context.Context) (VerifiedRelease, error) {
-			close(entered)
-			<-ctx.Done()
-			return VerifiedRelease{}, ctx.Err()
-		})
+		_, err := s.BeginPublishedInstall(
+			ctx,
+			ReleaseInstallOptions{
+				Operation: AutomaticReleaseUpdate,
+			},
+			func(ctx context.Context) (VerifiedRelease, error) {
+				close(entered)
+				<-ctx.Done()
+				return VerifiedRelease{}, ctx.Err()
+			},
+		)
 		done <- err
 	}()
 	<-entered
@@ -180,22 +216,37 @@ func TestPublishedDiscoverySerializesUninstallAndCancellation(t *testing.T) {
 	require.ErrorIs(t, <-done, context.Canceled)
 	require.NoError(t, other.Uninstall(context.Background()))
 	// A check starting after uninstall cannot resurrect the previous consent.
-	_, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, func(context.Context) (VerifiedRelease, error) {
-		t.Fatal("discovered after uninstall")
-		return VerifiedRelease{}, nil
-	})
+	_, err = s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		func(context.Context) (VerifiedRelease, error) {
+			t.Fatal("discovered after uninstall")
+			return VerifiedRelease{}, nil
+		},
+	)
 	require.NoError(t, err)
 }
 
 func TestPublishedInstallRefusesUnverifiedRelease(t *testing.T) {
 	s, _ := testStore(t)
 	for _, operation := range []ReleaseOperation{InstallRelease, RepairRelease} {
-		candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: operation, Updates: ManualUpdates},
-			func(context.Context) (VerifiedRelease, error) { return VerifiedRelease{}, nil })
+		candidate, err := s.BeginPublishedInstall(
+			context.Background(),
+			ReleaseInstallOptions{
+				Operation: operation,
+				Updates:   ManualUpdates,
+			},
+			func(context.Context) (VerifiedRelease, error) { return VerifiedRelease{}, nil },
+		)
 		require.Nil(t, candidate)
 		require.ErrorContains(t, err, "invalid runtime release format")
 	}
-	candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) { return VerifiedRelease{}, nil })
+	candidate, selected, err := s.BeginPublishedEnsure(
+		context.Background(),
+		func(context.Context) (VerifiedRelease, error) { return VerifiedRelease{}, nil },
+	)
 	require.Nil(t, candidate)
 	require.Nil(t, selected)
 	require.ErrorContains(t, err, "invalid runtime release format")
@@ -209,7 +260,14 @@ func TestPublishedInstallRefusesUnverifiedRelease(t *testing.T) {
 func TestCandidateManifestChangesDoNotReachSelection(t *testing.T) {
 	s, _ := testStore(t)
 	release, archive, load := publishedFixture(t, 1)
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: ManualUpdates}, load)
+	candidate, err := s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: InstallRelease,
+			Updates:   ManualUpdates,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	changed := candidate.Manifest()
 	changed.Bindings[0].Offset++
@@ -238,7 +296,9 @@ func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 		return nil, errors.New("unexpected archive acquisition")
 	})
 	t.Cleanup(func() { http.DefaultTransport = previous })
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: UpdateRelease},
+	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{
+		Operation: UpdateRelease,
+	},
 		func(context.Context) (VerifiedRelease, error) { return verifyFixture(moved) })
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
@@ -261,7 +321,14 @@ func TestPublishedCandidateFailurePreservesSelectedPolicy(t *testing.T) {
 	s, _ := testStore(t)
 	current := installPublishedFixture(t, s, 2, AutomaticUpdates)
 	_, archive, load := publishedFixture(t, 3)
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: ManualUpdates}, load)
+	candidate, err := s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: InstallRelease,
+			Updates:   ManualUpdates,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), archive))
 	// A caller aborts after failed qualification without Select.
@@ -271,7 +338,14 @@ func TestPublishedCandidateFailurePreservesSelectedPolicy(t *testing.T) {
 	require.Equal(t, current, *status.Release)
 	require.True(t, status.AutomaticUpdates)
 	_, _, same := publishedFixture(t, 2)
-	candidate, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: ManualUpdates}, same)
+	candidate, err = s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: InstallRelease,
+			Updates:   ManualUpdates,
+		},
+		same,
+	)
 	require.NoError(t, err)
 	require.Nil(t, candidate)
 	status, err = s.Inspect()
@@ -283,7 +357,14 @@ func TestPublishedSelectionUncertaintyRetainsOneCompleteRecord(t *testing.T) {
 	s, _ := testStore(t)
 	installPublishedFixture(t, s, 1, ManualUpdates)
 	next, archive, load := publishedFixture(t, 2)
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: AutomaticUpdates}, load)
+	candidate, err := s.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: InstallRelease,
+			Updates:   AutomaticUpdates,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), archive))
 	original := s.syncSelection
@@ -313,7 +394,10 @@ func TestPublishedRepairAllowsExplicitRecoveryAndRequiresDrain(t *testing.T) {
 	consumer, err := s.AcquireSelected()
 	require.NoError(t, err)
 	older, archive, load := publishedFixture(t, 1)
-	options := ReleaseInstallOptions{Operation: RepairRelease, Updates: ManualUpdates}
+	options := ReleaseInstallOptions{
+		Operation: RepairRelease,
+		Updates:   ManualUpdates,
+	}
 	_, err = s.BeginPublishedInstall(context.Background(), options, load)
 	require.ErrorIs(t, err, ErrInUse)
 	require.NoError(t, consumer.Close())
@@ -346,7 +430,11 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) {
 		calls++
 		require.Equal(t, ReleaseKeyringURL, r.URL.String())
-		return &http.Response{StatusCode: status, Body: io.NopCloser(bytes.NewReader(pgptest.Public(t, key))), Header: make(http.Header)}, nil
+		return &http.Response{
+			StatusCode: status,
+			Body:       io.NopCloser(bytes.NewReader(pgptest.Public(t, key))),
+			Header:     make(http.Header),
+		}, nil
 	})
 	load := func(ctx context.Context) (VerifiedRelease, error) {
 		trust, err := FetchReleaseKeyring(ctx)
@@ -355,7 +443,13 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 		}
 		return VerifyRelease(signed, trust)
 	}
-	candidate, err := store.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	candidate, err := store.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		load,
+	)
 	require.ErrorContains(t, err, "503")
 	require.Nil(t, candidate)
 	inspection, err := store.Inspect()
@@ -365,7 +459,13 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	require.Equal(t, 1, calls)
 	// The next attempt fetches trust afresh and can proceed under the same owner.
 	status = http.StatusOK
-	candidate, err = store.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: AutomaticReleaseUpdate}, load)
+	candidate, err = store.BeginPublishedInstall(
+		context.Background(),
+		ReleaseInstallOptions{
+			Operation: AutomaticReleaseUpdate,
+		},
+		load,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
 	require.NoError(t, candidate.Close())
@@ -384,10 +484,13 @@ func TestPublishedEnsurePreservesWarmSelectionWithoutDiscoveryOrInventory(t *tes
 			require.NoError(t, os.Mkdir(unrelated, 0700))
 			damage := filepath.Join(unrelated, "prepared.json")
 			require.NoError(t, os.WriteFile(damage, []byte("broken"), 0600))
-			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) {
-				t.Fatal("warm ensure invoked release discovery")
-				return VerifiedRelease{}, nil
-			})
+			candidate, selected, err := s.BeginPublishedEnsure(
+				context.Background(),
+				func(context.Context) (VerifiedRelease, error) {
+					t.Fatal("warm ensure invoked release discovery")
+					return VerifiedRelease{}, nil
+				},
+			)
 			require.NoError(t, err)
 			require.Nil(t, candidate)
 			require.Equal(t, current.Manifest, *selected)
@@ -423,10 +526,13 @@ func TestPublishedEnsureRefusesDamagedSelectionBeforeDiscovery(t *testing.T) {
 			}
 			before, err := os.ReadFile(path)
 			require.NoError(t, err)
-			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) {
-				t.Fatal("damaged ensure invoked release discovery")
-				return VerifiedRelease{}, nil
-			})
+			candidate, selected, err := s.BeginPublishedEnsure(
+				context.Background(),
+				func(context.Context) (VerifiedRelease, error) {
+					t.Fatal("damaged ensure invoked release discovery")
+					return VerifiedRelease{}, nil
+				},
+			)
 			require.ErrorIs(t, err, ErrDamaged)
 			require.Nil(t, candidate)
 			require.Nil(t, selected)
@@ -445,10 +551,13 @@ func TestPublishedEnsureRejectsStructuralPayloadAncestors(t *testing.T) {
 			path := filepath.Join(s.path, "generations", current.Manifest.Archive.SHA256, "node")
 			require.NoError(t, os.Rename(path, path+".saved"))
 			require.NoError(t, os.Symlink(target, path))
-			candidate, selected, err := s.BeginPublishedEnsure(context.Background(), func(context.Context) (VerifiedRelease, error) {
-				t.Fatal("damaged payload invoked release discovery")
-				return VerifiedRelease{}, nil
-			})
+			candidate, selected, err := s.BeginPublishedEnsure(
+				context.Background(),
+				func(context.Context) (VerifiedRelease, error) {
+					t.Fatal("damaged payload invoked release discovery")
+					return VerifiedRelease{}, nil
+				},
+			)
 			require.ErrorIs(t, err, ErrDamaged)
 			require.Nil(t, candidate)
 			require.Nil(t, selected)

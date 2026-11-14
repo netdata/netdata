@@ -133,7 +133,10 @@ func (s *Store) Finalize(
 		}
 		if info.Size() > FetchMaxBytes {
 			if err := source.Close(); err != nil {
-				return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, err)}
+				return nil, &CaptureError{
+					ID:  capture.ID,
+					Err: errors.Join(ErrTooLarge, err),
+				}
 			}
 			continue
 		}
@@ -153,7 +156,10 @@ func (s *Store) Finalize(
 			}, FetchMaxBytes+1),
 		)
 		if count > FetchMaxBytes {
-			copyErr = &CaptureError{ID: capture.ID, Err: errors.Join(copyErr, ErrTooLarge)}
+			copyErr = &CaptureError{
+				ID:  capture.ID,
+				Err: errors.Join(copyErr, ErrTooLarge),
+			}
 		}
 		closeErr := errors.Join(dest.Sync(), dest.Close(), source.Close())
 		if err = errors.Join(copyErr, closeErr); err != nil {

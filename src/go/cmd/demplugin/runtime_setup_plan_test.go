@@ -262,7 +262,14 @@ func TestRuntimeSetupPlanBuildOwnershipCannotBeChangedByRuntimeConfig(t *testing
 	runtimehost.DefaultMode = "native"
 	dir := t.TempDir()
 	root := filepath.Join(dir, "runtime")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			filepath.Join(dir, "dem.conf"),
+			[]byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)),
+			0600,
+		),
+	)
 	for _, args := range [][]string{nil, {"--root", root}} {
 		out, err := setupPlan(t, append([]string{"--config-dir", dir}, args...)...)
 		require.NoError(t, err)

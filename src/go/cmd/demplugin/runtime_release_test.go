@@ -24,8 +24,16 @@ func writeAdminRelease(t *testing.T, path string, manifest browserruntime.Manife
 	if manifest.Archive.URL == "" {
 		manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
 	}
-	release := browserruntime.Release{Format: 1, Sequence: 1, Manifest: manifest,
-		Sources: browserruntime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: manifest.Archive.SHA256, Bytes: 1}}
+	release := browserruntime.Release{
+		Format:   1,
+		Sequence: 1,
+		Manifest: manifest,
+		Sources: browserruntime.ReleaseSource{
+			URL:    "https://example.invalid/sources.tar.zst",
+			SHA256: manifest.Archive.SHA256,
+			Bytes:  1,
+		},
+	}
 	data, err := pgptest.Release(release, adminSigningKey(t))
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, data, 0600))

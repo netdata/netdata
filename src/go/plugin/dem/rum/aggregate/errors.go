@@ -23,7 +23,9 @@ func (r *windowRead) addError(v *activityObservation) {
 	}
 	g := r.errorGroups[fp]
 	if g == nil {
-		g = &errorPopulation{message: v.message}
+		g = &errorPopulation{
+			message: v.message,
+		}
 		r.errorGroups[fp] = g
 	}
 	g.count += v.errors

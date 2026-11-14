@@ -82,14 +82,21 @@ func (c Config) Validate() error {
 // ReleaseLoader selects canonical online trust only with network consent.
 // Offline imports require an explicit administrator-provisioned public keyring.
 // Call it under installation exclusion, never before checking update consent.
-func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (browserruntime.VerifiedRelease, error) {
+func (c Config) ReleaseLoader(
+	path string,
+	networkAllowed bool,
+) func(context.Context) (browserruntime.VerifiedRelease, error) {
 	return func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		if path == "" {
 			if !networkAllowed {
-				return browserruntime.VerifiedRelease{}, errors.New("release download requires explicit network consent")
+				return browserruntime.VerifiedRelease{}, errors.New(
+					"release download requires explicit network consent",
+				)
 			}
 			if c.ReleaseURL == "" {
-				return browserruntime.VerifiedRelease{}, errors.New("online runtime preparation requires runtime.release_url")
+				return browserruntime.VerifiedRelease{}, errors.New(
+					"online runtime preparation requires runtime.release_url",
+				)
 			}
 		}
 		var keys *browserruntime.ReleaseTrust
@@ -128,7 +135,9 @@ func (c Config) StoreConfig(varLibPath string) (browserruntime.Config, error) {
 	path := c.CachePath
 	if path == "" {
 		if !filepath.IsAbs(varLibPath) {
-			return browserruntime.Config{}, errors.New("runtime cache requires an absolute NETDATA_LIB_DIR or runtime.cache_path")
+			return browserruntime.Config{}, errors.New(
+				"runtime cache requires an absolute NETDATA_LIB_DIR or runtime.cache_path",
+			)
 		}
 		path = filepath.Join(varLibPath, "dem", "runtime")
 	}

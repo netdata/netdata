@@ -48,11 +48,24 @@ func newNativeFixture(t *testing.T) *nativeFixture {
 	require.NoError(t, err)
 	require.NoError(t, os.Chmod(path, 0755))
 	t.Cleanup(func() { require.NoError(t, os.RemoveAll(path)) })
-	fixture := &nativeFixture{config: NativeConfig{ControlPath: filepath.Join(path, "control"), PayloadPath: filepath.Join(path, "payload")}, uid: uid, gid: gid}
-	fixture.control, err = InitializeNativeControl(context.Background(), fixture.config, uid, gid, func(context.Context) error {
-		_, err := fixture.command(t, "initialize", nil).CombinedOutput()
-		return err
-	})
+	fixture := &nativeFixture{
+		config: NativeConfig{
+			ControlPath: filepath.Join(path, "control"),
+			PayloadPath: filepath.Join(path, "payload"),
+		},
+		uid: uid,
+		gid: gid,
+	}
+	fixture.control, err = InitializeNativeControl(
+		context.Background(),
+		fixture.config,
+		uid,
+		gid,
+		func(context.Context) error {
+			_, err := fixture.command(t, "initialize", nil).CombinedOutput()
+			return err
+		},
+	)
 	require.NoError(t, err)
 	fixture.manifest = fixture.installPayload(t, "first")
 	return fixture
@@ -84,7 +97,11 @@ func (f *nativeFixture) installPayload(t *testing.T, label string) Manifest {
 		}
 		return root.Chmod(name, mode)
 	}))
-	data, err := json.Marshal(NativePackage{Format: 1, Path: f.config.PayloadPath, Manifest: manifest})
+	data, err := json.Marshal(NativePackage{
+		Format:   1,
+		Path:     f.config.PayloadPath,
+		Manifest: manifest,
+	})
 	require.NoError(t, err)
 	require.NoError(t, writeNewFile(root, "native.json", data, 0644))
 	return manifest
@@ -99,8 +116,18 @@ func (f *nativeFixture) command(t *testing.T, action string, target *Manifest) *
 	manifest, err := json.Marshal(target)
 	require.NoError(t, err)
 	command := exec.Command(executable, "-test.run=^TestNativeServiceProcess$")
-	command.Env = append(os.Environ(), "DEM_NATIVE_ACTION="+action, "DEM_NATIVE_CONFIG="+string(config), "DEM_NATIVE_TARGET="+string(manifest))
-	command.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: uint32(f.uid), Gid: uint32(f.gid)}}
+	command.Env = append(
+		os.Environ(),
+		"DEM_NATIVE_ACTION="+action,
+		"DEM_NATIVE_CONFIG="+string(config),
+		"DEM_NATIVE_TARGET="+string(manifest),
+	)
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid: uint32(f.uid),
+			Gid: uint32(f.gid),
+		},
+	}
 	return command
 }
 
@@ -202,7 +229,13 @@ func nativeServiceProcess(action string) error {
 		}
 		if helper := os.Getenv("DEM_RUNTIME_TEST_HELPER"); helper != "" {
 			restore := ndexec.SetRunnerPathsForTests(helper, "")
-			process, err := ndexec.StartUnprivilegedProcessTree(context.Background(), ndexec.TreeOptions{Completion: use.Completion}, "/bin/true")
+			process, err := ndexec.StartUnprivilegedProcessTree(
+				context.Background(),
+				ndexec.TreeOptions{
+					Completion: use.Completion,
+				},
+				"/bin/true",
+			)
 			if err != nil {
 				restore()
 				return errors.Join(err, use.Finish(true))
@@ -340,7 +373,13 @@ func TestNativeReadyStateNeverReinitializesMissingProof(t *testing.T) {
 	_, err = os.Lstat(proof)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	called := false
-	_, err = InitializeNativeControl(ctx, f.config, f.uid, f.gid, func(context.Context) error { called = true; return nil })
+	_, err = InitializeNativeControl(
+		ctx,
+		f.config,
+		f.uid,
+		f.gid,
+		func(context.Context) error { called = true; return nil },
+	)
 	require.NoError(t, err)
 	require.False(t, called, "established state must not invoke bootstrap recovery")
 	require.Error(t, f.control.CloseAdmission(ctx, f.inspect(t)))
@@ -365,9 +404,15 @@ func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
 			case "writable-ancestor":
 				require.NoError(t, os.Chmod(filepath.Dir(f.config.PayloadPath), 0777))
 			case "foreign-owner":
-				require.NoError(t, os.Chown(filepath.Join(f.config.PayloadPath, f.manifest.Layout.EntryPoint), f.uid, f.gid))
+				require.NoError(
+					t,
+					os.Chown(filepath.Join(f.config.PayloadPath, f.manifest.Layout.EntryPoint), f.uid, f.gid),
+				)
 			case "misbound":
-				require.NoError(t, os.WriteFile(filepath.Join(f.config.PayloadPath, "chrome"), []byte("#!/bin/sh\nexit 0\n"), 0755))
+				require.NoError(
+					t,
+					os.WriteFile(filepath.Join(f.config.PayloadPath, "chrome"), []byte("#!/bin/sh\nexit 0\n"), 0755),
+				)
 			case "external-link":
 				require.NoError(t, os.Symlink("/bin/true", filepath.Join(f.config.PayloadPath, "outside")))
 			case "owner-only-execute":
@@ -375,7 +420,11 @@ func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
 				require.NoError(t, os.Chmod(filepath.Join(f.config.PayloadPath, f.manifest.Layout.Browser), 0744))
 			}
 			called := false
-			err := f.control.QualifyAndReady(context.Background(), f.inspect(t), func(context.Context, Manifest) error { called = true; return nil })
+			err := f.control.QualifyAndReady(
+				context.Background(),
+				f.inspect(t),
+				func(context.Context, Manifest) error { called = true; return nil },
+			)
 			require.Error(t, err)
 			require.False(t, called)
 		})
@@ -408,7 +457,11 @@ func TestNativeClosedInspectionDoesNotNeedPayload(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, status.empty())
 	called := false
-	err = f.control.QualifyAndReady(context.Background(), f.inspect(t), func(context.Context, Manifest) error { called = true; return nil })
+	err = f.control.QualifyAndReady(
+		context.Background(),
+		f.inspect(t),
+		func(context.Context, Manifest) error { called = true; return nil },
+	)
 	require.Error(t, err)
 	require.False(t, called)
 	data, err := f.command(t, "expect-closed", nil).CombinedOutput()
@@ -420,7 +473,13 @@ func TestNativeBootstrapInterruptionAndGateIdentity(t *testing.T) {
 	f.config.ControlPath += "-interrupted"
 	f.config.PayloadPath += "-interrupted"
 	ctx := context.Background()
-	_, err := InitializeNativeControl(ctx, f.config, f.uid, f.gid, func(context.Context) error { return errors.New("bootstrap fixture interrupted") })
+	_, err := InitializeNativeControl(
+		ctx,
+		f.config,
+		f.uid,
+		f.gid,
+		func(context.Context) error { return errors.New("bootstrap fixture interrupted") },
+	)
 	require.Error(t, err)
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
@@ -443,7 +502,13 @@ func TestNativeBootstrapInterruptionAndGateIdentity(t *testing.T) {
 	require.ErrorContains(t, err, "service UID/GID", "root cannot inspect receipts through the service API")
 	require.NoError(t, os.Rename(gate, gate+".saved"))
 	called := false
-	_, err = InitializeNativeControl(ctx, f.config, f.uid, f.gid, func(context.Context) error { called = true; return nil })
+	_, err = InitializeNativeControl(
+		ctx,
+		f.config,
+		f.uid,
+		f.gid,
+		func(context.Context) error { called = true; return nil },
+	)
 	require.Error(t, err)
 	require.False(t, called)
 	_, err = os.Lstat(gate)
@@ -454,7 +519,13 @@ func TestNativeMissingControlBesidePayloadIsNotFirstInstall(t *testing.T) {
 	f := newNativeFixture(t)
 	require.NoError(t, os.Rename(f.config.ControlPath, f.config.ControlPath+".lost"))
 	called := false
-	_, err := InitializeNativeControl(context.Background(), f.config, f.uid, f.gid, func(context.Context) error { called = true; return nil })
+	_, err := InitializeNativeControl(
+		context.Background(),
+		f.config,
+		f.uid,
+		f.gid,
+		func(context.Context) error { called = true; return nil },
+	)
 	require.ErrorContains(t, err, "existing payload")
 	require.False(t, called)
 	_, err = os.Lstat(f.config.ControlPath)
@@ -463,7 +534,10 @@ func TestNativeMissingControlBesidePayloadIsNotFirstInstall(t *testing.T) {
 
 func TestNativeMissingPackageIsUnavailable(t *testing.T) {
 	path := t.TempDir()
-	config := NativeConfig{ControlPath: filepath.Join(path, "control"), PayloadPath: filepath.Join(path, "payload")}
+	config := NativeConfig{
+		ControlPath: filepath.Join(path, "control"),
+		PayloadPath: filepath.Join(path, "payload"),
+	}
 	native, err := OpenNative(config)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.Nil(t, native)

@@ -54,7 +54,10 @@ func newFixture(t *testing.T, arch string) fixture {
 			Loader:       "lib/loader",
 			Fonts:        "fonts",
 		},
-		Bindings: []browserruntime.Binding{{Path: "bin/node", Offset: 42, Expected: []byte("loader\x00")}, {Path: "bin/chromium", Offset: 84, Expected: []byte("loader\x00")}},
+		Bindings: []browserruntime.Binding{
+			{Path: "bin/node", Offset: 42, Expected: []byte("loader\x00")},
+			{Path: "bin/chromium", Offset: 84, Expected: []byte("loader\x00")},
+		},
 	}
 	data, err := json.Marshal(m)
 	require.NoError(t, err)
@@ -62,7 +65,23 @@ func newFixture(t *testing.T, arch string) fixture {
 	return fixture{
 		dir:      dir,
 		manifest: m,
-		args:     []string{"sign", "--manifest", filepath.Join(dir, "manifest.json"), "--archive", filepath.Join(dir, "archive"), "--sources", filepath.Join(dir, "sources"), "--archive-url", "https://example.invalid/runtime.tar.zst", "--sources-url", "https://example.invalid/sources.tar.zst", "--sequence", "17", "--output", filepath.Join(dir, "release.json")},
+		args: []string{
+			"sign",
+			"--manifest",
+			filepath.Join(dir, "manifest.json"),
+			"--archive",
+			filepath.Join(dir, "archive"),
+			"--sources",
+			filepath.Join(dir, "sources"),
+			"--archive-url",
+			"https://example.invalid/runtime.tar.zst",
+			"--sources-url",
+			"https://example.invalid/sources.tar.zst",
+			"--sequence",
+			"17",
+			"--output",
+			filepath.Join(dir, "release.json"),
+		},
 	}
 }
 
@@ -79,7 +98,17 @@ func newSigningFixture(t *testing.T, arch string) fixture {
 }
 
 func (f fixture) verifyArgs() []string {
-	return []string{"verify", "--key", filepath.Join(f.dir, "public.gpg"), "--release", filepath.Join(f.dir, "release.json"), "--archive", filepath.Join(f.dir, "archive"), "--sources", filepath.Join(f.dir, "sources")}
+	return []string{
+		"verify",
+		"--key",
+		filepath.Join(f.dir, "public.gpg"),
+		"--release",
+		filepath.Join(f.dir, "release.json"),
+		"--archive",
+		filepath.Join(f.dir, "archive"),
+		"--sources",
+		filepath.Join(f.dir, "sources"),
+	}
 }
 
 func TestSignVerifyBothArchitectures(t *testing.T) {
@@ -127,7 +156,14 @@ func TestSignRejectsInvalidInputs(t *testing.T) {
 			f := newSigningFixture(t, "amd64")
 			switch kind {
 			case "digest":
-				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "archive"), bytes.Repeat([]byte("x"), int(f.manifest.Archive.Bytes)), 0600))
+				require.NoError(
+					t,
+					os.WriteFile(
+						filepath.Join(f.dir, "archive"),
+						bytes.Repeat([]byte("x"), int(f.manifest.Archive.Bytes)),
+						0600,
+					),
+				)
 			case "size":
 				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "archive"), []byte("short"), 0600))
 			case "unknown", "trailing", "oversize":
@@ -169,7 +205,10 @@ func TestVerifyRequiresAuthenticationAndArtifactIntegrity(t *testing.T) {
 			require.NoError(t, run(f.args, io.Discard))
 			switch kind {
 			case "wrong-key":
-				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, pgptest.Key(t, 8)), 0600))
+				require.NoError(
+					t,
+					os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, pgptest.Key(t, 8)), 0600),
+				)
 			case "tampered":
 				p := filepath.Join(f.dir, "release.json")
 				data, err := os.ReadFile(p)
@@ -233,7 +272,18 @@ func TestStageNativeRejectsInvalidInputs(t *testing.T) {
 	output := filepath.Join(f.dir, "payload")
 	// This signed-tool fixture has a valid manifest and matching bytes but no tar
 	// structure: staging must reject it through the shared production extractor.
-	err := run([]string{"stage-native", "--manifest", filepath.Join(f.dir, "manifest.json"), "--archive", filepath.Join(f.dir, "archive"), "--output", output}, io.Discard)
+	err := run(
+		[]string{
+			"stage-native",
+			"--manifest",
+			filepath.Join(f.dir, "manifest.json"),
+			"--archive",
+			filepath.Join(f.dir, "archive"),
+			"--output",
+			output,
+		},
+		io.Discard,
+	)
 	require.Error(t, err)
 	assert.NoFileExists(t, filepath.Join(output, "native.json"))
 }
@@ -246,7 +296,19 @@ func gpgFixture(t *testing.T) (string, []byte) {
 	home := t.TempDir()
 	require.NoError(t, os.Chmod(home, 0700))
 	t.Setenv("GNUPGHOME", home)
-	command := exec.Command("gpg", "--batch", "--pinentry-mode", "loopback", "--passphrase", "", "--quick-generate-key", "DEM release test <release@example.invalid>", "rsa2048", "sign", "1d")
+	command := exec.Command(
+		"gpg",
+		"--batch",
+		"--pinentry-mode",
+		"loopback",
+		"--passphrase",
+		"",
+		"--quick-generate-key",
+		"DEM release test <release@example.invalid>",
+		"rsa2048",
+		"sign",
+		"1d",
+	)
 	output, err := command.CombinedOutput()
 	require.NoError(t, err, string(output))
 	output, err = exec.Command("gpg", "--batch", "--with-colons", "--list-keys").Output()

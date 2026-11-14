@@ -185,7 +185,13 @@ func botDifferentialInputs(t *testing.T) []string {
 		re, err := syntax.Parse(entry, syntax.Perl)
 		require.NoError(t, err)
 		sample := botEntrySample(re)
-		require.Truef(t, regexp.MustCompile(entry).MatchString(sample), "sample %q does not match entry %q", sample, entry)
+		require.Truef(
+			t,
+			regexp.MustCompile(entry).MatchString(sample),
+			"sample %q does not match entry %q",
+			sample,
+			entry,
+		)
 		samples = append(samples, sample)
 	}
 	fold := strings.NewReplacer("s", "ſ", "S", "ſ", "k", "K", "i", "İ")

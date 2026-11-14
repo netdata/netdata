@@ -59,7 +59,10 @@ func (s *Store) Begin(runID, jobID, vnodeGUID string) (_ string, retErr error) {
 	if err := syncExternalDir("/tmp"); err != nil {
 		return "", err
 	}
-	s.active[runID] = captureOwner{JobID: jobID, VnodeGUID: vnodeGUID}
+	s.active[runID] = captureOwner{
+		JobID:     jobID,
+		VnodeGUID: vnodeGUID,
+	}
 	return workAlias(runID), nil
 }
 

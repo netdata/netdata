@@ -36,7 +36,11 @@ func TestAssetsHTTP(t *testing.T) {
 			assert.Empty(t, rec.Header().Get("Access-Control-Allow-Credentials"))
 			assert.Equal(t, "cross-origin", rec.Header().Get("Cross-Origin-Resource-Policy"))
 			assert.Equal(t, "public, max-age=31536000, immutable", rec.Header().Get("Cache-Control"))
-			assert.Equal(t, "<"+strings.TrimPrefix(faro.NoticesPath, "assets/")+">; rel=\"license\"", rec.Header().Get("Link"))
+			assert.Equal(
+				t,
+				"<"+strings.TrimPrefix(faro.NoticesPath, "assets/")+">; rel=\"license\"",
+				rec.Header().Get("Link"),
+			)
 			for _, condition := range []string{expected.ETag, "W/" + expected.ETag, `"different", ` + expected.ETag, "*"} {
 				req = httptest.NewRequest(http.MethodGet, "/rum/"+path, nil)
 				req.Header.Set("If-None-Match", condition)

@@ -133,7 +133,12 @@ func validateEvent(event synthetic.Event) error {
 // in that order.
 func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterResult) error {
 	switch result.Status {
-	case synthetic.Success, synthetic.Failed, synthetic.Timeout, synthetic.Inconclusive, synthetic.Error, synthetic.Cancelled:
+	case synthetic.Success,
+		synthetic.Failed,
+		synthetic.Timeout,
+		synthetic.Inconclusive,
+		synthetic.Error,
+		synthetic.Cancelled:
 	default:
 		return errors.New("invalid terminal outcome")
 	}
@@ -186,7 +191,8 @@ func validateTermination(kind synthetic.Kind, result *reporterResult) error {
 	default:
 		return errors.New("unsupported runner termination reason")
 	}
-	if len(result.InterruptedArtifacts) > 0 && (kind != synthetic.Journey || result.TerminationReason != synthetic.ExecutionBudget) {
+	if len(result.InterruptedArtifacts) > 0 &&
+		(kind != synthetic.Journey || result.TerminationReason != synthetic.ExecutionBudget) {
 		return errors.New("interrupted captures require a journey budget stop")
 	}
 	return nil
@@ -218,7 +224,8 @@ func validateJourneyResult(result *reporterResult) error {
 			return errors.New("journey success requires every declared ordinary test to pass")
 		}
 	case synthetic.Inconclusive:
-		if tests == nil || tests.Failed > 0 || tests.TimedOut > 0 || tests.Declared > 0 && tests.Passed == tests.Declared {
+		if tests == nil || tests.Failed > 0 || tests.TimedOut > 0 ||
+			tests.Declared > 0 && tests.Passed == tests.Declared {
 			return errors.New("inconclusive journey contradicts test outcomes")
 		}
 	case synthetic.Failed:

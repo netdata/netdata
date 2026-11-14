@@ -274,7 +274,11 @@ func TestFunctionAvailabilityFromCapturesAlone(t *testing.T) {
 	assertAvailability(t, components, false, false)
 	require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
 	require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<p>report</p>"), 0600))
-	_, err = captures.Finalize(t.Context(), id, []synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}})
+	_, err = captures.Finalize(
+		t.Context(),
+		id,
+		[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
+	)
 	require.NoError(t, err)
 	assertAvailability(t, components, false, true)
 	require.NoError(t, captures.Close())
@@ -352,19 +356,31 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 	runs := synthetichistory.NewStore(journalStore)
 	for i, association := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		_, err := rum.AppendEvent(ctx, rumhistory.EventRecord{
-			Site: "browser-traffic", VnodeGUID: association, SessionID: "same-session",
-			ObservedUS: now + int64(i), Type: "pageview", Page: "/",
+			Site:       "browser-traffic",
+			VnodeGUID:  association,
+			SessionID:  "same-session",
+			ObservedUS: now + int64(i),
+			Type:       "pageview",
+			Page:       "/",
 		})
 		require.NoError(t, err)
 		_, err = runs.AppendRun(ctx, "complete", synthetic.Run{
-			ID:    []string{"run-storefront", "run-documentation", "run-unassigned"}[i],
-			JobID: "journey:checkout", Kind: synthetic.Journey, Name: "checkout", VnodeGUID: association,
-			StartedUS: now + int64(i), CompletedUS: now + int64(i) + 1, Outcome: synthetic.Success,
+			ID:          []string{"run-storefront", "run-documentation", "run-unassigned"}[i],
+			JobID:       "journey:checkout",
+			Kind:        synthetic.Journey,
+			Name:        "checkout",
+			VnodeGUID:   association,
+			StartedUS:   now + int64(i),
+			CompletedUS: now + int64(i) + 1,
+			Outcome:     synthetic.Success,
 		})
 		require.NoError(t, err)
 	}
 	require.NoError(t, runs.Sync(ctx))
-	components := dem.New(dem.Dependencies{History: journalStore, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
+	components := dem.New(dem.Dependencies{
+		History:   journalStore,
+		Artifacts: privateCaptures(t),
+	}, dem.DefaultConfig())
 	for name, tc := range map[string]struct {
 		method string
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
@@ -375,7 +391,9 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			for _, association := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
 				response := tc.handle(ctx, funcapi.RawMethodRequest{
-					Method: tc.method, Args: []string{"vnode_guid:" + association}, Permissions: "0x7b",
+					Method:      tc.method,
+					Args:        []string{"vnode_guid:" + association},
+					Permissions: "0x7b",
 				})
 				require.NotNil(t, response.RawResponse)
 				rows := response.RawResponse["data"].([][]any)
@@ -398,7 +416,11 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 				index := response.RawResponse["columns"].(map[string]any)["vnode_guid"].(map[string]any)["index"].(int)
 				groups = append(groups, row[index])
 			}
-			assert.ElementsMatch(t, []any{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""}, groups)
+			assert.ElementsMatch(
+				t,
+				[]any{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""},
+				groups,
+			)
 		})
 	}
 }

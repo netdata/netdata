@@ -159,7 +159,11 @@ func errorText(err error) string {
 
 func (h *Host) Status() Snapshot {
 	h.mu.Lock()
-	result := Snapshot{Mode: h.mode, State: h.state, SetupError: errorText(h.setupErr)}
+	result := Snapshot{
+		Mode:       h.mode,
+		State:      h.state,
+		SetupError: errorText(h.setupErr),
+	}
 	maintenance := h.maintenanceErrorLocked()
 	if h.identity != nil {
 		identity := *h.identity
@@ -177,7 +181,8 @@ func (h *Host) Status() Snapshot {
 		status, err := h.store.Inspect()
 		result.Storage = &status
 		result.StorageError = errorText(err)
-		if result.Storage.Selected != nil && result.Storage.SelectionError == "" && result.Storage.InventoryError == "" {
+		if result.Storage.Selected != nil && result.Storage.SelectionError == "" &&
+			result.Storage.InventoryError == "" {
 			result.RestartRequired = result.Running == nil || *result.Running != result.Storage.Selected.Identity()
 		}
 	}
@@ -197,7 +202,11 @@ func (h *Host) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{use: use, host: h, identity: *h.identity}, nil
+	return managedUse{
+		use:      use,
+		host:     h,
+		identity: *h.identity,
+	}, nil
 }
 
 // Run maintains storage independently of monitoring configuration. It never

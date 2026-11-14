@@ -70,7 +70,13 @@ var checksColumns = rawfunc.Columns[registry.Job]{
 	column("name", "Name", funcapi.FieldTypeString, "", func(j registry.Job) any { return j.Name }),
 	column("target", "Target", funcapi.FieldTypeString, "", func(j registry.Job) any { return j.Target }),
 	column("state", "Current state", funcapi.FieldTypeString, "", func(j registry.Job) any { return string(j.State) }),
-	column("fresh", "Last observation fresh", funcapi.FieldTypeBoolean, "", func(j registry.Job) any { return j.Fresh }),
+	column(
+		"fresh",
+		"Last observation fresh",
+		funcapi.FieldTypeBoolean,
+		"",
+		func(j registry.Job) any { return j.Fresh },
+	),
 	column("run_id", "Last run", funcapi.FieldTypeString, "", func(j registry.Job) any { return j.Latest.ID }),
 	column("outcome", "Last outcome", funcapi.FieldTypeString, "", func(j registry.Job) any {
 		return string(j.Latest.Outcome)
@@ -96,10 +102,34 @@ var checksColumns = rawfunc.Columns[registry.Job]{
 	column("check_every", "Check interval", funcapi.FieldTypeInteger, "s", func(j registry.Job) any {
 		return int(j.Interval / time.Second)
 	}),
-	column("scheduled", "Scheduled occurrences", funcapi.FieldTypeInteger, "", func(j registry.Job) any { return j.Scheduled }),
-	column("admitted", "Admitted attempts", funcapi.FieldTypeInteger, "", func(j registry.Job) any { return j.Admitted }),
-	column("coalesced", "Coalesced occurrences", funcapi.FieldTypeInteger, "", func(j registry.Job) any { return j.Coalesced }),
-	column("pending", "Pending occurrence", funcapi.FieldTypeBoolean, "", func(j registry.Job) any { return j.Pending }),
+	column(
+		"scheduled",
+		"Scheduled occurrences",
+		funcapi.FieldTypeInteger,
+		"",
+		func(j registry.Job) any { return j.Scheduled },
+	),
+	column(
+		"admitted",
+		"Admitted attempts",
+		funcapi.FieldTypeInteger,
+		"",
+		func(j registry.Job) any { return j.Admitted },
+	),
+	column(
+		"coalesced",
+		"Coalesced occurrences",
+		funcapi.FieldTypeInteger,
+		"",
+		func(j registry.Job) any { return j.Coalesced },
+	),
+	column(
+		"pending",
+		"Pending occurrence",
+		funcapi.FieldTypeBoolean,
+		"",
+		func(j registry.Job) any { return j.Pending },
+	),
 	column("queue_age", "Oldest admission wait", funcapi.FieldTypeFloat, "s", func(j registry.Job) any {
 		if j.QueuedUS <= 0 {
 			return nil

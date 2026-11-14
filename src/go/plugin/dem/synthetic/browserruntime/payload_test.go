@@ -73,7 +73,10 @@ func TestBindingRejectsPayloadBeyondAbsolutePathLimit(t *testing.T) {
 	for i := range m.Bindings {
 		m.Bindings[i].Expected = make([]byte, 4096)
 		require.NoError(t, plainParents(root, m.Bindings[i].Path))
-		require.NoError(t, writeNewFile(root, m.Bindings[i].Path, append(make([]byte, 32), m.Bindings[i].Expected...), 0500))
+		require.NoError(
+			t,
+			writeNewFile(root, m.Bindings[i].Path, append(make([]byte, 32), m.Bindings[i].Expected...), 0500),
+		)
 	}
 	require.NoError(t, root.Mkdir("lib", 0700))
 	require.NoError(t, writeNewFile(root, m.Layout.Loader, []byte("loader"), 0500))

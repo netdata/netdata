@@ -73,7 +73,11 @@ func localName(name string) bool {
 
 // Identity names this release in run results, qualification and status.
 func (m Manifest) Identity() synthetic.RuntimeIdentity {
-	return synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
+	return synthetic.RuntimeIdentity{
+		Version:  m.Version,
+		SHA256:   m.Archive.SHA256,
+		Contract: m.Contract,
+	}
 }
 
 func (m Manifest) Validate() error {
@@ -81,10 +85,16 @@ func (m Manifest) Validate() error {
 		return errors.New("invalid runtime identity or platform")
 	}
 	if m.Contract != synthetic.ExecutionContract {
-		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d); upgrade the Agent or select a compatible runtime release", m.Contract, synthetic.ExecutionContract)
+		return fmt.Errorf(
+			"unsupported runtime execution contract %d (Agent supports %d); upgrade the Agent or select a compatible runtime release",
+			m.Contract,
+			synthetic.ExecutionContract,
+		)
 	}
 	a := m.Archive
-	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 || a.Bytes == math.MaxInt64 || a.TarBytes == math.MaxInt64 {
+	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 ||
+		a.Bytes == math.MaxInt64 ||
+		a.TarBytes == math.MaxInt64 {
 		return errors.New("invalid runtime archive bounds")
 	}
 	// Offline-only manifests may omit a URL; they retain the same digest checks.

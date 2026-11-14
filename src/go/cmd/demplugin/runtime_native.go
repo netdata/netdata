@@ -54,7 +54,9 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 		if err := browserruntime.InitializeNativeProof(config); err != nil {
 			return err
 		}
-		return json.NewEncoder(stdout).Encode(nativeInitialized{Initialized: true})
+		return json.NewEncoder(stdout).Encode(nativeInitialized{
+			Initialized: true,
+		})
 	}
 	var target browserruntime.Manifest
 	if command == "native-qualify" {
@@ -90,7 +92,12 @@ func inspectNative(native *browserruntime.Native, stdout io.Writer) error {
 	return json.NewEncoder(stdout).Encode(status)
 }
 
-func qualifyNative(ctx context.Context, native *browserruntime.Native, target browserruntime.Manifest, stdout io.Writer) error {
+func qualifyNative(
+	ctx context.Context,
+	native *browserruntime.Native,
+	target browserruntime.Manifest,
+	stdout io.Writer,
+) error {
 	candidate, err := native.AcquireCandidate(target)
 	if err != nil {
 		return err
@@ -137,33 +144,54 @@ type nativePhase struct {
 
 // closeNativeAdmission initializes the service proof through the service child
 // and closes package admission.
-func closeNativeAdmission(ctx context.Context, config browserruntime.NativeConfig, identity nativeIdentity, child *nativeChild, inspect browserruntime.NativeInspector, stdout io.Writer) error {
-	control, err := browserruntime.InitializeNativeControl(ctx, config, int(identity.uid), int(identity.gid), func(ctx context.Context) error {
-		data, err := child.run(ctx, "native-initialize", nil)
-		if err != nil {
-			return err
-		}
-		var reply nativeInitialized
-		if err := decodeNativeProtocol(bytes.NewReader(data), &reply); err != nil {
-			return err
-		}
-		if !reply.Initialized {
-			return errors.New("native service proof initialization was not confirmed")
-		}
-		return nil
-	})
+func closeNativeAdmission(
+	ctx context.Context,
+	config browserruntime.NativeConfig,
+	identity nativeIdentity,
+	child *nativeChild,
+	inspect browserruntime.NativeInspector,
+	stdout io.Writer,
+) error {
+	control, err := browserruntime.InitializeNativeControl(
+		ctx,
+		config,
+		int(identity.uid),
+		int(identity.gid),
+		func(ctx context.Context) error {
+			data, err := child.run(ctx, "native-initialize", nil)
+			if err != nil {
+				return err
+			}
+			var reply nativeInitialized
+			if err := decodeNativeProtocol(bytes.NewReader(data), &reply); err != nil {
+				return err
+			}
+			if !reply.Initialized {
+				return errors.New("native service proof initialization was not confirmed")
+			}
+			return nil
+		},
+	)
 	if err != nil {
 		return err
 	}
 	if err := control.CloseAdmission(ctx, inspect); err != nil {
 		return err
 	}
-	return json.NewEncoder(stdout).Encode(nativePhase{Phase: "closed"})
+	return json.NewEncoder(stdout).Encode(nativePhase{
+		Phase: "closed",
+	})
 }
 
 // configureNative qualifies the admitted target as the service UID and marks
 // the native runtime ready.
-func configureNative(ctx context.Context, config browserruntime.NativeConfig, child *nativeChild, inspect browserruntime.NativeInspector, stdout io.Writer) error {
+func configureNative(
+	ctx context.Context,
+	config browserruntime.NativeConfig,
+	child *nativeChild,
+	inspect browserruntime.NativeInspector,
+	stdout io.Writer,
+) error {
 	control, err := browserruntime.OpenNativeControl(config)
 	if err != nil {
 		return err
@@ -181,7 +209,9 @@ func configureNative(ctx context.Context, config browserruntime.NativeConfig, ch
 	}); err != nil {
 		return err
 	}
-	return json.NewEncoder(stdout).Encode(nativePhase{Phase: "ready"})
+	return json.NewEncoder(stdout).Encode(nativePhase{
+		Phase: "ready",
+	})
 }
 
 func decodeNativeProtocol(reader io.Reader, value any) error {
@@ -228,7 +258,10 @@ func verifyNativeQualification(data []byte, target browserruntime.Manifest) erro
 	if err := decodeNativeProtocol(bytes.NewReader(data), &qualification); err != nil {
 		return err
 	}
-	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney || !qualification.SandboxedLocalLighthouse || !qualification.ProcessTreeDrained || qualification.Runtime == nil {
+	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney ||
+		!qualification.SandboxedLocalLighthouse ||
+		!qualification.ProcessTreeDrained ||
+		qualification.Runtime == nil {
 		return errors.New("native service did not confirm complete, drained qualification")
 	}
 	if *qualification.Runtime != target.Identity() {

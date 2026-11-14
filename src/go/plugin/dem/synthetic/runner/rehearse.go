@@ -54,7 +54,8 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 func rehearsalFailureText(run synthetic.Run) string {
 	var lines []string
 	// The contextual first-failure summary already carries an identical core error.
-	if e := run.FailureEvidence; run.Error != "" && (e == nil || e.FirstFailure == nil || e.FirstFailure.Message != run.Error) {
+	if e := run.FailureEvidence; run.Error != "" &&
+		(e == nil || e.FirstFailure == nil || e.FirstFailure.Message != run.Error) {
 		lines = append(lines, run.Error)
 	}
 	for _, d := range run.Diagnostics() {

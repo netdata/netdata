@@ -24,16 +24,40 @@ func evidenceRecord(record string, key string, value any) string {
 }
 
 func evidenceStart(id string) synthetic.EvidenceTest {
-	return synthetic.EvidenceTest{ID: id, Title: "Checkout", Status: "running", ExpectedStatus: "passed", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 2, Column: 1}}
+	return synthetic.EvidenceTest{
+		ID:             id,
+		Title:          "Checkout",
+		Status:         "running",
+		ExpectedStatus: "passed",
+		Location: &synthetic.EvidenceLocation{
+			File:   "journey.spec.ts",
+			Line:   2,
+			Column: 1,
+		},
+	}
 }
 
 func evidenceStep(id, parent string) synthetic.EvidenceStep {
-	return synthetic.EvidenceStep{ID: id, TestID: "t1", ParentID: parent, Title: "Submit order", Category: "test.step", State: "running", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 3, Column: 2}}
+	return synthetic.EvidenceStep{
+		ID:       id,
+		TestID:   "t1",
+		ParentID: parent,
+		Title:    "Submit order",
+		Category: "test.step",
+		State:    "running",
+		Location: &synthetic.EvidenceLocation{
+			File:   "journey.spec.ts",
+			Line:   3,
+			Column: 2,
+		},
+	}
 }
 
 func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence, sinkSnapshot) {
 	t.Helper()
-	snapshot := consumeWithResult(t, synthetic.Request{Kind: synthetic.Journey}, nil, success(), lines...)
+	snapshot := consumeWithResult(t, synthetic.Request{
+		Kind: synthetic.Journey,
+	}, nil, success(), lines...)
 	return snapshot.evidence, snapshot
 }
 
@@ -42,28 +66,64 @@ func TestEvidenceNegotiationAndOptionalErrors(t *testing.T) {
 		lines  []string
 		status string
 	}{
-		"old runtime":             {nil, "unavailable"},
-		"declined":                {[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`}, "unsupported"},
-		"accepted":                {[]string{evidenceInit}, "partial"},
-		"complete":                {[]string{evidenceInit, evidenceRecord("complete", "", nil)}, "complete"},
-		"missing init body":       {[]string{`{"type":"extension_init"}`}, "invalid"},
-		"null init":               {[]string{`{"type":"extension_init","extension_init":null}`}, "invalid"},
-		"scalar init":             {[]string{`{"type":"extension_init","extension_init":3}`}, "invalid"},
-		"missing selected":        {[]string{`{"type":"extension_init","extension_init":{}}`}, "invalid"},
-		"unrequested":             {[]string{`{"type":"extension_init","extension_init":{"selected":["unknown.v1"]}}`}, "invalid"},
-		"duplicate":               {[]string{evidenceInit, evidenceInit}, "invalid"},
-		"late":                    {[]string{`{"type":"event","event":{"kind":"suite","at_ms":0}}`, evidenceInit}, "invalid"},
-		"missing extension body":  {[]string{evidenceInit, `{"type":"extension"}`}, "invalid"},
-		"null extension body":     {[]string{evidenceInit, `{"type":"extension","extension":null}`}, "invalid"},
-		"scalar data":             {[]string{evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":4}}`}, "invalid"},
-		"unknown variant":         {[]string{evidenceInit, evidenceRecord("future", "", nil)}, "invalid"},
-		"after completion":        {[]string{evidenceInit, evidenceRecord("complete", "", nil), evidenceRecord("complete", "", nil)}, "invalid"},
-		"unknown feature":         {[]string{evidenceInit, `{"type":"extension","extension":{"feature":"future.v1","data":{"anything":true}}}`}, "partial"},
-		"unselected feature":      {[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`, evidenceRecord("complete", "", nil)}, "unsupported"},
-		"unknown init member":     {[]string{`{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1"],"future":true}}`}, "invalid"},
-		"unknown envelope member": {[]string{evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","future":true,"data":{"record":"complete"}}}`}, "invalid"},
-		"data before init":        {[]string{evidenceRecord("complete", "", nil), evidenceInit}, "invalid"},
-		"additive fields":         {[]string{evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","future":{"private":"discard"}}}}`}, "complete"},
+		"old runtime": {nil, "unavailable"},
+		"declined": {
+			[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`},
+			"unsupported",
+		},
+		"accepted":          {[]string{evidenceInit}, "partial"},
+		"complete":          {[]string{evidenceInit, evidenceRecord("complete", "", nil)}, "complete"},
+		"missing init body": {[]string{`{"type":"extension_init"}`}, "invalid"},
+		"null init":         {[]string{`{"type":"extension_init","extension_init":null}`}, "invalid"},
+		"scalar init":       {[]string{`{"type":"extension_init","extension_init":3}`}, "invalid"},
+		"missing selected":  {[]string{`{"type":"extension_init","extension_init":{}}`}, "invalid"},
+		"unrequested": {
+			[]string{`{"type":"extension_init","extension_init":{"selected":["unknown.v1"]}}`},
+			"invalid",
+		},
+		"duplicate": {[]string{evidenceInit, evidenceInit}, "invalid"},
+		"late": {
+			[]string{`{"type":"event","event":{"kind":"suite","at_ms":0}}`, evidenceInit},
+			"invalid",
+		},
+		"missing extension body": {[]string{evidenceInit, `{"type":"extension"}`}, "invalid"},
+		"null extension body":    {[]string{evidenceInit, `{"type":"extension","extension":null}`}, "invalid"},
+		"scalar data": {
+			[]string{evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":4}}`},
+			"invalid",
+		},
+		"unknown variant": {[]string{evidenceInit, evidenceRecord("future", "", nil)}, "invalid"},
+		"after completion": {
+			[]string{evidenceInit, evidenceRecord("complete", "", nil), evidenceRecord("complete", "", nil)},
+			"invalid",
+		},
+		"unknown feature": {
+			[]string{evidenceInit, `{"type":"extension","extension":{"feature":"future.v1","data":{"anything":true}}}`},
+			"partial",
+		},
+		"unselected feature": {
+			[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`, evidenceRecord("complete", "", nil)},
+			"unsupported",
+		},
+		"unknown init member": {
+			[]string{`{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1"],"future":true}}`},
+			"invalid",
+		},
+		"unknown envelope member": {
+			[]string{
+				evidenceInit,
+				`{"type":"extension","extension":{"feature":"failure_evidence.v1","future":true,"data":{"record":"complete"}}}`,
+			},
+			"invalid",
+		},
+		"data before init": {[]string{evidenceRecord("complete", "", nil), evidenceInit}, "invalid"},
+		"additive fields": {
+			[]string{
+				evidenceInit,
+				`{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","future":{"private":"discard"}}}}`,
+			},
+			"complete",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -84,16 +144,27 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 		"two values":               `{"type":"extension"} {}`,
 		"core unknown key":         `{"type":"event","event":{"kind":"suite","new":true}}`,
 		"core bad enum":            `{"type":"event","event":{"kind":"future"}}`,
-		"oversize":                 `{"type":"extension","extension":{"data":"` + strings.Repeat("x", frameMaxBytes) + `"}}`,
+		"oversize": `{"type":"extension","extension":{"data":"` + strings.Repeat(
+			"x",
+			frameMaxBytes,
+		) + `"}}`,
 	}
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
+			s := newSink(synthetic.Request{
+				Kind: synthetic.Journey,
+			}, newRedactor(nil))
 			require.Error(t, s.consume(strings.NewReader(evidenceInit+"\n"+line)))
 		})
 	}
-	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	require.ErrorContains(t, s.consume(strings.NewReader(resultLine(success())+"\n"+evidenceInit)), "after its terminal")
+	s := newSink(synthetic.Request{
+		Kind: synthetic.Journey,
+	}, newRedactor(nil))
+	require.ErrorContains(
+		t,
+		s.consume(strings.NewReader(resultLine(success())+"\n"+evidenceInit)),
+		"after its terminal",
+	)
 }
 
 func TestEvidenceUpsertsAndPreservesFirstFailureAcrossLaterInterruption(t *testing.T) {
@@ -107,13 +178,27 @@ func TestEvidenceUpsertsAndPreservesFirstFailureAcrossLaterInterruption(t *testi
 	stepEnd.Message = "expected checkout confirmation"
 	path := stepEnd
 	path.Message = ""
-	failure := synthetic.FailureDetail{Test: end, Path: []synthetic.EvidenceStep{path}, Message: stepEnd.Message}
+	failure := synthetic.FailureDetail{
+		Test:    end,
+		Path:    []synthetic.EvidenceStep{path},
+		Message: stepEnd.Message,
+	}
 	second := evidenceStart("t2")
 	second.Title = "Login"
 	pending := evidenceStep("s2", "")
 	pending.TestID = "t2"
 	pending.Title = "Waiting for login"
-	e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("test", "test", test), evidenceRecord("step", "step", step), evidenceRecord("step", "step", stepEnd), evidenceRecord("test", "test", end), evidenceRecord("failure", "failure", failure), evidenceRecord("test", "test", second), evidenceRecord("step", "step", pending))
+	e, _ := consumeEvidence(
+		t,
+		evidenceInit,
+		evidenceRecord("test", "test", test),
+		evidenceRecord("step", "step", step),
+		evidenceRecord("step", "step", stepEnd),
+		evidenceRecord("test", "test", end),
+		evidenceRecord("failure", "failure", failure),
+		evidenceRecord("test", "test", second),
+		evidenceRecord("step", "step", pending),
+	)
 	require.Equal(t, "partial", e.ReportingStatus())
 	assert.Equal(t, &synthetic.FailureEvidence{
 		Availability: "supported",
@@ -142,7 +227,19 @@ func TestEvidenceCapsKeepLifecycleUpdatesAndLateFailure(t *testing.T) {
 	test := evidenceStart("late")
 	test.Status = "failed"
 	test.ReportingComplete = true
-	lines = append(lines, evidenceRecord("failure", "failure", synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{}, Message: "late assertion"}), evidenceRecord("complete", "", nil))
+	lines = append(
+		lines,
+		evidenceRecord(
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:    test,
+				Path:    []synthetic.EvidenceStep{},
+				Message: "late assertion",
+			},
+		),
+		evidenceRecord("complete", "", nil),
+	)
 	e, _ := consumeEvidence(t, lines...)
 	require.Equal(t, "complete", e.ReportingStatus())
 	assert.ElementsMatch(t, []string{"tests", "user_steps"}, e.Truncated)
@@ -165,7 +262,13 @@ func TestEvidenceInvalidUpdateDiscardsOnlyDisputedItem(t *testing.T) {
 	bad.Title = "different identity"
 	bad.Status = "passed"
 	bad.ReportingComplete = true
-	e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("test", "test", first), evidenceRecord("test", "test", second), evidenceRecord("test", "test", bad))
+	e, _ := consumeEvidence(
+		t,
+		evidenceInit,
+		evidenceRecord("test", "test", first),
+		evidenceRecord("test", "test", second),
+		evidenceRecord("test", "test", bad),
+	)
 	require.Equal(t, "invalid", e.ReportingStatus())
 	require.Len(t, e.Tests, 1)
 	assert.Equal(t, "t1", e.Tests[0].ID)
@@ -177,10 +280,18 @@ func TestEvidenceExpectedStatusIsObservedAtEnd(t *testing.T) {
 	end.Status = "failed"
 	end.ExpectedStatus = "failed"
 	end.ReportingComplete = true
-	e, _ := consumeEvidence(t, evidenceInit, evidenceRecord("test", "test", start), evidenceRecord("test", "test", end), evidenceRecord("complete", "", nil))
+	e, _ := consumeEvidence(
+		t,
+		evidenceInit,
+		evidenceRecord("test", "test", start),
+		evidenceRecord("test", "test", end),
+		evidenceRecord("complete", "", nil),
+	)
 	require.Equal(t, "complete", e.ReportingStatus())
 	assert.Equal(t, "failed", e.Tests[0].ExpectedStatus)
-	e, _ = consumeEvidence(t, evidenceInit, evidenceRecord("failure", "failure", synthetic.FailureDetail{Test: end}))
+	e, _ = consumeEvidence(t, evidenceInit, evidenceRecord("failure", "failure", synthetic.FailureDetail{
+		Test: end,
+	}))
 	assert.Equal(t, "invalid", e.ReportingStatus(), "expected failure cannot be presented as unexpected")
 }
 
@@ -193,8 +304,23 @@ func TestEvidenceRedactsBeforePersistenceAndSnapshotsOwnData(t *testing.T) {
 	step.Title = "private-value"
 	step.Message = "token=private-value"
 	step.TextTruncated = true
-	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "private-value"}))
-	require.NoError(t, s.consume(strings.NewReader(strings.Join([]string{evidenceInit, evidenceRecord("test", "test", test), evidenceRecord("step", "step", step)}, "\n"))))
+	s := newSink(
+		synthetic.Request{
+			Kind: synthetic.Journey,
+		},
+		newRedactor(map[string]string{"DEM_SECRET_TOKEN": "private-value"}),
+	)
+	require.NoError(
+		t,
+		s.consume(
+			strings.NewReader(
+				strings.Join(
+					[]string{evidenceInit, evidenceRecord("test", "test", test), evidenceRecord("step", "step", step)},
+					"\n",
+				),
+			),
+		),
+	)
 	snapshot := s.snapshot()
 	raw, err := json.Marshal(snapshot.evidence)
 	require.NoError(t, err)
@@ -217,15 +343,27 @@ func TestEvidencePayloadAndSourceBoundsAreNonfatal(t *testing.T) {
 			assert.Equal(t, "invalid", e.ReportingStatus())
 		})
 	}
-	e, _ := consumeEvidence(t, evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","large":"`+strings.Repeat("x", extensionBodyLimit)+`"}}}`)
+	e, _ := consumeEvidence(
+		t,
+		evidenceInit,
+		`{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","large":"`+strings.Repeat(
+			"x",
+			extensionBodyLimit,
+		)+`"}}}`,
+	)
 	assert.Equal(t, "invalid", e.ReportingStatus())
 }
 
 func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 	test := evidenceStart("t1")
 	test.Status, test.ReportingComplete = "failed", true
-	failure := synthetic.FailureDetail{Test: test, Message: strings.Repeat("token=a ", 200) + strings.Repeat("z", 400)}
-	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
+	failure := synthetic.FailureDetail{
+		Test:    test,
+		Message: strings.Repeat("token=a ", 200) + strings.Repeat("z", 400),
+	}
+	s := newSink(synthetic.Request{
+		Kind: synthetic.Journey,
+	}, newRedactor(nil))
 	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("failure", "failure", failure))))
 	got := s.snapshot().evidence.FirstFailure
 	require.NotNil(t, got)
@@ -237,10 +375,17 @@ func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 func TestStopContextIsProtectedAndIndependentOfFirstFailure(t *testing.T) {
 	failureTest := evidenceStart("earlier")
 	failureTest.Status, failureTest.ReportingComplete = "failed", true
-	failure := synthetic.FailureDetail{Test: failureTest, Message: "earlier assertion", Path: []synthetic.EvidenceStep{}}
+	failure := synthetic.FailureDetail{
+		Test:    failureTest,
+		Message: "earlier assertion",
+		Path:    []synthetic.EvidenceStep{},
+	}
 	stoppedTest := evidenceStart("t1")
 	stoppedTest.Status, stoppedTest.ReportingComplete = "interrupted", true
-	stop := synthetic.FailureDetail{Test: stoppedTest, Path: []synthetic.EvidenceStep{evidenceStep("late", "")}}
+	stop := synthetic.FailureDetail{
+		Test: stoppedTest,
+		Path: []synthetic.EvidenceStep{evidenceStep("late", "")},
+	}
 	lines := []string{evidenceInit, evidenceRecord("failure", "failure", failure)}
 	for n := 0; n < evidenceUserStepLimit; n++ {
 		step := evidenceStep(fmt.Sprintf("s%d", n), "")
@@ -287,8 +432,16 @@ func TestStopContextRedactionAndSnapshotOwnership(t *testing.T) {
 	test.Status, test.ReportingComplete = "timedOut", true
 	step := evidenceStep("s", "")
 	step.Title = "secret-value"
-	stop := synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}}
-	sink := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "secret-value"}))
+	stop := synthetic.FailureDetail{
+		Test: test,
+		Path: []synthetic.EvidenceStep{step},
+	}
+	sink := newSink(
+		synthetic.Request{
+			Kind: synthetic.Journey,
+		},
+		newRedactor(map[string]string{"DEM_SECRET_TOKEN": "secret-value"}),
+	)
 	require.NoError(t, sink.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("stop", "stop", stop))))
 	snapshot := sink.snapshot()
 	encoded, err := json.Marshal(snapshot.evidence)
@@ -348,30 +501,151 @@ func TestEvidenceWireBounds(t *testing.T) {
 		want        string
 	}
 	cases := map[string]testCase{
-		"test ID at limit":         {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart(text(128)); return v }(), "partial"},
-		"test ID past limit":       {"test", "test", evidenceStart(text(129)), "invalid"},
-		"title at limit":           {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(256); return v }(), "partial"},
-		"title past limit":         {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(257); return v }(), "invalid"},
-		"source at limit":          {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(256); return v }(), "partial"},
-		"source past limit":        {"test", "test", func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(257); return v }(), "invalid"},
-		"test at all budgets":      {"test", "test", maximalTest(), "partial"},
-		"step ID at limit":         {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep(text(64), ""); return v }(), "partial"},
-		"step ID past limit":       {"step", "step", evidenceStep(text(65), ""), "invalid"},
-		"parent ID at limit":       {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", text(64)); v.ParentOmitted = true; return v }(), "partial"},
-		"parent ID past limit":     {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", text(65)); v.ParentOmitted = true; return v }(), "invalid"},
-		"category at limit":        {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(64); return v }(), "partial"},
-		"category past limit":      {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(65); return v }(), "invalid"},
-		"step message at limit":    {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1024); return v }(), "partial"},
-		"step message past limit":  {"step", "step", func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1025); return v }(), "invalid"},
-		"step bytes at limit":      {"step", "step", sizedStep(2048), "partial"},
-		"step bytes past limit":    {"step", "step", sizedStep(2049), "invalid"},
-		"path at limit":            {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(16)}, "partial"},
-		"path past limit":          {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(17)}, "invalid"},
-		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit)}, "partial"},
-		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit+1)}, "invalid"},
-		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", textLimit)}, "partial"},
-		"omitted ancestors safe":   {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger}, "partial"},
-		"omitted ancestors unsafe": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger + 1}, "invalid"},
+		"test ID at limit": {
+			"test",
+			"test",
+			func() synthetic.EvidenceTest { v := evidenceStart(text(128)); return v }(),
+			"partial",
+		},
+		"test ID past limit": {"test", "test", evidenceStart(text(129)), "invalid"},
+		"title at limit": {
+			"test",
+			"test",
+			func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(256); return v }(),
+			"partial",
+		},
+		"title past limit": {
+			"test",
+			"test",
+			func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Title = text(257); return v }(),
+			"invalid",
+		},
+		"source at limit": {
+			"test",
+			"test",
+			func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(256); return v }(),
+			"partial",
+		},
+		"source past limit": {
+			"test",
+			"test",
+			func() synthetic.EvidenceTest { v := evidenceStart("t1"); v.Location.File = text(257); return v }(),
+			"invalid",
+		},
+		"test at all budgets": {"test", "test", maximalTest(), "partial"},
+		"step ID at limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep(text(64), ""); return v }(),
+			"partial",
+		},
+		"step ID past limit": {"step", "step", evidenceStep(text(65), ""), "invalid"},
+		"parent ID at limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", text(64)); v.ParentOmitted = true; return v }(),
+			"partial",
+		},
+		"parent ID past limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", text(65)); v.ParentOmitted = true; return v }(),
+			"invalid",
+		},
+		"category at limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(64); return v }(),
+			"partial",
+		},
+		"category past limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Category = text(65); return v }(),
+			"invalid",
+		},
+		"step message at limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1024); return v }(),
+			"partial",
+		},
+		"step message past limit": {
+			"step",
+			"step",
+			func() synthetic.EvidenceStep { v := evidenceStep("s1", ""); v.Message = text(1025); return v }(),
+			"invalid",
+		},
+		"step bytes at limit":   {"step", "step", sizedStep(2048), "partial"},
+		"step bytes past limit": {"step", "step", sizedStep(2049), "invalid"},
+		"path at limit": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test: ended(evidenceStart("t1")),
+				Path: chain(16),
+			},
+			"partial",
+		},
+		"path past limit": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test: ended(evidenceStart("t1")),
+				Path: chain(17),
+			},
+			"invalid",
+		},
+		"message at rune limit": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:    ended(evidenceStart("t1")),
+				Path:    []synthetic.EvidenceStep{},
+				Message: strings.Repeat("é", textLimit),
+			},
+			"partial",
+		},
+		"message past rune limit": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:    ended(evidenceStart("t1")),
+				Path:    []synthetic.EvidenceStep{},
+				Message: strings.Repeat("é", textLimit+1),
+			},
+			"invalid",
+		},
+		"message at widest escape": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:    ended(evidenceStart("t1")),
+				Path:    []synthetic.EvidenceStep{},
+				Message: strings.Repeat("\x01", textLimit),
+			},
+			"partial",
+		},
+		"omitted ancestors safe": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:             ended(evidenceStart("t1")),
+				Path:             []synthetic.EvidenceStep{},
+				OmittedAncestors: maxSafeInteger,
+			},
+			"partial",
+		},
+		"omitted ancestors unsafe": {
+			"failure",
+			"failure",
+			synthetic.FailureDetail{
+				Test:             ended(evidenceStart("t1")),
+				Path:             []synthetic.EvidenceStep{},
+				OmittedAncestors: maxSafeInteger + 1,
+			},
+			"invalid",
+		},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -405,10 +679,20 @@ func TestExtensionBodyBound(t *testing.T) {
 	}
 	// Insignificant whitespace pads the frozen-key init body to an exact size.
 	initBody := func(n int) string {
-		return `{"type":"extension_init","extension_init":` + sized(`{"selected":["failure_evidence.v1","browser_summary.v1"]`, " ", `}`, n) + `}`
+		return `{"type":"extension_init","extension_init":` + sized(
+			`{"selected":["failure_evidence.v1","browser_summary.v1"]`,
+			" ",
+			`}`,
+			n,
+		) + `}`
 	}
 	envelope := func(n int) string {
-		return `{"type":"extension","extension":` + sized(`{"feature":"failure_evidence.v1","data":{"record":"complete","pad":"`, "x", `"}}`, n) + `}`
+		return `{"type":"extension","extension":` + sized(
+			`{"feature":"failure_evidence.v1","data":{"record":"complete","pad":"`,
+			"x",
+			`"}}`,
+			n,
+		) + `}`
 	}
 	for name, tc := range map[string]struct {
 		lines []string

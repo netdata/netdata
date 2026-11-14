@@ -16,7 +16,19 @@ import (
 const captureInit = `{"type":"extension_init","extension_init":{"selected":["failure_evidence.v1","capture_details.v1","browser_summary.v1"]}}`
 
 func captureTest(id string, accepted, unaccepted int64) map[string]any {
-	return map[string]any{"record": "test", "test": synthetic.CaptureTest{ArtifactTest: synthetic.ArtifactTest{ID: id, Title: "Checkout"}, Status: "failed", ExpectedStatus: "passed", Accepted: accepted, Unaccepted: unaccepted}}
+	return map[string]any{
+		"record": "test",
+		"test": synthetic.CaptureTest{
+			ArtifactTest: synthetic.ArtifactTest{
+				ID:    id,
+				Title: "Checkout",
+			},
+			Status:         "failed",
+			ExpectedStatus: "passed",
+			Accepted:       accepted,
+			Unaccepted:     unaccepted,
+		},
+	}
 }
 
 func captureLink(id, testID string) map[string]any {
@@ -27,7 +39,11 @@ func consumeCaptures(t *testing.T, lines ...string) sinkSnapshot {
 	t.Helper()
 	result := success()
 	result.CaptureState = "not_needed"
-	request := synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true}
+	request := synthetic.Request{
+		Kind:                synthetic.Journey,
+		Capture:             true,
+		BrowserErrorSummary: true,
+	}
 	return consumeWithResult(t, request, map[string]string{"token": "synthetic-secret"}, result, lines...)
 }
 
@@ -62,13 +78,23 @@ func TestCaptureAssociationRetainsMixedOmissionsAndRedacts(t *testing.T) {
 	value := test["test"].(synthetic.CaptureTest)
 	value.Title = "synthetic-secret " + strings.Repeat("x", 220)
 	test["test"] = value
-	s := consumeCaptures(t, captureInit, extensionLine(captureDetailsFeature, test), extensionLine(captureDetailsFeature, captureLink("s1", "t1")), extensionLine(captureDetailsFeature, captureLink("s2", "t1")), extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
+	s := consumeCaptures(
+		t,
+		captureInit,
+		extensionLine(captureDetailsFeature, test),
+		extensionLine(captureDetailsFeature, captureLink("s1", "t1")),
+		extensionLine(captureDetailsFeature, captureLink("s2", "t1")),
+		extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}),
+	)
 	require.Len(t, s.captures.Tests, 1)
 	require.Len(t, s.captures.Associations, 2)
 	assert.Equal(t, int64(1), s.captures.Tests[0].Unaccepted)
 	assert.Contains(t, s.captures.Tests[0].Title, "[REDACTED]")
 	assert.NotContains(t, s.captures.Tests[0].Title, "synthetic-secret")
-	run := synthetic.Run{CaptureState: "available", Captures: s.captures}
+	run := synthetic.Run{
+		CaptureState: "available",
+		Captures:     s.captures,
+	}
 	candidates := []synthetic.Capture{{ID: "s1"}}
 	joinCaptures(&run, candidates, []synthetic.Capture{{ID: "s2"}})
 	assert.Equal(t, "t1", candidates[0].Test.ID)
@@ -86,11 +112,21 @@ func TestCaptureAssociationRetainsMixedOmissionsAndRedacts(t *testing.T) {
 
 func TestCaptureConflictingIdentityIsNotRetained(t *testing.T) {
 	for _, conflict := range []map[string]any{captureLink("s1", "t2"), captureTest("t1", 1, 0)} {
-		s := consumeCaptures(t, captureInit, extensionLine(captureDetailsFeature, captureTest("t1", 1, 0)), extensionLine(captureDetailsFeature, captureTest("t2", 0, 0)), extensionLine(captureDetailsFeature, captureLink("s1", "t1")), extensionLine(captureDetailsFeature, conflict))
+		s := consumeCaptures(
+			t,
+			captureInit,
+			extensionLine(captureDetailsFeature, captureTest("t1", 1, 0)),
+			extensionLine(captureDetailsFeature, captureTest("t2", 0, 0)),
+			extensionLine(captureDetailsFeature, captureLink("s1", "t1")),
+			extensionLine(captureDetailsFeature, conflict),
+		)
 		assert.Equal(t, "invalid", s.captures.Reporting)
 		assert.Empty(t, s.captures.Associations)
 		candidates := []synthetic.Capture{{ID: "s1"}}
-		joinCaptures(&synthetic.Run{CaptureState: "available", Captures: s.captures}, candidates, nil)
+		joinCaptures(&synthetic.Run{
+			CaptureState: "available",
+			Captures:     s.captures,
+		}, candidates, nil)
 		assert.Empty(t, candidates[0].Test.ID)
 	}
 }
@@ -101,23 +137,39 @@ func TestCaptureDetailLimitNeverLimitsCandidateAuthority(t *testing.T) {
 	for i := 0; i < 150; i++ {
 		id := fmt.Sprintf("t%d", i)
 		capture := fmt.Sprintf("s%d", i)
-		lines = append(lines, extensionLine(captureDetailsFeature, captureTest(id, 1, 0)), extensionLine(captureDetailsFeature, captureLink(capture, id)))
-		candidates = append(candidates, synthetic.Capture{ID: capture})
+		lines = append(
+			lines,
+			extensionLine(captureDetailsFeature, captureTest(id, 1, 0)),
+			extensionLine(captureDetailsFeature, captureLink(capture, id)),
+		)
+		candidates = append(candidates, synthetic.Capture{
+			ID: capture,
+		})
 	}
 	lines = append(lines, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 	s := consumeCaptures(t, lines...)
 	assert.Equal(t, "complete", s.captures.Reporting)
 	assert.True(t, s.captures.Truncated)
 	assert.Equal(t, captureDetailLimit, len(s.captures.Tests)+len(s.captures.Associations))
-	joinCaptures(&synthetic.Run{CaptureState: "available", Captures: s.captures}, candidates, nil)
+	joinCaptures(&synthetic.Run{
+		CaptureState: "available",
+		Captures:     s.captures,
+	}, candidates, nil)
 	assert.Len(t, candidates, 150)
 	assert.Equal(t, "t0", candidates[0].Test.ID)
 	assert.Empty(t, candidates[149].Test.ID)
 }
 
 func TestCaptureMetadataCannotWidenCoreWire(t *testing.T) {
-	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true}, newRedactor(nil))
-	err := s.consume(strings.NewReader(`{"type":"result","result":{"status":"failed","capture_state":"available","artifacts":[{"id":"s1","kind":"screenshot","path":"output/x.png","mime":"image/png","test":{"id":"t1"}}]}}`))
+	s := newSink(synthetic.Request{
+		Kind:    synthetic.Journey,
+		Capture: true,
+	}, newRedactor(nil))
+	err := s.consume(
+		strings.NewReader(
+			`{"type":"result","result":{"status":"failed","capture_state":"available","artifacts":[{"id":"s1","kind":"screenshot","path":"output/x.png","mime":"image/png","test":{"id":"t1"}}]}}`,
+		),
+	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown field "test"`)
 }
@@ -152,10 +204,21 @@ func TestTraceSupportReporting(t *testing.T) {
 		"unrequested selection":   {lines: []string{selected}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true, Trace: tc.trace}, newRedactor(nil))
+			s := newSink(
+				synthetic.Request{
+					Kind:                synthetic.Journey,
+					Capture:             true,
+					BrowserErrorSummary: true,
+					Trace:               tc.trace,
+				},
+				newRedactor(nil),
+			)
 			r := success()
 			r.CaptureState = "not_needed"
-			terminal, err := json.Marshal(frame{Type: "result", Result: &r})
+			terminal, err := json.Marshal(frame{
+				Type:   "result",
+				Result: &r,
+			})
 			require.NoError(t, err)
 			require.NoError(t, s.consume(strings.NewReader(strings.Join(append(tc.lines, string(terminal)), "\n"))))
 			snap := s.snapshot()
@@ -186,17 +249,40 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 				"malformed": `{"type":"extension_init","extension_init":{"selected":null}}`,
 			} {
 				t.Run(fmt.Sprintf("trace=%t/interrupted=%t/%s", trace, interrupted, name), func(t *testing.T) {
-					candidate := synthetic.Capture{ID: "trace1", Kind: "trace", MIME: "application/zip", Path: "output/trace.zip"}
-					r := reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, CaptureState: "available", Artifacts: []synthetic.Capture{candidate}}
+					candidate := synthetic.Capture{
+						ID:   "trace1",
+						Kind: "trace",
+						MIME: "application/zip",
+						Path: "output/trace.zip",
+					}
+					r := reporterResult{
+						Status: synthetic.Failed,
+						Tests: &synthetic.TestCounts{
+							Declared: 1,
+							Failed:   1,
+						},
+						CaptureState: "available",
+						Artifacts:    []synthetic.Capture{candidate},
+					}
 					if interrupted {
 						r.Status = synthetic.Timeout
 						r.TerminationReason = synthetic.ExecutionBudget
 						r.Artifacts = nil
 						r.InterruptedArtifacts = []synthetic.Capture{candidate}
 					}
-					raw, err := json.Marshal(frame{Type: "result", Result: &r})
+					raw, err := json.Marshal(frame{
+						Type:   "result",
+						Result: &r,
+					})
 					require.NoError(t, err)
-					s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, Trace: trace}, newRedactor(nil))
+					s := newSink(
+						synthetic.Request{
+							Kind:    synthetic.Journey,
+							Capture: true,
+							Trace:   trace,
+						},
+						newRedactor(nil),
+					)
 					err = s.consume(strings.NewReader(strings.TrimSpace(init + "\n" + string(raw))))
 					if trace {
 						require.NoError(t, err)

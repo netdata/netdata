@@ -19,12 +19,21 @@ func TestRedactedCutsUnfinishedPEMAtItsMarker(t *testing.T) {
 		value string
 		want  string
 	}{
-		"ascii prefix":         {value: "key: -----BEGIN PRIVATE KEY-----\nMIIsecretkeymaterial", want: "key: [REDACTED]"},
-		"lowercase marker":     {value: "-----begin private key-----\nMIIsecret", want: "[REDACTED]"},
-		"longer when lowered":  {value: grows + "-----BEGIN PRIVATE KEY-----\nMIIsecretkeymaterialMIIsecretkeymaterial", want: grows + "[REDACTED]"},
-		"marker near the end":  {value: grows + "-----BEGIN ", want: grows + "[REDACTED]"},
-		"shorter when lowered": {value: shrinks + "-----BEGIN PRIVATE KEY-----\nMIIsecret", want: shrinks + "[REDACTED]"},
-		"no marker":            {value: grows + " plain text", want: grows + " plain text"},
+		"ascii prefix": {
+			value: "key: -----BEGIN PRIVATE KEY-----\nMIIsecretkeymaterial",
+			want:  "key: [REDACTED]",
+		},
+		"lowercase marker": {value: "-----begin private key-----\nMIIsecret", want: "[REDACTED]"},
+		"longer when lowered": {
+			value: grows + "-----BEGIN PRIVATE KEY-----\nMIIsecretkeymaterialMIIsecretkeymaterial",
+			want:  grows + "[REDACTED]",
+		},
+		"marker near the end": {value: grows + "-----BEGIN ", want: grows + "[REDACTED]"},
+		"shorter when lowered": {
+			value: shrinks + "-----BEGIN PRIVATE KEY-----\nMIIsecret",
+			want:  shrinks + "[REDACTED]",
+		},
+		"no marker": {value: grows + " plain text", want: grows + " plain text"},
 	}
 	r := newRedactor(nil)
 	for name, tc := range tests {

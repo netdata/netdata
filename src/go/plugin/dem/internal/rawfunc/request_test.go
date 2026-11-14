@@ -29,7 +29,9 @@ func TestPermitted(t *testing.T) {
 		"all":             {permissions: "0xffff", member: true, admin: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			req := funcapi.RawMethodRequest{Permissions: tc.permissions}
+			req := funcapi.RawMethodRequest{
+				Permissions: tc.permissions,
+			}
 			assert.Equal(t, tc.member, Permitted(req, MemberAccess))
 			assert.Equal(t, tc.admin, Permitted(req, AdminAccess))
 			if tc.member {
@@ -46,7 +48,9 @@ func TestNoPayload(t *testing.T) {
 	assert.Equal(
 		t,
 		funcapi.ErrorResponse(400, "this read-only Function does not accept a payload"),
-		NoPayload(funcapi.RawMethodRequest{Payload: []byte(`{}`)}),
+		NoPayload(funcapi.RawMethodRequest{
+			Payload: []byte(`{}`),
+		}),
 	)
 }
 
@@ -57,15 +61,32 @@ func TestParseArgs(t *testing.T) {
 		want map[string]string
 		err  string
 	}{
-		"none":              {want: map[string]string{}},
-		"accepted":          {req: funcapi.RawMethodRequest{Args: []string{"site:shop", "after:-60"}}, want: map[string]string{"site": "shop", "after": "-60"}},
-		"empty value":       {req: funcapi.RawMethodRequest{Args: []string{"site:"}}, want: map[string]string{"site": ""}},
-		"value with colon":  {req: funcapi.RawMethodRequest{Args: []string{"site:a:b"}}, want: map[string]string{"site": "a:b"}},
-		"info word on info": {req: funcapi.RawMethodRequest{Info: true, Args: []string{"info", "site:shop"}}, want: map[string]string{"site": "shop"}},
-		"info word on data": {req: funcapi.RawMethodRequest{Args: []string{"info"}}, err: "expected key:value argument"},
-		"bare word":         {req: funcapi.RawMethodRequest{Args: []string{"shop"}}, err: "expected key:value argument"},
-		"unsupported":       {req: funcapi.RawMethodRequest{Args: []string{"limit:1"}}, err: `unsupported argument "limit"`},
-		"duplicate":         {req: funcapi.RawMethodRequest{Args: []string{"site:a", "site:b"}}, err: `duplicate argument "site"`},
+		"none": {want: map[string]string{}},
+		"accepted": {req: funcapi.RawMethodRequest{
+			Args: []string{"site:shop", "after:-60"},
+		}, want: map[string]string{"site": "shop", "after": "-60"}},
+		"empty value": {req: funcapi.RawMethodRequest{
+			Args: []string{"site:"},
+		}, want: map[string]string{"site": ""}},
+		"value with colon": {req: funcapi.RawMethodRequest{
+			Args: []string{"site:a:b"},
+		}, want: map[string]string{"site": "a:b"}},
+		"info word on info": {req: funcapi.RawMethodRequest{
+			Info: true,
+			Args: []string{"info", "site:shop"},
+		}, want: map[string]string{"site": "shop"}},
+		"info word on data": {req: funcapi.RawMethodRequest{
+			Args: []string{"info"},
+		}, err: "expected key:value argument"},
+		"bare word": {req: funcapi.RawMethodRequest{
+			Args: []string{"shop"},
+		}, err: "expected key:value argument"},
+		"unsupported": {req: funcapi.RawMethodRequest{
+			Args: []string{"limit:1"},
+		}, err: `unsupported argument "limit"`},
+		"duplicate": {req: funcapi.RawMethodRequest{
+			Args: []string{"site:a", "site:b"},
+		}, err: `duplicate argument "site"`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			got, err := ParseArgs(tc.req, accepted)
