@@ -611,7 +611,7 @@ Sites:
 - These objects have no site inventory or reconfiguration API.
 - The registry admits references to those exact owners; it does not construct them.
 - The route records the last rejected origin; a replacement runtime starts without it.
-- Aggregation and each exporter reject an observation for another site before changing state.
+- One site job feeds only its own aggregator, exporters and history writer, so they do not re-check the site name.
 - Native `Name` identifies the site; `DisplayName` is presentation metadata.
 
 ### Installation bootstrap

@@ -45,7 +45,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 				KeepErrors: true,
 			},
 		})
-		w := history.NewWriter(job, store, discardCounters{})
+		w := history.NewWriter(store, discardCounters{})
 		a.SetHistorySink(w)
 		route := httpapi.NewRoute(config.Site{
 			Name: job,
@@ -70,8 +70,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 			Received:     at,
 			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "doc", Revision: 1}},
 		}
-		result := r.a.Ingest(b)
-		require.True(t, result.Accepted)
+		r.a.Ingest(b)
 		assert.Equal(t, "spoofed", b.VnodeGUID, "ingestion must not mutate the browser observation")
 		b.Events = nil
 		b.Received = at.Add(time.Microsecond)

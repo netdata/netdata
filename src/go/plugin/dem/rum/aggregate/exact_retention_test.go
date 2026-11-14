@@ -67,8 +67,8 @@ func TestReceiverActivityExpiresWithoutPublication(t *testing.T) {
 		for second := range 181 {
 			*now = t0.Add(time.Duration(second) * time.Second)
 			if rejected {
-				a.Reject("s", beacon.RejectRate)
-				a.Reject("s", beacon.RejectBot)
+				a.Reject(beacon.RejectRate)
+				a.Reject(beacon.RejectBot)
 			} else {
 				a.Ingest(&beacon.Beacon{Site: "s", Received: *now})
 			}

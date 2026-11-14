@@ -23,7 +23,7 @@ import (
 type recSink struct {
 	mu       sync.Mutex
 	ingested []*beacon.Beacon
-	rejects  map[string]int // site+"/"+reason → n
+	rejects  map[string]int // reason → n
 }
 
 func newRecSink() *recSink {
@@ -38,10 +38,10 @@ func (r *recSink) Ingest(b *beacon.Beacon) {
 	r.ingested = append(r.ingested, b)
 }
 
-func (r *recSink) Reject(site, reason string) {
+func (r *recSink) Reject(reason string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.rejects[site+"/"+reason]++
+	r.rejects[reason]++
 }
 
 func (r *recSink) snapshot() (int, map[string]int) {
@@ -140,7 +140,7 @@ func TestCollectOriginPolicy(t *testing.T) {
 		"wildcard never matches the bare domain": {
 			hdr: map[string]string{
 				"Origin": "https://example.org",
-			}, wantStatus: 403, wantReject: "shop/rejected_origin",
+			}, wantStatus: 403, wantReject: "rejected_origin",
 		},
 		"default port normalized": {
 			hdr: map[string]string{
@@ -150,18 +150,18 @@ func TestCollectOriginPolicy(t *testing.T) {
 		"scheme must match": {
 			hdr: map[string]string{
 				"Origin": "http://shop.example.com",
-			}, wantStatus: 403, wantReject: "shop/rejected_origin",
+			}, wantStatus: 403, wantReject: "rejected_origin",
 		},
 		"wrong origin": {
 			hdr: map[string]string{
 				"Origin": "https://evil.example.net",
-			}, wantStatus: 403, wantReject: "shop/rejected_origin",
+			}, wantStatus: 403, wantReject: "rejected_origin",
 		},
 		"missing origin and referer": {
-			hdr: map[string]string{}, wantStatus: 403, wantReject: "shop/rejected_origin",
+			hdr: map[string]string{}, wantStatus: 403, wantReject: "rejected_origin",
 		},
 		"null origin": {
-			hdr: map[string]string{"Origin": "null"}, wantStatus: 403, wantReject: "shop/rejected_origin",
+			hdr: map[string]string{"Origin": "null"}, wantStatus: 403, wantReject: "rejected_origin",
 		},
 		"referer fallback": {
 			hdr: map[string]string{
@@ -287,7 +287,7 @@ func TestBodyLimits(t *testing.T) {
 		"oversize body": {
 			body:       `{"meta":{},"pad":"` + strings.Repeat("x", 3000) + `"}`,
 			wantStatus: 413,
-			wantReject: "shop/rejected_size",
+			wantReject: "rejected_size",
 		},
 		"exactly at cap": {
 			body:       `{"meta":{},"pad":"` + strings.Repeat("x", 2048-len(`{"meta":{},"pad":""}`)) + `"}`,
@@ -296,10 +296,10 @@ func TestBodyLimits(t *testing.T) {
 		"one over cap": {
 			body:       `{"meta":{},"pad":"` + strings.Repeat("x", 2049-len(`{"meta":{},"pad":""}`)) + `"}`,
 			wantStatus: 413,
-			wantReject: "shop/rejected_size",
+			wantReject: "rejected_size",
 		},
-		"bad json":        {body: `{"meta":`, wantStatus: 400, wantReject: "shop/invalid"},
-		"not json at all": {body: `hello`, wantStatus: 400, wantReject: "shop/invalid"},
+		"bad json":        {body: `{"meta":`, wantStatus: 400, wantReject: "invalid"},
+		"not json at all": {body: `hello`, wantStatus: 400, wantReject: "invalid"},
 		"empty object ok": {body: `{}`, wantStatus: 202},
 		"valid faro":      {body: faroBody, wantStatus: 202},
 	}
@@ -347,7 +347,7 @@ func TestOversizeWithoutContentLength(t *testing.T) {
 		t.Fatalf("status %d want 413", resp.StatusCode)
 	}
 	_, rejects := sink.snapshot()
-	if rejects["shop/rejected_size"] != 1 {
+	if rejects["rejected_size"] != 1 {
 		t.Fatalf("rejects %v", rejects)
 	}
 }
@@ -369,7 +369,7 @@ func TestPerIPRateLimit(t *testing.T) {
 		t.Fatalf("6th request: status %d retry-after %q", resp.StatusCode, resp.Header.Get("Retry-After"))
 	}
 	n, rejects := sink.snapshot()
-	if n != 5 || rejects["shop/rejected_rate"] != 1 {
+	if n != 5 || rejects["rejected_rate"] != 1 {
 		t.Fatalf("ingested %d rejects %v", n, rejects)
 	}
 
@@ -408,7 +408,7 @@ func TestPerSiteRateLimit(t *testing.T) {
 		t.Fatalf("4th request: status %d want 429", resp.StatusCode)
 	}
 	_, rejects := sink.snapshot()
-	if rejects["shop/rejected_rate"] != 1 {
+	if rejects["rejected_rate"] != 1 {
 		t.Fatalf("rejects %v", rejects)
 	}
 }

@@ -15,7 +15,7 @@ import (
 // The owning collector sequences aggregation and export behind this boundary.
 type Processor interface {
 	Ingest(*beacon.Beacon)
-	Reject(site, reason string)
+	Reject(reason string)
 }
 
 // RejectedOrigin is the last origin refused by a site, including an OPTIONS

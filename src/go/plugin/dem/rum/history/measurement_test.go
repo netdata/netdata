@@ -12,7 +12,7 @@ import (
 
 func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
 	store, _ := newTestStore(t)
-	writer := NewWriter("shop", store, newFakeCounters())
+	writer := NewWriter(store, newFakeCounters())
 	now := time.Now().UnixMicro()
 	records := []aggregate.HistoryEvent{
 		{Site: "shop", SessionID: "session", ObservedUS: now, Type: "pageview", Page: "/entry", ExperienceID: "document", View: "checkout", ViewID: "view-one", Revision: 1},

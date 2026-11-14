@@ -357,17 +357,15 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 	e.ch = make(chan *logspb.LogRecord, 1)
 
 	b1 := mkBeacon() // One pageview fills the queue.
-	e.Ingest(b1, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  b1,
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
 	b2 := mkBeacon()
 	b2.SessionID = "sess2"
-	e.Ingest(b2, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  b2,
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
@@ -383,9 +381,8 @@ func TestIngestDropsOnFullQueue(t *testing.T) {
 // the regular export timeout (the agent's SIGTERM grace is 3s).
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
-	e.Ingest(mkBeacon(), aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  mkBeacon(),
-		Accepted:     true,
 		Investigated: true,
 		PageView:     true,
 	})
@@ -415,9 +412,8 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	counters := newRecCounters()
 	e := newExporter(t, "127.0.0.1:1", counters, nil)
 	b := mkBeacon()
-	e.Ingest(b, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation: b,
-		Accepted:    true,
 	})
 	if n := len(e.ch); n != 0 {
 		t.Fatalf("queued %d records for a sampled-out beacon", n)

@@ -51,7 +51,6 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 				var sent, dropped, errors string
 				result := aggregate.Result{
 					Observation:  tracedBeacon(),
-					Accepted:     true,
 					Investigated: true,
 					PageView:     true,
 				}
@@ -59,7 +58,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 					remote := &fakeLogsService{}
 					e := newExporter(t, startServer(t, remote), counters, nil)
 					for i := 0; i < maxBatch+3; i++ {
-						e.Ingest(mkBeacon(), result)
+						e.Ingest(result)
 					}
 					run = e.Run
 					want = maxBatch + 3
@@ -82,7 +81,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 					b.Spans = append(b.Spans, b.Spans[0])
 					result.Observation = b
 					for i := 0; i < maxSpanBatch+3; i++ {
-						e.Ingest(b, result)
+						e.Ingest(result)
 					}
 					run = e.Run
 					want = 2 * (maxSpanBatch + 3)
@@ -195,7 +194,6 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 			var sent, dropped, errors string
 			result := aggregate.Result{
 				Observation:  tracedBeacon(),
-				Accepted:     true,
 				Investigated: true,
 				PageView:     true,
 			}
@@ -205,7 +203,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 					cancelled: cancelled,
 				}
 				e := newExporter(t, startServer(t, remote), counters, nil)
-				e.Ingest(mkBeacon(), result)
+				e.Ingest(result)
 				run = e.Run
 				requests = func() int { return len(remote.requests()) }
 				sent, dropped, errors = CounterLogsSent, CounterLogsDropped, CounterLogsErrors
@@ -215,7 +213,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 					cancelled: cancelled,
 				}
 				e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters, nil)
-				e.Ingest(tracedBeacon(), result)
+				e.Ingest(result)
 				run = e.Run
 				requests = remote.count
 				sent, dropped, errors = CounterSpansSent, CounterSpansDropped, CounterSpansErrors

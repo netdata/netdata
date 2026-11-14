@@ -207,20 +207,13 @@ func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T
 			Errors:    []beacon.Error{{Fingerprint: "failure", Message: "failed"}},
 		},
 	)
-	p.Ingest(&beacon.Beacon{
-		Site:      "other",
-		SessionID: "wrong",
-		Errors:    []beacon.Error{{Message: "wrong site"}},
-	})
-	p.Reject("site", beacon.RejectOrigin)
-	p.Reject("other", beacon.RejectRate)
+	p.Reject(beacon.RejectOrigin)
 	assert.Empty(t, drain())
 	assert.Empty(t, history.events)
 	snapshot := p.aggregator.Snapshot()
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterAccepted])
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterJSErrors])
 	assert.EqualValues(t, 1, snapshot.Counters[beacon.RejectOrigin])
-	assert.Zero(t, snapshot.Counters[beacon.RejectRate])
 	assert.Zero(t, transport.get(otlp.CounterLogsDropped))
 	assert.Zero(t, transport.get(otlp.CounterLogsSent))
 }

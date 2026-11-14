@@ -15,7 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
@@ -102,15 +101,9 @@ func (e *Logs) Run(ctx context.Context, final func() context.Context) {
 
 // Ingest consumes an aggregation result, builds records and enqueues them,
 // counting queue overflow as dropped. Only enabled exporters are constructed.
-func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
-	if !result.Accepted || b.Site != e.siteName {
-		return
-	}
+func (e *Logs) Ingest(result aggregate.Result) {
 	if !result.Investigated {
 		return // measured, but its session is not investigated
-	}
-	if result.Observation == nil {
-		return
 	}
 	recs := e.build(result.Observation, result.PageView)
 	for _, rec := range recs {

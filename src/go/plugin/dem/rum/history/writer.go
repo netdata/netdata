@@ -39,7 +39,6 @@ type eventWriter interface {
 }
 
 type Writer struct {
-	siteName string
 	st       eventWriter
 	counters Counters
 	ch       chan EventRecord
@@ -48,20 +47,16 @@ type Writer struct {
 }
 
 // NewWriter persists receiver-normalized observations without transforming them again.
-func NewWriter(siteName string, st *Store, counters Counters) *Writer {
+func NewWriter(st *Store, counters Counters) *Writer {
 	return &Writer{
 		st:       st,
 		counters: counters,
 		ch:       make(chan EventRecord, queueCap),
-		siteName: siteName,
 	}
 }
 
 // Event enqueues one record without blocking; a full queue counts it as dropped.
 func (w *Writer) Event(rec EventRecord) {
-	if rec.Site != w.siteName {
-		return
-	}
 	select {
 	case w.ch <- rec:
 	default:

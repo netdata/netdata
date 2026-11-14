@@ -84,7 +84,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	retained := history.NewStore(journalStore)
 	sites := registry.New()
 	owner, retire := addSite(t, sites, "shop", "first")
-	writer := history.NewWriter("shop", retained, discardCounters{})
+	writer := history.NewWriter(retained, discardCounters{})
 	owner.SetHistorySink(writer)
 	// A shared SDK session can contain login, logout, and another login.
 	ids := []string{"550e8400-e29b-41d4-a716-446655440000", "", "123456"}

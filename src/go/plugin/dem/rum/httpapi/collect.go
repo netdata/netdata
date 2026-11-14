@@ -56,7 +56,7 @@ func ping(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (s *Server) rejectOrigin(route *Route, r *http.Request) {
-	route.processor.Reject(route.config.Name, beacon.RejectOrigin)
+	route.processor.Reject(beacon.RejectOrigin)
 	route.rejectOrigin(r.Header.Get("Origin"), s.now())
 }
 
@@ -79,19 +79,19 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	ip := snap.clientIP(r)
 	ipKey := ip.String()
 	if !s.ips.allow(ipKey, now) || !route.allowSite(s.siteRate, now) {
-		route.processor.Reject(cfg.Name, beacon.RejectRate)
+		route.processor.Reject(beacon.RejectRate)
 		w.Header().Set("Retry-After", "1")
 		w.WriteHeader(http.StatusTooManyRequests)
 		return
 	}
 	if r.ContentLength > snap.maxBody {
-		route.processor.Reject(cfg.Name, beacon.RejectSize)
+		route.processor.Reject(beacon.RejectSize)
 		w.WriteHeader(http.StatusRequestEntityTooLarge)
 		return
 	}
 	bot := r.URL.Query().Get("bot") == "1" || faro.IsBot(r.Header.Get("User-Agent"))
 	if bot && !cfg.IncludesBots() {
-		route.processor.Reject(cfg.Name, beacon.RejectBot)
+		route.processor.Reject(beacon.RejectBot)
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -109,11 +109,11 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		var tooBig *http.MaxBytesError
 		if errors.As(err, &tooBig) {
-			route.processor.Reject(cfg.Name, beacon.RejectSize)
+			route.processor.Reject(beacon.RejectSize)
 			w.WriteHeader(http.StatusRequestEntityTooLarge)
 			return
 		}
-		route.processor.Reject(cfg.Name, beacon.RejectInvalid)
+		route.processor.Reject(beacon.RejectInvalid)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -145,7 +145,7 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		PathRules:          st.pathRules,
 	})
 	if err != nil {
-		route.processor.Reject(cfg.Name, beacon.RejectInvalid)
+		route.processor.Reject(beacon.RejectInvalid)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

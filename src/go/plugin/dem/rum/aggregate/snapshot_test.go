@@ -28,13 +28,13 @@ func TestReadsPreserveEveryVitalAndEmptyPopulation(t *testing.T) {
 				ID:       "view",
 				Revision: 1,
 			})
-			require.True(t, a.Ingest(input).Accepted)
+			a.Ingest(input)
 			activity := mk(*now, "activity", "/activity")
-			require.True(t, a.Ingest(activity).Accepted)
+			a.Ingest(activity)
 			session := mk(*now, "session", "/session")
 			session.Events = nil
 			session.Logs = []beacon.Log{{Message: "accepted activity"}}
-			require.True(t, a.Ingest(session).Accepted)
+			a.Ingest(session)
 
 			wantVitals := make(map[string]VitalStats)
 			for _, vital := range beacon.Vitals {
@@ -137,7 +137,7 @@ func TestPageSelectorsPreservePoorAndLexicalPrecedence(t *testing.T) {
 			}
 			input.Vitals = append(input.Vitals, metric)
 		}
-		require.True(t, a.Ingest(input).Accepted)
+		a.Ingest(input)
 	}
 	pages := a.Pages("")
 	require.Len(t, pages, 1)

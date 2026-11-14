@@ -43,7 +43,6 @@ import (
 
 func accepted(b *beacon.Beacon) aggregate.Result {
 	return aggregate.Result{
-		Accepted:     true,
 		Observation:  b,
 		Investigated: true,
 		PageView:     true,
@@ -54,23 +53,22 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 	c := newRecCounters()
 	l := newExporter(t, "127.0.0.1:1", c, nil)
 	tr := newTraceExporter(t, "127.0.0.1:1", "s1", c, nil)
-	for _, result := range []aggregate.Result{{}, {Accepted: true}, {Investigated: true}} {
-		l.Ingest(tracedBeacon(), result)
-		tr.Ingest(tracedBeacon(), result)
+	// Measured but not investigated: nothing is exported.
+	measured := aggregate.Result{
+		Observation: tracedBeacon(),
+		PageView:    true,
 	}
-	wrong := tracedBeacon()
-	wrong.Site = "other"
-	l.Ingest(wrong, accepted(wrong))
-	tr.Ingest(wrong, accepted(wrong))
+	l.Ingest(measured)
+	tr.Ingest(measured)
 	require.Empty(t, l.ch)
 	require.Empty(t, tr.spanCh)
 	require.Empty(t, c.snapshot())
 	// Exercise the actual bounded queues, without replacing their capacities.
 	for range queueCap + 1 {
-		l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+		l.Ingest(accepted(tracedBeacon()))
 	}
 	for range spanQueueCap + 1 {
-		tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+		tr.Ingest(accepted(tracedBeacon()))
 	}
 	require.Len(t, l.ch, queueCap)
 	require.Len(t, tr.spanCh, spanQueueCap)
@@ -86,8 +84,8 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 300 {
-				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
-				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				l.Ingest(accepted(tracedBeacon()))
+				tr.Ingest(accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -142,8 +140,8 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 			l := newExporter(t, startServer(t, ls), c, nil)
 			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
 			for range 5 {
-				l.Ingest(tracedBeacon(), accepted(tracedBeacon()))
-				tr.Ingest(tracedBeacon(), accepted(tracedBeacon()))
+				l.Ingest(accepted(tracedBeacon()))
+				tr.Ingest(accepted(tracedBeacon()))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
@@ -207,8 +205,8 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				b := tracedBeacon()
 				b.Site = site
 				for range attempts {
-					l.Ingest(b, accepted(b))
-					tr.Ingest(b, accepted(b))
+					l.Ingest(accepted(b))
+					tr.Ingest(accepted(b))
 					l.export(context.Background(), []*logspb.LogRecord{<-l.ch}, exportTimeout)
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}

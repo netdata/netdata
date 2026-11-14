@@ -51,7 +51,7 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters)
+	w := NewWriter(NewStore(st), counters)
 	now := time.Now().UnixMicro()
 	w.Event(
 		aggregate.HistoryEvent{
@@ -100,7 +100,7 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	calls := 0
 	w.st = eventWriterFunc(func(context.Context, EventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
@@ -116,7 +116,7 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempts := map[string]int{}
@@ -149,7 +149,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
 			counters := newFakeCounters()
-			w := NewWriter("site", nil, counters)
+			w := NewWriter(nil, counters)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
@@ -181,7 +181,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 }
 func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	deadlines := []time.Time{}
 	w.st = eventWriterFunc(func(ctx context.Context, r EventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
@@ -220,7 +220,7 @@ func (w *recordingEventWriter) Sync(context.Context) error {
 
 func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	for range queueCap + 1 {
 		w.Event(aggregate.HistoryEvent{
 			Site: "site",
@@ -231,7 +231,7 @@ func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
 }
 
 func TestEmptyFlushSkipsJournalSync(t *testing.T) {
-	w := NewWriter("site", nil, newFakeCounters())
+	w := NewWriter(nil, newFakeCounters())
 	disk := &recordingEventWriter{}
 	w.st = disk
 	assert.Zero(t, w.flush(context.Background(), nil))
@@ -264,7 +264,7 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := NewWriter("site", nil, newFakeCounters())
+	w := NewWriter(nil, newFakeCounters())
 	disk := &cancelLastAppendWriter{
 		cancel: cancel,
 	}
@@ -280,7 +280,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
-	w := NewWriter("site", nil, newFakeCounters())
+	w := NewWriter(nil, newFakeCounters())
 	disk := &recordingEventWriter{
 		syncErr: errors.New("sync failed"),
 	}
@@ -292,29 +292,4 @@ func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 	assert.Equal(t, 2, disk.syncs)
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Equal(t, 2, disk.syncs, "successful sync restores the idle shortcut")
-}
-
-func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
-	st, err := demjournal.Open(context.Background(), "")
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, st.Close()) })
-	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters)
-	for range queueCap + 1 {
-		w.Event(aggregate.HistoryEvent{
-			Site:       "other",
-			SessionID:  "session",
-			Type:       "event",
-			ObservedUS: time.Now().UnixMicro(),
-		})
-	}
-	require.Empty(t, w.ch)
-	drain(w)
-	require.Empty(t, counters.values)
-	rows, err := NewStore(st).QuerySessionEvents(context.Background(), "other", "session", "")
-	require.NoError(t, err)
-	require.Empty(t, rows)
-	rows, err = NewStore(st).QuerySessionEvents(context.Background(), "site", "session", "")
-	require.NoError(t, err)
-	require.Empty(t, rows)
 }

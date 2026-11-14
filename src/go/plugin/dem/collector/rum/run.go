@@ -43,7 +43,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		p.traces = traces
 		defer traces.Close()
 	}
-	writer := history.NewWriter(c.Name, c.deps.History, c.transport)
+	writer := history.NewWriter(c.deps.History, c.transport)
 	c.aggregator.SetHistorySink(writer)
 	route := httpapi.NewRoute(c.Site, p, c.redactor)
 	var id [16]byte

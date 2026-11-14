@@ -28,7 +28,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 		Name: "shop", PageGroups: 20, Countries: 20,
 		Investigate: aggregate.InvestigateCfg{Rate: 0, KeepErrors: true},
 	})
-	writer := history.NewWriter("shop", store, discardCounters{})
+	writer := history.NewWriter(store, discardCounters{})
 	owner.SetHistorySink(writer)
 	observed := time.Now().Add(-20 * time.Minute).Truncate(time.Second)
 	prior := &beacon.Beacon{
