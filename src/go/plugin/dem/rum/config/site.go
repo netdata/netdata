@@ -2,8 +2,9 @@
 
 package config
 
-// Site is one monitored web property. AllowedOrigins is required
-// Native job admission determines whether its endpoints exist.
+// Site is one monitored web property. Validate requires a name, top-N bounds
+// and at least one allowed origin; native job admission decides whether its
+// endpoints exist.
 type Site struct {
 	Name           string   `yaml:"name"                          json:"name"`
 	DisplayName    string   `yaml:"display_name"                  json:"display_name"`

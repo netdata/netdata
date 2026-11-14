@@ -346,17 +346,11 @@ func pageHost(raw string) string {
 	return strings.ToLower(u.Hostname())
 }
 
-// parseNavigationAttrs reads the two navigation-timing attributes the
-// navigation measurements need from a faro.performance.navigation
-// event's attributes. Field names verified against a captured Faro 2.11
-// beacon and pinned by TestParseFaro in decode_test.go:
-// "pageLoadTime" (fetchStart..domComplete, the SDK's own "page load"
-// metric — there is no separate "time to DOMContentLoaded from
-// navigation start" attribute) and "domContentLoadHandlerTime" (the
-// DOMContentLoaded handler's own duration) — the same two fields
-// Grafana's own Faro-based Frontend Observability product charts as
-// "page load" and "DOM content loaded". A missing/unparsable attribute
-// (the SDK omits it rather than sending a placeholder) leaves Has* false.
+// parseNavigationAttrs reads the two navigation-timing attributes Faro 2.11
+// sends on faro.performance.navigation events (pinned by TestParseFaro):
+// pageLoadTime (fetchStart to domComplete, the SDK's page-load metric) and
+// domContentLoadHandlerTime (the DOMContentLoaded handler's own duration).
+// The SDK omits an unavailable attribute, which leaves its Has* flag false.
 func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 	if len(attrs) == 0 {
 		return nil
