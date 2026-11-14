@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
@@ -22,372 +23,174 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// runRuntimeCommand is dispatched before cli.Parse and never enters the plugin
-// protocol. Executable candidates require publisher-authenticated release metadata.
-func runRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Writer) (bool, error) {
-	return runRuntimeCommandWithInput(ctx, args, nil, stdout, stderr)
-}
-
-// --cancel-on-stdin-close borrows input as a private control channel. The
-// watcher owns its duplicate; the caller retains ownership of input.
-func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) (handled bool, retErr error) {
-	if handled, err := runRuntimeSetupPlan(args, stdout, stderr); handled {
-		return true, err
+// runRuntimeCommand runs `dem.plugin runtime <command> [flags]`; args start
+// after "runtime". main routes these commands before cli.Parse, so they never
+// enter the plugin protocol. --cancel-on-stdin-close borrows input as a private
+// control channel; the caller retains ownership of input.
+func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]")
 	}
-	if handled, err := runNativeRuntimeCommand(ctx, args, stdout, stderr); handled {
-		return true, err
+	command, flags := args[0], args[1:]
+	switch {
+	case command == "setup-plan":
+		return runSetupPlan(flags, stdout, stderr)
+	case strings.HasPrefix(command, "native-"):
+		return runNativeCommand(ctx, command, flags, stdout, stderr)
 	}
-	if len(args) == 0 || args[0] != "runtime" {
-		return false, nil
-	}
-	if len(args) < 2 {
-		return true, errors.New("usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]")
-	}
-	command := args[1]
 	switch command {
 	case "ensure", "install", "update", "repair", "uninstall", "preload", "status", "qualify":
+		return runAdminCommand(ctx, command, flags, input, stdout, stderr)
 	default:
-		return true, fmt.Errorf("unknown runtime command %q", command)
+		return fmt.Errorf("unknown runtime command %q", command)
 	}
-	preparing := command == "ensure" || command == "install" || command == "update" || command == "repair" || command == "preload"
-	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	configDir := flags.String("config-dir", "", "directory containing administrator dem.conf")
-	expectedRoot := flags.String("expected-root", "", "require this canonical managed root before ensure mutates storage")
-	cancelOnInputClose := flags.Bool("cancel-on-stdin-close", false, "cancel ensure cooperatively when its private stdin control channel closes")
-	releasePath := flags.String("release", "", "local signed release descriptor; otherwise use configured latest URL")
-	manualUpdates := flags.Bool("manual-updates", false, "disable automatic daily update preparation (install/repair); activation always requires restart")
-	cache := flags.String("cache", "", "managed installation directory")
-	root := flags.String("root", "", "preload final root (must be new or empty; never move it)")
-	archive := flags.String("archive", "", "offline archive checked against the trusted release descriptor")
-	allowDownload := flags.Bool("allow-download", false, "explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates")
-	if err := flags.Parse(args[2:]); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return true, nil
-		}
-		return true, err
+}
+
+// runAdminCommand runs an administrator command. Once configuration loads, it
+// prints exactly one JSON report, failures included.
+func runAdminCommand(ctx context.Context, command string, args []string, input *os.File, stdout, stderr io.Writer) error {
+	f, err := parseAdminFlags(command, args, stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		return nil
 	}
-	if flags.NArg() != 0 {
-		return true, errors.New("unexpected positional runtime arguments")
+	if err != nil {
+		return err
 	}
-	if command != "ensure" && (*expectedRoot != "" || *cancelOnInputClose) {
-		return true, errors.New("--expected-root and --cancel-on-stdin-close are only valid for ensure")
+	if err := f.validateEnsureOnly(command); err != nil {
+		return err
 	}
-	if *expectedRoot != "" {
-		if err := validateSetupPlanPath(*expectedRoot); err != nil {
-			return true, err
-		}
-	}
-	if *cancelOnInputClose {
+	if f.cancelOnInputClose {
 		if input == nil {
-			return true, errors.New("--cancel-on-stdin-close requires a private stdin control channel")
+			return errors.New("--cancel-on-stdin-close requires a private stdin control channel")
 		}
 		var finish func()
-		var err error
 		ctx, finish, err = runtimeInputContext(ctx, input)
 		if err != nil {
-			return true, err
+			return err
 		}
 		defer finish()
 	}
-
-	if command == "ensure" && os.Geteuid() == 0 {
-		return true, errors.New("runtime ensure must run as the nonroot DEM service account")
-	}
-	if *configDir != "" && !filepath.IsAbs(*configDir) {
-		return true, errors.New("--config-dir must be absolute")
-	}
-	if preparing {
-		if *releasePath != "" && !filepath.IsAbs(*releasePath) {
-			return true, errors.New("--release must be absolute")
-		}
-		if (*archive != "") == *allowDownload {
-			return true, errors.New("provide either --archive or --allow-download for ensure/install/update/repair/preload")
-		}
-		if *archive != "" && *releasePath == "" {
-			return true, errors.New("offline archive requires an absolute --release path")
-		}
-	} else if *releasePath != "" || *archive != "" || *allowDownload {
-		return true, errors.New("--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload")
-	}
-	if *manualUpdates && command != "install" && command != "repair" {
-		return true, errors.New("--manual-updates is only valid for install/repair; update preserves the installed policy")
-	}
-	if *archive != "" && !filepath.IsAbs(*archive) {
-		return true, errors.New("--archive must be absolute")
-	}
-	if command == "preload" {
-		if !filepath.IsAbs(*root) {
-			return true, errors.New("preload requires an absolute --root final directory")
-		}
-		if *cache != "" {
-			return true, errors.New("preload uses --root, not --cache")
-		}
-	} else if *root != "" {
-		return true, errors.New("--root is only valid for preload")
+	if err := f.validate(command); err != nil {
+		return err
 	}
 	var confDirs []string
-	if *configDir != "" {
-		confDirs = []string{*configDir}
+	if f.configDir != "" {
+		confDirs = []string{f.configDir}
 	}
 	config, err := dem.LoadConfig(pluginconfig.ResolveConfigDirs(confDirs))
 	if err != nil {
-		return true, err
+		return err
 	}
 	cfg := config.Runtime
-	if *cache != "" {
-		cfg.CachePath = *cache
+	if f.cache != "" {
+		cfg.CachePath = f.cache
 	}
-	report := runtimeCommandReport{Command: command, Mode: cfg.Mode, State: "unavailable", DownloadAllowed: *allowDownload, ReleasePath: *releasePath}
-	if command == "ensure" {
-		report.Outcome = "failed"
-	}
+	report := runtimeCommandReport{Command: command, Mode: cfg.Mode, State: "unavailable", DownloadAllowed: f.allowDownload, ReleasePath: f.release}
 	if command == "repair" {
 		report.State = "unknown"
 	}
-	defer func() {
-		if retErr != nil {
-			if command == "ensure" {
-				report.Outcome = "failed"
-			}
-			report.SetupError = retErr.Error()
-		}
-		encoder := json.NewEncoder(stdout)
-		encoder.SetIndent("", "  ")
-		retErr = errors.Join(retErr, encoder.Encode(report))
-	}()
+	// preload always prepares a fresh root through managed storage, whatever the
+	// configured mode.
 	if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
-		if command != "status" && command != "qualify" {
-			if cfg.Mode == runtimehost.ModeNative {
-				return true, errors.New("native runtime installation, update, repair and removal belong to the package manager; install the optional netdata-dem-runtime package")
-			}
-			return true, errors.New("install/update/repair/uninstall require runtime.mode: managed")
-		}
-		handle := runtimehost.Open(cfg, "")
-		defer func() {
-			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
-				retErr = errors.Join(retErr, handle.Close())
-			}
-		}()
-		if handle.SetupError != nil {
-			return true, handle.SetupError
-		}
-		if cfg.Mode == runtimehost.ModeNative {
-			status := handle.Host.Status()
-			report.Runtime = status.Running
-			report.Native = status.Native
-			report.Notice = "Native package files are owned by the package manager. Stop standalone consumers before package replacement or removal."
-		} else {
-			report.Runtime = new(handle.Manifest.Identity())
-			report.PreloadPath = cfg.PreloadPath
-		}
-		report.Generation = report.Runtime.SHA256
-		report.State = "installed"
-		if command == "qualify" {
-			report.Qualification, retErr = qualifyRuntime(ctx, handle.Source)
-			if retErr == nil {
-				report.State = "qualified"
-			}
-		}
-		return true, retErr
+		err = runFixedRuntimeCommand(ctx, command, cfg, &report)
+	} else {
+		err = runManagedCommand(ctx, command, cfg, f, &report, stderr)
 	}
-	varlib := os.Getenv("NETDATA_LIB_DIR")
-	if varlib == "" {
-		varlib = buildinfo.VarLibDir
+	return writeReport(stdout, report, err)
+}
+
+type adminFlags struct {
+	configDir          string
+	expectedRoot       string
+	cancelOnInputClose bool
+	release            string
+	manualUpdates      bool
+	cache              string
+	root               string
+	archive            string
+	allowDownload      bool
+}
+
+func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlags, error) {
+	var f adminFlags
+	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&f.configDir, "config-dir", "", "directory containing administrator dem.conf")
+	flags.StringVar(&f.expectedRoot, "expected-root", "", "require this canonical managed root before ensure mutates storage")
+	flags.BoolVar(&f.cancelOnInputClose, "cancel-on-stdin-close", false, "cancel ensure cooperatively when its private stdin control channel closes")
+	flags.StringVar(&f.release, "release", "", "local signed release descriptor; otherwise use configured latest URL")
+	flags.BoolVar(&f.manualUpdates, "manual-updates", false, "disable automatic daily update preparation (install/repair); activation always requires restart")
+	flags.StringVar(&f.cache, "cache", "", "managed installation directory")
+	flags.StringVar(&f.root, "root", "", "preload final root (must be new or empty; never move it)")
+	flags.StringVar(&f.archive, "archive", "", "offline archive checked against the trusted release descriptor")
+	flags.BoolVar(&f.allowDownload, "allow-download", false, "explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates")
+	if err := flags.Parse(args); err != nil {
+		return f, err
 	}
-	if varlib == "" {
-		varlib = buildinfo.DefaultVarLibDir
+	if flags.NArg() != 0 {
+		return f, errors.New("unexpected positional runtime arguments")
+	}
+	return f, nil
+}
+
+// validateEnsureOnly checks the ensure-only flags, which precede every other
+// check because ensure arms its stdin control channel next.
+func (f adminFlags) validateEnsureOnly(command string) error {
+	if command != "ensure" && (f.expectedRoot != "" || f.cancelOnInputClose) {
+		return errors.New("--expected-root and --cancel-on-stdin-close are only valid for ensure")
+	}
+	if f.expectedRoot != "" {
+		return validateSetupPlanPath(f.expectedRoot)
+	}
+	return nil
+}
+
+func (f adminFlags) validate(command string) error {
+	if command == "ensure" && os.Geteuid() == 0 {
+		return errors.New("runtime ensure must run as the nonroot DEM service account")
+	}
+	if f.configDir != "" && !filepath.IsAbs(f.configDir) {
+		return errors.New("--config-dir must be absolute")
+	}
+	if preparesCandidate(command) {
+		if f.release != "" && !filepath.IsAbs(f.release) {
+			return errors.New("--release must be absolute")
+		}
+		if (f.archive != "") == f.allowDownload {
+			return errors.New("provide either --archive or --allow-download for ensure/install/update/repair/preload")
+		}
+		if f.archive != "" && f.release == "" {
+			return errors.New("offline archive requires an absolute --release path")
+		}
+	} else if f.release != "" || f.archive != "" || f.allowDownload {
+		return errors.New("--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload")
+	}
+	if f.manualUpdates && command != "install" && command != "repair" {
+		return errors.New("--manual-updates is only valid for install/repair; update preserves the installed policy")
+	}
+	if f.archive != "" && !filepath.IsAbs(f.archive) {
+		return errors.New("--archive must be absolute")
 	}
 	if command == "preload" {
-		entries, err := os.ReadDir(*root)
-		if err != nil && !errors.Is(err, os.ErrNotExist) {
-			return true, err
+		if !filepath.IsAbs(f.root) {
+			return errors.New("preload requires an absolute --root final directory")
 		}
-		if len(entries) != 0 {
-			return true, errors.New("preload root must be empty; use a new final root and stop all consumers before replacement")
+		if f.cache != "" {
+			return errors.New("preload uses --root, not --cache")
 		}
-		cfg.CachePath = *root
+	} else if f.root != "" {
+		return errors.New("--root is only valid for preload")
 	}
-	storeConfig, err := cfg.StoreConfig(varlib)
-	if err != nil {
-		return true, err
-	}
-	if command == "ensure" {
-		canonical, err := runtime.CanonicalRoot(storeConfig.Path)
-		if err != nil {
-			return true, err
-		}
-		if *expectedRoot != "" && canonical != filepath.Clean(*expectedRoot) {
-			return true, fmt.Errorf("configured canonical runtime root %q differs from --expected-root %q; no runtime storage changed", canonical, *expectedRoot)
-		}
-		storeConfig.Path = canonical
-	}
-	report.CachePath = storeConfig.Path
-	if err := ctx.Err(); err != nil {
-		return true, err
-	}
-	if !preparing {
-		if _, err := os.Stat(storeConfig.Path); err != nil {
-			if command == "status" && !errors.Is(err, os.ErrNotExist) {
-				report.State = "unknown"
-			}
-			return true, fmt.Errorf("runtime installation: %w", err)
-		}
-	}
-	store, err := runtime.Open(storeConfig)
-	if err != nil {
-		if command == "status" {
-			report.State = "unknown"
-		}
-		return true, err
-	}
-	sealed := false
-	defer func() {
-		if !sealed && command != "status" && command != "ensure" {
-			status, err := store.Inspect()
-			report.Storage = &status
-			report.StorageError = errorString(err)
-			if preparing {
-				report.selectedInstallation(status)
-				if retErr != nil && command == "repair" {
-					report.Notice = "Repair failed; selected installation state is shown separately from candidate progress. A cleared selection is not restored. Stop and drain all consumers before retrying repair."
-				}
-			}
-		}
-		if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
-			retErr = errors.Join(retErr, store.Close())
-		}
-	}()
-	if preparing {
-		options := runtime.ReleaseInstallOptions{Operation: runtime.ReleaseOperation(command)}
-		if command == "preload" {
-			options.Operation = runtime.InstallRelease
-		}
-		if options.Operation == runtime.InstallRelease || options.Operation == runtime.RepairRelease {
-			options.Updates = runtime.AutomaticUpdates
-			if *manualUpdates || command == "preload" {
-				options.Updates = runtime.ManualUpdates
-			}
-			if options.Updates == runtime.AutomaticUpdates {
-				fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
-			}
-		}
-		var candidate *runtime.Candidate
-		var selected *runtime.Manifest
-		if command == "ensure" {
-			load := cfg.ReleaseLoader(*releasePath, *allowDownload)
-			candidate, selected, err = store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
-				fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
-				return load(ctx)
-			})
-		} else {
-			candidate, err = store.BeginPublishedInstall(ctx, options, cfg.ReleaseLoader(*releasePath, *allowDownload))
-		}
-		if err != nil {
-			return true, err
-		}
-		if selected != nil {
-			report.Runtime = new(selected.Identity())
-			report.Generation = selected.Archive.SHA256
-			report.State = "installed"
-			report.Outcome = "already-selected"
-			report.Notice = "A usable runtime is already selected; no download, qualification or update policy change was performed. A new DEM process uses this selection. Running processes may require a restart; their active release was not inspected."
-			return true, nil
-		}
-		if candidate == nil {
-			report.Notice = "Selected release is unchanged. Already running processes keep their startup release until restart."
-			return true, nil
-		}
-		m := candidate.Manifest()
-		report.Candidate = new(m.Identity())
-		report.CandidateState = "requested"
-		defer func() {
-			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
-				retErr = errors.Join(retErr, candidate.Close())
-			}
-		}()
-		if *archive != "" {
-			err = candidate.Import(ctx, *archive)
-		} else {
-			err = candidate.Download(ctx)
-		}
-		if err != nil {
-			return true, err
-		}
-		report.CandidateState = "prepared"
-		report.Qualification, err = qualifyRuntime(ctx, runtimehost.Borrow(candidate))
-		if err != nil {
-			return true, err
-		}
-		if err := ctx.Err(); err != nil {
-			return true, err
-		}
-		if command == "preload" {
-			if err = candidate.SealPreload(); err != nil {
-				return true, err
-			}
-			sealed = true
-			report.Runtime = new(m.Identity())
-			report.Generation = m.Archive.SHA256
-			report.CachePath = ""
-			report.PreloadPath = storeConfig.Path
-			report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": storeConfig.Path}}
-			report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
-		} else {
-			if err = candidate.Select(); err != nil {
-				return true, err
-			}
-			report.CandidateState = "selected"
-			if command == "ensure" {
-				report.Outcome = "newly-selected"
-				report.Runtime = new(m.Identity())
-				report.Generation = m.Archive.SHA256
-			}
-			report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
-		}
-		report.State = "installed"
-		return true, nil
-	}
+	return nil
+}
+
+// preparesCandidate reports whether the command acquires and qualifies a release.
+func preparesCandidate(command string) bool {
 	switch command {
-	case "uninstall":
-		if err = store.Uninstall(ctx); err != nil {
-			return true, err
-		}
-		report.State = "uninstalled"
-		report.Notice = "Runtime files removed. This command does not change administrator-owned host policy; netdata-dem-runtime.sh handles high-level policy cleanup."
-	case "status":
-		status, err := store.Inspect()
-		report.Storage = &status
-		report.StorageError = errorString(err)
-		report.selectedInstallation(status)
-		report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
-		if err != nil {
-			return true, err
-		}
-		if status.Selected == nil {
-			return true, runtime.ErrUnavailable
-		}
-	case "qualify":
-		consumer, err := store.AcquireSelected()
-		if err != nil {
-			return true, err
-		}
-		defer func() {
-			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
-				retErr = errors.Join(retErr, consumer.Close())
-			}
-		}()
-		m := consumer.Manifest()
-		report.Runtime = new(m.Identity())
-		report.Generation = m.Archive.SHA256
-		report.State = "installed"
-		report.Qualification, err = qualifyRuntime(ctx, runtimehost.Borrow(consumer))
-		if err != nil {
-			return true, err
-		}
-		report.State = "qualified"
+	case "ensure", "install", "update", "repair", "preload":
+		return true
 	}
-	return true, nil
+	return false
 }
 
 type runtimeCommandReport struct {
@@ -412,6 +215,21 @@ type runtimeCommandReport struct {
 	Notice          string                     `json:"notice,omitempty"`
 }
 
+// setRuntime reports a runtime with its generation, the archive digest.
+func (r *runtimeCommandReport) setRuntime(identity synthetic.RuntimeIdentity) {
+	r.Runtime = &identity
+	r.Generation = identity.SHA256
+}
+
+// inventory records the store inventory and its error in the report's storage
+// fields. Only status treats the error as its own failure.
+func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, error) {
+	status, err := store.Inspect()
+	r.Storage = &status
+	r.StorageError = errorString(err)
+	return status, err
+}
+
 // selectedInstallation reports executable selection independently of a candidate
 // and of damage to unrelated retained generations.
 func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
@@ -419,8 +237,7 @@ func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
 	r.Generation = ""
 	r.State = "unavailable"
 	if status.Selected != nil {
-		r.Runtime = new(status.Selected.Identity())
-		r.Generation = status.Selected.Archive.SHA256
+		r.setRuntime(status.Selected.Identity())
 		r.State = "installed"
 	}
 	if status.SelectionError != "" {
@@ -431,9 +248,46 @@ func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
 	}
 }
 
+// writeReport records a command failure in the report and prints it. It owns
+// the failed ensure outcome, including a close failure after a selection.
+func writeReport(stdout io.Writer, report runtimeCommandReport, err error) error {
+	if err != nil {
+		if report.Command == "ensure" {
+			report.Outcome = "failed"
+		}
+		report.SetupError = err.Error()
+	}
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	return errors.Join(err, encoder.Encode(report))
+}
+
 func errorString(err error) string {
 	if err != nil {
 		return err.Error()
 	}
 	return ""
+}
+
+// closeUnlessUndrained joins the close error of a resource held by a command.
+// An undrained process tree keeps its candidate, consumer or proof protected
+// until process exit, so the resource stays open.
+func closeUnlessUndrained(err error, resource io.Closer) error {
+	if errors.Is(err, ndexec.ErrTreeNotDrained) {
+		return err
+	}
+	return errors.Join(err, resource.Close())
+}
+
+// varLibDir returns the raw Agent state directory (environment, then build-time
+// paths); plugin configuration is not initialized for runtime commands, and
+// setup-plan validates this value before it is cleaned.
+func varLibDir() string {
+	if dir := os.Getenv("NETDATA_LIB_DIR"); dir != "" {
+		return dir
+	}
+	if buildinfo.VarLibDir != "" {
+		return buildinfo.VarLibDir
+	}
+	return buildinfo.DefaultVarLibDir
 }

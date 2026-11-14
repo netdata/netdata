@@ -1,0 +1,123 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+package rumfunc_test
+
+import (
+	"context"
+	"os"
+	"testing"
+
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
+	"github.com/stretchr/testify/require"
+)
+
+func TestMetadataDocumentsProcessFunctions(t *testing.T) {
+	data, err := os.ReadFile("../../collector/rum/metadata.yaml")
+	require.NoError(t, err)
+	module, err := collecttest.DecodeMetadataModule(data, "")
+	require.NoError(t, err)
+	declarations := rumfunc.Declarations()
+	require.Len(t, module.Functions, len(declarations))
+	documented := make(map[string]collecttest.MetadataFunction)
+	for _, function := range module.Functions {
+		require.NotContains(t, documented, function.ID)
+		documented[function.ID] = function
+	}
+	handler := rumfunc.New(metadataFunctionSource{}, nil)
+	for _, declaration := range declarations {
+		t.Run(declaration.ID, func(t *testing.T) {
+			// RUM rows carry visitor sessions, locations and errors: sensitive data.
+			require.True(t, declaration.RequireCloud)
+			// Viewing Real User Monitoring requires a paid plan (access 0x0017).
+			require.True(t, declaration.RequireCommercial)
+			doc, ok := documented[declaration.ID]
+			require.True(t, ok, "missing Function documentation")
+			require.Equal(t, funcapi.FunctionName("rum", declaration), doc.FunctionName)
+			params := make([]string, 0, len(doc.Parameters))
+			for _, param := range doc.Parameters {
+				params = append(params, param.ID)
+			}
+			require.ElementsMatch(t, declaration.AcceptedParams, params)
+			require.NotContains(t, params, collecttest.FunctionJobParameter)
+			var args []string
+			for _, parameter := range declaration.AcceptedParams {
+				switch parameter {
+				case "site":
+					args = append(args, "site:shop")
+				case "session_id":
+					args = append(args, "session_id:visit")
+				}
+			}
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      declaration.ID,
+				Args:        args,
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, response.RawResponse)
+			require.Equal(t, 200, response.RawResponse["status"])
+			columns, ok := response.RawResponse["columns"].(map[string]any)
+			require.True(t, ok)
+			actual, err := collecttest.FunctionResponseColumns(&funcapi.FunctionResponse{
+				Columns: columns,
+			})
+			require.NoError(t, err)
+			require.Equal(t, actual, doc.Columns)
+		})
+	}
+}
+
+// These fixtures supply domain observations; the production handler builds each table.
+type metadataFunctionSource struct{}
+
+func (metadataFunctionSource) Receiver() query.Receiver {
+	return query.Receiver{
+		Serving: true,
+	}
+}
+func (metadataFunctionSource) Sites(context.Context, string) ([]query.Site, error) {
+	return []query.Site{
+		{Name: "shop", Label: "shop", Sampling: query.Sampling{
+			MeasureRate:     1,
+			InvestigateRate: 1,
+		}},
+	}, nil
+}
+func (metadataFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
+	return []query.Page{{Site: "shop", Page: "/"}}, nil
+}
+func (metadataFunctionSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
+	return nil, "", nil
+}
+func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error) {
+	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
+}
+func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
+	return []query.SessionEvent{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
+}
+func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error) {
+	return nil, nil
+}
+
+func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
+	for method, column := range map[string]string{
+		"rum-live": "ts", "rum-session-events": "ts", "rum-sessions": "last_observed_us",
+	} {
+		t.Run(method, func(t *testing.T) {
+			handler := rumfunc.New(metadataFunctionSource{}, nil)
+			args := []string{"site:shop"}
+			if method == "rum-session-events" {
+				args = append(args, "session_id:visit")
+			}
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Args: args, Permissions: "0x1b"}).RawResponse
+			require.NotNil(t, response)
+			require.Equal(t, 200, response["status"])
+			fields := response["columns"].(map[string]any)
+			field := fields[column].(map[string]any)
+			require.Equal(t, "timestamp", field["type"])
+			options := field["value_options"].(map[string]any)
+			require.Equal(t, "datetime_usec", options["transform"], "timestamps are Unix microseconds on the wire")
+		})
+	}
+}

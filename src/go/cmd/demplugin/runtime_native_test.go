@@ -16,17 +16,9 @@ import (
 )
 
 func TestNativeRuntimeDispatchRejectsOverrides(t *testing.T) {
-	for _, args := range [][]string{nil, {"runtime"}, {"runtime", "status"}, {"--version"}} {
+	for _, args := range [][]string{{"native-unknown"}, {"native-prepare", "--root", "/other"}, {"native-configure", "--service", "root"}, {"native-inspect", "stray"}, {"native-qualify", "--no-sandbox"}} {
 		var output bytes.Buffer
-		handled, err := runNativeRuntimeCommand(context.Background(), args, &output, &output)
-		require.False(t, handled)
-		require.NoError(t, err)
-		require.Empty(t, output.String())
-	}
-	for _, args := range [][]string{{"runtime", "native-unknown"}, {"runtime", "native-prepare", "--root", "/other"}, {"runtime", "native-configure", "--service", "root"}, {"runtime", "native-inspect", "stray"}, {"runtime", "native-qualify", "--no-sandbox"}} {
-		var output bytes.Buffer
-		handled, err := runNativeRuntimeCommand(context.Background(), args, &output, &output)
-		require.True(t, handled)
+		err := runRuntimeCommand(context.Background(), args, nil, &output, &output)
 		require.Error(t, err)
 		require.Empty(t, output.String())
 	}

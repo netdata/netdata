@@ -17,12 +17,12 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,15 +40,15 @@ func provider(t *testing.T, components dem.Components, id string) funcapi.Proces
 	return funcapi.ProcessFunctionProvider{}
 }
 
-func rumHandler(t *testing.T, components dem.Components) *rumfunctions.Handler {
+func rumHandler(t *testing.T, components dem.Components) *rumfunc.Handler {
 	t.Helper()
-	return provider(t, components, "rum").NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*rumfunctions.Handler)
+	return provider(t, components, "rum").NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*rumfunc.Handler)
 }
 
-func syntheticHandler(t *testing.T, components dem.Components) *syntheticfunctions.Handler {
+func syntheticHandler(t *testing.T, components dem.Components) *syntheticfunc.Handler {
 	t.Helper()
 	return provider(t, components, "synthetics").
-		NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
+		NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunc.Handler)
 }
 
 // privateHistory and privateCaptures are the temporary stores debug runs use.
@@ -321,8 +321,9 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
-			Method: "rum-sessions",
-			Args:   []string{"site:retired"},
+			Method:      "rum-sessions",
+			Args:        []string{"site:retired"},
+			Permissions: "0x1b",
 		},
 	)
 	require.NotNil(t, response.RawResponse)
@@ -332,8 +333,9 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	response = handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"site:retired", "session_id:session"},
+			Method:      "rum-session-events",
+			Args:        []string{"site:retired", "session_id:session"},
+			Permissions: "0x1b",
 		},
 	)
 	require.Len(t, response.RawResponse["data"].([][]any), 1)

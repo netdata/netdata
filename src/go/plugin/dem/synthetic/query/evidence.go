@@ -36,9 +36,6 @@ func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string)
 	if err := ctx.Err(); err != nil {
 		return Evidence{}, err
 	}
-	if s.artifacts == nil {
-		return Evidence{}, errors.New("artifact store unavailable")
-	}
 	manifest, err := s.artifacts.Manifest(ctx, jobID, runID)
 	if errors.Is(err, artifacts.ErrNotFound) {
 		return s.absentEvidence(ctx, jobID, runID, artifactID)
@@ -88,9 +85,6 @@ func (s *Service) absentEvidence(ctx context.Context, jobID, runID, artifactID s
 	// Active observations remain useful when history publication failed.
 	run, err := s.Run(ctx, jobID, runID)
 	if err != nil {
-		if s.history == nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			return Evidence{}, ErrNotFound
-		}
 		return Evidence{}, err
 	}
 	result := Evidence{

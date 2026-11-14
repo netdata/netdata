@@ -24,13 +24,7 @@ import (
 func setupPlan(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	var out, diagnostic bytes.Buffer
-	handled, err := runRuntimeCommand(
-		context.Background(),
-		append([]string{"runtime", "setup-plan"}, args...),
-		&out,
-		&diagnostic,
-	)
-	require.True(t, handled)
+	err := runRuntimeCommand(context.Background(), append([]string{"setup-plan"}, args...), nil, &out, &diagnostic)
 	return out.String(), err
 }
 
