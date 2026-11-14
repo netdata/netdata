@@ -64,7 +64,7 @@ func TestRuntimeEnsureCanceledBeforeStorageMutation(t *testing.T) {
 	cache := filepath.Join(root, "cache")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := runRuntimeCommand(ctx, []string{"runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache}, os.Stdout, os.Stderr)
+	err := runRuntimeCommand(ctx, []string{"ensure", "--allow-download", "--config-dir", root, "--cache", cache}, nil, os.Stdout, os.Stderr)
 	require.ErrorIs(t, err, context.Canceled)
 	require.NoDirExists(t, cache)
 }
@@ -130,7 +130,7 @@ func TestRuntimeEnsureControlEOFCancelsInstallerWait(t *testing.T) {
 				defer cancel()
 				done := make(chan error, 1)
 				go func() {
-					_, err := runRuntimeCommandWithInput(ctx, []string{"runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--cancel-on-stdin-close"}, input, io.Discard, io.Discard)
+					err := runRuntimeCommand(ctx, []string{"ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--cancel-on-stdin-close"}, input, io.Discard, io.Discard)
 					done <- err
 				}()
 				if action == "cancel" {

@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const nativeDiagnosticLimit = 16 << 10
+
 func nativeCommandPlatform() error { return nil }
 
 type nativeIdentity struct {
