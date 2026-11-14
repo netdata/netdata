@@ -36,9 +36,7 @@ func (s Site) Validate() error {
 	for _, origin := range s.AllowedOrigins {
 		u, err := url.Parse(origin)
 		if err != nil || u.Hostname() == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
-			(u.Path != "" && u.Path != "/") ||
-			u.RawQuery != "" ||
-			u.Fragment != "" {
+			(u.Path != "" && u.Path != "/") || hasQueryOrFragment(u, origin) || !validPort(u, false) {
 			return fmt.Errorf("allowed origin %q must be http(s)://host[:port]", origin)
 		}
 		host := u.Hostname()
@@ -141,8 +139,7 @@ func (r Receiver) Validate() error {
 func validPublicURL(raw string) bool {
 	u, err := url.Parse(raw)
 	return err == nil && u.Hostname() != "" && (u.Scheme == "http" || u.Scheme == "https") && u.User == nil &&
-		u.RawQuery == "" &&
-		u.Fragment == ""
+		!hasQueryOrFragment(u, raw) && validPort(u, false)
 }
 
 // validAddress validates a literal origin or gRPC destination, not a URL
@@ -150,8 +147,8 @@ func validPublicURL(raw string) bool {
 // requires a port.
 func validAddress(raw string, destination bool) bool {
 	u, err := url.Parse(raw)
-	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil ||
-		u.Path != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || strings.Contains(raw, "#") {
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Path != "" ||
+		hasQueryOrFragment(u, raw) {
 		return false
 	}
 	host := u.Hostname()
@@ -163,9 +160,21 @@ func validAddress(raw string, destination bool) bool {
 	} else if !hostRe.MatchString(host) {
 		return false
 	}
+	return validPort(u, destination)
+}
+
+// hasQueryOrFragment reports a query or fragment delimiter, even an empty one.
+// An empty fragment leaves no trace in url.URL, so the raw text is checked.
+func hasQueryOrFragment(u *url.URL, raw string) bool {
+	return u.RawQuery != "" || u.ForceQuery || strings.Contains(raw, "#")
+}
+
+// validPort accepts a port from 1 to 65535, or no port unless one is required;
+// a bare ":" is never accepted.
+func validPort(u *url.URL, required bool) bool {
 	port := u.Port()
 	if port == "" {
-		return !destination && !strings.HasSuffix(u.Host, ":")
+		return !required && !strings.HasSuffix(u.Host, ":")
 	}
 	n, err := strconv.Atoi(port)
 	return err == nil && n >= 1 && n <= 65535
