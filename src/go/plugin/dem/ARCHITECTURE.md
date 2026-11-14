@@ -553,7 +553,7 @@ File layout within packages:
 | `rum/aggregate` | State/construction, ingestion/results, activity, snapshots/ranking, vital statistics and cohesive topic operations, without creating extra state owners |
 | Function packages | Methods keep their columns beside their row builders |
 | History packages | Record codecs are separate from reducers |
-| `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover, with `_engine_test` for those needing the unix process harness |
+| `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
 | `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |
 
 - Pure DEM helpers stay under their domain or `internal/`.
