@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strings"
 	"sync"
 	"time"
 
@@ -68,80 +67,72 @@ func (s *sink) consume(reader io.Reader) error {
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 64<<10), frameMaxBytes+1)
 	for scanner.Scan() {
-		raw := scanner.Bytes()
-		if len(raw) > frameMaxBytes {
-			return s.fail(errors.New("runner frame exceeds 4 MiB transport limit"))
+		if err := s.frame(scanner.Bytes()); err != nil {
+			return s.fail(err)
 		}
-		decoder := json.NewDecoder(strings.NewReader(string(raw)))
-		decoder.DisallowUnknownFields()
-		var record wireEnvelope
-		if err := decoder.Decode(&record); err != nil {
-			return s.fail(fmt.Errorf("invalid runner protocol frame: %w", err))
-		}
-		var extra any
-		if err := decoder.Decode(&extra); err != io.EOF {
-			return s.fail(errors.New("multiple values in runner protocol frame"))
-		}
-		s.mu.Lock()
-		if s.result != nil {
-			s.mu.Unlock()
-			return s.fail(errors.New("runner sent a frame after its terminal result"))
-		}
-		var protocolErr error
-		switch record.Type {
-		case "event":
-			if record.Result != nil || record.ExtensionInit != nil || record.Extension != nil {
-				protocolErr = errors.New("invalid runner event envelope")
-				break
-			}
-			var event synthetic.Event
-			if err := decodeCore(record.Event, &event); err != nil {
-				protocolErr = err
-			} else if err := validateEvent(event); err != nil {
-				protocolErr = err
-			} else {
-				s.extensions.core()
-				s.add(event)
-			}
-		case "result":
-			if record.Event != nil || record.ExtensionInit != nil || record.Extension != nil {
-				protocolErr = errors.New("invalid runner result envelope")
-				break
-			}
-			var result reporterResult
-			if err := decodeCore(record.Result, &result); err != nil {
-				protocolErr = err
-			} else if err := validateResult(s.kind, s.capture, s.trace, &result); err != nil {
-				protocolErr = err
-			} else {
-				s.extensions.core()
-				result.Error = s.redact.text(result.Error)
-				s.result = &result
-			}
-		case "extension_init", "extension":
-			if record.Event != nil || record.Result != nil ||
-				record.Type == "extension_init" && record.Extension != nil ||
-				record.Type == "extension" && record.ExtensionInit != nil {
-				protocolErr = errors.New("mixed runner extension envelope")
-				break
-			}
-			if record.Type == "extension_init" {
-				s.extensions.init(record.ExtensionInit)
-			} else {
-				s.extensions.accept(record.Extension, s.redact)
-			}
-		default:
-			protocolErr = errors.New("unsupported runner frame type")
-		}
-		if protocolErr != nil {
-			s.mu.Unlock()
-			return s.fail(protocolErr)
-		}
-		s.mu.Unlock()
 	}
 	if err := scanner.Err(); err != nil {
 		return s.fail(fmt.Errorf("read runner protocol: %w", err))
 	}
+	return nil
+}
+
+// frame applies one protocol frame. An error fails the whole stream; invalid
+// optional output only invalidates that output.
+func (s *sink) frame(raw []byte) error {
+	if len(raw) > frameMaxBytes {
+		return errors.New("runner frame exceeds 4 MiB transport limit")
+	}
+	record, err := decodeFrame(raw)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.result != nil {
+		return errors.New("runner sent a frame after its terminal result")
+	}
+	body, err := record.body()
+	if err != nil {
+		return err
+	}
+	switch record.Type {
+	case "event":
+		return s.event(body)
+	case "result":
+		return s.terminal(body)
+	case "extension_init":
+		s.extensions.init(body)
+	default:
+		s.extensions.accept(body, s.redact)
+	}
+	return nil
+}
+
+func (s *sink) event(body json.RawMessage) error {
+	var event synthetic.Event
+	if err := decodeCore(body, &event); err != nil {
+		return err
+	}
+	if err := validateEvent(event); err != nil {
+		return err
+	}
+	s.extensions.core()
+	s.add(event)
+	return nil
+}
+
+func (s *sink) terminal(body json.RawMessage) error {
+	var result reporterResult
+	if err := decodeCore(body, &result); err != nil {
+		return err
+	}
+	if err := validateResult(s.kind, s.capture, s.trace, &result); err != nil {
+		return err
+	}
+	s.extensions.core()
+	result.Error = s.redact.text(result.Error)
+	s.result = &result
 	return nil
 }
 
