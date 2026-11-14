@@ -75,7 +75,11 @@ func newHandler(s *source) *syntheticfunc.Handler {
 	if s == nil {
 		return syntheticfunc.New(nil, nil)
 	}
-	return syntheticfunc.New(query.New(s.active, s, s, nil), nil)
+	active := s.active
+	if active == nil {
+		active = syntheticregistry.New()
+	}
+	return syntheticfunc.New(query.New(active, s, s, noPolicyError), nil)
 }
 
 // activeJobs is a fixed set of active jobs and their latest runs, keyed by job ID.
@@ -624,7 +628,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journal).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunc.New(query.New(nil, synthetichistory.NewStore(journal), nil, nil), nil)
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), synthetichistory.NewStore(journal), emptyArtifacts(t), noPolicyError), nil)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -650,7 +654,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	}
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
-	h := syntheticfunc.New(query.New(nil, retained, nil, nil), nil)
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), retained, emptyArtifacts(t), noPolicyError), nil)
 	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)
@@ -779,7 +783,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 		require.NoError(t, err)
 		active.runs[jobID] = run
 	}
-	h := syntheticfunc.New(query.New(active, store, nil, nil), nil)
+	h := syntheticfunc.New(query.New(active, store, emptyArtifacts(t), noPolicyError), nil)
 	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)
@@ -802,3 +806,23 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 		assert.Equal(t, 403, denied.Status)
 	}
 }
+
+// emptyHistory is a real run history holding no runs.
+func emptyHistory(t *testing.T) *synthetichistory.Store {
+	t.Helper()
+	store, err := demjournal.Open(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	return synthetichistory.NewStore(store)
+}
+
+// emptyArtifacts is a real capture store holding no captures.
+func emptyArtifacts(t *testing.T) *artifacts.Store {
+	t.Helper()
+	store, err := artifacts.Open(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	return store
+}
+
+func noPolicyError() string { return "" }

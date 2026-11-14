@@ -81,11 +81,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err != nil {
 		return statusError(err)
 	}
-	row := statusRow{Status: status}
-	if h.policyError != nil {
-		row.policyError = h.policyError()
-	}
-	response.Data = [][]any{statusColumns.Row(row)}
+	response.Data = [][]any{statusColumns.Row(statusRow{Status: status, policyError: h.policyError()})}
 	return response
 }
 func timestamp(t time.Time) any {

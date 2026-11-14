@@ -52,7 +52,7 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 			return journal.Status{
 				Inventory: inventory,
 			}, nil
-		}), nil)
+		}), func() string { return "" })
 		row := h.HandleRaw(context.Background(), request()).Data.([][]any)[0]
 		assert.Nil(t, row[0])
 		assert.Nil(t, row[1])
@@ -123,6 +123,6 @@ func TestCancellationReachesStorage(t *testing.T) {
 		assert.Same(t, ctx, got)
 		cancel()
 		return journal.Status{}, got.Err()
-	}), nil)
+	}), func() string { return "" })
 	assert.Equal(t, 499, h.HandleRaw(ctx, request()).Status)
 }

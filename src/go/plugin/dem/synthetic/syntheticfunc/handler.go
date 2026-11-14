@@ -84,9 +84,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	if h.deps == nil {
-		return funcapi.UnavailableResponse("synthetic observations are unavailable")
-	}
 	return spec.serve(h, ctx, args, spec.Table())
 }
 

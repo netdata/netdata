@@ -12,6 +12,7 @@ import (
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,8 @@ func TestStoredRunWithoutEventsOrArtifactsShowsEmptyLists(t *testing.T) {
 	require.Nil(t, stored.Events)
 	require.Nil(t, stored.Artifacts)
 
-	got := call(syntheticfunc.New(query.New(nil, store, nil, nil), nil), "synthetics-run", "job_id:lighthouse:home", "run_id:r")
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), store, emptyArtifacts(t), noPolicyError), nil)
+	got := call(h, "synthetics-run", "job_id:lighthouse:home", "run_id:r")
 	validate(t, got)
 	encoded, err := json.Marshal(got.RawResponse)
 	require.NoError(t, err)

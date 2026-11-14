@@ -65,7 +65,7 @@ func TestRunUsesActiveEvidenceThenRetainedHistory(t *testing.T) {
 	latest.HistoryError = "completion append outcome uncertain"
 	latest.Events = []synthetic.Event{{Message: "latest detail"}}
 	active := activeRuns{run.JobID: latest}
-	service := query.New(active, retained, nil, nil)
+	service := query.New(active, retained, emptyArtifacts(t), noPolicyError)
 	got, err := service.Run(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
 	assert.Equal(t, latest, got)
@@ -106,7 +106,7 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 		CompletedUS:  time.Now().UnixMicro(),
 	}
 	active := activeRuns{run.JobID: run}
-	service := query.New(active, nil, captures, nil)
+	service := query.New(active, emptyHistory(t), captures, noPolicyError)
 	// The manifest owns retained bytes even when the active observation does not
 	// mention them. Arbitrary files and wrong owners never grant membership.
 	evidence, err := service.Evidence(ctx, run.JobID, run.ID, "unrecorded")
@@ -183,7 +183,7 @@ func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {
 		captures, err = artifacts.Open(root)
 		require.NoError(t, err)
 		defer captures.Close()
-		service := query.New(nil, retained, captures, func() string { return "invalid policy reload" })
+		service := query.New(activeRuns{}, retained, captures, func() string { return "invalid policy reload" })
 		page, err := service.Catalogue(ctx, artifacts.Filter{
 			Limit: 1,
 		})
@@ -217,7 +217,7 @@ func TestScreenshotAssociationWithoutHistoryOrActiveJob(t *testing.T) {
 	store, err = artifacts.Open(root)
 	require.NoError(t, err)
 	defer store.Close()
-	service := query.New(activeRuns{}, nil, store, nil)
+	service := query.New(activeRuns{}, emptyHistory(t), store, noPolicyError)
 	evidence, err := service.Evidence(t.Context(), "journey:retired", id, "s1")
 	require.NoError(t, err)
 	require.Len(t, evidence.Artifacts, 1)
@@ -263,7 +263,7 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 			case "missing":
 				require.NoError(t, os.Remove(manifestPath))
 			}
-			service := query.New(active, nil, captures, nil)
+			service := query.New(active, unreadHistory{t}, captures, noPolicyError)
 			for _, id := range []string{"", "report"} {
 				result, err := service.Evidence(ctx, jobID, runID, id)
 				require.Error(t, err)
@@ -275,4 +275,37 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 			}
 		})
 	}
+}
+
+// emptyHistory is a real run history holding no runs.
+func emptyHistory(t *testing.T) *history.Store {
+	t.Helper()
+	store, err := journal.Open(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	return history.NewStore(store)
+}
+
+// emptyArtifacts is a real capture store holding no captures.
+func emptyArtifacts(t *testing.T) *artifacts.Store {
+	t.Helper()
+	store, err := artifacts.Open(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	return store
+}
+
+func noPolicyError() string { return "" }
+
+// unreadHistory fails the test when an evidence read falls back to run history.
+type unreadHistory struct{ t *testing.T }
+
+func (h unreadHistory) QueryRuns(context.Context, history.RunFilter) (history.RunPage, error) {
+	h.t.Error("run history must not be queried")
+	return history.RunPage{}, nil
+}
+
+func (h unreadHistory) GetRun(context.Context, string, string) (synthetic.Run, error) {
+	h.t.Error("run history must not be read")
+	return synthetic.Run{}, os.ErrNotExist
 }

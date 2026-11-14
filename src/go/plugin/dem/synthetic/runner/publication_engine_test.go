@@ -16,6 +16,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -142,7 +143,7 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				}
 			}
 			if strings.Contains(mode, "oversize") {
-				service := query.New(activeRun(ex.Run), nil, store.Store, nil)
+				service := query.New(activeRun(ex.Run), noRunHistory{}, store.Store, func() string { return "" })
 				evidence, err := service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, "")
 				require.NoError(t, err)
 				assert.Equal(t, ex.Run.CaptureState, evidence.CaptureState)
@@ -302,4 +303,15 @@ func (r activeRun) Snapshot(time.Time) []registry.Job { return nil }
 
 func (r activeRun) Latest(jobID, runID string) (synthetic.Run, bool) {
 	return synthetic.Run(r), jobID == r.JobID && runID == r.ID
+}
+
+// noRunHistory retains no runs: evidence comes from the capture manifest and the active run.
+type noRunHistory struct{}
+
+func (noRunHistory) QueryRuns(context.Context, synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
+	return synthetichistory.RunPage{}, nil
+}
+
+func (noRunHistory) GetRun(context.Context, string, string) (synthetic.Run, error) {
+	return synthetic.Run{}, os.ErrNotExist
 }

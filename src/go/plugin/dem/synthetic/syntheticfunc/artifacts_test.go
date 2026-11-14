@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +41,8 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	}
 	_, err = store.Enforce(ctx, 7, 1<<20)
 	require.NoError(t, err)
-	h := syntheticfunc.New(query.New(nil, nil, store, func() string { return "policy reload rejected" }), nil)
+	policyError := func() string { return "policy reload rejected" }
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), emptyHistory(t), store, policyError), nil)
 	response := h.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
