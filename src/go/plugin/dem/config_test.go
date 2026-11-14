@@ -138,7 +138,7 @@ func TestRuntimeConfigOverrides(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {max_bytes: 2147483648, previous_retention_days: 0}"), 0600))
 	loaded, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
-	assert.Equal(t, "managed", loaded.Runtime.Mode)
+	assert.Equal(t, runtimehost.ModeManaged, loaded.Runtime.Mode)
 	assert.Equal(t, 0, loaded.Runtime.PreviousRetentionDays)
 }
 
@@ -213,7 +213,7 @@ func TestRuntimeConfigLegitimateMergesPreserveDefaults(t *testing.T) {
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
 			cfg, err := LoadConfig(multipath.New(dir))
 			require.NoError(t, err)
-			expected := runtimehost.DefaultRuntimeConfig()
+			expected := runtimehost.DefaultConfig()
 			expected.MaxBytes = 2048
 			require.Equal(t, expected, cfg.Runtime)
 		})

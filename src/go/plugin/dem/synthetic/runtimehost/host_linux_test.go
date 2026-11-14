@@ -107,9 +107,7 @@ func installBundle(t *testing.T, store *runtime.Store, version string) runtime.M
 
 func newTestHost(t *testing.T, store *runtime.Store) *Host {
 	t.Helper()
-	host := New(Config{
-		Store: store,
-	})
+	host := NewManaged(store)
 	t.Cleanup(func() { require.NoError(t, host.Close()) })
 	return host
 }

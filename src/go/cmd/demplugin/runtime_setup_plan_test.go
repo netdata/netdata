@@ -263,9 +263,9 @@ func TestRuntimeSetupPlanValidatesEnvironmentAndCanonicalPath(t *testing.T) {
 }
 
 func TestRuntimeSetupPlanBuildOwnershipCannotBeChangedByRuntimeConfig(t *testing.T) {
-	previous := runtimehost.DefaultRuntimeMode
-	t.Cleanup(func() { runtimehost.DefaultRuntimeMode = previous })
-	runtimehost.DefaultRuntimeMode = "native"
+	previous := runtimehost.DefaultMode
+	t.Cleanup(func() { runtimehost.DefaultMode = previous })
+	runtimehost.DefaultMode = "native"
 	dir := t.TempDir()
 	root := filepath.Join(dir, "runtime")
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)), 0600))

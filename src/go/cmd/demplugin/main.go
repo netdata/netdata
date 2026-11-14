@@ -121,7 +121,7 @@ func main() {
 		// Process maintenance retries it, and the catalogue exposes its status.
 		fmt.Fprintf(os.Stderr, "initial DEM artifact cleanup failed: %v\n", err)
 	}
-	runtimeHandle := runtimehost.OpenRuntime(cfg.Runtime, pluginconfig.VarLibDir())
+	runtimeHandle := runtimehost.Open(cfg.Runtime, pluginconfig.VarLibDir())
 	executor, err := runner.New(runtimeHandle.Source, synthetichistory.NewStore(history), captures, cfg.Browser.Concurrency)
 	if err != nil {
 		_ = history.Close()

@@ -25,7 +25,7 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	manifest, archive = adminBundleFixture(t)
 	root = t.TempDir()
 	writeAdminTrust(t, root, "")
-	cfg := runtimehost.DefaultRuntimeConfig()
+	cfg := runtimehost.DefaultConfig()
 	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
 	cache = filepath.Join(root, "cache")
 	store, err := runtime.Open(runtime.DefaultConfig(cache))

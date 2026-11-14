@@ -12,10 +12,10 @@ import (
 )
 
 func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	cache := filepath.Join(t.TempDir(), "cache")
 	cfg.CachePath = cache
-	handle := OpenRuntime(cfg, "")
+	handle := Open(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.NotNil(t, handle.Source)
 	require.NotNil(t, handle.Host)
@@ -26,10 +26,10 @@ func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
 	require.NoError(t, handle.Close())
 }
 func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "preloaded"
+	cfg := DefaultConfig()
+	cfg.Mode = ModePreloaded
 	cfg.PreloadPath = filepath.Join(t.TempDir(), "not-created")
-	handle := OpenRuntime(cfg, "")
+	handle := Open(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.Nil(t, handle.Host)
 	require.Nil(t, handle.Store)
@@ -41,11 +41,11 @@ func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
 }
 
 func TestPreloadedMissingPathIsSetupUnavailable(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "preloaded"
+	cfg := DefaultConfig()
+	cfg.Mode = ModePreloaded
 	cfg.PreloadPath = "relative"
 	require.NoError(t, cfg.Validate())
-	handle := OpenRuntime(cfg, "")
+	handle := Open(cfg, "")
 	require.ErrorContains(t, handle.SetupError, "must be absolute")
 	require.Nil(t, handle.Host)
 	_, err := handle.Source.BeginUse()

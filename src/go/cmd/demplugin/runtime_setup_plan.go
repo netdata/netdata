@@ -60,10 +60,10 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 	var path string
 	switch {
 	case *root != "":
-		mode, path = "preloaded", *root
-	case mode == "native":
+		mode, path = runtimehost.ModePreloaded, *root
+	case mode == runtimehost.ModeNative:
 		path = runtime.DefaultNativeConfig().PayloadPath
-	case mode == "preloaded":
+	case mode == runtimehost.ModePreloaded:
 		path = cfg.PreloadPath
 	default:
 		if *cache != "" {
@@ -101,10 +101,10 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 	// Native packaging fixes this build default. Runtime configuration may change
 	// the selected mode, but must not change who owns automatic host setup.
 	var delivery string
-	switch runtimehost.DefaultRuntimeMode {
-	case "managed":
+	switch runtimehost.Mode(runtimehost.DefaultMode) {
+	case runtimehost.ModeManaged:
 		delivery = "standalone"
-	case "native":
+	case runtimehost.ModeNative:
 		delivery = "native-package"
 	default:
 		return true, errors.New("unknown runtime build default")

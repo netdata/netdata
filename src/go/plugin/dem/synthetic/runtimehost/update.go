@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
@@ -17,6 +18,42 @@ type UpdateStatus struct {
 	Checking      bool  `json:"checking"`
 	LastCheckUS   int64 `json:"last_check_us,omitempty"`
 	LastSuccessUS int64 `json:"last_success_us,omitempty"`
+}
+
+type Qualifier interface {
+	Qualify(context.Context, runner.Source) (*runner.Qualification, error)
+}
+
+// PrepareRelease owns one complete managed transaction. Qualification must use
+// the process's existing execution owner when called inside a running plugin.
+// A nil result with no error means no candidate needed preparation.
+func PrepareRelease(ctx context.Context, store *runtime.Store, options runtime.ReleaseInstallOptions,
+	load func(context.Context) (runtime.Release, error), archive string, qualifier Qualifier) (_ *runner.Qualification, result error) {
+	if qualifier == nil {
+		return nil, errors.New("runtime qualifier is unavailable")
+	}
+	candidate, err := store.BeginPublishedInstall(ctx, options, load)
+	if err != nil || candidate == nil {
+		return nil, err
+	}
+	defer func() {
+		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
+			result = errors.Join(result, candidate.Close())
+		}
+	}()
+	if archive == "" {
+		err = candidate.Download(ctx)
+	} else {
+		err = candidate.Import(ctx, archive)
+	}
+	if err != nil {
+		return nil, err
+	}
+	qualification, err := qualifier.Qualify(ctx, Borrow(candidate))
+	if err != nil {
+		return qualification, err
+	}
+	return qualification, candidate.Select()
 }
 
 // Updater is a process service, independent of monitor configuration and storage

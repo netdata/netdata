@@ -156,14 +156,14 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 		encoder.SetIndent("", "  ")
 		retErr = errors.Join(retErr, encoder.Encode(report))
 	}()
-	if (cfg.Mode == "preloaded" || cfg.Mode == "native") && command != "preload" {
+	if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
 		if command != "status" && command != "qualify" {
-			if cfg.Mode == "native" {
+			if cfg.Mode == runtimehost.ModeNative {
 				return true, errors.New("native runtime installation, update, repair and removal belong to the package manager; install the optional netdata-dem-runtime package")
 			}
 			return true, errors.New("install/update/repair/uninstall require runtime.mode: managed")
 		}
-		handle := runtimehost.OpenRuntime(cfg, "")
+		handle := runtimehost.Open(cfg, "")
 		defer func() {
 			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
 				retErr = errors.Join(retErr, handle.Close())
@@ -172,7 +172,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 		if handle.SetupError != nil {
 			return true, handle.SetupError
 		}
-		if cfg.Mode == "native" {
+		if cfg.Mode == runtimehost.ModeNative {
 			status := handle.Host.Status()
 			report.Runtime = status.Running
 			report.Native = status.Native
@@ -331,7 +331,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			report.Generation = m.Archive.SHA256
 			report.CachePath = ""
 			report.PreloadPath = storeConfig.Path
-			report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": "preloaded", "preload_path": storeConfig.Path}}
+			report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": storeConfig.Path}}
 			report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
 		} else {
 			if err = candidate.Select(); err != nil {
@@ -394,7 +394,7 @@ type runtimeCommandReport struct {
 	Outcome         string                     `json:"outcome,omitempty"`
 	DownloadAllowed bool                       `json:"download_allowed"`
 	Command         string                     `json:"command"`
-	Mode            string                     `json:"mode"`
+	Mode            runtimehost.Mode           `json:"mode"`
 	State           string                     `json:"state"`
 	ReleasePath     string                     `json:"release_path,omitempty"`
 	CachePath       string                     `json:"cache_path,omitempty"`

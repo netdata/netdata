@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package runtimehost holds one selected browser runtime for the plugin process.
+// Package runtimehost opens the browser runtime selected for the plugin process
+// and adapts it to the runner and the job framework.
 package runtimehost
 
 import (
@@ -15,7 +16,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 const (
@@ -26,18 +26,8 @@ const (
 	StateUnavailable = "unavailable"
 )
 
-// Config supplies a caller-owned store. Missing installation does not prevent
-// RUM operation; browser jobs wait until an installed runtime is selected by a
-// new plugin process.
-type Config struct {
-	Store       *runtime.Store
-	Native      *runtime.Native
-	Mode        string
-	Unavailable error
-}
-
 type Snapshot struct {
-	Mode             string                     `json:"mode"`
+	Mode             Mode                       `json:"mode"`
 	Running          *synthetic.RuntimeIdentity `json:"running,omitempty"`
 	State            string                     `json:"state"`
 	SetupError       string                     `json:"setup_error,omitempty"`
@@ -49,10 +39,13 @@ type Snapshot struct {
 	Update           UpdateStatus               `json:"update"`
 }
 
+// Host holds one selected browser runtime for the plugin process. Missing
+// installation does not prevent RUM operation; browser jobs wait until an
+// installed runtime is selected by a new plugin process.
 type Host struct {
-	store           *runtime.Store
-	native          *runtime.Native
-	mode            string
+	store           *runtime.Store  // managed hosts only; caller-owned
+	native          *runtime.Native // native hosts only; caller-owned
+	mode            Mode
 	consumer        processConsumer
 	identity        *synthetic.RuntimeIdentity
 	mu              sync.Mutex
@@ -77,55 +70,65 @@ type processConsumer interface {
 
 var _ runner.Source = (*Host)(nil)
 
-// New acquires the installation and its process protection atomically, once.
-// Neither monitor changes nor subsequent installations change this selection.
-func New(config Config) *Host {
-	h := &Host{
-		store:       config.Store,
-		native:      config.Native,
-		mode:        config.Mode,
-		maintenance: make(map[string]error), log: logger.New(),
-		state: StateMissing, done: make(chan struct{}), sweepInterval: time.Hour,
+func newHost(mode Mode) *Host {
+	return &Host{
+		mode:          mode,
+		maintenance:   make(map[string]error),
+		log:           logger.New(),
+		state:         StateMissing,
+		done:          make(chan struct{}),
+		sweepInterval: time.Hour,
 	}
-	if h.mode == "" {
-		h.mode = "managed"
+}
+
+// NewManaged acquires the store's selected installation and its process
+// protection atomically, once. Neither monitor changes nor subsequent
+// installations change this selection.
+func NewManaged(store *runtime.Store) *Host {
+	h := newHost(ModeManaged)
+	h.store = store
+	if consumer, err := store.AcquireSelected(); err != nil {
+		h.fail(err)
+	} else {
+		h.admit(consumer)
 	}
-	err := config.Unavailable
-	if err == nil {
-		if h.mode == "native" {
-			if h.native == nil {
-				err = errors.New("native browser runtime is unavailable")
-			} else {
-				var consumer *runtime.NativeConsumer
-				consumer, err = h.native.AcquireSelected()
-				if err == nil {
-					h.consumer = consumer
-				}
-			}
-		} else if h.store == nil {
-			err = errors.New("browser runtime store is unavailable")
-		} else {
-			var consumer *runtime.Consumer
-			consumer, err = h.store.AcquireSelected()
-			if err == nil {
-				h.consumer = consumer
-			}
-		}
-	}
-	if err != nil {
-		h.state, h.setupErr = StateUnavailable, err
-		if errors.Is(err, runtime.ErrUnavailable) {
-			h.state = StateMissing
-			h.setupErr = fmt.Errorf("install a browser runtime and restart dem.plugin: %w", err)
-			if h.mode == "native" {
-				h.setupErr = fmt.Errorf("install the optional netdata-dem-runtime package and restart dem.plugin: %w", err)
-			}
-		}
-		return h
-	}
-	h.identity = new(h.consumer.Manifest().Identity())
-	h.state = StateReady
 	return h
+}
+
+// NewNative acquires the package payload's selection like NewManaged.
+func NewNative(native *runtime.Native) *Host {
+	h := newHost(ModeNative)
+	h.native = native
+	if consumer, err := native.AcquireSelected(); err != nil {
+		h.fail(err)
+	} else {
+		h.admit(consumer)
+	}
+	return h
+}
+
+// NewUnavailable reports a setup failure that left the mode without runtime storage.
+func NewUnavailable(mode Mode, err error) *Host {
+	h := newHost(mode)
+	h.fail(err)
+	return h
+}
+
+func (h *Host) admit(consumer processConsumer) {
+	h.consumer = consumer
+	h.identity = new(consumer.Manifest().Identity())
+	h.state = StateReady
+}
+
+func (h *Host) fail(err error) {
+	h.state, h.setupErr = StateUnavailable, err
+	if errors.Is(err, runtime.ErrUnavailable) {
+		h.state = StateMissing
+		h.setupErr = fmt.Errorf("install a browser runtime and restart dem.plugin: %w", err)
+		if h.mode == ModeNative {
+			h.setupErr = fmt.Errorf("install the optional netdata-dem-runtime package and restart dem.plugin: %w", err)
+		}
+	}
 }
 
 func (h *Host) Ready() error {
@@ -187,24 +190,6 @@ func (h *Host) BeginUse() (runner.Use, error) {
 		return nil, err
 	}
 	return managedUse{use: use, host: h, identity: *h.identity}, nil
-}
-
-type managedUse struct {
-	use      *runtime.Use
-	host     *Host
-	identity synthetic.RuntimeIdentity
-}
-
-func (u managedUse) Paths() runner.Paths {
-	return runner.Paths{Node: u.use.Paths.Node, EntryPoint: u.use.Paths.EntryPoint, Identity: u.identity}
-}
-func (u managedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
-func (u managedUse) Finish(drained bool) error {
-	err := u.use.Finish(drained)
-	if err != nil && u.host != nil {
-		u.host.recordFinishError(err)
-	}
-	return err
 }
 
 // Run maintains storage independently of monitoring configuration. It never

@@ -36,10 +36,10 @@ func (c *BrowserConfig) UnmarshalYAML(unmarshal func(any) error) error {
 }
 
 type Config struct {
-	History   RetentionConfig           `yaml:"history"`
-	Artifacts RetentionConfig           `yaml:"artifacts"`
-	Runtime   runtimehost.RuntimeConfig `yaml:"runtime"`
-	Browser   BrowserConfig             `yaml:"browser"`
+	History   RetentionConfig    `yaml:"history"`
+	Artifacts RetentionConfig    `yaml:"artifacts"`
+	Runtime   runtimehost.Config `yaml:"runtime"`
+	Browser   BrowserConfig      `yaml:"browser"`
 }
 
 func DefaultConfig() Config {
@@ -49,7 +49,7 @@ func DefaultConfig() Config {
 			Days:     7,
 			MaxBytes: 2 << 30,
 		},
-		Runtime: runtimehost.DefaultRuntimeConfig(),
+		Runtime: runtimehost.DefaultConfig(),
 		History: RetentionConfig{
 			Days:     30,
 			MaxBytes: 1 << 30,
@@ -80,7 +80,7 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	// Decode the original document strictly for runtime settings, including merges
 	// and aliases, while leaving other sections opaque to this schema.
 	runtimeInput := struct {
-		Runtime runtimehost.RuntimeConfig    `yaml:"runtime"`
+		Runtime runtimehost.Config           `yaml:"runtime"`
 		Other   map[string]opaqueConfigValue `yaml:",inline"`
 	}{Runtime: cfg.Runtime}
 	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {

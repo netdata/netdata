@@ -21,8 +21,8 @@ import (
 )
 
 func TestRuntimeConfigDefaults(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	assert.Equal(t, "managed", cfg.Mode)
+	cfg := DefaultConfig()
+	assert.Equal(t, ModeManaged, cfg.Mode)
 	store, err := cfg.StoreConfig("/var/lib/netdata")
 	require.NoError(t, err)
 	assert.Equal(t, "/var/lib/netdata/dem/runtime", store.Path)
@@ -31,8 +31,8 @@ func TestRuntimeConfigDefaults(t *testing.T) {
 }
 
 func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "native"
+	cfg := DefaultConfig()
+	cfg.Mode = ModeNative
 	require.NoError(t, cfg.Validate())
 	cfg.CachePath = "/alternate/proof"
 	require.ErrorContains(t, cfg.Validate(), "cache_path is only valid in managed mode")
@@ -42,7 +42,7 @@ func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
 }
 
 func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	for _, path := range []string{"", "relative"} {
 		_, err := cfg.StoreConfig(path)
 		require.Error(t, err)
@@ -62,7 +62,7 @@ func trustedFixture() runtime.Manifest {
 		Layout:   runtime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
 }
-func signedSetupFixture(t *testing.T) (RuntimeConfig, runtime.Release, []byte) {
+func signedSetupFixture(t *testing.T) (Config, runtime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
 	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
@@ -73,7 +73,7 @@ func signedSetupFixture(t *testing.T) (RuntimeConfig, runtime.Release, []byte) {
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "public.gpg")
 	require.NoError(t, os.WriteFile(path, pgptest.Public(t, key), 0600))
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	cfg.OfflineKeyring = path
 	return cfg, release, raw
 }
@@ -197,14 +197,14 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	require.ErrorContains(t, err, "offline_keyring")
 	require.Empty(t, requests)
 	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
-	handle := OpenRuntime(cfg, "")
+	handle := Open(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.NoError(t, handle.Close())
 	require.Empty(t, requests, "synchronous runtime startup must never retrieve public keys or descriptors")
 }
 
 func TestReleaseLoaderRequiresDiscoveryURLBeforeNetworkAccess(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	previous := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = previous })
 	requests := 0

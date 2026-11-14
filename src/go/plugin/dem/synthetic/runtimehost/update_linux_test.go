@@ -50,7 +50,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	var archiveRequests atomic.Int32
@@ -97,7 +97,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	require.NoError(t, u.check(context.Background()))
 	require.Equal(t, 1, calls)
 	require.Equal(t, int32(1), archiveRequests.Load())
-	newHost := New(Config{Store: store})
+	newHost := NewManaged(store)
 	defer newHost.Close()
 	require.Equal(t, "second", newHost.Status().Running.Version)
 	require.False(t, newHost.Status().RestartRequired)
@@ -107,7 +107,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(data) }))
@@ -134,7 +134,7 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	entered := make(chan struct{})
 	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
@@ -160,7 +160,7 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 
 func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 	store := testStore(t)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
