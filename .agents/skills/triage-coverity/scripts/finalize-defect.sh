@@ -94,7 +94,8 @@ echo -e "${COV_GRAY}CID ${CID}: verdict=${VERDICT} -> class=${CLASS_ID} sev=${SE
 
 # If a commit SHA is given, append it to the comment before posting.
 if [[ -n "${COMMIT_SHA}" ]]; then
-    tmp_comment="$(mktemp "${TMPDIR:-/tmp}/cov-comment-XXXXXX.txt")"
+    # BSD/macOS mktemp randomizes only trailing X's, so the template must end in them.
+    tmp_comment="$(mktemp "${TMPDIR:-/tmp}/cov-comment.XXXXXX")"
     trap 'rm -f "${tmp_comment}"' EXIT
     {
         cat "${COMMENT_FILE}"
