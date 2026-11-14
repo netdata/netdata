@@ -193,7 +193,7 @@ func retainedNames(t *testing.T, s *Store) []string {
 func snapshotNames(t *testing.T, reader *Snapshot) []string {
 	t.Helper()
 	var names []string
-	require.NoError(t, reader.VisitEntries(func(entry *journal.SnapshotEntry) error {
+	require.NoError(t, visitEntries(reader, func(entry *journal.SnapshotEntry) error {
 		return entry.VisitPayloads(func(payload []byte) error {
 			name, value, _ := bytes.Cut(payload, []byte("="))
 			if string(name) == "MESSAGE" {

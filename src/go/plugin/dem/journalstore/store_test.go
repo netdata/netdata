@@ -38,12 +38,20 @@ func countEntries(t *testing.T, s *Store) int {
 	reader, release, err := s.OpenReader(context.Background())
 	require.NoError(t, err)
 	defer release()
-	if reader == nil {
-		return 0
-	}
 	n := 0
-	require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { n++; return nil }))
+	require.NoError(t, visitEntries(reader, func(*journal.SnapshotEntry) error { n++; return nil }))
 	return n
+}
+
+// visitEntries walks every captured entry in native order. Production readers
+// select through the indexes instead (VisitMatch, VisitRange).
+func visitEntries(r *Snapshot, visit func(*journal.SnapshotEntry) error) error {
+	for _, file := range r.files {
+		if err := file.VisitEntries(r.ctx, visit); err != nil {
+			return err
+		}
+	}
+	return r.ctx.Err()
 }
 
 func TestCancelledAdmissionDoesNotAppend(t *testing.T) {
@@ -73,7 +81,7 @@ func TestScanCancellationAndSnapshotBoundaries(t *testing.T) {
 	reader, release, err := s.OpenReader(ctx)
 	require.NoError(t, err)
 	count := 0
-	err = reader.VisitEntries(func(*journal.SnapshotEntry) error { count++; cancel(); return nil })
+	err = visitEntries(reader, func(*journal.SnapshotEntry) error { count++; cancel(); return nil })
 	assert.ErrorIs(t, err, context.Canceled)
 	assert.Equal(t, 1, count)
 	release()
@@ -82,7 +90,7 @@ func TestScanCancellationAndSnapshotBoundaries(t *testing.T) {
 	defer release()
 	appendEntry(t, s)
 	count = 0
-	require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { count++; return nil }))
+	require.NoError(t, visitEntries(reader, func(*journal.SnapshotEntry) error { count++; return nil }))
 	assert.Equal(t, 4, count, "snapshot excludes later appends")
 }
 

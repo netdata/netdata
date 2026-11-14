@@ -140,9 +140,6 @@ func (s *Store) Close() error {
 // HasObservedKind is a prompt Function-discovery hint, not a retention inventory.
 // It stays true for this store's lifetime once startup or an append observes the kind.
 func (s *Store) HasObservedKind(kind Kind) bool {
-	if s == nil {
-		return false
-	}
 	switch kind {
 	case KindRUM:
 		return s.observedRUM.Load()

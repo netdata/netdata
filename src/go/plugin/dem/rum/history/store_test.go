@@ -257,7 +257,7 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, files, "expired idle history is unlinked")
 		var retained int
-		require.NoError(t, reader.VisitEntries(func(*journal.SnapshotEntry) error { retained++; return nil }))
+		require.NoError(t, reader.VisitMatch("DEM_SESSION_ID", "s", func(*journal.SnapshotEntry) error { retained++; return nil }))
 		assert.Equal(t, 1, retained, "opened snapshot survives archive unlink")
 		sessions, err := s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0, "")
 		require.NoError(t, err)

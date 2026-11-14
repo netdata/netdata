@@ -23,9 +23,6 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
 	var previous EventRecord
 	return reader.VisitRange(journalstore.KindRUM, after, before, func(entry *journal.SnapshotEntry) error {
 		record, rum, err := decodeEvent(entry, &previous)
@@ -47,9 +44,6 @@ func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID strin
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
 	var previous EventRecord
 	return reader.VisitMatch("DEM_SESSION_ID", session, func(entry *journal.SnapshotEntry) error {
 		record, rum, err := decodeEvent(entry, &previous)

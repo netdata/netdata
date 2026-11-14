@@ -27,9 +27,6 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
 	candidate := func(entry *journal.SnapshotEntry) error {
 		phase, run, syntheticEntry, err := decodeSynthetic(entry)
 		if err != nil {

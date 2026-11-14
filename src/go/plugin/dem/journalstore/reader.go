@@ -117,14 +117,6 @@ func (r *Snapshot) close() error {
 	}
 	return err
 }
-func (r *Snapshot) VisitEntries(visit func(*journal.SnapshotEntry) error) error {
-	for _, file := range r.files {
-		if err := file.VisitEntries(r.ctx, visit); err != nil {
-			return err
-		}
-	}
-	return r.ctx.Err()
-}
 func (r *Snapshot) VisitMatch(name, value string, visit func(*journal.SnapshotEntry) error) error {
 	for _, file := range r.files {
 		if err := file.VisitMatch(r.ctx, []byte(name), []byte(value), visit); err != nil {
