@@ -9,35 +9,32 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-type prepared struct{}
-
-func (prepared) Check(context.Context, model.Kind) error       { return nil }
-func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
-
-func (prepared) ExecuteScheduled(
-	context.Context,
-	model.Request,
-	func(string),
-	func(time.Time) model.Schedule,
-) model.Execution {
-	panic("unexpected audit during validation")
-}
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: prepared{},
+		Executor: syntheticjobtest.Executor{},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "home"
 	c.URL = "https://example.org/"
 	return c
+}
+
+// request builds the execution request Init validates for the current configuration.
+func request(t *testing.T, c *Collector) model.Request {
+	t.Helper()
+	r, err := c.newRequest("")
+	require.NoError(t, err)
+	return r
 }
 
 func TestConfiguration(t *testing.T) {
@@ -152,6 +149,29 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			Defaults: true,
 		},
 	)
+}
+
+func TestRequestFromConfiguration(t *testing.T) {
+	c := configured()
+	c.SaveReport = true
+	require.NoError(t, c.Init(t.Context()))
+	assert.Equal(
+		t,
+		model.Request{
+			Kind:    model.Lighthouse,
+			Name:    "home",
+			URL:     "https://example.org/",
+			Timeout: 3 * time.Minute,
+			Capture: true,
+		},
+		request(t, c),
+	)
+}
+
+// DynCfg detects Test by method set, so a Test promoted from the shared job would change how drafts are validated.
+func TestDraftValidationUsesCheck(t *testing.T) {
+	_, testable := any(New(Dependencies{})).(dyncfg.Testable)
+	assert.False(t, testable)
 }
 
 func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {

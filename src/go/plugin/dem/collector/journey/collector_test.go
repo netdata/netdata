@@ -11,30 +11,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-type prepared struct{}
-
-func (prepared) Check(context.Context, model.Kind) error       { return nil }
-func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
-
-func (prepared) ExecuteScheduled(
-	context.Context,
-	model.Request,
-	func(string),
-	func(time.Time) model.Schedule,
-) model.Execution {
-	panic("unexpected execution during config validation")
-}
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: prepared{},
+		Executor: syntheticjobtest.Executor{},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "login"
@@ -50,6 +39,8 @@ func request(t *testing.T, c *Collector) model.Request {
 	return r
 }
 
+var _ dyncfg.Testable = (*Collector)(nil)
+
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
 		`{"vnode":"storefront","name":"login","update_every":10,"check_every":900,"timeout":120,"script":"test('login', async () => {});","secrets":[{"name":"DEM_SECRET_PASSWORD","value":"${env:TEST_PASSWORD}"}],"screenshot_on_failure":true,"trace_on_failure":true,"browser_error_summary":true}`,
@@ -61,7 +52,9 @@ func TestConfiguration(t *testing.T) {
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 		t.Run(format, func(t *testing.T) {
 			c := New(Dependencies{})
-			input := []byte(`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false,"trace_on_failure":false}`)
+			input := []byte(
+				`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false,"trace_on_failure":false}`,
+			)
 			require.NoError(t, decode(input, c))
 			want := Config{
 				Name:        "login",
@@ -224,6 +217,25 @@ func TestBrowserErrorSummaryOption(t *testing.T) {
 	c := configured()
 	require.NoError(t, c.Init(context.Background()))
 	assert.False(t, request(t, c).BrowserErrorSummary)
+}
+
+func TestRequestFromConfiguration(t *testing.T) {
+	c := configured()
+	c.Secrets = []Secret{{Name: "DEM_SECRET_LOGIN", Value: "synthetic-password"}}
+	c.ScreenshotOnFailure = true
+	require.NoError(t, c.Init(t.Context()))
+	assert.Equal(
+		t,
+		model.Request{
+			Kind:    model.Journey,
+			Name:    "login",
+			Script:  "test('login', async () => {});",
+			Secrets: map[string]string{"DEM_SECRET_LOGIN": "synthetic-password"},
+			Timeout: 2 * time.Minute,
+			Capture: true,
+		},
+		request(t, c),
+	)
 }
 
 func TestTraceRequestAndDependency(t *testing.T) {
