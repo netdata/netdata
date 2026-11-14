@@ -450,3 +450,40 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	b.StopTimer()
 	require.NoError(b, s.Sweep())
 }
+
+func TestManagedClaimCloseStartsGraceImmediately(t *testing.T) {
+	for _, kind := range []string{"consumer", "candidate"} {
+		t.Run(kind, func(t *testing.T) {
+			s, now := testStore(t)
+			var manifest Manifest
+			var owner io.Closer
+			if kind == "consumer" {
+				manifest = installFixture(t, s, "old-consumer")
+				consumer, err := s.AcquireSelected()
+				require.NoError(t, err)
+				owner = consumer
+				installFixture(t, s, "replacement")
+			} else {
+				manifest = importFixture(t, s, "unselected-candidate")
+				candidate, err := s.beginFixture(context.Background(), manifest, InstallRelease)
+				require.NoError(t, err)
+				owner = candidate
+			}
+			// Establish that the live claim prevents a grace deadline.
+			require.NoError(t, s.Sweep())
+			before, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.True(t, before.Unneeded.IsZero())
+			*now = now.Add(time.Hour)
+			require.NoError(t, owner.Close())
+			after, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.Equal(t, now.UTC(), after.Unneeded, "close must reconcile grace without waiting for a sweep")
+			*now = now.Add(time.Hour)
+			require.NoError(t, owner.Close())
+			again, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.Equal(t, after.Unneeded, again.Unneeded)
+		})
+	}
+}

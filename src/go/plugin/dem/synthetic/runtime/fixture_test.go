@@ -5,12 +5,9 @@ package runtime
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
@@ -53,14 +50,6 @@ func archiveBounds(a demruntimetest.Archive) Archive {
 	}
 }
 
-// archiveFile writes archive bytes to a private offline input file.
-func archiveFile(t testing.TB, data []byte) string {
-	t.Helper()
-	path := filepath.Join(t.TempDir(), "archive.tar.zst")
-	require.NoError(t, os.WriteFile(path, data, 0600))
-	return path
-}
-
 // boundPayloadFixture extracts and binds the shared payload without a store.
 func boundPayloadFixture(t *testing.T) (*os.Root, Manifest) {
 	t.Helper()
@@ -71,55 +60,6 @@ func boundPayloadFixture(t *testing.T) (*os.Root, Manifest) {
 	require.NoError(t, extractArchive(bytes.NewReader(archive), root, m.Archive))
 	require.NoError(t, bindPrefix(root, "/prepared/runtime", m))
 	return root, m
-}
-
-// publishedRelease describes m as a published release with sequence.
-func publishedRelease(m Manifest, sequence uint64) Release {
-	return Release{
-		Format:   1,
-		Sequence: sequence,
-		Manifest: m,
-		Sources: ReleaseSource{
-			URL:    "https://artifacts.example.invalid/sources.tar.zst",
-			SHA256: strings.Repeat("b", 64),
-			Bytes:  100,
-		},
-	}
-}
-
-// fixturePublisher signs fixture releases. Installation accepts only releases
-// that VerifyRelease authenticated, so fixtures take the same path as published
-// ones. Helper processes create their own publisher.
-var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
-	key, err := openpgp.NewEntity("Runtime fixture", "", "fixture@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
-	if err != nil {
-		return fixtureKeys{}, err
-	}
-	var public bytes.Buffer
-	if err := key.Serialize(&public); err != nil {
-		return fixtureKeys{}, err
-	}
-	trust, err := ParseReleaseKeyring(public.Bytes())
-	return fixtureKeys{key: key, trust: trust}, err
-})
-
-type fixtureKeys struct {
-	key   *openpgp.Entity
-	trust *ReleaseTrust
-}
-
-// verifyFixture signs release as its publisher and authenticates it as a
-// production loader does; validation errors come from VerifyRelease.
-func verifyFixture(release Release) (VerifiedRelease, error) {
-	keys, err := fixturePublisher()
-	if err != nil {
-		return VerifiedRelease{}, err
-	}
-	envelope, err := pgptest.Release(release, keys.key)
-	if err != nil {
-		return VerifiedRelease{}, err
-	}
-	return VerifyRelease(envelope, keys.trust)
 }
 
 // releaseFixture is a cross-architecture release signed by its own key, for
