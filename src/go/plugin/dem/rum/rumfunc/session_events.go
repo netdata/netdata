@@ -73,7 +73,7 @@ var sessionEventsColumns = rawfunc.Columns[query.SessionEvent]{
 		Tooltip: "Details",
 		Type:    funcapi.FieldTypeString,
 		Visible: true,
-		Value:   func(e query.SessionEvent) any { return credentialPatterns.Apply(e.Text) },
+		Value:   func(e query.SessionEvent) any { return e.Text },
 	},
 	{
 		Name:    "trace_id",
@@ -87,7 +87,7 @@ var sessionEventsColumns = rawfunc.Columns[query.SessionEvent]{
 		Tooltip: "User ID at Event",
 		Type:    funcapi.FieldTypeString,
 		Visible: true,
-		Value:   func(e query.SessionEvent) any { return credentialPatterns.Apply(e.UserID) },
+		Value:   func(e query.SessionEvent) any { return e.UserID },
 	},
 	{
 		Name:     "experience_id",
@@ -103,7 +103,7 @@ var sessionEventsColumns = rawfunc.Columns[query.SessionEvent]{
 		Type:     funcapi.FieldTypeString,
 		Visible:  true,
 		Sortable: true,
-		Value:    func(e query.SessionEvent) any { return credentialPatterns.Apply(e.View) },
+		Value:    func(e query.SessionEvent) any { return e.View },
 	},
 	{
 		Name:     "view_id",

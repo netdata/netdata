@@ -3,11 +3,13 @@
 package aggregate
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -193,4 +195,54 @@ func TestNilHistorySinkIsSafe(t *testing.T) {
 		Message:     "m",
 		Fingerprint: "fp1",
 	}))
+}
+
+// Decoded text reaches history as normalized: a credential that removing a
+// control character joins is redacted before it is recorded.
+func TestHistoryRecordsNoCredentialJoinedByCleaning(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	raw, err := json.Marshal(map[string]any{
+		"meta": map[string]any{
+			"session": map[string]string{"id": "session"},
+			"page":    map[string]string{"id": "document", "url": "https://example.org/checkout"},
+			"view":    map[string]string{"name": "tok\x00en=hunter2"},
+			"app":     map[string]string{"version": "Bea\x00rer abcdef.ghi"},
+			"user":    map[string]string{"id": "tok\x00en=hunter2"},
+		},
+		"exceptions": []any{map[string]any{
+			"type":       "Error",
+			"value":      "request failed tok\x00en=hunter2",
+			"stacktrace": map[string]any{"frames": []any{map[string]any{"function": "Bea\x00rer abcdef.ghi", "filename": "https://example.org/app.js", "lineno": 1, "colno": 2}}},
+		}},
+		"events": []any{map[string]any{"name": "Bea\x00rer abcdef.ghi"}},
+	})
+	require.NoError(t, err)
+	b, err := faro.Decode(raw, faro.Options{Site: "s", Now: *now})
+	require.NoError(t, err)
+	a.Ingest(b)
+	require.Len(t, sink.events, 2)
+	context := HistoryEvent{
+		ExperienceID: "document",
+		View:         "token=[REDACTED]",
+		Site:         "s",
+		SessionID:    "session",
+		ObservedUS:   now.UnixMicro(),
+		Page:         "/checkout",
+		Device:       beacon.DeviceDesktop,
+		Version:      "[REDACTED]",
+		UserID:       "token=[REDACTED]",
+	}
+	errorEvent := context
+	errorEvent.Type = "error"
+	errorEvent.Text = "Error: request failed token=[REDACTED]"
+	errorEvent.Fingerprint = sink.events[0].Fingerprint // a hash of the normalized error, not under test
+	errorEvent.ErrorType = "Error"
+	errorEvent.Message = "request failed token=[REDACTED]"
+	errorEvent.SampleStack = "[REDACTED] (https://example.org/app.js:1:2)\n"
+	customEvent := context
+	customEvent.Type = "event"
+	customEvent.Text = "[REDACTED]"
+	assert.Equal(t, []HistoryEvent{errorEvent, customEvent}, sink.events)
 }

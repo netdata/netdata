@@ -656,6 +656,20 @@ Sites:
 - The browser bootstrap limits instrumentation and outgoing metadata. The receiver independently enforces the same
   policy and normalizes supported URLs, paths and text before aggregation, retained history or enabled exports.
 - Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.
+- Ingestion removes control characters from each received text value and redacts every credential the site redactor
+  finds in the received or in the cleaned text. A credential can depend on a removed character (`Bearer<TAB>token`, a
+  word boundary) or be joined by its removal. The size bound comes last, so it cannot cut a credential into an
+  unrecognized prefix. Composed texts (stacks, session timeline entries) are built from redacted values. Opaque IDs
+  (session, page, view, observation, trace) are validated, not redacted.
+- URL values (page URLs, URL-shaped view names and URL attributes) are reduced first: credentials, query and fragment
+  are dropped and path segments generalized. The credential patterns then read the reduced, percent-encoded URL, where
+  an encoded space, a removed control character or a site path rule that rewrote part of a credential can hide a
+  pattern (`/a/Bearer%20token`).
+- Site path rules on a non-URL view name read the cleaned name when it holds no credential in either form, and the
+  redacted name otherwise, so a rule cannot split a credential; a name they leave unchanged is redacted as text.
+- Query output applies the current site redactor to every text value of active sites, because configured credentials
+  can change after ingestion, and the credential patterns to every text value of retired sites, so records written by
+  earlier builds or under an older pattern set get the current patterns. RUM Functions add no redaction of their own.
 
 | Geolocation mode | Lookup | Live observations | Journal and OTLP |
 |---|---|---|---|

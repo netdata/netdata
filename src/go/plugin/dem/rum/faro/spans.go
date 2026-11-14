@@ -107,7 +107,7 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 			break
 		}
 		semanticKey := clean(kv.Key, len(kv.Key))
-		key := opt.text(semanticKey, maxNameLen)
+		key := opt.text(kv.Key, maxNameLen)
 		if key == "" {
 			continue
 		}

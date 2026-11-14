@@ -77,7 +77,7 @@ var errorsColumns = rawfunc.Columns[errorRow]{
 		Tooltip: "Message",
 		Type:    funcapi.FieldTypeString,
 		Visible: true,
-		Value:   func(r errorRow) any { return credentialPatterns.Apply(r.Message) },
+		Value:   func(r errorRow) any { return r.Message },
 	},
 	{
 		Name:     "count_window",
@@ -130,7 +130,7 @@ var errorsColumns = rawfunc.Columns[errorRow]{
 		Tooltip: "Sample Stack",
 		Type:    funcapi.FieldTypeString,
 		Visible: true,
-		Value:   func(r errorRow) any { return credentialPatterns.Apply(r.SampleStack) },
+		Value:   func(r errorRow) any { return r.SampleStack },
 	},
 	{
 		Name:      "row_id",

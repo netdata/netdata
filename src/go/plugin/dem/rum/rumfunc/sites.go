@@ -233,7 +233,7 @@ var sitesColumns = rawfunc.Columns[siteRow]{
 		Type:     funcapi.FieldTypeString,
 		Visible:  true,
 		Sortable: true,
-		Value:    func(r siteRow) any { return credentialPatterns.Apply(r.Rejected.Origin) },
+		Value:    func(r siteRow) any { return r.Rejected.Origin },
 	},
 	{
 		Name:      "last_rejected_at",
