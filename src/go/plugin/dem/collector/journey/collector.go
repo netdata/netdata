@@ -10,7 +10,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/attemptmetrics"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjob"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
@@ -59,7 +59,7 @@ type Collector struct {
 	Config      `yaml:",inline" json:""`
 	deps        Dependencies
 	store       metrix.CollectorStore
-	attempt     attemptmetrics.Instruments
+	attempt     syntheticjob.Instruments
 	metrics     metrics
 	request     model.Request
 	initialized bool
@@ -90,7 +90,7 @@ func New(deps Dependencies) *Collector {
 		},
 		deps:    deps,
 		store:   store,
-		attempt: attemptmetrics.New(meter),
+		attempt: syntheticjob.New(meter),
 		metrics: newMetrics(meter),
 	}
 }

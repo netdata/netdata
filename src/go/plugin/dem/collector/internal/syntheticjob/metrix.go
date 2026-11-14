@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Package attemptmetrics publishes latest browser observations and attempt counters.
-package attemptmetrics
+// Package syntheticjob publishes latest browser observations and attempt counters.
+package syntheticjob
 
 import (
 	"math"
