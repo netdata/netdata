@@ -1,7 +1,7 @@
 # DEM runtime release descriptors
 
 This offline release tool signs the complete runtime preparation contract with
-GPG and verifies it through `runtime.VerifyRelease`. It performs
+GPG and verifies it through `browserruntime.VerifyRelease`. It performs
 no network requests, publication, browser execution or release discovery. Run it
 from `src/go`, using a Go version matching `go.mod`.
 
@@ -106,7 +106,7 @@ checks root ownership and protected ancestors, so a staging directory alone is
 not an installed or qualified runtime.
 
 The builder API is
-`runtime.PrepareNativePackage(ctx, manifest, archivePath, outputPath) error`.
+`browserruntime.PrepareNativePackage(ctx, manifest, archivePath, outputPath) error`.
 Only a successful return authorizes packaging the output. Failed staging remains
 for inspection and explicit cleanup; no completed `native.json` is emitted after
 a digest, extraction, binding or permission failure. Existing nonempty outputs

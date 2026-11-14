@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -271,7 +271,7 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 	}
 	root := t.TempDir()
 	cache := filepath.Join(root, "absent", "cache")
-	canonical, err := runtime.CanonicalRoot(cache)
+	canonical, err := browserruntime.CanonicalRoot(cache)
 	require.NoError(t, err)
 	mismatch := fmt.Sprintf("configured canonical runtime root %q differs from --expected-root %q; no runtime storage changed", canonical, "/var/lib/netdata/dem/runtime")
 	result := runtimeRun(t, context.Background(), "runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--expected-root", "/var/lib/netdata/dem/runtime")

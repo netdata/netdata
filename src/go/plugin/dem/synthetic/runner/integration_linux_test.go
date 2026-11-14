@@ -25,10 +25,10 @@ import (
 	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -60,10 +60,10 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	defer restore()
 	raw, err := os.ReadFile(values[0])
 	require.NoError(t, err)
-	var manifest runtime.Manifest
+	var manifest browserruntime.Manifest
 	require.NoError(t, json.Unmarshal(raw, &manifest))
 	require.NoError(t, manifest.Validate())
-	store, err := runtime.Open(runtime.DefaultConfig(values[1]))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(values[1]))
 	require.NoError(t, err)
 	consumer, err := store.AcquireSelected()
 	require.NoError(t, err)
@@ -602,7 +602,7 @@ func readProcIdentity(pid int) (procIdentity, error) {
 
 // This adapter exposes only the public execution contract of the acquired
 // consumer. It cannot select a different generation or inject private paths.
-type selectedRuntime struct{ consumer *runtime.Consumer }
+type selectedRuntime struct{ consumer *browserruntime.Consumer }
 
 func (s selectedRuntime) BeginUse() (runner.Use, error) {
 	use, err := s.consumer.BeginUse()
@@ -613,7 +613,7 @@ func (s selectedRuntime) BeginUse() (runner.Use, error) {
 }
 
 type selectedUse struct {
-	use      *runtime.Use
+	use      *browserruntime.Use
 	identity synthetic.RuntimeIdentity
 }
 

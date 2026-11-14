@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +20,7 @@ type healthLog struct {
 }
 
 func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
-	h := NewUnavailable(ModeNative, runtime.ErrUnavailable)
+	h := NewUnavailable(ModeNative, browserruntime.ErrUnavailable)
 	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
 	require.Equal(t, StateMissing, h.Status().State)
 	require.Equal(t, ModeNative, h.Status().Mode)
@@ -48,7 +48,7 @@ func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
-	h := NewUnavailable(ModeManaged, runtime.ErrUnavailable)
+	h := NewUnavailable(ModeManaged, browserruntime.ErrUnavailable)
 	var logs healthLog
 	h.log = logger.NewWithWriter(&logs)
 	h.setMaintenance("cleanup", errors.New("trash blocked"))

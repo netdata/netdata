@@ -504,11 +504,11 @@ Synthetic packages:
 | `synthetic/syntheticfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
-| `synthetic/runtime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement and native package admission |
+| `synthetic/browserruntime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement and native package admission |
 | `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
-Deeper package guides: [runtime store](synthetic/runtime/README.md), [runtime host](synthetic/runtimehost/README.md),
+Deeper package guides: [runtime store](synthetic/browserruntime/README.md), [runtime host](synthetic/runtimehost/README.md),
 [capture store](synthetic/artifacts/README.md), [runtime release](../../../dem-runtime/README.md) and
 [Faro assets](rum/faro/assets/README.md).
 
@@ -1114,7 +1114,7 @@ Fixed startup selection (`synthetic/runtimehost`):
 - Startup and hourly maintenance retire unprotected old versions independently of enabled monitors. Maintenance
   errors do not invalidate an otherwise usable runtime or change website outcomes.
 
-Explicit installation and protection (`synthetic/runtime`):
+Explicit installation and protection (`synthetic/browserruntime`):
 
 - Fresh/empty stores publish an initialization record, complete the private layout under coordination, then durably mark
   it ready before admission. Interrupted initialization is retryable; ready stores never recreate missing safety

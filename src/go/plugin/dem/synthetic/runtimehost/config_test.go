@@ -9,13 +9,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -56,18 +56,18 @@ func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
 	assert.Equal(t, cfg.CachePath, store.Path)
 }
 
-func trustedFixture() runtime.Manifest {
-	return runtime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + goruntime.GOARCH,
-		Archive:  runtime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
-		Layout:   runtime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
-		Bindings: []runtime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
+func trustedFixture() browserruntime.Manifest {
+	return browserruntime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + runtime.GOARCH,
+		Archive:  browserruntime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
+		Layout:   browserruntime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
+		Bindings: []browserruntime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
 }
-func signedSetupFixture(t *testing.T) (Config, runtime.Release, []byte) {
+func signedSetupFixture(t *testing.T) (Config, browserruntime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
 	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
-	release := runtime.Release{Format: 1, Sequence: 1, Manifest: manifest,
-		Sources: runtime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 1}}
+	release := browserruntime.Release{Format: 1, Sequence: 1, Manifest: manifest,
+		Sources: browserruntime.ReleaseSource{URL: "https://example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 1}}
 	key := pgptest.Key(t, 19)
 	raw, err := pgptest.Release(release, key)
 	require.NoError(t, err)
@@ -106,7 +106,7 @@ func TestInstalledReleaseTrust(t *testing.T) {
 func TestInstalledReleaseRejectsOtherArchitecture(t *testing.T) {
 	cfg, release, _ := signedSetupFixture(t)
 	release.Manifest.Platform = "linux/arm64"
-	if goruntime.GOARCH == "arm64" {
+	if runtime.GOARCH == "arm64" {
 		release.Manifest.Platform = "linux/amd64"
 	}
 	raw, err := pgptest.Release(release, pgptest.Key(t, 19))
@@ -144,7 +144,7 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	http.DefaultTransport = releaseSetupTransport(func(r *http.Request) (*http.Response, error) {
 		requests = append(requests, r.URL.String())
 		body := raw
-		if r.URL.String() == runtime.ReleaseKeyringURL {
+		if r.URL.String() == browserruntime.ReleaseKeyringURL {
 			body = pgptest.Public(t, pgptest.Key(t, 19))
 		} else {
 			require.Equal(t, cfg.ReleaseURL, r.URL.String())
@@ -161,17 +161,17 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	got, err := cfg.ReleaseLoader(path, true)(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, release, got.Release())
-	require.Equal(t, []string{runtime.ReleaseKeyringURL}, requests)
+	require.Equal(t, []string{browserruntime.ReleaseKeyringURL}, requests)
 	requests = nil
 	got, err = cfg.ReleaseLoader("", true)(context.Background())
 	require.NoError(t, err)
 	require.Equal(t, release, got.Release())
-	require.Equal(t, []string{runtime.ReleaseKeyringURL, cfg.ReleaseURL}, requests)
+	require.Equal(t, []string{browserruntime.ReleaseKeyringURL, cfg.ReleaseURL}, requests)
 	requests = nil
 	fail = true
 	_, err = cfg.ReleaseLoader(path, true)(context.Background())
 	require.ErrorContains(t, err, "503")
-	require.Equal(t, []string{runtime.ReleaseKeyringURL}, requests, "failed canonical refresh must not fall back to the offline ring")
+	require.Equal(t, []string{browserruntime.ReleaseKeyringURL}, requests, "failed canonical refresh must not fall back to the offline ring")
 	requests = nil
 	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, pgptest.Public(t, pgptest.Key(t, 19)), 0600))
 	got, err = cfg.ReleaseLoader(path, false)(context.Background())

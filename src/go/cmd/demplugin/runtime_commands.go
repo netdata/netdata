@@ -10,8 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
 
@@ -19,7 +19,7 @@ const unchangedReleaseNotice = "Selected release is unchanged. Already running p
 
 // releaseLoader returns publisher-authenticated release metadata; executable
 // candidates are never begun without it.
-type releaseLoader = func(context.Context) (runtime.VerifiedRelease, error)
+type releaseLoader = func(context.Context) (browserruntime.VerifiedRelease, error)
 
 // runFixedRuntimeCommand serves status and qualify for preloaded and native
 // runtimes, whose files this CLI never changes.
@@ -74,7 +74,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 		return err
 	}
 	if command == "ensure" {
-		canonical, err := runtime.CanonicalRoot(storeConfig.Path)
+		canonical, err := browserruntime.CanonicalRoot(storeConfig.Path)
 		if err != nil {
 			return err
 		}
@@ -95,7 +95,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 			return fmt.Errorf("runtime installation: %w", err)
 		}
 	}
-	store, err := runtime.Open(storeConfig)
+	store, err := browserruntime.Open(storeConfig)
 	if err != nil {
 		if command == "status" {
 			report.State = "unknown"
@@ -120,7 +120,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 	return closeUnlessUndrained(err, store)
 }
 
-func reportStatus(store *runtime.Store, report *runtimeCommandReport) error {
+func reportStatus(store *browserruntime.Store, report *runtimeCommandReport) error {
 	status, err := report.inventory(store)
 	report.selectedInstallation(status)
 	report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
@@ -128,12 +128,12 @@ func reportStatus(store *runtime.Store, report *runtimeCommandReport) error {
 		return err
 	}
 	if status.Selected == nil {
-		return runtime.ErrUnavailable
+		return browserruntime.ErrUnavailable
 	}
 	return nil
 }
 
-func uninstallRuntime(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
+func uninstallRuntime(ctx context.Context, store *browserruntime.Store, report *runtimeCommandReport) error {
 	err := store.Uninstall(ctx)
 	if err == nil {
 		report.State = "uninstalled"
@@ -145,7 +145,7 @@ func uninstallRuntime(ctx context.Context, store *runtime.Store, report *runtime
 
 // qualifySelected qualifies the selected generation, then reports the store
 // inventory after releasing it.
-func qualifySelected(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
+func qualifySelected(ctx context.Context, store *browserruntime.Store, report *runtimeCommandReport) error {
 	consumer, err := store.AcquireSelected()
 	if err == nil {
 		report.setRuntime(consumer.Manifest().Identity())
@@ -171,8 +171,8 @@ func qualifyInstalled(ctx context.Context, source runner.Source, report *runtime
 // ensureRuntime enrolls a runtime only when none is selected; a usable selection
 // is reported without download or qualification. ensure never reports store
 // inventory.
-func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader, archive string, report *runtimeCommandReport, stderr io.Writer) error {
-	candidate, selected, err := store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
+func ensureRuntime(ctx context.Context, store *browserruntime.Store, load releaseLoader, archive string, report *runtimeCommandReport, stderr io.Writer) error {
+	candidate, selected, err := store.BeginPublishedEnsure(ctx, func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
 		return load(ctx)
 	})
@@ -201,7 +201,7 @@ func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader
 
 // installRuntime installs, updates or repairs the selection. Its report shows
 // the selected installation separately from candidate progress.
-func installRuntime(ctx context.Context, command string, store *runtime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
+func installRuntime(ctx context.Context, command string, store *browserruntime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
 	err := installCandidate(ctx, command, store, load, archive, manualUpdates, report, stderr)
 	status, _ := report.inventory(store)
 	report.selectedInstallation(status)
@@ -211,13 +211,13 @@ func installRuntime(ctx context.Context, command string, store *runtime.Store, l
 	return err
 }
 
-func installCandidate(ctx context.Context, command string, store *runtime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
-	options := runtime.ReleaseInstallOptions{Operation: runtime.ReleaseOperation(command)}
+func installCandidate(ctx context.Context, command string, store *browserruntime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
+	options := browserruntime.ReleaseInstallOptions{Operation: browserruntime.ReleaseOperation(command)}
 	// install and repair set the update policy; update preserves the installed one.
 	if command != "update" {
-		options.Updates = runtime.AutomaticUpdates
+		options.Updates = browserruntime.AutomaticUpdates
 		if manualUpdates {
-			options.Updates = runtime.ManualUpdates
+			options.Updates = browserruntime.ManualUpdates
 		} else {
 			fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
 		}
@@ -236,7 +236,7 @@ func installCandidate(ctx context.Context, command string, store *runtime.Store,
 // preloadRuntime prepares a candidate in a fresh final root and seals it there.
 // A sealed root is no longer managed storage, so only an unsealed attempt
 // reports the store inventory.
-func preloadRuntime(ctx context.Context, store *runtime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) error {
+func preloadRuntime(ctx context.Context, store *browserruntime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) error {
 	sealed, err := sealPreload(ctx, store, root, load, archive, report)
 	if !sealed {
 		status, _ := report.inventory(store)
@@ -248,8 +248,8 @@ func preloadRuntime(ctx context.Context, store *runtime.Store, root string, load
 // sealPreload begins a candidate without automatic updates, qualifies it and
 // seals it as the preload root. sealed reports a completed seal even when
 // closing the candidate fails afterwards.
-func sealPreload(ctx context.Context, store *runtime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) (sealed bool, err error) {
-	options := runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: runtime.ManualUpdates}
+func sealPreload(ctx context.Context, store *browserruntime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) (sealed bool, err error) {
+	options := browserruntime.ReleaseInstallOptions{Operation: browserruntime.InstallRelease, Updates: browserruntime.ManualUpdates}
 	candidate, err := store.BeginPublishedInstall(ctx, options, load)
 	if err != nil {
 		return false, err
@@ -275,7 +275,7 @@ func sealPreload(ctx context.Context, store *runtime.Store, root string, load re
 }
 
 // selectCandidate qualifies the candidate and selects it.
-func selectCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
+func selectCandidate(ctx context.Context, candidate *browserruntime.Candidate, archive string, report *runtimeCommandReport) error {
 	if err := qualifyCandidate(ctx, candidate, archive, report); err != nil {
 		return err
 	}
@@ -291,7 +291,7 @@ func selectCandidate(ctx context.Context, candidate *runtime.Candidate, archive 
 // qualifyCandidate imports or downloads the candidate and qualifies it in a
 // standalone execution scope. A cancellation after qualification stops the
 // command before the candidate is published.
-func qualifyCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
+func qualifyCandidate(ctx context.Context, candidate *browserruntime.Candidate, archive string, report *runtimeCommandReport) error {
 	report.Candidate = new(candidate.Manifest().Identity())
 	report.CandidateState = "requested"
 	var err error

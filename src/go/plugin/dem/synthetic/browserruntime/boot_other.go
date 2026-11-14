@@ -2,6 +2,6 @@
 
 //go:build !linux
 
-package runtime
+package browserruntime
 
 func hostBoot() bootIdentity { return bootIdentity{} }

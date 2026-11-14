@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package runtime
+package browserruntime
 
 // Unverified IDs are never promoted retroactively by a later successful read.
 type bootIdentity struct {

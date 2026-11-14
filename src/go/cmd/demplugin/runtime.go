@@ -17,8 +17,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
@@ -194,25 +194,25 @@ func preparesCandidate(command string) bool {
 }
 
 type runtimeCommandReport struct {
-	Outcome         string                     `json:"outcome,omitempty"`
-	DownloadAllowed bool                       `json:"download_allowed"`
-	Command         string                     `json:"command"`
-	Mode            runtimehost.Mode           `json:"mode"`
-	State           string                     `json:"state"`
-	ReleasePath     string                     `json:"release_path,omitempty"`
-	CachePath       string                     `json:"cache_path,omitempty"`
-	Generation      string                     `json:"generation,omitempty"`
-	Runtime         *synthetic.RuntimeIdentity `json:"runtime,omitempty"`
-	Candidate       *synthetic.RuntimeIdentity `json:"candidate,omitempty"`
-	CandidateState  string                     `json:"candidate_state,omitempty"`
-	SetupError      string                     `json:"setup_error,omitempty"`
-	Storage         *runtime.Status            `json:"storage,omitempty"`
-	StorageError    string                     `json:"storage_error,omitempty"`
-	Native          *runtime.NativeStatus      `json:"native,omitempty"`
-	Qualification   *runner.Qualification      `json:"qualification,omitempty"`
-	PreloadedConfig map[string]any             `json:"preloaded_config,omitempty"`
-	PreloadPath     string                     `json:"preload_path,omitempty"`
-	Notice          string                     `json:"notice,omitempty"`
+	Outcome         string                       `json:"outcome,omitempty"`
+	DownloadAllowed bool                         `json:"download_allowed"`
+	Command         string                       `json:"command"`
+	Mode            runtimehost.Mode             `json:"mode"`
+	State           string                       `json:"state"`
+	ReleasePath     string                       `json:"release_path,omitempty"`
+	CachePath       string                       `json:"cache_path,omitempty"`
+	Generation      string                       `json:"generation,omitempty"`
+	Runtime         *synthetic.RuntimeIdentity   `json:"runtime,omitempty"`
+	Candidate       *synthetic.RuntimeIdentity   `json:"candidate,omitempty"`
+	CandidateState  string                       `json:"candidate_state,omitempty"`
+	SetupError      string                       `json:"setup_error,omitempty"`
+	Storage         *browserruntime.Status       `json:"storage,omitempty"`
+	StorageError    string                       `json:"storage_error,omitempty"`
+	Native          *browserruntime.NativeStatus `json:"native,omitempty"`
+	Qualification   *runner.Qualification        `json:"qualification,omitempty"`
+	PreloadedConfig map[string]any               `json:"preloaded_config,omitempty"`
+	PreloadPath     string                       `json:"preload_path,omitempty"`
+	Notice          string                       `json:"notice,omitempty"`
 }
 
 // setRuntime reports a runtime with its generation, the archive digest.
@@ -223,7 +223,7 @@ func (r *runtimeCommandReport) setRuntime(identity synthetic.RuntimeIdentity) {
 
 // inventory records the store inventory and its error in the report's storage
 // fields. Only status treats the error as its own failure.
-func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, error) {
+func (r *runtimeCommandReport) inventory(store *browserruntime.Store) (browserruntime.Status, error) {
 	status, err := store.Inspect()
 	r.Storage = &status
 	r.StorageError = errorString(err)
@@ -232,7 +232,7 @@ func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, 
 
 // selectedInstallation reports executable selection independently of a candidate
 // and of damage to unrelated retained generations.
-func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
+func (r *runtimeCommandReport) selectedInstallation(status browserruntime.Status) {
 	r.Runtime = nil
 	r.Generation = ""
 	r.State = "unavailable"

@@ -2,7 +2,7 @@
 
 //go:build !linux
 
-package runtime
+package browserruntime
 
 import (
 	"errors"

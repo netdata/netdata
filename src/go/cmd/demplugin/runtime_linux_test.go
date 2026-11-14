@@ -5,13 +5,13 @@ package main
 import (
 	"os"
 	"path/filepath"
-	goruntime "runtime"
+	"runtime"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -23,16 +23,16 @@ import (
 func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	t.Helper()
 	b := demruntimetest.NewBundle(t, "cli-fixture")
-	manifest := runtime.Manifest{
+	manifest := browserruntime.Manifest{
 		Format:   1,
 		Contract: 2,
 		Version:  "cli-fixture",
-		Platform: "linux/" + goruntime.GOARCH,
-		Archive:  runtime.Archive(b.Bounds),
-		Layout:   runtime.Layout(b.Layout),
+		Platform: "linux/" + runtime.GOARCH,
+		Archive:  browserruntime.Archive(b.Bounds),
+		Layout:   browserruntime.Layout(b.Layout),
 	}
 	for _, binding := range b.Bindings {
-		manifest.Bindings = append(manifest.Bindings, runtime.Binding(binding))
+		manifest.Bindings = append(manifest.Bindings, browserruntime.Binding(binding))
 	}
 	require.NoError(t, manifest.Validate())
 	root := t.TempDir()
@@ -57,7 +57,7 @@ func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 	require.NotNil(t, report.Storage)
 	assert.Nil(t, report.Storage.Selected)
 	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
-	require.ErrorIs(t, err, runtime.ErrUnavailable)
+	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
 	assert.Equal(t, "unavailable", report.State)
 }
 
@@ -147,7 +147,7 @@ func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, report.Runtime, result.Runtime)
 	}
-	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
 	require.NoError(t, err)
 	consumer, err := store.AcquireSelected()
 	require.NoError(t, err)
@@ -159,5 +159,5 @@ func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "uninstalled", result.State)
 	_, err = runtimeCommand(t, append([]string{"runtime", "status"}, common...)...)
-	require.ErrorIs(t, err, runtime.ErrUnavailable)
+	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
 }

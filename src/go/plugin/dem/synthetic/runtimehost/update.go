@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -28,9 +28,9 @@ type Qualifier interface {
 // Updater is a process service, independent of monitor configuration and storage
 // maintenance. It prepares selections; it never restarts or switches consumers.
 type Updater struct {
-	store     *runtime.Store
+	store     *browserruntime.Store
 	qualifier Qualifier
-	load      func(context.Context) (runtime.VerifiedRelease, error)
+	load      func(context.Context) (browserruntime.VerifiedRelease, error)
 	delay     func(bool) time.Duration
 	log       *logger.Logger
 	mu        sync.Mutex
@@ -45,7 +45,7 @@ type Updater struct {
 // NewUpdater attaches automatic release preparation to a managed host, at most
 // once. Host.Status reports its progress and Host.Close joins it before
 // releasing process protection. Hosts without a managed store return nil.
-func (h *Host) NewUpdater(qualifier Qualifier, load func(context.Context) (runtime.VerifiedRelease, error)) *Updater {
+func (h *Host) NewUpdater(qualifier Qualifier, load func(context.Context) (browserruntime.VerifiedRelease, error)) *Updater {
 	if h.store == nil {
 		return nil
 	}
@@ -99,7 +99,7 @@ func (u *Updater) check(ctx context.Context) error {
 	u.status.Checking = true
 	u.mu.Unlock()
 	discovered := false
-	err := u.prepare(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
+	err := u.prepare(ctx, func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		discovered = true
 		u.mu.Lock()
 		u.status.LastCheckUS = time.Now().UnixMicro()
@@ -124,8 +124,8 @@ func (u *Updater) check(ctx context.Context) error {
 // prepare runs one complete managed transaction. Qualification uses the
 // process's existing execution owner. Without consent or a newer release no
 // candidate is begun.
-func (u *Updater) prepare(ctx context.Context, load func(context.Context) (runtime.VerifiedRelease, error)) (result error) {
-	options := runtime.ReleaseInstallOptions{Operation: runtime.AutomaticReleaseUpdate}
+func (u *Updater) prepare(ctx context.Context, load func(context.Context) (browserruntime.VerifiedRelease, error)) (result error) {
+	options := browserruntime.ReleaseInstallOptions{Operation: browserruntime.AutomaticReleaseUpdate}
 	candidate, err := u.store.BeginPublishedInstall(ctx, options, load)
 	if err != nil || candidate == nil {
 		return err

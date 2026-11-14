@@ -18,7 +18,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 )
 
 func main() {
@@ -89,17 +89,17 @@ func run(args []string, diagnostics io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("source archive: %w", err)
 	}
-	release := runtime.Release{
+	release := browserruntime.Release{
 		Format:   1,
 		Sequence: sequence,
 		Manifest: m,
-		Sources: runtime.ReleaseSource{
+		Sources: browserruntime.ReleaseSource{
 			URL:    sourcesURL,
 			SHA256: hash,
 			Bytes:  size,
 		},
 	}
-	trusted, err := runtime.ReadReleaseKeyring(publicKey)
+	trusted, err := browserruntime.ReadReleaseKeyring(publicKey)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func run(args []string, diagnostics io.Writer) error {
 	if (len(key) != 40 && len(key) != 64) || strings.Trim(key, "0123456789abcdefABCDEF") != "" {
 		return errors.New("sign requires a full GPG signing fingerprint")
 	}
-	payload, err := runtime.ReleaseSigningPayload(release)
+	payload, err := browserruntime.ReleaseSigningPayload(release)
 	if err != nil {
 		return err
 	}
@@ -120,18 +120,18 @@ func run(args []string, diagnostics io.Writer) error {
 	if err != nil {
 		return errors.New("GPG runtime release signing failed")
 	}
-	signed, err := runtime.EncodeRelease(payload, signature)
+	signed, err := browserruntime.EncodeRelease(payload, signature)
 	if err != nil {
 		return err
 	}
-	if _, err := runtime.VerifyRelease(signed, trusted); err != nil {
+	if _, err := browserruntime.VerifyRelease(signed, trusted); err != nil {
 		return fmt.Errorf("verify generated signature: %w", err)
 	}
 	return writeNew(descriptor, signed)
 }
 
 func verify(key, descriptor, archive, sources string) error {
-	public, err := runtime.ReadReleaseKeyring(key)
+	public, err := browserruntime.ReadReleaseKeyring(key)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func verify(key, descriptor, archive, sources string) error {
 	if err != nil {
 		return err
 	}
-	verified, err := runtime.VerifyRelease(data, public)
+	verified, err := browserruntime.VerifyRelease(data, public)
 	if err != nil {
 		return err
 	}
@@ -164,11 +164,11 @@ func readBounded(path string) ([]byte, error) {
 	}
 	defer f.Close()
 	// Input metadata cannot produce a valid envelope beyond the release protocol bound.
-	data, err := io.ReadAll(io.LimitReader(f, runtime.ReleaseEnvelopeLimit+1))
+	data, err := io.ReadAll(io.LimitReader(f, browserruntime.ReleaseEnvelopeLimit+1))
 	if err != nil {
 		return nil, err
 	}
-	if len(data) > runtime.ReleaseEnvelopeLimit {
+	if len(data) > browserruntime.ReleaseEnvelopeLimit {
 		return nil, errors.New("metadata exceeds release protocol size limit")
 	}
 	return data, nil
@@ -233,8 +233,8 @@ func writeNew(path string, data []byte) error {
 	return nil
 }
 
-func readBuilderManifest(path string) (runtime.Manifest, error) {
-	var m runtime.Manifest
+func readBuilderManifest(path string) (browserruntime.Manifest, error) {
+	var m browserruntime.Manifest
 	data, err := readBounded(path)
 	if err != nil {
 		return m, err
@@ -269,5 +269,5 @@ func stageNative(args []string, diagnostics io.Writer) error {
 	if err != nil {
 		return err
 	}
-	return runtime.PrepareNativePackage(context.Background(), m, *archive, *output)
+	return browserruntime.PrepareNativePackage(context.Background(), m, *archive, *output)
 }

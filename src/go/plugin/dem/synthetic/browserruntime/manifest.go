@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package runtime owns DEM's prepared browser runtimes and their lifetime.
-package runtime
+// Package browserruntime owns DEM's prepared browser runtimes and their lifetime.
+package browserruntime
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 	"math"
 	"net/url"
 	"path"
-	goruntime "runtime"
+	"runtime"
 	"slices"
 	"strings"
 
@@ -130,7 +130,7 @@ func ValidHTTPSURL(address string) bool {
 
 // SupportedHost reports whether this process can run browser runtimes at all.
 func SupportedHost() bool {
-	return goruntime.GOOS == "linux" && supportedPlatform(hostPlatform())
+	return runtime.GOOS == "linux" && supportedPlatform(hostPlatform())
 }
 
 // MatchesHost reports whether m was built for this process's architecture.
@@ -138,7 +138,7 @@ func (m Manifest) MatchesHost() bool { return m.Platform == hostPlatform() }
 
 // hostPlatform names the release platform for this architecture; runtime
 // releases exist only for Linux.
-func hostPlatform() string { return "linux/" + goruntime.GOARCH }
+func hostPlatform() string { return "linux/" + runtime.GOARCH }
 
 func supportedPlatform(platform string) bool {
 	return platform == "linux/amd64" || platform == "linux/arm64"

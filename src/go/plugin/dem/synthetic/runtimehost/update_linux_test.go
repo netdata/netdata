@@ -13,8 +13,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,7 +27,7 @@ func (f qualifyFunc) Qualify(ctx context.Context, source runner.Source) (*runner
 func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
-	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
 	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
@@ -42,7 +42,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
 	verifiedNext := verifiedRelease(t, next)
-	load := func(context.Context) (runtime.VerifiedRelease, error) { return verifiedNext, nil }
+	load := func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedNext, nil }
 	calls := 0
 	u := host.NewUpdater(qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
 		calls++
@@ -78,7 +78,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
-	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
 	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
@@ -93,7 +93,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	var logs healthLog
 	host.log = logger.NewWithWriter(&logs)
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
-		func(context.Context) (runtime.VerifiedRelease, error) { return verifiedNext, nil })
+		func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedNext, nil })
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
 	require.Equal(t, first.Manifest, *status.Storage.Selected)
@@ -106,7 +106,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	host.sweep()
 	require.Equal(t, "update: sandbox qualification failed", host.Status().MaintenanceError, "storage cleanup cannot clear update health")
 	// A later check that finds no newer release clears update health.
-	u.load = func(context.Context) (runtime.VerifiedRelease, error) { return verifiedFirst, nil }
+	u.load = func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedFirst, nil }
 	require.NoError(t, u.check(context.Background()))
 	require.Empty(t, host.Status().MaintenanceError)
 	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update recovered"))
@@ -115,17 +115,17 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
-	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
 	host := NewManaged(store)
 	defer host.Close()
 	entered := make(chan struct{})
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
-	}), func(ctx context.Context) (runtime.VerifiedRelease, error) {
+	}), func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		close(entered)
 		<-ctx.Done()
-		return runtime.VerifiedRelease{}, ctx.Err()
+		return browserruntime.VerifiedRelease{}, ctx.Err()
 	})
 	u.delay = func(bool) time.Duration { return 0 }
 	go u.Run(context.Background())
@@ -143,16 +143,16 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
-	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
 	host := NewManaged(store)
 	entered := make(chan struct{})
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
-	}), func(ctx context.Context) (runtime.VerifiedRelease, error) {
+	}), func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		close(entered)
 		<-ctx.Done()
-		return runtime.VerifiedRelease{}, ctx.Err()
+		return browserruntime.VerifiedRelease{}, ctx.Err()
 	})
 	u.delay = func(bool) time.Duration { return 0 }
 	go u.Run(context.Background())
@@ -174,9 +174,9 @@ func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}),
-		func(context.Context) (runtime.VerifiedRelease, error) {
+		func(context.Context) (browserruntime.VerifiedRelease, error) {
 			t.Error("unexpected discovery")
-			return runtime.VerifiedRelease{}, nil
+			return browserruntime.VerifiedRelease{}, nil
 		})
 	require.NoError(t, u.check(context.Background()))
 	require.Zero(t, host.Status().Update.LastCheckUS)

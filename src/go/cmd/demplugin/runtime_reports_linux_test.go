@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -228,7 +228,7 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			var root, cache, release, archive string
-			var fixture runtime.Manifest
+			var fixture browserruntime.Manifest
 			if tc.selected {
 				root, cache, release, archive, fixture = selectedAdminFixture(t)
 			} else {
@@ -236,14 +236,14 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 				root = t.TempDir()
 				writeAdminTrust(t, root, "")
 				cache = filepath.Join(root, "cache")
-				trusted, err := runtime.ReadRelease(release, adminTrust(t))
+				trusted, err := browserruntime.ReadRelease(release, adminTrust(t))
 				require.NoError(t, err)
 				fixture = trusted.Release().Manifest
 			}
 			reported := cache
 			if strings.HasPrefix(name, "ensure") {
 				// ensure reports the canonical root it verified.
-				canonical, err := runtime.CanonicalRoot(cache)
+				canonical, err := browserruntime.CanonicalRoot(cache)
 				require.NoError(t, err)
 				reported = canonical
 			}
