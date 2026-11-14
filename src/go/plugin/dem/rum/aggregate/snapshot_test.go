@@ -82,19 +82,19 @@ func TestReadsPreserveEveryVitalAndEmptyPopulation(t *testing.T) {
 
 func TestVitalPopulationDoesNotInventOtherMeasurements(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
-	for i := 0; i < 10000+1; i++ {
+	for i := range 3 {
 		b := mk(*now, fmt.Sprint(i), "/", v(beacon.FCP, 100))
 		b.Events = nil
 		a.Ingest(b)
 	}
 	s := a.Snapshot()
-	assert.Equal(t, 10001, s.Vitals[beacon.FCP].N)
+	assert.Equal(t, 3, s.Vitals[beacon.FCP].N)
 	assert.Equal(t, 100., s.Vitals[beacon.FCP].P75)
 	assert.Zero(t, s.Vitals[beacon.LCP].N)
 	assert.Zero(t, s.PageviewsWindow)
 	assert.Zero(t, s.API.N)
 	assert.Zero(t, s.Load.N)
-	assert.Equal(t, 10001, s.ObservedSessions)
+	assert.Equal(t, 3, s.ObservedSessions)
 }
 
 func TestUnknownDimensionsRemainVisible(t *testing.T) {

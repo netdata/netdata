@@ -99,7 +99,7 @@ func TestIsFirstParty(t *testing.T) {
 func TestResourcePopulationIndependentOfDocumentMeasurements(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.Ingest(mk(*now, "document", "/", v(beacon.LCP, 100)))
-	for i := 0; i < 10000+1; i++ {
+	for i := range 3 {
 		a.Ingest(
 			&beacon.Beacon{
 				Site:         "s",
@@ -117,7 +117,7 @@ func TestResourcePopulationIndependentOfDocumentMeasurements(t *testing.T) {
 	assert.EqualValues(t, 1, s.PageviewsWindow)
 	assert.Equal(t, 1, s.Vitals[beacon.LCP].N)
 	assert.Equal(t, 100., s.Vitals[beacon.LCP].P75)
-	assert.Equal(t, 10001, s.API.N)
+	assert.Equal(t, 3, s.API.N)
 	assert.Equal(t, 10., s.API.P75)
 	assert.Equal(t, 2, s.ObservedSessions)
 }

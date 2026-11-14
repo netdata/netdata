@@ -70,7 +70,9 @@ func TestReceiptIndexOrder(t *testing.T) {
 	}
 }
 
-func TestExactPopulationsBeyondFormerCapacity(t *testing.T) {
+// Every retained population stays exact: no count cap, sampling or
+// approximation applies within the window.
+func TestRetainedPopulationsAreExact(t *testing.T) {
 	a, now := newAgg(5*time.Minute, SiteCfg{Name: "s", PageGroups: 20, Countries: 20})
 	const documents = 10001
 	for i := range documents {

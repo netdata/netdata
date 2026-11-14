@@ -285,10 +285,6 @@ func TestApplicationViewsAreSeparateAndRequireExplicitEvents(t *testing.T) {
 	}
 }
 
-type lifecycleHistory []HistoryEvent
-
-func (h *lifecycleHistory) Event(event HistoryEvent) { *h = append(*h, event) }
-
 func TestSessionLifecycleOccurrenceAdmission(t *testing.T) {
 	for _, name := range []string{"session_start", "session_resume", "session_extend"} {
 		t.Run(name, func(t *testing.T) {
@@ -312,8 +308,8 @@ func TestSessionLifecycleOccurrenceAdmission(t *testing.T) {
 					Rate: 1,
 				},
 			})
-			var history lifecycleHistory
-			a.SetHistorySink(&history)
+			history := &fakeHistorySink{}
+			a.SetHistorySink(history)
 			first := a.Ingest(decode("occurrence-1", "1", now.Add(-2*time.Minute)))
 			require.Len(t, first.Observation.Events, 1)
 			require.Zero(t, a.Activity().ObservedSessions)
@@ -328,7 +324,7 @@ func TestSessionLifecycleOccurrenceAdmission(t *testing.T) {
 			require.EqualValues(t, 1, a.Activity().ObservedSessions)
 			require.Zero(t, a.Activity().PageviewsWindow)
 			require.Zero(t, a.Snapshot().Counters[CounterInvalidMeasurements])
-			require.Empty(t, history, "session lifecycle does not produce generic history rows")
+			require.Empty(t, history.events, "session lifecycle does not produce generic history rows")
 			events, found := a.SessionEvents("session")
 			require.True(t, found)
 			require.Empty(t, events, "session lifecycle does not produce native timeline rows")
