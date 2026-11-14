@@ -76,6 +76,10 @@ func TestApplyRemovingFollowsValueOrder(t *testing.T) {
 	input := "Bearer abcdtoken=QXSECRET\x00"
 	assert.Equal(t, "Bearer [REDACTED]token=[REDACTED]", r.ApplyRemoving(input, unicode.IsControl))
 	assert.Equal(t, "Bearer [REDACTED]token=[REDACTED]", r.Apply(input))
+	// A later value cannot match across an earlier replacement, whatever its bytes.
+	r = NewRedactor("abcd", "\xfftok")
+	input = "abcdtoken=QXSECRET\x00"
+	assert.Equal(t, "[REDACTED]token=[REDACTED]", r.ApplyRemoving(input, unicode.IsControl))
 }
 
 // The span engine behind ApplyRemoving replaces what Apply replaces; only

@@ -92,6 +92,8 @@ type span struct{ start, end int }
 // spans lists the byte ranges Apply replaces in s, step by step in Apply's
 // order: each configured value, then the standalone patterns, then key=value.
 // Each step reads the text with the earlier replacements filled (see filled).
+// Unlike Apply, a configured value never matches across an earlier marker,
+// which matters only for values that contain the marker's text.
 func (r *Redactor) spans(s string) []span {
 	var out []span
 	text := s
@@ -99,16 +101,21 @@ func (r *Redactor) spans(s string) []span {
 		if len(v) < 4 {
 			continue
 		}
-		n := len(out)
+		earlier := len(out)
 		for i := 0; ; {
 			j := strings.Index(text[i:], v)
 			if j < 0 {
 				break
 			}
-			out = append(out, span{start: i + j, end: i + j + len(v)})
-			i += j + len(v)
+			sp := span{start: i + j, end: i + j + len(v)}
+			if overlaps(sp, out[:earlier]) {
+				i += j + 1 // Apply sees a marker there, not the filler
+				continue
+			}
+			out = append(out, sp)
+			i = sp.end
 		}
-		text = filled(text, out[n:])
+		text = filled(text, out[earlier:])
 	}
 	n := len(out)
 	if r.standalone.MatchString(text) {
@@ -125,9 +132,18 @@ func (r *Redactor) spans(s string) []span {
 	return out
 }
 
-// filler stands in for a replaced range. It is invalid UTF-8, so no configured
-// value contains it, and the patterns read it like the marker: only a key=value
-// value holds it, and it is not a word character.
+func overlaps(sp span, spans []span) bool {
+	for _, o := range spans {
+		if sp.start < o.end && o.start < sp.end {
+			return true
+		}
+	}
+	return false
+}
+
+// filler stands in for a replaced range. The patterns read it like the marker:
+// only a key=value value holds it, and it is not a word character. Configured
+// values never match across it (see spans).
 const filler = 0xFF
 
 // filled returns text with spans overwritten by filler, or text itself when
