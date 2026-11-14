@@ -78,7 +78,7 @@ type InvestigateCfg struct {
 
 // alwaysKeep reports whether b alone makes its session investigated.
 func (c InvestigateCfg) alwaysKeep(b *beacon.Beacon) bool {
-	return (c.KeepErrors && len(b.Errors) > 0) || (c.KeepPoorVitals && b.HasPoorVital())
+	return (c.KeepErrors && len(b.Errors) > 0) || (c.KeepPoorVitals && hasPoorVital(b))
 }
 
 // Aggregator owns the rolling measurements and investigation state for one site.

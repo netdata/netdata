@@ -140,7 +140,7 @@ func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
 func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *testing.T) {
 	const session = "late-error"
 	const rate = 0.000001
-	require.False(t, beacon.SessionSampled(session, rate))
+	require.False(t, aggregate.SessionSampled(session, rate))
 	p, history, drain, _, _ := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate:       rate,
 		KeepErrors: true,
@@ -194,7 +194,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 
 func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T) {
 	const rate = 0.000001
-	require.False(t, beacon.SessionSampled("quiet", rate))
+	require.False(t, aggregate.SessionSampled("quiet", rate))
 	p, history, drain, _, transport := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate: rate,
 	})

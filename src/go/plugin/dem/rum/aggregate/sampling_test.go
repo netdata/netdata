@@ -51,7 +51,7 @@ func TestInvestigateSamplingIsPerSession(t *testing.T) {
 		id := fmt.Sprintf("sess-%d", i)
 		b := pageview(*now, id)
 		result := a.Ingest(b)
-		if result.Investigated != beacon.SessionSampled(id, 0.5) {
+		if result.Investigated != SessionSampled(id, 0.5) {
 			t.Fatalf("%s: Investigated=%v disagrees with the session decision", id, result.Investigated)
 		}
 		b2 := pageview(*now, id)
@@ -142,5 +142,62 @@ func TestActivityCountsInvestigatedSessions(t *testing.T) {
 	act := a.Activity()
 	if act.ObservedSessions != 2 || act.InvestigatedSessions != 1 {
 		t.Fatalf("activity = %+v, want 2 active, 1 investigated", act)
+	}
+}
+
+func TestSessionSampledIsStablePerSessionAndProportional(t *testing.T) {
+	if !SessionSampled("any", 1) || SessionSampled("any", 0) {
+		t.Fatal("rate 1 keeps every session, rate 0 none")
+	}
+	first := SessionSampled("s-42", 0.3)
+	second := SessionSampled("s-42", 0.3)
+	if first != second {
+		t.Fatal("the decision must be the same every time for one session")
+	}
+	kept := 0
+	for i := 0; i < 20000; i++ {
+		if SessionSampled(fmt.Sprintf("session-%d", i), 0.1) {
+			kept++
+		}
+	}
+	if kept < 1700 || kept > 2300 {
+		t.Fatalf("10%% of 20000 sessions kept = %d", kept)
+	}
+}
+
+func TestHasPoorVital(t *testing.T) {
+	for _, tc := range []struct {
+		vitals []beacon.Vital
+		want   bool
+	}{
+		{nil, false},
+		{[]beacon.Vital{{Name: beacon.LCP, Value: 2400}, {Name: beacon.CLS, Value: 0.05}}, false},
+		{[]beacon.Vital{{Name: beacon.LCP, Value: 4001}}, true},
+		{[]beacon.Vital{{Name: beacon.INP, Value: 501}}, true},
+		{[]beacon.Vital{{Name: beacon.CLS, Value: 0.26}}, true},
+		{[]beacon.Vital{{Name: beacon.FCP, Value: 3001}}, true},
+		{[]beacon.Vital{{Name: beacon.TTFB, Value: 1801}}, true},
+		{[]beacon.Vital{{Name: beacon.LCP, Value: 4000}}, false},
+		{[]beacon.Vital{{Name: "FID", Value: 1e9}}, false},
+	} {
+		if got := hasPoorVital(&beacon.Beacon{
+			Vitals: tc.vitals,
+		}); got != tc.want {
+			t.Errorf("%+v: got %v", tc.vitals, got)
+		}
+	}
+}
+
+// Session promotion and chart ratings read one threshold table, so a vital
+// promotes a session exactly when the charts count it as poor.
+func TestPoorVitalMatchesChartRating(t *testing.T) {
+	for _, name := range beacon.Vitals {
+		limit := thresholds[name][1]
+		for _, value := range []float64{limit, limit * 1.001} {
+			rated := stats(name, []float64{value}).Poor == 1
+			if got := poorVital(beacon.Vital{Name: name, Value: value}); got != rated {
+				t.Errorf("%s=%v: promotion %v, chart poor %v", name, value, got, rated)
+			}
+		}
 	}
 }

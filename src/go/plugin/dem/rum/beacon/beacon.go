@@ -34,10 +34,6 @@ const (
 // mobile:true beacon is classified as tablet rather than mobile ("viewport width >= 600").
 const TabletViewportMinWidth = 600
 
-// SessionTTL is how long a session lasts without a beacon before the next
-// one starts a new session.
-const SessionTTL = 30 * time.Minute
-
 // EventKind describes normalized event semantics independently of wire names.
 type EventKind uint8
 
