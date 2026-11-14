@@ -25,9 +25,10 @@ func (e *SelectionError) Error() string {
 }
 func (e *SelectionError) Unwrap() error { return e.Err }
 
-// selection is the durable installation decision. Release is nil only after an
-// explicit uninstall; every selected generation is backed by an authenticated
-// release, whose manifest identifies it.
+// selection is the durable installation decision. Every selected generation is
+// backed by an authenticated release, whose manifest identifies it. An explicit
+// null release means nothing is selected: a new store, after uninstall, or while
+// repair rebuilds the selection.
 type selection struct {
 	Release          *Release `json:"release"`
 	AutomaticUpdates bool     `json:"automatic_updates,omitempty"`

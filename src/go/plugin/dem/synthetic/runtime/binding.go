@@ -69,10 +69,11 @@ type payloadLayoutError string
 func (e payloadLayoutError) Error() string { return string(e) }
 
 // Execute permission classes for verifyBoundPayload. Linux grants execution
-// through the owner bits when the caller owns the file and through group/other
-// bits otherwise. Managed generations are owned and executed by the service
-// account. Native payloads are root-owned and executed by the non-root service
-// UID, so their owner bit never authorizes the service.
+// through the owner bits when the caller owns the file, the group bits when it
+// is in the file's group, and the other bits otherwise. Managed generations are
+// owned and executed by the service account. Native payloads are root-owned and
+// executed by the non-root service UID, so their owner bit never authorizes it;
+// qualification, which runs the payload as that UID, remains the full proof.
 const (
 	ownerExecute    os.FileMode = 0100
 	nonOwnerExecute os.FileMode = 0011

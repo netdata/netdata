@@ -33,9 +33,10 @@ signatures to 64 KiB before parsing. Unknown fields and trailing JSON are reject
 Publication sequence is monotonically increasing across architectures and execution
 contract changes in the release channel. Installation and update checks reject
 regression below the current selected sequence and reuse of that sequence for
-different release content. Equal content is a no-op. This rule applies to ordinary latest checks,
-including an explicitly requested check; choosing an older authenticated offline
-release is a deliberate administrator recovery operation instead.
+different release content. Equal content is a no-op. This rule applies to ordinary
+latest checks, including an explicitly requested check; choosing an older
+authenticated offline release is a deliberate administrator recovery operation
+instead.
 
 Sequence describes publisher order, not component security. These primitives do
 not detect withheld updates, guarantee freshness for a fresh installation,
@@ -56,9 +57,10 @@ Extraction rejects escaping paths, duplicate entries, privileged modes, devices,
 hard links and symlink parents. Preparation binds only authenticated interpreter
 slots to the final generation, generates the private browser wrapper/font
 configuration and verifies the bound layout: plain parents, the entrypoint, and
-executables carrying the execute bit of the identity that runs them (owner for
-managed generations; group or other for root-owned native packages, which ensure
-and native admission verify the same way). It syncs staging before publishing.
+owner-executable executables in the preparing account's staging. Ensure checks a
+selected generation the same way. Native admission applies the same layout check
+but requires a group or other execute bit: root owns package files and the
+non-root service runs them. Preparation syncs staging before publishing.
 A prepared generation must never be relocated.
 
 The store reserves archive plus expanded workspace before opening the source.
@@ -88,10 +90,11 @@ This is not isolation against malicious code running as the same service account
 | Execution receipt | Every executable access; only authoritative drainage, helper receipt or verified reboot permits release |
 
 `BeginPublishedInstall` holds a separate installation lock while
-preparation/qualification runs outside inventory coordination. `Candidate.Select` publishes the qualified
-release. `AcquireSelected` reads that selection and creates its process claim under
-the same coordination lock. There is no per-monitor claim or automatic download.
-A missing startup selection requires a restart after installation.
+preparation/qualification runs outside inventory coordination. `Candidate.Select`
+publishes the qualified release. `AcquireSelected` reads that selection and creates
+its process claim under the same coordination lock. There is no per-monitor claim or
+automatic download. A missing startup selection requires a restart after
+installation.
 
 Each consumer/candidate `BeginUse` publishes an execution record before returning
 paths. Pass its `Completion` to exactly one supervised invocation, join the helper,

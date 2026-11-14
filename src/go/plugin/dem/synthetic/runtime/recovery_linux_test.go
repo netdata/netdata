@@ -156,9 +156,15 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 			old := installFixture(t, s, "old")
 			selected := installFixture(t, s, "selected")
 			damageRuntime(t, s, old, selected, damage)
-			require.ErrorIs(t, s.Sweep(), ErrDamaged)
+			// Damage never reads as an ordinary absence through the strict inventory.
+			err := s.Sweep()
+			require.ErrorIs(t, err, ErrDamaged)
+			require.NotErrorIs(t, err, ErrUnavailable)
+			require.NotErrorIs(t, err, os.ErrNotExist)
 			status, err := s.Inspect()
 			require.ErrorIs(t, err, ErrDamaged)
+			require.NotErrorIs(t, err, ErrUnavailable)
+			require.NotErrorIs(t, err, os.ErrNotExist)
 			require.Empty(t, status.InventoryError)
 			if damage == "invalid-unselected" {
 				require.Empty(t, status.SelectionError)
