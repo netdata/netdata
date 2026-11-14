@@ -6,8 +6,6 @@
 #include "database/rrd.h"
 #include "sqlite3.h"
 
-void analytics_set_data_str(char **name, const char *value);
-
 #define SQLITE_BIND_FAIL(label, rc)                                                                                    \
     do {                                                                                                               \
         if ((rc) != SQLITE_OK)                                                                                         \

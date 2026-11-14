@@ -784,12 +784,11 @@ docker run -e DO_NOT_TRACK=1 netdata/netdata
 
 ### Build-time variables
 
-A few environment variables are baked into the image at build time and are **not** meant to be set with `docker run -e`:
+One environment variable is baked into the image at build time and is **not** meant to be set with `docker run -e`:
 
-- `NETDATA_OFFICIAL_IMAGE` — marks whether the image is an official Netdata build. It is set during the image build and feeds the anonymous telemetry beacon. You do not need to set it.
 - `DOCKER_GRP` — the group name created in the image at build time.
 
-These are documented here for completeness. Changing them at runtime has no supported effect on the entrypoint behavior.
+It is documented here for completeness. Changing it at runtime has no supported effect on the entrypoint behavior.
 
 ## Publish a test image to your own repository
 

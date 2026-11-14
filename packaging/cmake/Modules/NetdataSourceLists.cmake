@@ -34,8 +34,12 @@ set(DAEMON_FILES
         src/daemon/libuv_workers.h
         src/daemon/pulse/pulse.c
         src/daemon/pulse/pulse.h
-        src/daemon/analytics.c
-        src/daemon/analytics.h
+        src/daemon/api-v1-info-fields.c
+        src/daemon/api-v1-info-fields.h
+        src/daemon/telemetry-optout.c
+        src/daemon/telemetry-optout.h
+        src/daemon/timezone.c
+        src/daemon/timezone.h
         src/daemon/main.c
         src/daemon/main.h
         src/daemon/environment.c

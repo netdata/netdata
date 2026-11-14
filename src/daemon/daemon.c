@@ -170,10 +170,8 @@ static void oom_score_adj(void) {
         return;
     }
 
-    if (old_score != 0) {
+    if (old_score != 0)
         wanted_score = old_score;
-        analytics_report_oom_score(old_score);
-    }
 
     // check the environment
     const char *s = getenv("OOMScoreAdjust");
@@ -225,7 +223,6 @@ static void oom_score_adj(void) {
                 netdata_log_info("Adjusted my Out-Of-Memory (OOM) score from %d to %d.", (int)old_score, (int)final_score);
             else
                 netdata_log_error("Adjusted my Out-Of-Memory (OOM) score from %d to %d, but it has been set to %d.", (int)old_score, (int)wanted_score, (int)final_score);
-            analytics_report_oom_score(final_score);
         }
         else
             netdata_log_error("Failed to adjust my Out-Of-Memory (OOM) score to %d. Running with %d. (systemd systems may change it via netdata.service)", (int)wanted_score, (int)old_score);

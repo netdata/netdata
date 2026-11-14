@@ -157,8 +157,6 @@ static void service_to_buffer(BUFFER *wb, SERVICE_TYPE service) {
         buffer_strcat(wb, "CONTEXT ");
     if(service & SERVICE_SYSTEM_INFO)
         buffer_strcat(wb, "SYSTEM_INFO ");
-    if(service & SERVICE_ANALYTICS)
-        buffer_strcat(wb, "ANALYTICS ");
     if(service & SERVICE_EXPORTERS)
         buffer_strcat(wb, "EXPORTERS ");
     if(service & SERVICE_HTTPD)

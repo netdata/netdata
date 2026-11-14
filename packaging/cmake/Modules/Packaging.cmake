@@ -402,7 +402,6 @@ set(CPACK_RPM_NETDATA_USER_FILELIST
     "%attr(0750,root,netdata) /usr/libexec/netdata/netdata-uninstaller.sh"
     "%attr(0750,root,netdata) /usr/libexec/netdata/netdata-updater.sh"
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/alarm-notify.sh"
-    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/cgroup-name"
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
     "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/get-kubernetes-labels.sh"

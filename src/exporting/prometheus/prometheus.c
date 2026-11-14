@@ -958,7 +958,7 @@ static inline time_t prometheus_preparation(
     time_t now)
 {
 #ifndef UNIT_TESTING
-    analytics_log_prometheus();
+    info_fields_count_hit(INFO_FIELDS_HIT_PROMETHEUS);
 #endif
     if (!server || !*server)
         server = "default";

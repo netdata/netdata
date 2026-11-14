@@ -35,7 +35,7 @@ The time can be changed by setting this `-DNETDATA_TRACE_RWLOCKS_WAIT_TIME_TO_IG
 If any lock is holded for more than 10000 usec, it will be logged like this:
 
 ```
-RW_LOCK ON LOCK 0x0x55a20afc1b20: 4187198, 'ANALYTICS' (function analytics_gather_mutable_meta_data() 532@daemon/analytics.c) holded a 'R' for 13232 usec.
+RW_LOCK ON LOCK 0x0x55a20afc1b20: 4187198, 'WEB[1]' (function host_collectors() 14@web/api/v1/api_v1_info.c) holded a 'R' for 13232 usec.
 ```
 
 The time can be changed by setting this `-DNETDATA_TRACE_RWLOCKS_HOLD_TIME_TO_IGNORE_USEC=20000` (or whatever number) to the CFLAGS.

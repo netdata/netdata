@@ -8,7 +8,6 @@
 #endif
 
 void aclk_main(void *ptr);
-void analytics_main(void *ptr);
 void cpuidlejitter_main(void *ptr);
 void health_main(void *ptr);
 void pluginsd_main(void *ptr);
@@ -43,13 +42,13 @@ const struct netdata_static_thread static_threads_common[] = {
         .start_routine = health_main
     },
     {
-        .name = "ANALYTICS",
+        .name = "NOTIFY-METHODS",
         .config_section = NULL,
         .config_name = NULL,
         .enabled = 0,
         .thread = NULL,
         .init_routine = NULL,
-        .start_routine = analytics_main
+        .start_routine = info_fields_notification_methods_main
     },
     {
         .name = "PULSE",

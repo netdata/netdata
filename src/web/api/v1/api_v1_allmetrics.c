@@ -46,7 +46,7 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
 #define SHELL_ELEMENT_MAX 100
 
 void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_string, BUFFER *wb) {
-    analytics_log_shell();
+    info_fields_count_hit(INFO_FIELDS_HIT_SHELL);
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     // for each chart
@@ -171,7 +171,7 @@ static void allmetrics_json_value(BUFFER *wb, NETDATA_DOUBLE value) {
 }
 
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
-    analytics_log_json();
+    info_fields_count_hit(INFO_FIELDS_HIT_JSON);
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     buffer_strcat(wb, "{");
