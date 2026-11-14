@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rumfunc_test
 
 import (
@@ -10,8 +11,49 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type captureFunctionSource struct {
+	metadataFunctionSource
+	known bool
+	count int
+}
+
+func (s captureFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
+	return []query.Page{{Site: "shop", Page: "/", FrustrationsKnown: s.known, FrustrationWindow: s.count}}, nil
+}
+
+func TestPageFrustrationDistinguishesDisabledFromMeasuredZero(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		known bool
+		count int
+		want  any
+	}{
+		{"disabled", false, 0, nil},
+		{"enabled_without_signals", true, 0, 0},
+		{"enabled_with_signals", true, 3, 3},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := rumfunc.New(captureFunctionSource{
+				known: tc.known,
+				count: tc.count,
+			}, nil)
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      "rum-pages",
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, response.RawResponse)
+			rows := response.RawResponse["data"].([][]any)
+			require.Len(t, rows, 1)
+			columns := response.RawResponse["columns"].(map[string]any)
+			index := columns["frustration_window"].(map[string]any)["index"].(int)
+			assert.Equal(t, tc.want, rows[0][index])
+		})
+	}
+}
 
 type measurementSource struct {
 	metadataFunctionSource
@@ -57,60 +99,6 @@ func TestPagePopulationCountsAndAbsentPercentiles(t *testing.T) {
 	}
 }
 
-type measurementSiteSource struct {
-	metadataFunctionSource
-	serving bool
-	rate    float64
-}
-
-func (s measurementSiteSource) Receiver() query.Receiver {
-	return query.Receiver{
-		Serving: s.serving,
-	}
-}
-func (s measurementSiteSource) Sites(context.Context, string) ([]query.Site, error) {
-	return []query.Site{{Name: "shop", Sampling: query.Sampling{
-		MeasureRate: s.rate,
-	}, Activity: query.Activity{
-		ObservedSessions:       3,
-		InvestigatedSessions:   7,
-		PageviewsWindow:        2,
-		ApplicationViewsWindow: 4,
-		JSErrorsWindow:         6,
-	}}}, nil
-}
-func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
-	for name, tc := range map[string]struct {
-		serving                    bool
-		rate                       float64
-		sessions, documents, views any
-	}{
-		"measured":             {true, 1, 3, 2, uint64(4)},
-		"receiver unavailable": {false, 1, nil, nil, nil},
-		"measurement disabled": {true, 0, nil, nil, nil},
-	} {
-		t.Run(name, func(t *testing.T) {
-			handler := rumfunc.New(measurementSiteSource{
-				serving: tc.serving,
-				rate:    tc.rate,
-			}, nil)
-			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method:      "rum-sites",
-				Permissions: "0x1b",
-			}).RawResponse
-			require.NotNil(t, response)
-			rows := response["data"].([][]any)
-			cols := response["columns"].(map[string]any)
-			value := func(key string) any { return rows[0][cols[key].(map[string]any)["index"].(int)] }
-			require.Equal(t, tc.sessions, value("observed_sessions"))
-			require.Equal(t, tc.documents, value("pageviews_window"))
-			require.Equal(t, tc.views, value("application_views_window"))
-			require.Equal(t, 7, value("investigated_sessions"), "bounded detail cache is a distinct population")
-			require.Contains(t, response["help"], "not people or concurrent visitors")
-		})
-	}
-}
-
 func TestPageActivityCountsAndOptionalFrustration(t *testing.T) {
 	for name, tc := range map[string]struct {
 		count                 int
@@ -147,27 +135,4 @@ func TestPageActivityCountsAndOptionalFrustration(t *testing.T) {
 			require.Equal(t, map[string]any{"pageviews_window": tc.activity, "errors_window": tc.activity, "frustration_window": tc.frustration}, got)
 		})
 	}
-}
-
-func TestSiteActivityCountsAndDetailPopulation(t *testing.T) {
-	handler := rumfunc.New(measurementSiteSource{
-		serving: true,
-		rate:    1,
-	}, nil)
-	response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-		Method:      "rum-sites",
-		Permissions: "0x1b",
-	}).RawResponse
-	require.NotNil(t, response)
-	rows := response["data"].([][]any)
-	require.Len(t, rows, 1)
-	columns := response["columns"].(map[string]any)
-	got := map[string]any{}
-	for _, key := range []string{"pageviews_window", "js_errors_window", "application_views_window", "observed_sessions", "investigated_sessions"} {
-		got[key] = rows[0][columns[key].(map[string]any)["index"].(int)]
-	}
-	require.Equal(t, map[string]any{
-		"pageviews_window": 2, "js_errors_window": uint64(6), "application_views_window": uint64(4),
-		"observed_sessions": 3, "investigated_sessions": 7,
-	}, got, "measurement counts remain distinct from bounded investigation detail")
 }

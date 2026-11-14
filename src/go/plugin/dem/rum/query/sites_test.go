@@ -3,6 +3,7 @@ package query_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,10 +11,11 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
-	registry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
 )
 
@@ -97,4 +99,40 @@ func TestSiteEvidencePersistsAfterAcceptanceAndResetsWithGeneration(t *testing.T
 	require.True(t, rows[0].Rejected.At.IsZero())
 	require.True(t, rows[0].Activity.LastBeaconAt.IsZero())
 	require.Equal(t, -1, rows[0].Activity.LastBeaconAgeS)
+}
+
+func TestPagesExposeRetainedGroupsBeyondChartTopNAndWindowedSessions(t *testing.T) {
+	hub := registry.New()
+	owner, _ := addSite(t, hub, "shop", "first")
+	now := time.Now()
+	for i := range 25 {
+		id := fmt.Sprint(i)
+		owner.Ingest(&beacon.Beacon{
+			Site:         "shop",
+			Received:     now,
+			SessionID:    id,
+			ExperienceID: id,
+			PageGroup:    "/page-" + id,
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: id, Revision: 1}},
+		})
+	}
+	owner.Ingest(&beacon.Beacon{
+		Site:         "shop",
+		Received:     now.Add(-10 * time.Minute),
+		SessionID:    "expired",
+		ExperienceID: "expired",
+		PageGroup:    "/page-0",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "expired", Revision: 1}},
+	})
+	service := query.New(hub, nil)
+	pages, err := service.Pages(context.Background(), "shop", "")
+	require.NoError(t, err)
+	require.Len(t, pages, 25, "chart top-N is 20 but Functions must expose all retained groups")
+	for _, page := range pages {
+		require.Equal(t, 1, page.Sessions)
+		require.Equal(t, 1, page.PageviewsWindow)
+	}
+	sites, err := service.Sites(context.Background(), "")
+	require.NoError(t, err)
+	require.Equal(t, 25, sites[0].Activity.ObservedSessions)
 }

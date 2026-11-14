@@ -107,3 +107,54 @@ func TestLiveVnodeSelectionUsesRecordedRowsBeforeLimits(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, pages, "rolling pages belong only to the current measurement window")
 }
+
+func TestLivePreservesQuietSitesAndPaginatesWithoutSkipping(t *testing.T) {
+	hub := registry.New()
+	s := query.New(hub, nil)
+	hot, _ := addSite(t, hub, "hot", "first")
+	quiet, _ := addSite(t, hub, "quiet", "first")
+	for i := 0; i < 6; i++ {
+		page(hot, "hot", fmt.Sprintf("/hot/%d", i))
+	}
+	page(quiet, "quiet", "/quiet/first")
+	var paths []string
+	var cursor string
+	for range 4 {
+		rows, next, err := s.Live(context.Background(), "", cursor, 2, "")
+		require.NoError(t, err)
+		cursor = next
+		for _, r := range rows {
+			paths = append(paths, r.Page)
+		}
+	}
+	assert.Equal(t, []string{"/hot/0", "/hot/1", "/hot/2", "/hot/3", "/hot/4", "/hot/5", "/quiet/first"}, paths)
+	page(quiet, "quiet", "/quiet/second")
+	rows, next, err := s.Live(context.Background(), "", cursor, 2, "")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "/quiet/second", rows[0].Page)
+	rows, _, err = s.Live(context.Background(), "", next, 2, "")
+	require.NoError(t, err)
+	assert.Empty(t, rows)
+}
+
+func TestLiveReplacementAndFilterDoNotReuseAnotherStreamPosition(t *testing.T) {
+	hub := registry.New()
+	s := query.New(hub, nil)
+	a, retire := addSite(t, hub, "a", "old")
+	b, _ := addSite(t, hub, "b", "other")
+	page(a, "a", "/old")
+	page(b, "b", "/other")
+	rows, cursor, err := s.Live(context.Background(), "a", "", 10, "")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	retire()
+	replacement, _ := addSite(t, hub, "a", "new")
+	page(replacement, "a", "/new")
+	rows, _, err = s.Live(context.Background(), "", cursor, 10, "")
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+	assert.Equal(t, "/other", rows[0].Page)
+	assert.Equal(t, "/new", rows[1].Page)
+	assert.Equal(t, "new", rows[1].Generation)
+}
