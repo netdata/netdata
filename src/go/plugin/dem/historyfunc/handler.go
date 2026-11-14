@@ -6,10 +6,10 @@ package historyfunc
 import (
 	"context"
 	"errors"
-	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 )
 
@@ -61,13 +61,10 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Method != method {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	if len(req.Payload) > 0 {
-		return funcapi.ErrorResponse(400, "this read-only Function does not accept a payload")
+	if r := rawfunc.NoPayload(req); r != nil {
+		return r
 	}
-	for _, arg := range req.Args {
-		if req.Info && arg == "info" {
-			continue
-		}
+	if _, err := rawfunc.ParseArgs(req, nil); err != nil {
 		return funcapi.ErrorResponse(400, "history status does not accept arguments")
 	}
 	response := &funcapi.FunctionResponse{
@@ -80,9 +77,8 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Info {
 		return response
 	}
-	mask, err := strconv.ParseUint(req.Permissions, 0, 64)
-	if err != nil || mask&0x1b != 0x1b {
-		return funcapi.ErrorResponse(403, "member permissions are required")
+	if r := rawfunc.RequireMember(req); r != nil {
+		return r
 	}
 	if err := ctx.Err(); err != nil {
 		return statusError(err)
@@ -123,13 +119,14 @@ func nullable(s string) any {
 	return s
 }
 func statusError(err error) *funcapi.FunctionResponse {
-	if errors.Is(err, context.Canceled) {
-		return funcapi.ErrorResponse(499, "request cancelled")
-	}
-	if errors.Is(err, context.DeadlineExceeded) {
+	switch {
+	case errors.Is(err, context.Canceled):
+		return rawfunc.Cancelled(err)
+	case errors.Is(err, context.DeadlineExceeded):
 		return funcapi.ErrorResponse(504, "request timed out")
+	default:
+		return funcapi.UnavailableResponse(err.Error())
 	}
-	return funcapi.UnavailableResponse(err.Error())
 }
 
 func columns() map[string]any {

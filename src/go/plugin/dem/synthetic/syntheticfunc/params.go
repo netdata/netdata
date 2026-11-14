@@ -6,41 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 )
-
-func permitted(value string, required uint64) bool {
-	mask, err := strconv.ParseUint(value, 0, 64)
-	return err == nil && mask&required == required
-}
-
-func parseArgs(words, accepted []string) (map[string]string, error) {
-	args := make(map[string]string, len(words))
-	for _, word := range words {
-		key, value, ok := strings.Cut(word, ":")
-		if !ok {
-			return nil, errors.New("expected key:value argument")
-		}
-		allowed := false
-		for _, name := range accepted {
-			if key == name {
-				allowed = true
-				break
-			}
-		}
-		if !allowed {
-			return nil, fmt.Errorf("unsupported argument %q", key)
-		}
-		if _, exists := args[key]; exists {
-			return nil, fmt.Errorf("duplicate argument %q", key)
-		}
-		args[key] = value
-	}
-	return args, nil
-}
 
 func rowLimit(value string) (int, error) {
 	if value == "" {

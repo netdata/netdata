@@ -6,12 +6,13 @@ package rumfunc
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
@@ -70,45 +71,18 @@ func Declarations() []funcapi.FunctionConfig {
 	return out
 }
 func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	var spec *method
-	for i := range methods {
-		if methods[i].id == req.Method {
-			spec = &methods[i]
-			break
-		}
-	}
-	if spec == nil {
+	i := slices.IndexFunc(methods, func(m method) bool { return m.id == req.Method })
+	if i < 0 {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	args := map[string]string{}
-	for _, word := range req.Args {
-		if req.Info && word == "info" {
-			continue
-		}
-		key, value, ok := strings.Cut(word, ":")
-		if !ok {
-			return funcapi.ErrorResponse(400, "expected key:value argument")
-		}
-		supported := false
-		for _, param := range spec.params {
-			if key == param {
-				supported = true
-				break
-			}
-		}
-		if !supported {
-			return funcapi.ErrorResponse(400, "unsupported argument %q", key)
-		}
-		if _, exists := args[key]; exists {
-			return funcapi.ErrorResponse(400, "duplicate argument %q", key)
-		}
-		args[key] = value
-	}
-	guid, err := vnodeguid.Resolve(args, h.lookupVnodeGUID)
+	spec := &methods[i]
+	args, err := rawfunc.ParseArgs(req, spec.params)
 	if err != nil {
-		return funcapi.ErrorResponse(400, "%s", err)
+		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	args["vnode_guid"] = guid
+	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
 	response := map[string]any{
 		"status":              200,
 		"type":                "table",
@@ -155,8 +129,8 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			Help:   response["help"].(string),
 		}
 	}
-	if err := ctx.Err(); err != nil {
-		return funcapi.ErrorResponse(499, "request cancelled")
+	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
+		return r
 	}
 	var rows [][]any
 	now := time.Now().Unix()
@@ -225,8 +199,8 @@ func boolean(v bool) int {
 }
 
 func functionError(err error) *funcapi.FunctionResponse {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-		return funcapi.ErrorResponse(499, "request cancelled")
+	if r := rawfunc.Cancelled(err); r != nil {
+		return r
 	}
 	var invalid query.InvalidArgument
 	if errors.As(err, &invalid) {

@@ -6,10 +6,11 @@ package syntheticfunc
 import (
 	"context"
 	"errors"
+	"slices"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
@@ -50,16 +51,11 @@ func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funca
 }
 
 func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	var spec *method
-	for i := range methods {
-		if methods[i].id == req.Method {
-			spec = &methods[i]
-			break
-		}
-	}
-	if spec == nil {
+	i := slices.IndexFunc(methods, func(m method) bool { return m.id == req.Method })
+	if i < 0 {
 		return funcapi.NotFoundResponse(req.Method)
 	}
+	spec := &methods[i]
 	// Metadata discovery never queries active jobs, history or artifact storage.
 	if req.Info {
 		return &funcapi.FunctionResponse{
@@ -69,27 +65,25 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			DefaultSortColumn: spec.sort,
 		}
 	}
-	if !permitted(req.Permissions, 0x1b) {
-		return funcapi.ErrorResponse(403, "member permissions are required")
+	if r := rawfunc.RequireMember(req); r != nil {
+		return r
 	}
-	if len(req.Payload) > 0 {
-		return funcapi.ErrorResponse(400, "this read-only Function does not accept a payload")
+	if r := rawfunc.NoPayload(req); r != nil {
+		return r
 	}
-	args, err := parseArgs(req.Args, spec.params)
+	args, err := rawfunc.ParseArgs(req, spec.params)
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	if req.Method == "synthetics-artifact" && args["artifact_id"] != "" && !permitted(req.Permissions, 0x7b) {
+	if req.Method == "synthetics-artifact" && args["artifact_id"] != "" && !rawfunc.Permitted(req, rawfunc.AdminAccess) {
 		return funcapi.ErrorResponse(403, "administrator permissions are required for artifact bytes")
 	}
 	if err := ctx.Err(); err != nil {
 		return functionError(err)
 	}
-	guid, err := vnodeguid.Resolve(args, h.lookupVnodeGUID)
-	if err != nil {
+	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	args["vnode_guid"] = guid
 	if h.deps == nil {
 		return funcapi.UnavailableResponse("synthetic observations are unavailable")
 	}
@@ -140,9 +134,10 @@ func number(value *float64) any {
 }
 
 func functionError(err error) *funcapi.FunctionResponse {
+	if r := rawfunc.Cancelled(err); r != nil {
+		return r
+	}
 	switch {
-	case errors.Is(err, context.Canceled), errors.Is(err, context.DeadlineExceeded):
-		return funcapi.ErrorResponse(499, "request cancelled")
 	case errors.Is(err, query.ErrNotFound):
 		return funcapi.ErrorResponse(404, "requested evidence is unavailable")
 	case errors.Is(err, query.ErrArtifactNotRecorded):
