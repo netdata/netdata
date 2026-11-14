@@ -23,7 +23,7 @@ func (h *Handler) sessionEventsRows(ctx context.Context, site, session, vnodeGUI
 	var events []query.SessionEvent
 	events, err = h.deps.SessionEvents(ctx, site, session, vnodeGUID)
 	for _, e := range events {
-		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision, e.VnodeGUID})
+		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, e.Text, e.TraceID, e.UserID, e.ExperienceID, e.View, e.ViewID, e.MetricID, e.Revision, e.VnodeGUID})
 	}
 	return rows, err
 }

@@ -652,6 +652,12 @@ Sites:
 - The browser bootstrap limits instrumentation and outgoing metadata. The receiver independently enforces the same
   policy and normalizes supported URLs, paths and text before aggregation, retained history or enabled exports.
 - Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.
+- Ingestion applies the site redactor to each received text value twice: as received, and again after control
+  characters are removed when that changed the text. A credential can depend on a removed character
+  (`Bearer<TAB>token`) or be joined by its removal. The size bound comes last, so it cannot cut a credential into an
+  unrecognized prefix. Composed texts (stacks, session timeline entries) are built from redacted values.
+- Query output applies the current site redactor to every text value of active sites, because configured credentials
+  can change after ingestion. Retired-site history is returned as stored. RUM Functions add no redaction of their own.
 
 | Geolocation mode | Lookup | Live observations | Journal and OTLP |
 |---|---|---|---|

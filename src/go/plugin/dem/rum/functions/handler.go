@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
@@ -28,14 +27,12 @@ type Deps interface {
 
 type Handler struct {
 	deps            Deps
-	redact          *redact.Redactor
 	lookupVnodeGUID func(string) (string, bool)
 }
 
 func New(deps Deps, lookupVnodeGUID func(string) (string, bool)) *Handler {
 	return &Handler{
 		deps:            deps,
-		redact:          redact.NewRedactor(),
 		lookupVnodeGUID: lookupVnodeGUID,
 	}
 }

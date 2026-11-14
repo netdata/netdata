@@ -52,7 +52,7 @@ func (h *Handler) sitesRows(ctx context.Context, now int64, site, vnodeGUID stri
 				detail(measurementKnown, a.ObservedSessions),
 				detail(measurementKnown, a.PageviewsWindow), detail(measurementKnown, a.JSErrorsWindow),
 				a.RejectedPerMin, measured, investigated, a.InvestigatedSessions, a.BotsPerMin,
-				h.redact.Apply(s.Rejected.Origin), lastRejectedAt, rejectAge,
+				s.Rejected.Origin, lastRejectedAt, rejectAge,
 				s.Capture.Geolocation, boolean(s.Capture.FrustrationSignals),
 				detail(measurementKnown, a.ApplicationViewsWindow), s.VnodeGUID,
 			},
