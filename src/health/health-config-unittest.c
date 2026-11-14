@@ -1979,6 +1979,347 @@ static int test_dyncfg_long_condition_is_not_truncated(int *passed) {
     return 0;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// /api/v1/alarms, /api/v1/alarms_values and the silencers list must be valid JSON whatever text an alert, a child's
+// hostname or a silencer carries, and every string must read back as the stored value.
+
+#define UNITTEST_JSON_AWKWARD "q\"b\\s</>&'t\tn\nu\xc3\xa9"
+
+static const char *unittest_json_string(json_object *obj, const char *key) {
+    json_object *v;
+    if(!obj || !json_object_object_get_ex(obj, key, &v) || !json_object_is_type(v, json_type_string))
+        return NULL;
+    return json_object_get_string(v);
+}
+
+static int unittest_json_check_string(json_object *obj, const char *where, const char *key, const char *expected) {
+    const char *got = unittest_json_string(obj, key);
+    if(!got || strcmp(got, expected) != 0) {
+        fprintf(stderr, "FAILED [%s]: '%s' is '%s', expected '%s'\n", where, key, got ? got : "(missing)", expected);
+        return 1;
+    }
+    return 0;
+}
+
+static int unittest_json_check_type(json_object *obj, const char *where, const char *key, json_type type) {
+    json_object *v;
+    if(!json_object_object_get_ex(obj, key, &v) || json_object_get_type(v) != type) {
+        fprintf(stderr, "FAILED [%s]: '%s' is not a %s\n", where, key, json_type_to_name(type));
+        return 1;
+    }
+    return 0;
+}
+
+static void unittest_alarms_json_payload(BUFFER *wb, const char *chart) {
+    buffer_flush(wb);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    buffer_json_member_add_uint64(wb, "format_version", 1);
+    buffer_json_member_add_array(wb, "rules");
+    {
+        buffer_json_add_array_item_object(wb);
+        buffer_json_member_add_boolean(wb, "enabled", true);
+        buffer_json_member_add_string(wb, "type", "instance");
+        buffer_json_member_add_object(wb, "config");
+        {
+            buffer_json_member_add_string(wb, "summary", UNITTEST_JSON_AWKWARD);
+            buffer_json_member_add_string(wb, "info", UNITTEST_JSON_AWKWARD);
+            buffer_json_member_add_string(wb, "type", UNITTEST_JSON_AWKWARD);
+            buffer_json_member_add_string(wb, "component", UNITTEST_JSON_AWKWARD);
+            buffer_json_member_add_string(wb, "classification", UNITTEST_JSON_AWKWARD);
+
+            buffer_json_member_add_object(wb, "match");
+            buffer_json_member_add_string(wb, "on", chart);
+            buffer_json_member_add_string(wb, "host_labels", "*");
+            buffer_json_member_add_string(wb, "instance_labels", "*");
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "value");
+            {
+                buffer_json_member_add_object(wb, "database_lookup");
+                buffer_json_member_add_int64(wb, "after", -60);
+                buffer_json_member_add_int64(wb, "before", 0);
+                buffer_json_member_add_string(wb, "time_group", "average");
+                buffer_json_member_add_string(wb, "dims_group", "sum");
+                buffer_json_member_add_string(wb, "data_source", "samples");
+                buffer_json_member_add_array(wb, "options");
+                buffer_json_array_close(wb);
+                buffer_json_member_add_string(wb, "dimensions", "*");
+                buffer_json_object_close(wb);
+            }
+            buffer_json_member_add_string(wb, "units", UNITTEST_JSON_AWKWARD);
+            buffer_json_member_add_int64(wb, "update_every", 1);
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "conditions");
+            buffer_json_member_add_string(wb, "warning_condition", "$this > 80");
+            buffer_json_member_add_string(wb, "critical_condition", "");
+            buffer_json_object_close(wb);
+
+            buffer_json_member_add_object(wb, "action");
+            buffer_json_member_add_string(wb, "recipient", UNITTEST_JSON_AWKWARD);
+            buffer_json_object_close(wb);
+        }
+        buffer_json_object_close(wb); // config
+        buffer_json_object_close(wb); // rule
+    }
+    buffer_json_array_close(wb);
+    buffer_json_finalize(wb);
+}
+
+static int test_alarms_json_escapes_alert_text(int *passed) {
+    static const char *name = "unittest-alarms\"json\\<&>\xc3\xa9";
+    static const char *chart_type = "unittest_alarms_json";
+    static const char *chart_id = "c1";
+
+    if(!localhost) {
+        fprintf(stderr, "FAILED [alarms json]: no localhost\n");
+        return 1;
+    }
+
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    CLEAN_BUFFER *wb = buffer_create(0, NULL);
+    char dyncfg_id[256];
+    char chart[256];
+    snprintfz(chart, sizeof(chart), "%s.%s", chart_type, chart_id);
+    snprintfz(dyncfg_id, sizeof(dyncfg_id), "health:alert:prototype:%s", name);
+
+    // linking an alert writes a health log entry, so the health log allocator must exist; this also creates
+    // the prototypes dictionary (idempotent)
+    health_plugin_init();
+
+    int failed = 0;
+    bool added = false;
+
+    unittest_alarms_json_payload(payload, chart);
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_ADD, name,
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, "unittest", NULL);
+    if(code != DYNCFG_RESP_ACCEPTED) {
+        fprintf(stderr, "FAILED [alarms json]: DYNCFG ADD code=%d response='%s'\n", code, buffer_tostring(result));
+        failed++;
+        goto cleanup;
+    }
+    added = true;
+
+    RRDSET *st = rrdset_create_localhost(chart_type, chart_id, NULL, "family", "unittest.alarms_json", "title",
+                                         "units", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d1", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_set_by_pointer(st, rd, 1);
+    rrdset_done(st);
+    health_prototype_alerts_for_rrdset_incrementally(st);
+
+    // what the serializers must reproduce: the stored values
+    char key[1024] = "", alert_name[512] = "", summary[512] = "", info[512] = "", units[512] = "";
+    char recipient[512] = "", classification[512] = "", component[512] = "", type[512] = "", warn[512] = "";
+    RRDCALC *rc;
+    foreach_rrdcalc_in_rrdhost_read(localhost, rc) {
+        if(rc->rrdset != st)
+            continue;
+
+        CLEAN_STRING *s = NULL, *i = NULL;
+        rrdcalc_runtime_strings_acquire(rc, &s, &i);
+        snprintfz(key, sizeof(key), "%s.%s", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+        strncpyz(alert_name, rrdcalc_name(rc), sizeof(alert_name) - 1);
+        strncpyz(summary, string2str(s), sizeof(summary) - 1);
+        strncpyz(info, string2str(i), sizeof(info) - 1);
+        strncpyz(units, rrdcalc_units(rc), sizeof(units) - 1);
+        strncpyz(recipient, rrdcalc_recipient(rc), sizeof(recipient) - 1);
+        strncpyz(classification, rrdcalc_classification(rc), sizeof(classification) - 1);
+        strncpyz(component, rrdcalc_component(rc), sizeof(component) - 1);
+        strncpyz(type, rrdcalc_type(rc), sizeof(type) - 1);
+        strncpyz(warn, expression_source(rc->config.warning), sizeof(warn) - 1);
+    }
+    foreach_rrdcalc_in_rrdhost_done(rc);
+
+    if(!*key) {
+        fprintf(stderr, "FAILED [alarms json]: the alert was not linked to %s\n", chart);
+        failed++;
+        goto cleanup_chart;
+    }
+
+    // the test is only meaningful if the awkward characters survived into the stored values
+    if(!strchr(alert_name, '"') || !strchr(summary, '"') || !strchr(summary, '\\') || !strchr(info, '\n')) {
+        fprintf(stderr, "FAILED [alarms json]: stored values lost the characters under test: name='%s' summary='%s'\n",
+                alert_name, summary);
+        failed++;
+        goto cleanup_chart;
+    }
+
+    STRING *saved_hostname = localhost->hostname;
+    localhost->hostname = string_strdupz(UNITTEST_JSON_AWKWARD);
+
+    for(size_t v = 0; v < 2; v++) {
+        const char *where = v ? "alarms_values json" : "alarms json";
+        buffer_flush(wb);
+        if(v)
+            health_alarms_values2json(localhost, wb, 1);
+        else
+            health_alarms2json(localhost, wb, 1);
+
+        json_object *root = json_tokener_parse(buffer_tostring(wb));
+        if(!root) {
+            fprintf(stderr, "FAILED [%s]: output is not valid JSON:\n%s\n", where, buffer_tostring(wb));
+            failed++;
+            continue;
+        }
+
+        int errors = unittest_json_check_string(root, where, "hostname", UNITTEST_JSON_AWKWARD);
+
+        json_object *alarms = NULL, *alert = NULL;
+        if(!json_object_object_get_ex(root, "alarms", &alarms) || !json_object_object_get_ex(alarms, key, &alert)) {
+            fprintf(stderr, "FAILED [%s]: no alarms member '%s'\n", where, key);
+            errors++;
+        }
+        else if(v) {
+            errors += unittest_json_check_type(alert, where, "id", json_type_int);
+            errors += unittest_json_check_type(alert, where, "status", json_type_string);
+        }
+        else {
+            errors += unittest_json_check_string(alert, where, "name", alert_name);
+            errors += unittest_json_check_string(alert, where, "chart", chart);
+            errors += unittest_json_check_string(alert, where, "summary", summary);
+            errors += unittest_json_check_string(alert, where, "info", info);
+            errors += unittest_json_check_string(alert, where, "units", units);
+            errors += unittest_json_check_string(alert, where, "recipient", recipient);
+            errors += unittest_json_check_string(alert, where, "class", classification);
+            errors += unittest_json_check_string(alert, where, "component", component);
+            errors += unittest_json_check_string(alert, where, "type", type);
+            errors += unittest_json_check_string(alert, where, "warn", warn);
+            errors += unittest_json_check_string(alert, where, "warn", "$this > 80");
+
+            // member types that clients rely on, including the three that have always been strings
+            errors += unittest_json_check_type(alert, where, "id", json_type_int);
+            errors += unittest_json_check_type(alert, where, "active", json_type_boolean);
+            errors += unittest_json_check_type(alert, where, "update_every", json_type_int);
+            errors += unittest_json_check_type(alert, where, "delay_multiplier", json_type_double);
+            errors += unittest_json_check_type(alert, where, "warn_repeat_every", json_type_string);
+            errors += unittest_json_check_type(alert, where, "crit_repeat_every", json_type_string);
+            errors += unittest_json_check_type(alert, where, "last_repeat", json_type_string);
+            errors += unittest_json_check_type(alert, where, "green", json_type_null);
+            errors += unittest_json_check_type(alert, where, "lookup_options", json_type_string);
+        }
+
+        json_object_put(root);
+
+        if(errors)
+            failed++;
+        else
+            (*passed)++;
+    }
+
+    string_freez(localhost->hostname);
+    localhost->hostname = saved_hostname;
+
+cleanup_chart:
+    rrdcalc_unlink_and_delete_all_rrdset_alerts(st);
+    rrdset_is_obsolete___safe_from_collector_thread(st);
+
+cleanup:
+    if(added) {
+        buffer_flush(result);
+        code = dyncfg_health_cb(NULL, dyncfg_id, DYNCFG_CMD_REMOVE, NULL, NULL, NULL, NULL, result,
+                                HTTP_ACCESS_NONE, "unittest", NULL);
+        if(code != HTTP_RESP_OK) {
+            fprintf(stderr, "FAILED [alarms json cleanup]: code=%d response='%s'\n", code, buffer_tostring(result));
+            failed++;
+        }
+    }
+
+    return failed;
+}
+
+// the silencers list is also the silencers file: what is saved must load back unchanged
+static int test_silencers_json_round_trip(int *passed) {
+    static const char *selectors[][2] = {
+        { HEALTH_ALARM_KEY, "a\"l\\a<r>m&\xc3\xa9 *x" },
+        { HEALTH_CHART_KEY, "c\"h\\a\trt" },
+        { HEALTH_CONTEXT_KEY, "co\"nt\\ext" },
+        { HEALTH_HOST_KEY, "h\"o\\st" },
+    };
+
+    int failed = 0;
+    SILENCERS *saved_silencers = silencers;
+    STRING *saved_filename = health_globals.config.silencers_filename;
+
+    const char *tmpdir = getenv("TMPDIR");
+    if(!tmpdir || !*tmpdir)
+        tmpdir = P_tmpdir;
+    char filename[FILENAME_MAX + 1];
+    snprintfz(filename, sizeof(filename), "%s/netdata-silencers-XXXXXX", tmpdir);
+    int fd = mkstemp(filename);
+    if(fd == -1) {
+        fprintf(stderr, "FAILED [silencers json]: cannot create a file in '%s'\n", tmpdir);
+        return 1;
+    }
+    close(fd);
+    health_globals.config.silencers_filename = string_strdupz(filename);
+
+    CLEAN_BUFFER *saved = buffer_create(0, NULL);
+    CLEAN_BUFFER *loaded = buffer_create(0, NULL);
+
+    health_initialize_global_silencers();
+    SILENCER *s = NULL;
+    for(size_t i = 0; i < _countof(selectors); i++) {
+        char key[64], value[256];
+        strncpyz(key, selectors[i][0], sizeof(key) - 1);
+        strncpyz(value, selectors[i][1], sizeof(value) - 1);
+        s = health_silencers_addparam(s, key, value);
+    }
+    health_silencers_add(s);
+    silencers->stype = STYPE_SILENCE_NOTIFICATIONS;
+
+    health_silencers2json(saved);
+    json_object *root = json_tokener_parse(buffer_tostring(saved));
+    json_object *list = NULL;
+    if(!root || !json_object_object_get_ex(root, "silencers", &list) || json_object_array_length(list) != 1) {
+        fprintf(stderr, "FAILED [silencers json]: the list is not valid JSON:\n%s\n", buffer_tostring(saved));
+        failed++;
+    }
+    else {
+        json_object *entry = json_object_array_get_idx(list, 0);
+        int errors = 0;
+        for(size_t i = 0; i < _countof(selectors); i++)
+            errors += unittest_json_check_string(entry, "silencers json", selectors[i][0], selectors[i][1]);
+        errors += unittest_json_check_string(root, "silencers json", "type", "SILENCE");
+        if(errors)
+            failed++;
+        else
+            (*passed)++;
+    }
+    if(root)
+        json_object_put(root);
+
+    // save, start over, load
+    health_silencers2file(saved);
+    struct stat st;
+    if(stat(filename, &st) != 0 || (size_t)st.st_size != buffer_strlen(saved)) {
+        fprintf(stderr, "FAILED [silencers file round trip]: '%s' was not written\n", filename);
+        failed++;
+    }
+    free_silencers(silencers->silencers);
+    freez(silencers);
+    health_initialize_global_silencers();
+    health_silencers_init();
+    health_silencers2json(loaded);
+
+    if(strcmp(buffer_tostring(saved), buffer_tostring(loaded)) != 0) {
+        fprintf(stderr, "FAILED [silencers file round trip]: saved:\n%s\nloaded:\n%s\n",
+                buffer_tostring(saved), buffer_tostring(loaded));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    unlink(filename);
+    free_silencers(silencers->silencers);
+    freez(silencers);
+    silencers = saved_silencers;
+    string_freez(health_globals.config.silencers_filename);
+    health_globals.config.silencers_filename = saved_filename;
+
+    return failed;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -2019,6 +2360,8 @@ int health_config_unittest(void) {
     failed += test_dyncfg_rejects_invalid_time_group_options(&passed);
     failed += test_dyncfg_condition_file_round_trip(&passed);
     failed += test_dyncfg_long_condition_is_not_truncated(&passed);
+    failed += test_alarms_json_escapes_alert_text(&passed);
+    failed += test_silencers_json_round_trip(&passed);
     failed += test_expression_rejects_leave_the_default(&passed);
     failed += test_expression_omitted_operand_defaults_to_zero(&passed);
     failed += test_expression_mixed_count_previous(&passed);
