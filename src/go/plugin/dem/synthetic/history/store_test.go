@@ -3,8 +3,10 @@
 package history_test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"os"
 	"path/filepath"
@@ -511,4 +513,73 @@ func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	detail, err := store.GetRun(ctx, "journey:checkout", "before-move")
 	require.NoError(t, err)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.VnodeGUID)
+}
+
+// storedEntries reads every retained entry straight from the journal files with
+// the SDK, independent of the store's own reader. Trusted "_" fields come from
+// the host identity and are left out.
+func storedEntries(t *testing.T, root string) []map[string][]string {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(root, "*", "*.journal"))
+	require.NoError(t, err)
+	var entries []map[string][]string
+	for _, path := range paths {
+		file, err := sdk.OpenIndexedSnapshot(context.Background(), path, sdk.IndexedSnapshotOptions{})
+		require.NoError(t, err)
+		err = file.VisitEntries(context.Background(), func(entry *sdk.SnapshotEntry) error {
+			fields := map[string][]string{}
+			entries = append(entries, fields)
+			return entry.VisitPayloads(func(payload []byte) error {
+				name, value, _ := bytes.Cut(payload, []byte("="))
+				if !bytes.HasPrefix(name, []byte("_")) {
+					fields[string(name)] = append(fields[string(name)], string(value))
+				}
+				return nil
+			})
+		})
+		require.NoError(t, errors.Join(err, file.Close()))
+	}
+	return entries
+}
+
+// The complete stored entries, including the envelope the store derives, are the
+// persisted synthetic history contract.
+func TestStoredRunEntryContract(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	st, err := demjournal.Open(ctx, root)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	run := synthetic.Run{
+		ID:          "run-1",
+		JobID:       "journey:checkout",
+		Kind:        synthetic.Journey,
+		Name:        "checkout",
+		StartedUS:   1_700_000_000_000_008,
+		CompletedUS: 1_700_000_060_000_000,
+		Outcome:     synthetic.Success,
+	}
+	store := history.NewStore(st)
+	for _, phase := range []synthetic.HistoryPhase{synthetic.HistoryStart, synthetic.HistoryComplete} {
+		attempted, err := store.AppendRun(ctx, phase, run)
+		require.NoError(t, err)
+		require.True(t, attempted)
+	}
+	require.NoError(t, store.Sync(ctx))
+	data, err := json.Marshal(run)
+	require.NoError(t, err)
+	entry := func(phase string) map[string][]string {
+		return map[string][]string{
+			"DEM_SCHEMA":           {"1"},
+			"DEM_KIND":             {"synthetic"},
+			"DEM_STARTED_US":       {"1700000000000008"},
+			"DEM_SYNTHETIC_MINUTE": {"28333333"},
+			"DEM_PHASE":            {phase},
+			"DEM_JOB_ID":           {"journey:checkout"},
+			"DEM_RUN_ID":           {"run-1"},
+			"DEM_DATA":             {string(data)},
+			"MESSAGE":              {"synthetic " + phase},
+		}
+	}
+	assert.Equal(t, []map[string][]string{entry("start"), entry("complete")}, storedEntries(t, root))
 }
