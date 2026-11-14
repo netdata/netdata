@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
@@ -60,8 +62,9 @@ func (s *sink) consume(reader io.Reader) error {
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
-		for _, stream := range s.streams {
-			stream.end()
+		// A fixed order keeps flushed tails and the event cap reproducible.
+		for _, key := range slices.Sorted(maps.Keys(s.streams)) {
+			s.streams[key].end()
 		}
 	}()
 	scanner := bufio.NewScanner(reader)
