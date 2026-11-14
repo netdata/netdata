@@ -30,7 +30,7 @@ type Options struct {
 	// and leave the live ones untouched. The browser runtime store is shared.
 	Private    bool
 	GeoIPPaths geoip.Paths
-	// Warnings receives non-fatal startup diagnostics.
+	// Warnings receives non-fatal startup diagnostics; required (the command passes stderr).
 	Warnings io.Writer
 }
 

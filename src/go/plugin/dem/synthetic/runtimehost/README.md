@@ -7,7 +7,9 @@ borrows a sealed administrator preload. Packaging sets `DefaultMode` to native
 for DEB/RPM builds. Managed and native modes get a `Host`; a preload is a
 runner source without one, outside managed retention. Setup problems never fail
 `Open`: the handle's source reports them to browser jobs while RUM keeps
-working. Every runner source adapter lives in `source.go`.
+working. The `Host` is the runner source of managed and native modes
+(`host.go`); the borrowed-claim, preload and unavailable sources and the
+execution-use adapter live in `source.go`.
 
 `Host` acquires the explicitly installed selection and its process protection
 atomically at construction. That immutable release is used for the entire plugin
