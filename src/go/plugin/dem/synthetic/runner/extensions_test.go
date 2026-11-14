@@ -48,9 +48,11 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 			[]string{all, extensionLine(failureEvidenceFeature, json.RawMessage(complete)), extensionLine(browserSummaryFeature, json.RawMessage(browserEnd)), extensionLine(captureDetailsFeature, json.RawMessage(complete))},
 			optionalStatus{done, done, "complete", "supported"},
 		},
-		"duplicate evidence selection": {[]string{selected(failureEvidenceFeature, failureEvidenceFeature)}, optionalStatus{invalid("invalid_init"), invalid("invalid_init"), "invalid", "invalid"}},
+		// A repeated selection records the same reason for every output.
+		"duplicate evidence selection": {[]string{selected(failureEvidenceFeature, failureEvidenceFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"duplicate browser selection":  {[]string{selected(browserSummaryFeature, browserSummaryFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"duplicate capture selection":  {[]string{selected(captureDetailsFeature, captureDetailsFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
+		"duplicate trace selection":    {[]string{selected(captureDetailsFeature, failureTraceFeature, failureTraceFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"unknown selection":            {[]string{selected("future.v1")}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"malformed init":               {[]string{`{"type":"extension_init","extension_init":{"selected":null}}`}, optionalStatus{invalid("invalid_init"), invalid("invalid_init"), "invalid", "invalid"}},
 		"late init":                    {[]string{event, all}, optionalStatus{invalid("late_or_duplicate_init"), invalid("late_or_duplicate_init"), "invalid", "invalid"}},
