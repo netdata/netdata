@@ -75,7 +75,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		return status, err
 	}
 	for name, r := range inv.reservations {
-		// Use the SAME observation for used and reserved bytes: writers run
+		// Use the same observation for used and reserved bytes: writers run
 		// outside exclusion, so two scans could undercount a growing operation.
 		written := bytesByRecord[name]
 		status.PreparingBytes += written

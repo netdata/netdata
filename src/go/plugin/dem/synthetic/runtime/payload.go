@@ -15,7 +15,7 @@ import (
 )
 
 // bindPrefix operates only on unpublished, digest-verified staging files. The
-// interpreter names the FINAL generation, never the staging directory.
+// interpreter names the final generation, never the staging directory.
 func bindPrefix(root *os.Root, final string, m Manifest) error {
 	if !filepath.IsAbs(final) || filepath.Clean(final) != final || strings.ContainsAny(final, "\x00\r\n") || !utf8.ValidString(final) {
 		return errors.New("runtime prefix must be a clean absolute UTF-8 path")

@@ -17,8 +17,8 @@ var storeDirectories = []string{"generations", "claims", "uses", "staging", "tra
 
 var storeLocks = []string{"coordination.lock", "installation.lock"}
 
-// The existing managed format is unchanged. Proof-only roots have a distinct
-// format so neither owner can reinterpret or bootstrap the other's state.
+// Managed stores and proof-only ownership roots have distinct formats, so
+// neither owner can reinterpret or bootstrap the other's state.
 type runtimeRootLayout int
 
 const (

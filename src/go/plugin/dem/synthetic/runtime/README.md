@@ -4,14 +4,26 @@ This package verifies release descriptors and archives, prepares private executa
 paths, and coordinates installation, process ownership and execution lifetime.
 It does not install host packages, invoke npm or choose component versions.
 Release inputs and adapters live in `src/dem-runtime` and `packaging/dem-runtime`.
+`synthetic/runtimehost` chooses the key source and adapts this package to the runner
+and job framework; `cmd/demplugin` is the administrator CLI.
+
+| Files | Contract |
+|---|---|
+| `manifest.go`, `release.go`, `release_trust.go` | Manifest validation, URL and platform rules, signed releases, keyrings |
+| `download.go`, `archive.go`, `payload.go` | HTTPS acquisition, digest and extraction bounds, interpreter binding and bound-payload checks |
+| `durable.go`, `root*.go`, `boot*.go` | Record writes and lock files, root bootstrap and permissions, boot identity |
+| `ownership_ledger*.go` | Claims, execution receipts, proof inventory and trash |
+| `store.go`, `inventory.go`, `retention.go` | Managed store, generations, damage classification, status and retirement |
+| `selection.go`, `installation.go`, `prepare.go`, `preload.go` | Selection record and consumers, candidates and published installation, preparation, sealed preloads |
+| `native*.go` | Native package preparation, root admission control and service-UID consumers |
 
 ## Trust and preparation
 
 A publisher-authenticated format-1 descriptor identifies execution contract 2,
 release version, platform, archive SHA256/size, tar/expanded bounds, entry count,
 layout and authenticated interpreter slots. The archive is not its own trust anchor.
-Production release discovery and CLI delivery integration are separate from these
-local installation primitives.
+`FetchRelease` (online discovery) and `ReadRelease` (offline descriptor) both end in
+`VerifyRelease`; which keyring they use is the caller's policy.
 
 ### Signed release descriptors
 
@@ -21,6 +33,8 @@ over the domain `netdata-dem-runtime-release-v1` followed by a NUL and the exact
 JSON bytes. The release tool uses the existing package GPG signer. Verification
 runs inside Go and requires SHA-256 or stronger signatures from a currently valid,
 unrevoked signing key. The envelope cannot supply keys or a key-discovery URL.
+`VerifyRelease` returns a `VerifiedRelease`, the only release type that
+`BeginPublishedInstall` and `BeginPublishedEnsure` accept; its zero value is refused.
 
 The signed release includes the entire `Manifest`, including layout, extraction
 bounds and interpreter-binding instructions, and the source archive's HTTPS URL,
@@ -164,14 +178,39 @@ store for retry; a failed execution release never supplies completion evidence.
 identity/final location. Managed operations then refuse the root, including stores
 opened before sealing. `ReadPreload` supports read-only mounts without state writes.
 The administrator must keep it private, service-account-owned and immutable, and
-stop every consumer before removal/replacement. Native package transaction safety
-requires separate payload/coordination ownership and is deferred to delivery work.
+stop every consumer before removal/replacement.
+
+## Native packages
+
+A native package installs a prebound payload at the fixed prefix
+`/usr/lib/netdata/dem-runtime` and keeps admission state in `/var/lib/netdata-dem-runtime`.
+Native package and repository authentication is its trust boundary.
+
+- Build: `PrepareNativePackage` verifies the archive in a spool beside a new or empty
+  stage, extracts it, binds interpreter slots and generated configuration to the
+  installed prefix, normalizes modes to 0755/0644 and publishes `native.json` only after
+  syncing the stage. Package recipes assign root ownership.
+- Admission (root, package hooks): a root-owned gate and `admission.json` move through
+  `initializing`, `closed`, `qualifying` and `ready`. `CloseAdmission` refuses while
+  service-UID proof shows consumers or executions, and closes admission before the
+  package manager changes files. `QualifyAndReady` records the installed payload as the
+  qualifying target, runs service-UID qualification without holding the gate, and
+  opens ordinary admission only if the payload and target are unchanged and no proof
+  remains. Established state never bootstraps a missing gate, ledger or namespace.
+- Consumers (service UID): `Native` reads admission under the shared gate and admits a
+  payload only if its whole tree is root-owned and immutable to the service, its
+  bound layout is intact with a group or other execute bit, and its interpreter
+  slots and generated configuration name the installed prefix. Claims and execution
+  receipts use the same ownership ledger as managed stores, in a service-owned proof
+  root. `Inspect` and `Sweep` reconcile proof without touching package files.
 
 ## Validation
 
 Tests cover archive bounds/path handling, interpreter binding, selection/activation,
 idle and pressure protection, serialization, refused uninstall, publication failure,
-process death, uncertain uses, receipt recovery and boot provenance.
+process death, uncertain uses, receipt recovery and boot provenance. Native admission
+tests need root and a `netdata` account and otherwise skip. Runtime, host, CLI and
+release-tool tests share one synthetic archive builder, `internal/demruntimetest`.
 `DEM_RUNTIME_TEST_HELPER` enables real supervisor receipt tests; run under the same
 unprivileged identity as the helper. Real CLI qualification covers journeys and
 Lighthouse. Filesystem fault tests do not simulate physical power loss or establish

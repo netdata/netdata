@@ -72,8 +72,8 @@ func (a *downloadActivity) close() {
 
 func (a *downloadActivity) failure(err error) error {
 	if errors.Is(context.Cause(a.ctx), errDownloadInactive) {
-		// Do not expose the internal cancellation as voluntary cancellation:
-		// the host must retain its normal acquisition-failure retry backoff.
+		// Report inactivity as a download failure, never as context
+		// cancellation: callers treat cancellation as their own decision.
 		return &downloadError{cause: errDownloadInactive, detail: "network inactivity timeout"}
 	}
 	if err == nil || err == io.EOF {
