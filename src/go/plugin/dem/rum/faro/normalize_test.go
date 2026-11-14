@@ -278,8 +278,10 @@ func TestCaptureViewNamePathRules(t *testing.T) {
 		PathRules: []PathRule{{Re: regexp.MustCompile(`cust-\w+`), Replace: ":cust"}},
 	}
 	for view, want := range map[string]string{
-		"cust-AKIA0123456789ABCDEF12":   ":cust",
-		"cust-12\x0034":                 ":cust",
+		"cust-AKIA0123456789ABCDEF12": ":cust",
+		"cust-12\x0034":               ":cust",
+		// A rule rewrites one part; a removed tab separates a credential elsewhere.
+		"cust-123 Bearer\tabcdef":       ":cust [REDACTED]",
 		"checkout Bearer\tabcdef":       "checkout [REDACTED]",
 		"checkout configu\x00red-value": "checkout [REDACTED]",
 	} {
