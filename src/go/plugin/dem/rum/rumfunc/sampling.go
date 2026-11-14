@@ -2,6 +2,7 @@
 package rumfunc
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 	"strings"
@@ -42,4 +43,34 @@ func samplingNote(site query.Site) string {
 func percent(rate float64) string {
 	// Significant digits suppress multiplication noise without rounding tiny rates to zero.
 	return strconv.FormatFloat(rate*100, 'g', 15, 64) + "%"
+}
+
+// samplingHelp follows the method help with the current sampling policy of the
+// selected sites, separately from what historical evidence may reflect.
+func (h *Handler) samplingHelp(ctx context.Context, help string, args map[string]string) (string, error) {
+	sites, err := h.deps.Sites(ctx, args["vnode_guid"])
+	if err != nil {
+		return "", err
+	}
+	var notes []string
+	problemBiased := false
+	for _, site := range sites {
+		if args["site"] != "" && args["site"] != site.Name {
+			continue
+		}
+		notes = append(notes, samplingNote(site))
+		sampling := site.Sampling
+		if sampling.InvestigateRate < 1 && (sampling.KeepErrors || sampling.KeepPoorVitals) {
+			problemBiased = true
+		}
+	}
+	help += ". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
+		"These rows do not estimate all visitors or errors."
+	if len(notes) > 0 {
+		help += " Current sampling policy: " + strings.Join(notes, "; ") + "."
+		if problemBiased {
+			help += " Problem overrides bias retained detail toward failures."
+		}
+	}
+	return help, nil
 }

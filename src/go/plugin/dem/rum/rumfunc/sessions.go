@@ -1,188 +1,194 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rumfunc
 
 import (
 	"context"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
 var sessionsMethod = method{
-	id:      "rum-sessions",
-	title:   "RUM Sessions",
-	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
-	sort:    "last_observed_us",
-	every:   10,
-	history: true,
-	params:  []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
-	columns: rumSessionsColumns,
+	Method: rawfunc.Method{
+		ID:          "rum-sessions",
+		Title:       "RUM Sessions",
+		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+		Sort:        "last_observed_us",
+		UpdateEvery: 10,
+		History:     true,
+		Params:      []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
+		Columns:     sessionsColumns.Build(),
+	},
+	samplingHelp: true,
+	rows:         (*Handler).sessionsRows,
 }
 
-func (h *Handler) sessionsRows(ctx context.Context, site, userID string, after, before, now int64, vnodeGUID string) (rows [][]any, err error) {
-	var sessions []query.Session
-	sessions, err = h.deps.Sessions(ctx, site, userID, after, before, vnodeGUID)
+// sessionRow is one session summary with the request time.
+type sessionRow struct {
+	query.Session
+	now int64
+}
+
+func (h *Handler) sessionsRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
+	now := time.Now().Unix()
+	after, before, err := historyRange(args, now)
+	if err != nil {
+		return nil, badRequest(err)
+	}
+	sessions, err := h.deps.Sessions(ctx, args["site"], args["user_id"], after, before, args["vnode_guid"])
+	var rows [][]any
 	for _, s := range sessions {
-		rows = append(
-			rows,
-			[]any{
-				s.Site,
-				s.SessionID,
-				now - s.StartedAt,
-				s.LastAt - s.StartedAt,
-				s.Pageviews,
-				s.Errors,
-				s.Browser,
-				s.Device,
-				s.Country,
-				s.Version,
-				s.EntryPage,
-				s.LastPage,
-				s.UserIDs,
-				s.Frustrations,
-				rowID(s.Site, rowID(s.VnodeGUID, s.SessionID)), s.ApplicationViews, s.LastObservedUS, s.VnodeGUID,
-			},
-		)
+		rows = append(rows, sessionsColumns.Row(sessionRow{Session: s, now: now}))
 	}
 	return rows, err
 }
 
-var rumSessionsColumns = map[string]any{
-	"vnode_guid": (funcapi.Column{Index: 17, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
-	"last_observed_us": (funcapi.Column{
-		Index:         16,
-		Name:          "Last Selected Observation",
-		Sort:          funcapi.FieldSortDescending,
-		Type:          funcapi.FieldTypeTimestamp,
-		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"row_id": (funcapi.Column{
-		Index:         14,
-		Name:          "Row ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		UniqueKey:     true,
-	}).BuildColumn(),
-	"site": (funcapi.Column{
-		Index:         0,
-		Name:          "Site",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"session_id": (funcapi.Column{
-		Index:         1,
-		Name:          "Session",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"started_age_s": (funcapi.Column{
-		Index:         2,
-		Name:          "First Selected Observation (s ago)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"duration_s": (funcapi.Column{
-		Index:         3,
-		Name:          "Selected Observation Span (s)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"pageviews": (funcapi.Column{
-		Index:         4,
-		Name:          "Retained Document Views",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"errors": (funcapi.Column{
-		Index:         5,
-		Name:          "JS Errors",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"browser": (funcapi.Column{
-		Index:         6,
-		Name:          "Browser",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"device": (funcapi.Column{
-		Index:         7,
-		Name:          "Device",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"country": (funcapi.Column{
-		Index:         8,
-		Name:          "Country",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"version": (funcapi.Column{
-		Index:         9,
-		Name:          "Version",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"entry_page": (funcapi.Column{
-		Index:         10,
-		Name:          "Entry Page",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"last_page": (funcapi.Column{
-		Index:         11,
-		Name:          "Last Page",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"user_ids": (funcapi.Column{
-		Index:         12,
-		Name:          "Observed User IDs",
-		Type:          funcapi.FieldTypeArray,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-		Filter:        funcapi.FieldFilterMultiselect,
-	}).BuildColumn(),
-	"frustrations": (funcapi.Column{
-		Index:         13,
-		Name:          "Retained Frustration Signals",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"application_views": (funcapi.Column{
-		Index:         15,
-		Name:          "Retained Application Views",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
+var sessionsColumns = rawfunc.Columns[sessionRow]{
+	{
+		Name:     "site",
+		Tooltip:  "Site",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Site },
+	},
+	{
+		Name:     "session_id",
+		Tooltip:  "Session",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.SessionID },
+	},
+	{
+		Name:     "started_age_s",
+		Tooltip:  "First Selected Observation (s ago)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.now - r.StartedAt },
+	},
+	{
+		Name:     "duration_s",
+		Tooltip:  "Selected Observation Span (s)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.LastAt - r.StartedAt },
+	},
+	{
+		Name:     "pageviews",
+		Tooltip:  "Retained Document Views",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Pageviews },
+	},
+	{
+		Name:     "errors",
+		Tooltip:  "JS Errors",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Errors },
+	},
+	{
+		Name:     "browser",
+		Tooltip:  "Browser",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Browser },
+	},
+	{
+		Name:     "device",
+		Tooltip:  "Device",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Device },
+	},
+	{
+		Name:     "country",
+		Tooltip:  "Country",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Country },
+	},
+	{
+		Name:     "version",
+		Tooltip:  "Version",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Version },
+	},
+	{
+		Name:    "entry_page",
+		Tooltip: "Entry Page",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(r sessionRow) any { return r.EntryPage },
+	},
+	{
+		Name:    "last_page",
+		Tooltip: "Last Page",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(r sessionRow) any { return r.LastPage },
+	},
+	{
+		Name:     "user_ids",
+		Tooltip:  "Observed User IDs",
+		Type:     funcapi.FieldTypeArray,
+		Visible:  true,
+		Sortable: true,
+		Filter:   funcapi.FieldFilterMultiselect,
+		Value:    func(r sessionRow) any { return r.UserIDs },
+	},
+	{
+		Name:     "frustrations",
+		Tooltip:  "Retained Frustration Signals",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.Frustrations },
+	},
+	{
+		Name:      "row_id",
+		Tooltip:   "Row ID",
+		Type:      funcapi.FieldTypeString,
+		UniqueKey: true,
+		Value:     func(r sessionRow) any { return rowID(r.Site, rowID(r.VnodeGUID, r.SessionID)) },
+	},
+	{
+		Name:     "application_views",
+		Tooltip:  "Retained Application Views",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.ApplicationViews },
+	},
+	{
+		Name:      "last_observed_us",
+		Tooltip:   "Last Selected Observation",
+		Type:      funcapi.FieldTypeTimestamp,
+		Visible:   true,
+		Sortable:  true,
+		Sort:      funcapi.FieldSortDescending,
+		Transform: funcapi.FieldTransformDatetimeUsec,
+		Value:     func(r sessionRow) any { return r.LastObservedUS },
+	},
+	{
+		Name:     "vnode_guid",
+		Tooltip:  "Vnode GUID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r sessionRow) any { return r.VnodeGUID },
+	},
 }

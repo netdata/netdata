@@ -1,179 +1,169 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rumfunc
 
 import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
 var pagesMethod = method{
-	id:      "rum-pages",
-	title:   "RUM Pages",
-	help:    "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe the exact retained populations. Percentiles are null when there are no observations. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
-	sort:    "pageviews_window",
-	every:   10,
-	columns: rumPagesColumns,
-	params:  []string{"site", "vnode", "vnode_guid"},
+	Method: rawfunc.Method{
+		ID:          "rum-pages",
+		Title:       "RUM Pages",
+		Help:        "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe the exact retained populations. Percentiles are null when there are no observations. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
+		Sort:        "pageviews_window",
+		UpdateEvery: 10,
+		Params:      []string{"site", "vnode", "vnode_guid"},
+		Columns:     pagesColumns.Build(),
+	},
+	rows: (*Handler).pagesRows,
 }
 
-func (h *Handler) pagesRows(ctx context.Context, site, vnodeGUID string) (rows [][]any, err error) {
-	var pages []query.Page
-	pages, err = h.deps.Pages(ctx, site, vnodeGUID)
+func (h *Handler) pagesRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
+	pages, err := h.deps.Pages(ctx, args["site"], args["vnode_guid"])
+	var rows [][]any
 	for _, p := range pages {
-		rows = append(
-			rows,
-			[]any{
-				p.Site,
-				p.Page,
-				p.PageviewsWindow,
-				p.Sessions,
-				number(p.Vitals[beacon.LCP].N > 0, p.Vitals[beacon.LCP].P75),
-				number(p.Vitals[beacon.INP].N > 0, p.Vitals[beacon.INP].P75),
-				number(p.Vitals[beacon.CLS].N > 0, p.Vitals[beacon.CLS].P75),
-				p.ErrorsWindow,
-				h.redact.Apply(p.LCPElement),
-				h.redact.Apply(p.INPElement),
-				h.redact.Apply(p.CLSElement),
-				detail(p.FrustrationsKnown, p.FrustrationWindow),
-				rowID(p.Site, p.Page),
-				p.Vitals[beacon.LCP].N,
-				p.Vitals[beacon.INP].N,
-				p.Vitals[beacon.CLS].N,
-				p.VnodeGUID,
-			},
-		)
+		rows = append(rows, pagesColumns.Row(p))
 	}
-
 	return rows, err
 }
 
-var rumPagesColumns = map[string]any{
-	"vnode_guid": (funcapi.Column{Index: 16, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
-	"row_id": (funcapi.Column{
-		Index:         12,
-		Name:          "Row ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		UniqueKey:     true,
-	}).BuildColumn(),
-	"site": (funcapi.Column{
-		Index:         0,
-		Name:          "Site",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"page": (funcapi.Column{
-		Index:         1,
-		Name:          "Document Entry",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"pageviews_window": (funcapi.Column{
-		Index:         2,
-		Name:          "Document Views (window)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"sessions": (funcapi.Column{
-		Index:         3,
-		Name:          "Observed Sessions (window)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"lcp_p75_ms": (funcapi.Column{
-		Index:         4,
-		Name:          "LCP p75 (ms)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"inp_p75_ms": (funcapi.Column{
-		Index:         5,
-		Name:          "INP p75 (ms)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"cls_p75": (funcapi.Column{
-		Index:         6,
-		Name:          "CLS p75",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"errors_window": (funcapi.Column{
-		Index:         7,
-		Name:          "JS Errors (window)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"lcp_element": (funcapi.Column{
-		Index:         8,
-		Name:          "LCP Element",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"inp_element": (funcapi.Column{
-		Index:         9,
-		Name:          "INP Element",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"cls_element": (funcapi.Column{
-		Index:         10,
-		Name:          "CLS Element",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"frustration_window": (funcapi.Column{
-		Index:         11,
-		Name:          "Frustration Signals (window)",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"lcp_samples": (funcapi.Column{
-		Index:         13,
-		Name:          "LCP Samples",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"inp_samples": (funcapi.Column{
-		Index:         14,
-		Name:          "INP Samples",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"cls_samples": (funcapi.Column{
-		Index:         15,
-		Name:          "CLS Samples",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
+var pagesColumns = rawfunc.Columns[query.Page]{
+	{
+		Name:     "site",
+		Tooltip:  "Site",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Site },
+	},
+	{
+		Name:     "page",
+		Tooltip:  "Document Entry",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Page },
+	},
+	{
+		Name:     "pageviews_window",
+		Tooltip:  "Document Views (window)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.PageviewsWindow },
+	},
+	{
+		Name:     "sessions",
+		Tooltip:  "Observed Sessions (window)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Sessions },
+	},
+	{
+		Name:     "lcp_p75_ms",
+		Tooltip:  "LCP p75 (ms)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return detail(p.Vitals[beacon.LCP].N > 0, p.Vitals[beacon.LCP].P75) },
+	},
+	{
+		Name:     "inp_p75_ms",
+		Tooltip:  "INP p75 (ms)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return detail(p.Vitals[beacon.INP].N > 0, p.Vitals[beacon.INP].P75) },
+	},
+	{
+		Name:     "cls_p75",
+		Tooltip:  "CLS p75",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return detail(p.Vitals[beacon.CLS].N > 0, p.Vitals[beacon.CLS].P75) },
+	},
+	{
+		Name:     "errors_window",
+		Tooltip:  "JS Errors (window)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.ErrorsWindow },
+	},
+	{
+		Name:    "lcp_element",
+		Tooltip: "LCP Element",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(p query.Page) any { return credentialPatterns.Apply(p.LCPElement) },
+	},
+	{
+		Name:    "inp_element",
+		Tooltip: "INP Element",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(p query.Page) any { return credentialPatterns.Apply(p.INPElement) },
+	},
+	{
+		Name:    "cls_element",
+		Tooltip: "CLS Element",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(p query.Page) any { return credentialPatterns.Apply(p.CLSElement) },
+	},
+	{
+		Name:     "frustration_window",
+		Tooltip:  "Frustration Signals (window)",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return detail(p.FrustrationsKnown, p.FrustrationWindow) },
+	},
+	{
+		Name:      "row_id",
+		Tooltip:   "Row ID",
+		Type:      funcapi.FieldTypeString,
+		UniqueKey: true,
+		Value:     func(p query.Page) any { return rowID(p.Site, p.Page) },
+	},
+	{
+		Name:     "lcp_samples",
+		Tooltip:  "LCP Samples",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Vitals[beacon.LCP].N },
+	},
+	{
+		Name:     "inp_samples",
+		Tooltip:  "INP Samples",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Vitals[beacon.INP].N },
+	},
+	{
+		Name:     "cls_samples",
+		Tooltip:  "CLS Samples",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.Vitals[beacon.CLS].N },
+	},
+	{
+		Name:     "vnode_guid",
+		Tooltip:  "Vnode GUID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(p query.Page) any { return p.VnodeGUID },
+	},
 }

@@ -1,118 +1,140 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rumfunc
 
 import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
 var sessionEventsMethod = method{
-	id:      "rum-session-events",
-	title:   "RUM Session Events",
-	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
-	sort:    "ts",
-	every:   10,
-	history: true,
-	params:  []string{"site", "vnode", "vnode_guid", "session_id"},
-	columns: rumSessionEventsColumns,
+	Method: rawfunc.Method{
+		ID:          "rum-session-events",
+		Title:       "RUM Session Events",
+		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
+		Sort:        "ts",
+		UpdateEvery: 10,
+		History:     true,
+		Params:      []string{"site", "vnode", "vnode_guid", "session_id"},
+		Columns:     sessionEventsColumns.Build(),
+	},
+	rows: (*Handler).sessionEventsRows,
 }
 
-func (h *Handler) sessionEventsRows(ctx context.Context, site, session, vnodeGUID string) (rows [][]any, err error) {
-	var events []query.SessionEvent
-	events, err = h.deps.SessionEvents(ctx, site, session, vnodeGUID)
-	for _, e := range events {
-		rows = append(rows, []any{e.ObservedUS, e.Type, e.Page, h.redact.Apply(e.Text), e.TraceID, h.redact.Apply(e.UserID), e.ExperienceID, h.redact.Apply(e.View), e.ViewID, e.MetricID, e.Revision, e.VnodeGUID})
+func (h *Handler) sessionEventsRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
+	if args["session_id"] == "" {
+		return nil, requestError{status: 400, message: "session_id is required"}
 	}
-	return rows, err
+	events, err := h.deps.SessionEvents(ctx, args["site"], args["session_id"], args["vnode_guid"])
+	if err != nil {
+		return nil, err
+	}
+	if len(events) == 0 {
+		return nil, requestError{status: 404, message: "unknown session"}
+	}
+	rows := make([][]any, 0, len(events))
+	for _, e := range events {
+		rows = append(rows, sessionEventsColumns.Row(e))
+	}
+	return rows, nil
 }
 
-var rumSessionEventsColumns = map[string]any{
-	"vnode_guid": (funcapi.Column{Index: 11, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
-	"user_id": (funcapi.Column{
-		Index:         5,
-		Name:          "User ID at Event",
+var sessionEventsColumns = rawfunc.Columns[query.SessionEvent]{
+	{
+		Name:      "ts",
+		Tooltip:   "Agent Observation Time",
+		Type:      funcapi.FieldTypeTimestamp,
+		Visible:   true,
+		Sortable:  true,
+		Transform: funcapi.FieldTransformDatetimeUsec,
+		Value:     func(e query.SessionEvent) any { return e.ObservedUS },
+	},
+	{
+		Name:          "type",
+		Tooltip:       "Event",
 		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"ts": (funcapi.Column{
-		Index:         0,
-		Name:          "Agent Observation Time",
-		Type:          funcapi.FieldTypeTimestamp,
-		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
-		Visualization: funcapi.FieldVisualValue,
 		Visible:       true,
 		Sortable:      true,
-	}).BuildColumn(),
-	"type": (funcapi.Column{
-		Index:         1,
-		Name:          "Event",
-		Type:          funcapi.FieldTypeString,
 		Visualization: funcapi.FieldVisualPill,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"page": (funcapi.Column{
-		Index:         2,
-		Name:          "Page",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"text": (funcapi.Column{
-		Index:         3,
-		Name:          "Details",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"trace_id": (funcapi.Column{
-		Index:         4,
-		Name:          "Trace",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"experience_id": (funcapi.Column{
-		Index:         6,
-		Name:          "Document Experience",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"view": (funcapi.Column{
-		Index:         7,
-		Name:          "Application View",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"view_id": (funcapi.Column{
-		Index:         8,
-		Name:          "Application View ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"metric_id": (funcapi.Column{
-		Index:         9,
-		Name:          "Metric ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"revision": (funcapi.Column{
-		Index:         10,
-		Name:          "Revision",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
+		Value:         func(e query.SessionEvent) any { return e.Type },
+	},
+	{
+		Name:    "page",
+		Tooltip: "Page",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(e query.SessionEvent) any { return e.Page },
+	},
+	{
+		Name:    "text",
+		Tooltip: "Details",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(e query.SessionEvent) any { return credentialPatterns.Apply(e.Text) },
+	},
+	{
+		Name:    "trace_id",
+		Tooltip: "Trace",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(e query.SessionEvent) any { return e.TraceID },
+	},
+	{
+		Name:    "user_id",
+		Tooltip: "User ID at Event",
+		Type:    funcapi.FieldTypeString,
+		Visible: true,
+		Value:   func(e query.SessionEvent) any { return credentialPatterns.Apply(e.UserID) },
+	},
+	{
+		Name:     "experience_id",
+		Tooltip:  "Document Experience",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return e.ExperienceID },
+	},
+	{
+		Name:     "view",
+		Tooltip:  "Application View",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return credentialPatterns.Apply(e.View) },
+	},
+	{
+		Name:     "view_id",
+		Tooltip:  "Application View ID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return e.ViewID },
+	},
+	{
+		Name:     "metric_id",
+		Tooltip:  "Metric ID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return e.MetricID },
+	},
+	{
+		Name:     "revision",
+		Tooltip:  "Revision",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return e.Revision },
+	},
+	{
+		Name:     "vnode_guid",
+		Tooltip:  "Vnode GUID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(e query.SessionEvent) any { return e.VnodeGUID },
+	},
 }

@@ -7,12 +7,11 @@ import (
 	"context"
 	"errors"
 	"slices"
-	"strings"
-	"time"
+	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
@@ -29,99 +28,64 @@ type Deps interface {
 
 type Handler struct {
 	deps            Deps
-	redact          *redact.Redactor
 	lookupVnodeGUID func(string) (string, bool)
 }
 
 func New(deps Deps, lookupVnodeGUID func(string) (string, bool)) *Handler {
 	return &Handler{
 		deps:            deps,
-		redact:          redact.NewRedactor(),
 		lookupVnodeGUID: lookupVnodeGUID,
 	}
 }
+
 func (h *Handler) Cleanup(context.Context) {}
+
 func (h *Handler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
+
 func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return funcapi.ErrorResponse(400, "raw RUM request required")
 }
+
+type method struct {
+	rawfunc.Method
+	// samplingHelp adds the selected sites' current sampling policy to the help.
+	samplingHelp bool
+	// rows reads the method's rows and may add method-specific response fields.
+	rows func(h *Handler, ctx context.Context, args map[string]string, response map[string]any) ([][]any, error)
+}
+
+var methods = []method{sitesMethod, pagesMethod, liveMethod, sessionsMethod, errorsMethod, sessionEventsMethod}
+
 func Declarations() []funcapi.FunctionConfig {
 	out := make([]funcapi.FunctionConfig, 0, len(methods))
-	for _, spec := range methods {
-		out = append(
-			out,
-			funcapi.FunctionConfig{
-				ID:                spec.id,
-				FunctionName:      spec.id,
-				Name:              spec.title,
-				UpdateEvery:       spec.every,
-				Help:              spec.help,
-				Tags:              "rum",
-				RequireCloud:      true,
-				RequireCommercial: true,
-				RawRequest:        true,
-				ManagedInfo:       true,
-				HasHistory:        spec.history,
-				AcceptedParams:    spec.params,
-			},
-		)
+	for _, m := range methods {
+		out = append(out, m.Declaration("rum"))
 	}
 	return out
 }
+
 func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	i := slices.IndexFunc(methods, func(m method) bool { return m.id == req.Method })
+	i := slices.IndexFunc(methods, func(m method) bool { return m.ID == req.Method })
 	if i < 0 {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	spec := &methods[i]
-	args, err := rawfunc.ParseArgs(req, spec.params)
+	spec := methods[i]
+	args, err := rawfunc.ParseArgs(req, spec.Params)
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
 	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	response := map[string]any{
-		"status":              200,
-		"type":                "table",
-		"has_history":         spec.history,
-		"update_every":        spec.every,
-		"help":                spec.help,
-		"columns":             spec.columns,
-		"data":                [][]any{},
-		"default_sort_column": spec.sort,
-	}
-	if req.Method == "rum-sessions" || req.Method == "rum-errors" {
-		sites, err := h.deps.Sites(ctx, args["vnode_guid"])
+	response := spec.Table()
+	if spec.samplingHelp {
+		help, err := h.samplingHelp(ctx, spec.Help, args)
 		if err != nil {
 			return functionError(err)
 		}
-		var notes []string
-		problemBiased := false
-		for _, site := range sites {
-			if args["site"] != "" && args["site"] != site.Name {
-				continue
-			}
-			notes = append(notes, samplingNote(site))
-			sampling := site.Sampling
-			if sampling.InvestigateRate < 1 && (sampling.KeepErrors || sampling.KeepPoorVitals) {
-				problemBiased = true
-			}
-		}
-		help := spec.help + ". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
-			"These rows do not estimate all visitors or errors."
-		if len(notes) > 0 {
-			help += " Current sampling policy: " + strings.Join(notes, "; ") + "."
-			if problemBiased {
-				help += " Problem overrides bias retained detail toward failures."
-			}
-		}
 		response["help"] = help
-	}
-	if len(spec.params) > 0 {
-		response["accepted_params"] = spec.params
 	}
 	if req.Info {
 		return &funcapi.FunctionResponse{
@@ -132,65 +96,28 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r
 	}
-	var rows [][]any
-	now := time.Now().Unix()
-	switch req.Method {
-	case "rum-sites":
-		var receiver query.Receiver
-		rows, receiver, err = h.sitesRows(ctx, now, args["site"], args["vnode_guid"])
-		response["collector"] = map[string]any{
-			"public_url":        receiver.PublicURL,
-			"ingress_available": receiver.Serving,
-			"geoip":             receiver.GeoIP,
-		}
-	case "rum-pages":
-		rows, err = h.pagesRows(ctx, args["site"], args["vnode_guid"])
-	case "rum-live":
-		var next string
-		rows, next, err = h.liveRows(ctx, args["site"], args["after"], args["vnode_guid"])
-		response["next"] = next
-	case "rum-sessions", "rum-errors":
-		var after, before int64
-		after, before, err = historyRange(args, now)
-		if err != nil {
-			return funcapi.ErrorResponse(400, "%v", err)
-		}
-		if req.Method == "rum-sessions" {
-			rows, err = h.sessionsRows(ctx, args["site"], args["user_id"], after, before, now, args["vnode_guid"])
-		} else {
-			rows, err = h.errorsRows(ctx, args["site"], args["fingerprint"], after, before, now, args["vnode_guid"])
-		}
-	case "rum-session-events":
-		if args["session_id"] == "" {
-			return funcapi.ErrorResponse(400, "session_id is required")
-		}
-		rows, err = h.sessionEventsRows(ctx, args["site"], args["session_id"], args["vnode_guid"])
-		if err == nil && len(rows) == 0 {
-			return funcapi.ErrorResponse(404, "unknown session")
-		}
-	}
-
+	rows, err := spec.rows(h, ctx, args, response)
 	if err != nil {
 		return functionError(err)
 	}
-	if rows == nil {
-		rows = [][]any{}
+	if rows != nil {
+		response["data"] = rows
 	}
-	response["data"] = rows
 	return funcapi.RawResponse(response)
 }
+
+// credentialPatterns guards evidence text with the shared credential patterns.
+// Query redacts active sites with their site redactor; retired-site history is
+// not redacted there, and ingestion redacts before it strips control characters.
+var credentialPatterns = redact.NewRedactor()
+
 func detail(has bool, value any) any {
 	if has {
 		return value
 	}
 	return nil
 }
-func number(has bool, value float64) any {
-	if has {
-		return value
-	}
-	return nil
-}
+
 func boolean(v bool) int {
 	if v {
 		return 1
@@ -198,9 +125,26 @@ func boolean(v bool) int {
 	return 0
 }
 
+// rowID prefixes the site's byte length so arbitrary site-local values cannot collide.
+func rowID(site, value string) string { return strconv.Itoa(len(site)) + ":" + site + value }
+
+// requestError is a client error with its own status.
+type requestError struct {
+	status  int
+	message string
+}
+
+func (e requestError) Error() string { return e.message }
+
+func badRequest(err error) requestError { return requestError{status: 400, message: err.Error()} }
+
 func functionError(err error) *funcapi.FunctionResponse {
 	if r := rawfunc.Cancelled(err); r != nil {
 		return r
+	}
+	var request requestError
+	if errors.As(err, &request) {
+		return funcapi.ErrorResponse(request.status, "%s", request.message)
 	}
 	var invalid query.InvalidArgument
 	if errors.As(err, &invalid) {

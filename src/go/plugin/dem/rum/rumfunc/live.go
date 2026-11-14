@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rumfunc
 
 import (
@@ -6,248 +7,238 @@ import (
 	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
 var liveMethod = method{
-	id:      "rum-live",
-	title:   "RUM Live",
-	help:    "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
-	sort:    "seq",
-	every:   2,
-	columns: rumLiveColumns,
-	params:  []string{"site", "vnode", "vnode_guid", "after"},
+	Method: rawfunc.Method{
+		ID:          "rum-live",
+		Title:       "RUM Live",
+		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
+		Sort:        "seq",
+		UpdateEvery: 2,
+		Params:      []string{"site", "vnode", "vnode_guid", "after"},
+		Columns:     liveColumns.Build(),
+	},
+	rows: (*Handler).liveRows,
 }
 
-func (h *Handler) liveRows(ctx context.Context, site, after, vnodeGUID string) (rows [][]any, next string, err error) {
-	var live []query.LiveEvent
-	live, next, err = h.deps.Live(ctx, site, after, 2000, vnodeGUID)
+func (h *Handler) liveRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {
+	live, next, err := h.deps.Live(ctx, args["site"], args["after"], 2000, args["vnode_guid"])
+	response["next"] = next
+	var rows [][]any
 	for _, r := range live {
-		country := r.Country
-		if country == "" {
-			country = "unknown"
-		}
-		rows = append(
-			rows,
-			[]any{
-				r.Site + ":" + r.Generation + ":" + strconv.FormatUint(r.Seq, 10),
-				r.TS.UnixMicro(),
-				r.Site,
-				country,
-				r.City,
-				number(r.HasGeo, r.Lat),
-				number(r.HasGeo, r.Lon),
-				r.Page,
-				r.Browser,
-				r.Device,
-				boolean(r.PageView),
-				number(r.HasLCP, r.LCPMS),
-				number(r.HasINP, r.INPMS),
-				number(r.HasFCP, r.FCPMS),
-				number(r.HasTTFB, r.TTFBMS),
-				number(r.HasCLS, r.CLS),
-				r.Errors,
-				r.Kind, r.ExperienceID, r.View, r.ViewID, r.Vital, r.MetricID, r.Revision, r.VnodeGUID,
-			},
-		)
+		rows = append(rows, liveColumns.Row(r))
 	}
-
-	return rows, next, err
+	return rows, err
 }
 
-var rumLiveColumns = map[string]any{
-	"vnode_guid": (funcapi.Column{Index: 24, Name: "Vnode GUID", Type: funcapi.FieldTypeString, Visualization: funcapi.FieldVisualValue, Visible: true, Sortable: true}).BuildColumn(),
-	"seq": (funcapi.Column{
-		Index:         0,
-		UniqueKey:     true,
-		Name:          "Event",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-		Sticky:        true,
-	}).BuildColumn(),
-	"ts": (funcapi.Column{
-		Index:         1,
-		Name:          "Time",
-		Type:          funcapi.FieldTypeTimestamp,
-		ValueOptions:  funcapi.ValueOptions{Transform: funcapi.FieldTransformDatetimeUsec},
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"site": (funcapi.Column{
-		Index:         2,
-		Name:          "Site",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"country": (funcapi.Column{
-		Index:         3,
-		Name:          "Country",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"city": (funcapi.Column{
-		Index:         4,
-		Name:          "City",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"lat": (funcapi.Column{
-		Index:         5,
-		Name:          "Latitude",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"lon": (funcapi.Column{
-		Index:         6,
-		Name:          "Longitude",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-	}).BuildColumn(),
-	"page": (funcapi.Column{
-		Index:         7,
-		Name:          "Document Entry",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"browser": (funcapi.Column{
-		Index:         8,
-		Name:          "Browser",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"device": (funcapi.Column{
-		Index:         9,
-		Name:          "Device",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"pageview": (funcapi.Column{
-		Index:         10,
-		Name:          "Document View",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"lcp_ms": (funcapi.Column{
-		Index:         11,
-		Name:          "LCP (ms)",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"inp_ms": (funcapi.Column{
-		Index:         12,
-		Name:          "INP (ms)",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"fcp_ms": (funcapi.Column{
-		Index:         13,
-		Name:          "FCP (ms)",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"ttfb_ms": (funcapi.Column{
-		Index:         14,
-		Name:          "TTFB (ms)",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"cls": (funcapi.Column{
-		Index:         15,
-		Name:          "CLS",
-		Type:          funcapi.FieldTypeFloat,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"errors": (funcapi.Column{
-		Index:         16,
-		Name:          "JS Errors",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"kind": (funcapi.Column{
-		Index:         17,
-		Name:          "Row Kind",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"experience_id": (funcapi.Column{
-		Index:         18,
-		Name:          "Document Experience",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"view": (funcapi.Column{
-		Index:         19,
-		Name:          "Application View",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"view_id": (funcapi.Column{
-		Index:         20,
-		Name:          "Application View ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"vital": (funcapi.Column{
-		Index:         21,
-		Name:          "Vital",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"metric_id": (funcapi.Column{
-		Index:         22,
-		Name:          "Metric ID",
-		Type:          funcapi.FieldTypeString,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
-	"revision": (funcapi.Column{
-		Index:         23,
-		Name:          "Revision",
-		Type:          funcapi.FieldTypeInteger,
-		Visualization: funcapi.FieldVisualValue,
-		Visible:       true,
-		Sortable:      true,
-	}).BuildColumn(),
+var liveColumns = rawfunc.Columns[query.LiveEvent]{
+	{
+		Name:      "seq",
+		Tooltip:   "Event",
+		Type:      funcapi.FieldTypeString,
+		Visible:   true,
+		Sortable:  true,
+		Sticky:    true,
+		UniqueKey: true,
+		Value:     func(r query.LiveEvent) any { return r.Site + ":" + r.Generation + ":" + strconv.FormatUint(r.Seq, 10) },
+	},
+	{
+		Name:      "ts",
+		Tooltip:   "Time",
+		Type:      funcapi.FieldTypeTimestamp,
+		Visible:   true,
+		Sortable:  true,
+		Transform: funcapi.FieldTransformDatetimeUsec,
+		Value:     func(r query.LiveEvent) any { return r.TS.UnixMicro() },
+	},
+	{
+		Name:     "site",
+		Tooltip:  "Site",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Site },
+	},
+	{
+		Name:     "country",
+		Tooltip:  "Country",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value: func(r query.LiveEvent) any {
+			if r.Country == "" {
+				return "unknown"
+			}
+			return r.Country
+		},
+	},
+	{
+		Name:     "city",
+		Tooltip:  "City",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.City },
+	},
+	{
+		Name:    "lat",
+		Tooltip: "Latitude",
+		Type:    funcapi.FieldTypeFloat,
+		Visible: true,
+		Value:   func(r query.LiveEvent) any { return detail(r.HasGeo, r.Lat) },
+	},
+	{
+		Name:    "lon",
+		Tooltip: "Longitude",
+		Type:    funcapi.FieldTypeFloat,
+		Visible: true,
+		Value:   func(r query.LiveEvent) any { return detail(r.HasGeo, r.Lon) },
+	},
+	{
+		Name:     "page",
+		Tooltip:  "Document Entry",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Page },
+	},
+	{
+		Name:     "browser",
+		Tooltip:  "Browser",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Browser },
+	},
+	{
+		Name:     "device",
+		Tooltip:  "Device",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Device },
+	},
+	{
+		Name:     "pageview",
+		Tooltip:  "Document View",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return boolean(r.PageView) },
+	},
+	{
+		Name:     "lcp_ms",
+		Tooltip:  "LCP (ms)",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return detail(r.HasLCP, r.LCPMS) },
+	},
+	{
+		Name:     "inp_ms",
+		Tooltip:  "INP (ms)",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return detail(r.HasINP, r.INPMS) },
+	},
+	{
+		Name:     "fcp_ms",
+		Tooltip:  "FCP (ms)",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return detail(r.HasFCP, r.FCPMS) },
+	},
+	{
+		Name:     "ttfb_ms",
+		Tooltip:  "TTFB (ms)",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return detail(r.HasTTFB, r.TTFBMS) },
+	},
+	{
+		Name:     "cls",
+		Tooltip:  "CLS",
+		Type:     funcapi.FieldTypeFloat,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return detail(r.HasCLS, r.CLS) },
+	},
+	{
+		Name:     "errors",
+		Tooltip:  "JS Errors",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Errors },
+	},
+	{
+		Name:     "kind",
+		Tooltip:  "Row Kind",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Kind },
+	},
+	{
+		Name:     "experience_id",
+		Tooltip:  "Document Experience",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.ExperienceID },
+	},
+	{
+		Name:     "view",
+		Tooltip:  "Application View",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.View },
+	},
+	{
+		Name:     "view_id",
+		Tooltip:  "Application View ID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.ViewID },
+	},
+	{
+		Name:     "vital",
+		Tooltip:  "Vital",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Vital },
+	},
+	{
+		Name:     "metric_id",
+		Tooltip:  "Metric ID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.MetricID },
+	},
+	{
+		Name:     "revision",
+		Tooltip:  "Revision",
+		Type:     funcapi.FieldTypeInteger,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.Revision },
+	},
+	{
+		Name:     "vnode_guid",
+		Tooltip:  "Vnode GUID",
+		Type:     funcapi.FieldTypeString,
+		Visible:  true,
+		Sortable: true,
+		Value:    func(r query.LiveEvent) any { return r.VnodeGUID },
+	},
 }
