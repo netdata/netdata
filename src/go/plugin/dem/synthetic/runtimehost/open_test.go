@@ -40,6 +40,48 @@ func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
 	require.True(t, os.IsNotExist(err))
 }
 
+func TestOpenKeepsTheConfiguredModeWhenUnusable(t *testing.T) {
+	for name, tc := range map[string]struct {
+		mode     Mode
+		host     bool
+		reported Mode
+	}{
+		"managed":   {mode: ModeManaged, host: true, reported: ModeManaged},
+		"native":    {mode: ModeNative, host: true, reported: ModeNative},
+		"invalid":   {mode: "auto", host: true, reported: ModeManaged},
+		"preloaded": {mode: ModePreloaded},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.Mode = tc.mode
+			switch tc.mode {
+			case ModeManaged:
+				cfg.CachePath = filepath.Join(t.TempDir(), "cache")
+			case ModePreloaded:
+				cfg.PreloadPath = filepath.Join(t.TempDir(), "absent")
+			}
+			handle := Open(cfg, "")
+			t.Cleanup(func() { require.NoError(t, handle.Close()) })
+			require.NotNil(t, handle.Source)
+			if !tc.host {
+				require.Nil(t, handle.Host)
+				require.Error(t, handle.SetupError)
+			} else {
+				require.NotNil(t, handle.Host)
+				assert.Equal(t, tc.reported, handle.Host.Status().Mode)
+				assert.Equal(t, handle.Host.Ready(), handle.SetupError)
+			}
+			if tc.mode == "auto" {
+				require.ErrorContains(t, handle.SetupError, "mode must be managed, native or preloaded")
+			}
+			if handle.SetupError != nil {
+				_, err := handle.Source.BeginUse()
+				require.Error(t, err)
+			}
+		})
+	}
+}
+
 func TestPreloadedMissingPathIsSetupUnavailable(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Mode = ModePreloaded

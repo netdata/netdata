@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -25,8 +26,19 @@ func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 	var warnings bytes.Buffer
 	process, err := Open(Options{Config: processConfig(t), VarLibDir: varLib, Private: true, Warnings: &warnings})
 	require.NoError(t, err)
-	for _, module := range []string{"receiver", "rum", "journey", "lighthouse"} {
-		assert.Contains(t, process.Collectors, module)
+	for _, module := range []string{"receiver", "rum"} {
+		require.Contains(t, process.Collectors, module)
+		assert.Nil(t, process.Collectors[module].ActivationDependencies, module)
+	}
+	// Managed and native modes always have a host, so browser jobs wait for it.
+	for _, module := range []string{"journey", "lighthouse"} {
+		require.Contains(t, process.Collectors, module)
+		require.NotNil(t, process.Collectors[module].ActivationDependencies, module)
+		dependencies, err := process.Collectors[module].ActivationDependencies(nil)
+		require.NoError(t, err)
+		require.Len(t, dependencies, 1)
+		assert.Equal(t, runtimehost.DependencyKind, dependencies[0].Kind, module)
+		assert.Equal(t, runtimehost.DependencyName, dependencies[0].Name, module)
 	}
 	require.GreaterOrEqual(t, len(process.Services), 2)
 	assert.Same(t, process.Retention, process.Services[0])

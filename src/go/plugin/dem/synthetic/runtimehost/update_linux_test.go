@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
@@ -117,17 +118,26 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
 	failure := errors.New("sandbox qualification failed")
+	var logs healthLog
+	host.log = logger.NewWithWriter(&logs)
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
 		func(context.Context) (runtime.Release, error) { return next, nil })
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
 	require.Equal(t, first.Manifest, *status.Storage.Selected)
 	require.False(t, status.RestartRequired)
-	require.Contains(t, status.MaintenanceError, failure.Error())
+	require.Equal(t, "update: sandbox qualification failed", status.MaintenanceError)
 	require.Zero(t, status.Storage.CandidateClaims)
 	require.NoError(t, host.Ready())
+	require.ErrorIs(t, u.check(context.Background()), failure)
+	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update failed: sandbox qualification failed"))
 	host.sweep()
-	require.Contains(t, host.Status().MaintenanceError, failure.Error(), "storage cleanup cannot clear update health")
+	require.Equal(t, "update: sandbox qualification failed", host.Status().MaintenanceError, "storage cleanup cannot clear update health")
+	// A later check that finds no newer release clears update health.
+	u.load = func(context.Context) (runtime.Release, error) { return first, nil }
+	require.NoError(t, u.check(context.Background()))
+	require.Empty(t, host.Status().MaintenanceError)
+	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update recovered"))
 }
 
 func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
