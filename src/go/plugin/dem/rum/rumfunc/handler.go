@@ -11,7 +11,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
@@ -112,11 +111,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	}
 	return funcapi.RawResponse(response)
 }
-
-// credentialPatterns guards evidence text with the shared credential patterns.
-// Query redacts active sites with their site redactor; retired-site history is
-// not redacted there, and ingestion redacts before it strips control characters.
-var credentialPatterns = redact.NewRedactor()
 
 func detail(has bool, value any) any {
 	if has {

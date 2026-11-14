@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -19,25 +20,30 @@ var viewURLScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
 // Text is normalized before it becomes an aggregation key or retained evidence.
 // Opaque protocol IDs use their own validation and are not generalized as paths.
-func (o Options) apply(value string) string {
-	r := o.Redactor
-	if r == nil {
-		r = defaultRedactor
+func (o Options) redactor() *redact.Redactor {
+	if o.Redactor == nil {
+		return defaultRedactor
 	}
-	return r.Apply(value)
+	return o.Redactor
+}
+
+// redacted removes control characters, as clean does, and every credential the
+// site redactor finds in the received or in the cleaned text. Callers bound the
+// result, so truncation cannot leave a credential prefix the patterns miss.
+func (o Options) redacted(value string) string {
+	return strings.TrimSpace(o.redactor().ApplyRemoving(value, unicode.IsControl))
 }
 
 func (o Options) text(value string, limit int) string {
-	return clean(o.apply(value), limit)
+	return truncate(o.redacted(value), limit)
 }
 
 func (o Options) cleanURL(value string) string {
 	if value == "" {
 		return ""
 	}
-	value = o.apply(redactURL(value, o.PathRules))
 	// Keep the full URL until callers separate host and path or bound an attribute.
-	return clean(value, len(value))
+	return o.redacted(redactURL(value, o.PathRules))
 }
 
 func (o Options) url(value string, limit int) string {
@@ -45,23 +51,30 @@ func (o Options) url(value string, limit int) string {
 }
 
 func (o Options) view(value string) string {
-	value = clean(value, len(value))
-	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
-		value = o.url(value, maxPathLen)
+	cleaned := clean(value, len(value))
+	if strings.Contains(cleaned, "/") || viewURLScheme.MatchString(cleaned) {
+		// A URL view follows the page URL rules: reduce the URL, then redact it.
+		value = o.url(cleaned, maxPathLen)
 		if value != "" {
 			value = urlPath(value)
 		}
-	} else {
-		for _, rule := range o.PathRules {
-			value = rule.Re.ReplaceAllString(value, rule.Replace)
-		}
+		return o.text(value, maxNameLen)
+	}
+	// A view name is text. Site path rules read the cleaned name, as for URL
+	// views; a name they leave unchanged is redacted in both forms.
+	ruled := cleaned
+	for _, rule := range o.PathRules {
+		ruled = rule.Re.ReplaceAllString(ruled, rule.Replace)
+	}
+	if ruled != cleaned {
+		return o.text(ruled, maxNameLen)
 	}
 	return o.text(value, maxNameLen)
 }
 
 func (o Options) selector(value string) string {
-	// Apply credential patterns before the selector and size transformations.
-	return clean(redactSelector(o.apply(value)), maxSelector)
+	// Selector patterns read the cleaned text; the size bound comes last.
+	return truncate(redactSelector(o.redacted(value)), maxSelector)
 }
 
 type stackFrame struct {
