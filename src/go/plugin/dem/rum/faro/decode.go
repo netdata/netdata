@@ -301,11 +301,11 @@ func (o Options) events(p *faroPayload, b *beacon.Beacon) {
 // event logs, the rest as bounded diagnostic text.
 func (o Options) eventAttrs(kind beacon.EventKind, name string, raw map[string]string) map[string]string {
 	var attrs map[string]string
-	for k, v := range raw {
+	for received, v := range raw {
 		if len(attrs) >= maxEventAttrs {
 			break
 		}
-		k = clean(k, len(k))
+		k := clean(received, len(received))
 		rule := eventAttrRule(kind, name, k)
 		if !o.EventLogs && !rule.native {
 			continue
@@ -316,7 +316,7 @@ func (o Options) eventAttrs(kind beacon.EventKind, name string, raw map[string]s
 		}
 		// Known keys carry protocol semantics; custom keys are diagnostic text.
 		if !rule.native {
-			k = o.text(k, maxNameLen)
+			k = o.text(received, maxNameLen)
 		}
 		if k != "" {
 			if attrs == nil {

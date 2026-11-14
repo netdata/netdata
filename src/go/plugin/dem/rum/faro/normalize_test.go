@@ -4,9 +4,11 @@ package faro
 
 import (
 	"encoding/json"
+	"reflect"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -279,4 +281,124 @@ func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
 	}
 	assert.NotEqual(t, fingerprints[0], fingerprints[1])
 	assert.NotEqual(t, fingerprints[1], fingerprints[2])
+}
+
+func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
+	const pem = "-----BEGIN PRIVATE KEY-----MIIBOgIBAAJBAKj34GkxFhD90vcNLYLInFEX6Ppy1tPf-----END PRIVATE KEY-----"
+	bound := strings.Repeat("x", maxUserIDLen-14) + " "
+	for name, tc := range map[string]struct {
+		raw    string
+		secret string // the credential value; it must not survive anywhere
+		want   string // the normalized user ID
+	}{
+		"bearer split by NUL":          {raw: "Bea\x00rer abcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
+		"bearer split by escape":       {raw: "Bea\x1brer abcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
+		"bearer split by DEL":          {raw: "Bea\x7frer abcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
+		"bearer split by C1 control":   {raw: "Bea\u0085rer abcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
+		"key split by NUL":             {raw: "tok\x00en=hunter2", secret: "hunter2", want: "token=[REDACTED]"},
+		"key split by newline":         {raw: "tok\nen=hunter2", secret: "hunter2", want: "token=[REDACTED]"},
+		"access key split by tab":      {raw: "AKIA\tABCDEFGHIJKLMNOP", secret: "ABCDEFGHIJKLMNOP", want: "[REDACTED]"},
+		"PEM label split by NUL":       {raw: strings.Replace(pem, "PRIVATE KEY", "PRIVATE\x00 KEY", 1), secret: "MIIBOgIBAAJBAKj34Gkx", want: "[REDACTED]"},
+		"configured value split by C1": {raw: "configu\u009fred-value", secret: "configured-value", want: "[REDACTED]"},
+		// Shapes the received text already exposes stay redacted: the
+		// whitespace and word boundary they need are control characters.
+		"bearer after a tab":           {raw: "Bearer\tabcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
+		"key after a control boundary": {raw: "a\x01token=hunter2", secret: "hunter2", want: "atoken=[REDACTED]"},
+		// The bound applies to the redacted text, so the value cannot keep a
+		// prefix and the result stays within the limit.
+		"credential at the bound": {raw: bound + "tok\x00en=hunter2", secret: "hun", want: bound + "token=[REDACT"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			frame := map[string]any{"function": tc.raw, "filename": "https://example.org/app.js", "lineno": 1, "colno": 2}
+			serialized, err := json.Marshal(frame)
+			require.NoError(t, err)
+			text := map[string]any{"stringValue": tc.raw}
+			raw, err := json.Marshal(map[string]any{
+				"meta": map[string]any{
+					"session": map[string]string{"id": "session"},
+					"page":    map[string]string{"url": "https://example.org/checkout"},
+					"browser": map[string]string{"name": tc.raw, "version": tc.raw, "os": tc.raw},
+					"view":    map[string]string{"name": tc.raw},
+					"app":     map[string]string{"version": tc.raw, "environment": tc.raw},
+					"user":    map[string]string{"id": tc.raw},
+				},
+				"measurements": []any{map[string]any{"values": map[string]float64{"lcp": 5000}, "context": map[string]string{"element": tc.raw}}},
+				"exceptions":   []any{map[string]any{"type": tc.raw, "value": tc.raw, "stacktrace": map[string]any{"frames": []any{frame}}}},
+				"events": []any{
+					map[string]any{"name": tc.raw, "domain": tc.raw, "attributes": map[string]string{tc.raw: tc.raw, "target": tc.raw}},
+					map[string]any{"name": "rage_click", "attributes": map[string]string{"target": tc.raw}},
+				},
+				"logs": []any{map[string]any{"level": "error", "message": tc.raw, "context": map[string]string{"type": tc.raw, "stackFrames": string(serialized)}}},
+				"traces": map[string]any{"resourceSpans": []any{map[string]any{
+					"resource": map[string]any{"attributes": []any{map[string]any{"key": "service.name", "value": text}}},
+					"scopeSpans": []any{map[string]any{
+						"scope": map[string]string{"name": tc.raw, "version": tc.raw},
+						"spans": []any{map[string]any{
+							"traceId": "1234567890abcdef1234567890abcdef", "spanId": "1234567890abcdef",
+							"startTimeUnixNano": "1", "endTimeUnixNano": "2", "name": tc.raw,
+							"status":     map[string]any{"message": tc.raw},
+							"attributes": []any{map[string]any{"key": tc.raw, "value": text}},
+						}},
+					}},
+				}}},
+			})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{
+				Now:                now,
+				EventLogs:          true,
+				FrustrationSignals: true,
+				ConsoleLogs:        true,
+				Tracing:            true,
+				Redactor:           redact.NewRedactor("configured-value"),
+			})
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, b.UserID)
+			require.Len(t, b.Vitals, 1)
+			require.Len(t, b.Errors, 1)
+			require.Len(t, b.Events, 2)
+			require.Len(t, b.Logs, 1)
+			require.Len(t, b.Spans, 1)
+			for _, value := range beaconStrings(reflect.ValueOf(b)) {
+				assert.NotContains(t, value, tc.secret)
+			}
+		})
+	}
+}
+
+// beaconStrings returns every string a decoded beacon holds, map keys included.
+func beaconStrings(v reflect.Value) []string {
+	switch v.Kind() {
+	case reflect.String:
+		return []string{v.String()}
+	case reflect.Pointer, reflect.Interface:
+		if v.IsNil() {
+			return nil
+		}
+		return beaconStrings(v.Elem())
+	case reflect.Slice, reflect.Array:
+		var out []string
+		for i := range v.Len() {
+			out = append(out, beaconStrings(v.Index(i))...)
+		}
+		return out
+	case reflect.Map:
+		var out []string
+		for iter := v.MapRange(); iter.Next(); {
+			out = append(out, beaconStrings(iter.Key())...)
+			out = append(out, beaconStrings(iter.Value())...)
+		}
+		return out
+	case reflect.Struct:
+		if v.Type() == reflect.TypeFor[time.Time]() {
+			return nil
+		}
+		var out []string
+		for i := range v.NumField() {
+			out = append(out, beaconStrings(v.Field(i))...)
+		}
+		return out
+	default:
+		return nil
+	}
 }

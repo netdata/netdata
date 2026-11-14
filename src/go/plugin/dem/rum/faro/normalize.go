@@ -27,17 +27,29 @@ func (o Options) apply(value string) string {
 	return r.Apply(value)
 }
 
+// redacted removes control characters and applies the site redactor to the
+// received text and, when cleaning changed it, to the cleaned text. A
+// credential can depend on a removed character ("Bearer\tTOKEN", a word
+// boundary) or be joined by its removal ("tok\x00en=..."). Callers bound the
+// result, so truncation cannot leave a credential prefix the patterns miss.
+func (o Options) redacted(value string) string {
+	value = o.apply(value)
+	if cleaned := clean(value, len(value)); cleaned != value {
+		return o.apply(cleaned)
+	}
+	return value
+}
+
 func (o Options) text(value string, limit int) string {
-	return clean(o.apply(value), limit)
+	return truncate(o.redacted(value), limit)
 }
 
 func (o Options) cleanURL(value string) string {
 	if value == "" {
 		return ""
 	}
-	value = o.apply(redactURL(value, o.PathRules))
 	// Keep the full URL until callers separate host and path or bound an attribute.
-	return clean(value, len(value))
+	return o.redacted(redactURL(value, o.PathRules))
 }
 
 func (o Options) url(value string, limit int) string {
@@ -45,7 +57,7 @@ func (o Options) url(value string, limit int) string {
 }
 
 func (o Options) view(value string) string {
-	value = clean(value, len(value))
+	value = o.redacted(value)
 	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
 		value = o.url(value, maxPathLen)
 		if value != "" {
@@ -60,8 +72,8 @@ func (o Options) view(value string) string {
 }
 
 func (o Options) selector(value string) string {
-	// Apply credential patterns before the selector and size transformations.
-	return clean(redactSelector(o.apply(value)), maxSelector)
+	// Selector patterns read the cleaned text; the size bound comes last.
+	return truncate(redactSelector(o.redacted(value)), maxSelector)
 }
 
 type stackFrame struct {
