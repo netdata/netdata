@@ -61,15 +61,16 @@ func (o Options) view(value string) string {
 		return o.text(value, maxNameLen)
 	}
 	// A view name is text. Site path rules read the cleaned name, as for URL
-	// views, unless the received name shows a credential the cleaned one does
-	// not: then they read the redacted name.
+	// views, unless it holds a credential in either form: then they read the
+	// redacted name, so a rule cannot split the credential and expose the rest.
 	named := o.redacted(value)
-	ruled := o.pathRules(cleaned)
-	if ruled == cleaned {
-		return truncate(named, maxNameLen)
+	source := cleaned
+	if named != cleaned {
+		source = named
 	}
-	if named != o.redactor().Apply(cleaned) {
-		ruled = o.pathRules(named)
+	ruled := o.pathRules(source)
+	if ruled == source {
+		return truncate(named, maxNameLen)
 	}
 	return o.text(ruled, maxNameLen)
 }

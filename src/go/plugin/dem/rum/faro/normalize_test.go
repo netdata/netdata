@@ -269,8 +269,9 @@ func TestCaptureURLViewsReduceBeforeRedaction(t *testing.T) {
 	}
 }
 
-// Site path rules read the cleaned view name, before a redaction marker can
-// split what they match; a name they leave alone is redacted in both forms.
+// Site path rules read the cleaned view name, so a marker cannot split what
+// they match. A name holding a credential is redacted first, so a rule cannot
+// split the credential either; that wins over the rule's rewrite.
 func TestCaptureViewNamePathRules(t *testing.T) {
 	opt := Options{
 		Now:       now,
@@ -278,12 +279,33 @@ func TestCaptureViewNamePathRules(t *testing.T) {
 		PathRules: []PathRule{{Re: regexp.MustCompile(`cust-\w+`), Replace: ":cust"}},
 	}
 	for view, want := range map[string]string{
-		"cust-AKIA0123456789ABCDEF12": ":cust",
+		"cust-AKIA0123456789ABCDEF12": "cust-[REDACTED]12",
+		"order cust-token=hunter2":    "order :cust=[REDACTED]",
+		"cust-Bearer abcdef":          "cust-[REDACTED]",
+		"cust-configured-value":       "cust-[REDACTED]",
 		"cust-12\x0034":               ":cust",
 		// A rule rewrites one part; a removed tab separates a credential elsewhere.
 		"cust-123 Bearer\tabcdef":       ":cust [REDACTED]",
 		"checkout Bearer\tabcdef":       "checkout [REDACTED]",
 		"checkout configu\x00red-value": "checkout [REDACTED]",
+	} {
+		t.Run(view, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"meta": map[string]any{"view": map[string]string{"name": view}}})
+			require.NoError(t, err)
+			b, err := Decode(raw, opt)
+			require.NoError(t, err)
+			assert.Equal(t, want, b.View)
+		})
+	}
+}
+
+// A rule that rewrites part of a credential cannot leave the rest unredacted.
+func TestCaptureViewNameDigitRule(t *testing.T) {
+	opt := Options{Now: now, PathRules: []PathRule{{Re: regexp.MustCompile(`\d+`), Replace: ":id"}}}
+	for view, want := range map[string]string{
+		"AKIA0123456789ABCDEF": "[REDACTED]",
+		"Bearer abc123xyz":     "[REDACTED]",
+		"checkout 42":          "checkout :id",
 	} {
 		t.Run(view, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"meta": map[string]any{"view": map[string]string{"name": view}}})
