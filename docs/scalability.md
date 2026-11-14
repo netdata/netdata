@@ -62,12 +62,14 @@ We tested a single installation Netdata Parent and Prometheus, at **4.6 million 
 
 | Metric                          | Netdata           | Prometheus       | Impact                                       |
 |---------------------------------|-------------------|------------------|----------------------------------------------|
-| **CPU Usage**                   | ~9.4 cores        | ~14.8 cores      | 36% less CPU                                 |
+| **CPU Usage**                   | ~9.4 cores        | ~14.8 cores      | 37% less CPU                                 |
 | **Memory Usage**                | ~47 GiB           | ~383 GiB         | 88% less RAM                                 |
-| **Disk I/O**                    | ~4.7 MiB/s writes | ~147 MiB/s total | 97% less I/O                                 |
+| **Disk I/O**                    | ~4.7 MiB/s total  | ~147 MiB/s total | 97% less I/O                                 |
 | **Per-second retention (1TiB)** | ~1.25 days        | ~2 hours         | 15x longer - 40x retention in lower tiers    |
 | **Sample completeness**         | ~100%             | ~93.7%           | Zero data loss                               |
 | **Query latency (2hr window)**  | ~0.11s            | ~1.8s            | 16x faster - 22x faster in long term queries |
+
+The benchmark measured ingestion, with machine learning and alerting disabled on Netdata. The sizing guidelines below budget more per metric because they include machine learning, alerts, queries and headroom.
 
 **Critical insight:** This isn't exotic scale. **Every Netdata deployment with >500 nodes runs at millions of metrics per second.** Our users don't even notice - because the architecture absorbs it.
 
@@ -100,7 +102,7 @@ Each Agent is autonomous:
 
 This means:
 
-- No data loss if Parent is down (Agents buffer locally)
+- No data loss if Parent is down, as long as the outage fits in the Agent's local per-second retention (Agents buffer locally)
 - No performance degradation as you scale (work stays distributed)
 - No architectural changes from 1 to 100,000 nodes
 
@@ -166,7 +168,7 @@ The architecture adapts to your needs - train where you have resources, use ever
 
 :::tip
 
-Scale horizontally with more Parents, not vertically with bigger Parents. Beyond 500 nodes per Parent, resource usage grows non-linearly.
+Scale out by adding Parents. About 500 nodes per Parent is a planning unit for capacity and cost math, not a limit: a Parent can handle multiple times this load, given the right resources.
 
 :::
 
@@ -270,7 +272,7 @@ This isn't just optimization. It's a fundamentally different architecture that r
 <details>
 <summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. This is a planning unit for capacity and cost math, not a hard limit: a Parent can handle multiple times this load, given the right resources.
 
 </details>
 

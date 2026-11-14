@@ -137,7 +137,8 @@ With Netdata you can monitor all these components across platforms:
 |                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 | **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                       **Custom Applications**<small><br/>OpenMetrics and StatsD</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                      **OpenTelemetry (OTLP)**<small><br/>Metrics, logs and traces over gRPC and HTTP</small>|               Yes                |    -    |  Yes  |                         -                         |
 
 On Linux, you can continuously monitor all kernel features and hardware sensors for errors, including Intel/AMD/Nvidia GPUs, PCI AER, RAM EDAC, IPMI, S.M.A.R.T, Intel RAPL, NVMe, fans, power supplies, and voltage readings.
 
@@ -260,10 +261,11 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 | Capability                   | Description                                                                                                                                   |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Comprehensive Collection** | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• OpenMetrics, StatsD, and logs<br>• OpenTelemetry support coming soon |
+| **Comprehensive Collection** | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Logs |
 | **Performance & Precision**  | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
 | **Edge-Based ML**            | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Pattern recognition based on historical behavior             |
-| **Advanced Log Management**  | • Direct systemd-journald and Windows Event Log integration<br>• Process logs at the edge<br>• Rich log visualization                         |
+| **Advanced Log Management**  | • Direct systemd-journald and Windows Event Log integration<br>• OpenTelemetry logs (OTLP) with indexed storage<br>• Process logs at the edge<br>• Rich log visualization                         |
+| **Traces**                   | • OpenTelemetry traces (OTLP)<br>• Traces explorer                                                                                           |
 | **Observability Pipeline**   | • Parent-Child relationships<br>• Flexible centralization<br>• Multi-level replication and retention                                          |
 | **Automated Visualization**  | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
 | **Smart Alerting**           | • Pre-configured alerts<br>• Multiple notification methods<br>• Proactive detection                                                           |

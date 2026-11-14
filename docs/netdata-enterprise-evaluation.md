@@ -37,6 +37,19 @@ Typically, organizations use the mixed approach, where they install a number of 
 
 For more information see [Deployment Strategies](/docs/deployment-guides/deployment-with-centralization-points.md).
 
+## Evaluation Criteria
+
+How Netdata approaches the criteria an enterprise evaluation usually covers, with pointers to the details:
+
+- **Scale.** Netdata scales out, not up. Independent Parents run locally at each site, data center or region, and capacity grows by adding Parents. For network monitoring, SNMP collection runs on distributed hubs close to the devices, including branch offices connected over DSL lines. See [Scalability](#scalability) and [Network Performance Monitoring](/docs/npm/README.md).
+- **High availability.** Parents cluster active-active, and each Parent in a cluster keeps its own full copy of the data. During an internet outage, Agents and Parents keep collecting, evaluating alerts and serving their own dashboards locally. See [Clustering and High Availability of Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
+- **Deployment and configuration.** Configuration works both ways: as code, provisioned with Ansible, Puppet, Chef, Salt, Terraform or Helm, or centrally from the dashboard. See [Rollout / Lifecycle Management](#rollout--lifecycle-management) and [Dynamic Configuration](/docs/netdata-agent/configuration/dynamic-configuration.md).
+- **Security and access.** Agents connect to Netdata Cloud outbound only and open no inbound ports for it. Users sign in with SSO, groups map to roles through SCIM, and access is scoped by spaces and rooms. See [Authentication, Authorization, and Accounting](#authentication-authorization-and-accounting-aaa) and [Security and Privacy Design](/docs/security-and-privacy-design/README.md).
+- **Data sovereignty.** Metrics, logs and traces are stored on the Agents and Parents in your infrastructure. Netdata Cloud stores metadata only, and Netdata Cloud On-Prem keeps the control plane inside your network too. See [Compliance and Security](#compliance-and-security).
+- **Integrations.** Open standards in and out: OpenTelemetry, OpenMetrics and StatsD in; Prometheus, InfluxDB, Graphite and others out. More than 800 collectors, and alert notifications to PagerDuty, Slack, Teams, ServiceNow and more. See [Integration](#integration).
+- **Cost.** Agents run on spare capacity, Parents on ordinary VMs, pricing is per node, and observability data does not cross the WAN. See [Cost Efficiency](#cost-efficiency).
+- **Support.** Community, business and enterprise support, with professional services for architecture, deployment and migration. See [Support and Maintenance](#support-and-maintenance).
+
 ## Infrastructure Requirements
 
 Netdata has been architected to minimize resource consumption while maximizing observability capabilities. This efficiency is achieved through several key design decisions:
@@ -51,14 +64,16 @@ This design philosophy enables Netdata to monitor infrastructure at unprecedente
 
 ### Agent Requirements (Per Node)
 
-Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core (see [CPU Requirements](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) for default-settings sizing guidance). The exact figures depend on the number of metrics collected per server.
+**Netdata uses under 5% of one CPU core and about 200 MB of RAM on a typical server.** That is with default settings: per-second collection of about 3,000 metrics, machine learning on every metric, three storage tiers and all stock alerts. Usage grows with the number of metrics collected. [Sizing](/docs/netdata-agent/sizing-netdata-agents/README.md) covers busy hosts and Parents.
+
+**On edge devices, Netdata runs in about 30 MiB.** A Raspberry Pi 3 B+ configured as a lightweight Child uses about 3% of one core at five-second collection, and under 1% at five-minute collection. See [edge devices](/docs/fleet-management/minimize-cpu-and-memory.md).
 
 When connected to a Netdata Parent (the agent is in `child` mode), these requirements can be significantly reduced and, in the case of storage, even eliminated (no data on local disk).
 
-| Type       | Metric/s | CPU                     | Memory        | Network  | Storage                   |
-|------------|----------|-------------------------|---------------|----------|---------------------------|
-| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none     | varies based on retention |
-| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none                      |
+| Type       | Metric/s | CPU                      | Memory      | Network  | Storage                          |
+|------------|----------|--------------------------|-------------|----------|----------------------------------|
+| standalone | about 3k | under 5% of a single core | about 200 MB | none     | about 4 GiB by default, configurable |
+| child      | 3k - 10k | 2% - 10% of a single core | 100 - 300 MiB | \<1 Mbps | none                             |
 
 For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
@@ -66,11 +81,13 @@ For more information and ways to further reduce Agent resource utilization, see 
 
 Parent nodes aggregate data from multiple child agents and require resources that scale with the volume of metrics collected and other deployment decisions (clustered parents, centralized machine learning, etc).
 
-The best practice is to have a cluster of Netdata Parents for every approximately 500 monitored nodes (2M metrics/second, see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full 100/250/500-node breakdown), like this:
+Size each Netdata Parent, or Parent cluster, for 100 to 500 monitored nodes (a planning unit for capacity, not a limit: about 4,000 metrics/second per node, leaving headroom; see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines)):
 
-| Monitored Nodes | Metric/s  | CPU Cores | Memory | Network  | Storage                   |
-|-----------------|-----------|-----------|--------|----------|---------------------------|
-| 500 nodes       | 2 million | 20 cores  | 80 GB  | 200 Mbps | varies based on retention |
+| Monitored Nodes | Metric/s    | CPU Cores | Memory | Network  | Storage                   |
+|-----------------|-------------|-----------|--------|----------|---------------------------|
+| 100 nodes       | 0.5 million | 5 cores   | 20 GB  | 50 Mbps  | varies based on retention |
+| 250 nodes       | 1 million   | 10 cores  | 40 GB  | 100 Mbps | varies based on retention |
+| 500 nodes       | 2 million   | 20 cores  | 80 GB  | 200 Mbps | varies based on retention |
 
 These figures include ingestion and query resources.
 
@@ -82,7 +99,7 @@ For high availability configurations, see [Clustering and High Availability of N
 
 For organizations requiring complete control over their monitoring infrastructure, Netdata Cloud On-Prem provides the full control plane within the datacenter (air-gapped).
 
-Netdata Cloud is a Kubernetes cluster (Kubernetes 1.23+):
+Netdata Cloud On-Prem runs on Kubernetes:
 
 | Monitored Nodes | CPU Cores | Memory | Storage | Notes                  |
 |-----------------|-----------|--------|---------|------------------------|
@@ -133,13 +150,11 @@ To control access to observability data, Netdata Cloud uses spaces and rooms to 
 
 ## Scalability
 
-Netdata scales horizontally. There is no limit on how large a Netdata monitored infrastructure can scale, although there are several practical usability limits when it comes to using the observability platform.
+Netdata scales out: each Parent cluster is an independent shard, so you add capacity by adding Parents, and no central component caps the size of the monitored infrastructure.
 
-For data ingestion and storage, there is no limit, theoretical or practical. When using standalone agents, each agent is independent of the others. When using parent-child agents, each parent is sized independently of the others and the system scales by adding more parents.
+Ingestion and storage have no central component that caps them. When using standalone agents, each agent is independent of the others. When using parent-child agents, each Parent is sized on its own, and the system grows by adding Parents.
 
-Practical limits exist when querying observability data, mainly due to the amount of information web browsers and aggregation points can reasonably handle at once. The system becomes slower depending on the amount of information queried at once (i.e. how many nodes, instances, time-series appear on the same chart or view), similar to all observability platforms (not Netdata specific).
-
-Due to the distributed nature of the architecture (parallel independent execution of smaller queries), Netdata responsiveness is usually significantly better compared to other monitoring solutions. Still, it is influenced by the amount of data queried at once.
+Queries run in parallel on the Agents and Parents that hold the data: each one aggregates its own nodes and Netdata Cloud merges the results, so adding Parents adds query capacity too. See [Fleet-wide queries](/docs/netdata-design.md#fleet-wide-queries).
 
 ## Impact on the Monitored Infrastructure
 
@@ -168,6 +183,27 @@ For detailed information see [Disk Requirements and Retention](/docs/netdata-age
 
 For logs collected from systemd journals, Netdata reads standard journal files (also readable with `journalctl`), so standard systemd-journald practices such as archiving, backup, centralization, exporting, and Forward Secure Sealing apply. OpenTelemetry logs use the OpenTelemetry plugin's indexed storage and configured retention limits.
 
+## Logs
+
+Netdata fits three ways of working with logs:
+
+- **Logs left where they are.** Teams that do not centralize system logs can still search them: Netdata queries systemd journals and Windows event logs on each host, in place, without moving them. See [systemd journal](/src/collectors/systemd-journal.plugin/README.md) and [Windows events](/src/collectors/windows-events.plugin/README.md).
+- **Logs centralized with OpenTelemetry.** Teams that centralize logs ship them through the OpenTelemetry Collector, which reads log files, journals, Windows event channels and Kubernetes container logs, with no changes to the applications. See [Centralizing Logs with OpenTelemetry](/docs/logs/centralizing-logs-with-opentelemetry.md).
+- **Indexed log storage.** Centralized logs are stored on the Agents and Parents with every field indexed as they arrive, on the same backend as traces, and there is no separate log database to run.
+
+## Application Monitoring and Tracing
+
+Netdata monitors applications out of the box:
+
+1. **Processes, services and containers.** Every process, systemd service, Windows service and container, per second: CPU, memory, disk and network I/O, open files, threads and everything else the operating system exposes for it. See [Processes](/docs/functions/processes.md).
+2. **Network connections and dependencies.** Netdata reads the live socket table on each host and maps which process talks to which, attributed to its container, systemd unit or Kubernetes pod. See [Application Dependency Mapping](/docs/npm/topology/dependency-mapping.md).
+3. **Logs through OpenTelemetry.** Application logs collected as described in [Logs](#logs).
+4. **Distributed tracing through OpenTelemetry.** Applications instrumented with OpenTelemetry send spans to Netdata, which indexes every span field, including names, kinds, statuses and attributes, and keeps a trace ID index to load any trace whole. See [Trace Storage and Retention](/docs/opentelemetry/trace-storage-and-retention.md).
+5. **Service map with RED metrics.** From the spans, Netdata maps how services call each other and the databases, queues and external endpoints they depend on, with request rate, errors and latency (p50, p95, p99) for every call, on both the client and the server side. See [Service map](/docs/opentelemetry/trace-storage-and-retention.md#service-map).
+6. **Digital experience monitoring.** Real user monitoring collects Web Vitals, page and view traffic, JavaScript errors, resource timing and session timelines from real browsers, and can send browser traces to connect user sessions with backend spans. Synthetic monitoring runs Playwright browser journeys and Lighthouse audits on a schedule, from your own Agents. See [Real User Monitoring](/src/go/plugin/dem/collector/rum/README.md) and [Browser Journeys](/src/go/plugin/dem/collector/journey/README.md).
+
+The first three need no instrumentation and no involvement from the application: processes, services, containers and connections are read from the operating system, and logs from the files the applications already write. All of it is collected in real time.
+
 ## Integration
 
 Netdata is an open platform.
@@ -180,17 +216,17 @@ For systemd journal sources, standard systemd-journald practices apply. OpenTele
 
 For alert notifications, Netdata supports PagerDuty, Slack, Teams, email (SMTP), Discord, Telegram, Jira, ServiceNow, and custom webhooks.
 
-For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source). Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (requires access to a cloud LLM provider such as Google, OpenAI, Anthropic, or DeepSeek, or a self-hosted provider like Ollama).
+For AI and Large Language Models, Netdata supports Model Context Protocol (MCP) — available via Netdata Cloud for infrastructure-wide access and on every Agent/Parent for direct local access. Netdata supports AI DevOps/SRE Copilots like Claude Code and Gemini CLI, and provides an AI Chat application (requires access to a cloud LLM provider such as Google, OpenAI, Anthropic, or DeepSeek, or a self-hosted provider like Ollama).
 
 ## Compliance and Security
 
 Netdata provides enterprise-grade security and compliance capabilities designed to meet the requirements of regulated industries and security-conscious organizations.
 
 **Compliance Standards:**
-Netdata maintains SOC 2 Type 2 certification, with ISO 27001 on the roadmap. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
+Netdata maintains SOC 2 Type 2 certification. The platform aligns with GDPR, CCPA, HIPAA (with BAA available), and PCI DSS requirements, making it suitable for financial services, healthcare, and government deployments.
 
 **Data Sovereignty Architecture:**
-The platform's architecture ensures complete data sovereignty - all metrics and logs remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is synchronized to Netdata Cloud, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.
+The platform's architecture ensures complete data sovereignty - all metrics, logs and traces remain on customer infrastructure. Only metadata (node names, chart titles, alert configurations) is stored in Netdata Cloud; metric, log and trace data passes through Cloud only to answer the queries users run, with all data transmission protected by TLS encryption. Air-gapped deployment options are available for maximum security isolation.
 
 **Enterprise Authentication:**
 Comprehensive SSO integration supports LDAP/AD group mapping through SCIM 2.0, enabling automatic role assignment based on organizational structure. Multi-factor authentication, IP whitelisting, and role-based access control provide granular security controls with comprehensive audit logging.
@@ -218,7 +254,7 @@ Proactive monitoring services provide health checks, performance reviews, capaci
 Netdata's flexible architecture supports extensive customization to meet specific organizational requirements while maintaining ease of use and operational simplicity.
 
 **Dashboard and Visualization:**
-The platform provides drag-and-drop dashboard creation with custom visualizations, shared dashboards, and template libraries. Over 30 chart types are available with custom color schemes, responsive layouts, and export capabilities.
+The platform provides drag-and-drop dashboard creation with custom visualizations, shared dashboards, and template libraries. More than a dozen chart types are available with custom color schemes, responsive layouts, and export capabilities.
 
 **Alert Management:**
 Comprehensive alert customization includes custom thresholds, complex conditions, ML-based alerts, and schedule-based rules. Pre-built and custom alert templates support bulk configuration with version control integration.
@@ -226,18 +262,19 @@ Comprehensive alert customization includes custom thresholds, complex conditions
 **Extensibility:**
 The plugin architecture supports custom collectors in multiple languages (Go recommended, Python, Bash, Node.js). Custom exporters offer format customization, filtering rules, transformation options, and batch processing. API extensions enable webhook development, custom endpoints, data processing, and event handling.
 
-## Cost and Licensing
+## Cost Efficiency
 
-Netdata offers flexible licensing models designed to accommodate organizations of all sizes, from open-source deployments to enterprise on-premises installations.
+Netdata costs less to run than centralized observability stacks, for four reasons:
 
-**Licensing Options:**
-The open-source version provides full agent functionality with unlimited metrics and community support. Netdata Cloud plans range from a free Community plan (5 nodes, 1 user) to Business plans (unlimited nodes, enterprise SSO) and Enterprise On-Prem (self-hosted control plane with custom contracts).
+1. **Agents run on spare capacity.** A standalone Agent uses under 5% of one CPU core, about 200 MB of RAM and a few GB of disk, which fits in the headroom servers already keep. Agents streaming to a Parent can use even less, with no local disk.
+2. **Parents scale out on ordinary VMs.** Each Parent is independent and sized for 100 to 500 nodes (from 5 cores and 20 GB of RAM for 100 nodes to 20 cores and 80 GB for 500), on standard disks. There is no central database cluster or high-performance storage tier to buy, run or back up.
+3. **Pricing is predictable.** Plans are priced per node. Metrics and system logs have no volume charge, and there is no retention fee. Application logs and trace spans come with large allowances, pooled across all nodes, and only usage above the pool is billed. Spikes don't raise the bill: the node count excludes the busiest 2 hours of each day and the busiest 3 days of each month.
+4. **Egress cost is practically zero.** Observability data stays where it is collected and is not copied across the WAN or the internet.
 
-**Total Cost of Ownership:**
-Minimal infrastructure requirements, low bandwidth usage, efficient storage, and energy efficiency contribute to reduced infrastructure costs. Operational benefits include automated deployment, self-maintaining systems, minimal administration requirements, and low training needs.
+For current pricing, see [netdata.cloud/pricing](https://www.netdata.cloud/pricing/).
 
 **Return on Investment:**
-Organizations typically realize immediate benefits through instant visibility, zero configuration overhead, automatic discovery, and real-time insights. Long-term value includes predictive capabilities, capacity optimization, performance improvements, operational efficiency gains, faster MTTR, prevented outages, and reduced tool sprawl.
+Value starts at installation: auto-discovery collects every system and application it finds, with working dashboards and alerts from the first minute. Over time, machine-learning anomaly ranking and AI investigations shorten troubleshooting, and one platform for metrics, logs, traces and alerts reduces tool sprawl.
 
 ## Training and Documentation
 
