@@ -16,11 +16,10 @@ import (
 // before egress. It replaces exact supplied values of at least four bytes, then
 // applies credential-pattern matches regardless of their value length.
 type Redactor struct {
-	values     []string
-	standalone *regexp.Regexp // whole match → [REDACTED]
-	keyvalue   *regexp.Regexp // keep the key, redact the value
+	values []string
 }
 
+// standalonePattern matches credentials that are replaced whole.
 var standalonePattern = regexp.MustCompile(
 	`(?i)(` +
 		`bearer\s+[a-z0-9._~+/-]+=*` + // Bearer tokens
@@ -31,14 +30,13 @@ var standalonePattern = regexp.MustCompile(
 
 const credentialKeys = `api_key|apikey|access_token|client_secret|token|password|secret`
 
+// keyValuePattern matches credential key=value pairs; the key is kept and the value redacted.
 var keyValuePattern = regexp.MustCompile(`(?i)\b((?:` + credentialKeys + `))=[^&\s"']*`)
 var queryKeyPattern = regexp.MustCompile(`(?i)^(?:` + credentialKeys + `)$`)
 
 func NewRedactor(values ...string) *Redactor {
 	return &Redactor{
-		values:     append([]string(nil), values...),
-		standalone: standalonePattern,
-		keyvalue:   keyValuePattern,
+		values: append([]string(nil), values...),
 	}
 }
 
@@ -54,11 +52,11 @@ func (r *Redactor) Apply(s string) string {
 	}
 	// Most diagnostic strings contain no credentials. Avoid allocating copies
 	// when the replacement would leave them unchanged.
-	if r.standalone.MatchString(out) {
-		out = r.standalone.ReplaceAllString(out, redacted)
+	if standalonePattern.MatchString(out) {
+		out = standalonePattern.ReplaceAllString(out, redacted)
 	}
-	if r.keyvalue.MatchString(out) {
-		out = r.keyvalue.ReplaceAllString(out, "$1="+redacted)
+	if keyValuePattern.MatchString(out) {
+		out = keyValuePattern.ReplaceAllString(out, "$1="+redacted)
 	}
 	return out
 }
@@ -118,14 +116,14 @@ func (r *Redactor) spans(s string) []span {
 		text = filled(text, out[earlier:])
 	}
 	n := len(out)
-	if r.standalone.MatchString(text) {
-		for _, m := range r.standalone.FindAllStringIndex(text, -1) {
+	if standalonePattern.MatchString(text) {
+		for _, m := range standalonePattern.FindAllStringIndex(text, -1) {
 			out = append(out, span{start: m[0], end: m[1]})
 		}
 		text = filled(text, out[n:])
 	}
-	if r.keyvalue.MatchString(text) {
-		for _, m := range r.keyvalue.FindAllStringSubmatchIndex(text, -1) {
+	if keyValuePattern.MatchString(text) {
+		for _, m := range keyValuePattern.FindAllStringSubmatchIndex(text, -1) {
 			out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
 		}
 	}
