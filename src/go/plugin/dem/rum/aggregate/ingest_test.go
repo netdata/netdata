@@ -4,6 +4,7 @@ package aggregate
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -258,6 +259,32 @@ func TestNavigationRevisionAndBFCacheAbsence(t *testing.T) {
 	b.Navigation = nil
 	a.Ingest(b)
 	assert.Equal(t, 1, a.Snapshot().Load.N)
+}
+
+// Navigation needs an experience and a revision. A non-finite or negative
+// timing field is dropped from an otherwise admitted revision.
+func TestInvalidNavigationTimingIsCounted(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	invalid := func() uint64 { return a.Snapshot().Counters[CounterInvalidMeasurements] }
+	b := mk(*now, "s", "/")
+	b.Events = nil
+	b.Navigation = &beacon.Navigation{Revision: 0, HasLoad: true, LoadMS: 10}
+	assert.Nil(t, a.Ingest(b).Observation.Navigation)
+	b.ExperienceID = ""
+	b.Navigation = &beacon.Navigation{Revision: 1, HasLoad: true, LoadMS: 10}
+	assert.Nil(t, a.Ingest(b).Observation.Navigation)
+	require.EqualValues(t, 2, invalid())
+
+	b.ExperienceID = "document"
+	b.Navigation = &beacon.Navigation{Revision: 1, HasLoad: true, LoadMS: math.NaN(), HasDCL: true, DCLMS: -1}
+	got := a.Ingest(b).Observation.Navigation
+	require.NotNil(t, got)
+	assert.False(t, got.HasLoad)
+	assert.False(t, got.HasDCL)
+	assert.EqualValues(t, 4, invalid())
+	s := a.Snapshot()
+	assert.Zero(t, s.Load.N)
+	assert.Zero(t, s.DCL.N)
 }
 
 func TestApplicationViewsAreSeparateAndRequireExplicitEvents(t *testing.T) {

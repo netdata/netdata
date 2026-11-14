@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSessionDetailAccumulates(t *testing.T) {
@@ -238,5 +239,30 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	last := h.events[len(h.events)-1]
 	if last.UserID != "u_42" || last.Type != "frustration" {
 		t.Fatalf("history event = %+v", last)
+	}
+}
+
+// A page view takes the revision of the report's first document activation.
+func TestDocumentRevision(t *testing.T) {
+	tests := map[string]struct {
+		events []beacon.Event
+		want   uint64
+	}{
+		"no activation": {
+			events: []beacon.Event{{Kind: beacon.EventView, Revision: 3}},
+		},
+		"first activation": {
+			events: []beacon.Event{
+				{Kind: beacon.EventView, Revision: 3},
+				{Kind: beacon.EventDocument, Revision: 2},
+				{Kind: beacon.EventDocument, Revision: 5},
+			},
+			want: 2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{Events: tc.events}))
+		})
 	}
 }

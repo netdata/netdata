@@ -43,7 +43,7 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
 	raw := []byte(`{"events":[
   {"name":"session_start","attributes":{"unused":"value"}},
   {"name":"view_changed","attributes":{"fromView":"/users/123456","toView":"/users/987654","unused":"value"}},
-  {"name":"custom","attributes":{"context":"value"}},
+  {"name":"custom","attributes":{"context":"value","observation_id":"not an id"}},
   {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"100","domContentLoadHandlerTime":"10","unused":"value"}},
   {"name":"faro.performance.resource","attributes":{"name":"https://example.org/a?private=value","httpHost":"example.org","duration":"25","transferSize":"500","initiatorType":"fetch","unused":"value"}},
   {"name":"faro.tracing.fetch","attributes":{"url.full":"/api?private=value","http.request.method":"GET","http.response.status_code":"200","duration_ns":"25000000","unused":"value"},"trace":{"trace_id":"1234567890abcdef1234567890abcdef"}},
@@ -74,6 +74,8 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, enabled.Events, 7)
 	assert.Equal(t, "value", enabled.Events[2].Attrs["context"])
+	// Observation identity is protocol data only for identified event kinds.
+	assert.Equal(t, "not an id", enabled.Events[2].Attrs["observation_id"])
 	assert.Equal(t, "button#:id", enabled.Events[6].Attrs["target"])
 }
 
