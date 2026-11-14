@@ -343,12 +343,22 @@ func (o Options) logs(p *faroPayload) []beacon.Log {
 		logs = append(logs, beacon.Log{
 			ErrorType: errorType,
 			Stack:     stack,
-			Level:     o.text(strings.ToLower(l.Level), 16),
+			Level:     o.consoleLevel(l.Level),
 			Message:   msg,
 			Time:      flexTime(l.Timestamp, o.Now),
 		})
 	}
 	return logs
+}
+
+// consoleLevel keeps Faro's log levels in lower case; any other value is
+// diagnostic text, redacted as received.
+func (o Options) consoleLevel(level string) string {
+	switch lower := strings.ToLower(strings.TrimSpace(level)); lower {
+	case "trace", "debug", "info", "log", "warn", "error":
+		return lower
+	}
+	return o.text(level, 16)
 }
 
 // attributedElement is the redacted selector Faro reports for vital.

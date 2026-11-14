@@ -6,7 +6,9 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"unicode"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,17 +39,38 @@ func TestTextCredentialPatterns(t *testing.T) {
 	}
 }
 
+func TestApplyRemoving(t *testing.T) {
+	r := NewRedactor("configured-value")
+	for input, want := range map[string]string{
+		"":                                "",
+		"ordinary text":                   "ordinary text",
+		"line one\nline two\x00":          "line oneline two",
+		"tok\x00en=hunter2":               "token=[REDACTED]",
+		"Bea\u0085rer abcdef":             "[REDACTED]",
+		"configu\x1bred-value":            "[REDACTED]",
+		"Bearer abcdef\x00ghijkl":         "[REDACTED]",
+		"Bearer configured\t-value":       "[REDACTED]",
+		"Bearer\tabcdef":                  "[REDACTED]",
+		"a\x01token=hunter2":              "atoken=[REDACTED]",
+		"token=\x00":                      "token=[REDACTED]",
+		"AKIA0123456789ABCDEF\x01token=x": "[REDACTED]token=[REDACTED]",
+		"\x7fkey Bearer\nabc tok\x00en=x": "key [REDACTED] token=[REDACTED]",
+	} {
+		assert.Equal(t, want, r.ApplyRemoving(input, unicode.IsControl), "input %q", input)
+	}
+}
+
 // Redacted text passes through the redactor and the credential patterns
 // unchanged, so a later pattern pass over redacted output is a no-op. Inputs
-// join fragments that interact: separators, word boundaries, keys, values and
-// markers.
+// join fragments that interact: separators, removable characters, word
+// boundaries, keys, values and markers.
 func TestApplyOutputIsStable(t *testing.T) {
 	site := NewRedactor("configured-value")
 	patterns := NewRedactor()
 	fragments := []string{
-		"bearer", "Bearer", " ", "\t", "\n", "token", "password", "api_key", "=", "&", "'", `"`, "akia", "AKIA",
-		"0123456789abcdef", "ABCDEF", "-----BEGIN A KEY-----", "-----END A KEY-----", "[REDACTED]", "x", "_", ".", "/",
-		"configured-value", "configured", "-value",
+		"bearer", "Bearer", " ", "\t", "\n", "\x00", "\x01", "\u0085", "token", "password", "api_key", "=", "&", "'",
+		`"`, "akia", "AKIA", "0123456789abcdef", "ABCDEF", "-----BEGIN A KEY-----", "-----END A KEY-----", "[REDACTED]",
+		"x", "_", ".", "/", "configured-value", "configured", "-value",
 	}
 	rng := rand.New(rand.NewPCG(1, 2))
 	for range 20000 {
@@ -55,9 +78,14 @@ func TestApplyOutputIsStable(t *testing.T) {
 		for range 1 + rng.IntN(12) {
 			b.WriteString(fragments[rng.IntN(len(fragments))])
 		}
-		out := site.Apply(b.String())
-		require.Equal(t, out, site.Apply(out), "input %q", b.String())
-		require.Equal(t, out, patterns.Apply(out), "input %q", b.String())
+		input := b.String()
+		out := site.Apply(input)
+		require.Equal(t, out, site.Apply(out), "input %q", input)
+		require.Equal(t, out, patterns.Apply(out), "input %q", input)
+		removed := site.ApplyRemoving(input, unicode.IsControl)
+		require.Equal(t, -1, strings.IndexFunc(removed, unicode.IsControl), "input %q", input)
+		require.Equal(t, removed, site.Apply(removed), "input %q", input)
+		require.Equal(t, removed, patterns.Apply(removed), "input %q", input)
 	}
 }
 
@@ -73,6 +101,25 @@ func BenchmarkApply(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
 				r.Apply(tc.value)
+			}
+		})
+	}
+}
+
+// Text without removable characters costs one Apply; removable characters add
+// one copy and a pattern check of the cleaned text. Timings are
+// development-machine trends, not CI gates.
+func BenchmarkApplyRemoving(b *testing.B) {
+	r := NewRedactor("configured-value")
+	for _, tc := range []struct{ name, value string }{
+		{"ordinary", "ordinary checkout failure"},
+		{"multiline", "checkout failed\nretry later\npayment widget unavailable"},
+		{"credentials", "request failed\ntok\x00en=one Bearer abc.def"},
+	} {
+		b.Run(tc.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for b.Loop() {
+				r.ApplyRemoving(tc.value, unicode.IsControl)
 			}
 		})
 	}

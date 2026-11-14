@@ -250,6 +250,25 @@ func TestCaptureURLPercentAndOpaqueViewHandling(t *testing.T) {
 	}
 }
 
+// A URL view is reduced like a page URL before credentials are redacted, so a
+// credential cannot hide the URL shape and the path rules that follow it.
+func TestCaptureURLViewsReduceBeforeRedaction(t *testing.T) {
+	for view, want := range map[string]string{
+		"token=a/b&email=user@example.com":            "/token=[REDACTED]",
+		"/reset/abcdef123456ghijkl789.token=xyz":      "/reset/:token",
+		"/files/1a2b3c4d5e6f7g8h9i0jconfigured-value": "/files/:token",
+		"/users/jane@example.com?token=abc":           "/users/:email",
+	} {
+		t.Run(view, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"meta": map[string]any{"view": map[string]string{"name": view}}})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{Now: now, Redactor: redact.NewRedactor("configured-value")})
+			require.NoError(t, err)
+			assert.Equal(t, want, b.View)
+		})
+	}
+}
+
 func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
 	opt := Options{
 		Now:         now,
@@ -300,6 +319,11 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 		"access key split by tab":      {raw: "AKIA\tABCDEFGHIJKLMNOP", secret: "ABCDEFGHIJKLMNOP", want: "[REDACTED]"},
 		"PEM label split by NUL":       {raw: strings.Replace(pem, "PRIVATE KEY", "PRIVATE\x00 KEY", 1), secret: "MIIBOgIBAAJBAKj34Gkx", want: "[REDACTED]"},
 		"configured value split by C1": {raw: "configu\u009fred-value", secret: "configured-value", want: "[REDACTED]"},
+		// A control character inside the value ends the match in the received
+		// text; the cleaned text holds the whole credential.
+		"bearer value split by NUL":              {raw: "Bearer abcdef\x00ghijkl", secret: "ghijkl", want: "[REDACTED]"},
+		"configured value after a bearer prefix": {raw: "Bearer configured\t-value", secret: "-value", want: "[REDACTED]"},
+		"both shapes in one value":               {raw: "Bearer\tabcdef tok\x00en=hunter2", secret: "hunter2", want: "[REDACTED] token=[REDACTED]"},
 		// Shapes the received text already exposes stay redacted: the
 		// whitespace and word boundary they need are control characters.
 		"bearer after a tab":           {raw: "Bearer\tabcdef.ghi", secret: "abcdef.ghi", want: "[REDACTED]"},
@@ -328,7 +352,7 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 					map[string]any{"name": tc.raw, "domain": tc.raw, "attributes": map[string]string{tc.raw: tc.raw, "target": tc.raw}},
 					map[string]any{"name": "rage_click", "attributes": map[string]string{"target": tc.raw}},
 				},
-				"logs": []any{map[string]any{"level": "error", "message": tc.raw, "context": map[string]string{"type": tc.raw, "stackFrames": string(serialized)}}},
+				"logs": []any{map[string]any{"level": tc.raw, "message": tc.raw, "context": map[string]string{"type": tc.raw, "stackFrames": string(serialized)}}},
 				"traces": map[string]any{"resourceSpans": []any{map[string]any{
 					"resource": map[string]any{"attributes": []any{map[string]any{"key": "service.name", "value": text}}},
 					"scopeSpans": []any{map[string]any{
@@ -362,6 +386,24 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 			for _, value := range beaconStrings(reflect.ValueOf(b)) {
 				assert.NotContains(t, value, tc.secret)
 			}
+		})
+	}
+}
+
+func TestConsoleLevelRedactsBeforeLowercasing(t *testing.T) {
+	for level, want := range map[string]string{
+		"WARN":      "warn",
+		" error ":   "error",
+		"Lv1Secret": "[REDACTED]",
+		"Custom":    "Custom",
+	} {
+		t.Run(level, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"logs": []any{map[string]string{"level": level, "message": "failed"}}})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{Now: now, ConsoleLogs: true, Redactor: redact.NewRedactor("Lv1Secret")})
+			require.NoError(t, err)
+			require.Len(t, b.Logs, 1)
+			assert.Equal(t, want, b.Logs[0].Level)
 		})
 	}
 }

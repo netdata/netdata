@@ -3,9 +3,12 @@
 package redact
 
 import (
+	"cmp"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // Redactor removes secret values and common credential shapes from text
@@ -57,6 +60,113 @@ func (r *Redactor) Apply(s string) string {
 		out = r.keyvalue.ReplaceAllString(out, "$1="+redacted)
 	}
 	return out
+}
+
+// ApplyRemoving returns s without the runes remove selects. It redacts every
+// credential Apply finds in s or in s without those runes: removing a rune can
+// join a credential ("tok\x00en=...") or break one that needs it
+// ("Bearer\tTOKEN", a word boundary). Kept runes keep their bytes.
+func (r *Redactor) ApplyRemoving(s string, remove func(rune) bool) string {
+	if strings.IndexFunc(s, remove) < 0 {
+		return r.Apply(s)
+	}
+	var kept strings.Builder
+	kept.Grow(len(s))
+	writeKept(&kept, s, remove)
+	spans := r.spans(s, nil)
+	if keptSpans := r.spans(kept.String(), nil); len(keptSpans) > 0 {
+		spans = append(spans, keptToSource(keptSpans, s, remove)...)
+	}
+	if len(spans) == 0 {
+		return kept.String()
+	}
+	// A replacement can give its neighbor a word boundary the original lacked.
+	return r.Apply(replaceSpans(s, spans, remove))
+}
+
+// span is a byte range Apply would replace with one marker; an empty span
+// inserts one (a credential key without a value).
+type span struct{ start, end int }
+
+// spans lists Apply's replacements, each found in s itself.
+func (r *Redactor) spans(s string, out []span) []span {
+	for _, v := range r.values {
+		if len(v) < 4 {
+			continue
+		}
+		for i := 0; ; {
+			j := strings.Index(s[i:], v)
+			if j < 0 {
+				break
+			}
+			out = append(out, span{start: i + j, end: i + j + len(v)})
+			i += j + len(v)
+		}
+	}
+	if r.standalone.MatchString(s) {
+		for _, m := range r.standalone.FindAllStringIndex(s, -1) {
+			out = append(out, span{start: m[0], end: m[1]})
+		}
+	}
+	if r.keyvalue.MatchString(s) {
+		for _, m := range r.keyvalue.FindAllStringSubmatchIndex(s, -1) {
+			out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
+		}
+	}
+	return out
+}
+
+// keptToSource maps spans of s without the removed runes onto s.
+func keptToSource(spans []span, s string, remove func(rune) bool) []span {
+	at := make([]int, 0, len(s)+1) // at[k] is the offset in s of kept byte k
+	for i := 0; i < len(s); {
+		c, n := utf8.DecodeRuneInString(s[i:])
+		if !remove(c) {
+			for b := range n {
+				at = append(at, i+b)
+			}
+		}
+		i += n
+	}
+	at = append(at, len(s))
+	out := make([]span, len(spans))
+	for i, sp := range spans {
+		out[i] = span{start: at[sp.start], end: at[sp.start]}
+		if sp.end > sp.start {
+			out[i].end = at[sp.end-1] + 1
+		}
+	}
+	return out
+}
+
+// replaceSpans writes s without the removed runes, each run of overlapping or
+// touching spans replaced by one marker.
+func replaceSpans(s string, spans []span, remove func(rune) bool) string {
+	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(a.start-b.start, a.end-b.end) })
+	var out strings.Builder
+	out.Grow(len(s) + len(redacted))
+	pos := 0
+	for i := 0; i < len(spans); {
+		merged := spans[i]
+		for i++; i < len(spans) && spans[i].start <= merged.end; i++ {
+			merged.end = max(merged.end, spans[i].end)
+		}
+		writeKept(&out, s[pos:merged.start], remove)
+		out.WriteString(redacted)
+		pos = merged.end
+	}
+	writeKept(&out, s[pos:], remove)
+	return out.String()
+}
+
+func writeKept(out *strings.Builder, s string, remove func(rune) bool) {
+	for i := 0; i < len(s); {
+		c, n := utf8.DecodeRuneInString(s[i:])
+		if !remove(c) {
+			out.WriteString(s[i : i+n])
+		}
+		i += n
+	}
 }
 
 // ApplyURL recognizes query names after URL decoding, including repeated keys.
