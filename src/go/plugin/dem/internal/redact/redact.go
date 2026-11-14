@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"regexp"
 	"slices"
+	"sort"
 	"strings"
 	"unicode/utf8"
 )
@@ -73,8 +74,8 @@ func (r *Redactor) ApplyRemoving(s string, remove func(rune) bool) string {
 	var kept strings.Builder
 	kept.Grow(len(s))
 	writeKept(&kept, s, remove)
-	spans := r.spans(s, nil)
-	if keptSpans := r.spans(kept.String(), nil); len(keptSpans) > 0 {
+	spans := r.spans(s)
+	if keptSpans := r.spans(kept.String()); len(keptSpans) > 0 {
 		spans = append(spans, keptToSource(keptSpans, s, remove)...)
 	}
 	if len(spans) == 0 {
@@ -88,8 +89,10 @@ func (r *Redactor) ApplyRemoving(s string, remove func(rune) bool) string {
 // inserts one (a credential key without a value).
 type span struct{ start, end int }
 
-// spans lists Apply's replacements, each found in s itself.
-func (r *Redactor) spans(s string, out []span) []span {
+// spans lists the byte ranges Apply replaces in s, stage by stage in Apply's
+// order. A later stage reads earlier replacements as filler (see fill).
+func (r *Redactor) spans(s string) []span {
+	var out []span
 	for _, v := range r.values {
 		if len(v) < 4 {
 			continue
@@ -103,37 +106,59 @@ func (r *Redactor) spans(s string, out []span) []span {
 			i += j + len(v)
 		}
 	}
-	if r.standalone.MatchString(s) {
-		for _, m := range r.standalone.FindAllStringIndex(s, -1) {
-			out = append(out, span{start: m[0], end: m[1]})
-		}
+	if len(out) == 0 && !r.standalone.MatchString(s) && !r.keyvalue.MatchString(s) {
+		return nil
 	}
-	if r.keyvalue.MatchString(s) {
-		for _, m := range r.keyvalue.FindAllStringSubmatchIndex(s, -1) {
-			out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
-		}
+	masked := []byte(s)
+	fill(masked, out)
+	values := len(out)
+	for _, m := range r.standalone.FindAllIndex(masked, -1) {
+		out = append(out, span{start: m[0], end: m[1]})
+	}
+	fill(masked, out[values:])
+	for _, m := range r.keyvalue.FindAllSubmatchIndex(masked, -1) {
+		out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
 	}
 	return out
 }
 
+// fill overwrites spans with a byte the patterns read like the marker: no
+// pattern class holds it except a key=value value, and it is a word boundary
+// on both sides.
+func fill(b []byte, spans []span) {
+	for _, sp := range spans {
+		for i := sp.start; i < sp.end; i++ {
+			b[i] = '['
+		}
+	}
+}
+
 // keptToSource maps spans of s without the removed runes onto s.
 func keptToSource(spans []span, s string, remove func(rune) bool) []span {
-	at := make([]int, 0, len(s)+1) // at[k] is the offset in s of kept byte k
+	// Each removed rune shifts the kept bytes after it.
+	type shift struct{ kept, removed int } // kept offset of the next kept byte, removed bytes so far
+	var shifts []shift
+	removed := 0
 	for i := 0; i < len(s); {
 		c, n := utf8.DecodeRuneInString(s[i:])
-		if !remove(c) {
-			for b := range n {
-				at = append(at, i+b)
-			}
+		if remove(c) {
+			shifts = append(shifts, shift{kept: i - removed, removed: removed + n})
+			removed += n
 		}
 		i += n
 	}
-	at = append(at, len(s))
+	source := func(k int) int { // offset in s of kept byte k, or len(s) past the end
+		j := sort.Search(len(shifts), func(j int) bool { return shifts[j].kept > k })
+		if j == 0 {
+			return k
+		}
+		return k + shifts[j-1].removed
+	}
 	out := make([]span, len(spans))
 	for i, sp := range spans {
-		out[i] = span{start: at[sp.start], end: at[sp.start]}
+		out[i] = span{start: source(sp.start), end: source(sp.start)}
 		if sp.end > sp.start {
-			out[i].end = at[sp.end-1] + 1
+			out[i].end = source(sp.end-1) + 1
 		}
 	}
 	return out

@@ -269,6 +269,30 @@ func TestCaptureURLViewsReduceBeforeRedaction(t *testing.T) {
 	}
 }
 
+// Site path rules read the cleaned view name, before a redaction marker can
+// split what they match; a name they leave alone is redacted in both forms.
+func TestCaptureViewNamePathRules(t *testing.T) {
+	opt := Options{
+		Now:       now,
+		Redactor:  redact.NewRedactor("configured-value"),
+		PathRules: []PathRule{{Re: regexp.MustCompile(`cust-\w+`), Replace: ":cust"}},
+	}
+	for view, want := range map[string]string{
+		"cust-AKIA0123456789ABCDEF12":   ":cust",
+		"cust-12\x0034":                 ":cust",
+		"checkout Bearer\tabcdef":       "checkout [REDACTED]",
+		"checkout configu\x00red-value": "checkout [REDACTED]",
+	} {
+		t.Run(view, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"meta": map[string]any{"view": map[string]string{"name": view}}})
+			require.NoError(t, err)
+			b, err := Decode(raw, opt)
+			require.NoError(t, err)
+			assert.Equal(t, want, b.View)
+		})
+	}
+}
+
 func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
 	opt := Options{
 		Now:         now,
@@ -394,6 +418,7 @@ func TestConsoleLevelRedactsBeforeLowercasing(t *testing.T) {
 	for level, want := range map[string]string{
 		"WARN":      "warn",
 		" error ":   "error",
+		"ERR\x00OR": "error",
 		"Lv1Secret": "[REDACTED]",
 		"Custom":    "Custom",
 	} {

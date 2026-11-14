@@ -657,6 +657,10 @@ Sites:
   word boundary) or be joined by its removal. The size bound comes last, so it cannot cut a credential into an
   unrecognized prefix. Composed texts (stacks, session timeline entries) are built from redacted values. Opaque IDs
   (session, page, view, observation, trace) are validated, not redacted.
+- URL values (page URLs, URL-shaped view names and URL attributes) are reduced first: credentials, query and fragment
+  are dropped and path segments generalized. The credential patterns then read the reduced, percent-encoded URL, where
+  an encoded space or a removed control character can hide a pattern (`/a/Bearer%20token`).
+- Site path rules on a non-URL view name read the cleaned name; a name they leave unchanged is redacted as text.
 - Query output applies the current site redactor to every text value of active sites, because configured credentials
   can change after ingestion. Retired-site history is returned as stored, including records written by earlier builds
   or under earlier credentials. RUM Functions add no redaction of their own.

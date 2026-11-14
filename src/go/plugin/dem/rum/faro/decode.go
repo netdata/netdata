@@ -354,7 +354,7 @@ func (o Options) logs(p *faroPayload) []beacon.Log {
 // consoleLevel keeps Faro's log levels in lower case; any other value is
 // diagnostic text, redacted as received.
 func (o Options) consoleLevel(level string) string {
-	switch lower := strings.ToLower(strings.TrimSpace(level)); lower {
+	switch lower := strings.ToLower(clean(level, len(level))); lower {
 	case "trace", "debug", "info", "log", "warn", "error":
 		return lower
 	}

@@ -51,7 +51,8 @@ func (o Options) url(value string, limit int) string {
 }
 
 func (o Options) view(value string) string {
-	if cleaned := clean(value, len(value)); strings.Contains(cleaned, "/") || viewURLScheme.MatchString(cleaned) {
+	cleaned := clean(value, len(value))
+	if strings.Contains(cleaned, "/") || viewURLScheme.MatchString(cleaned) {
 		// A URL view follows the page URL rules: reduce the URL, then redact it.
 		value = o.url(cleaned, maxPathLen)
 		if value != "" {
@@ -59,14 +60,14 @@ func (o Options) view(value string) string {
 		}
 		return o.text(value, maxNameLen)
 	}
-	// A view name is text; site path rules apply to its redacted form.
-	named := o.redacted(value)
-	value = named
+	// A view name is text. Site path rules read the cleaned name, as for URL
+	// views; a name they leave unchanged is redacted in both forms.
+	ruled := cleaned
 	for _, rule := range o.PathRules {
-		value = rule.Re.ReplaceAllString(value, rule.Replace)
+		ruled = rule.Re.ReplaceAllString(ruled, rule.Replace)
 	}
-	if value == named {
-		return truncate(value, maxNameLen)
+	if ruled != cleaned {
+		return o.text(ruled, maxNameLen)
 	}
 	return o.text(value, maxNameLen)
 }

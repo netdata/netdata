@@ -55,30 +55,55 @@ func TestApplyRemoving(t *testing.T) {
 		"token=\x00":                      "token=[REDACTED]",
 		"AKIA0123456789ABCDEF\x01token=x": "[REDACTED]token=[REDACTED]",
 		"\x7fkey Bearer\nabc tok\x00en=x": "key [REDACTED] token=[REDACTED]",
+		// Configured values are replaced before the patterns run, as in Apply.
+		"Bearer configured-value-----BEGIN A KEY-----body-----END A KEY-----\x00": "Bearer [REDACTED]",
+		"Bearer configured-valuetoken=abc\x00":                                    "Bearer [REDACTED]token=[REDACTED]",
 	} {
 		assert.Equal(t, want, r.ApplyRemoving(input, unicode.IsControl), "input %q", input)
 	}
 }
 
-// Redacted text passes through the redactor and the credential patterns
-// unchanged, so a later pattern pass over redacted output is a no-op. Inputs
-// join fragments that interact: separators, removable characters, word
-// boundaries, keys, values and markers.
-func TestApplyOutputIsStable(t *testing.T) {
-	site := NewRedactor("configured-value")
-	patterns := NewRedactor()
+// The span engine behind ApplyRemoving replaces what Apply replaces; only
+// adjacent markers may merge.
+func TestSpansMatchApply(t *testing.T) {
+	r := NewRedactor("configured-value")
+	collapse := func(s string) string {
+		for strings.Contains(s, redacted+redacted) {
+			s = strings.ReplaceAll(s, redacted+redacted, redacted)
+		}
+		return s
+	}
+	keep := func(rune) bool { return false }
+	rng := rand.New(rand.NewPCG(3, 4))
+	for range 20000 {
+		input := randomText(rng)
+		require.Equal(t, collapse(r.Apply(input)), collapse(replaceSpans(input, r.spans(input), keep)), "input %q", input)
+	}
+}
+
+// randomText joins fragments that interact: separators, removable characters,
+// word boundaries, keys, values, markers and the configured value.
+func randomText(rng *rand.Rand) string {
 	fragments := []string{
 		"bearer", "Bearer", " ", "\t", "\n", "\x00", "\x01", "\u0085", "token", "password", "api_key", "=", "&", "'",
 		`"`, "akia", "AKIA", "0123456789abcdef", "ABCDEF", "-----BEGIN A KEY-----", "-----END A KEY-----", "[REDACTED]",
-		"x", "_", ".", "/", "configured-value", "configured", "-value",
+		"x", "_", ".", "/", "configured-value", "configured", "-value", "QXSECRET",
 	}
+	var b strings.Builder
+	for range 1 + rng.IntN(12) {
+		b.WriteString(fragments[rng.IntN(len(fragments))])
+	}
+	return b.String()
+}
+
+// Redacted text passes through the redactor and the credential patterns
+// unchanged, so a later pattern pass over redacted output is a no-op.
+func TestApplyOutputIsStable(t *testing.T) {
+	site := NewRedactor("configured-value")
+	patterns := NewRedactor()
 	rng := rand.New(rand.NewPCG(1, 2))
 	for range 20000 {
-		var b strings.Builder
-		for range 1 + rng.IntN(12) {
-			b.WriteString(fragments[rng.IntN(len(fragments))])
-		}
-		input := b.String()
+		input := randomText(rng)
 		out := site.Apply(input)
 		require.Equal(t, out, site.Apply(out), "input %q", input)
 		require.Equal(t, out, patterns.Apply(out), "input %q", input)
@@ -86,6 +111,27 @@ func TestApplyOutputIsStable(t *testing.T) {
 		require.Equal(t, -1, strings.IndexFunc(removed, unicode.IsControl), "input %q", input)
 		require.Equal(t, removed, site.Apply(removed), "input %q", input)
 		require.Equal(t, removed, patterns.Apply(removed), "input %q", input)
+	}
+}
+
+// ApplyRemoving redacts at least what Apply redacts in either form: a planted
+// token survives it no more often than it survives either form's Apply.
+func TestApplyRemovingCoversBothForms(t *testing.T) {
+	r := NewRedactor("configured-value")
+	strip := func(s string) string {
+		return strings.Map(func(c rune) rune {
+			if unicode.IsControl(c) {
+				return -1
+			}
+			return c
+		}, s)
+	}
+	rng := rand.New(rand.NewPCG(5, 6))
+	for range 20000 {
+		input := randomText(rng)
+		got := strings.Count(r.ApplyRemoving(input, unicode.IsControl), "QXSECRET")
+		limit := min(strings.Count(strip(r.Apply(input)), "QXSECRET"), strings.Count(r.Apply(strip(input)), "QXSECRET"))
+		require.LessOrEqual(t, got, limit, "input %q", input)
 	}
 }
 
@@ -115,6 +161,7 @@ func BenchmarkApplyRemoving(b *testing.B) {
 		{"ordinary", "ordinary checkout failure"},
 		{"multiline", "checkout failed\nretry later\npayment widget unavailable"},
 		{"credentials", "request failed\ntok\x00en=one Bearer abc.def"},
+		{"long credentials", strings.Repeat("request failed\n", 64) + "tok\x00en=one Bearer abc.def"},
 	} {
 		b.Run(tc.name, func(b *testing.B) {
 			b.ReportAllocs()
