@@ -207,11 +207,11 @@ func TestInitValidationContract(t *testing.T) {
 		},
 		"public_url with query": {
 			mutate: func(c *rum.Collector) { c.PublicURL = "https://cdn.example.org/?v=1" },
-			want:   "public_url must be an http(s) base URL",
+			want:   "public_url must be an http(s) base URL without credentials, query or fragment",
 		},
 		"public_url with credentials": {
 			mutate: func(c *rum.Collector) { c.PublicURL = "https://user:pass@cdn.example.org" },
-			want:   "public_url must be an http(s) base URL",
+			want:   "public_url must be an http(s) base URL without credentials, query or fragment",
 		},
 		"unreadable trace CA": {
 			mutate: func(c *rum.Collector) {

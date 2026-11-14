@@ -46,14 +46,23 @@ func TestTracingAddresses(t *testing.T) {
 			if tc.origin != "" {
 				tracing.PropagateTo = []string{tc.origin}
 			}
-			errs := ValidateSiteExtras(Site{
+			err := validateWithRequired(Site{
 				Tracing: tracing,
 			})
 			if tc.valid {
-				assert.Empty(t, errs)
+				assert.NoError(t, err)
 			} else {
-				assert.NotEmpty(t, errs)
+				assert.Error(t, err)
 			}
 		})
 	}
+}
+
+// validateWithRequired validates s after filling the required site fields, so a
+// test exercises only the settings it sets.
+func validateWithRequired(s Site) error {
+	s.Name = "shop"
+	s.PageGroups, s.Countries = 20, 20
+	s.AllowedOrigins = []string{"https://example.org"}
+	return s.Validate()
 }
