@@ -23,29 +23,26 @@ type Executor interface {
 	) synthetic.Execution
 }
 
-// Observer callbacks are serialized and finish before Run returns. They must not
-// reenter Session. Complete receives the executor-owned immutable run record.
-type Observer interface {
-	SetVnodeGUID(string)
-	SetState(string)
-	Complete(synthetic.Run)
-	SetSchedule(Status)
-}
-
+// Session is the only owner of an active job's state: schedule status, current state and the latest verified run
+// of the current vnode association. Collection and Functions read it through Snapshot and Latest.
 type Session struct {
 	mu               sync.Mutex
 	request          synthetic.Request
+	jobID            string
 	interval         time.Duration
 	executor         Executor
-	observer         Observer
 	started          bool
 	next             time.Time
 	pending          time.Time
 	queued           time.Time
 	status           Status
-	latest           Observation
-	hasLatest        bool
 	associationEpoch uint64
+	// Current-association observation; SetVnodeGUID resets it.
+	state         synthetic.JobState
+	latest        synthetic.Run
+	hasLatest     bool
+	lastSuccessUS int64
+	lastFailureUS int64
 }
 
 // SetVnodeGUID invalidates current observations without relabeling queued or
@@ -58,16 +55,15 @@ func (s *Session) SetVnodeGUID(guid string) {
 	}
 	s.request.VnodeGUID = guid
 	s.associationEpoch++
-	s.latest, s.hasLatest = Observation{}, false
-	if s.observer != nil {
-		s.observer.SetVnodeGUID(guid)
-	}
+	s.state = synthetic.JobUnknown
+	s.latest, s.hasLatest = synthetic.Run{}, false
+	s.lastSuccessUS, s.lastFailureUS = 0, 0
 }
 
 // New prepares one activation without starting work. Run schedules an immediate
 // bootstrap and an activation-relative JobID phase one to two intervals later,
 // then advances at the fixed interval even when admission or execution is slow.
-func New(req synthetic.Request, interval time.Duration, executor Executor, observer Observer) (*Session, error) {
+func New(req synthetic.Request, interval time.Duration, executor Executor) (*Session, error) {
 	if interval <= 0 {
 		return nil, errors.New("monitor interval must be positive")
 	}
@@ -80,11 +76,15 @@ func New(req synthetic.Request, interval time.Duration, executor Executor, obser
 	req.Secrets = maps.Clone(req.Secrets)
 	return &Session{
 		request:  req,
+		jobID:    req.JobID(),
 		interval: interval,
 		executor: executor,
-		observer: observer,
+		state:    synthetic.JobUnknown,
 	}, nil
 }
+
+// JobID identifies the session's job; it never changes.
+func (s *Session) JobID() string { return s.jobID }
 
 // Run executes until cancellation or an unverifiable executor result. Cancellation
 // joins the outstanding executor before returning, including queued work.
@@ -114,11 +114,10 @@ func (s *Session) run(
 		return nil
 	}
 	activation := now()
-	s.next = activation.Add(s.interval).Add(phase(s.request.JobID(), s.interval))
+	s.next = activation.Add(s.interval).Add(phase(s.jobID, s.interval))
 	s.pending = activation
 	s.status.Scheduled = 1
 	s.status.Pending = true
-	s.status.PendingDueUS = activation.UnixMicro()
 	s.mu.Unlock()
 
 	workerCtx, cancel := context.WithCancel(ctx)
@@ -153,7 +152,6 @@ func (s *Session) run(
 			}
 			reset(s.next.Sub(now()))
 		}
-		s.publishSchedule()
 		s.mu.Unlock()
 		if stopping && !inflight {
 			return nil
@@ -168,33 +166,25 @@ func (s *Session) run(
 			s.mu.Lock()
 			wasAdmitted := s.status.Active
 			s.status.Active = false
-			s.status.ActiveDueUS, s.status.ActiveQueuedUS = 0, 0
 			s.queued = time.Time{}
 			s.status.QueuedUS = 0
 			if !execution.Drained {
 				s.clearPending()
-				s.publishSchedule()
 				s.mu.Unlock()
 				return errors.New("monitor execution completion is unverified")
 			}
 			if wasAdmitted {
 				if execution.Run.CompletedUS <= 0 {
 					s.clearPending()
-					s.publishSchedule()
 					s.mu.Unlock()
 					return errors.New("monitor execution has no verified completion time")
 				}
 				s.status.Outcomes.complete(execution.Run.Outcome)
-				s.publishSchedule()
 				if attemptEpoch == s.associationEpoch {
-					s.latest, s.hasLatest = observe(execution.Run), true
-					if s.observer != nil {
-						s.observer.Complete(execution.Run)
-					}
+					s.complete(execution.Run)
 				}
 			} else if ctx.Err() == nil {
 				s.clearPending()
-				s.publishSchedule()
 				s.mu.Unlock()
 				return errors.New("monitor execution ended before admission")
 			}
@@ -225,7 +215,6 @@ func (s *Session) advance(now time.Time) {
 	}
 	s.pending = latest
 	s.status.Pending = true
-	s.status.PendingDueUS = latest.UnixMicro()
 }
 
 func (s *Session) admit(now time.Time) synthetic.Schedule {
@@ -240,54 +229,81 @@ func (s *Session) admit(now time.Time) synthetic.Schedule {
 	delay := nonnegative(now.Sub(s.pending))
 	s.clearPending()
 	s.status.Active = true
-	s.status.ActiveDueUS = schedule.DueUS
-	s.status.ActiveQueuedUS = schedule.QueuedUS
 	s.status.AdmittedUS = now.UnixMicro()
 	s.status.SchedulingDelay = delay
 	s.status.Admitted++
 	s.queued = time.Time{}
 	s.status.QueuedUS = 0
-	s.publishSchedule()
 	return schedule
 }
 
 func (s *Session) clearPending() {
 	s.pending = time.Time{}
 	s.status.Pending = false
-	s.status.PendingDueUS = 0
 }
 
+// setState records the executor-reported phase of an attempt of the current association.
 func (s *Session) setState(epoch uint64, state string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if epoch == s.associationEpoch && s.observer != nil {
-		s.observer.SetState(state)
+	if epoch == s.associationEpoch {
+		s.state = synthetic.JobState(state)
 	}
 }
 
-func (s *Session) publishSchedule() {
-	if s.observer != nil {
-		s.observer.SetSchedule(s.status)
+// complete records a verified completion of the current association. The copy shares no memory with the
+// executor's record, and like the history copy it stores empty event and artifact lists as nil.
+func (s *Session) complete(run synthetic.Run) {
+	s.latest, s.hasLatest = synthetic.CloneRun(run), true
+	s.state = synthetic.JobState(run.Outcome)
+	switch run.Outcome {
+	case synthetic.Success:
+		s.lastSuccessUS = run.CompletedUS
+	case synthetic.Failed, synthetic.Timeout:
+		s.lastFailureUS = run.CompletedUS
 	}
 }
 
+// Snapshot copies the current state and derives freshness, stale state and queue age at now. It copies scalars
+// only, so per-cycle collection never copies events, evidence or captures.
 func (s *Session) Snapshot(now time.Time) Snapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	out := Snapshot{
+		JobID:          s.jobID,
+		Kind:           s.request.Kind,
+		Name:           s.request.Name,
+		VnodeGUID:      s.request.VnodeGUID,
+		Interval:       s.interval,
 		Status:         s.status,
-		Latest:         s.latest,
+		State:          s.state,
 		HasObservation: s.hasLatest,
+		LastSuccessUS:  s.lastSuccessUS,
+		LastFailureUS:  s.lastFailureUS,
 	}
 	if !s.queued.IsZero() {
 		out.QueueAge = nonnegative(now.Sub(s.queued))
 	}
 	if s.hasLatest {
+		out.Latest = observe(s.latest)
 		out.ObservationAge = now.Sub(time.UnixMicro(s.latest.CompletedUS))
-		out.Fresh = out.ObservationAge >= 0 &&
-			(out.ObservationAge <= s.interval || out.ObservationAge-s.interval <= s.interval)
+		// Within two check intervals, written so that it cannot overflow.
+		out.Fresh = out.ObservationAge >= 0 && out.ObservationAge-s.interval <= s.interval
+		if !out.Fresh && out.State != synthetic.JobWaiting && out.State != synthetic.JobRunning {
+			out.State = synthetic.JobStale
+		}
 	}
 	return out
+}
+
+// Latest returns a copy of the latest verified run of the current association when its ID is runID.
+func (s *Session) Latest(runID string) (synthetic.Run, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasLatest || s.latest.ID != runID {
+		return synthetic.Run{}, false
+	}
+	return synthetic.CloneRun(s.latest), true
 }
 
 func nonnegative(d time.Duration) time.Duration {

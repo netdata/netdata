@@ -141,12 +141,7 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				}
 			}
 			if strings.Contains(mode, "oversize") {
-				active := registry.New()
-				registration, err := active.Register(registry.Job{JobID: ex.Run.JobID, CadenceSeconds: 60})
-				require.NoError(t, err)
-				defer registration.Retire()
-				registration.Complete(ex.Run)
-				service := query.New(active, nil, store.Store, nil)
+				service := query.New(activeRun(ex.Run), nil, store.Store, nil)
 				evidence, err := service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, "")
 				require.NoError(t, err)
 				assert.Equal(t, ex.Run.CaptureState, evidence.CaptureState)
@@ -297,4 +292,13 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			}
 		})
 	}
+}
+
+// activeRun is an active job whose latest run is the wrapped run.
+type activeRun synthetic.Run
+
+func (r activeRun) Snapshot(time.Time) []registry.Job { return nil }
+
+func (r activeRun) Latest(jobID, runID string) (synthetic.Run, bool) {
+	return synthetic.Run(r), jobID == r.JobID && runID == r.ID
 }

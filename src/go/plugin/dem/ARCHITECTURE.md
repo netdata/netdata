@@ -494,7 +494,8 @@ Synthetic packages:
 | Package | Responsibility |
 |---|---|
 | `synthetic` | Shared request, run, event, capture and optional-output status values with their vocabularies, plus request and job ID validation |
-| `synthetic/registry` | Copied active-job observations, generation fencing and freshness |
+| `synthetic/monitor` | One active job's cadence and state: schedule status, current state, latest run, freshness and queue age |
+| `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
@@ -524,7 +525,7 @@ flowchart LR
     H --> J("journal")
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
-    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip")
+    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip · monitor")
     Reg --> Dom
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
@@ -533,7 +534,10 @@ flowchart LR
 
 Dependency direction:
 
-- Function adapters depend on query results and shared domain values.
+- RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
+  through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
+  `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
+  store dependency.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
@@ -1029,7 +1033,7 @@ Draft rehearsal:
 - `Engine.Rehearse` shares the installed source, admission and fail-stop owner with scheduled execution. It uses
   an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
   disabled. A missing history owner remains an error for ordinary monitoring.
-- Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
+- Rehearsal never calls collector `Run` or `Collect`, registers a monitor session, or writes metrics.
   After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
   or polling API exists.
 - Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
@@ -1037,8 +1041,9 @@ Draft rehearsal:
 
 Registration:
 
-- `Run` registers one observation generation before readiness.
-- The monitor session publishes current-association outcomes through that exact registration; `Collect` reads its scalar snapshot.
+- `Run` registers its monitor session before readiness. The registry indexes sessions and keeps no copy of their state.
+- The session owns schedule status, current state, the latest verified run and last success/failure times. `Collect`
+  and `synthetics-checks` read its scalar snapshot; active-first run detail copies only the requested latest run.
 - Session owns a monotonic association epoch under its mutex. At execution-queue submission it captures both the
   prepared request (including vnode GUID) and epoch by value. Later admission may choose a newer pending due time,
   but MUST NOT replace the captured identity. History and artifacts retain this GUID regardless of reassignment.
@@ -1046,11 +1051,11 @@ Registration:
   success/failure timestamps. Same-GUID hostname/label updates preserve them. Old-epoch state/completion callbacks
   MUST NOT refill current observations, including A-to-B-to-A transitions. Changes count when delivered by the
   framework's configured-vnode snapshot; unobserved intermediate config edits are not association transitions.
-- Placement, state and completion callbacks are serialized under Session's mutex, with lock order Session then
-  Registry and no callback reentry. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state
-  and queue diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
+- Placement, state and completion updates are serialized under Session's mutex; the registry never holds its own lock
+  while reading a session. Physical-job scheduled/admitted/coalesced/outcome counters, pending/active state and queue
+  diagnostics continue across reassignment. Obsolete completions still undergo drainage and completion-time
   checks; fencing current publication MUST NOT hide unsafe execution or delete historical evidence.
-- Retirement cancels and joins the session and executor call before retiring its registration; late callbacks remain fenced.
+- Retirement cancels and joins the session and executor call before removing the session from the registry.
 
 Failure handling:
 
@@ -1154,7 +1159,8 @@ Protected preloads and shutdown:
 - Identity detail retains active-first diagnosis.
 - Summary reduction is O(selected runs) memory and stores no full timelines. SDK snapshots use bounded buffers per
   retained file.
-- Current synthetic registry registrations own copied generation observations and reset to unknown on replacement.
+- Current synthetic observations belong to each monitor session; a new activation or a vnode reassignment starts
+  unknown.
 - Freshness is two browser check intervals and remains independent of an in-flight attempt. History does not drive current
   incidents.
 

@@ -89,8 +89,11 @@ func TestNativeSyntheticVnodeAttributionAndChartRouting(t *testing.T) {
 				tick++
 				job.Tick(tick)
 				jobs := hub.Snapshot(time.Now())
-				return len(jobs) == 1 && jobs[0].VnodeGUID == guid && jobs[0].Latest != nil &&
-					jobs[0].Latest.VnodeGUID == guid && strings.Contains(out.String(), "HOST '"+guid+"'")
+				if len(jobs) != 1 || jobs[0].VnodeGUID != guid {
+					return false
+				}
+				latest, ok := latestRun(hub, jobs[0])
+				return ok && latest.VnodeGUID == guid && strings.Contains(out.String(), "HOST '"+guid+"'")
 			}, 5*time.Second, 10*time.Millisecond)
 		}
 		collect(first.GUID)

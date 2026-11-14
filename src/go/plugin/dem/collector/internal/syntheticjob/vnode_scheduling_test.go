@@ -115,12 +115,12 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				assert.Equal(t, a, old.request.VnodeGUID)
 				old.state("running") // A delayed callback must obey the same fence as completion.
 				if name != "metadata" {
-					assert.Equal(t, "unknown", hub.Snapshot(time.Now())[0].State)
+					assert.Equal(t, synthetic.JobUnknown, hub.Snapshot(time.Now())[0].State)
 				}
 				close(old.finish)
 				require.Eventually(t, func() bool {
 					job := hub.Snapshot(time.Now())[0]
-					return job.Schedule.Outcomes.Success == 1 && (name != "metadata" || job.Latest != nil)
+					return job.Outcomes.Success == 1 && (name != "metadata" || job.HasObservation)
 				}, 5*time.Second, time.Millisecond)
 				job := hub.Snapshot(time.Now())[0]
 				assert.Equal(t, changes[len(changes)-1], job.VnodeGUID)
@@ -128,10 +128,10 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				require.NoError(t, err)
 				assert.EqualValues(t, 1, values["attempts_success"])
 				if name == "metadata" {
-					require.NotNil(t, job.Latest)
+					require.True(t, job.HasObservation)
 					assert.EqualValues(t, 123, values["duration"])
 				} else {
-					assert.Nil(t, job.Latest)
+					assert.False(t, job.HasObservation)
 					assert.Zero(t, job.LastSuccessUS)
 					assert.Zero(t, job.LastFailureUS)
 					assert.NotContains(t, values, "duration")
@@ -146,11 +146,12 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				close(current.finish)
 				require.Eventually(t, func() bool {
 					job := hub.Snapshot(time.Now())[0]
-					return job.Schedule.Outcomes.Success == 2 && job.Latest != nil
+					return job.Outcomes.Success == 2 && job.HasObservation
 				}, 5*time.Second, time.Millisecond)
 				job = hub.Snapshot(time.Now())[0]
-				require.NotNil(t, job.Latest)
-				assert.Equal(t, job.VnodeGUID, job.Latest.VnodeGUID)
+				latest, ok := latestRun(hub, job)
+				require.True(t, ok)
+				assert.Equal(t, job.VnodeGUID, latest.VnodeGUID)
 				values, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 				require.NoError(t, err)
 				assert.EqualValues(t, 123, values["duration"])
@@ -161,7 +162,7 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				values, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 				require.NoError(t, err)
 				assert.NotContains(t, values, "duration", "completed observation clears on reassignment too")
-				assert.Nil(t, hub.Snapshot(time.Now())[0].Latest)
+				assert.False(t, hub.Snapshot(time.Now())[0].HasObservation)
 			})
 		}
 	})

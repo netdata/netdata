@@ -11,6 +11,7 @@ import (
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	functions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	history "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	registry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/stretchr/testify/assert"
@@ -23,22 +24,20 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
 	store := history.NewStore(journal)
-	hub := registry.New()
+	active := activeJobs{runs: map[string]model.Run{}}
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		name := []string{"checkout", "search", "legacy"}[i]
 		jobID := "journey:" + name
-		job, err := hub.Register(registry.Job{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site})
-		require.NoError(t, err)
-		defer job.Retire()
+		active.jobs = append(active.jobs, registry.Job{Snapshot: monitor.Snapshot{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site}})
 		run := model.Run{ID: name, JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site, Outcome: model.Success, StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro()}
 		if i == 0 {
 			run.VnodeGUID = "33333333-3333-4333-8333-333333333333"
 		}
 		_, err = store.AppendRun(ctx, "complete", run)
 		require.NoError(t, err)
-		job.Complete(run)
+		active.runs[jobID] = run
 	}
-	h := functions.New(query.New(hub, store, nil, nil), nil)
+	h := functions.New(query.New(active, store, nil, nil), nil)
 	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)

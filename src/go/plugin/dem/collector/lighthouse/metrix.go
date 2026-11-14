@@ -2,8 +2,6 @@
 package lighthouse
 
 import (
-	"math"
-
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjob"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
@@ -38,8 +36,10 @@ func (m metrics) Write(run monitor.Observation) {
 		observe(m.cls, v.CLS)
 	}
 }
+
+// observe publishes a present measurement; the runner accepts only finite, non-negative lab values.
 func observe(gauge metrix.SnapshotGauge, value monitor.Scalar) {
-	if value.Present && !math.IsNaN(value.Value) && !math.IsInf(value.Value, 0) {
+	if value.Present {
 		gauge.Observe(value.Value)
 	}
 }

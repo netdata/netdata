@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,9 +58,9 @@ func TestActiveRegistrationAndReplacement(t *testing.T) {
 		stop := start(t, current)
 		jobs := hub.Snapshot(time.Now())
 		require.Len(t, jobs, 1)
-		assert.Nil(t, jobs[0].Latest)
+		assert.False(t, jobs[0].HasObservation)
 		assert.Equal(t, module+":checkout", jobs[0].JobID)
-		assert.Equal(t, k.cadence, jobs[0].CadenceSeconds)
+		assert.Equal(t, time.Duration(k.cadence)*time.Second, jobs[0].Interval)
 		assert.Equal(t, k.target, jobs[0].Target)
 		candidate := k.new(syntheticjobtest.Executor{}, hub, settings{})
 		require.NoError(t, candidate.Init(t.Context()))
@@ -108,7 +107,7 @@ func TestOutcomesAndMissingObservations(t *testing.T) {
 					ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
 						assert.Equal(t, "checkout", r.Name)
 						state("running")
-						assert.Equal(t, "running", hub.Snapshot(time.Now())[0].State)
+						assert.Equal(t, synthetic.JobRunning, hub.Snapshot(time.Now())[0].State)
 						return synthetic.Execution{
 							Drained: true,
 							Run:     evidence,
@@ -210,10 +209,8 @@ func TestLaterObservationWithMissingValuesCreatesGaps(t *testing.T) {
 					run.Outcome = synthetic.Error
 					run.DurationMS = nil
 					run.Tests = nil
-					run.Metrics = &synthetic.LabMetrics{
-						Performance: new(math.NaN()),
-						LCPMS:       new(math.Inf(1)),
-					}
+					// A measurement object without values is a gap, not a zero.
+					run.Metrics = &synthetic.LabMetrics{}
 				}
 				return synthetic.Execution{
 					Drained: true,
@@ -235,7 +232,7 @@ func TestLaterObservationWithMissingValuesCreatesGaps(t *testing.T) {
 		}
 		require.Eventually(t, func() bool {
 			jobs := hub.Snapshot(time.Now())
-			return len(jobs) == 1 && jobs[0].Latest != nil && jobs[0].Latest.Outcome == synthetic.Error
+			return len(jobs) == 1 && jobs[0].HasObservation && jobs[0].Latest.Outcome == synthetic.Error
 		}, 3*time.Second, time.Millisecond)
 		got = collect(t, c)
 		for _, name := range names {
@@ -397,8 +394,8 @@ func TestNativeJobExecutionCancellationAndOutput(t *testing.T) {
 		receive(t, entered)
 		snapshot := hub.Snapshot(time.Now())
 		require.Len(t, snapshot, 1)
-		assert.Equal(t, "running", snapshot[0].State)
-		require.NotNil(t, snapshot[0].Latest)
+		assert.Equal(t, synthetic.JobRunning, snapshot[0].State)
+		require.True(t, snapshot[0].HasObservation)
 		assert.Equal(t, synthetic.Failed, snapshot[0].Latest.Outcome)
 		stop()
 		receive(t, cancelled)
@@ -451,7 +448,7 @@ func TestStopJoinsLateCallbacksBeforeSuccessorCanActivate(t *testing.T) {
 		c.Cleanup(t.Context())
 		jobs := hub.Snapshot(time.Now())
 		require.Len(t, jobs, 1)
-		assert.Nil(t, jobs[0].Latest, "joined predecessor cannot publish to successor")
+		assert.False(t, jobs[0].HasObservation, "joined predecessor cannot publish to successor")
 	})
 }
 
@@ -484,7 +481,7 @@ func TestUnverifiedCompletionFailsRunEvenAfterCancellation(t *testing.T) {
 				receive(t, entered)
 				jobs := hub.Snapshot(time.Now())
 				require.Len(t, jobs, 1)
-				assert.Nil(t, jobs[0].Latest)
+				assert.False(t, jobs[0].HasObservation)
 				assert.NotContains(t, collect(t, c), "duration")
 				if stop {
 					cancel()

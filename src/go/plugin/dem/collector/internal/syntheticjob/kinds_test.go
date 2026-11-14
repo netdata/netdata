@@ -195,14 +195,23 @@ func waitLatest(t *testing.T, hub *registry.Registry, id string) synthetic.Run {
 	var run synthetic.Run
 	require.Eventually(t, func() bool {
 		for _, j := range hub.Snapshot(time.Now()) {
-			if j.JobID == id && j.Latest != nil {
-				run = *j.Latest
-				return true
+			if j.JobID == id {
+				var ok bool
+				run, ok = latestRun(hub, j)
+				return ok
 			}
 		}
 		return false
 	}, 3*time.Second, time.Millisecond)
 	return run
+}
+
+// latestRun returns the full latest run of a job listed by hub.
+func latestRun(hub *registry.Registry, job registry.Job) (synthetic.Run, bool) {
+	if !job.HasObservation {
+		return synthetic.Run{}, false
+	}
+	return hub.Latest(job.JobID, job.Latest.ID)
 }
 
 // start initializes c, runs it until ready and returns an idempotent stop that requires Run to join.

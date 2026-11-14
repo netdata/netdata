@@ -14,6 +14,19 @@ const (
 	Cancelled    Outcome = "cancelled"
 )
 
+// JobState is an active job's current state: unknown until an attempt reports a phase, the executor-reported
+// attempt phase, the latest outcome, or stale when that outcome is no longer fresh and no attempt is in progress.
+type JobState string
+
+const (
+	JobUnknown = JobState(Unknown)
+	// JobWaiting means an attempt waits for browser admission.
+	JobWaiting JobState = "waiting"
+	// JobRunning means the admitted attempt's runner process started.
+	JobRunning JobState = "running"
+	JobStale   JobState = "stale"
+)
+
 type TestCounts struct {
 	Declared        int `json:"declared"`
 	Passed          int `json:"passed"`
