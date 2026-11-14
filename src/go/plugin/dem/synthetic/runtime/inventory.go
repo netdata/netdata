@@ -93,7 +93,7 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 			inv.selectionError = damagedMetadata("selection.json", ErrUnavailable)
 		case inv.generationErrors[id] != nil:
 			inv.selectionError = inv.generationErrors[id]
-		case !sameManifest(g.Manifest, *inv.selected):
+		case !sameExecutable(g.Manifest, *inv.selected):
 			inv.selectionError = damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from selected release"))
 		}
 	}

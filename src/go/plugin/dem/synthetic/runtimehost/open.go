@@ -5,7 +5,6 @@ package runtimehost
 import (
 	"errors"
 	"path/filepath"
-	goruntime "runtime"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
@@ -39,7 +38,7 @@ func Open(cfg Config, varLibPath string) *Handle {
 	if cfg.Mode == ModePreloaded && !filepath.IsAbs(cfg.PreloadPath) {
 		h.SetupError = errors.Join(h.SetupError, errors.New("runtime.preload_path must be absolute"))
 	}
-	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
+	if !runtime.SupportedHost() {
 		h.SetupError = errors.Join(h.SetupError, errors.New("browser runtime requires Linux amd64 or arm64"))
 	}
 	switch cfg.Mode {

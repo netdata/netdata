@@ -6,7 +6,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 )
 
 type preloadRecord struct {
@@ -54,7 +53,7 @@ func (c *Candidate) SealPreload() error {
 // preload does not claim native package lifecycle or same-account isolation.
 func ReadPreload(path string) (Paths, Manifest, error) {
 	var empty Manifest
-	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
+	if !SupportedHost() {
 		return Paths{}, empty, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
 	}
 	if !filepath.IsAbs(path) {
@@ -82,7 +81,7 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 	if err := record.Manifest.Validate(); err != nil {
 		return Paths{}, empty, err
 	}
-	if record.Path != path || record.Manifest.Platform != "linux/"+goruntime.GOARCH {
+	if record.Path != path || !record.Manifest.MatchesHost() {
 		return Paths{}, empty, errors.New("preload identity, platform or final path differs from its preparation")
 	}
 	paths, err := preparedPaths(root, path, record.Manifest)

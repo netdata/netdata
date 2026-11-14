@@ -11,7 +11,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -44,7 +43,7 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	if m.Platform != "linux/"+goruntime.GOARCH {
+	if !m.MatchesHost() {
 		return errors.New("runtime archive does not match this architecture")
 	}
 	if err := ctx.Err(); err != nil {

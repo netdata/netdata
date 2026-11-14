@@ -111,7 +111,7 @@ func (s *Store) isLegacyEmptySelection() bool {
 func (s *Store) selectLocked(record selection) error {
 	// Split publication from directory sync so the caller can distinguish a failed
 	// write from a visible selection whose durability is not yet known.
-	if err := publishJSON(s.root, "selection.json", record); err != nil {
+	if err := publishJSON(s.root, "selection.json", record, 0600); err != nil {
 		return err
 	}
 	if err := s.syncSelection(); err != nil {

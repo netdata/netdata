@@ -23,6 +23,11 @@ func randomID() (string, error) {
 	return hex.EncodeToString(value[:]), nil
 }
 
+// validLockFile is the identity check for lock files created by ensureLock.
+func validLockFile(info os.FileInfo) bool {
+	return info.Mode().IsRegular() && info.Mode().Perm() == 0600 && info.Size() == 0
+}
+
 func ensureLock(root *os.Root, name string) error {
 	f, err := root.OpenFile(name, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0600)
 	if err == nil {
@@ -32,7 +37,7 @@ func ensureLock(root *os.Root, name string) error {
 		if statErr != nil {
 			return statErr
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {
+		if !validLockFile(info) {
 			return errors.New("invalid runtime lock file")
 		}
 		return nil
@@ -129,14 +134,20 @@ func readJSON(root *os.Root, name string, value any) error {
 	return nil
 }
 
+// saveJSON durably publishes a service-private record: it survives a crash once
+// saveJSON returns.
 func saveJSON(root *os.Root, name string, value any) error {
-	if err := publishJSON(root, name, value); err != nil {
+	if err := publishJSON(root, name, value, 0600); err != nil {
 		return err
 	}
 	return syncDirectory(root, filepath.Dir(name))
 }
 
-func publishJSON(root *os.Root, name string, value any) error {
+// publishJSON atomically replaces name with a synced temporary file. The caller
+// owns the directory sync, so it can tell a failed write from a visible record
+// whose durability is not yet known. A failed write removes its temporary file;
+// only an interrupted one can leave it behind.
+func publishJSON(root *os.Root, name string, value any, mode os.FileMode) (result error) {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -146,13 +157,16 @@ func publishJSON(root *os.Root, name string, value any) error {
 		return err
 	}
 	temporary := name + "." + id
-	if err := writeNewFile(root, temporary, append(data, '\n'), 0600); err != nil {
+	defer func() {
+		if result != nil {
+			// Best effort: the random name belongs to this write alone.
+			_ = root.Remove(temporary)
+		}
+	}()
+	if err := writeNewFile(root, temporary, append(data, '\n'), mode); err != nil {
 		return err
 	}
-	if err := root.Rename(temporary, name); err != nil {
-		return err
-	}
-	return nil
+	return root.Rename(temporary, name)
 }
 
 // retireToTrash is shared durability machinery, not retirement policy. Callers

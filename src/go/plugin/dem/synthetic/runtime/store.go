@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"time"
 )
 
@@ -70,7 +69,7 @@ type generation struct {
 }
 
 func Open(config Config) (*Store, error) {
-	if goruntime.GOOS != "linux" || (goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64") {
+	if !SupportedHost() {
 		return nil, errors.New("managed browser runtimes require Linux amd64 or arm64")
 	}
 	if config.MaxBytes <= 0 || config.PreviousRetention < 0 {
@@ -165,7 +164,7 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 	if err != nil {
 		return Paths{}, err
 	}
-	if !sameManifest(g.Manifest, m) {
+	if !sameExecutable(g.Manifest, m) {
 		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
 	}
 	return boundPaths(filepath.Join(path, "generations", m.Archive.SHA256), m.Layout), nil

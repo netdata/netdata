@@ -303,7 +303,7 @@ func (s *ownershipLedger) removeOwned(name string) error {
 // ownerAlive is only for in-process claims/preparation, never for execution pins.
 func (s *ownershipLedger) ownerAlive(name string) (bool, error) {
 	info, err := s.root.Lstat(filepath.Join(name, "owner.lock"))
-	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {
+	if err != nil || !validLockFile(info) {
 		return false, errors.New("invalid runtime operation owner")
 	}
 	lock := flock.New(filepath.Join(s.path, name, "owner.lock"), flock.SetFlag(os.O_RDWR))

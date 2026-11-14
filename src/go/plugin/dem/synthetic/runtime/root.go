@@ -396,7 +396,7 @@ func (layout runtimeRootLayout) validate(root *os.Root) error {
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {
+		if !validLockFile(info) {
 			return fmt.Errorf("invalid runtime lock: %s", name)
 		}
 	}

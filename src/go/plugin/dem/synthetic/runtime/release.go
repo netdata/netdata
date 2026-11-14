@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"path/filepath"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
@@ -54,9 +53,7 @@ func (r Release) Validate() error {
 	if r.Manifest.Archive.URL == "" {
 		return errors.New("published runtime release requires an archive URL")
 	}
-	u, err := url.Parse(r.Sources.URL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" ||
-		!validID(r.Sources.SHA256) || r.Sources.Bytes <= 0 {
+	if !ValidHTTPSURL(r.Sources.URL) || !validID(r.Sources.SHA256) || r.Sources.Bytes <= 0 {
 		return errors.New("invalid runtime release source archive")
 	}
 	return nil
@@ -146,9 +143,7 @@ func releaseUpdate(current, next Release) (bool, error) {
 		return false, errors.New("runtime latest would regress the installed publication sequence")
 	}
 	if next.Sequence == current.Sequence {
-		before, _ := json.Marshal(current)
-		after, _ := json.Marshal(next)
-		if !bytes.Equal(before, after) {
+		if !sameJSON(current, next) {
 			return false, errors.New("runtime release publication sequence was reused for different content")
 		}
 		return false, nil
@@ -162,8 +157,7 @@ func FetchRelease(ctx context.Context, address string, trusted *ReleaseTrust) (R
 	if err := validateReleaseTrust(trusted); err != nil {
 		return Release{}, err
 	}
-	u, err := url.Parse(address)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
+	if !ValidHTTPSURL(address) {
 		return Release{}, errors.New("runtime release discovery requires HTTPS without credentials or a fragment")
 	}
 	body, err := openDownload(ctx, address, downloadIdleTimeout)

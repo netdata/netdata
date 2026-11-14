@@ -6,9 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"path/filepath"
-	goruntime "runtime"
 	"time"
 
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -72,11 +70,8 @@ func (c Config) Validate() error {
 	if c.Mode != ModeManaged && c.CachePath != "" {
 		return errors.New("cache_path is only valid in managed mode")
 	}
-	if c.ReleaseURL != "" {
-		u, err := url.Parse(c.ReleaseURL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
-			return errors.New("release_url requires HTTPS without credentials or a fragment")
-		}
+	if c.ReleaseURL != "" && !runtime.ValidHTTPSURL(c.ReleaseURL) {
+		return errors.New("release_url requires HTTPS without credentials or a fragment")
 	}
 	if c.OfflineKeyring != "" && !filepath.IsAbs(c.OfflineKeyring) {
 		return errors.New("offline_keyring requires an absolute path to a public OpenPGP keyring")
@@ -120,7 +115,7 @@ func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Con
 		if err != nil {
 			return runtime.Release{}, err
 		}
-		if release.Manifest.Platform != "linux/"+goruntime.GOARCH {
+		if !release.Manifest.MatchesHost() {
 			return runtime.Release{}, errors.New("runtime release does not match this architecture")
 		}
 		return release, nil
