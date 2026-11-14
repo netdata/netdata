@@ -6,36 +6,43 @@ package history
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
-// The existing burst budget bounds queued browser detail; a full queue reports
-// drops without blocking measurement. Small batches amortize counter updates.
+// The existing burst budget bounds queued browser detail; a full queue counts
+// drops without blocking measurement. Batches amortize journal syncs.
 const (
 	maxBatch    = 500
 	batchPeriod = 5 * time.Second
 	queueCap    = 5000
 )
 
+// Counters receives the writer's accounting; the owning site job publishes it.
+// Event calls Add under the producer's lock when the queue is full, so Add must
+// be a short update under at most a leaf lock, with no I/O and no call back
+// into the producer.
 type Counters interface {
 	Add(counter string, n uint64)
 }
+
+// Counter names reported through Counters: the rum.history chart dimensions.
+const (
+	CounterWritten = "history_written"
+	CounterDropped = "history_dropped"
+)
+
 type eventWriter interface {
 	AppendEvent(context.Context, EventRecord) (attempted bool, err error)
 	Sync(context.Context) error
 }
 
 type Writer struct {
-	siteName  string
-	st        eventWriter
-	counters  Counters
-	ch        chan aggregate.HistoryEvent
-	dropMu    sync.Mutex
-	chanDrops uint64
+	siteName string
+	st       eventWriter
+	counters Counters
+	ch       chan EventRecord
 	// Run owns pendingSync; attempted appends can need a sync even after an error.
 	pendingSync bool
 }
@@ -45,30 +52,20 @@ func NewWriter(siteName string, st *Store, counters Counters) *Writer {
 	return &Writer{
 		st:       st,
 		counters: counters,
-		ch:       make(chan aggregate.HistoryEvent, queueCap),
+		ch:       make(chan EventRecord, queueCap),
 		siteName: siteName,
 	}
 }
 
-func (w *Writer) Event(rec aggregate.HistoryEvent) {
+// Event enqueues one record without blocking; a full queue counts it as dropped.
+func (w *Writer) Event(rec EventRecord) {
 	if rec.Site != w.siteName {
 		return
 	}
 	select {
 	case w.ch <- rec:
 	default:
-		w.dropMu.Lock()
-		w.chanDrops++
-		w.dropMu.Unlock()
-	}
-}
-func (w *Writer) reportQueueDrops() {
-	w.dropMu.Lock()
-	drops := w.chanDrops
-	w.chanDrops = 0
-	w.dropMu.Unlock()
-	if drops != 0 {
-		w.counters.Add(aggregate.CounterHistoryDropped, drops)
+		w.counters.Add(CounterDropped, 1)
 	}
 }
 
@@ -79,7 +76,18 @@ func (w *Writer) reportQueueDrops() {
 func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
-	batch := make([]aggregate.HistoryEvent, 0, maxBatch)
+	batch := make([]EventRecord, 0, maxBatch)
+	// flushSteady keeps an unattempted suffix for the final drain and reports
+	// whether the whole batch was consumed.
+	flushSteady := func() bool {
+		consumed := w.flush(ctx, batch)
+		if consumed < len(batch) {
+			batch = batch[consumed:]
+			return false
+		}
+		batch = batch[:0]
+		return true
+	}
 steady:
 	for {
 		select {
@@ -87,25 +95,11 @@ steady:
 			break steady
 		case rec := <-w.ch:
 			batch = append(batch, rec)
-			if len(batch) >= maxBatch {
-				consumed := w.flush(ctx, batch)
-				if consumed == len(batch) {
-					batch = batch[:0]
-				} else {
-					batch = batch[consumed:]
-				}
-				if len(batch) != 0 {
-					break steady
-				}
+			if len(batch) >= maxBatch && !flushSteady() {
+				break steady
 			}
 		case <-ticker.C:
-			consumed := w.flush(ctx, batch)
-			if consumed == len(batch) {
-				batch = batch[:0]
-			} else {
-				batch = batch[consumed:]
-			}
-			if len(batch) != 0 {
+			if !flushSteady() {
 				break steady
 			}
 		}
@@ -119,7 +113,7 @@ steady:
 		default:
 			remaining := batch[w.flush(finalCtx, batch):]
 			if len(remaining) != 0 {
-				w.counters.Add(aggregate.CounterHistoryDropped, uint64(len(remaining)))
+				w.counters.Add(CounterDropped, uint64(len(remaining)))
 			}
 			return
 		}
@@ -128,8 +122,7 @@ steady:
 
 // flush returns the consumed prefix. Only cancelled admission leaves a suffix
 // for final drain: journal appends have no batch transaction or rollback.
-func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int {
-	w.reportQueueDrops()
+func (w *Writer) flush(ctx context.Context, batch []EventRecord) int {
 	if len(batch) == 0 && !w.pendingSync {
 		return 0
 	}
@@ -137,41 +130,16 @@ func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int 
 		if ctx.Err() != nil {
 			return i
 		}
-		r := EventRecord{
-			ExperienceID: rec.ExperienceID,
-			View:         rec.View,
-			ViewID:       rec.ViewID,
-			MetricID:     rec.MetricID,
-			Revision:     rec.Revision,
-
-			Site:        rec.Site,
-			VnodeGUID:   rec.VnodeGUID,
-			SessionID:   rec.SessionID,
-			ObservedUS:  rec.ObservedUS,
-			Type:        rec.Type,
-			Page:        rec.Page,
-			Text:        rec.Text,
-			TraceID:     rec.TraceID,
-			Browser:     rec.Browser,
-			Device:      rec.Device,
-			Country:     rec.Country,
-			Version:     rec.Version,
-			UserID:      rec.UserID,
-			Fingerprint: rec.Fingerprint,
-			ErrorType:   rec.ErrorType,
-			Message:     rec.Message,
-			SampleStack: rec.SampleStack,
-		}
-		attempted, err := w.st.AppendEvent(ctx, r)
+		attempted, err := w.st.AppendEvent(ctx, rec)
 		if attempted {
 			w.pendingSync = true
 		}
 		if !attempted && ctx.Err() != nil {
 			return i
 		}
-		counter := aggregate.CounterHistoryWritten
+		counter := CounterWritten
 		if err != nil {
-			counter = aggregate.CounterHistoryDropped
+			counter = CounterDropped
 		}
 		w.counters.Add(counter, 1)
 	}

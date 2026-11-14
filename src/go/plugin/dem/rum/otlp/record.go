@@ -12,22 +12,23 @@ import (
 	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
-// queued is one record waiting on the owning site's export queue.
-type queued struct{ rec *logspb.LogRecord }
-
 // build turns admitted observations into document activations, vital updates,
 // JS errors, custom events and console log lines (already
 // filtered upstream by ConsoleLogsOn). Receiver normalization owns all text
 // cleaning and bounds; export preserves the accepted observation.
-func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
+func (e *Logs) build(b *beacon.Beacon, pageView bool) []*logspb.LogRecord {
 	base := baseAttrs(b)
-	var out []queued
+	var out []*logspb.LogRecord
 
 	if pageView {
 		attrs, ts := base, b.Received
 		for _, event := range b.Events {
 			if event.Kind == beacon.EventDocument {
-				attrs = append(append([]*commonpb.KeyValue{}, base...), strAttr("event.id", event.ID), strAttr("event.revision", strconv.FormatUint(event.Revision, 10)))
+				attrs = append(
+					append([]*commonpb.KeyValue{}, base...),
+					strAttr("event.id", event.ID),
+					strAttr("event.revision", strconv.FormatUint(event.Revision, 10)),
+				)
 				if !event.Time.IsZero() {
 					ts = event.Time
 				}
@@ -69,7 +70,11 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []queued {
 		}
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("event.name", ev.Name))
 		if ev.ID != "" {
-			attrs = append(attrs, strAttr("event.id", ev.ID), strAttr("event.revision", strconv.FormatUint(ev.Revision, 10)))
+			attrs = append(
+				attrs,
+				strAttr("event.id", ev.ID),
+				strAttr("event.revision", strconv.FormatUint(ev.Revision, 10)),
+			)
 		}
 		for k, v := range ev.Attrs {
 			attrs = append(attrs, strAttr("event.attr."+k, v))
@@ -129,12 +134,12 @@ func (e *Logs) record(
 	ts time.Time,
 	sev logspb.SeverityNumber,
 	body string,
-) queued {
+) *logspb.LogRecord {
 	if ts.IsZero() {
 		ts = e.now()
 	}
 	all := append([]*commonpb.KeyValue{strAttr("rum.type", typ)}, attrs...)
-	rec := &logspb.LogRecord{
+	return &logspb.LogRecord{
 		TimeUnixNano:         uint64(ts.UnixNano()),
 		ObservedTimeUnixNano: uint64(e.now().UnixNano()),
 		SeverityNumber:       sev,
@@ -145,9 +150,6 @@ func (e *Logs) record(
 			},
 		},
 		Attributes: all,
-	}
-	return queued{
-		rec: rec,
 	}
 }
 

@@ -2,6 +2,7 @@
 package aggregate
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -72,6 +73,69 @@ func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 		})
 	}
 }
+
+// Session and sessionless errors persist the same complete record: the site's
+// configured vnode, the arrival context and bounded error detail. Only a
+// session timeline defaults an empty page group to "/".
+func TestErrorHistoryRecordIsComplete(t *testing.T) {
+	message, stack := strings.Repeat("m", 250), strings.Repeat("s", errMaxStackBytes+100)
+	tests := map[string]struct {
+		session, page string
+	}{
+		"session":     {session: "session", page: "/"},
+		"sessionless": {session: "", page: ""},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			a, _ := newAgg(30 * time.Minute)
+			a.SetVnodeGUID(vnodeA)
+			sink := &fakeHistorySink{}
+			a.SetHistorySink(sink)
+			a.Ingest(&beacon.Beacon{
+				Site:         "s",
+				Received:     t0,
+				SessionID:    tc.session,
+				VnodeGUID:    "untrusted",
+				ExperienceID: "document",
+				View:         "checkout",
+				ViewID:       "view-1",
+				Browser:      "Firefox",
+				Device:       "mobile",
+				Country:      "GR",
+				AppVersion:   "1.2",
+				UserID:       "user",
+				Errors: []beacon.Error{{
+					Fingerprint: "fingerprint",
+					Type:        "TypeError",
+					Message:     message,
+					Stack:       stack,
+				}},
+			})
+			require.Equal(t, []HistoryEvent{{
+				VnodeGUID:    vnodeA,
+				ExperienceID: "document",
+				View:         "checkout",
+				ViewID:       "view-1",
+				Site:         "s",
+				SessionID:    tc.session,
+				ObservedUS:   t0.UnixMicro(),
+				Type:         "error",
+				Page:         tc.page,
+				Text:         ("TypeError: " + message)[:sessionEventTextMax],
+				Browser:      "Firefox",
+				Device:       "mobile",
+				Country:      "GR",
+				Version:      "1.2",
+				UserID:       "user",
+				Fingerprint:  "fingerprint",
+				ErrorType:    "TypeError",
+				Message:      message,
+				SampleStack:  stack[:errMaxStackBytes],
+			}}, sink.events)
+		})
+	}
+}
+
 func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	sink := &fakeHistorySink{}

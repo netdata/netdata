@@ -102,17 +102,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		sd.lastSeen = now
 	}
 	sd.lastPage = page
-	context := eventContext{
-		vnodeGUID:    b.VnodeGUID,
-		experienceID: b.ExperienceID,
-		view:         b.View,
-		viewID:       b.ViewID,
-		browser:      b.Browser,
-		device:       b.Device,
-		country:      b.Country,
-		version:      b.AppVersion,
-		userID:       b.UserID,
-	}
+	context := newEventContext(b)
 	recorded := false
 	record := func(event sessionEvent) {
 		if event.typ != "vital" {
@@ -164,18 +154,9 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	}
 	for _, err := range b.Errors {
 		sd.errors++
-		record(sessionEvent{
-			ts:   now,
-			typ:  "error",
-			page: page,
-			text: truncateRunes(err.Type+": "+err.Message, sessionEventTextMax),
-			error: &sessionError{
-				fingerprint: err.Fingerprint,
-				typ:         err.Type,
-				message:     err.Message,
-				stack:       truncateStack(err.Stack),
-			},
-		})
+		event, detail := newErrorEvent(err, now, page)
+		event.error = &detail
+		record(event)
 	}
 	for _, ev := range b.Events {
 		if ev.Kind == beacon.EventDocument || ev.Kind == beacon.EventNavigation || ev.Kind == beacon.EventResource ||
@@ -241,6 +222,47 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	return sd.investigated
 }
 
+// newEventContext captures the identity, release and location b arrived with.
+func newEventContext(b *beacon.Beacon) eventContext {
+	return eventContext{
+		vnodeGUID:    b.VnodeGUID,
+		experienceID: b.ExperienceID,
+		view:         b.View,
+		viewID:       b.ViewID,
+		browser:      b.Browser,
+		device:       b.Device,
+		country:      b.Country,
+		version:      b.AppVersion,
+		userID:       b.UserID,
+	}
+}
+
+// newErrorEvent returns one JS error entry and the metadata history persists for
+// it. Only a ring entry retains the metadata; a sessionless error applies it to
+// its record directly and allocates nothing for it.
+func newErrorEvent(err beacon.Error, ts time.Time, page string) (sessionEvent, sessionError) {
+	event := sessionEvent{
+		ts:   ts,
+		typ:  "error",
+		page: page,
+		text: truncateRunes(err.Type+": "+err.Message, sessionEventTextMax),
+	}
+	detail := sessionError{
+		fingerprint: err.Fingerprint,
+		typ:         err.Type,
+		message:     err.Message,
+		stack:       truncateStack(err.Stack),
+	}
+	return event, detail
+}
+
+func (d sessionError) apply(rec *HistoryEvent) {
+	rec.Fingerprint, rec.ErrorType = d.fingerprint, d.typ
+	rec.Message, rec.SampleStack = d.message, d.stack
+}
+
+// history is the only projection of a timeline entry: history persistence and
+// the live session-events read both use it.
 func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 	rec := HistoryEvent{
 		VnodeGUID:    e.context.vnodeGUID,
@@ -263,8 +285,7 @@ func (e sessionEvent) history(site, sessionID string) HistoryEvent {
 		UserID:       e.context.userID,
 	}
 	if e.error != nil {
-		rec.Fingerprint, rec.ErrorType = e.error.fingerprint, e.error.typ
-		rec.Message, rec.SampleStack = e.error.message, e.error.stack
+		e.error.apply(&rec)
 	}
 	return rec
 }
@@ -334,22 +355,10 @@ func (st *siteState) dropSession(el *list.Element) {
 
 // ---- rum-session-events FUNCTION read ----
 
-// SessionEventInfo is one rum-session-events row.
-type SessionEventInfo struct {
-	VnodeGUID                            string
-	ExperienceID, View, ViewID, MetricID string
-	Revision                             uint64
-	TS                                   time.Time
-	Type                                 string
-	Page                                 string
-	Text                                 string
-	TraceID                              string
-	UserID                               string
-}
-
-// SessionEvents returns one session's event ring (oldest first).
+// SessionEvents returns one session's event ring (oldest first) projected as
+// history records, so live and persisted reads share one projection.
 // ok is false when the session id is unknown (caller: 404).
-func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) {
+func (a *Aggregator) SessionEvents(sessionID string) ([]HistoryEvent, bool) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	a.site.evictSessions(a.now())
@@ -358,22 +367,9 @@ func (a *Aggregator) SessionEvents(sessionID string) ([]SessionEventInfo, bool) 
 		return nil, false
 	}
 	sd := el.Value.(*sessionDetail)
-	out := make([]SessionEventInfo, len(sd.events))
+	out := make([]HistoryEvent, len(sd.events))
 	for i, e := range sd.events {
-		out[i] = SessionEventInfo{
-			VnodeGUID:    e.context.vnodeGUID,
-			ExperienceID: e.context.experienceID,
-			View:         e.context.view,
-			ViewID:       e.context.viewID,
-			MetricID:     e.metricID,
-			Revision:     e.revision,
-			TS:           e.ts,
-			Type:         e.typ,
-			Page:         e.page,
-			Text:         e.text,
-			TraceID:      e.traceID,
-			UserID:       e.context.userID,
-		}
+		out[i] = e.history(a.site.cfg.Name, sd.id)
 	}
 	return out, true
 }

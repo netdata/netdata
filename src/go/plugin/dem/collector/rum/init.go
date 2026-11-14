@@ -104,6 +104,7 @@ func (c *Collector) Init(ctx context.Context) error {
 			KeepPoorVitals: c.KeepsPoorVitals(),
 		},
 	})
+	c.transport = newTransportCounters()
 	m := c.store.Write().SnapshotMeter("")
 	if c.DisplayName != "" && c.DisplayName != c.Name {
 		m = m.WithLabels(metrix.Label{

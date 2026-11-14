@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	logs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	traces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -73,8 +74,8 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 	}
 	require.Len(t, l.ch, queueCap)
 	require.Len(t, tr.spanCh, spanQueueCap)
-	require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPDropped])
-	require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansDropped])
+	require.EqualValues(t, 1, c.snapshot()[CounterLogsDropped])
+	require.EqualValues(t, 1, c.snapshot()[CounterSpansDropped])
 }
 
 func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
@@ -102,13 +103,13 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 			require.Empty(t, l.ch)
 			require.Empty(t, tr.spanCh)
 			if expired {
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterOTLPDropped])
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterSpansDropped])
+				require.EqualValues(t, 300, c.snapshot()[CounterLogsDropped])
+				require.EqualValues(t, 300, c.snapshot()[CounterSpansDropped])
 				require.Empty(t, ls.requests())
 				require.Zero(t, ts.count())
 			} else {
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterOTLPSent])
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, 300, c.snapshot()[CounterLogsSent])
+				require.EqualValues(t, 300, c.snapshot()[CounterSpansSent])
 			}
 		})
 	}
@@ -150,10 +151,10 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 			l.Run(ctx, final)
 			tr.Run(ctx, final)
 			rejected := uint64(max(0, min(5, n)))
-			require.EqualValues(t, rejected, c.snapshot()[aggregate.CounterOTLPErrors])
-			require.EqualValues(t, 5-rejected, c.snapshot()[aggregate.CounterOTLPSent])
-			require.EqualValues(t, rejected, c.snapshot()[aggregate.CounterSpansErrors])
-			require.EqualValues(t, 5-rejected, c.snapshot()[aggregate.CounterSpansSent])
+			require.EqualValues(t, rejected, c.snapshot()[CounterLogsErrors])
+			require.EqualValues(t, 5-rejected, c.snapshot()[CounterLogsSent])
+			require.EqualValues(t, rejected, c.snapshot()[CounterSpansErrors])
+			require.EqualValues(t, 5-rejected, c.snapshot()[CounterSpansSent])
 		})
 	}
 	require.Contains(t, output.String(), `logs partial rejection`)
@@ -208,14 +209,14 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				for range attempts {
 					l.Ingest(b, accepted(b))
 					tr.Ingest(b, accepted(b))
-					l.export(context.Background(), []queued{<-l.ch}, exportTimeout)
+					l.export(context.Background(), []*logspb.LogRecord{<-l.ch}, exportTimeout)
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}
 				// Suppressing repeated diagnostics must not suppress delivery accounting.
-				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterOTLPErrors])
-				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterSpansErrors])
-				require.Zero(t, c.snapshot()[aggregate.CounterOTLPSent])
-				require.Zero(t, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, attempts, c.snapshot()[CounterLogsErrors])
+				require.EqualValues(t, attempts, c.snapshot()[CounterSpansErrors])
+				require.Zero(t, c.snapshot()[CounterLogsSent])
+				require.Zero(t, c.snapshot()[CounterSpansSent])
 			}
 			for _, site := range []string{"shop", "checkout"} {
 				for _, signal := range []string{"logs", "traces"} {
@@ -236,7 +237,9 @@ func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 		now: func() time.Time { return t0 },
 	}
 	for level, want := range map[string]string{"info": "INFO", "warn": "WARN", "error": "ERROR", "debug": "DEBUG", "trace": "TRACE"} {
-		frame, err := json.Marshal(map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"})
+		frame, err := json.Marshal(
+			map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"},
+		)
 		require.NoError(t, err)
 		raw, err := json.Marshal(map[string]any{"logs": []any{map[string]any{
 			"level": level, "message": "secret-value",
@@ -384,8 +387,8 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 			l.export(context.Background(), l.build(mkBeacon(), true), time.Second)
 			tr.exportSpans(context.Background(), []spanItem{{n: 1, rs: tr.resourceSpans(tracedBeacon())}}, time.Second)
 			if tc.success {
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPSent])
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, 1, c.snapshot()[CounterLogsSent])
+				require.EqualValues(t, 1, c.snapshot()[CounterSpansSent])
 				mu.Lock()
 				require.Len(t, seen, 2)
 				for _, auth := range seen {
@@ -393,8 +396,8 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 				}
 				mu.Unlock()
 			} else {
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPErrors])
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansErrors])
+				require.EqualValues(t, 1, c.snapshot()[CounterLogsErrors])
+				require.EqualValues(t, 1, c.snapshot()[CounterSpansErrors])
 			}
 		})
 	}

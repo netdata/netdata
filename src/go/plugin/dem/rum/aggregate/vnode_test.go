@@ -19,7 +19,9 @@ const (
 func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
 	a.SetVnodeGUID(vnodeA)
-	a.site.cfg.Investigate = InvestigateCfg{KeepErrors: true}
+	a.site.cfg.Investigate = InvestigateCfg{
+		KeepErrors: true,
+	}
 	sink := &fakeHistorySink{}
 	a.SetHistorySink(sink)
 	b := mk(*now, "session", "/old", v(beacon.LCP, 9000))
@@ -30,9 +32,6 @@ func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	require.Equal(t, vnodeA, admitted.Observation.VnodeGUID)
 	require.Equal(t, "untrusted", b.VnodeGUID)
 	require.Empty(t, sink.events)
-	a.Add(CounterHistoryWritten, 4)
-	a.Add(CounterOTLPSent, 5)
-	a.Add(CounterSpansSent, 6)
 	require.Empty(t, a.Pages(vnodeB))
 	require.Equal(t, a.Pages(""), a.Pages(vnodeA))
 	before := a.Snapshot()
@@ -48,17 +47,24 @@ func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	assert.Zero(t, empty.Counters[CounterAccepted])
 	assert.False(t, empty.ResourcesSeen)
 	assert.Zero(t, empty.FirstPartyResources)
-	assert.EqualValues(t, 4, empty.Counters[CounterHistoryWritten])
-	assert.EqualValues(t, 5, empty.Counters[CounterOTLPSent])
-	assert.EqualValues(t, 6, empty.Counters[CounterSpansSent])
 	retained, _ := a.Live(0, 10, "")
 	require.Len(t, retained, 2)
 	assert.Equal(t, vnodeA, retained[0].VnodeGUID)
 	// Promotion after reassignment retains preceding A context and adds B context.
-	promoted := &beacon.Beacon{Site: "s", SessionID: "session", Received: now.Add(time.Second), PageGroup: "/new", Errors: []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "failed"}}}
+	promoted := &beacon.Beacon{
+		Site:      "s",
+		SessionID: "session",
+		Received:  now.Add(time.Second),
+		PageGroup: "/new",
+		Errors:    []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "failed"}},
+	}
 	a.Ingest(promoted)
 	require.Len(t, sink.events, 3)
-	assert.Equal(t, []string{vnodeA, vnodeA, vnodeB}, []string{sink.events[0].VnodeGUID, sink.events[1].VnodeGUID, sink.events[2].VnodeGUID})
+	assert.Equal(
+		t,
+		[]string{vnodeA, vnodeA, vnodeB},
+		[]string{sink.events[0].VnodeGUID, sink.events[1].VnodeGUID, sink.events[2].VnodeGUID},
+	)
 	// Reusing the same identified measurements is admitted in B's fresh ledger.
 	a.Ingest(b)
 	require.Empty(t, a.Pages(vnodeA))
@@ -73,8 +79,6 @@ func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	}
 	a.SetVnodeGUID(vnodeA)
 	assert.Empty(t, a.Pages(""), "returning to A starts another fresh measurement window")
-	a.Add(CounterHistoryWritten, 2) // A delayed job-wide transport completion remains valid.
-	assert.EqualValues(t, 6, a.Snapshot().Counters[CounterHistoryWritten])
 	events, ok := a.SessionEvents("session")
 	require.True(t, ok)
 	require.NotEmpty(t, events)

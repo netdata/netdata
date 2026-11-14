@@ -27,11 +27,6 @@ func (a *Aggregator) Reject(site, reason string) {
 		st.bots = append(st.bots, now)
 	}
 }
-func (a *Aggregator) Add(counter string, n uint64) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.site.counters[counter] += n
-}
 
 // Result carries the newly admitted observations for investigation/export.
 // Observation is non-nil for an accepted batch, including a replay with no new measurements.
@@ -65,7 +60,9 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	obs := *b
 	obs.VnodeGUID = st.cfg.VnodeGUID
 	obs.Vitals, obs.Events, obs.Resources, obs.Navigation = nil, nil, nil, nil
-	attrs := reportAttributes{source: b}
+	attrs := reportAttributes{
+		source: b,
+	}
 	var documents, views, frustrations uint64
 	var resourceEvents []beacon.Event
 	var navigationEvent *beacon.Event
@@ -258,27 +255,14 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		investigated = st.cfg.Investigate.Rate >= 1 || st.cfg.Investigate.alwaysKeep(&obs)
 	}
 	if investigated && b.SessionID == "" && a.history != nil {
+		// A sessionless error has no timeline; its page group stays as reported.
+		context := newEventContext(&obs)
 		for _, e := range obs.Errors {
-			a.history.Event(HistoryEvent{
-				Site:         st.cfg.Name,
-				VnodeGUID:    st.cfg.VnodeGUID,
-				ObservedUS:   now.UnixMicro(),
-				Type:         "error",
-				Page:         b.PageGroup,
-				ExperienceID: b.ExperienceID,
-				View:         b.View,
-				ViewID:       b.ViewID,
-				Browser:      b.Browser,
-				Device:       b.Device,
-				Country:      b.Country,
-				Version:      b.AppVersion,
-				UserID:       b.UserID,
-				Fingerprint:  e.Fingerprint,
-				ErrorType:    e.Type,
-				Message:      e.Message,
-				Text:         truncateRunes(e.Type+": "+e.Message, sessionEventTextMax),
-				SampleStack:  truncateStack(e.Stack),
-			})
+			event, detail := newErrorEvent(e, now, b.PageGroup)
+			event.context = context
+			rec := event.history(st.cfg.Name, "")
+			detail.apply(&rec)
+			a.history.Event(rec)
 		}
 	}
 	a.appendLive(&obs, pageView, now)

@@ -109,32 +109,16 @@ func (s *Store) QuerySessions(
 
 // QuerySessionEvents returns the full retained timeline in Agent receipt-time
 // order. Activity-only presence records contribute to summaries, not timelines.
-func (s *Store) QuerySessionEvents(ctx context.Context, site, sessionID, vnodeGUID string) ([]SessionEventRecord, error) {
+func (s *Store) QuerySessionEvents(
+	ctx context.Context,
+	site, sessionID, vnodeGUID string,
+) ([]SessionEventRecord, error) {
 	var out []SessionEventRecord
 	err := s.matchSession(ctx, site, sessionID, vnodeGUID, func(r EventRecord) {
 		if r.Type == "activity" {
 			return
 		}
-		out = append(
-			out,
-			SessionEventRecord{
-				ExperienceID: r.ExperienceID,
-				View:         r.View,
-				ViewID:       r.ViewID,
-				MetricID:     r.MetricID,
-				Revision:     r.Revision,
-
-				Site:       r.Site,
-				VnodeGUID:  r.VnodeGUID,
-				SessionID:  r.SessionID,
-				ObservedUS: r.ObservedUS,
-				Type:       r.Type,
-				Page:       r.Page,
-				Text:       r.Text,
-				TraceID:    r.TraceID,
-				UserID:     r.UserID,
-			},
-		)
+		out = append(out, SessionEventOf(r))
 	})
 	if err != nil {
 		return nil, err

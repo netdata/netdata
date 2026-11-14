@@ -29,7 +29,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		aggregator: c.aggregator,
 	}
 	if c.EventLogsOn() {
-		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.aggregator, c.redactor)
+		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.transport, c.redactor)
 		if err != nil {
 			return err
 		}
@@ -37,14 +37,14 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		defer logs.Close()
 	}
 	if c.TracingOn() {
-		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.aggregator, c.redactor)
+		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.transport, c.redactor)
 		if err != nil {
 			return err
 		}
 		p.traces = traces
 		defer traces.Close()
 	}
-	writer := history.NewWriter(c.Name, c.deps.History, c.aggregator)
+	writer := history.NewWriter(c.Name, c.deps.History, c.transport)
 	c.aggregator.SetHistorySink(writer)
 	state := diagnostics.New()
 	route := httpapi.NewRoute(c.Site, p, state)

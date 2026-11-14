@@ -116,7 +116,46 @@ func BenchmarkIngestErrors(b *testing.B) {
 		Browser:   "Chrome",
 		Received:  time.Now(),
 		Errors: []beacon.Error{
-			{Type: "TypeError", Message: "checkout failed", Stack: "at checkout()", Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()")},
+			{
+				Type:        "TypeError",
+				Message:     "checkout failed",
+				Stack:       "at checkout()",
+				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+			},
+		},
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		a.Ingest(input)
+	}
+}
+
+// A report without a session has no timeline: an investigated error goes
+// straight to history without retaining session detail.
+func BenchmarkIngestSessionlessErrors(b *testing.B) {
+	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		VnodeGUID: "11111111-1111-4111-8111-111111111111",
+		Investigate: aggregate.InvestigateCfg{
+			Rate: 1,
+		},
+		Name:       "shop",
+		PageGroups: 20,
+		Countries:  20,
+	})
+	a.SetHistorySink(discardHistory{})
+	input := &beacon.Beacon{
+		Site:      "shop",
+		PageGroup: "/checkout",
+		Browser:   "Chrome",
+		Received:  time.Now(),
+		Errors: []beacon.Error{
+			{
+				Type:        "TypeError",
+				Message:     "checkout failed",
+				Stack:       "at checkout()",
+				Fingerprint: beacon.Fingerprint("TypeError", "checkout failed", "at checkout()"),
+			},
 		},
 	}
 	b.ReportAllocs()
@@ -288,20 +327,39 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 func BenchmarkDenseWindowReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{Name: "shop", PageGroups: 20, Countries: 20})
+			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+				Name:       "shop",
+				PageGroups: 20,
+				Countries:  20,
+			})
 			now := time.Now()
 			for i := range 150000 {
 				a.Ingest(&beacon.Beacon{
-					Site: "shop", ExperienceID: strconv.Itoa(i), SessionID: strconv.Itoa(i),
-					PageGroup: "/page_" + strconv.Itoa(i%20), PageHost: "example.org", AppVersion: strconv.Itoa(i % 3),
-					Browser: "Chrome", Device: "desktop", Country: "GR", Received: now,
-					Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
+					Site:         "shop",
+					ExperienceID: strconv.Itoa(i),
+					SessionID:    strconv.Itoa(i),
+					PageGroup:    "/page_" + strconv.Itoa(i%20),
+					PageHost:     "example.org",
+					AppVersion:   strconv.Itoa(i % 3),
+					Browser:      "Chrome",
+					Device:       "desktop",
+					Country:      "GR",
+					Received:     now,
+					Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
 					Vitals: []beacon.Vital{
 						{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64((i * 37) % 10000)},
 						{ID: "inp", Revision: 1, Name: beacon.INP, Value: float64((i * 23) % 1000)},
 						{ID: "cls", Revision: 1, Name: beacon.CLS, Value: float64(i%100) / 100},
 					},
-					Resources: []beacon.Resource{{ID: "resource", Host: "example.org", Initiator: "fetch", HasDuration: true, DurationMS: float64(i % 1000)}},
+					Resources: []beacon.Resource{
+						{
+							ID:          "resource",
+							Host:        "example.org",
+							Initiator:   "fetch",
+							HasDuration: true,
+							DurationMS:  float64(i % 1000),
+						},
+					},
 				})
 			}
 			if got := a.Activity().PageviewsWindow; got != 150000 {

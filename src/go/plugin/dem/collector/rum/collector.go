@@ -26,7 +26,7 @@ var charts string
 var schema string
 
 type Config struct {
-	Vnode       string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
+	Vnode       string           `yaml:"vnode,omitempty"        json:"vnode,omitempty"`
 	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
 	Window      confopt.Duration `yaml:"window"                 json:"window"`
 	config.Site `yaml:",inline" json:""`
@@ -41,6 +41,7 @@ type Collector struct {
 	deps       Dependencies
 	store      metrix.CollectorStore
 	aggregator *aggregate.Aggregator
+	transport  *transportCounters
 	redactor   *redact.Redactor
 	metrics    collectorMetrics
 	vnodeGUID  string
