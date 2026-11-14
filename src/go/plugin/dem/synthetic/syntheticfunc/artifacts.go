@@ -8,23 +8,30 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
 var artifactsMethod = method{
-	id:     "synthetics-artifacts",
-	title:  "Retained synthetic captures",
-	help:   "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
-	sort:   "published_us",
-	params: []string{"job_id", "before", "limit", "vnode", "vnode_guid"},
-	columns: columns(
-		column{"run_id", "Run", funcapi.FieldTypeString, ""},
-		column{"job_id", "Monitor", funcapi.FieldTypeString, ""},
-		column{"published_us", "Published", funcapi.FieldTypeTimestamp, ""},
-		column{"bytes", "Set size", funcapi.FieldTypeInteger, "bytes"},
-		column{"artifact_count", "Artifacts", funcapi.FieldTypeInteger, ""},
-		column{"vnode_guid", "Vnode GUID", funcapi.FieldTypeString, ""},
-	),
+	Method: rawfunc.Method{
+		ID:          "synthetics-artifacts",
+		Title:       "Retained synthetic captures",
+		Help:        "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		Sort:        "published_us",
+		UpdateEvery: 10,
+		Params:      []string{"job_id", "before", "limit", "vnode", "vnode_guid"},
+		Columns:     artifactsColumns.Build(),
+	},
+	serve: (*Handler).artifacts,
+}
+
+var artifactsColumns = rawfunc.Columns[artifacts.Set]{
+	column("run_id", "Run", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.RunID }),
+	column("job_id", "Monitor", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.JobID }),
+	column("published_us", "Published", funcapi.FieldTypeTimestamp, "", func(s artifacts.Set) any { return s.PublishedUS }),
+	column("bytes", "Set size", funcapi.FieldTypeInteger, "bytes", func(s artifacts.Set) any { return s.Bytes }),
+	column("artifact_count", "Artifacts", funcapi.FieldTypeInteger, "", func(s artifacts.Set) any { return s.Artifacts }),
+	column("vnode_guid", "Vnode GUID", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.VnodeGUID }),
 }
 
 func (h *Handler) artifacts(
@@ -51,7 +58,7 @@ func (h *Handler) artifacts(
 	}
 	rows := make([][]any, 0, len(page.Sets))
 	for _, set := range page.Sets {
-		rows = append(rows, []any{set.RunID, set.JobID, set.PublishedUS, set.Bytes, set.Artifacts, set.VnodeGUID})
+		rows = append(rows, artifactsColumns.Row(set))
 	}
 	response["data"] = rows
 	response["limit"] = limit

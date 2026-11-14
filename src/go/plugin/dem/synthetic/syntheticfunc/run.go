@@ -1,12 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package syntheticfunc
 
 import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
+
+var runMethod = method{
+	Method: rawfunc.Method{
+		ID:          "synthetics-run",
+		Title:       "Synthetic run detail",
+		Help:        "One retained or latest active attempt, independent of picker bounds, with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means no verified terminal observation.",
+		Sort:        "at_ms",
+		UpdateEvery: 10,
+		Params:      []string{"job_id", "run_id"},
+		Columns:     runColumns.Build(),
+	},
+	serve: (*Handler).run,
+}
 
 func (h *Handler) run(ctx context.Context, args map[string]string, response map[string]any) *funcapi.FunctionResponse {
 	if args["job_id"] == "" || args["run_id"] == "" {
@@ -18,20 +33,7 @@ func (h *Handler) run(ctx context.Context, args map[string]string, response map[
 	}
 	rows := make([][]any, 0, len(run.Events))
 	for _, e := range run.Events {
-		rows = append(
-			rows,
-			[]any{
-				e.AtMS,
-				e.Kind,
-				e.TestID,
-				e.Title,
-				e.Phase,
-				e.Status,
-				e.ExpectedStatus,
-				number(e.DurationMS),
-				e.Message,
-			},
-		)
+		rows = append(rows, runColumns.Row(e))
 	}
 	response["data"] = rows
 	response["run"] = runDetail(run)
@@ -39,28 +41,25 @@ func (h *Handler) run(ctx context.Context, args map[string]string, response map[
 	return funcapi.RawResponse(response)
 }
 
-var runMethod = method{
-	id:     "synthetics-run",
-	title:  "Synthetic run detail",
-	help:   "One retained or latest active attempt, independent of picker bounds, with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means no verified terminal observation.",
-	sort:   "at_ms",
-	params: []string{"job_id", "run_id"},
-	columns: columns(
-		column{
-			"at_ms",
-			"Event time",
-			funcapi.FieldTypeTimestamp,
-			"",
-		},
-		column{"kind", "Event", funcapi.FieldTypeString, ""},
-		column{"test_id", "Test", funcapi.FieldTypeString, ""},
-		column{"title", "Title", funcapi.FieldTypeString, ""},
-		column{"phase", "Phase", funcapi.FieldTypeString, ""},
-		column{"status", "Actual status", funcapi.FieldTypeString, ""},
-		column{"expected_status", "Expected status", funcapi.FieldTypeString, ""},
-		column{"duration_ms", "Duration", funcapi.FieldTypeFloat, "ms"},
-		column{"message", "Message", funcapi.FieldTypeString, ""},
-	),
+var runColumns = rawfunc.Columns[model.Event]{
+	{
+		// Reporter event times are Unix milliseconds.
+		Name:      "at_ms",
+		Tooltip:   "Event time",
+		Type:      funcapi.FieldTypeTimestamp,
+		Transform: funcapi.FieldTransformDatetime,
+		Visible:   true,
+		Sortable:  true,
+		Value:     func(e model.Event) any { return e.AtMS },
+	},
+	column("kind", "Event", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Kind }),
+	column("test_id", "Test", funcapi.FieldTypeString, "", func(e model.Event) any { return e.TestID }),
+	column("title", "Title", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Title }),
+	column("phase", "Phase", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Phase }),
+	column("status", "Actual status", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Status }),
+	column("expected_status", "Expected status", funcapi.FieldTypeString, "", func(e model.Event) any { return e.ExpectedStatus }),
+	column("duration_ms", "Duration", funcapi.FieldTypeFloat, "ms", func(e model.Event) any { return number(e.DurationMS) }),
+	column("message", "Message", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Message }),
 }
 
 func runDetail(run model.Run) map[string]any {

@@ -51,18 +51,18 @@ func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funca
 }
 
 func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	i := slices.IndexFunc(methods, func(m method) bool { return m.id == req.Method })
+	i := slices.IndexFunc(methods, func(m method) bool { return m.ID == req.Method })
 	if i < 0 {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	spec := &methods[i]
+	spec := methods[i]
 	// Metadata discovery never queries active jobs, history or artifact storage.
 	if req.Info {
 		return &funcapi.FunctionResponse{
 			Status:            200,
-			Help:              spec.help,
-			Columns:           spec.columns,
-			DefaultSortColumn: spec.sort,
+			Help:              spec.Help,
+			Columns:           spec.Columns,
+			DefaultSortColumn: spec.Sort,
 		}
 	}
 	if r := rawfunc.RequireMember(req); r != nil {
@@ -71,11 +71,11 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if r := rawfunc.NoPayload(req); r != nil {
 		return r
 	}
-	args, err := rawfunc.ParseArgs(req, spec.params)
+	args, err := rawfunc.ParseArgs(req, spec.Params)
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	if req.Method == "synthetics-artifact" && args["artifact_id"] != "" && !rawfunc.Permitted(req, rawfunc.AdminAccess) {
+	if spec.ID == artifactMethod.ID && args["artifact_id"] != "" && !rawfunc.Permitted(req, rawfunc.AdminAccess) {
 		return funcapi.ErrorResponse(403, "administrator permissions are required for artifact bytes")
 	}
 	if err := ctx.Err(); err != nil {
@@ -87,34 +87,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if h.deps == nil {
 		return funcapi.UnavailableResponse("synthetic observations are unavailable")
 	}
-	response := map[string]any{
-		"status":              200,
-		"type":                "table",
-		"has_history":         spec.history,
-		"update_every":        10,
-		"help":                spec.help,
-		"columns":             spec.columns,
-		"data":                [][]any{},
-		"default_sort_column": spec.sort,
-		"accepted_params":     spec.params,
-	}
-	switch req.Method {
-	case "synthetics-checks":
-		return h.checks(ctx, args, response)
-	case "synthetics-runs":
-		return h.runs(ctx, args, response)
-	case "synthetics-run":
-		return h.run(ctx, args, response)
-	case "synthetics-artifacts":
-		return h.artifacts(ctx, args, response)
-	case "synthetics-artifact":
-		if args["job_id"] == "" || args["run_id"] == "" {
-			return funcapi.ErrorResponse(400, "job_id and run_id are required")
-		}
-		return h.artifact(ctx, args, response)
-	}
-
-	return funcapi.RawResponse(response)
+	return spec.serve(h, ctx, args, spec.Table())
 }
 
 func timestamp(value int64) any {

@@ -17,7 +17,7 @@ type statusFunc func(context.Context) (journal.Status, error)
 func (f statusFunc) Status(ctx context.Context) (journal.Status, error) { return f(ctx) }
 func request() funcapi.RawMethodRequest {
 	return funcapi.RawMethodRequest{
-		Method:      method,
+		Method:      method.ID,
 		Permissions: "0x1b",
 	}
 }
@@ -79,24 +79,24 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 		want int
 	}{
 		{"info", funcapi.RawMethodRequest{
-			Method: method,
+			Method: method.ID,
 			Info:   true,
 			Args:   []string{"info"},
 		}, 200},
 		{"missing permission", funcapi.RawMethodRequest{
-			Method: method,
+			Method: method.ID,
 		}, 403},
 		{"insufficient permission", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1",
 		}, 403},
 		{"payload", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1b",
 			Payload:     []byte("{}"),
 		}, 400},
 		{"time filter", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1b",
 			Args:        []string{"after:1"},
 		}, 400},

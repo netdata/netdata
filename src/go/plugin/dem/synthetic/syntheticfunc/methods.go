@@ -3,48 +3,15 @@
 package syntheticfunc
 
 import (
-	"strings"
+	"context"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 )
 
 type method struct {
-	id, title, help, sort string
-	params                []string
-	history               bool
-	columns               map[string]any
-}
-
-type column struct {
-	id, title string
-	kind      funcapi.FieldType
-	units     string
-}
-
-func columns(fields ...column) map[string]any {
-	out := make(map[string]any, len(fields))
-	for i, f := range fields {
-		transform := funcapi.FieldTransformNone
-		if f.kind == funcapi.FieldTypeTimestamp {
-			transform = funcapi.FieldTransformDatetimeUsec
-			if strings.HasSuffix(f.id, "_ms") {
-				transform = funcapi.FieldTransformDatetime
-			}
-		}
-		out[f.id] = (funcapi.Column{
-			ValueOptions: funcapi.ValueOptions{
-				Transform: transform,
-			},
-			Index:         i,
-			Name:          f.title,
-			Type:          f.kind,
-			Units:         f.units,
-			Visualization: funcapi.FieldVisualValue,
-			Visible:       true,
-			Sortable:      true,
-		}).BuildColumn()
-	}
-	return out
+	rawfunc.Method
+	serve func(h *Handler, ctx context.Context, args map[string]string, response map[string]any) *funcapi.FunctionResponse
 }
 
 var methods = []method{checksMethod, runsMethod, runMethod, artifactsMethod, artifactMethod}
@@ -52,23 +19,24 @@ var methods = []method{checksMethod, runsMethod, runMethod, artifactsMethod, art
 func Declarations() []funcapi.FunctionConfig {
 	out := make([]funcapi.FunctionConfig, 0, len(methods))
 	for _, m := range methods {
-		out = append(
-			out,
-			funcapi.FunctionConfig{
-				ID:                m.id,
-				FunctionName:      m.id,
-				Name:              m.title,
-				UpdateEvery:       10,
-				Help:              m.help,
-				Tags:              "synthetics",
-				RequireCloud:      true,
-				RequireCommercial: true,
-				RawRequest:        true,
-				ManagedInfo:       true,
-				HasHistory:        m.history,
-				AcceptedParams:    append([]string(nil), m.params...),
-			},
-		)
+		out = append(out, m.Declaration("synthetics"))
 	}
 	return out
+}
+
+// column declares a visible, sortable column. Timestamps are Unix microseconds.
+func column[T any](name, tooltip string, kind funcapi.FieldType, units string, value func(T) any) rawfunc.Column[T] {
+	col := rawfunc.Column[T]{
+		Name:     name,
+		Tooltip:  tooltip,
+		Type:     kind,
+		Units:    units,
+		Visible:  true,
+		Sortable: true,
+		Value:    value,
+	}
+	if kind == funcapi.FieldTypeTimestamp {
+		col.Transform = funcapi.FieldTransformDatetimeUsec
+	}
+	return col
 }
