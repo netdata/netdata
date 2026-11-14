@@ -5,69 +5,13 @@ package runtime
 import (
 	"bytes"
 	"encoding/json"
-	"strings"
-	"sync"
 	"testing"
 
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func releaseFixture(t *testing.T) (Release, *openpgp.Entity) {
-	t.Helper()
-	m, _ := bundleFixture(t, "signed-release")
-	m.Platform = "linux/arm64"
-	m.Archive.URL = "https://artifacts.example.invalid/dem-runtime/1/arm64/" + m.Archive.SHA256 + ".tar.zst"
-	return Release{
-		Format:   1,
-		Sequence: 23,
-		Manifest: m,
-		Sources: ReleaseSource{
-			URL:    "https://artifacts.example.invalid/dem-runtime/1/sources.tar.zst",
-			SHA256: strings.Repeat("a", 64),
-			Bytes:  100,
-		},
-	}, pgptest.Key(t, 1)
-}
-
-// fixturePublisher signs fixture releases. Installation accepts only releases
-// that VerifyRelease authenticated, so fixtures take the same path as published
-// ones. Helper processes create their own publisher.
-var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
-	key, err := openpgp.NewEntity("Runtime fixture", "", "fixture@example.invalid", &packet.Config{Algorithm: packet.PubKeyAlgoEdDSA})
-	if err != nil {
-		return fixtureKeys{}, err
-	}
-	var public bytes.Buffer
-	if err := key.Serialize(&public); err != nil {
-		return fixtureKeys{}, err
-	}
-	trust, err := ParseReleaseKeyring(public.Bytes())
-	return fixtureKeys{key: key, trust: trust}, err
-})
-
-type fixtureKeys struct {
-	key   *openpgp.Entity
-	trust *ReleaseTrust
-}
-
-// verifyFixture signs release as its publisher and authenticates it as a
-// production loader does; validation errors come from VerifyRelease.
-func verifyFixture(release Release) (VerifiedRelease, error) {
-	keys, err := fixturePublisher()
-	if err != nil {
-		return VerifiedRelease{}, err
-	}
-	envelope, err := pgptest.Release(release, keys.key)
-	if err != nil {
-		return VerifiedRelease{}, err
-	}
-	return VerifyRelease(envelope, keys.trust)
-}
 
 func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	release, key := releaseFixture(t)
@@ -155,21 +99,21 @@ func TestReleaseVerificationRequiresLocalTrustAndBoundedMetadata(t *testing.T) {
 
 func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 	current, _ := releaseFixture(t)
-	for _, scenario := range []struct {
-		name   string
+	scenarios := map[string]struct {
 		change func(*Release)
 		update bool
 		err    string
 	}{
-		{name: "same release"},
-		{name: "new publication", change: func(r *Release) { r.Sequence++ }, update: true},
-		{name: "replayed older release", change: func(r *Release) { r.Sequence-- }, err: "regress"},
-		{name: "reused sequence", change: func(r *Release) { r.Manifest.Version += ".changed" }, err: "reused"},
-		{name: "changed binding with same archive", change: func(r *Release) { r.Manifest.Bindings[0].Offset++ }, err: "reused"},
-		{name: "other architecture", change: func(r *Release) { r.Manifest.Platform = "linux/amd64" }, err: "platform differs"},
-		{name: "missing publication order", change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
+		"same release":                      {},
+		"new publication":                   {change: func(r *Release) { r.Sequence++ }, update: true},
+		"replayed older release":            {change: func(r *Release) { r.Sequence-- }, err: "regress"},
+		"reused sequence":                   {change: func(r *Release) { r.Manifest.Version += ".changed" }, err: "reused"},
+		"changed binding with same archive": {change: func(r *Release) { r.Manifest.Bindings[0].Offset++ }, err: "reused"},
+		"other architecture":                {change: func(r *Release) { r.Manifest.Platform = "linux/amd64" }, err: "platform differs"},
+		"missing publication order":         {change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
+	}
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
 			data, err := json.Marshal(current)
 			require.NoError(t, err)
 			var next Release
@@ -186,11 +130,4 @@ func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 			assert.Equal(t, scenario.update, update)
 		})
 	}
-}
-
-func testTrust(t *testing.T, key *openpgp.Entity) *ReleaseTrust {
-	t.Helper()
-	trust, err := ParseReleaseKeyring(pgptest.Public(t, key))
-	require.NoError(t, err)
-	return trust
 }

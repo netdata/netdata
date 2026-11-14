@@ -3,86 +3,21 @@
 package runtimehost
 
 import (
-	"archive/tar"
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"fmt"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/logger"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
 )
-
-// The fixture goes through the real authenticated import and binding path; its
-// synthetic executable bytes are never launched.
-func testBundle(t *testing.T, version string) (runtime.Manifest, []byte) {
-	t.Helper()
-	slot := make([]byte, 1024)
-	files := []struct {
-		name string
-		data []byte
-		mode int64
-	}{
-		{"node", slot, 0755}, {"browser", slot, 0755}, {"loader", []byte("loader"), 0755},
-		{
-			"dependencies/package.json",
-			[]byte("{}"),
-			0644,
-		}, {"runner/run.mjs", []byte(version), 0644}, {"fonts/font", []byte("font"), 0644},
-	}
-	var raw, compressed bytes.Buffer
-	tw := tar.NewWriter(&raw)
-	var expanded int64
-	for _, f := range files {
-		require.NoError(t, tw.WriteHeader(&tar.Header{
-			Name:     f.name,
-			Mode:     f.mode,
-			Size:     int64(len(f.data)),
-			Typeflag: tar.TypeReg,
-		}))
-		_, err := tw.Write(f.data)
-		require.NoError(t, err)
-		expanded += int64(len(f.data))
-	}
-	require.NoError(t, tw.Close())
-	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
-	require.NoError(t, err)
-	_, err = encoder.Write(raw.Bytes())
-	require.NoError(t, err)
-	require.NoError(t, encoder.Close())
-	m := runtime.Manifest{
-		Format:   1,
-		Contract: 2,
-		Version:  version,
-		Platform: "linux/" + goruntime.GOARCH,
-		Archive: runtime.Archive{
-			SHA256:        fmt.Sprintf("%x", sha256.Sum256(compressed.Bytes())),
-			Bytes:         int64(compressed.Len()),
-			TarBytes:      int64(raw.Len()),
-			ExpandedBytes: expanded,
-			Entries:       len(files),
-		},
-		Layout: runtime.Layout{
-			EntryPoint:   "runner/run.mjs",
-			Node:         "node",
-			Browser:      "browser",
-			Loader:       "loader",
-			Dependencies: "dependencies",
-			Fonts:        "fonts",
-		},
-		Bindings: []runtime.Binding{{Path: "node", Expected: slot}, {Path: "browser", Expected: slot}},
-	}
-	require.NoError(t, m.Validate())
-	return m, compressed.Bytes()
-}
 
 func testStore(t *testing.T) *runtime.Store {
 	t.Helper()
@@ -96,13 +31,68 @@ func testStore(t *testing.T) *runtime.Store {
 
 var installSequence atomic.Uint64
 
-// These synthetic bytes prove storage/host ownership, not browser qualification.
 // Each installation publishes a sequence above every earlier one in this process.
 func installBundle(t *testing.T, store *runtime.Store, version string) runtime.Manifest {
 	t.Helper()
 	release, data := publishedBundle(t, version, installSequence.Add(1))
 	selectPublished(t, store, release, data, runtime.ManualUpdates)
 	return release.Manifest
+}
+
+// publishedBundle describes the shared fixture payload as a published release.
+// Its synthetic bytes prove storage and host ownership, not browser
+// qualification.
+func publishedBundle(t *testing.T, version string, sequence uint64) (runtime.Release, []byte) {
+	t.Helper()
+	b := demruntimetest.NewBundle(t, version)
+	m := runtime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  version,
+		Platform: "linux/" + goruntime.GOARCH,
+		Archive: runtime.Archive{
+			URL:           "https://artifacts.example.invalid/runtime.tar.zst",
+			SHA256:        b.SHA256,
+			Bytes:         b.Bytes,
+			TarBytes:      b.TarBytes,
+			ExpandedBytes: b.ExpandedBytes,
+			Entries:       b.Entries,
+		},
+		Layout: runtime.Layout(b.Layout),
+	}
+	for _, binding := range b.Bindings {
+		m.Bindings = append(m.Bindings, runtime.Binding(binding))
+	}
+	require.NoError(t, m.Validate())
+	return runtime.Release{Format: 1, Sequence: sequence, Manifest: m,
+		Sources: runtime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("a", 64), Bytes: 100}}, b.Data
+}
+
+// verifiedRelease signs release with the fixture publisher key and authenticates
+// it as a production loader does.
+func verifiedRelease(t *testing.T, release runtime.Release) runtime.VerifiedRelease {
+	t.Helper()
+	key := pgptest.Key(t, 66)
+	public, err := runtime.ParseReleaseKeyring(pgptest.Public(t, key))
+	require.NoError(t, err)
+	envelope, err := pgptest.Release(release, key)
+	require.NoError(t, err)
+	verified, err := runtime.VerifyRelease(envelope, public)
+	require.NoError(t, err)
+	return verified
+}
+
+func selectPublished(t *testing.T, store *runtime.Store, release runtime.Release, data []byte, policy runtime.UpdatePolicy) {
+	t.Helper()
+	verified := verifiedRelease(t, release)
+	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
+	path := filepath.Join(t.TempDir(), "archive.tar.zst")
+	require.NoError(t, os.WriteFile(path, data, 0600))
+	candidate, err := store.BeginPublishedInstall(context.Background(), runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: policy}, func(context.Context) (runtime.VerifiedRelease, error) { return verified, nil })
+	require.NoError(t, err)
+	require.NoError(t, candidate.Import(context.Background(), path))
+	require.NoError(t, candidate.Select())
+	require.NoError(t, candidate.Close())
 }
 
 func newTestHost(t *testing.T, store *runtime.Store) *Host {
@@ -194,7 +184,8 @@ func TestLostSelectedGenerationRequiresRepairRatherThanInstall(t *testing.T) {
 	require.NoError(t, err)
 	use, err := consumer.BeginUse()
 	require.NoError(t, err)
-	generation := filepath.Dir(use.Paths.Node)
+	// The generated launcher sits at the generation root.
+	generation := filepath.Dir(use.Paths.Browser)
 	require.NoError(t, use.Finish(true))
 	require.NoError(t, consumer.Close())
 	require.NoError(t, os.Rename(generation, filepath.Join(t.TempDir(), "lost")))

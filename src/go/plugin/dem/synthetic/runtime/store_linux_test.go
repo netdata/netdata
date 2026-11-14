@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,25 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/require"
 )
-
-func testStore(t *testing.T) (*Store, *time.Time) {
-	t.Helper()
-	s, err := Open(DefaultConfig(filepath.Join(t.TempDir(), "store")))
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, s.Close()) })
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	s.now = func() time.Time { return now }
-	return s, &now
-}
-
-func importFixture(t *testing.T, s *Store, label string) Manifest {
-	t.Helper()
-	m, archive := bundleFixture(t, label)
-	file := filepath.Join(t.TempDir(), "archive.tar.zst")
-	require.NoError(t, os.WriteFile(file, archive, 0600))
-	require.NoError(t, s.importUnselected(context.Background(), m, file))
-	return m
-}
 
 func TestStoreGraceProcessAndRestart(t *testing.T) {
 	s, now := testStore(t)
@@ -83,8 +63,7 @@ func TestStorePressureNeverEvictsProcessOrUncertainUse(t *testing.T) {
 	claim, err := s.testProcessClaim(first.Archive.SHA256)
 	require.NoError(t, err)
 	second, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
-	file := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.WriteFile(file, archive, 0600))
+	file := archiveFile(t, archive)
 	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
 	use, err := s.beginUse(first)
 	require.NoError(t, err)
@@ -378,8 +357,7 @@ func startRuntimeOwner(t *testing.T, s *Store, m Manifest, mode string) func() {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(file, data, 0600))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRuntimeOwnerProcess$")
-	cmd.Env = append(os.Environ(), "DEM_RUNTIME_OWNER_MODE="+mode, "DEM_RUNTIME_OWNER_STORE="+s.path, "DEM_RUNTIME_OWNER_MANIFEST="+file)
+	cmd := helperCommand(ctx, "TestRuntimeOwnerProcess", "DEM_RUNTIME_OWNER_MODE="+mode, "DEM_RUNTIME_OWNER_STORE="+s.path, "DEM_RUNTIME_OWNER_MANIFEST="+file)
 	input, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	output, err := cmd.StdoutPipe()
@@ -492,8 +470,7 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	require.NoError(b, err)
 	defer s.Close()
 	m, archive := bundleFixture(b, "benchmark")
-	file := filepath.Join(b.TempDir(), "archive")
-	require.NoError(b, os.WriteFile(file, archive, 0600))
+	file := archiveFile(b, archive)
 	require.NoError(b, s.importUnselected(context.Background(), m, file))
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -509,31 +486,4 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	}
 	b.StopTimer()
 	require.NoError(b, s.Sweep())
-}
-
-// These helpers exercise unselected-generation retention and individual owner
-// reclamation. Installation behavior is tested through the public API separately.
-func (s *Store) importUnselected(ctx context.Context, m Manifest, path string) error {
-	candidate, err := s.beginFixture(ctx, m, InstallRelease)
-	if err != nil {
-		return err
-	}
-	defer candidate.Close()
-	return candidate.Import(ctx, path)
-}
-
-// requirePrepared asserts that m is published and intact without acquiring
-// execution ownership or changing retention timestamps.
-func requirePrepared(t *testing.T, s *Store, m Manifest) {
-	t.Helper()
-	require.NoError(t, s.withLock(func() error {
-		_, err := s.prepared(m)
-		return err
-	}))
-}
-
-func (s *Store) testProcessClaim(id string) (*claim, error) {
-	var owner *claim
-	err := s.withLock(func() error { var err error; owner, err = s.ledger.claimLocked(id, "process"); return err })
-	return owner, err
 }

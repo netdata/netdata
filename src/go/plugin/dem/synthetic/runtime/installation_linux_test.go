@@ -8,63 +8,13 @@ import (
 	"errors"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
-
-var fixtureSequence atomic.Uint64
-
-// fixtureRelease publishes m with a sequence above every earlier fixture in this
-// process.
-func fixtureRelease(m Manifest) Release {
-	return Release{
-		Format:   1,
-		Sequence: fixtureSequence.Add(1),
-		Manifest: m,
-		Sources: ReleaseSource{
-			URL:    "https://artifacts.example.invalid/sources.tar.zst",
-			SHA256: strings.Repeat("b", 64),
-			Bytes:  100,
-		},
-	}
-}
-
-// beginFixture starts an installation or repair candidate for m through the
-// published-installation path with manual updates.
-func (s *Store) beginFixture(ctx context.Context, m Manifest, operation ReleaseOperation) (*Candidate, error) {
-	return s.beginRelease(ctx, fixtureRelease(m), operation)
-}
-
-func (s *Store) beginRelease(ctx context.Context, release Release, operation ReleaseOperation) (*Candidate, error) {
-	options := ReleaseInstallOptions{
-		Operation: operation,
-		Updates:   ManualUpdates,
-	}
-	candidate, err := s.BeginPublishedInstall(ctx, options, func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) })
-	if err == nil && candidate == nil {
-		err = errors.New("fixture installation was an unexpected no-op")
-	}
-	return candidate, err
-}
-
-func installFixture(t *testing.T, s *Store, label string) Manifest {
-	t.Helper()
-	m, archive := bundleFixture(t, label)
-	input := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.WriteFile(input, archive, 0600))
-	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
-	require.NoError(t, err)
-	require.NoError(t, candidate.Import(context.Background(), input))
-	require.NoError(t, candidate.Select())
-	require.NoError(t, candidate.Close())
-	return m
-}
 
 func TestLegacyEmptySelectionIsUninstalled(t *testing.T) {
 	s, _ := testStore(t)
@@ -102,8 +52,7 @@ func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	other.now = s.now
 	require.NoError(t, other.Sweep())
 	next, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
-	input := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.WriteFile(input, archive, 0600))
+	input := archiveFile(t, archive)
 	candidate, err := other.beginFixture(context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	require.ErrorIs(t, candidate.Import(context.Background(), input), ErrAllowance)
@@ -280,12 +229,8 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 			data, err := json.Marshal(fixtureRelease(next))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(file, data, 0600))
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSelectionWriterExitProcess$")
-			cmd.Env = append(os.Environ(), "DEM_SELECTION_EXIT_MODE="+mode, "DEM_SELECTION_EXIT_STORE="+s.path, "DEM_SELECTION_EXIT_RELEASE="+file)
-			output, err := cmd.CombinedOutput()
-			require.NoError(t, err, "%s", output)
+			output, status := runHelper(t, "TestSelectionWriterExitProcess", "DEM_SELECTION_EXIT_MODE="+mode, "DEM_SELECTION_EXIT_STORE="+s.path, "DEM_SELECTION_EXIT_RELEASE="+file)
+			require.Zero(t, status, "%s", output)
 			reopened, err := Open(s.config)
 			require.NoError(t, err)
 			defer reopened.Close()

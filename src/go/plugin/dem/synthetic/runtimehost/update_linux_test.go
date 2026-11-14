@@ -7,14 +7,11 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -25,41 +22,6 @@ type qualifyFunc func(context.Context, runner.Source) (*runner.Qualification, er
 
 func (f qualifyFunc) Qualify(ctx context.Context, source runner.Source) (*runner.Qualification, error) {
 	return f(ctx, source)
-}
-
-func publishedBundle(t *testing.T, version string, sequence uint64) (runtime.Release, []byte) {
-	t.Helper()
-	m, data := testBundle(t, version)
-	m.Archive.URL = "https://artifacts.example.invalid/runtime.tar.zst"
-	return runtime.Release{Format: 1, Sequence: sequence, Manifest: m,
-		Sources: runtime.ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("a", 64), Bytes: 100}}, data
-}
-
-// verifiedRelease signs release with the fixture publisher key and authenticates
-// it as a production loader does.
-func verifiedRelease(t *testing.T, release runtime.Release) runtime.VerifiedRelease {
-	t.Helper()
-	key := pgptest.Key(t, 66)
-	public, err := runtime.ParseReleaseKeyring(pgptest.Public(t, key))
-	require.NoError(t, err)
-	envelope, err := pgptest.Release(release, key)
-	require.NoError(t, err)
-	verified, err := runtime.VerifyRelease(envelope, public)
-	require.NoError(t, err)
-	return verified
-}
-
-func selectPublished(t *testing.T, store *runtime.Store, release runtime.Release, data []byte, policy runtime.UpdatePolicy) {
-	t.Helper()
-	verified := verifiedRelease(t, release)
-	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
-	path := filepath.Join(t.TempDir(), "archive.tar.zst")
-	require.NoError(t, os.WriteFile(path, data, 0600))
-	candidate, err := store.BeginPublishedInstall(context.Background(), runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: policy}, func(context.Context) (runtime.VerifiedRelease, error) { return verified, nil })
-	require.NoError(t, err)
-	require.NoError(t, candidate.Import(context.Background(), path))
-	require.NoError(t, candidate.Select())
-	require.NoError(t, candidate.Close())
 }
 
 func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {

@@ -6,79 +6,18 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/xml"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/stretchr/testify/require"
 )
-
-type fixtureEntry struct {
-	name, link string
-	contents   []byte
-	kind       byte
-	mode       int64
-}
-
-func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
-	t.Helper()
-	expected := append([]byte("/not-prepared/"), make([]byte, 1010)...)
-	program := append([]byte(strings.Repeat("H", 32)), expected...)
-	entries := []fixtureEntry{
-		{name: "node/bin/node", contents: program, mode: 0755},
-		{name: "browser/browser", contents: program, mode: 0755},
-		{name: "lib/loader.so", contents: []byte("loader"), mode: 0755},
-		{name: "dependencies/package.json", contents: []byte(label), mode: 0644},
-		{name: "dependencies/node_modules/.bin/tool", link: "../package/tool.js", kind: tar.TypeSymlink},
-		{name: "dependencies/node_modules/package/tool.js", contents: []byte("tool"), mode: 0644},
-		{name: "runner/run.mjs", contents: []byte("export {}"), mode: 0644},
-		{name: "fonts/font.ttf", contents: []byte("font"), mode: 0644},
-	}
-	a, archive := archiveFixture(t, entries)
-	a.URL = "https://artifacts.example.invalid/" + a.SHA256 + ".tar.zst"
-	m := Manifest{Format: 1, Contract: 2, Version: "test-1", Platform: "linux/" + goruntime.GOARCH, Archive: a,
-		Layout:   Layout{EntryPoint: "runner/run.mjs", Node: "node/bin/node", Dependencies: "dependencies", Browser: "browser/browser", Loader: "lib/loader.so", Fonts: "fonts"},
-		Bindings: []Binding{{Path: "node/bin/node", Offset: 32, Expected: expected}, {Path: "browser/browser", Offset: 32, Expected: expected}},
-	}
-	require.NoError(t, m.Validate())
-	return m, archive
-}
-
-func archiveFixture(t testing.TB, entries []fixtureEntry) (Archive, []byte) {
-	t.Helper()
-	var raw, compressed bytes.Buffer
-	writer := tar.NewWriter(&raw)
-	var expanded int64
-	for _, entry := range entries {
-		kind := entry.kind
-		if kind == 0 {
-			kind = tar.TypeReg
-		}
-		size := int64(len(entry.contents))
-		require.NoError(t, writer.WriteHeader(&tar.Header{Name: entry.name, Typeflag: kind, Mode: entry.mode, Size: size, Linkname: entry.link}))
-		if kind == tar.TypeReg {
-			_, err := writer.Write(entry.contents)
-			require.NoError(t, err)
-			expanded += size
-		}
-	}
-	require.NoError(t, writer.Close())
-	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
-	require.NoError(t, err)
-	_, err = encoder.Write(raw.Bytes())
-	require.NoError(t, err)
-	require.NoError(t, encoder.Close())
-	sum := sha256.Sum256(compressed.Bytes())
-	return Archive{SHA256: hex.EncodeToString(sum[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)}, compressed.Bytes()
-}
 
 func TestBundleExtractionAndBinding(t *testing.T) {
 	m, archive := bundleFixture(t, "first")
@@ -110,18 +49,18 @@ func TestBundleExtractionAndBinding(t *testing.T) {
 }
 
 func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
-	cases := map[string][]fixtureEntry{
-		"escape":           {{name: "../outside", contents: []byte("no"), mode: 0600}},
-		"absolute":         {{name: "/outside", contents: []byte("no"), mode: 0600}},
-		"hardlink":         {{name: "alias", link: "file", kind: tar.TypeLink}},
-		"external-symlink": {{name: "alias", link: "../outside", kind: tar.TypeSymlink}},
-		"chained-escape":   {{name: "d", kind: tar.TypeDir}, {name: "other", kind: tar.TypeDir}, {name: "d/alias", link: "../other", kind: tar.TypeSymlink}, {name: "escape", link: "d/alias/../../outside", kind: tar.TypeSymlink}},
-		"symlink-parent":   {{name: "alias", link: "inside", kind: tar.TypeSymlink}, {name: "alias/file", contents: []byte("no"), mode: 0600}},
-		"duplicate":        {{name: "file", contents: []byte("first"), mode: 0600}, {name: "file", contents: []byte("last"), mode: 0600}},
-		"device":           {{name: "device", kind: tar.TypeChar, mode: 0600}},
-		"setuid":           {{name: "file", contents: []byte("no"), mode: 04755}},
-		"reserved":         {{name: "prepared.json", contents: []byte("{}"), mode: 0600}},
-		"native reserved":  {{name: "native.json", contents: []byte("{}"), mode: 0600}},
+	cases := map[string][]demruntimetest.Entry{
+		"escape":           {{Name: "../outside", Contents: []byte("no"), Mode: 0600}},
+		"absolute":         {{Name: "/outside", Contents: []byte("no"), Mode: 0600}},
+		"hardlink":         {{Name: "alias", Link: "file", Kind: tar.TypeLink}},
+		"external-symlink": {{Name: "alias", Link: "../outside", Kind: tar.TypeSymlink}},
+		"chained-escape":   {{Name: "d", Kind: tar.TypeDir}, {Name: "other", Kind: tar.TypeDir}, {Name: "d/alias", Link: "../other", Kind: tar.TypeSymlink}, {Name: "escape", Link: "d/alias/../../outside", Kind: tar.TypeSymlink}},
+		"symlink-parent":   {{Name: "alias", Link: "inside", Kind: tar.TypeSymlink}, {Name: "alias/file", Contents: []byte("no"), Mode: 0600}},
+		"duplicate":        {{Name: "file", Contents: []byte("first"), Mode: 0600}, {Name: "file", Contents: []byte("last"), Mode: 0600}},
+		"device":           {{Name: "device", Kind: tar.TypeChar, Mode: 0600}},
+		"setuid":           {{Name: "file", Contents: []byte("no"), Mode: 04755}},
+		"reserved":         {{Name: "prepared.json", Contents: []byte("{}"), Mode: 0600}},
+		"native reserved":  {{Name: "native.json", Contents: []byte("{}"), Mode: 0600}},
 	}
 	for name, entries := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -203,17 +142,6 @@ func TestBindingRejectsPayloadBeyondAbsolutePathLimit(t *testing.T) {
 	prefix := strings.Repeat("/"+strings.Repeat("p", 99), length/100) + strings.Repeat("p", length%100)
 	require.Len(t, prefix+"/"+m.Layout.Loader, 4095)
 	require.ErrorContains(t, bindPrefix(root, prefix, m), "absolute path limit")
-}
-
-func boundPayloadFixture(t *testing.T) (*os.Root, Manifest) {
-	t.Helper()
-	m, archive := bundleFixture(t, "bound")
-	root, err := os.OpenRoot(t.TempDir())
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, root.Close()) })
-	require.NoError(t, extractArchive(bytes.NewReader(archive), root, m.Archive))
-	require.NoError(t, bindPrefix(root, "/prepared/runtime", m))
-	return root, m
 }
 
 func TestBoundPayloadRequiresExecuteBitOfRunningClass(t *testing.T) {
@@ -309,7 +237,7 @@ func TestBoundPayloadStructuralDamageIsDamage(t *testing.T) {
 }
 
 func TestArchiveZstdIntegrityAndBounds(t *testing.T) {
-	a, compressed := archiveFixture(t, []fixtureEntry{{name: "file", contents: []byte("payload"), mode: 0600}})
+	a, compressed := archiveFixture(t, []demruntimetest.Entry{{Name: "file", Contents: []byte("payload"), Mode: 0600}})
 	decoder, err := zstd.NewReader(nil)
 	require.NoError(t, err)
 	raw, err := decoder.DecodeAll(compressed, nil)

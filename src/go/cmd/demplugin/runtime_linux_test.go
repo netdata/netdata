@@ -3,16 +3,12 @@
 package main
 
 import (
-	"archive/tar"
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	goruntime "runtime"
 	"testing"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -21,47 +17,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This authenticated fixture proves archive plumbing and final-path binding, not
-// executable/browser readiness. qualify must reject it.
+// adminBundleFixture writes the shared fixture payload and its signed release.
+// It proves archive plumbing and final-path binding, not executable/browser
+// readiness: qualify must reject it.
 func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	t.Helper()
-	prefix := append([]byte("/unprepared/"), make([]byte, 1012)...)
-	entries := []struct {
-		name string
-		body []byte
-	}{
-		{"node", prefix}, {"browser", prefix}, {"loader", []byte("loader")},
-		{"dependencies/package.json", []byte("{}")}, {"fonts/test.ttf", []byte("font")},
-		{"runner/run.mjs", []byte("// non-executable qualification fixture")},
-		{"runtime.json", []byte(`{"contract":2,"version":"cli-fixture","paths":{"dependencies":"dependencies","browser":"chrome"}}`)},
+	b := demruntimetest.NewBundle(t, "cli-fixture")
+	manifest := runtime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  "cli-fixture",
+		Platform: "linux/" + goruntime.GOARCH,
+		Archive: runtime.Archive{
+			SHA256:        b.SHA256,
+			Bytes:         b.Bytes,
+			TarBytes:      b.TarBytes,
+			ExpandedBytes: b.ExpandedBytes,
+			Entries:       b.Entries,
+		},
+		Layout: runtime.Layout(b.Layout),
 	}
-	var raw, compressed bytes.Buffer
-	tw := tar.NewWriter(&raw)
-	var expanded int64
-	for _, entry := range entries {
-		require.NoError(t, tw.WriteHeader(&tar.Header{Name: entry.name, Mode: 0755, Size: int64(len(entry.body)), Typeflag: tar.TypeReg}))
-		_, err := tw.Write(entry.body)
-		require.NoError(t, err)
-		expanded += int64(len(entry.body))
-	}
-	require.NoError(t, tw.Close())
-	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
-	require.NoError(t, err)
-	_, err = encoder.Write(raw.Bytes())
-	require.NoError(t, err)
-	require.NoError(t, encoder.Close())
-	digest := sha256.Sum256(compressed.Bytes())
-	manifest := runtime.Manifest{Format: 1, Contract: 2, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
-		Archive:  runtime.Archive{SHA256: hex.EncodeToString(digest[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)},
-		Layout:   runtime.Layout{EntryPoint: "runner/run.mjs", Node: "node", Browser: "browser", Dependencies: "dependencies", Loader: "loader", Fonts: "fonts"},
-		Bindings: []runtime.Binding{{Path: "node", Expected: prefix}, {Path: "browser", Expected: prefix}},
+	for _, binding := range b.Bindings {
+		manifest.Bindings = append(manifest.Bindings, runtime.Binding(binding))
 	}
 	require.NoError(t, manifest.Validate())
 	root := t.TempDir()
 	manifestPath = filepath.Join(root, "trusted.json")
 	archivePath = filepath.Join(root, "runtime.tar.zst")
 	writeAdminRelease(t, manifestPath, manifest)
-	require.NoError(t, os.WriteFile(archivePath, compressed.Bytes(), 0600))
+	require.NoError(t, os.WriteFile(archivePath, b.Data, 0600))
 	return manifestPath, archivePath
 }
 

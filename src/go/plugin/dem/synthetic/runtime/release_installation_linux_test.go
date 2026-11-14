@@ -19,34 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func publishedFixture(t *testing.T, sequence uint64) (Release, string, func(context.Context) (VerifiedRelease, error)) {
-	t.Helper()
-	m, archive := bundleFixture(t, strings.Repeat("release", int(sequence)))
-	m.Archive.URL = "https://artifacts.example.invalid/" + m.Archive.SHA256 + ".tar.zst"
-	release := Release{Format: 1, Sequence: sequence, Manifest: m,
-		Sources: ReleaseSource{URL: "https://artifacts.example.invalid/sources.tar.zst", SHA256: strings.Repeat("b", 64), Bytes: 100}}
-	_, key := releaseFixture(t)
-	envelope, err := pgptest.Release(release, key)
-	require.NoError(t, err)
-	path := filepath.Join(t.TempDir(), "archive.tar.zst")
-	require.NoError(t, os.WriteFile(path, archive, 0600))
-	return release, path, func(context.Context) (VerifiedRelease, error) {
-		return VerifyRelease(envelope, testTrust(t, key))
-	}
-}
-
-func installPublishedFixture(t *testing.T, s *Store, sequence uint64, policy UpdatePolicy) Release {
-	t.Helper()
-	release, archive, load := publishedFixture(t, sequence)
-	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: policy}, load)
-	require.NoError(t, err)
-	require.NotNil(t, candidate)
-	require.NoError(t, candidate.Import(context.Background(), archive))
-	require.NoError(t, candidate.Select())
-	require.NoError(t, candidate.Close())
-	return release
-}
-
 func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 	s, _ := testStore(t)
 	current := installPublishedFixture(t, s, 2, AutomaticUpdates)

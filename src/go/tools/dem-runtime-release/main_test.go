@@ -3,7 +3,6 @@
 package main
 
 import (
-	"archive/tar"
 	"bytes"
 	"encoding/json"
 	"io"
@@ -13,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/assert"
@@ -199,52 +198,21 @@ func TestStageNativeUsesBuilderManifestWithoutSigningKey(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			f := newFixture(t, arch)
-			slot := make([]byte, 128)
-			copy(slot, "/unprepared/loader")
-			for i := range f.manifest.Bindings {
-				f.manifest.Bindings[i].Offset = 0
-				f.manifest.Bindings[i].Expected = slot
+			b := demruntimetest.NewBundle(t, "stage-"+arch)
+			f.manifest.Layout = runtime.Layout(b.Layout)
+			f.manifest.Bindings = nil
+			for _, binding := range b.Bindings {
+				f.manifest.Bindings = append(f.manifest.Bindings, runtime.Binding(binding))
 			}
-			entries := []struct {
-				name string
-				data []byte
-				mode int64
-			}{
-				{f.manifest.Layout.Node, slot, 0755}, {f.manifest.Layout.Browser, slot, 0755},
-				{f.manifest.Layout.Loader, []byte("loader"), 0755}, {f.manifest.Layout.EntryPoint, []byte("export {}"), 0644},
-				{f.manifest.Layout.Dependencies + "/package.json", []byte("{}"), 0644}, {f.manifest.Layout.Fonts + "/font.ttf", []byte("font"), 0644},
-			}
-			var tarData, compressed bytes.Buffer
-			tw := tar.NewWriter(&tarData)
-			var expanded int64
-			for _, entry := range entries {
-				require.NoError(t, tw.WriteHeader(&tar.Header{
-					Name:     entry.name,
-					Mode:     entry.mode,
-					Size:     int64(len(entry.data)),
-					Typeflag: tar.TypeReg,
-				}))
-				_, err := tw.Write(entry.data)
-				require.NoError(t, err)
-				expanded += int64(len(entry.data))
-			}
-			require.NoError(t, tw.Close())
-			encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
-			require.NoError(t, err)
-			_, err = encoder.Write(tarData.Bytes())
-			require.NoError(t, err)
-			require.NoError(t, encoder.Close())
-			archive := filepath.Join(f.dir, "archive")
-			require.NoError(t, os.WriteFile(archive, compressed.Bytes(), 0600))
-			hash, size, err := hashFile(archive)
-			require.NoError(t, err)
 			f.manifest.Archive = runtime.Archive{
-				SHA256:        hash,
-				Bytes:         size,
-				TarBytes:      int64(tarData.Len()),
-				ExpandedBytes: expanded,
-				Entries:       len(entries),
+				SHA256:        b.SHA256,
+				Bytes:         b.Bytes,
+				TarBytes:      b.TarBytes,
+				ExpandedBytes: b.ExpandedBytes,
+				Entries:       b.Entries,
 			}
+			archive := filepath.Join(f.dir, "archive")
+			require.NoError(t, os.WriteFile(archive, b.Data, 0600))
 			raw, err := json.Marshal(f.manifest)
 			require.NoError(t, err)
 			manifestPath := filepath.Join(f.dir, "manifest.json")

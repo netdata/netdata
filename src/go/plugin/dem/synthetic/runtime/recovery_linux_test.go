@@ -8,11 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -185,8 +183,7 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 			require.NoDirExists(t, filepath.Join(s.path, "generations", selected.Archive.SHA256))
 			m, archive := bundleFixture(t, "selected")
 			require.Equal(t, selected, m)
-			input := filepath.Join(t.TempDir(), "archive")
-			require.NoError(t, os.WriteFile(input, archive, 0600))
+			input := archiveFile(t, archive)
 			require.NoError(t, candidate.Import(context.Background(), input))
 			require.NoError(t, candidate.Select())
 			require.NoError(t, candidate.Close())
@@ -334,14 +331,14 @@ func TestRepairWriterExitProcess(t *testing.T) {
 		s.syncSelection = func() error {
 			calls++
 			if calls == 2 {
-				os.Exit(73)
+				os.Exit(helperCrashExit)
 			}
 			return original()
 		}
 	}
 	_, err = s.beginFixture(context.Background(), *m, RepairRelease)
 	require.NoError(t, err)
-	os.Exit(73)
+	os.Exit(helperCrashExit)
 }
 
 func TestRepairRetryAfterCallerExit(t *testing.T) {
@@ -349,20 +346,12 @@ func TestRepairRetryAfterCallerExit(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			s, _ := testStore(t)
 			m := installFixture(t, s, "selected")
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRepairWriterExitProcess$")
-			cmd.Env = append(os.Environ(), "DEM_REPAIR_EXIT_MODE="+mode, "DEM_REPAIR_EXIT_STORE="+s.path)
-			output, err := cmd.CombinedOutput()
-			var exit *exec.ExitError
-			require.ErrorAs(t, err, &exit, string(output))
-			require.Equal(t, 73, exit.ExitCode(), string(output))
+			output, exit := runHelper(t, "TestRepairWriterExitProcess", "DEM_REPAIR_EXIT_MODE="+mode, "DEM_REPAIR_EXIT_STORE="+s.path)
+			require.Equal(t, helperCrashExit, exit, string(output))
 			candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 			require.NoError(t, err)
 			_, archive := bundleFixture(t, "selected")
-			input := filepath.Join(t.TempDir(), "archive")
-			require.NoError(t, os.WriteFile(input, archive, 0600))
-			require.NoError(t, candidate.Import(context.Background(), input))
+			require.NoError(t, candidate.Import(context.Background(), archiveFile(t, archive)))
 			require.NoError(t, candidate.Select())
 			require.NoError(t, candidate.Close())
 			status, err := s.Inspect()
@@ -529,19 +518,13 @@ func TestBootstrapExitBeforeParentSyncProcess(t *testing.T) {
 	}
 	_, err := ensureRuntimeRoot(path, managedRootLayout)
 	require.NoError(t, err)
-	os.Exit(73)
+	os.Exit(helperCrashExit)
 }
 
 func TestOpenReconcilesPublishedBootstrapAfterExit(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "new", "nested", "store")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestBootstrapExitBeforeParentSyncProcess$")
-	cmd.Env = append(os.Environ(), "DEM_BOOTSTRAP_EXIT_STORE="+path)
-	output, err := cmd.CombinedOutput()
-	var exit *exec.ExitError
-	require.ErrorAs(t, err, &exit, string(output))
-	require.Equal(t, 73, exit.ExitCode(), string(output))
+	output, status := runHelper(t, "TestBootstrapExitBeforeParentSyncProcess", "DEM_BOOTSTRAP_EXIT_STORE="+path)
+	require.Equal(t, helperCrashExit, status, string(output))
 	before, err := os.Stat(path)
 	require.NoError(t, err)
 	s, err := Open(DefaultConfig(path))
