@@ -58,7 +58,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 	if runID != "" {
 		return reader.VisitMatch("DEM_RUN_ID", runID, candidate)
 	}
-	return reader.VisitRange("synthetic", f.After, before, candidate)
+	return reader.VisitRange(journalstore.KindSynthetic, f.After, before, candidate)
 }
 
 // Both phases carry their immutable start clock, so indexed membership includes
@@ -110,7 +110,7 @@ func decodeSynthetic(entry *journal.SnapshotEntry) (synthetic.HistoryPhase, synt
 		return "", synthetic.Run{}, false, err
 	}
 	kind, started, err := envelope.Validate()
-	if err != nil || kind != "synthetic" {
+	if err != nil || kind != journalstore.KindSynthetic {
 		return "", synthetic.Run{}, false, err
 	}
 	for _, field := range []struct{ name, value string }{

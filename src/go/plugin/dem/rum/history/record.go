@@ -77,8 +77,8 @@ type ErrorGroup struct {
 
 func eventFields(r EventRecord) []journal.Field {
 	fields := []journal.Field{
-		journal.StringField("DEM_KIND", "rum"),
-		journal.StringField("DEM_OBSERVED_US", strconv.FormatInt(r.ObservedUS, 10)),
+		journal.StringField(journalstore.FieldKind, string(journalstore.KindRUM)),
+		journal.StringField(journalstore.FieldObservedUS, strconv.FormatInt(r.ObservedUS, 10)),
 		journal.StringField("DEM_REVISION", strconv.FormatUint(r.Revision, 10)),
 	}
 	for _, field := range []struct{ name, value string }{
@@ -195,7 +195,7 @@ func decodeEvent(entry *journal.SnapshotEntry, previous *EventRecord) (EventReco
 		return r, false, err
 	}
 	kind, observed, err := envelope.Validate()
-	if err != nil || kind != "rum" {
+	if err != nil || kind != journalstore.KindRUM {
 		return r, false, err
 	}
 	r.ObservedUS = observed

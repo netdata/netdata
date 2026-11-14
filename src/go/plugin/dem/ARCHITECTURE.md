@@ -544,7 +544,8 @@ Dependency direction:
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journalstore.Store`. They cannot close it or independently apply retention.
-- Journal knows SDK fields and snapshots, not RUM or synthetic schemas.
+- `journalstore` owns the shared record envelope (kind, domain clock, schema version and minute bucket) and SDK
+  snapshots. RUM and synthetic record fields and their decoding stay with the history adapters.
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.
 - HTTP never imports the registry or collectors; its small `Processor` and `Routes` interfaces describe its consumers.

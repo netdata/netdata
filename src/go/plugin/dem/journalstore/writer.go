@@ -28,7 +28,7 @@ func (s *Store) Append(ctx context.Context, fields []journal.Field) (attempted b
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	var kind string
+	var kind Kind
 	fields, kind, err = appendEnvelope(fields)
 	if err != nil {
 		return false, err

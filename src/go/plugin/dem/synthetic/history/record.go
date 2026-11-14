@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
@@ -29,9 +30,9 @@ func (s *Store) AppendRun(ctx context.Context, phase synthetic.HistoryPhase, run
 		return false, err
 	}
 	return s.store.Append(ctx, []journal.Field{
-		journal.StringField("DEM_KIND", "synthetic"), journal.StringField("DEM_PHASE", string(phase)),
+		journal.StringField(journalstore.FieldKind, string(journalstore.KindSynthetic)), journal.StringField("DEM_PHASE", string(phase)),
 		journal.StringField("DEM_JOB_ID", run.JobID), journal.StringField("DEM_RUN_ID", run.ID),
-		journal.StringField("DEM_STARTED_US", strconv.FormatInt(run.StartedUS, 10)),
+		journal.StringField(journalstore.FieldStartedUS, strconv.FormatInt(run.StartedUS, 10)),
 		journal.StringField("DEM_DATA", string(data)), journal.StringField("MESSAGE", "synthetic "+string(phase)),
 	})
 }

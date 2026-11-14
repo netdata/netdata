@@ -92,7 +92,7 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 				ID: "rum",
 				Functions: func() []funcapi.FunctionConfig {
 					return availableFunctions(rumfunc.Declarations(), func() bool {
-						return rumRegistry.HasSites() || deps.History.HasObservedKind("rum")
+						return rumRegistry.HasSites() || deps.History.HasObservedKind(journalstore.KindRUM)
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
@@ -103,7 +103,7 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
 					return availableFunctions(syntheticfunc.Declarations(), func() bool {
-						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") ||
+						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind(journalstore.KindSynthetic) ||
 							deps.Artifacts.HasObservedPublished()
 					})
 				},

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
@@ -26,7 +27,7 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 		return ctx.Err()
 	}
 	var previous EventRecord
-	return reader.VisitRange("rum", after, before, func(entry *journal.SnapshotEntry) error {
+	return reader.VisitRange(journalstore.KindRUM, after, before, func(entry *journal.SnapshotEntry) error {
 		record, rum, err := decodeEvent(entry, &previous)
 		if err != nil {
 			return err

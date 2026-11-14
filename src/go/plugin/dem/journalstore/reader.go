@@ -142,15 +142,15 @@ const exactBucketLimit = int64(256)
 
 // VisitRange selects candidates by the domain clock's minute. Domain decoders
 // validate exact timestamps against the inclusive whole-second bounds afterward.
-func (r *Snapshot) VisitRange(kind string, after, before int64, visit func(*journal.SnapshotEntry) error) error {
+func (r *Snapshot) VisitRange(kind Kind, after, before int64, visit func(*journal.SnapshotEntry) error) error {
 	if after < 0 || before < after {
 		return fmt.Errorf("invalid history observation/start range")
 	}
 	field := ""
 	switch kind {
-	case "rum":
+	case KindRUM:
 		field = rumBucket
-	case "synthetic":
+	case KindSynthetic:
 		field = syntheticBucket
 	default:
 		return fmt.Errorf("invalid history kind %q", kind)
