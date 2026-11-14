@@ -49,6 +49,12 @@ Verified live -- response is a JSON array, each entry:
 agents_query_cloud GET "/api/v2/spaces/$SPACE/rooms" \
   | jq -r --arg NAME "agent-events" '.[] | select(.name==$NAME) | .id'
 
+# Check whether a specific room id exists (exit 0 = exists, 1 = not found).
+# No single-room GET endpoint exists; derive existence from the room list.
+agents_query_cloud GET "/api/v2/spaces/$SPACE/rooms" \
+  | jq -e --arg ID "$ROOM" 'any(.id==$ID)' >/dev/null \
+  && echo "room exists" || echo "room not found"
+
 # Rooms with at least one reachable node, sorted by node count.
 agents_query_cloud GET "/api/v2/spaces/$SPACE/rooms" \
   | jq -r 'sort_by(-.node_count) | .[] | select(.node_count > 0) | "\(.name)\t\(.node_count)"'
