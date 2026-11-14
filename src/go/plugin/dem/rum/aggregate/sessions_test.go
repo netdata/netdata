@@ -227,7 +227,7 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 	if !ok {
 		t.Fatal("session missing")
 	}
-	var req *SessionEventInfo
+	var req *HistoryEvent
 	for i := range events {
 		if events[i].Type == "request" {
 			req = &events[i]

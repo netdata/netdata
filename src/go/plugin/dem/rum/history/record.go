@@ -8,21 +8,13 @@ import (
 	"strconv"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-// EventRecord is an immutable self-contained investigation event. ObservedUS
-// is Agent receipt time, preserved through delayed promotion and persistence.
-type EventRecord struct {
-	VnodeGUID                                    string
-	ExperienceID, View, ViewID, MetricID         string
-	Revision                                     uint64
-	Site, SessionID                              string
-	ObservedUS                                   int64
-	Type, Page, Text, TraceID                    string
-	Browser, Device, Country, Version, UserID    string
-	Fingerprint, ErrorType, Message, SampleStack string
-}
+// EventRecord names the producer's record in history terms. It is the same type,
+// so the producer, writer and journal codec share one field list.
+type EventRecord = aggregate.HistoryEvent
 
 // SessionRecord summarizes retained observations selected by Agent receipt time.
 // StartedAt and LastAt are seconds; LastObservedUS preserves ordering precision.
@@ -39,6 +31,7 @@ type SessionRecord struct {
 	Frustrations                        int64
 }
 
+// SessionEventRecord is one rum-session-events row.
 type SessionEventRecord struct {
 	VnodeGUID                            string
 	ExperienceID, View, ViewID, MetricID string
@@ -46,6 +39,27 @@ type SessionEventRecord struct {
 	Site, SessionID                      string
 	ObservedUS                           int64
 	Type, Page, Text, TraceID, UserID    string
+}
+
+// SessionEventOf projects a record onto its timeline row. Live and persisted rows
+// both use it, so the same event compares equal when the two sources overlap.
+func SessionEventOf(r EventRecord) SessionEventRecord {
+	return SessionEventRecord{
+		VnodeGUID:    r.VnodeGUID,
+		ExperienceID: r.ExperienceID,
+		View:         r.View,
+		ViewID:       r.ViewID,
+		MetricID:     r.MetricID,
+		Revision:     r.Revision,
+		Site:         r.Site,
+		SessionID:    r.SessionID,
+		ObservedUS:   r.ObservedUS,
+		Type:         r.Type,
+		Page:         r.Page,
+		Text:         r.Text,
+		TraceID:      r.TraceID,
+		UserID:       r.UserID,
+	}
 }
 
 // ErrorGroup counts the selected retained errors. Details is true only for a

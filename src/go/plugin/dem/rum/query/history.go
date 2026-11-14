@@ -18,7 +18,13 @@ func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, e
 	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
 	return out, err
 }
-func (s *Service) Sessions(ctx context.Context, site, userID string, after, before int64, vnodeGUID string) ([]Session, error) {
+
+func (s *Service) Sessions(
+	ctx context.Context,
+	site, userID string,
+	after, before int64,
+	vnodeGUID string,
+) ([]Session, error) {
 	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, 2000, vnodeGUID)
 	if err != nil {
 		return nil, err
@@ -59,23 +65,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 			if vnodeGUID != "" && event.VnodeGUID != vnodeGUID {
 				continue
 			}
-			row := history.SessionEventRecord{
-				ExperienceID: event.ExperienceID,
-				View:         event.View,
-				ViewID:       event.ViewID,
-				MetricID:     event.MetricID,
-				Revision:     event.Revision,
-
-				Site:       key,
-				VnodeGUID:  event.VnodeGUID,
-				SessionID:  session,
-				ObservedUS: event.TS.UnixMicro(),
-				Type:       event.Type,
-				Page:       event.Page,
-				Text:       event.Text,
-				TraceID:    event.TraceID,
-				UserID:     event.UserID,
-			}
+			row := history.SessionEventOf(event)
 			redactSessionEvent(&row, redact)
 			live = append(live, row)
 		}
@@ -89,6 +79,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 	}
 	// Match occurrences, not just values: two identical events in a beacon
 	// remain two after the same events have also reached the history writer.
+	// Both sources project through history.SessionEventOf, so equal events compare equal.
 	overlap := make(map[history.SessionEventRecord]int, len(rows))
 	for i := range rows {
 		if redact := redactors[rows[i].Site]; redact != nil {

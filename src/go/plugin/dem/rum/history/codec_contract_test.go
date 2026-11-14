@@ -114,6 +114,20 @@ func TestEventFieldsContract(t *testing.T) {
 	}
 }
 
+// Live and persisted timeline rows deduplicate by equality. Every row field must
+// come from the same-named record field, so neither source can drift.
+func TestSessionEventOfCarriesEveryRowField(t *testing.T) {
+	record := fullEventRecord(t)
+	row := reflect.ValueOf(SessionEventOf(record))
+	source := reflect.ValueOf(record)
+	for i := range row.NumField() {
+		name := row.Type().Field(i).Name
+		from := source.FieldByName(name)
+		require.True(t, from.IsValid(), "row field %s has no record field", name)
+		require.Equal(t, from.Interface(), row.Field(i).Interface(), "row field %s", name)
+	}
+}
+
 func TestEventCodecRoundTripsEveryField(t *testing.T) {
 	s, _ := newTestStore(t)
 	want := fullEventRecord(t)

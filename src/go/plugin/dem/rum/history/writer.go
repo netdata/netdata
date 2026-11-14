@@ -33,7 +33,7 @@ type Writer struct {
 	siteName  string
 	st        eventWriter
 	counters  Counters
-	ch        chan aggregate.HistoryEvent
+	ch        chan EventRecord
 	dropMu    sync.Mutex
 	chanDrops uint64
 	// Run owns pendingSync; attempted appends can need a sync even after an error.
@@ -45,12 +45,12 @@ func NewWriter(siteName string, st *Store, counters Counters) *Writer {
 	return &Writer{
 		st:       st,
 		counters: counters,
-		ch:       make(chan aggregate.HistoryEvent, queueCap),
+		ch:       make(chan EventRecord, queueCap),
 		siteName: siteName,
 	}
 }
 
-func (w *Writer) Event(rec aggregate.HistoryEvent) {
+func (w *Writer) Event(rec EventRecord) {
 	if rec.Site != w.siteName {
 		return
 	}
@@ -79,7 +79,7 @@ func (w *Writer) reportQueueDrops() {
 func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
-	batch := make([]aggregate.HistoryEvent, 0, maxBatch)
+	batch := make([]EventRecord, 0, maxBatch)
 steady:
 	for {
 		select {
@@ -128,7 +128,7 @@ steady:
 
 // flush returns the consumed prefix. Only cancelled admission leaves a suffix
 // for final drain: journal appends have no batch transaction or rollback.
-func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int {
+func (w *Writer) flush(ctx context.Context, batch []EventRecord) int {
 	w.reportQueueDrops()
 	if len(batch) == 0 && !w.pendingSync {
 		return 0
@@ -137,32 +137,7 @@ func (w *Writer) flush(ctx context.Context, batch []aggregate.HistoryEvent) int 
 		if ctx.Err() != nil {
 			return i
 		}
-		r := EventRecord{
-			ExperienceID: rec.ExperienceID,
-			View:         rec.View,
-			ViewID:       rec.ViewID,
-			MetricID:     rec.MetricID,
-			Revision:     rec.Revision,
-
-			Site:        rec.Site,
-			VnodeGUID:   rec.VnodeGUID,
-			SessionID:   rec.SessionID,
-			ObservedUS:  rec.ObservedUS,
-			Type:        rec.Type,
-			Page:        rec.Page,
-			Text:        rec.Text,
-			TraceID:     rec.TraceID,
-			Browser:     rec.Browser,
-			Device:      rec.Device,
-			Country:     rec.Country,
-			Version:     rec.Version,
-			UserID:      rec.UserID,
-			Fingerprint: rec.Fingerprint,
-			ErrorType:   rec.ErrorType,
-			Message:     rec.Message,
-			SampleStack: rec.SampleStack,
-		}
-		attempted, err := w.st.AppendEvent(ctx, r)
+		attempted, err := w.st.AppendEvent(ctx, rec)
 		if attempted {
 			w.pendingSync = true
 		}

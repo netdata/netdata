@@ -9,10 +9,12 @@ type HistorySink interface {
 	Event(HistoryEvent)
 }
 
-// HistoryEvent carries the metadata needed to investigate an event even after
-// earlier journal files expire. ObservedUS is the Agent receipt time;
-// the history writer assigns saved time separately. Activity events record
-// sessions with no new timeline event and are omitted from timeline displays.
+// HistoryEvent is the immutable, self-contained investigation record: it carries
+// the metadata needed to investigate an event even after earlier journal files
+// expire. The history package persists this type as-is. ObservedUS is the Agent
+// receipt time, preserved through delayed promotion and persistence; the journal
+// assigns saved time separately. Activity events record sessions with no new
+// timeline event and are omitted from timeline displays.
 type HistoryEvent struct {
 	VnodeGUID                                    string
 	ExperienceID, View, ViewID, MetricID         string
