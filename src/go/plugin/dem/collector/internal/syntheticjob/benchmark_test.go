@@ -77,7 +77,7 @@ func benchmarkKindCollect(b *testing.B, module string, k kind, events int) {
 	deadline := time.Now().Add(3 * time.Second)
 	for {
 		jobs := hub.Snapshot(time.Now())
-		if len(jobs) == 1 && jobs[0].Latest != nil {
+		if len(jobs) == 1 && jobs[0].HasObservation {
 			break
 		}
 		if time.Now().After(deadline) {

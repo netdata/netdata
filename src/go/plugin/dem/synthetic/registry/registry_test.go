@@ -1,78 +1,115 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package registry_test
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
-	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestGenerationSnapshotsAndFreshness(t *testing.T) {
-	h := syntheticregistry.New()
+// completingExecutor admits and completes every attempt with run.
+type completingExecutor struct{ run synthetic.Run }
+
+func (e completingExecutor) ExecuteScheduled(
+	_ context.Context,
+	_ synthetic.Request,
+	_ func(string),
+	admitted func(time.Time) synthetic.Schedule,
+) synthetic.Execution {
+	admitted(time.Now())
+	return synthetic.Execution{
+		Drained: true,
+		Run:     e.run,
+	}
+}
+
+func newSession(t *testing.T, name string, executor monitor.Executor) *monitor.Session {
+	t.Helper()
+	session, err := monitor.New(synthetic.Request{
+		Kind:    synthetic.Journey,
+		Name:    name,
+		Script:  "export {};",
+		Timeout: time.Minute,
+	}, time.Hour, executor)
+	require.NoError(t, err)
+	return session
+}
+
+func TestRegisterListsActiveSessionsUntilRetired(t *testing.T) {
+	h := registry.New()
+	assert.False(t, h.HasJobs())
+	a, b := newSession(t, "a", completingExecutor{}), newSession(t, "b", completingExecutor{})
+	retireB, err := h.Register(b, "https://example.org/")
+	require.NoError(t, err)
+	retireA, err := h.Register(a, "")
+	require.NoError(t, err)
+	_, err = h.Register(newSession(t, "a", completingExecutor{}), "")
+	require.EqualError(t, err, "synthetic job already active")
 	now := time.Now()
-	job := syntheticregistry.Job{
-		JobID:          "journey:shop",
-		CadenceSeconds: 900,
-		TimeoutSeconds: 120,
-	}
-	reg, err := h.Register(job)
-	require.NoError(t, err)
-	initial := h.Snapshot(now)
-	require.Len(t, initial, 1)
-	assert.Equal(t, "unknown", initial[0].State)
-	assert.Nil(t, initial[0].Latest)
-	_, err = h.Register(job)
-	require.Error(t, err)
-	duration := 1.0
-	run := synthetic.Run{
-		ID:          "id",
-		JobID:       job.JobID,
-		Outcome:     synthetic.Failed,
-		CompletedUS: now.UnixMicro(),
-		Tests: &synthetic.TestCounts{
-			Declared: 1,
-			Failed:   1,
+	assert.Equal(t, []registry.Job{
+		{
+			Snapshot: a.Snapshot(now),
 		},
-		Events: []synthetic.Event{{Message: "original", DurationMS: &duration}},
-	}
-	reg.Complete(run)
-	run.Tests.Failed = 0
-	run.Events[0].Message = "changed"
-	duration = 3
-	snap := h.Snapshot(now.Add(time.Second))
-	assert.True(t, snap[0].Fresh)
-	assert.Equal(t, 1, snap[0].Latest.Tests.Failed)
-	assert.Equal(t, "original", snap[0].Latest.Events[0].Message)
-	assert.Equal(t, 1.0, *snap[0].Latest.Events[0].DurationMS)
-	snap[0].Latest.Tests.Failed = 0
-	assert.Equal(t, 1, h.Snapshot(now)[0].Latest.Tests.Failed)
-	reg.SetState("running")
-	reg.SetSchedule(monitor.Status{
-		Scheduled: 3,
-		Admitted:  1,
-		Coalesced: 1,
-		Pending:   true,
-		QueuedUS:  now.UnixMicro(),
-	})
-	assert.Equal(t, time.Second, h.Snapshot(time.UnixMicro(now.UnixMicro()).Add(time.Second))[0].Schedule.QueueAge)
-	old := h.Snapshot(now.Add(1801 * time.Second))
-	assert.Equal(t, "running", old[0].State)
-	assert.False(t, old[0].Fresh)
-	reg.Retire()
-	require.Empty(t, h.Snapshot(now))
-	replacement, err := h.Register(job)
+		{
+			Target:   "https://example.org/",
+			Snapshot: b.Snapshot(now),
+		},
+	}, h.Snapshot(now))
+	assert.True(t, h.HasJobs())
+
+	retireA()
+	successor := newSession(t, "a", completingExecutor{})
+	retireSuccessor, err := h.Register(successor, "")
 	require.NoError(t, err)
-	reg.Complete(run)
-	reg.SetSchedule(monitor.Status{
-		Scheduled: 100,
-	})
-	reg.Retire()
-	assert.Zero(t, h.Snapshot(now)[0].Schedule.Scheduled)
-	assert.Nil(t, h.Snapshot(now)[0].Latest)
-	replacement.Retire()
+	retireA()
+	assert.Len(t, h.Snapshot(now), 2, "a retired session cannot remove its successor")
+	retireSuccessor()
+	retireB()
+	assert.Empty(t, h.Snapshot(now))
+	assert.False(t, h.HasJobs())
+}
+
+func TestLatestCopiesOneActiveRun(t *testing.T) {
+	run := synthetic.Run{
+		ID:          "r",
+		Outcome:     synthetic.Failed,
+		CompletedUS: time.Now().UnixMicro(),
+		Events:      []synthetic.Event{{Message: "original"}},
+	}
+	h := registry.New()
+	session := newSession(t, "checkout", completingExecutor{run: run})
+	retire, err := h.Register(session, "")
+	require.NoError(t, err)
+	defer retire()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() { done <- session.Run(ctx) }()
+	defer func() {
+		cancel()
+		require.NoError(t, <-done)
+	}()
+	require.Eventually(t, func() bool {
+		_, ok := h.Latest("journey:checkout", "r")
+		return ok
+	}, 5*time.Second, time.Millisecond)
+	got, _ := h.Latest("journey:checkout", "r")
+	assert.Equal(t, run, got)
+	got.Events[0].Message = "changed"
+	again, _ := h.Latest("journey:checkout", "r")
+	assert.Equal(t, "original", again.Events[0].Message)
+	for name, key := range map[string][2]string{
+		"other run":      {"journey:checkout", "other"},
+		"inactive job":   {"journey:other", "r"},
+		"empty identity": {"", ""},
+	} {
+		_, ok := h.Latest(key[0], key[1])
+		assert.False(t, ok, name)
+	}
 }

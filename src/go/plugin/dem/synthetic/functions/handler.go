@@ -12,15 +12,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 )
 
 // Deps exposes snapshots and immutable retained evidence, without browser
 // admission or a second desired-configuration registry.
 type Deps interface {
-	Jobs(time.Time) []query.Job
+	Jobs(time.Time) []registry.Job
 	Catalogue(context.Context, artifacts.Filter) (query.CataloguePage, error)
-	Runs(context.Context, query.RunFilter) (query.RunPage, error)
+	Runs(context.Context, history.RunFilter) (history.RunPage, error)
 	Run(context.Context, string, string) (model.Run, error)
 	Evidence(context.Context, string, string, string) (query.Evidence, error)
 }

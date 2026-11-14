@@ -63,8 +63,9 @@ func TestSameSiteJobsHaveIndependentIdentityAndLifetime(t *testing.T) {
 		assert.Equal(t, module+":search", jobs[1].JobID)
 		for _, job := range jobs {
 			assert.Equal(t, siteGUID, job.VnodeGUID)
-			require.NotNil(t, job.Latest)
-			assert.Equal(t, siteGUID, job.Latest.VnodeGUID)
+			latest, ok := latestRun(hub, job)
+			require.True(t, ok)
+			assert.Equal(t, siteGUID, latest.VnodeGUID)
 		}
 		stopFirst()
 		jobs = hub.Snapshot(time.Now())

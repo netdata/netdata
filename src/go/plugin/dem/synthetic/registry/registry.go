@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package registry indexes the active synthetic jobs for Functions. Each job's monitor session owns its state;
+// the registry keeps no copy of it.
 package registry
 
 import (
 	"errors"
-	"sort"
+	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -12,146 +15,85 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
+// Job is one active job as Functions list it.
 type Job struct {
-	JobID          string         `json:"job_id"`
-	Kind           synthetic.Kind `json:"kind"`
-	Name           string         `json:"name"`
-	VnodeGUID      string         `json:"vnode_guid,omitempty"`
-	Target         string         `json:"target,omitempty"`
-	CadenceSeconds int            `json:"cadence_seconds"`
-	TimeoutSeconds float64        `json:"timeout_seconds"`
-	State          string         `json:"state"`
-	Fresh          bool           `json:"fresh"`
-	Latest         *synthetic.Run `json:"latest,omitempty"`
-	LastSuccessUS  int64          `json:"last_success_us"`
-	LastFailureUS  int64          `json:"last_failure_us"`
-	Schedule       monitor.Status `json:"schedule"`
+	// Target is the credential-free URL of a URL-targeted kind; empty otherwise.
+	Target string
+	monitor.Snapshot
 }
 
-// Registry contains active observation snapshots only. Native configuration owns
-// desired/disabled/failed-startup jobs; Functions do not mirror their configs.
+// Registry contains active jobs only. Native configuration owns desired, disabled
+// and failed-startup jobs; Functions do not mirror their configs.
 type Registry struct {
 	mu   sync.Mutex
-	jobs map[string]*Registration
+	jobs map[string]*registration
 }
 
-type Registration struct {
-	registry *Registry
-	job      Job
-	retired  bool
+type registration struct {
+	session *monitor.Session
+	target  string
 }
 
 func New() *Registry {
 	return &Registry{
-		jobs: make(map[string]*Registration),
+		jobs: make(map[string]*registration),
 	}
 }
-func (h *Registry) Register(job Job) (*Registration, error) {
+
+// Register makes an active session visible until the returned retire function runs. A job ID admits one session
+// at a time; retiring an earlier session never removes its successor.
+func (h *Registry) Register(session *monitor.Session, target string) (retire func(), err error) {
+	jobID := session.JobID()
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if job.JobID == "" {
-		return nil, errors.New("empty synthetic job identity")
-	}
-	if h.jobs[job.JobID] != nil {
+	if h.jobs[jobID] != nil {
 		return nil, errors.New("synthetic job already active")
 	}
-	job.State = "unknown"
-	r := &Registration{
-		registry: h,
-		job:      job,
+	r := &registration{
+		session: session,
+		target:  target,
 	}
-	h.jobs[job.JobID] = r
-	return r, nil
+	h.jobs[jobID] = r
+	return func() {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		if h.jobs[jobID] == r {
+			delete(h.jobs, jobID)
+		}
+	}, nil
 }
 
-// SetVnodeGUID updates current placement without reattributing a completed run.
-func (r *Registration) SetVnodeGUID(guid string) {
-	r.registry.mu.Lock()
-	defer r.registry.mu.Unlock()
-	if r.retired || r.job.VnodeGUID == guid {
-		return
-	}
-	r.job.VnodeGUID = guid
-	r.job.Latest = nil
-	r.job.State = "unknown"
-	r.job.LastSuccessUS = 0
-	r.job.LastFailureUS = 0
-}
-func (r *Registration) SetState(state string) {
-	r.registry.mu.Lock()
-	defer r.registry.mu.Unlock()
-	if !r.retired {
-		r.job.State = state
-	}
-}
-func (r *Registration) Complete(run synthetic.Run) {
-	r.registry.mu.Lock()
-	defer r.registry.mu.Unlock()
-	if r.retired {
-		return
-	}
-	r.job.Latest = cloneRun(&run)
-	r.job.State = string(run.Outcome)
-	if run.Outcome == synthetic.Success {
-		r.job.LastSuccessUS = run.CompletedUS
-	}
-	if run.Outcome == synthetic.Failed || run.Outcome == synthetic.Timeout {
-		r.job.LastFailureUS = run.CompletedUS
-	}
-}
-
-func (r *Registration) SetSchedule(status monitor.Status) {
-	r.registry.mu.Lock()
-	defer r.registry.mu.Unlock()
-	if !r.retired {
-		r.job.Schedule = status
-	}
-}
-func (r *Registration) Retire() {
-	r.registry.mu.Lock()
-	defer r.registry.mu.Unlock()
-	if r.retired {
-		return
-	}
-	r.retired = true
-	if r.registry.jobs[r.job.JobID] == r {
-		delete(r.registry.jobs, r.job.JobID)
-	}
-}
+// Snapshot lists the active jobs at now, ordered by job ID.
 func (h *Registry) Snapshot(now time.Time) []Job {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-	out := make([]Job, 0, len(h.jobs))
+	registrations := make([]*registration, 0, len(h.jobs))
 	for _, r := range h.jobs {
-		job := r.job
-		if job.Schedule.QueuedUS > 0 {
-			job.Schedule.QueueAge = max(0, now.Sub(time.UnixMicro(job.Schedule.QueuedUS)))
-		}
-		job.Latest = cloneRun(job.Latest)
-		if job.Latest != nil {
-			age := now.Sub(time.UnixMicro(job.Latest.CompletedUS))
-			cadence := time.Duration(job.CadenceSeconds) * time.Second
-			job.Fresh = job.Latest.CompletedUS > 0 && cadence > 0 && age >= 0 &&
-				(age <= cadence || age-cadence <= cadence)
-			if job.Latest.CompletedUS > 0 && !job.Fresh && job.State != "waiting" && job.State != "running" {
-				job.State = "stale"
-			}
-		}
-
-		out = append(out, job)
+		registrations = append(registrations, r)
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].JobID < out[j].JobID })
+	h.mu.Unlock()
+	out := make([]Job, len(registrations))
+	for i, r := range registrations {
+		out[i] = Job{
+			Target:   r.target,
+			Snapshot: r.session.Snapshot(now),
+		}
+	}
+	slices.SortFunc(out, func(a, b Job) int { return strings.Compare(a.JobID, b.JobID) })
 	return out
 }
-func cloneRun(in *synthetic.Run) *synthetic.Run {
-	if in == nil {
-		return nil
+
+// Latest returns a copy of an active job's latest run when its ID is runID.
+func (h *Registry) Latest(jobID, runID string) (synthetic.Run, bool) {
+	h.mu.Lock()
+	r := h.jobs[jobID]
+	h.mu.Unlock()
+	if r == nil {
+		return synthetic.Run{}, false
 	}
-	result := synthetic.CloneRun(*in)
-	return &result
+	return r.session.Latest(runID)
 }
 
-// HasJobs reports whether any runtime is currently admitted.
+// HasJobs reports whether any job is active.
 func (h *Registry) HasJobs() bool {
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -59,34 +59,9 @@ func (e *controlledExecutor) ExecuteScheduled(
 	}
 }
 
-type recordedObserver struct {
-	mu     sync.Mutex
-	runs   []synthetic.Run
-	status Status
-	wake   chan struct{}
-}
-
-func (o *recordedObserver) SetState(string)     {}
-func (o *recordedObserver) SetVnodeGUID(string) {}
-func (o *recordedObserver) SetSchedule(status Status) {
-	o.mu.Lock()
-	o.status = status
-	o.mu.Unlock()
-	select {
-	case o.wake <- struct{}{}:
-	default:
-	}
-}
-func (o *recordedObserver) Complete(run synthetic.Run) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.runs = append(o.runs, run)
-}
-
 type monitorHarness struct {
 	session  *Session
 	executor *controlledExecutor
-	observer *recordedObserver
 	cancel   context.CancelFunc
 	done     chan error
 	tick     chan time.Time
@@ -110,16 +85,13 @@ func newHarness(t *testing.T, req synthetic.Request) *monitorHarness {
 		executor: &controlledExecutor{
 			calls: make(chan *controlledCall, 10),
 		},
-		observer: &recordedObserver{
-			wake: make(chan struct{}, 1),
-		},
 		done:  make(chan error, 1),
 		tick:  make(chan time.Time),
 		reset: make(chan time.Duration, 10),
 		now:   time.Unix(1700000000, 0),
 	}
 	var err error
-	h.session, err = New(req, 10*time.Second, h.executor, h.observer)
+	h.session, err = New(req, 10*time.Second, h.executor)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	h.cancel = cancel
@@ -169,19 +141,19 @@ func receive[T any](t *testing.T, ch <-chan T) T {
 	}
 }
 
+// wait polls the session until the monitor goroutine has applied a transition.
 func (h *monitorHarness) wait(t *testing.T, predicate func(Snapshot) bool) Snapshot {
 	t.Helper()
-	deadline := time.After(5 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		snapshot := h.session.Snapshot(h.Now())
 		if predicate(snapshot) {
 			return snapshot
 		}
-		select {
-		case <-h.observer.wake:
-		case <-deadline:
+		if time.Now().After(deadline) {
 			t.Fatalf("monitor did not reach expected state: %+v", snapshot)
 		}
+		time.Sleep(time.Millisecond)
 	}
 }
 
@@ -217,7 +189,6 @@ func TestQueuedLatestOccurrencePreservesAdmissionTurn(t *testing.T) {
 	snapshot := h.wait(t, func(s Snapshot) bool { return s.Scheduled == 1000001 })
 	assert.Equal(t, uint64(1000000), snapshot.Coalesced)
 	assert.Equal(t, bootstrap.UnixMicro(), snapshot.QueuedUS)
-	assert.Equal(t, latestDue.UnixMicro(), snapshot.PendingDueUS)
 	assert.Equal(t, latestDue.Sub(bootstrap), snapshot.QueueAge)
 	assert.False(t, snapshot.HasObservation)
 	assert.False(t, snapshot.Fresh)
@@ -242,7 +213,6 @@ func TestQueuedLatestOccurrencePreservesAdmissionTurn(t *testing.T) {
 	assert.Equal(t, uint64(1), snapshot.Admitted)
 	assert.False(t, snapshot.Pending)
 	assert.True(t, snapshot.Active)
-	assert.Equal(t, bootstrap.UnixMicro(), snapshot.ActiveQueuedUS)
 	assert.Zero(t, snapshot.SchedulingDelay)
 	h.stop(t, call)
 }
@@ -329,10 +299,11 @@ func TestActiveCoalescingAndEveryCompletion(t *testing.T) {
 		HasMetrics: true,
 	}, snapshot.Latest)
 	assert.False(t, snapshot.Latest.Metrics.LCPMS.Present)
-	h.observer.mu.Lock()
-	assert.Len(t, h.observer.runs, 2)
-	assert.Equal(t, snapshot.Outcomes, h.observer.status.Outcomes)
-	h.observer.mu.Unlock()
+	latest, ok := h.session.Latest("second")
+	require.True(t, ok)
+	assert.Equal(t, run, latest)
+	_, ok = h.session.Latest("first")
+	assert.False(t, ok, "only the latest run is retained")
 	h.stop(t, nil)
 }
 
@@ -393,10 +364,9 @@ func TestUnverifiedResultsDoNotPublishObservation(t *testing.T) {
 			receive(t, call.schedule)
 			call.finish <- execution
 			require.Error(t, receive(t, h.done))
-			assert.False(t, h.session.Snapshot(h.Now()).HasObservation)
-			h.observer.mu.Lock()
-			assert.Empty(t, h.observer.runs)
-			h.observer.mu.Unlock()
+			snapshot := h.session.Snapshot(h.Now())
+			assert.False(t, snapshot.HasObservation)
+			assert.Equal(t, synthetic.JobRunning, snapshot.State)
 		})
 	}
 }
@@ -429,6 +399,11 @@ func TestObservationFreshnessUsesActualCompletion(t *testing.T) {
 			snapshot := h.session.Snapshot(completed.Add(tc.age))
 			assert.Equal(t, tc.age, snapshot.ObservationAge)
 			assert.Equal(t, tc.fresh, snapshot.Fresh)
+			state := synthetic.JobStale
+			if tc.fresh {
+				state = synthetic.JobState(synthetic.Error)
+			}
+			assert.Equal(t, state, snapshot.State)
 			assert.Equal(t, synthetic.Error, snapshot.Latest.Outcome)
 			assert.Equal(t, Outcomes{
 				Error: 1,
@@ -436,6 +411,70 @@ func TestObservationFreshnessUsesActualCompletion(t *testing.T) {
 			assert.False(t, snapshot.Latest.DurationMS.Present)
 		})
 	}
+	h.stop(t, nil)
+}
+
+func TestStateAndLatestOutcomesFollowTheCurrentAssociation(t *testing.T) {
+	h := newHarness(t, request())
+	call := receive(t, h.executor.calls)
+	assert.Equal(t, synthetic.JobWaiting, h.session.Snapshot(h.Now()).State)
+	call.admission <- h.Now()
+	receive(t, call.schedule)
+	assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
+	failed := h.Now()
+	call.finish <- synthetic.Execution{
+		Run: synthetic.Run{
+			ID:          "failed",
+			Outcome:     synthetic.Failed,
+			CompletedUS: failed.UnixMicro(),
+		},
+		Drained: true,
+	}
+	snapshot := h.wait(t, func(s Snapshot) bool { return s.HasObservation })
+	assert.Equal(t, synthetic.JobState(synthetic.Failed), snapshot.State)
+	assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
+	assert.Zero(t, snapshot.LastSuccessUS)
+
+	// A waiting or running attempt shows its phase instead of a stale observation.
+	h.advance(t, failed.Add(time.Minute))
+	next := receive(t, h.executor.calls)
+	snapshot = h.session.Snapshot(h.Now())
+	assert.False(t, snapshot.Fresh)
+	assert.Equal(t, synthetic.JobWaiting, snapshot.State)
+	next.admission <- h.Now()
+	receive(t, next.schedule)
+	assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
+	succeeded := h.Now()
+	next.finish <- synthetic.Execution{
+		Run: synthetic.Run{
+			ID:          "succeeded",
+			Outcome:     synthetic.Success,
+			CompletedUS: succeeded.UnixMicro(),
+		},
+		Drained: true,
+	}
+	snapshot = h.wait(t, func(s Snapshot) bool { return s.Outcomes.Success == 1 })
+	assert.Equal(t, synthetic.JobState(synthetic.Success), snapshot.State)
+	assert.Equal(t, succeeded.UnixMicro(), snapshot.LastSuccessUS)
+	assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
+	latest, ok := h.session.Latest("succeeded")
+	require.True(t, ok)
+	assert.Equal(t, "succeeded", latest.ID)
+
+	// A vnode change clears the observation and state; the activation counters continue.
+	const guid = "11111111-1111-4111-8111-111111111111"
+	h.session.SetVnodeGUID(guid)
+	assert.Equal(t, Snapshot{
+		JobID:     "journey:test",
+		Kind:      synthetic.Journey,
+		Name:      "test",
+		VnodeGUID: guid,
+		Interval:  10 * time.Second,
+		Status:    snapshot.Status,
+		State:     synthetic.JobUnknown,
+	}, h.session.Snapshot(h.Now()))
+	_, ok = h.session.Latest("succeeded")
+	assert.False(t, ok)
 	h.stop(t, nil)
 }
 
@@ -466,13 +505,13 @@ func TestNewRejectsInvalidInputsAndCopiesSecrets(t *testing.T) {
 		"request":  {interval: time.Second, executor: e},
 	} {
 		t.Run(name, func(t *testing.T) {
-			_, err := New(tc.request, tc.interval, tc.executor, nil)
+			_, err := New(tc.request, tc.interval, tc.executor)
 			require.Error(t, err)
 		})
 	}
 	req := request()
 	req.Secrets = map[string]string{"DEM_SECRET_TEST": "test-value"}
-	s, err := New(req, time.Second, e, nil)
+	s, err := New(req, time.Second, e)
 	require.NoError(t, err)
 	req.Secrets["DEM_SECRET_TEST"] = "changed"
 	ctx, cancel := context.WithCancel(context.Background())
@@ -490,12 +529,18 @@ func TestNewRejectsInvalidInputsAndCopiesSecrets(t *testing.T) {
 }
 
 func TestCancelledBeforeStartAndSecondRun(t *testing.T) {
-	s, err := New(request(), time.Second, &controlledExecutor{}, nil)
+	s, err := New(request(), time.Second, &controlledExecutor{})
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.NoError(t, s.Run(ctx))
-	assert.Equal(t, Snapshot{}, s.Snapshot(time.Now()))
+	assert.Equal(t, Snapshot{
+		JobID:    "journey:test",
+		Kind:     synthetic.Journey,
+		Name:     "test",
+		Interval: time.Second,
+		State:    synthetic.JobUnknown,
+	}, s.Snapshot(time.Now()))
 	require.ErrorContains(t, s.Run(ctx), "already started")
 }
 
@@ -531,7 +576,7 @@ func TestAdmissionRacingStopRetainsOccurrenceUntilJoin(t *testing.T) {
 			}
 		},
 	)
-	s, err := New(request(), time.Hour, executor, nil)
+	s, err := New(request(), time.Hour, executor)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -547,10 +592,9 @@ func TestAdmissionRacingStopRetainsOccurrenceUntilJoin(t *testing.T) {
 	}
 	close(release)
 	schedule := receive(t, schedules)
-	assert.Equal(t, synthetic.Schedule{
-		DueUS:    queued.PendingDueUS,
-		QueuedUS: queued.QueuedUS,
-	}, schedule)
+	assert.Equal(t, queued.QueuedUS, schedule.QueuedUS)
+	assert.Positive(t, schedule.DueUS, "the bootstrap occurrence stays selected")
+	assert.LessOrEqual(t, schedule.DueUS, schedule.QueuedUS)
 	require.NoError(t, receive(t, done))
 	assert.Equal(t, Outcomes{
 		Cancelled: 1,

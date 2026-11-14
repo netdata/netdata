@@ -31,7 +31,20 @@ func fixtureRunID() string {
 	return hex.EncodeToString(id[:])
 }
 
-func TestRunUsesCopiedActiveEvidenceThenRetainedHistory(t *testing.T) {
+// activeRuns serves the latest run of each active job, keyed by job ID.
+type activeRuns map[string]synthetic.Run
+
+func (a activeRuns) Snapshot(time.Time) []registry.Job { return nil }
+
+func (a activeRuns) Latest(jobID, runID string) (synthetic.Run, bool) {
+	run, ok := a[jobID]
+	if !ok || run.ID != runID {
+		return synthetic.Run{}, false
+	}
+	return run, true
+}
+
+func TestRunUsesActiveEvidenceThenRetainedHistory(t *testing.T) {
 	ctx := context.Background()
 	log, err := journal.Open(ctx, t.TempDir())
 	require.NoError(t, err)
@@ -48,24 +61,15 @@ func TestRunUsesCopiedActiveEvidenceThenRetainedHistory(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = retained.AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	active := registry.New()
-	registration, err := active.Register(registry.Job{
-		JobID:          run.JobID,
-		CadenceSeconds: 900,
-	})
-	require.NoError(t, err)
-	run.HistoryError = "completion append outcome uncertain"
-	run.Events[0].Message = "latest detail"
-	registration.Complete(run)
+	latest := run
+	latest.HistoryError = "completion append outcome uncertain"
+	latest.Events = []synthetic.Event{{Message: "latest detail"}}
+	active := activeRuns{run.JobID: latest}
 	service := query.New(active, retained, nil, nil)
 	got, err := service.Run(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
-	assert.Equal(t, run, got)
-	got.Events[0].Message = "caller edit"
-	again, err := service.Run(ctx, run.JobID, run.ID)
-	require.NoError(t, err)
-	assert.Equal(t, "latest detail", again.Events[0].Message)
-	registration.Retire()
+	assert.Equal(t, latest, got)
+	delete(active, run.JobID)
 	got, err = service.Run(ctx, run.JobID, run.ID)
 	require.NoError(t, err)
 	assert.Empty(t, got.HistoryError)
@@ -95,20 +99,13 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 		[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
 	)
 	require.NoError(t, err)
-	active := registry.New()
 	run := synthetic.Run{
 		ID:           runID,
 		JobID:        "lighthouse:home",
 		CaptureState: "available",
 		CompletedUS:  time.Now().UnixMicro(),
 	}
-	registration, err := active.Register(registry.Job{
-		JobID:          run.JobID,
-		CadenceSeconds: 900,
-	})
-	require.NoError(t, err)
-	defer registration.Retire()
-	registration.Complete(run)
+	active := activeRuns{run.JobID: run}
 	service := query.New(active, nil, captures, nil)
 	// The manifest owns retained bytes even when the active observation does not
 	// mention them. Arbitrary files and wrong owners never grant membership.
@@ -120,7 +117,7 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	assert.Equal(t, content, evidence.Body)
 	assert.Equal(t, synthetic.CaptureAvailable, evidence.CaptureState)
 	run.Artifacts = manifest
-	registration.Complete(run)
+	active[run.JobID] = run
 	_, err = captures.Enforce(ctx, 7, 1)
 	require.NoError(t, err)
 	evidence, err = service.Evidence(ctx, run.JobID, run.ID, "")
@@ -220,7 +217,7 @@ func TestScreenshotAssociationWithoutHistoryOrActiveJob(t *testing.T) {
 	store, err = artifacts.Open(root)
 	require.NoError(t, err)
 	defer store.Close()
-	service := query.New(registry.New(), nil, store, nil)
+	service := query.New(activeRuns{}, nil, store, nil)
 	evidence, err := service.Evidence(t.Context(), "journey:retired", id, "s1")
 	require.NoError(t, err)
 	require.Len(t, evidence.Artifacts, 1)
@@ -249,23 +246,16 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 				[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
 			)
 			require.NoError(t, err)
-			active := registry.New()
 			jobID := "lighthouse:owner"
 			if damage == "wrong owner" {
 				jobID = "lighthouse:impostor"
 			}
-			registration, err := active.Register(registry.Job{
-				JobID:          jobID,
-				CadenceSeconds: 900,
-			})
-			require.NoError(t, err)
-			defer registration.Retire()
-			registration.Complete(synthetic.Run{
+			active := activeRuns{jobID: {
 				ID:           runID,
 				JobID:        jobID,
 				Artifacts:    entries,
 				CaptureState: "available",
-			})
+			}}
 			manifestPath := filepath.Join(root, "runs", runID, "manifest.json")
 			switch damage {
 			case "corrupt":

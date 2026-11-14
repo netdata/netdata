@@ -68,7 +68,7 @@ func (m attemptMetrics) write(s monitor.Snapshot) {
 	}
 	state := string(outcome)
 	if s.HasObservation && !s.Fresh {
-		state = "stale"
+		state = string(synthetic.JobStale)
 	}
 	m.outcome.Enable(state)
 	if s.Fresh && s.Latest.DurationMS.Present {

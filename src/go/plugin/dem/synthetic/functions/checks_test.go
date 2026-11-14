@@ -77,15 +77,9 @@ type activeJob struct {
 func startActiveJob(t *testing.T, hub *syntheticregistry.Registry, req model.Request, target string) *activeJob {
 	t.Helper()
 	executor := newSteppedExecutor()
-	registration, err := hub.Register(syntheticregistry.Job{
-		JobID:          req.JobID(),
-		Kind:           req.Kind,
-		Name:           req.Name,
-		Target:         target,
-		CadenceSeconds: 900,
-	})
+	session, err := monitor.New(req, 900*time.Second, executor)
 	require.NoError(t, err)
-	session, err := monitor.New(req, 900*time.Second, executor, registration)
+	retire, err := hub.Register(session, target)
 	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -98,7 +92,7 @@ func startActiveJob(t *testing.T, hub *syntheticregistry.Registry, req model.Req
 		stopped = true
 		cancel()
 		require.NoError(t, <-done)
-		registration.Retire()
+		retire()
 	}
 	t.Cleanup(stop)
 	return &activeJob{
@@ -144,7 +138,7 @@ func takeSeconds(t *testing.T, row map[string]any, column string) {
 func TestChecksAndRunFollowActiveSessions(t *testing.T) {
 	hub := syntheticregistry.New()
 	src := &source{
-		hub: hub,
+		active: hub,
 	}
 	audit := startActiveJob(t, hub, model.Request{
 		Kind:    model.Lighthouse,

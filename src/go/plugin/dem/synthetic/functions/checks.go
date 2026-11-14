@@ -38,19 +38,21 @@ func (h *Handler) checks(
 		}
 		var id, outcome, detail, historyErr string
 		var completed, duration, queueAge, delay any
-		if j.Schedule.QueuedUS > 0 {
-			queueAge = j.Schedule.QueueAge.Seconds()
+		if j.QueuedUS > 0 {
+			queueAge = j.QueueAge.Seconds()
 		}
-		if j.Schedule.AdmittedUS > 0 {
-			delay = j.Schedule.SchedulingDelay.Seconds()
+		if j.AdmittedUS > 0 {
+			delay = j.SchedulingDelay.Seconds()
 		}
-		if last := j.Latest; last != nil {
+		if last := j.Latest; j.HasObservation {
 			id = last.ID
 			outcome = string(last.Outcome)
 			detail = last.Error
 			historyErr = last.HistoryError
 			completed = timestamp(last.CompletedUS)
-			duration = number(last.DurationMS)
+			if last.DurationMS.Present {
+				duration = last.DurationMS.Value
+			}
 		}
 		rows = append(
 			rows,
@@ -59,7 +61,7 @@ func (h *Handler) checks(
 				j.Kind,
 				j.Name,
 				j.Target,
-				j.State,
+				string(j.State),
 				j.Fresh,
 				id,
 				outcome,
@@ -70,11 +72,11 @@ func (h *Handler) checks(
 				detail,
 				historyErr,
 				j.VnodeGUID,
-				j.CadenceSeconds,
-				j.Schedule.Scheduled,
-				j.Schedule.Admitted,
-				j.Schedule.Coalesced,
-				j.Schedule.Pending,
+				int(j.Interval / time.Second),
+				j.Scheduled,
+				j.Admitted,
+				j.Coalesced,
+				j.Pending,
 				queueAge,
 				delay,
 			},
