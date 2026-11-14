@@ -506,6 +506,35 @@ int unit_test_str2ld() {
             " vs %" NETDATA_DOUBLE_MODIFIER "\n", values[i], mine, sys);
     }
 
+    // keywords: strtold() does not parse "null", so check the result and endptr directly
+    struct {
+        const char *value;
+        bool is_nan;
+        size_t consumed;
+    } keywords[] = {
+        { "nan",     true,  3 },
+        { "null",    true,  4 },
+        { "inf",     false, 3 },
+        { "null ",   true,  4 },
+        { "nullx",   true,  4 },
+        { "  null",  true,  6 },
+        { "nanx",    true,  3 },
+        { "infx",    false, 3 },
+    };
+
+    for(size_t k = 0; k < _countof(keywords); k++) {
+        char *e = NULL;
+        NETDATA_DOUBLE v = str2ndd(keywords[k].value, &e);
+        bool value_ok = keywords[k].is_nan ? isnan(v) : (isinf(v) && v > 0);
+        if(!value_ok || e != keywords[k].value + keywords[k].consumed) {
+            fprintf(stderr, "str2ndd('%s') returned %" NETDATA_DOUBLE_MODIFIER " and consumed %d chars, expected %s and %zu chars\n",
+                    keywords[k].value, v, e ? (int)(e - keywords[k].value) : -1,
+                    keywords[k].is_nan ? "nan" : "inf", keywords[k].consumed);
+            return -1;
+        }
+    }
+    fprintf(stderr, "str2ndd() keywords nan/null/inf: endptr correct\n");
+
     return 0;
 }
 

@@ -202,6 +202,12 @@ bool duration_parse(const char *duration, int64_t *result, const char *default_u
             return false;
         }
 
+        // nan, null and inf are not durations
+        if (!netdata_double_isnumber(value)) {
+            *result = 0;
+            return false;
+        }
+
         // Skip spaces between number and unit
         while (isspace((uint8_t)*s)) s++;
 
