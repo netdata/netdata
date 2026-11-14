@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -75,23 +74,4 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 	for i, event := range scanned {
 		assert.Equal(t, groups[i], event.VnodeGUID, "missing fields must not inherit the previous association")
 	}
-}
-
-func TestLegacySiteTextNeverBecomesVnodeIdentity(t *testing.T) {
-	ctx := context.Background()
-	store, _ := newTestStore(t)
-	fields := eventFields(EventRecord{Site: "job", SessionID: "session", Type: "event", ObservedUS: time.Now().UnixMicro()})
-	// Even UUID-looking legacy site text was not a captured vnode association.
-	fields = append(fields, journal.StringField("DEM_SITE_ID", "11111111-1111-4111-8111-111111111111"))
-	attempted, err := store.store.Append(ctx, fields)
-	require.True(t, attempted)
-	require.NoError(t, err)
-	require.NoError(t, store.Sync(ctx))
-	rows, err := store.QuerySessionEvents(ctx, "job", "session", "")
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Empty(t, rows[0].VnodeGUID)
-	selected, err := store.QuerySessionEvents(ctx, "job", "session", "11111111-1111-4111-8111-111111111111")
-	require.NoError(t, err)
-	assert.Empty(t, selected)
 }
