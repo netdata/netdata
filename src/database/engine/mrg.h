@@ -44,6 +44,9 @@ struct mrg_statistics {
 MRG *mrg_create(void);
 MRG *mrg_create_for_unittest(void);
 
+// a fresh temporary directory for dbengine unit tests, under a sanitized TMPDIR or /tmp; false when none is usable
+bool dbengine_unittest_make_tmpdir(char *dst, size_t dst_size);
+
 // returns the number of metrics still referenced; when non-zero the MRG is left allocated
 size_t mrg_destroy(MRG *mrg);
 
