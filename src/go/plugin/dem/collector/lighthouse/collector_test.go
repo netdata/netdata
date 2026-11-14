@@ -9,29 +9,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-type prepared struct{}
-
-func (prepared) Check(context.Context, model.Kind) error { return nil }
-
-func (prepared) ExecuteScheduled(
-	context.Context,
-	model.Request,
-	func(string),
-	func(time.Time) model.Schedule,
-) model.Execution {
-	panic("unexpected audit during validation")
-}
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: prepared{},
+		Executor: syntheticjobtest.Executor{
+			ExecuteFunc: func(context.Context, model.Request, func(string)) model.Execution {
+				panic("unexpected execution during config validation")
+			},
+		},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "home"
@@ -151,6 +145,12 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 			Defaults: true,
 		},
 	)
+}
+
+// DynCfg detects Test by method set, so a Test promoted from the shared job would change how drafts are validated.
+func TestDraftValidationUsesCheck(t *testing.T) {
+	_, testable := any(New(Dependencies{})).(dyncfg.Testable)
+	assert.False(t, testable)
 }
 
 func TestYAMLNullVnodeRemainsUnassigned(t *testing.T) {

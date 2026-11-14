@@ -465,11 +465,11 @@ Shared and process-wide packages:
 
 | Package | Responsibility |
 |---|---|
-| `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication |
+| `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication; journey and lighthouse embed the shared synthetic job and keep request building and their own metrics |
+| `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
 | `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/redact` | DEM text and credential redaction |
-| `internal/attemptmetrics` | Shared synthetic outcome and duration instruments |
 | `config/` | Installed configuration files; not a Go package |
 
 RUM packages, in data-path order. RUM processing is separate from investigation queries and Function presentation:

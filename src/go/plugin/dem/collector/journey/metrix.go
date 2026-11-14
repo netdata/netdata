@@ -3,6 +3,7 @@ package journey
 
 import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjob"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
@@ -16,7 +17,7 @@ type metrics struct {
 	notRun          metrix.SnapshotGauge
 }
 
-func newMetrics(m metrix.SnapshotMeter) metrics {
+func newMetrics(m metrix.SnapshotMeter) syntheticjob.Metrics {
 	return metrics{
 		declared:        m.Gauge("tests_declared"),
 		passed:          m.Gauge("tests_passed"),
@@ -27,7 +28,7 @@ func newMetrics(m metrix.SnapshotMeter) metrics {
 		notRun:          m.Gauge("tests_not_run"),
 	}
 }
-func (m metrics) write(run monitor.Observation) {
+func (m metrics) Write(run monitor.Observation) {
 	if v := run.Tests; run.HasTests {
 		m.declared.Observe(float64(v.Declared))
 		m.passed.Observe(float64(v.Passed))

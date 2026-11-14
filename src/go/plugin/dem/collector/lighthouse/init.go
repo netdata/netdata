@@ -1,49 +1,30 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package lighthouse
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 func (c *Collector) Init(ctx context.Context) error {
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if c.deps.Executor == nil || c.deps.Registry == nil {
-		return errors.New("missing synthetic executor or observation registry")
-	}
-	if c.CheckEvery <= 0 || time.Duration(c.CheckEvery) > time.Duration(1<<63-1)/time.Second {
-		return errors.New("check_every must be positive and representable as a duration")
-	}
-	if c.UpdateEvery <= 0 {
-		return errors.New("update_every must be positive")
-	}
+	return c.Job.Init(ctx, c.CheckEvery, c.UpdateEvery, c.newRequest)
+}
+
+// newRequest validates the audit options and builds the execution request.
+func (c *Collector) newRequest(vnodeGUID string) (model.Request, error) {
 	request := model.Request{
 		Kind:      model.Lighthouse,
-		VnodeGUID: c.vnodeGUID,
+		VnodeGUID: vnodeGUID,
 		Name:      c.Name,
 		URL:       c.URL,
 		Timeout:   time.Duration(c.Timeout),
 		Capture:   c.SaveReport,
 	}
 	if err := model.ValidateRequest(request); err != nil {
-		return err
+		return model.Request{}, err
 	}
-	c.request = request
-	c.initialized = true
-	return nil
+	return request, nil
 }
-func (c *Collector) Check(ctx context.Context) error {
-	if !c.initialized {
-		return errors.New("collector is not initialized")
-	}
-	// Preparation has a fixed budget independent of the public attempt timeout.
-	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	return c.deps.Executor.Check(ctx, c.request.Kind)
-}
-func (c *Collector) Cleanup(context.Context) {}

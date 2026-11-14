@@ -4,8 +4,6 @@
 package dem
 
 import (
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
@@ -19,30 +17,21 @@ import (
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-// Executor is the browser capability injected into native collectors.
-type Executor interface {
-	Check(context.Context, synthetic.Kind) error
-	monitor.Executor
-	Rehearse(context.Context, synthetic.Request) error
-}
-
 type Dependencies struct {
 	GeoIPPaths     geoip.Paths
 	History        *journal.Store
 	Artifacts      *artifacts.Store
 	Runtime        *runtimehost.Host
-	Executor       Executor
+	Executor       journey.Executor
 	ConfigProvider func() (Config, error)
 }
 
@@ -128,7 +117,8 @@ func New(deps Dependencies, cfg Config) Components {
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
 					return availableFunctions(syntheticfunctions.Declarations(), func() bool {
-						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") || deps.Artifacts.HasObservedPublished()
+						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") ||
+							deps.Artifacts.HasObservedPublished()
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {

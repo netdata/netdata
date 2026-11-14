@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-package dem_test
+package syntheticjob_test
 
 import (
 	"context"
@@ -7,22 +7,14 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type vnodeMonitor interface {
-	collectorapi.CollectorV2
-	collectorapi.CollectorV2Runner
-	collectorapi.ConfiguredVnodeConsumer
-}
 
 type vnodeAttempt struct {
 	request synthetic.Request
@@ -30,53 +22,59 @@ type vnodeAttempt struct {
 	finish  chan struct{}
 }
 
-type heldVnodeExecutor struct {
-	vnodeExecutor
-	calls chan vnodeAttempt
-}
-
-func (e heldVnodeExecutor) ExecuteScheduled(ctx context.Context, r synthetic.Request, state func(string), admit func(time.Time) synthetic.Schedule) synthetic.Execution {
-	at := time.Now()
-	schedule := admit(at)
-	call := vnodeAttempt{request: r, state: state, finish: make(chan struct{})}
-	state("running")
-	e.calls <- call
-	outcome := synthetic.Success
-	select {
-	case <-call.finish:
-	case <-ctx.Done():
-		outcome = synthetic.Cancelled
+// heldExecutor hands each admitted attempt to the test and holds it until finish or cancellation.
+func heldExecutor(calls chan<- vnodeAttempt) syntheticjobtest.Executor {
+	return syntheticjobtest.Executor{
+		ExecuteFunc: func(ctx context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
+			call := vnodeAttempt{
+				request: r,
+				state:   state,
+				finish:  make(chan struct{}),
+			}
+			state("running")
+			calls <- call
+			outcome := synthetic.Success
+			select {
+			case <-call.finish:
+			case <-ctx.Done():
+				outcome = synthetic.Cancelled
+			}
+			return synthetic.Execution{
+				Drained: true,
+				Run: synthetic.Run{
+					ID:         "attempt",
+					Outcome:    outcome,
+					DurationMS: new(123.0),
+					Tests: &synthetic.TestCounts{
+						Declared: 1,
+						Passed:   1,
+					},
+					Metrics: &synthetic.LabMetrics{
+						Performance: new(90.0),
+					},
+				},
+			}
+		},
 	}
-	duration, performance := 123.0, 90.0
-	return synthetic.Execution{Drained: true, Run: synthetic.Run{
-		ID: "attempt", JobID: r.JobID(), Kind: r.Kind, Name: r.Name, VnodeGUID: r.VnodeGUID,
-		Outcome: outcome, StartedUS: at.UnixMicro(), CompletedUS: time.Now().UnixMicro(),
-		ScheduledUS: schedule.DueUS, QueuedUS: schedule.QueuedUS, DurationMS: &duration,
-		Tests:   &synthetic.TestCounts{Declared: 1, Passed: 1},
-		Metrics: &synthetic.LabMetrics{Performance: &performance},
-	}}
 }
 
 func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 	const a = "11111111-1111-4111-8111-111111111111"
 	const b = "22222222-2222-4222-8222-222222222222"
-	for _, kind := range []string{"journey", "lighthouse"} {
+	forEachKind(t, func(t *testing.T, _ string, k kind) {
 		for name, changes := range map[string][]string{"different": {b}, "aba": {b, a}, "metadata": {a}} {
-			t.Run(kind+"/"+name, func(t *testing.T) {
+			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				hub := registry.New()
-				e := heldVnodeExecutor{calls: make(chan vnodeAttempt, 1)}
-				var c vnodeMonitor
-				if kind == "journey" {
-					job := journey.New(journey.Dependencies{Executor: e, Registry: hub})
-					job.Name, job.Script, job.CheckEvery = "check", "test('visit', async () => {});", 1
-					c = job
-				} else {
-					job := lighthouse.New(lighthouse.Dependencies{Executor: e, Registry: hub})
-					job.Name, job.URL, job.CheckEvery = "check", "https://example.org", 1
-					c = job
-				}
-				c.SetConfiguredVnode(vnodes.VirtualNode{GUID: a, Hostname: "first"})
+				calls := make(chan vnodeAttempt, 1)
+				c := k.new(heldExecutor(calls), hub, settings{
+					name:       "check",
+					checkEvery: 1,
+				})
+				c.SetConfiguredVnode(vnodes.VirtualNode{
+					GUID:     a,
+					Hostname: "first",
+				})
 				require.NoError(t, c.Init(t.Context()))
 				ctx, cancel := context.WithCancel(t.Context())
 				ready, done := make(chan struct{}), make(chan error, 1)
@@ -100,7 +98,7 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				next := func() vnodeAttempt {
 					t.Helper()
 					select {
-					case call := <-e.calls:
+					case call := <-calls:
 						return call
 					case <-time.After(5 * time.Second):
 						t.Fatal("monitor did not submit an attempt")
@@ -109,7 +107,10 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				}
 				old := next()
 				for _, guid := range changes {
-					c.SetConfiguredVnode(vnodes.VirtualNode{GUID: guid, Hostname: "changed"})
+					c.SetConfiguredVnode(vnodes.VirtualNode{
+						GUID:     guid,
+						Hostname: "changed",
+					})
 				}
 				assert.Equal(t, a, old.request.VnodeGUID)
 				old.state("running") // A delayed callback must obey the same fence as completion.
@@ -135,8 +136,9 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 					assert.Zero(t, job.LastFailureUS)
 					assert.NotContains(t, values, "duration")
 					assert.NotContains(t, values, "observation_age")
-					assert.NotContains(t, values, "performance")
-					assert.NotContains(t, values, "tests_passed")
+					for _, name := range measurementNames() {
+						assert.NotContains(t, values, name)
+					}
 					assert.EqualValues(t, 1, values[`execution_state{execution_state="unknown"}`])
 				}
 				current := next()
@@ -152,12 +154,15 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 				values, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 				require.NoError(t, err)
 				assert.EqualValues(t, 123, values["duration"])
-				c.SetConfiguredVnode(vnodes.VirtualNode{GUID: "", Hostname: "physical-agent"})
+				c.SetConfiguredVnode(vnodes.VirtualNode{
+					GUID:     "",
+					Hostname: "physical-agent",
+				})
 				values, err = collecttest.CollectScalarSeries(c, metrix.ReadFlatten())
 				require.NoError(t, err)
 				assert.NotContains(t, values, "duration", "completed observation clears on reassignment too")
 				assert.Nil(t, hub.Snapshot(time.Now())[0].Latest)
 			})
 		}
-	}
+	})
 }

@@ -11,36 +11,50 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
-type prepared struct{}
-
-func (prepared) Check(context.Context, model.Kind) error       { return nil }
-func (prepared) Rehearse(context.Context, model.Request) error { panic("unexpected rehearsal") }
-
-func (prepared) ExecuteScheduled(
-	context.Context,
-	model.Request,
-	func(string),
-	func(time.Time) model.Schedule,
-) model.Execution {
-	panic("unexpected execution during config validation")
-}
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: prepared{},
+		Executor: syntheticjobtest.Executor{
+			ExecuteFunc: func(context.Context, model.Request, func(string)) model.Execution {
+				panic("unexpected execution during config validation")
+			},
+		},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "login"
 	c.Script = "test('login', async () => {});"
 	return c
 }
+
+// request returns the request Init stores for the configuration of c, as the executor receives it.
+func request(t *testing.T, c *Collector) model.Request {
+	t.Helper()
+	var sent model.Request
+	probe := New(Dependencies{
+		Executor: syntheticjobtest.Executor{
+			RehearseFunc: func(_ context.Context, r model.Request) error {
+				sent = r
+				return nil
+			},
+		},
+		Registry: syntheticregistry.New(),
+	})
+	probe.Config = c.Config
+	require.NoError(t, probe.Init(t.Context()))
+	require.NoError(t, probe.Test(t.Context()))
+	return sent
+}
+
+var _ dyncfg.Testable = (*Collector)(nil)
 
 func TestConfiguration(t *testing.T) {
 	cfgJSON := []byte(
@@ -53,7 +67,9 @@ func TestConfiguration(t *testing.T) {
 	for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 		t.Run(format, func(t *testing.T) {
 			c := New(Dependencies{})
-			input := []byte(`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false,"trace_on_failure":false}`)
+			input := []byte(
+				`{"name":"login","script":"test('login', async () => {});","screenshot_on_failure":false,"trace_on_failure":false}`,
+			)
 			require.NoError(t, decode(input, c))
 			want := Config{
 				Name:        "login",
@@ -202,20 +218,20 @@ func TestBrowserErrorSummaryOption(t *testing.T) {
 					require.NoError(t, err)
 					require.NoError(t, codec.decode(raw, c))
 					require.NoError(t, c.Init(context.Background()))
-					assert.Equal(t, enabled, c.request.BrowserErrorSummary)
+					assert.Equal(t, enabled, request(t, c).BrowserErrorSummary)
 					raw, err = codec.encode(c.Configuration())
 					require.NoError(t, err)
 					copy := configured()
 					require.NoError(t, codec.decode(raw, copy))
 					require.NoError(t, copy.Init(context.Background()))
-					assert.Equal(t, enabled, copy.request.BrowserErrorSummary)
+					assert.Equal(t, enabled, request(t, copy).BrowserErrorSummary)
 				})
 			}
 		})
 	}
 	c := configured()
 	require.NoError(t, c.Init(context.Background()))
-	assert.False(t, c.request.BrowserErrorSummary)
+	assert.False(t, request(t, c).BrowserErrorSummary)
 }
 
 func TestTraceRequestAndDependency(t *testing.T) {
@@ -225,6 +241,6 @@ func TestTraceRequestAndDependency(t *testing.T) {
 	require.EqualError(t, c.Init(t.Context()), "trace_on_failure requires screenshot_on_failure")
 	c.ScreenshotOnFailure = true
 	require.NoError(t, c.Init(t.Context()))
-	assert.True(t, c.request.Trace)
-	assert.True(t, c.request.Capture)
+	assert.True(t, request(t, c).Trace)
+	assert.True(t, request(t, c).Capture)
 }

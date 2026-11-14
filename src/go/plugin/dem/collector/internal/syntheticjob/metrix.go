@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Package attemptmetrics publishes latest browser observations and attempt counters.
-package attemptmetrics
+
+package syntheticjob
 
 import (
 	"math"
@@ -10,15 +10,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
-type Instruments struct {
+// attemptMetrics publishes the latest observation state and the session attempt counters of every synthetic kind.
+type attemptMetrics struct {
 	outcome                                                            metrix.StateSetInstrument
 	duration, age, queueAge, delay, active, pending                    metrix.SnapshotGauge
 	scheduled, admitted, coalesced                                     metrix.SnapshotCounter
 	success, failed, timeout, inconclusive, errors, cancelled, unknown metrix.SnapshotCounter
 }
 
-func New(m metrix.SnapshotMeter) Instruments {
-	return Instruments{
+func newAttemptMetrics(m metrix.SnapshotMeter) attemptMetrics {
+	return attemptMetrics{
 		outcome: m.StateSet(
 			"execution_state",
 			metrix.WithStateSetMode(metrix.ModeEnum),
@@ -52,7 +53,7 @@ func New(m metrix.SnapshotMeter) Instruments {
 	}
 }
 
-func (m Instruments) Write(s monitor.Snapshot) {
+func (m attemptMetrics) write(s monitor.Snapshot) {
 	outcome := synthetic.Unknown
 	if s.HasObservation && s.Fresh {
 		switch s.Latest.Outcome {
