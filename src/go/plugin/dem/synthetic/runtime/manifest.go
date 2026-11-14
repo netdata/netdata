@@ -5,6 +5,7 @@ package runtime
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -118,4 +119,18 @@ func reservedName(name string) bool {
 		}
 	}
 	return false
+}
+
+func sameManifest(a, b Manifest) bool {
+	// Mirrors may change transport without changing executable identity.
+	a.Archive.URL, b.Archive.URL = "", ""
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && string(left) == string(right)
+}
+
+func sameNativeManifest(a, b Manifest) bool {
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && string(left) == string(right)
 }

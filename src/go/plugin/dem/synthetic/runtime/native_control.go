@@ -14,6 +14,7 @@ import (
 )
 
 const nativeGateName = "coordination.lock"
+
 const nativeStateName = "admission.json"
 
 // NativePackage is installed with the package payload, after build-time binding
@@ -334,10 +335,4 @@ func writeNativeControl(config NativeConfig, state nativeControlRecord) error {
 		return err
 	}
 	return syncDirectory(root, ".")
-}
-
-func sameNativeManifest(a, b Manifest) bool {
-	left, errA := json.Marshal(a)
-	right, errB := json.Marshal(b)
-	return errA == nil && errB == nil && string(left) == string(right)
 }

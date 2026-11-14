@@ -12,23 +12,6 @@ import (
 	"strings"
 )
 
-type reservation struct {
-	Generation string `json:"generation"`
-	Bytes      int64  `json:"bytes"`
-}
-
-type inventory struct {
-	ownershipInventory
-	selected         *Manifest
-	release          *Release
-	automaticUpdates bool
-	selectionError   error
-	generationErrors map[string]error
-	generations      map[string]generation
-	preparing        map[string]int
-	reservations     map[string]reservation
-}
-
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
 // ProtectedBytes and ReclaimableBytes count each owned file once. CandidateBytes,
@@ -62,50 +45,6 @@ type Status struct {
 	UncertainPins         int               `json:"uncertain_pins"`
 	BootRecoveryAvailable bool              `json:"boot_recovery_available"`
 	CleanupError          string            `json:"cleanup_error,omitempty"`
-}
-
-func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
-	owned, err := s.ownershipLedger.inventoryLocked(reconcile)
-	inv := inventory{
-		ownershipInventory: owned,
-		generations:        make(map[string]generation),
-		preparing:          make(map[string]int),
-		reservations:       make(map[string]reservation),
-	}
-	if err != nil {
-		return inv, err
-	}
-	staging, err := s.childDirectories("staging")
-	if err != nil {
-		return inv, err
-	}
-	for _, name := range staging {
-		alive, err := s.ownerAlive(name)
-		if err != nil {
-			return inv, err
-		}
-		if !alive {
-			inv.reclaimableRecords[name] = true
-			if !reconcile {
-				continue
-			}
-			if err := s.removeOwned(name); err != nil {
-				return inv, err
-			}
-			continue
-		}
-		var r reservation
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
-			return inv, err
-		}
-		if !validID(r.Generation) || r.Bytes <= 0 {
-			return inv, errors.New("invalid runtime reservation")
-		}
-		inv.reservations[name] = r
-		inv.protectedRecords[name] = true
-		inv.preparing[r.Generation]++
-	}
-	return inv, nil
 }
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
@@ -332,8 +271,4 @@ func (s *Store) flushTrash() error {
 		return err
 	}
 	return s.deleteTrash(names)
-}
-
-func (inv inventory) protected(id string) bool {
-	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
 }

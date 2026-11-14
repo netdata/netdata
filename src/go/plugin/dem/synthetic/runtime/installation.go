@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
+	"syscall"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -16,159 +16,161 @@ import (
 
 var ErrInUse = errors.New("runtime installation has consumers or unresolved executions")
 
-// SelectionError means publication became visible but its crash durability could
-// not be confirmed. Callers must inspect/reconcile instead of claiming rollback.
-type SelectionError struct{ Err error }
+// ReleaseOperation distinguishes an explicit installation/repair decision from
+// checks of an existing installation. Repair may deliberately select an older
+// authenticated release; normal checks may never regress publication order.
+type ReleaseOperation string
 
-func (e *SelectionError) Error() string {
-	return "runtime selection publication is uncertain: " + e.Err.Error()
+const (
+	InstallRelease         ReleaseOperation = "install"
+	ensureRelease          ReleaseOperation = "ensure"
+	UpdateRelease          ReleaseOperation = "update"
+	AutomaticReleaseUpdate ReleaseOperation = "automatic-update"
+	RepairRelease          ReleaseOperation = "repair"
+)
+
+type UpdatePolicy string
+
+const (
+	AutomaticUpdates UpdatePolicy = "automatic"
+	ManualUpdates    UpdatePolicy = "manual"
+)
+
+type ReleaseInstallOptions struct {
+	Operation ReleaseOperation
+	// Required for install and repair. Update operations preserve consent.
+	Updates UpdatePolicy
 }
-func (e *SelectionError) Unwrap() error { return e.Err }
 
-// selection is the durable installation decision. Every selected generation is
-// backed by an authenticated release, whose manifest identifies it. An explicit
-// null release means nothing is selected: a new store, after uninstall, or while
-// repair rebuilds the selection.
-type selection struct {
-	Release          *Release `json:"release"`
-	AutomaticUpdates bool     `json:"automatic_updates,omitempty"`
+// BeginPublishedInstall takes installer exclusion BEFORE reading eligibility or
+// calling load. The caller must authenticate load's result with VerifyRelease.
+// Discovery runs outside inventory exclusion, so active monitoring continues.
+// The returned candidate owns installer exclusion through qualification and
+// publication. A nil candidate is a successful no-op: disabled automatic updates
+// or an unchanged release. No download can resurrect an uninstalled selection.
+func (s *Store) BeginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (*Candidate, error) {
+	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
+	return candidate, err
 }
 
-func (s selection) manifest() *Manifest {
-	if s.Release == nil {
-		return nil
-	}
-	m := s.Release.Manifest
-	return &m
+// BeginPublishedEnsure enrolls only a proven absent selection. A usable selected
+// generation is checked under installer exclusion without discovery, inventory,
+// qualification or changing its update policy. The returned manifest is a
+// snapshot; exclusion is released before return. Damage requires explicit repair.
+// A new candidate enables automatic preparation only when successfully selected.
+func (s *Store) BeginPublishedEnsure(ctx context.Context, load func(context.Context) (Release, error)) (*Candidate, *Manifest, error) {
+	return s.beginPublishedInstall(ctx, ReleaseInstallOptions{Operation: ensureRelease, Updates: AutomaticUpdates}, load)
 }
 
-func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
-	// A prior writer may have died after rename but before directory fsync. No
-	// dependent deletion or executable admission precedes this durability barrier.
-	if reconcile {
-		if err := s.syncSelection(); err != nil {
-			return nil, err
+func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstallOptions, load func(context.Context) (Release, error)) (_ *Candidate, _ *Manifest, result error) {
+	switch options.Operation {
+	case InstallRelease, RepairRelease, ensureRelease:
+		if options.Updates != AutomaticUpdates && options.Updates != ManualUpdates {
+			return nil, nil, errors.New("runtime installation requires an explicit update policy")
 		}
-	}
-	m, err := s.readSelection()
-	if err == nil && m != nil {
-		_, err = s.prepared(*m)
-		if errors.Is(err, ErrUnavailable) {
-			err = damagedMetadata("selection.json", err)
+	case UpdateRelease, AutomaticReleaseUpdate:
+		if options.Updates != "" {
+			return nil, nil, errors.New("runtime update preserves the installed update policy")
 		}
+	default:
+		return nil, nil, errors.New("invalid published runtime operation")
 	}
-	if isMetadataDamage(err) {
-		// A declared but unusable selection needs repair, not an ordinary
-		// first installation.
-		return nil, damaged(err)
+	if load == nil {
+		return nil, nil, errors.New("runtime release loader is unavailable")
 	}
+	operation, err := s.lockInstallation(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return m, nil
-}
-
-func (s *Store) readSelection() (*Manifest, error) {
-	record, err := s.readSelectionRecord()
-	if err != nil {
-		return nil, err
-	}
-	return record.manifest(), nil
-}
-
-// legacyEmptySelection is the exact record earlier builds wrote for a new or
-// uninstalled store. It still means nothing is selected; every other former
-// shape is damage. The next selection write replaces it.
-const legacyEmptySelection = "{\"manifest\":null}\n"
-
-func (s *Store) readSelectionRecord() (selection, error) {
-	// Only an explicit null means uninstalled. Missing fields or a missing
-	// record must not silently discard an installed release's protection.
-	record := selection{
-		Release: &Release{},
-	}
-	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
-		return record, damagedMetadata("selection.json", err)
-	} else if isMetadataDamage(err) && s.isLegacyEmptySelection() {
-		return selection{}, nil
-	} else if err != nil {
-		return record, err
-	}
-	if err := record.validate(); err != nil {
-		return record, damagedMetadata("selection.json", err)
-	}
-	return record, nil
-}
-
-func (s *Store) isLegacyEmptySelection() bool {
-	data, err := s.root.ReadFile("selection.json")
-	return err == nil && string(data) == legacyEmptySelection
-}
-
-func (s *Store) selectLocked(record selection) error {
-	// Split publication from directory sync so the caller can distinguish a failed
-	// write from a visible selection whose durability is not yet known.
-	if err := publishJSON(s.root, "selection.json", record); err != nil {
+	transferred := false
+	defer func() {
+		if !transferred {
+			result = errors.Join(result, s.releaseOwner(operation))
+		}
+	}()
+	var current selection
+	err = s.withLock(func() error {
+		// Repair is an explicit drained operation and can recover damaged
+		// selection metadata. Its caller supplies the new consent policy.
+		if options.Operation == RepairRelease {
+			return nil
+		}
+		if _, err := s.selectedLocked(true); err != nil {
+			return err
+		}
+		var err error
+		current, err = s.readSelectionRecord()
+		if m := current.manifest(); err == nil && options.Operation == ensureRelease && m != nil {
+			err = s.validateEnsureSelection(*m)
+		}
 		return err
+	})
+	if err != nil {
+		return nil, nil, err
 	}
-	if err := s.syncSelection(); err != nil {
-		return &SelectionError{
-			Err: err,
+	if m := current.manifest(); options.Operation == ensureRelease && m != nil {
+		return nil, m, nil
+	}
+	if options.Operation == AutomaticReleaseUpdate && !current.AutomaticUpdates {
+		return nil, nil, nil
+	}
+	if options.Operation == UpdateRelease && current.Release == nil {
+		return nil, nil, errors.New("install an authenticated runtime release before checking updates")
+	}
+	release, err := load(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := release.Validate(); err != nil {
+		return nil, nil, err
+	}
+	next := selection{Release: &release, AutomaticUpdates: current.AutomaticUpdates}
+	if options.Operation == InstallRelease || options.Operation == RepairRelease || options.Operation == ensureRelease {
+		next.AutomaticUpdates = options.Updates == AutomaticUpdates
+	}
+	if current.Release != nil {
+		changed, err := releaseUpdate(*current.Release, release)
+		if err != nil {
+			return nil, nil, err
 		}
+		if !changed {
+			// Reinstalling the exact release can explicitly change consent
+			// without acquiring or executing unchanged payload bytes.
+			if current.AutomaticUpdates != next.AutomaticUpdates {
+				err = s.withLock(func() error { return s.selectLocked(next) })
+			}
+			return nil, nil, err
+		}
+	}
+	// candidateWithOperation owns releasing operation even on failure.
+	transferred = true
+	candidate, err := s.candidateWithOperation(operation, next, options.Operation == RepairRelease)
+	if err != nil {
+		return nil, nil, err
+	}
+	return candidate, nil, nil
+}
+
+func (s *Store) validateEnsureSelection(m Manifest) (result error) {
+	root, err := s.root.OpenRoot(filepath.Join("generations", m.Archive.SHA256))
+	if err != nil {
+		return selectedPayloadError(err)
+	}
+	defer func() { result = errors.Join(result, root.Close()) }()
+	if err := verifyBoundPayload(root, m, ownerExecute); err != nil {
+		return selectedPayloadError(err)
 	}
 	return nil
 }
 
-// Consumer freezes one selection for a process lifetime. Closing it prevents
-// future BeginUse calls; already issued uses have independent execution receipts.
-type Consumer struct {
-	store    *Store
-	manifest Manifest
-	claim    *claim
-	mu       sync.Mutex
-	closed   bool
-}
-
-func (c *Consumer) Manifest() Manifest { return c.manifest }
-func (c *Consumer) BeginUse() (*Use, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.closed {
-		return nil, errors.New("runtime consumer is closed")
+func selectedPayloadError(err error) error {
+	// Only confirmed absence or structural violations prove damage. Access, I/O
+	// and other inconclusive failures retain their cause for diagnosis or retry.
+	var invalid payloadLayoutError
+	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.As(err, &invalid) {
+		return damaged(fmt.Errorf("selected runtime payload: %w", err))
 	}
-	return c.store.beginUse(c.manifest)
-}
-func (c *Consumer) Close() error {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.closed = true
-	return c.store.closeClaim(c.claim)
-}
-
-func (s *Store) AcquireSelected() (*Consumer, error) {
-	var consumer *Consumer
-	err := s.withLock(func() error {
-		m, err := s.selectedLocked(true)
-		if err != nil {
-			return err
-		}
-		if m == nil {
-			return ErrUnavailable
-		}
-		owner, err := s.claimLocked(m.Archive.SHA256, "process")
-		if err == nil {
-			consumer = &Consumer{
-				store:    s,
-				manifest: *m,
-				claim:    owner,
-			}
-		}
-		return err
-	})
-	if err != nil && consumer != nil {
-		return nil, errors.Join(err, consumer.Close())
-	}
-	return consumer, err
+	return fmt.Errorf("selected runtime payload: %w", err)
 }
 
 // Candidate holds the installation transaction and generation protection through
@@ -236,6 +238,7 @@ func (c *Candidate) Import(ctx context.Context, archive string) error {
 	}
 	return c.store.importArchive(ctx, c.manifest, archive)
 }
+
 func (c *Candidate) Download(ctx context.Context) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -339,8 +342,4 @@ func (s *Store) repairLocked(m Manifest) error {
 		}
 	}
 	return nil
-}
-
-func (inv inventory) inUse() bool {
-	return inv.ownershipInventory.inUse() || len(inv.reservations) > 0
 }

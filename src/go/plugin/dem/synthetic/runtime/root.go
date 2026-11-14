@@ -14,6 +14,7 @@ import (
 )
 
 var storeDirectories = []string{"generations", "claims", "uses", "staging", "trash", "initializing"}
+
 var storeLocks = []string{"coordination.lock", "installation.lock"}
 
 // The existing managed format is unchanged. Proof-only roots have a distinct
@@ -40,7 +41,9 @@ func (layout runtimeRootLayout) locks() []string {
 }
 
 const layoutName = "layout.json"
+
 const layoutTemporaryPrefix = ".dem-layout-"
+
 const publicationName = ".dem-runtime-publication.json"
 
 type storeLayout struct {

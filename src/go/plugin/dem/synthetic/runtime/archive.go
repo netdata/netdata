@@ -4,6 +4,7 @@ package runtime
 
 import (
 	"archive/tar"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
@@ -147,4 +148,16 @@ func extractFile(root *os.Root, name string, src io.Reader, size int64, executab
 	}
 	err = errors.Join(copyErr, f.Chmod(mode), f.Sync())
 	return errors.Join(err, f.Close())
+}
+
+type contextReader struct {
+	ctx    context.Context
+	source io.Reader
+}
+
+func (r contextReader) Read(p []byte) (int, error) {
+	if err := r.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return r.source.Read(p)
 }

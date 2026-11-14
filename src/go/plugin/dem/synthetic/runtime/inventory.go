@@ -5,32 +5,12 @@ package runtime
 import (
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"time"
 )
 
 var ErrDamaged = errors.New("runtime metadata is damaged; stop consumers and use runtime repair or uninstall")
-
-type metadataError struct {
-	name string
-	err  error
-}
-
-func (e *metadataError) Error() string { return fmt.Sprintf("%s: %v", e.name, e.err) }
-func (e *metadataError) Unwrap() error { return e.err }
-func isMetadataDamage(err error) bool {
-	var damage *metadataError
-	return errors.As(err, &damage)
-}
-
-func damagedMetadata(name string, err error) error {
-	return &metadataError{
-		name: name,
-		err:  err,
-	}
-}
 
 // damaged reports damage at a public boundary. The cause is kept as text only:
 // a declared but unusable record must never satisfy errors.Is for an ordinary
@@ -39,14 +19,21 @@ func damaged(err error) error {
 	return fmt.Errorf("%w: %v", ErrDamaged, err)
 }
 
-func metadataDecodeError(name string, err error) error {
-	// os.File.Read wraps operational errors in PathError. They must not become
-	// permission to replace data, including an error from the trailing-value read.
-	var operational *os.PathError
-	if errors.As(err, &operational) {
-		return err
-	}
-	return damagedMetadata(name, err)
+type reservation struct {
+	Generation string `json:"generation"`
+	Bytes      int64  `json:"bytes"`
+}
+
+type inventory struct {
+	ownershipInventory
+	selected         *Manifest
+	release          *Release
+	automaticUpdates bool
+	selectionError   error
+	generationErrors map[string]error
+	generations      map[string]generation
+	preparing        map[string]int
+	reservations     map[string]reservation
 }
 
 // The strict inventory remains the authority for automatic retirement and
@@ -134,6 +121,50 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 	return inv, nil
 }
 
+func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
+	owned, err := s.ownershipLedger.inventoryLocked(reconcile)
+	inv := inventory{
+		ownershipInventory: owned,
+		generations:        make(map[string]generation),
+		preparing:          make(map[string]int),
+		reservations:       make(map[string]reservation),
+	}
+	if err != nil {
+		return inv, err
+	}
+	staging, err := s.childDirectories("staging")
+	if err != nil {
+		return inv, err
+	}
+	for _, name := range staging {
+		alive, err := s.ownerAlive(name)
+		if err != nil {
+			return inv, err
+		}
+		if !alive {
+			inv.reclaimableRecords[name] = true
+			if !reconcile {
+				continue
+			}
+			if err := s.removeOwned(name); err != nil {
+				return inv, err
+			}
+			continue
+		}
+		var r reservation
+		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
+			return inv, err
+		}
+		if !validID(r.Generation) || r.Bytes <= 0 {
+			return inv, errors.New("invalid runtime reservation")
+		}
+		inv.reservations[name] = r
+		inv.protectedRecords[name] = true
+		inv.preparing[r.Generation]++
+	}
+	return inv, nil
+}
+
 func (inv inventory) damageError() error {
 	if inv.selectionError == nil && len(inv.generationErrors) == 0 {
 		return nil
@@ -148,4 +179,12 @@ func (inv inventory) damageError() error {
 		errs = append(errs, inv.generationErrors[id])
 	}
 	return damaged(errors.Join(errs...))
+}
+
+func (inv inventory) protected(id string) bool {
+	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
+}
+
+func (inv inventory) inUse() bool {
+	return inv.ownershipInventory.inUse() || len(inv.reservations) > 0
 }

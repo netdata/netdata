@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -28,6 +27,16 @@ func (s *Store) importArchive(ctx context.Context, m Manifest, archive string) e
 			return nil, fmt.Errorf("offline runtime archive: %w", err)
 		}
 		return file, nil
+	})
+}
+
+// Downloads are explicit candidate operations, never monitor lifecycle work.
+func (s *Store) download(ctx context.Context, m Manifest) error {
+	if m.Archive.URL == "" {
+		return errors.New("runtime manifest has no download source")
+	}
+	return s.prepare(ctx, m, func() (io.ReadCloser, error) {
+		return openDownload(ctx, m.Archive.URL, downloadIdleTimeout)
 	})
 }
 
@@ -120,6 +129,14 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	})
 }
 
+func (s *Store) finishPreparation(name string, owner io.Closer) {
+	err := s.releaseOwner(owner)
+	if err == nil {
+		err = s.withLock(func() error { return s.removeOwned(name) })
+	}
+	s.recordCleanupError(errors.Join(err, s.flushTrash()))
+}
+
 func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 	needed, err := s.preparationBytes(m)
 	if err != nil {
@@ -201,28 +218,4 @@ func (s *Store) preparationBytes(m Manifest) (int64, error) {
 		total += amount
 	}
 	return total, nil
-}
-
-func syncTree(root *os.Root) error {
-	return fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return syncDirectory(root, name)
-		}
-		return nil
-	})
-}
-
-type contextReader struct {
-	ctx    context.Context
-	source io.Reader
-}
-
-func (r contextReader) Read(p []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
-	}
-	return r.source.Read(p)
 }
