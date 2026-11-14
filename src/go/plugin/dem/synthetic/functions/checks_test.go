@@ -319,7 +319,7 @@ func TestChecksAndRunFollowActiveSessions(t *testing.T) {
 		"error": "performance budget failed",
 		"tests": null,
 		"capture_state": "",
-		"artifacts": null,
+		"artifacts": [],
 		"captures": null,
 		"history_error": "journal write failed",
 		"dropped_events": 0,

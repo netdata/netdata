@@ -64,6 +64,11 @@ var runMethod = method{
 }
 
 func runDetail(run model.Run) map[string]any {
+	// Run copies and history records keep an empty artifact list as null; the Function shows it as empty.
+	artifacts := run.Artifacts
+	if artifacts == nil {
+		artifacts = []model.Artifact{}
+	}
 	detail := map[string]any{
 		"id":                      run.ID,
 		"job_id":                  run.JobID,
@@ -81,7 +86,7 @@ func runDetail(run model.Run) map[string]any {
 		"error":                   run.Error,
 		"tests":                   run.Tests,
 		"capture_state":           run.CaptureState,
-		"artifacts":               run.Artifacts,
+		"artifacts":               artifacts,
 		"captures":                run.Captures,
 		"history_error":           run.HistoryError,
 		"dropped_events":          run.DroppedEvents,
