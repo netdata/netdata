@@ -58,12 +58,23 @@ func (e *steppedExecutor) ExecuteScheduled(
 	e.schedule = schedule
 	state("running")
 	e.running <- struct{}{}
-	run := <-e.finish
-	run.JobID, run.Kind, run.Name, run.VnodeGUID = request.JobID(), request.Kind, request.Name, request.VnodeGUID
-	run.ScheduledUS, run.QueuedUS = schedule.DueUS, schedule.QueuedUS
-	return model.Execution{
-		Drained: true,
-		Run:     run,
+	select {
+	case run := <-e.finish:
+		run.JobID, run.Kind, run.Name, run.VnodeGUID = request.JobID(), request.Kind, request.Name, request.VnodeGUID
+		run.ScheduledUS, run.QueuedUS = schedule.DueUS, schedule.QueuedUS
+		return model.Execution{
+			Drained: true,
+			Run:     run,
+		}
+	case <-ctx.Done():
+		// A test that stops early must not leave the session waiting for this attempt.
+		return model.Execution{
+			Drained: true,
+			Run: model.Run{
+				Outcome:     model.Cancelled,
+				CompletedUS: time.Now().UnixMicro(),
+			},
+		}
 	}
 }
 
@@ -146,12 +157,13 @@ func TestChecksAndRunFollowActiveSessions(t *testing.T) {
 		URL:     "https://example.org/",
 		Timeout: time.Minute,
 	}, "https://example.org/")
-	checkout := startActiveJob(t, hub, model.Request{
+	checkoutRequest := model.Request{
 		Kind:    model.Journey,
 		Name:    "checkout",
 		Script:  "export {};",
 		Timeout: time.Minute,
-	}, "")
+	}
+	checkout := startActiveJob(t, hub, checkoutRequest, "")
 	receiveSignal(t, audit.executor.queued)
 	receiveSignal(t, checkout.executor.queued)
 
@@ -348,9 +360,19 @@ func TestChecksAndRunFollowActiveSessions(t *testing.T) {
 	assert.Equal(t, 404, call(newHandler(src), "synthetics-run", "job_id:lighthouse:home", "run_id:audit-run").Status)
 	assert.Equal(t, 2, src.getCalls, "a cleared observation falls back to history")
 
+	// Retirement removes the rows; a successor with the same job ID starts without the prior observation.
 	audit.stop()
 	checkout.stop()
 	assert.Empty(t, checksRows(t, src))
+	successor := startActiveJob(t, hub, checkoutRequest, "")
+	receiveSignal(t, successor.executor.queued)
+	rows = checksRows(t, src)
+	takeSeconds(t, rows["journey:checkout"], "queue_age")
+	assert.Equal(t, map[string]map[string]any{
+		"journey:checkout": expect("journey:checkout", waiting),
+	}, rows)
+	assert.Equal(t, 404, call(newHandler(src), "synthetics-run", "job_id:journey:checkout", "run_id:checkout-run").Status)
+	assert.Equal(t, 3, src.getCalls, "the predecessor's run is not served as active")
 }
 
 func jsonInt(v int64) string { return strconv.FormatInt(v, 10) }
