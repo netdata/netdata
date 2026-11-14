@@ -25,10 +25,20 @@ func (e *SelectionError) Error() string {
 }
 func (e *SelectionError) Unwrap() error { return e.Err }
 
+// selection is the durable installation decision. Release is nil only after an
+// explicit uninstall; every selected generation is backed by an authenticated
+// release, whose manifest identifies it.
 type selection struct {
-	Manifest         *Manifest `json:"manifest"`
-	Release          *Release  `json:"release,omitempty"`
-	AutomaticUpdates bool      `json:"automatic_updates,omitempty"`
+	Release          *Release `json:"release"`
+	AutomaticUpdates bool     `json:"automatic_updates,omitempty"`
+}
+
+func (s selection) manifest() *Manifest {
+	if s.Release == nil {
+		return nil
+	}
+	m := s.Release.Manifest
+	return &m
 }
 
 func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
@@ -48,8 +58,8 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 	}
 	if isMetadataDamage(err) {
 		// A declared but unusable selection needs repair, not an ordinary
-		// first installation. Do not expose ErrUnavailable through this error.
-		return nil, fmt.Errorf("%w: %v", ErrDamaged, err)
+		// first installation.
+		return nil, damaged(err)
 	}
 	if err != nil {
 		return nil, err
@@ -62,36 +72,27 @@ func (s *Store) readSelection() (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return record.Manifest, err
+	return record.manifest(), nil
 }
 
 func (s *Store) readSelectionRecord() (selection, error) {
 	// Only an explicit null means uninstalled. Missing fields or a missing
 	// record must not silently discard an installed release's protection.
 	record := selection{
-		Manifest: &Manifest{},
+		Release: &Release{},
 	}
 	if err := readJSON(s.root, "selection.json", &record); errors.Is(err, os.ErrNotExist) {
 		return record, damagedMetadata("selection.json", err)
 	} else if err != nil {
 		return record, err
 	}
-	if record.Manifest != nil {
-		if err := record.Manifest.Validate(); err != nil {
-			return record, damagedMetadata("selection.json", err)
-		}
-	}
-	if err := record.validateRelease(); err != nil {
+	if err := record.validate(); err != nil {
 		return record, damagedMetadata("selection.json", err)
 	}
 	return record, nil
 }
 
-func (s *Store) selectLocked(m *Manifest) error {
-	return s.selectRecordLocked(selection{Manifest: m})
-}
-
-func (s *Store) selectRecordLocked(record selection) error {
+func (s *Store) selectLocked(record selection) error {
 	// Split publication from directory sync so the caller can distinguish a failed
 	// write from a visible selection whose durability is not yet known.
 	if err := publishJSON(s.root, "selection.json", record); err != nil {
@@ -165,7 +166,7 @@ type Candidate struct {
 	operation   *flock.Flock
 	sealed      bool
 	finished    bool
-	publication *selection
+	publication selection
 }
 
 func (s *Store) lockInstallation(ctx context.Context) (*flock.Flock, error) {
@@ -180,30 +181,11 @@ func (s *Store) lockInstallation(ctx context.Context) (*flock.Flock, error) {
 	return lock, nil
 }
 
-func (s *Store) BeginInstall(ctx context.Context, m Manifest) (*Candidate, error) {
-	return s.beginCandidate(ctx, m, false)
-}
-
-// BeginRepair rebuilds the requested release and retires damaged generations.
-// It requires every consumer and execution to be drained, and holds installer
-// exclusion through qualification/publication. It never resets ownership proof.
-func (s *Store) BeginRepair(ctx context.Context, m Manifest) (*Candidate, error) {
-	return s.beginCandidate(ctx, m, true)
-}
-
-func (s *Store) beginCandidate(ctx context.Context, m Manifest, repair bool) (*Candidate, error) {
-	if err := m.Validate(); err != nil {
-		return nil, err
-	}
-	operation, err := s.lockInstallation(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return s.candidateWithOperation(operation, m, repair)
-}
-
 // Ownership of operation transfers to the candidate, or is released on error.
-func (s *Store) candidateWithOperation(operation *flock.Flock, m Manifest, repair bool) (*Candidate, error) {
+// Repair rebuilds the release and retires damaged generations. It requires every
+// consumer and execution to be drained and never resets ownership proof.
+func (s *Store) candidateWithOperation(operation *flock.Flock, publication selection, repair bool) (*Candidate, error) {
+	m := publication.Release.Manifest
 	var consumer *Consumer
 	err := s.withLock(func() error {
 		if repair {
@@ -230,8 +212,9 @@ func (s *Store) candidateWithOperation(operation *flock.Flock, m Manifest, repai
 		return nil, errors.Join(err, s.releaseOwner(operation))
 	}
 	return &Candidate{
-		Consumer:  consumer,
-		operation: operation,
+		Consumer:    consumer,
+		operation:   operation,
+		publication: publication,
 	}, nil
 }
 
@@ -267,10 +250,7 @@ func (c *Candidate) Select() error {
 		if _, err := c.store.prepared(c.manifest); err != nil {
 			return err
 		}
-		if c.publication != nil {
-			return c.store.selectRecordLocked(*c.publication)
-		}
-		return c.store.selectLocked(&c.manifest)
+		return c.store.selectLocked(c.publication)
 	})
 }
 
@@ -309,7 +289,7 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 		if inv.inUse() {
 			return ErrInUse
 		}
-		if err := s.selectLocked(nil); err != nil {
+		if err := s.selectLocked(selection{}); err != nil {
 			return err
 		}
 		for id := range inv.generations {
@@ -336,7 +316,7 @@ func (s *Store) repairLocked(m Manifest) error {
 	// A same-release rebuild cannot leave its old selection admitting startup
 	// consumers while those paths are retired. Preserve healthy other selections.
 	if inv.selectionError != nil || (inv.selected != nil && inv.selected.Archive.SHA256 == m.Archive.SHA256) {
-		if err := s.selectLocked(nil); err != nil {
+		if err := s.selectLocked(selection{}); err != nil {
 			return err
 		}
 	}

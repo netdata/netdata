@@ -43,6 +43,7 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 		{name: "fonts/font.ttf", contents: []byte("font"), mode: 0644},
 	}
 	a, archive := archiveFixture(t, entries)
+	a.URL = "https://artifacts.example.invalid/" + a.SHA256 + ".tar.zst"
 	m := Manifest{Format: 1, Contract: 2, Version: "test-1", Platform: "linux/" + goruntime.GOARCH, Archive: a,
 		Layout:   Layout{EntryPoint: "runner/run.mjs", Node: "node/bin/node", Dependencies: "dependencies", Browser: "browser/browser", Loader: "lib/loader.so", Fonts: "fonts"},
 		Bindings: []Binding{{Path: "node/bin/node", Offset: 32, Expected: expected}, {Path: "browser/browser", Offset: 32, Expected: expected}},

@@ -48,7 +48,7 @@ func TestImportFollowsRegularArchiveSymlink(t *testing.T) {
 	require.NoError(t, os.WriteFile(target, archive, 0600))
 	require.NoError(t, os.Symlink(target, link))
 	require.NoError(t, s.importUnselected(context.Background(), m, link))
-	require.NoError(t, s.Available(m))
+	requirePrepared(t, s, m)
 }
 
 func TestPublicationReportsGenerationReadFailure(t *testing.T) {

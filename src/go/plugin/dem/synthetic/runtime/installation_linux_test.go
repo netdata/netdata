@@ -6,22 +6,60 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
+
+var fixtureSequence atomic.Uint64
+
+// fixtureRelease publishes m with a sequence above every earlier fixture in this
+// process. The store persists what its loader returns; signature verification
+// is covered by the release trust tests.
+func fixtureRelease(m Manifest) Release {
+	return Release{
+		Format:   1,
+		Sequence: fixtureSequence.Add(1),
+		Manifest: m,
+		Sources: ReleaseSource{
+			URL:    "https://artifacts.example.invalid/sources.tar.zst",
+			SHA256: strings.Repeat("b", 64),
+			Bytes:  100,
+		},
+	}
+}
+
+// beginFixture starts an installation or repair candidate for m through the
+// published-installation path with manual updates.
+func (s *Store) beginFixture(ctx context.Context, m Manifest, operation ReleaseOperation) (*Candidate, error) {
+	return s.beginRelease(ctx, fixtureRelease(m), operation)
+}
+
+func (s *Store) beginRelease(ctx context.Context, release Release, operation ReleaseOperation) (*Candidate, error) {
+	options := ReleaseInstallOptions{
+		Operation: operation,
+		Updates:   ManualUpdates,
+	}
+	candidate, err := s.BeginPublishedInstall(ctx, options, func(context.Context) (Release, error) { return release, nil })
+	if err == nil && candidate == nil {
+		err = errors.New("fixture installation was an unexpected no-op")
+	}
+	return candidate, err
+}
 
 func installFixture(t *testing.T, s *Store, label string) Manifest {
 	t.Helper()
 	m, archive := bundleFixture(t, label)
 	input := filepath.Join(t.TempDir(), "archive")
 	require.NoError(t, os.WriteFile(input, archive, 0600))
-	candidate, err := s.BeginInstall(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), input))
 	require.NoError(t, candidate.Select())
@@ -42,7 +80,7 @@ func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	next, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
 	input := filepath.Join(t.TempDir(), "archive")
 	require.NoError(t, os.WriteFile(input, archive, 0600))
-	candidate, err := other.BeginInstall(context.Background(), next)
+	candidate, err := other.beginFixture(context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	require.ErrorIs(t, candidate.Import(context.Background(), input), ErrAllowance)
 	require.NoError(t, candidate.Close())
@@ -90,7 +128,7 @@ func TestActivationKeepsOldProcessAndUninstallRefusesEveryGeneration(t *testing.
 func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 	s, now := testStore(t)
 	m := importFixture(t, s, "candidate")
-	candidate, err := s.BeginInstall(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	*now = now.Add(365 * 24 * time.Hour)
 	other, err := Open(s.config)
@@ -98,11 +136,11 @@ func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 	defer other.Close()
 	other.now = s.now
 	require.NoError(t, other.Sweep())
-	require.NoError(t, other.Available(m))
+	requirePrepared(t, other, m)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, other.Uninstall(ctx), context.Canceled)
-	_, err = other.BeginInstall(ctx, m)
+	_, err = other.beginFixture(ctx, m, InstallRelease)
 	require.ErrorIs(t, err, context.Canceled)
 	require.NoError(t, candidate.Close())
 	require.NoError(t, other.Uninstall(context.Background()))
@@ -114,7 +152,7 @@ func TestSelectionPublicationUncertaintyBlocksDeletionUntilReconciled(t *testing
 	s, now := testStore(t)
 	first := installFixture(t, s, "first")
 	next := importFixture(t, s, "second")
-	candidate, err := s.BeginInstall(context.Background(), next)
+	candidate, err := s.beginFixture(context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	original := s.syncSelection
 	calls := 0
@@ -155,7 +193,7 @@ func TestPrepublicationFailurePreservesSelection(t *testing.T) {
 	s, _ := testStore(t)
 	first := installFixture(t, s, "first")
 	next := importFixture(t, s, "second")
-	candidate, err := s.BeginInstall(context.Background(), next)
+	candidate, err := s.beginFixture(context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	defer candidate.Close()
 	s.syncSelection = func() error { return errors.New("failed before publication") }
@@ -180,11 +218,12 @@ func TestSelectionWriterExitProcess(t *testing.T) {
 	require.NoError(t, err)
 	var candidate *Candidate
 	if mode == "select" {
-		data, err := os.ReadFile(os.Getenv("DEM_SELECTION_EXIT_MANIFEST"))
+		// The parent allocates the release: this process has its own sequence counter.
+		data, err := os.ReadFile(os.Getenv("DEM_SELECTION_EXIT_RELEASE"))
 		require.NoError(t, err)
-		var m Manifest
-		require.NoError(t, json.Unmarshal(data, &m))
-		candidate, err = s.BeginInstall(context.Background(), m)
+		var release Release
+		require.NoError(t, json.Unmarshal(data, &release))
+		candidate, err = s.beginRelease(context.Background(), release, InstallRelease)
 		require.NoError(t, err)
 	}
 	count := 0
@@ -213,14 +252,14 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 			if mode == "select" {
 				next = importFixture(t, s, "next")
 			}
-			file := filepath.Join(t.TempDir(), "manifest.json")
-			data, err := json.Marshal(next)
+			file := filepath.Join(t.TempDir(), "release.json")
+			data, err := json.Marshal(fixtureRelease(next))
 			require.NoError(t, err)
 			require.NoError(t, os.WriteFile(file, data, 0600))
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestSelectionWriterExitProcess$")
-			cmd.Env = append(os.Environ(), "DEM_SELECTION_EXIT_MODE="+mode, "DEM_SELECTION_EXIT_STORE="+s.path, "DEM_SELECTION_EXIT_MANIFEST="+file)
+			cmd.Env = append(os.Environ(), "DEM_SELECTION_EXIT_MODE="+mode, "DEM_SELECTION_EXIT_STORE="+s.path, "DEM_SELECTION_EXIT_RELEASE="+file)
 			output, err := cmd.CombinedOutput()
 			require.NoError(t, err, "%s", output)
 			reopened, err := Open(s.config)
@@ -232,7 +271,7 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 				require.Equal(t, next, consumer.Manifest())
 				require.NoError(t, consumer.Close())
 				require.NoError(t, reopened.Sweep())
-				require.NoError(t, reopened.Available(next))
+				requirePrepared(t, reopened, next)
 			} else {
 				require.ErrorIs(t, err, ErrUnavailable)
 				require.NoError(t, reopened.Uninstall(context.Background()))
@@ -244,7 +283,7 @@ func TestRecoverSelectionAfterWriterExit(t *testing.T) {
 func TestPreparationReportsOneCandidateClaim(t *testing.T) {
 	s, _ := testStore(t)
 	m, archive := bundleFixture(t, "status")
-	candidate, err := s.BeginInstall(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, candidate.Close()) })
 	ready, resume := make(chan struct{}), make(chan struct{})
@@ -284,7 +323,7 @@ func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
 	selected := installFixture(t, s, "selected")
 	unsupported := selected
 	unsupported.Contract = 1
-	candidate, err := s.BeginInstall(context.Background(), unsupported)
+	candidate, err := s.beginFixture(context.Background(), unsupported, InstallRelease)
 	require.Nil(t, candidate)
 	require.ErrorContains(t, err, "unsupported runtime execution contract 1")
 	require.ErrorContains(t, err, "upgrade the Agent")
@@ -307,7 +346,7 @@ func TestManagedClaimCloseStartsGraceImmediately(t *testing.T) {
 				installFixture(t, s, "replacement")
 			} else {
 				manifest = importFixture(t, s, "unselected-candidate")
-				candidate, err := s.BeginInstall(context.Background(), manifest)
+				candidate, err := s.beginFixture(context.Background(), manifest, InstallRelease)
 				require.NoError(t, err)
 				owner = candidate
 			}

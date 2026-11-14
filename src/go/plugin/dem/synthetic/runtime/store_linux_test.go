@@ -514,13 +514,24 @@ func BenchmarkRuntimeUse(b *testing.B) {
 // These helpers exercise unselected-generation retention and individual owner
 // reclamation. Installation behavior is tested through the public API separately.
 func (s *Store) importUnselected(ctx context.Context, m Manifest, path string) error {
-	candidate, err := s.BeginInstall(ctx, m)
+	candidate, err := s.beginFixture(ctx, m, InstallRelease)
 	if err != nil {
 		return err
 	}
 	defer candidate.Close()
 	return candidate.Import(ctx, path)
 }
+
+// requirePrepared asserts that m is published and intact without acquiring
+// execution ownership or changing retention timestamps.
+func requirePrepared(t *testing.T, s *Store, m Manifest) {
+	t.Helper()
+	require.NoError(t, s.withLock(func() error {
+		_, err := s.prepared(m)
+		return err
+	}))
+}
+
 func (s *Store) testProcessClaim(id string) (*claim, error) {
 	var owner *claim
 	err := s.withLock(func() error { var err error; owner, err = s.claimLocked(id, "process"); return err })
