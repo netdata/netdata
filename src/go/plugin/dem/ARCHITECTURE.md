@@ -471,6 +471,7 @@ Shared and process-wide packages:
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
 | `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
+| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
 | `config/` | Installed configuration files; not a Go package |
 
@@ -538,7 +539,7 @@ Dependency direction:
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
   through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
   `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
-  store dependency.
+  store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
@@ -556,7 +557,7 @@ File layout within packages:
 | Package | Files are split by |
 |---|---|
 | `rum/aggregate` | State/construction, ingestion/results, activity, snapshots/ranking, vital statistics and cohesive topic operations, without creating extra state owners |
-| Function packages | Methods keep their columns beside their row builders |
+| Function packages | Each method keeps its ordered column list, which defines both the column map and every row, beside its row reader |
 | History packages | Record codecs are separate from reducers |
 | `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
 | `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |
