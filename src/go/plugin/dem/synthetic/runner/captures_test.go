@@ -63,8 +63,8 @@ func TestCaptureReportingNegotiationAndIsolation(t *testing.T) {
 			s := consumeCaptures(t, tc.lines...)
 			require.NotNil(t, s.captures)
 			assert.Equal(t, tc.status, s.captures.Reporting)
-			assert.NotEqual(t, "invalid", s.evidence.Availability)
-			assert.NotEqual(t, "invalid", s.browser.Availability)
+			assert.NotEqual(t, "invalid", s.evidence.ReportingStatus())
+			assert.NotEqual(t, "invalid", s.browser.ReportingStatus())
 		})
 	}
 }

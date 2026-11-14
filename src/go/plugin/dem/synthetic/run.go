@@ -111,40 +111,64 @@ func CloneRun(in Run) Run {
 	r.Captures = CloneCaptureReport(in.Captures)
 	r.BrowserSummary = CloneBrowserSummary(in.BrowserSummary)
 	r.FailureEvidence = CloneFailureEvidence(in.FailureEvidence)
-	if in.Runtime != nil {
-		identity := *in.Runtime
-		r.Runtime = &identity
-	}
+	r.Runtime = clonePtr(in.Runtime)
+	// Appending to nil turns an empty list into nil, so history stores null
+	// for an attempt without events or artifacts. Keep that stored shape.
 	r.Events = append([]Event(nil), in.Events...)
 	for i := range r.Events {
-		if v := r.Events[i].DeclaredTests; v != nil {
-			n := *v
-			r.Events[i].DeclaredTests = &n
-		}
-		if v := r.Events[i].DurationMS; v != nil {
-			n := *v
-			r.Events[i].DurationMS = &n
-		}
+		r.Events[i].DeclaredTests = clonePtr(r.Events[i].DeclaredTests)
+		r.Events[i].DurationMS = clonePtr(r.Events[i].DurationMS)
 	}
 	r.Artifacts = append([]Artifact(nil), in.Artifacts...)
-	if in.Tests != nil {
-		v := *in.Tests
-		r.Tests = &v
-	}
+	r.Tests = clonePtr(in.Tests)
 	if in.Metrics != nil {
 		m := *in.Metrics
+		m.Performance = clonePtr(m.Performance)
+		m.FCPMS = clonePtr(m.FCPMS)
+		m.LCPMS = clonePtr(m.LCPMS)
+		m.TBTMS = clonePtr(m.TBTMS)
+		m.SIMS = clonePtr(m.SIMS)
+		m.CLS = clonePtr(m.CLS)
 		r.Metrics = &m
-		values := []**float64{&m.Performance, &m.FCPMS, &m.LCPMS, &m.TBTMS, &m.SIMS, &m.CLS}
-		for _, p := range values {
-			if *p != nil {
-				v := **p
-				*p = &v
-			}
+	}
+	r.DurationMS = clonePtr(in.DurationMS)
+	return r
+}
+
+// clonePtr returns a pointer to a copy of *p, or nil.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	return new(*p)
+}
+
+// Labels of the evidence summaries shared by run history and rehearsal errors.
+const (
+	FirstFailureLabel     = "First unexpected failure"
+	LastObservedStepLabel = "Last observed running step"
+	StopContextLabel      = "Pending before cleanup"
+	BrowserErrorsLabel    = "Browser errors"
+)
+
+// Diagnostic is one labeled summary of optional run evidence.
+type Diagnostic struct {
+	Label string
+	Text  string
+}
+
+// Diagnostics returns the run's non-empty evidence summaries in presentation order.
+func (r Run) Diagnostics() []Diagnostic {
+	var out []Diagnostic
+	for _, d := range []Diagnostic{
+		{FirstFailureLabel, r.FailureEvidence.FailureSummary()},
+		{LastObservedStepLabel, r.FailureEvidence.LastObservedStepSummary()},
+		{StopContextLabel, r.FailureEvidence.StopSummary()},
+		{BrowserErrorsLabel, r.BrowserSummary.Summary()},
+	} {
+		if d.Text != "" {
+			out = append(out, d)
 		}
 	}
-	if in.DurationMS != nil {
-		v := *in.DurationMS
-		r.DurationMS = &v
-	}
-	return r
+	return out
 }

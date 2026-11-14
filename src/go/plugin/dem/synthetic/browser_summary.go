@@ -11,14 +11,12 @@ import (
 
 // BrowserSummary is optional fixture-context evidence, independent of run outcome.
 type BrowserSummary struct {
-	Availability     string            `json:"availability"`
-	Reason           string            `json:"reason,omitempty"`
-	ReporterComplete bool              `json:"reporter_complete"`
-	Coverage         string            `json:"coverage"`
-	Run              *BrowserAggregate `json:"run,omitempty"`
-	Tests            []BrowserTest     `json:"tests,omitempty"`
-	Samples          []BrowserSample   `json:"samples,omitempty"`
-	Truncated        []string          `json:"truncated,omitempty"`
+	FeatureStatus
+	Coverage  string            `json:"coverage"`
+	Run       *BrowserAggregate `json:"run,omitempty"`
+	Tests     []BrowserTest     `json:"tests,omitempty"`
+	Samples   []BrowserSample   `json:"samples,omitempty"`
+	Truncated []string          `json:"truncated,omitempty"`
 }
 type BrowserCounts struct {
 	Uncaught     int64 `json:"uncaught,omitempty"`
@@ -104,44 +102,31 @@ func CloneBrowserSummary(in *BrowserSummary) *BrowserSummary {
 	out := *in
 	out.Truncated = slices.Clone(in.Truncated)
 	if in.Run != nil {
-		v := *in.Run
-		v.Omissions = slices.Clone(v.Omissions)
-		out.Run = &v
+		run := *in.Run
+		run.Omissions = slices.Clone(run.Omissions)
+		out.Run = &run
 	}
 	out.Tests = slices.Clone(in.Tests)
 	for i := range out.Tests {
 		out.Tests[i].SampleIDs = slices.Clone(in.Tests[i].SampleIDs)
-		if in.Tests[i].Counts != nil {
-			v := *in.Tests[i].Counts
-			out.Tests[i].Counts = &v
-		}
+		out.Tests[i].Counts = clonePtr(in.Tests[i].Counts)
 	}
 	out.Samples = slices.Clone(in.Samples)
 	for i := range out.Samples {
 		s := &out.Samples[i]
 		s.Args = slices.Clone(s.Args)
-		if s.Text != nil {
-			v := *s.Text
-			s.Text = &v
-		}
-		if s.URL != nil {
-			v := *s.URL
-			s.URL = &v
-		}
+		s.Text = clonePtr(s.Text)
+		s.URL = clonePtr(s.URL)
 	}
 	return &out
 }
+
+// ReportingStatus is NotRecorded for an absent summary, else its FeatureStatus.
 func (b *BrowserSummary) ReportingStatus() string {
 	if b == nil {
-		return "not_recorded"
+		return NotRecorded
 	}
-	if b.Availability != "supported" {
-		return b.Availability
-	}
-	if b.ReporterComplete {
-		return "complete"
-	}
-	return "partial"
+	return b.FeatureStatus.ReportingStatus()
 }
 
 // Summary names the observed scope and reporting status so missing coverage is explicit.
