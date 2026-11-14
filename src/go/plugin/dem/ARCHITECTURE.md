@@ -663,10 +663,11 @@ Sites:
 - URL values (page URLs, URL-shaped view names and URL attributes) are reduced first: credentials, query and fragment
   are dropped and path segments generalized. The credential patterns then read the reduced, percent-encoded URL, where
   an encoded space or a removed control character can hide a pattern (`/a/Bearer%20token`).
-- Site path rules on a non-URL view name read the cleaned name; a name they leave unchanged is redacted as text.
+- Site path rules on a non-URL view name read the cleaned name, or the redacted name when the received name shows a
+  credential the cleaned one does not; a name they leave unchanged is redacted as text.
 - Query output applies the current site redactor to every text value of active sites, because configured credentials
-  can change after ingestion. Retired-site history is returned as stored, including records written by earlier builds
-  or under earlier credentials. RUM Functions add no redaction of their own.
+  can change after ingestion, and the credential patterns to every text value of retired sites, so records written by
+  earlier builds or under an older pattern set get the current patterns. RUM Functions add no redaction of their own.
 
 | Geolocation mode | Lookup | Live observations | Journal and OTLP |
 |---|---|---|---|

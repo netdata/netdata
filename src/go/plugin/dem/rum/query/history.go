@@ -11,12 +11,22 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
-// History is sanitized before persistence, including for retired sites. Active
-// redactors additionally guard output using the current configured credentials.
+// History is redacted at ingestion with the site redactor of that time. Output
+// applies the current site redactor while the site is active, and the
+// credential patterns once it is retired, so records written by earlier builds
+// or pattern sets get the current patterns too.
 func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, error) {
 	out := map[string]*redact.Redactor{}
 	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
 	return out, err
+}
+
+// outputRedactor redacts a history row of site, given the active sites' redactors.
+func outputRedactor(active map[string]*redact.Redactor, site string) *redact.Redactor {
+	if r := active[site]; r != nil {
+		return r
+	}
+	return credentialPatterns
 }
 
 func (s *Service) Sessions(
@@ -33,19 +43,18 @@ func (s *Service) Sessions(
 	redactors, err := s.redactors(ctx)
 	for i := range rows {
 		r := &rows[i]
-		if redact := redactors[r.Site]; redact != nil {
-			for j := range r.UserIDs {
-				r.UserIDs[j] = redact.Apply(r.UserIDs[j])
-			}
-			sort.Strings(r.UserIDs)
-			r.UserIDs = slices.Compact(r.UserIDs)
-			r.Version = redact.Apply(r.Version)
-			r.Browser = redact.Apply(r.Browser)
-			r.Device = redact.Apply(r.Device)
-			r.Country = redact.Apply(r.Country)
-			r.EntryPage = redact.Apply(r.EntryPage)
-			r.LastPage = redact.Apply(r.LastPage)
+		redact := outputRedactor(redactors, r.Site)
+		for j := range r.UserIDs {
+			r.UserIDs[j] = redact.Apply(r.UserIDs[j])
 		}
+		sort.Strings(r.UserIDs)
+		r.UserIDs = slices.Compact(r.UserIDs)
+		r.Version = redact.Apply(r.Version)
+		r.Browser = redact.Apply(r.Browser)
+		r.Device = redact.Apply(r.Device)
+		r.Country = redact.Apply(r.Country)
+		r.EntryPage = redact.Apply(r.EntryPage)
+		r.LastPage = redact.Apply(r.LastPage)
 	}
 	out := make([]Session, len(rows))
 	for i, row := range rows {
@@ -83,9 +92,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 	// Both sources project through history.SessionEventOf, so equal events compare equal.
 	overlap := make(map[history.SessionEventRecord]int, len(rows))
 	for i := range rows {
-		if redact := redactors[rows[i].Site]; redact != nil {
-			redactSessionEvent(&rows[i], redact)
-		}
+		redactSessionEvent(&rows[i], outputRedactor(redactors, rows[i].Site))
 		overlap[rows[i]]++
 	}
 	for _, row := range live {
@@ -123,14 +130,13 @@ func (s *Service) Errors(
 	redactors, err := s.redactors(ctx)
 	for i := range rows {
 		r := &rows[i]
-		if redact := redactors[r.Site]; redact != nil {
-			r.Type = redact.Apply(r.Type)
-			r.Message = redact.Apply(r.Message)
-			r.SampleStack = redact.Apply(r.SampleStack)
-			r.TopPage = redact.Apply(r.TopPage)
-			for j := range r.Browsers {
-				r.Browsers[j] = redact.Apply(r.Browsers[j])
-			}
+		redact := outputRedactor(redactors, r.Site)
+		r.Type = redact.Apply(r.Type)
+		r.Message = redact.Apply(r.Message)
+		r.SampleStack = redact.Apply(r.SampleStack)
+		r.TopPage = redact.Apply(r.TopPage)
+		for j := range r.Browsers {
+			r.Browsers[j] = redact.Apply(r.Browsers[j])
 		}
 	}
 	out := make([]ErrorGroup, len(rows))
