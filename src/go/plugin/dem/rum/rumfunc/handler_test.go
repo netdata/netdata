@@ -31,7 +31,7 @@ func (s recordingSource) Live(context.Context, string, string, int, string) ([]q
 	s.read("Live")
 	return []query.LiveEvent{{}}, "", nil
 }
-func (s recordingSource) Sessions(context.Context, string, string, int64, int64, string) ([]query.Session, error) {
+func (s recordingSource) Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error) {
 	s.read("Sessions")
 	return []query.Session{{Site: "shop"}}, nil
 }

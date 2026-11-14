@@ -4,6 +4,7 @@ package syntheticfunc
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -15,7 +16,7 @@ var runsMethod = method{
 	Method: rawfunc.Method{
 		ID:          "synthetics-runs",
 		Title:       "Synthetic runs",
-		Help:        "Retained attempts selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		Help:        "Retained attempts selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(rawfunc.MaxRows) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 		Sort:        "started_us",
 		UpdateEvery: 10,
 		History:     true,

@@ -16,7 +16,7 @@ var artifactsMethod = method{
 	Method: rawfunc.Method{
 		ID:          "synthetics-artifacts",
 		Title:       "Retained synthetic captures",
-		Help:        "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–2000. Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		Help:        "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–" + strconv.Itoa(rawfunc.MaxRows) + ". Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 		Sort:        "published_us",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "before", "limit", "vnode", "vnode_guid"},

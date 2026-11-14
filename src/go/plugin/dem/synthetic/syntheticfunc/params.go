@@ -7,17 +7,18 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 )
 
 func rowLimit(value string) (int, error) {
 	if value == "" {
-		return 2000, nil
+		return rawfunc.MaxRows, nil
 	}
 	limit, err := strconv.Atoi(value)
-	if err != nil || limit < 1 || limit > 2000 {
-		return 0, errors.New("limit must be between 1 and 2000")
+	if err != nil || limit < 1 || limit > rawfunc.MaxRows {
+		return 0, fmt.Errorf("limit must be between 1 and %d", rawfunc.MaxRows)
 	}
 	return limit, nil
 }
@@ -58,19 +59,22 @@ func runFilter(args map[string]string, now int64) (history.RunFilter, error) {
 	if err != nil {
 		return f, err
 	}
-	for key, dst := range map[string]*int64{"after": &f.After, "before": f.Before} {
-		if args[key] != "" {
-			v, err := strconv.ParseInt(args[key], 10, 64)
+	for _, bound := range []struct {
+		key string
+		dst *int64
+	}{{"after", &f.After}, {"before", f.Before}} {
+		if args[bound.key] != "" {
+			v, err := strconv.ParseInt(args[bound.key], 10, 64)
 			if err != nil {
-				return f, fmt.Errorf("%s must be Unix seconds or a relative negative offset", key)
+				return f, fmt.Errorf("%s must be Unix seconds or a relative negative offset", bound.key)
 			}
 			if v < 0 {
 				v += now
 			}
 			if v < 0 {
-				return f, fmt.Errorf("%s must not precede the Unix epoch", key)
+				return f, fmt.Errorf("%s must not precede the Unix epoch", bound.key)
 			}
-			*dst = v
+			*bound.dst = v
 		}
 	}
 	if f.After > *f.Before {

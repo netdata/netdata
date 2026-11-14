@@ -21,7 +21,7 @@ type Deps interface {
 	Sites(context.Context, string) ([]query.Site, error)
 	Pages(context.Context, string, string) ([]query.Page, error)
 	Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error)
-	Sessions(context.Context, string, string, int64, int64, string) ([]query.Session, error)
+	Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error)
 	SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error)
 	Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error)
 }

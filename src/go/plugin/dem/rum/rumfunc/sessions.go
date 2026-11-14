@@ -38,7 +38,7 @@ func (h *Handler) sessionsRows(ctx context.Context, args map[string]string, _ ma
 	if err != nil {
 		return nil, badRequest(err)
 	}
-	sessions, err := h.deps.Sessions(ctx, args["site"], args["user_id"], after, before, args["vnode_guid"])
+	sessions, err := h.deps.Sessions(ctx, args["site"], args["user_id"], after, before, rawfunc.MaxRows, args["vnode_guid"])
 	var rows [][]any
 	for _, s := range sessions {
 		rows = append(rows, sessionsColumns.Row(sessionRow{Session: s, now: now}))

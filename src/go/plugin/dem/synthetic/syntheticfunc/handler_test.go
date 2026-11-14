@@ -228,6 +228,14 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 		got := call(h, "synthetics-runs", args...)
 		assert.Equal(t, 400, got.Status)
 	}
+	// With both bounds invalid, the after bound is reported on every call.
+	for range 64 {
+		require.Equal(
+			t,
+			funcapi.ErrorResponse(400, "after must be Unix seconds or a relative negative offset"),
+			call(h, "synthetics-runs", "after:NaN", "before:NaN"),
+		)
+	}
 	assert.Equal(t, 400, call(h, "synthetics-run", "run_id:r").Status)
 	assert.Equal(t, 404, call(h, "synthetics-run", "job_id:journey:a", "run_id:missing").Status)
 	ctx, cancel := context.WithCancel(context.Background())

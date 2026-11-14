@@ -88,7 +88,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	afterRetirement, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, pending, afterRetirement)
-	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+5, "")
+	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+5, 2000, "")
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	require.EqualValues(t, 1, sessions[0].Pageviews)

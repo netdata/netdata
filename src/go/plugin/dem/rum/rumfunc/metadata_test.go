@@ -90,7 +90,7 @@ func (metadataFunctionSource) Pages(context.Context, string, string) ([]query.Pa
 func (metadataFunctionSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
 	return nil, "", nil
 }
-func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64, string) ([]query.Session, error) {
+func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
 func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {

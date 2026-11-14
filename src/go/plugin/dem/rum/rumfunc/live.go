@@ -25,7 +25,7 @@ var liveMethod = method{
 }
 
 func (h *Handler) liveRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {
-	live, next, err := h.deps.Live(ctx, args["site"], args["after"], 2000, args["vnode_guid"])
+	live, next, err := h.deps.Live(ctx, args["site"], args["after"], rawfunc.MaxRows, args["vnode_guid"])
 	response["next"] = next
 	var rows [][]any
 	for _, r := range live {

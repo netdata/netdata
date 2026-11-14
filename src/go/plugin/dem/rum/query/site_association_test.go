@@ -105,10 +105,10 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	current := old
 	ingest(current, "job-a", now.Add(time.Second))
 	flush(current.w)
-	rows, err := service.Sessions(ctx, "", "", 0, now.Unix()+2, "")
+	rows, err := service.Sessions(ctx, "", "", 0, now.Unix()+2, 2000, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 3, "same group must not merge jobs; reassignment must not merge groups")
-	selected, err := service.Sessions(ctx, "job-a", "", 0, now.Unix()+2, "11111111-1111-4111-8111-111111111111")
+	selected, err := service.Sessions(ctx, "job-a", "", 0, now.Unix()+2, 2000, "11111111-1111-4111-8111-111111111111")
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
 	assert.Equal(t, int64(1), selected[0].Errors)
