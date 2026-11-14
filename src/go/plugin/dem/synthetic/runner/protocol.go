@@ -3,12 +3,13 @@ package runner
 
 import (
 	"bufio"
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"math"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -32,7 +33,8 @@ func newRedactor(values map[string]string) *textRedactor {
 			known = append(known, value)
 		}
 	}
-	sort.Slice(known, func(i, j int) bool { return len(known[i]) > len(known[j]) })
+	// Longest first, so a secret containing another is replaced whole.
+	slices.SortFunc(known, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
 	var pairs []string
 	for _, value := range known {
 		pairs = append(pairs, value, "[REDACTED]")
