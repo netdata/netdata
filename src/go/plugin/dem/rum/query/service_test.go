@@ -31,6 +31,11 @@ import (
 
 type measurementProcessor struct{ *aggregate.Aggregator }
 
+// discardCounters ignores history writer accounting, which these reads do not check.
+type discardCounters struct{}
+
+func (discardCounters) Add(string, uint64) {}
+
 func (p measurementProcessor) Ingest(b *beacon.Beacon) { p.Aggregator.Ingest(b) }
 
 func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*aggregate.Aggregator, func()) {
@@ -175,7 +180,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 		cancel()
 		w.Run(runCtx)
 	}
-	first := history.NewWriter("site", st, a)
+	first := history.NewWriter("site", st, discardCounters{})
 	a.SetHistorySink(first)
 	a.Ingest(
 		&beacon.Beacon{
@@ -196,7 +201,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	assert.Equal(t, pending[1], pending[2], "identical repeated events are real occurrences")
 	flush(first)
 	assert.Equal(t, pending, request(), "flushing must not duplicate the live ring")
-	second := history.NewWriter("site", st, a)
+	second := history.NewWriter("site", st, discardCounters{})
 	a.SetHistorySink(second)
 	a.Ingest(
 		&beacon.Beacon{
@@ -306,7 +311,7 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 	st := history.NewStore(journalStore)
 	hub := rumregistry.New()
 	a, _ := addSite(t, hub, "site", "first")
-	writer := history.NewWriter("site", st, a)
+	writer := history.NewWriter("site", st, discardCounters{})
 	a.SetHistorySink(writer)
 	a.Ingest(
 		&beacon.Beacon{

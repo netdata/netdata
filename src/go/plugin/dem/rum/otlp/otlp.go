@@ -42,11 +42,21 @@ const (
 	ShutdownFlushTimeout = time.Second
 )
 
-// Counters receives the rum.otlp chart bookkeeping (sent/dropped/errors
-// dimensions). *aggregate.Aggregator satisfies this directly.
+// Counters receives export accounting; the owning site job publishes it.
 type Counters interface {
 	Add(counter string, n uint64)
 }
+
+// Counter names reported through Counters: the rum.otlp and rum.spans chart
+// dimensions.
+const (
+	CounterLogsSent     = "otlp_sent"
+	CounterLogsDropped  = "otlp_dropped"
+	CounterLogsErrors   = "otlp_errors"
+	CounterSpansSent    = "spans_sent"
+	CounterSpansDropped = "spans_dropped"
+	CounterSpansErrors  = "spans_errors"
+)
 
 // Logs owns one site's enabled event-log destination and queue.
 type Logs struct {
@@ -86,7 +96,7 @@ func (e *Logs) Run(ctx context.Context, final func() context.Context) {
 		e.ch,
 		maxBatch,
 		func(ctx context.Context, batch []*logspb.LogRecord) bool { return e.export(ctx, batch, exportTimeout) },
-		func(batch []*logspb.LogRecord) { e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(batch))) },
+		func(batch []*logspb.LogRecord) { e.counters.Add(CounterLogsDropped, uint64(len(batch))) },
 	)
 }
 
@@ -107,7 +117,7 @@ func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
 		select {
 		case e.ch <- rec:
 		default:
-			e.counters.Add(aggregate.CounterOTLPDropped, 1)
+			e.counters.Add(CounterLogsDropped, 1)
 		}
 	}
 }
@@ -141,14 +151,14 @@ func (e *Logs) export(parent context.Context, batch []*logspb.LogRecord, timeout
 	resp, err := e.client.Export(ctx, req)
 	if err != nil {
 		e.failed("logs", err)
-		e.counters.Add(aggregate.CounterOTLPErrors, uint64(len(batch)))
+		e.counters.Add(CounterLogsErrors, uint64(len(batch)))
 		return true
 	}
 	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedLogRecords(), uint64(len(batch)))
 	if rejected > 0 {
 		e.rejected("logs", rejected)
 	}
-	e.counters.Add(aggregate.CounterOTLPErrors, rejected)
-	e.counters.Add(aggregate.CounterOTLPSent, uint64(len(batch))-rejected)
+	e.counters.Add(CounterLogsErrors, rejected)
+	e.counters.Add(CounterLogsSent, uint64(len(batch))-rejected)
 	return true
 }

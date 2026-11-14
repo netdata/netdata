@@ -63,7 +63,7 @@ func (h *processingHistory) Event(event aggregate.HistoryEvent) { h.events = app
 func newProcessingTest(
 	t *testing.T,
 	investigate aggregate.InvestigateCfg,
-) (*processor, *processingHistory, func() []string, *processingLogs) {
+) (*processor, *processingHistory, func() []string, *processingLogs, *transportCounters) {
 	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
@@ -84,13 +84,14 @@ func newProcessingTest(
 	)
 	h := &processingHistory{}
 	a.SetHistorySink(h)
+	transport := newTransportCounters()
 	exporter, err := otlp.NewLogs(
 		context.Background(),
 		config.Destination{
 			Endpoint: new("http://" + listener.Addr().String()),
 		},
 		"site",
-		a,
+		transport,
 		nil,
 	)
 	require.NoError(t, err)
@@ -108,11 +109,11 @@ func newProcessingTest(
 	return &processor{
 		aggregator: a,
 		logs:       exporter,
-	}, h, drain, logs
+	}, h, drain, logs, transport
 }
 
 func TestProcessingDeduplicatesWithoutMutatingInput(t *testing.T) {
-	p, history, drain, _ := newProcessingTest(t, aggregate.InvestigateCfg{
+	p, history, drain, _, _ := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate: 1,
 	})
 	event := &beacon.Beacon{
@@ -140,7 +141,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	const session = "late-error"
 	const rate = 0.000001
 	require.False(t, beacon.SessionSampled(session, rate))
-	p, history, drain, _ := newProcessingTest(t, aggregate.InvestigateCfg{
+	p, history, drain, _, _ := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate:       rate,
 		KeepErrors: true,
 	})
@@ -194,7 +195,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T) {
 	const rate = 0.000001
 	require.False(t, beacon.SessionSampled("quiet", rate))
-	p, history, drain, _ := newProcessingTest(t, aggregate.InvestigateCfg{
+	p, history, drain, _, transport := newProcessingTest(t, aggregate.InvestigateCfg{
 		Rate: rate,
 	})
 	p.Ingest(
@@ -220,17 +221,27 @@ func TestProcessingUninvestigatedAndRejectedObservationsDoNotExport(t *testing.T
 	assert.EqualValues(t, 1, snapshot.Counters[aggregate.CounterJSErrors])
 	assert.EqualValues(t, 1, snapshot.Counters[beacon.RejectOrigin])
 	assert.Zero(t, snapshot.Counters[beacon.RejectRate])
-	assert.Zero(t, snapshot.Counters[aggregate.CounterOTLPDropped])
-	assert.Zero(t, snapshot.Counters[aggregate.CounterOTLPSent])
+	assert.Zero(t, transport.get(otlp.CounterLogsDropped))
+	assert.Zero(t, transport.get(otlp.CounterLogsSent))
 }
 
 func TestProcessingQueuedExportsKeepGUIDAcrossReassignment(t *testing.T) {
 	const guidA = "11111111-1111-4111-8111-111111111111"
 	const guidB = "22222222-2222-4222-8222-222222222222"
-	p, history, drain, exported := newProcessingTest(t, aggregate.InvestigateCfg{Rate: 1})
+	p, history, drain, exported, transport := newProcessingTest(t, aggregate.InvestigateCfg{
+		Rate: 1,
+	})
 	admit := func(guid, path string) {
 		p.aggregator.SetVnodeGUID(guid)
-		p.Ingest(&beacon.Beacon{Site: "site", SessionID: "session", ExperienceID: path, PageGroup: path, Events: []beacon.Event{{Kind: beacon.EventDocument, ID: path, Revision: 1}}})
+		p.Ingest(
+			&beacon.Beacon{
+				Site:         "site",
+				SessionID:    "session",
+				ExperienceID: path,
+				PageGroup:    path,
+				Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: path, Revision: 1}},
+			},
+		)
 	}
 	admit(guidA, "/old")
 	admit(guidB, "/new")
@@ -242,6 +253,11 @@ func TestProcessingQueuedExportsKeepGUIDAcrossReassignment(t *testing.T) {
 	guids := append([]string(nil), exported.guids...)
 	exported.mu.Unlock()
 	assert.Equal(t, []string{guidA, guidB}, guids, "flush reads captured records rather than current configuration")
-	assert.EqualValues(t, 2, p.aggregator.Snapshot().Counters[aggregate.CounterOTLPSent], "export diagnostics remain job-wide")
-	assert.EqualValues(t, 1, p.aggregator.Snapshot().Counters[aggregate.CounterPageviews], "traffic belongs to the new measurement window")
+	assert.EqualValues(t, 2, transport.get(otlp.CounterLogsSent), "export diagnostics remain job-wide")
+	assert.EqualValues(
+		t,
+		1,
+		p.aggregator.Snapshot().Counters[aggregate.CounterPageviews],
+		"traffic belongs to the new measurement window",
+	)
 }

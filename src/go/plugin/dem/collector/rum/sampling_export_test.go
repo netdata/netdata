@@ -14,6 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -124,10 +126,11 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			assert.EqualValues(t, observations, counters[aggregate.CounterAccepted])
 			assert.EqualValues(t, observations, counters[aggregate.CounterPageviews])
 			assert.EqualValues(t, 1, counters[aggregate.CounterJSErrors])
-			assert.EqualValues(t, tc.wantLogs, counters[aggregate.CounterOTLPSent])
-			assert.EqualValues(t, tc.wantSpans, counters[aggregate.CounterSpansSent])
-			for _, counter := range []string{aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors, aggregate.CounterHistoryDropped, aggregate.CounterInvalidMeasurements} {
-				assert.Zero(t, counters[counter], counter)
+			assert.EqualValues(t, tc.wantLogs, site.TransportCounter(otlp.CounterLogsSent))
+			assert.EqualValues(t, tc.wantSpans, site.TransportCounter(otlp.CounterSpansSent))
+			assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
+			for _, counter := range []string{otlp.CounterLogsDropped, otlp.CounterLogsErrors, otlp.CounterSpansDropped, otlp.CounterSpansErrors, history.CounterDropped} {
+				assert.Zero(t, site.TransportCounter(counter), counter)
 			}
 			live, _ := a.Live(0, 10, "")
 			assert.Len(
@@ -157,7 +160,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 				assert.Empty(t, rows)
 				assert.Empty(t, timeline)
 				assert.Empty(t, errors)
-				assert.Zero(t, counters[aggregate.CounterHistoryWritten])
+				assert.Zero(t, site.TransportCounter(history.CounterWritten))
 				return
 			}
 			require.Len(t, rows, 1)
@@ -180,7 +183,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 				want["after-action"] = "/after"
 			}
 			assert.Equal(t, want, actions)
-			assert.EqualValues(t, len(timeline), counters[aggregate.CounterHistoryWritten], fmt.Sprint(timeline))
+			assert.EqualValues(t, len(timeline), site.TransportCounter(history.CounterWritten), fmt.Sprint(timeline))
 		})
 	}
 }

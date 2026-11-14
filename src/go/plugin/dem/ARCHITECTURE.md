@@ -135,7 +135,7 @@ The four collector modules (the journeys below show them in action):
 | Module | Job shape | Defaults | Owns while running |
 |---|---|---|---|
 | `receiver` | Single instance (`dem:collector:receiver`) | Listens on `127.0.0.1:19938`, `update_every: 10` | HTTP listener, GeoIP resolver, receiver availability |
-| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters |
+| `rum` | One job per website (`dem:collector:rum:<name>`) | 5-minute measurement `window`, `update_every: 10` | Aggregator, route, diagnostics, history writer, optional exporters, transport counters |
 | `journey` | One job per journey script (`script` or `script_path`) | Checks every 900 s, 120 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 | `lighthouse` | One job per audited URL | Checks every 1800 s, 180 s timeout; charts every 10 s | Prepared request, monitor session, registration, metric store |
 
@@ -786,7 +786,8 @@ OTLP export:
 - The destinations have identical security options and do not inherit from each other.
 - OTLP exports only newly selected observations. Prior exports and asynchronously arriving spans are not reconstructed.
 - The trace exporter preserves each beacon's trace resource attributes.
-- The history writer and each enabled exporter account for their own queues.
+- The history writer and each enabled exporter account for their own queues in the site job's transport counters.
+  They live outside the aggregator, so a vnode change that resets measurements leaves them intact.
 - Shared receiver/site policy and destination declarations belong to `rum/config`. `rum/otlp` implements transport
   security, signal mapping and drainage.
 - Runtime export failure does not stop native aggregation or history.

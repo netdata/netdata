@@ -33,26 +33,14 @@ const versionTopN = 10
 // Other is the display value of a synthetic fold; output also carries a typed flag.
 const Other = "other"
 
-// Site-level cumulative event and receiver/export diagnostic counters.
+// Site-level cumulative event and receiver diagnostic counters.
 const (
 	CounterPageviews           = "document_views"
 	CounterApplicationViews    = "application_views"
 	CounterInvalidMeasurements = "invalid_measurements"
 	CounterJSErrors            = "js_errors"
 	CounterAccepted            = "accepted"
-	CounterOTLPSent            = "otlp_sent"
-	CounterOTLPDropped         = "otlp_dropped"
-	CounterOTLPErrors          = "otlp_errors"
 
-	// History writer counters: the rum.history chart's
-	// written/dropped dims. Fed by the history writer's own goroutine via
-	// Add, never from inside Ingest (see HistorySink's doc comment).
-	CounterHistoryWritten = "history_written"
-	CounterHistoryDropped = "history_dropped"
-	// Browser span export, the rum.spans chart.
-	CounterSpansSent    = "spans_sent"
-	CounterSpansDropped = "spans_dropped"
-	CounterSpansErrors  = "spans_errors"
 	// Frustration signals, the rum.frustration chart.
 	CounterRageClicks  = "rage_clicks"
 	CounterDeadClicks  = "dead_clicks"
@@ -212,8 +200,4 @@ func (a *Aggregator) SetVnodeGUID(guid string) {
 	cfg.VnodeGUID = guid
 	a.site = newSiteState(a.window, cfg)
 	a.site.sess, a.site.sessIdx = old.sess, old.sessIdx
-	// These counters describe this job's asynchronous transports, not a measured population.
-	for _, key := range []string{CounterHistoryWritten, CounterHistoryDropped, CounterOTLPSent, CounterOTLPDropped, CounterOTLPErrors, CounterSpansSent, CounterSpansDropped, CounterSpansErrors} {
-		a.site.counters[key] = old.counters[key]
-	}
 }

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
 // The existing burst budget bounds queued browser detail; a full queue reports
@@ -21,9 +20,17 @@ const (
 	queueCap    = 5000
 )
 
+// Counters receives the writer's accounting; the owning site job publishes it.
 type Counters interface {
 	Add(counter string, n uint64)
 }
+
+// Counter names reported through Counters: the rum.history chart dimensions.
+const (
+	CounterWritten = "history_written"
+	CounterDropped = "history_dropped"
+)
+
 type eventWriter interface {
 	AppendEvent(context.Context, EventRecord) (attempted bool, err error)
 	Sync(context.Context) error
@@ -68,7 +75,7 @@ func (w *Writer) reportQueueDrops() {
 	w.chanDrops = 0
 	w.dropMu.Unlock()
 	if drops != 0 {
-		w.counters.Add(aggregate.CounterHistoryDropped, drops)
+		w.counters.Add(CounterDropped, drops)
 	}
 }
 
@@ -116,7 +123,7 @@ steady:
 		default:
 			remaining := batch[w.flush(finalCtx, batch):]
 			if len(remaining) != 0 {
-				w.counters.Add(aggregate.CounterHistoryDropped, uint64(len(remaining)))
+				w.counters.Add(CounterDropped, uint64(len(remaining)))
 			}
 			return
 		}
@@ -141,9 +148,9 @@ func (w *Writer) flush(ctx context.Context, batch []EventRecord) int {
 		if !attempted && ctx.Err() != nil {
 			return i
 		}
-		counter := aggregate.CounterHistoryWritten
+		counter := CounterWritten
 		if err != nil {
-			counter = aggregate.CounterHistoryDropped
+			counter = CounterDropped
 		}
 		w.counters.Add(counter, 1)
 	}

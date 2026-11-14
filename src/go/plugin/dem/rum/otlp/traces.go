@@ -79,7 +79,7 @@ func (e *Traces) Ingest(b *beacon.Beacon, result aggregate.Result) {
 		rs: rs,
 	}:
 	default:
-		e.counters.Add(aggregate.CounterSpansDropped, n)
+		e.counters.Add(CounterSpansDropped, n)
 	}
 }
 
@@ -175,7 +175,7 @@ func (e *Traces) Run(ctx context.Context, final func() context.Context) {
 		e.spanCh,
 		maxSpanBatch,
 		func(ctx context.Context, batch []spanItem) bool { return e.exportSpans(ctx, batch, exportTimeout) },
-		func(batch []spanItem) { e.counters.Add(aggregate.CounterSpansDropped, spanCount(batch)) },
+		func(batch []spanItem) { e.counters.Add(CounterSpansDropped, spanCount(batch)) },
 	)
 }
 
@@ -207,14 +207,14 @@ func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout t
 	resp, err := e.client.Export(ctx, req)
 	if err != nil {
 		e.failed("traces", err)
-		e.counters.Add(aggregate.CounterSpansErrors, n)
+		e.counters.Add(CounterSpansErrors, n)
 		return true
 	}
 	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedSpans(), n)
 	if rejected > 0 {
 		e.rejected("traces", rejected)
 	}
-	e.counters.Add(aggregate.CounterSpansErrors, rejected)
-	e.counters.Add(aggregate.CounterSpansSent, n-rejected)
+	e.counters.Add(CounterSpansErrors, rejected)
+	e.counters.Add(CounterSpansSent, n-rejected)
 	return true
 }

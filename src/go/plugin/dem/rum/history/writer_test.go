@@ -95,8 +95,8 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
 	assert.Equal(t, "at [REDACTED]", groups[0].SampleStack)
-	assert.EqualValues(t, 2, counters.get(aggregate.CounterHistoryWritten))
-	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, 2, counters.get(CounterWritten))
+	assert.Zero(t, counters.get(CounterDropped))
 }
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
@@ -111,8 +111,8 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	}
 	drain(w)
 	assert.Equal(t, queueCap, calls)
-	assert.EqualValues(t, queueCap, counters.get(aggregate.CounterHistoryWritten))
-	assert.EqualValues(t, 7, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, queueCap, counters.get(CounterWritten))
+	assert.EqualValues(t, 7, counters.get(CounterDropped))
 }
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
@@ -142,8 +142,8 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	for text, n := range attempts {
 		assert.Equal(t, 1, n, "event %s replayed", text)
 	}
-	assert.EqualValues(t, maxBatch+7, counters.get(aggregate.CounterHistoryWritten))
-	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, maxBatch+7, counters.get(CounterWritten))
+	assert.Zero(t, counters.get(CounterDropped))
 }
 func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
@@ -174,8 +174,8 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 				wantWritten--
 				wantDropped++
 			}
-			assert.EqualValues(t, wantWritten, counters.get(aggregate.CounterHistoryWritten))
-			assert.EqualValues(t, wantDropped, counters.get(aggregate.CounterHistoryDropped))
+			assert.EqualValues(t, wantWritten, counters.get(CounterWritten))
+			assert.EqualValues(t, wantDropped, counters.get(CounterDropped))
 		})
 	}
 }
@@ -230,7 +230,7 @@ func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
 	}
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Zero(t, disk.syncs)
-	assert.EqualValues(t, 1, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, 1, counters.get(CounterDropped))
 	assert.Equal(t, 1, w.flush(context.Background(), []aggregate.HistoryEvent{{Site: "site", Type: "event"}}))
 	assert.Equal(t, 1, disk.appends)
 	assert.Equal(t, 1, disk.syncs)

@@ -18,10 +18,10 @@ func (c *Collector) Collect(context.Context) error {
 		state = "available"
 	}
 	c.metrics.ingress.Enable(state)
-	s := c.aggregator.Snapshot()
 	for _, counter := range c.metrics.diagnostics {
-		counter.instrument.ObserveTotal(float64(s.Counters[counter.name]))
+		counter.instrument.ObserveTotal(float64(c.transport.get(counter.name)))
 	}
+	s := c.aggregator.Snapshot()
 	// Inability or intentional disablement is not an observed quiet window.
 	if !available || c.MeasureRate() == 0 {
 		return nil

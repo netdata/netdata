@@ -74,7 +74,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 						}
 						return n
 					}
-					sent, dropped, errors = aggregate.CounterOTLPSent, aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors
+					sent, dropped, errors = CounterLogsSent, CounterLogsDropped, CounterLogsErrors
 				} else {
 					remote := &fakeTraceService{}
 					e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters, nil)
@@ -99,7 +99,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 						}
 						return n
 					}
-					sent, dropped, errors = aggregate.CounterSpansSent, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors
+					sent, dropped, errors = CounterSpansSent, CounterSpansDropped, CounterSpansErrors
 				}
 				base, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -208,7 +208,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 				e.Ingest(mkBeacon(), result)
 				run = e.Run
 				requests = func() int { return len(remote.requests()) }
-				sent, dropped, errors = aggregate.CounterOTLPSent, aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors
+				sent, dropped, errors = CounterLogsSent, CounterLogsDropped, CounterLogsErrors
 			} else {
 				remote := &blockedTraceService{
 					started:   started,
@@ -218,7 +218,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 				e.Ingest(tracedBeacon(), result)
 				run = e.Run
 				requests = remote.count
-				sent, dropped, errors = aggregate.CounterSpansSent, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors
+				sent, dropped, errors = CounterSpansSent, CounterSpansDropped, CounterSpansErrors
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

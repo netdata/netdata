@@ -46,7 +46,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 				KeepErrors: true,
 			},
 		})
-		w := history.NewWriter(job, store, a)
+		w := history.NewWriter(job, store, discardCounters{})
 		a.SetHistorySink(w)
 		d := diagnostics.New()
 		route := httpapi.NewRoute(config.Site{

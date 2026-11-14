@@ -27,11 +27,6 @@ func (a *Aggregator) Reject(site, reason string) {
 		st.bots = append(st.bots, now)
 	}
 }
-func (a *Aggregator) Add(counter string, n uint64) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	a.site.counters[counter] += n
-}
 
 // Result carries the newly admitted observations for investigation/export.
 // Observation is non-nil for an accepted batch, including a replay with no new measurements.

@@ -19,6 +19,7 @@ import (
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -179,20 +180,20 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			counters := a.Snapshot().Counters
 			assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
 			if !tc.logs {
-				assert.Zero(t, counters[aggregate.CounterOTLPSent])
-				assert.Zero(t, counters[aggregate.CounterOTLPDropped])
-				assert.Zero(t, counters[aggregate.CounterOTLPErrors])
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsSent))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsDropped))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsErrors))
 			}
 			if !tc.traces {
-				assert.Zero(t, counters[aggregate.CounterSpansSent])
-				assert.Zero(t, counters[aggregate.CounterSpansDropped])
-				assert.Zero(t, counters[aggregate.CounterSpansErrors])
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansSent))
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansDropped))
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansErrors))
 			} else {
-				assert.EqualValues(t, 2, counters[aggregate.CounterSpansSent])
+				assert.EqualValues(t, 2, site.TransportCounter(otlp.CounterSpansSent))
 			}
 			if tc.reject {
-				assert.Positive(t, counters[aggregate.CounterOTLPErrors])
-				assert.Zero(t, counters[aggregate.CounterOTLPSent])
+				assert.Positive(t, site.TransportCounter(otlp.CounterLogsErrors))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsSent))
 			}
 			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
 			require.NoError(t, err)
@@ -234,8 +235,8 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	stop()
 	counters := a.Snapshot().Counters
 	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
-	require.EqualValues(t, 4, counters[aggregate.CounterOTLPSent])
-	require.Zero(t, counters[aggregate.CounterOTLPErrors])
+	require.EqualValues(t, 4, site.TransportCounter(otlp.CounterLogsSent))
+	require.Zero(t, site.TransportCounter(otlp.CounterLogsErrors))
 	require.Zero(t, counters[aggregate.CounterJSErrors])
 	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
 	require.NoError(t, err)
@@ -272,7 +273,7 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	send("first")
 	require.Eventually(
 		t,
-		func() bool { return a.Snapshot().Counters[aggregate.CounterOTLPErrors] > 0 },
+		func() bool { return site.TransportCounter(otlp.CounterLogsErrors) > 0 },
 		4*time.Second,
 		10*time.Millisecond,
 	)
@@ -282,16 +283,16 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	send("second")
 	require.Eventually(
 		t,
-		func() bool { return a.Snapshot().Counters[aggregate.CounterOTLPSent] > 0 },
+		func() bool { return site.TransportCounter(otlp.CounterLogsSent) > 0 },
 		4*time.Second,
 		10*time.Millisecond,
 	)
 	stop()
 	counters := a.Snapshot().Counters
 	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
-	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPErrors])
-	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPSent])
-	assert.Zero(t, counters[aggregate.CounterOTLPDropped])
+	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsErrors))
+	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsSent))
+	assert.Zero(t, site.TransportCounter(otlp.CounterLogsDropped))
 	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)

@@ -74,8 +74,8 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 	}
 	require.Len(t, l.ch, queueCap)
 	require.Len(t, tr.spanCh, spanQueueCap)
-	require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPDropped])
-	require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansDropped])
+	require.EqualValues(t, 1, c.snapshot()[CounterLogsDropped])
+	require.EqualValues(t, 1, c.snapshot()[CounterSpansDropped])
 }
 
 func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
@@ -103,13 +103,13 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 			require.Empty(t, l.ch)
 			require.Empty(t, tr.spanCh)
 			if expired {
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterOTLPDropped])
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterSpansDropped])
+				require.EqualValues(t, 300, c.snapshot()[CounterLogsDropped])
+				require.EqualValues(t, 300, c.snapshot()[CounterSpansDropped])
 				require.Empty(t, ls.requests())
 				require.Zero(t, ts.count())
 			} else {
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterOTLPSent])
-				require.EqualValues(t, 300, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, 300, c.snapshot()[CounterLogsSent])
+				require.EqualValues(t, 300, c.snapshot()[CounterSpansSent])
 			}
 		})
 	}
@@ -151,10 +151,10 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 			l.Run(ctx, final)
 			tr.Run(ctx, final)
 			rejected := uint64(max(0, min(5, n)))
-			require.EqualValues(t, rejected, c.snapshot()[aggregate.CounterOTLPErrors])
-			require.EqualValues(t, 5-rejected, c.snapshot()[aggregate.CounterOTLPSent])
-			require.EqualValues(t, rejected, c.snapshot()[aggregate.CounterSpansErrors])
-			require.EqualValues(t, 5-rejected, c.snapshot()[aggregate.CounterSpansSent])
+			require.EqualValues(t, rejected, c.snapshot()[CounterLogsErrors])
+			require.EqualValues(t, 5-rejected, c.snapshot()[CounterLogsSent])
+			require.EqualValues(t, rejected, c.snapshot()[CounterSpansErrors])
+			require.EqualValues(t, 5-rejected, c.snapshot()[CounterSpansSent])
 		})
 	}
 	require.Contains(t, output.String(), `logs partial rejection`)
@@ -213,10 +213,10 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}
 				// Suppressing repeated diagnostics must not suppress delivery accounting.
-				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterOTLPErrors])
-				require.EqualValues(t, attempts, c.snapshot()[aggregate.CounterSpansErrors])
-				require.Zero(t, c.snapshot()[aggregate.CounterOTLPSent])
-				require.Zero(t, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, attempts, c.snapshot()[CounterLogsErrors])
+				require.EqualValues(t, attempts, c.snapshot()[CounterSpansErrors])
+				require.Zero(t, c.snapshot()[CounterLogsSent])
+				require.Zero(t, c.snapshot()[CounterSpansSent])
 			}
 			for _, site := range []string{"shop", "checkout"} {
 				for _, signal := range []string{"logs", "traces"} {
@@ -387,8 +387,8 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 			l.export(context.Background(), l.build(mkBeacon(), true), time.Second)
 			tr.exportSpans(context.Background(), []spanItem{{n: 1, rs: tr.resourceSpans(tracedBeacon())}}, time.Second)
 			if tc.success {
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPSent])
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansSent])
+				require.EqualValues(t, 1, c.snapshot()[CounterLogsSent])
+				require.EqualValues(t, 1, c.snapshot()[CounterSpansSent])
 				mu.Lock()
 				require.Len(t, seen, 2)
 				for _, auth := range seen {
@@ -396,8 +396,8 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 				}
 				mu.Unlock()
 			} else {
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterOTLPErrors])
-				require.EqualValues(t, 1, c.snapshot()[aggregate.CounterSpansErrors])
+				require.EqualValues(t, 1, c.snapshot()[CounterLogsErrors])
+				require.EqualValues(t, 1, c.snapshot()[CounterSpansErrors])
 			}
 		})
 	}
