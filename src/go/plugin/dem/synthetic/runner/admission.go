@@ -3,8 +3,8 @@
 package runner
 
 import (
-	"container/list"
 	"context"
+	"slices"
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -18,30 +18,42 @@ type executionKey struct {
 
 type admissionWaiter struct {
 	ready   chan struct{}
-	element *list.Element
 	job     *admissionJob
 	granted bool
 }
 
+// admissionJob queues one logical job's requests. It is in the owner's ready
+// queue exactly when it has waiters and no active attempt.
 type admissionJob struct {
 	key     executionKey
 	active  bool
-	waiters list.List
-	ready   *list.Element
+	waiters []*admissionWaiter
 }
 
-// The ready list contains eligible jobs, not individual requests. Each release
-// gives a waiting job one turn before placing its remaining requests at the tail.
-// All mutations, including cancellation, are O(1) per granted or removed request.
+// executionOwner shares browser.concurrency slots fairly across jobs, per
+// Agent. The ready queue holds jobs, not requests: each release gives the next
+// waiting job one turn and requeues a job with remaining requests at the tail.
+// Queues stay short (a job waits with its monitor call plus explicit
+// rehearsals; the ready queue has at most one entry per configured job), so
+// slices with linear removal on cancellation are enough.
 type executionOwner struct {
 	mu         sync.Mutex
 	limit      int
 	active     int
 	jobs       map[executionKey]*admissionJob
-	ready      list.List
+	ready      []*admissionJob
 	fatal      chan error
 	poisoned   chan struct{}
 	poisonOnce sync.Once
+}
+
+func newExecutionOwner(limit int) *executionOwner {
+	return &executionOwner{
+		limit:    limit,
+		jobs:     make(map[executionKey]*admissionJob),
+		fatal:    make(chan error, 1),
+		poisoned: make(chan struct{}),
+	}
 }
 
 func (o *executionOwner) acquire(ctx context.Context, key executionKey) (*admissionJob, error) {
@@ -60,9 +72,9 @@ func (o *executionOwner) acquire(ctx context.Context, key executionKey) (*admiss
 		o.jobs[key] = job
 	}
 	waiter := &admissionWaiter{ready: make(chan struct{}), job: job}
-	waiter.element = job.waiters.PushBack(waiter)
-	if !job.active && job.ready == nil {
-		job.ready = o.ready.PushBack(job)
+	job.waiters = append(job.waiters, waiter)
+	if !job.active && len(job.waiters) == 1 {
+		o.ready = append(o.ready, job)
 	}
 	o.dispatch()
 	o.mu.Unlock()
@@ -79,11 +91,11 @@ func (o *executionOwner) acquire(ctx context.Context, key executionKey) (*admiss
 }
 
 func (o *executionOwner) dispatch() {
-	for o.active < o.limit && o.ready.Len() != 0 && !o.isPoisoned() {
-		job := o.ready.Remove(o.ready.Front()).(*admissionJob)
-		job.ready = nil
-		waiter := job.waiters.Remove(job.waiters.Front()).(*admissionWaiter)
-		waiter.element = nil
+	for o.active < o.limit && len(o.ready) != 0 && !o.isPoisoned() {
+		job := o.ready[0]
+		o.ready = slices.Delete(o.ready, 0, 1)
+		waiter := job.waiters[0]
+		job.waiters = slices.Delete(job.waiters, 0, 1)
 		waiter.granted = true
 		job.active = true
 		o.active++
@@ -91,6 +103,8 @@ func (o *executionOwner) dispatch() {
 	}
 }
 
+// remove withdraws a waiter that stopped waiting. A grant that raced the stop
+// is released instead.
 func (o *executionOwner) remove(waiter *admissionWaiter) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -99,15 +113,10 @@ func (o *executionOwner) remove(waiter *admissionWaiter) {
 		return
 	}
 	job := waiter.job
-	job.waiters.Remove(waiter.element)
-	if job.waiters.Len() == 0 {
-		if job.ready != nil {
-			o.ready.Remove(job.ready)
-			job.ready = nil
-		}
-		if !job.active {
-			delete(o.jobs, job.key)
-		}
+	job.waiters = slices.DeleteFunc(job.waiters, func(w *admissionWaiter) bool { return w == waiter })
+	if len(job.waiters) == 0 && !job.active {
+		o.ready = slices.DeleteFunc(o.ready, func(j *admissionJob) bool { return j == job })
+		delete(o.jobs, job.key)
 	}
 }
 
@@ -120,19 +129,12 @@ func (o *executionOwner) release(job *admissionJob) {
 func (o *executionOwner) releaseLocked(job *admissionJob) {
 	job.active = false
 	o.active--
-	if job.waiters.Len() == 0 {
+	if len(job.waiters) == 0 {
 		delete(o.jobs, job.key)
 	} else {
-		job.ready = o.ready.PushBack(job)
+		o.ready = append(o.ready, job)
 	}
 	o.dispatch()
 }
 
-func (o *executionOwner) isPoisoned() bool {
-	select {
-	case <-o.poisoned:
-		return true
-	default:
-		return false
-	}
-}
+func (o *executionOwner) isPoisoned() bool { return closed(o.poisoned) }

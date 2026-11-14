@@ -70,17 +70,12 @@ func New(source Source, history historyWriter, artifacts artifactStore, concurre
 
 func newEngine(source Source, history historyWriter, artifacts artifactStore, concurrency int) *Engine {
 	return &Engine{
-		executionOwner: &executionOwner{
-			limit:    concurrency,
-			jobs:     make(map[executionKey]*admissionJob),
-			fatal:    make(chan error, 1),
-			poisoned: make(chan struct{}),
-		},
-		checks:    &checkOwner{},
-		source:    source,
-		history:   history,
-		artifacts: artifacts,
-		platform:  runtimeAllowed,
+		executionOwner: newExecutionOwner(concurrency),
+		checks:         &checkOwner{},
+		source:         source,
+		history:        history,
+		artifacts:      artifacts,
+		platform:       runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},

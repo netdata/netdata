@@ -80,23 +80,23 @@ func (e *Engine) executeProcess(
 	_ = errWrite.Close()
 	var inputErr error
 	var readers sync.WaitGroup
-	readers.Add(3)
-	go func() {
-		defer readers.Done()
+	readers.Go(func() {
 		defer inWrite.Close()
 		if _, err := inWrite.Write(input); err != nil {
 			inputErr = err
 			cancel()
 		}
-	}()
-	go func() {
-		defer readers.Done()
+	})
+	readers.Go(func() {
 		defer outRead.Close()
 		if err := stdout(outRead); err != nil {
 			cancel()
 		}
-	}()
-	go func() { defer readers.Done(); defer errRead.Close(); stderr(errRead) }()
+	})
+	readers.Go(func() {
+		defer errRead.Close()
+		stderr(errRead)
+	})
 	result := process.Wait()
 	if !result.Drained {
 		e.poison(result.Err)
