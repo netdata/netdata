@@ -54,6 +54,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	handler := rumfunc.New(query.New(registry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
+		Permissions: "0x1b",
 	}).RawResponse
 	require.NotNil(t, response)
 	require.Equal(t, "last_observed_us", response["default_sort_column"])
@@ -69,14 +70,14 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	require.EqualValues(t, 1, data[1][4])
 	require.EqualValues(t, 0, data[1][5])
 	require.Equal(t, []string{"prior-user"}, data[1][12])
-	timeline := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-session-events", Args: []string{"site:shop", "session_id:promoted"}}).RawResponse
+	timeline := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-session-events", Args: []string{"site:shop", "session_id:promoted"}, Permissions: "0x1b"}).RawResponse
 	require.NotNil(t, timeline)
 	events := timeline["data"].([][]any)
 	require.Len(t, events, 2)
 	require.Equal(t, observed.UnixMicro(), events[0][0], "browser event time must not become the native history clock")
 	require.Equal(t, observed.Add(time.Minute).UnixMicro(), events[1][0], "identity timeline includes the later promotion trigger")
 	// No observation in the gap implies no selected activity, despite observations on both sides.
-	gap := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()+10), fmt.Sprintf("before:%d", observed.Unix()+20)}}).RawResponse
+	gap := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()+10), fmt.Sprintf("before:%d", observed.Unix()+20)}, Permissions: "0x1b"}).RawResponse
 	require.NotNil(t, gap)
 	require.Empty(t, gap["data"])
 }

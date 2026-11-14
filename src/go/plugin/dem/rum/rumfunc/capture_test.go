@@ -40,7 +40,8 @@ func TestPageFrustrationDistinguishesDisabledFromMeasuredZero(t *testing.T) {
 				count: tc.count,
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method: "rum-pages",
+				Method:      "rum-pages",
+				Permissions: "0x1b",
 			})
 			require.NotNil(t, response.RawResponse)
 			rows := response.RawResponse["data"].([][]any)

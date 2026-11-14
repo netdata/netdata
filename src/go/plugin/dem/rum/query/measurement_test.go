@@ -60,7 +60,8 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	require.Equal(t, 1, sites[0].Activity.ObservedSessions)
 	require.EqualValues(t, 1, sites[0].Activity.ApplicationViewsWindow)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method: "rum-live",
+		Method:      "rum-live",
+		Permissions: "0x1b",
 	}).RawResponse
 	require.NotNil(t, response)
 	columns := response["columns"].(map[string]any)

@@ -25,7 +25,8 @@ func TestSitesGeoIPSourceEvidence(t *testing.T) {
 	handler := rumfunc.New(query.New(hub, nil), nil)
 	collector := func() map[string]any {
 		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-			Method: "rum-sites",
+			Method:      "rum-sites",
+			Permissions: "0x1b",
 		}).RawResponse
 		data, err := json.Marshal(response["collector"])
 		require.NoError(t, err)

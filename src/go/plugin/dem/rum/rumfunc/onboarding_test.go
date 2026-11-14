@@ -38,7 +38,8 @@ func TestSiteFunctionPublishesIndependentFacts(t *testing.T) {
 		response := rumfunc.New(onboardingSource{
 			site: site,
 		}, nil).HandleRaw(context.Background(), funcapi.RawMethodRequest{
-			Method: "rum-sites",
+			Method:      "rum-sites",
+			Permissions: "0x1b",
 		}).RawResponse
 		require.NotNil(t, response)
 		columns := response["columns"].(map[string]any)

@@ -76,7 +76,8 @@ func TestOnboardingBrowser(t *testing.T) {
 		case "/function":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(fn.HandleRaw(r.Context(), funcapi.RawMethodRequest{
-				Method: "rum-sites",
+				Method:      "rum-sites",
+				Permissions: "0x1b",
 			}).RawResponse)
 			return
 		case "/requests":

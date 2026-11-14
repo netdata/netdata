@@ -163,8 +163,9 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 		response := handler.HandleRaw(
 			ctx,
 			funcapi.RawMethodRequest{
-				Method: "rum-session-events",
-				Args:   []string{"site:site", "session_id:session"},
+				Method:      "rum-session-events",
+				Args:        []string{"site:site", "session_id:session"},
+				Permissions: "0x1b",
 			},
 		)
 		require.NotNil(t, response.RawResponse, "status=%d message=%s", response.Status, response.Message)
@@ -253,8 +254,9 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 			response := handler.HandleRaw(
 				context.Background(),
 				funcapi.RawMethodRequest{
-					Method: tc.method,
-					Args:   tc.args,
+					Method:      tc.method,
+					Args:        tc.args,
+					Permissions: "0x1b",
 				},
 			)
 			assert.Equal(t, tc.status, response.Status)
@@ -273,15 +275,17 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"session_id:empty"},
+			Method:      "rum-session-events",
+			Args:        []string{"session_id:empty"},
+			Permissions: "0x1b",
 		},
 	)
 	require.NotNil(t, response.RawResponse)
 	require.Len(t, response.RawResponse["data"].([][]any), 1)
 	a.Snapshot()
 	response = handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-		Method: "rum-pages",
+		Method:      "rum-pages",
+		Permissions: "0x1b",
 	})
 	rows := response.RawResponse["data"].([][]any)
 	require.Len(t, rows, 1)
@@ -291,8 +295,9 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 	response = handler.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"session_id:empty"},
+			Method:      "rum-session-events",
+			Args:        []string{"session_id:empty"},
+			Permissions: "0x1b",
 		},
 	)
 	assert.Equal(t, 499, response.Status)
@@ -346,8 +351,9 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 			response := handler.HandleRaw(
 				ctx,
 				funcapi.RawMethodRequest{
-					Method: method,
-					Args:   args,
+					Method:      method,
+					Args:        args,
+					Permissions: "0x1b",
 				},
 			)
 			require.NotNil(t, response.RawResponse)
@@ -416,7 +422,8 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 			handler := rumfunc.New(query.New(hub, st), nil)
 			for _, method := range []string{"rum-sessions", "rum-errors"} {
 				response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-					Method: method,
+					Method:      method,
+					Permissions: "0x1b",
 				})
 				require.NotNil(t, response.RawResponse)
 				help := response.RawResponse["help"]
@@ -425,7 +432,8 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 				assert.Contains(t, help, "earlier policies")
 			}
 			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-				Method: "rum-sites",
+				Method:      "rum-sites",
+				Permissions: "0x1b",
 			})
 			require.NotNil(t, response.RawResponse)
 			rows := response.RawResponse["data"].([][]any)
@@ -463,8 +471,9 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	}
 	handler := rumfunc.New(query.New(rumregistry.New(), st), nil)
 	overview := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method: "rum-errors",
-		Args:   []string{"site:retired"},
+		Method:      "rum-errors",
+		Args:        []string{"site:retired"},
+		Permissions: "0x1b",
 	})
 	require.NotNil(t, overview.RawResponse)
 	rows := overview.RawResponse["data"].([][]any)
@@ -477,8 +486,9 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	detail := handler.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
-			Method: "rum-errors",
-			Args:   []string{"site:retired", "fingerprint:fp"},
+			Method:      "rum-errors",
+			Args:        []string{"site:retired", "fingerprint:fp"},
+			Permissions: "0x1b",
 		},
 	)
 	require.NotNil(t, detail.RawResponse)
@@ -489,8 +499,9 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	timeline := handler.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"site:retired", "session_id:b"},
+			Method:      "rum-session-events",
+			Args:        []string{"site:retired", "session_id:b"},
+			Permissions: "0x1b",
 		},
 	)
 	require.NotNil(t, timeline.RawResponse)
@@ -498,8 +509,9 @@ func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	invalid := handler.HandleRaw(
 		ctx,
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"session_id:b", "after:-60"},
+			Method:      "rum-session-events",
+			Args:        []string{"session_id:b", "after:-60"},
+			Permissions: "0x1b",
 		},
 	)
 	assert.Equal(t, 400, invalid.Status, "unused range filters must not be silently accepted")

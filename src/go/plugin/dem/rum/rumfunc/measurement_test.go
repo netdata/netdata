@@ -40,7 +40,8 @@ func TestPagePopulationCountsAndAbsentPercentiles(t *testing.T) {
 				},
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method: "rum-pages",
+				Method:      "rum-pages",
+				Permissions: "0x1b",
 			}).RawResponse
 			require.NotNil(t, response)
 			rows := response["data"].([][]any)
@@ -94,7 +95,8 @@ func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
 				rate:    tc.rate,
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method: "rum-sites",
+				Method:      "rum-sites",
+				Permissions: "0x1b",
 			}).RawResponse
 			require.NotNil(t, response)
 			rows := response["data"].([][]any)
@@ -131,7 +133,8 @@ func TestPageActivityCountsAndOptionalFrustration(t *testing.T) {
 				},
 			}, nil)
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method: "rum-pages",
+				Method:      "rum-pages",
+				Permissions: "0x1b",
 			}).RawResponse
 			require.NotNil(t, response)
 			rows := response["data"].([][]any)
@@ -152,7 +155,8 @@ func TestSiteActivityCountsAndDetailPopulation(t *testing.T) {
 		rate:    1,
 	}, nil)
 	response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-		Method: "rum-sites",
+		Method:      "rum-sites",
+		Permissions: "0x1b",
 	}).RawResponse
 	require.NotNil(t, response)
 	rows := response["data"].([][]any)

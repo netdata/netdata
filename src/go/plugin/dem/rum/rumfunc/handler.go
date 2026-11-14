@@ -93,6 +93,9 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			Help:   response["help"].(string),
 		}
 	}
+	if r := rawfunc.RequireMember(req); r != nil {
+		return r
+	}
 	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r
 	}

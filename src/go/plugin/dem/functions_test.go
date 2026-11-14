@@ -321,8 +321,9 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	response := handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
-			Method: "rum-sessions",
-			Args:   []string{"site:retired"},
+			Method:      "rum-sessions",
+			Args:        []string{"site:retired"},
+			Permissions: "0x1b",
 		},
 	)
 	require.NotNil(t, response.RawResponse)
@@ -332,8 +333,9 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	response = handler.HandleRaw(
 		context.Background(),
 		funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"site:retired", "session_id:session"},
+			Method:      "rum-session-events",
+			Args:        []string{"site:retired", "session_id:session"},
+			Permissions: "0x1b",
 		},
 	)
 	require.Len(t, response.RawResponse["data"].([][]any), 1)

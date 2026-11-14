@@ -51,8 +51,9 @@ func TestMetadataDocumentsProcessFunctions(t *testing.T) {
 				}
 			}
 			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method: declaration.ID,
-				Args:   args,
+				Method:      declaration.ID,
+				Args:        args,
+				Permissions: "0x1b",
 			})
 			require.NotNil(t, response.RawResponse)
 			require.Equal(t, 200, response.RawResponse["status"])
@@ -109,7 +110,7 @@ func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
 			if method == "rum-session-events" {
 				args = append(args, "session_id:visit")
 			}
-			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Args: args}).RawResponse
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Args: args, Permissions: "0x1b"}).RawResponse
 			require.NotNil(t, response)
 			require.Equal(t, 200, response["status"])
 			fields := response["columns"].(map[string]any)

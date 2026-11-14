@@ -49,7 +49,8 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 	for method, field := range map[string]string{"rum-errors": "fingerprint", "rum-pages": "page", "rum-sessions": "session_id"} {
 		t.Run(method, func(t *testing.T) {
 			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-				Method: method,
+				Method:      method,
+				Permissions: "0x1b",
 			})
 			require.NotNil(t, response.RawResponse)
 			rows := response.RawResponse["data"].([][]any)
@@ -103,8 +104,9 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	handler := rumfunc.New(query.New(sites, retained), nil)
 	timeline := func() [][]any {
 		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-			Method: "rum-session-events",
-			Args:   []string{"site:shop", "session_id:shared"},
+			Method:      "rum-session-events",
+			Args:        []string{"site:shop", "session_id:shared"},
+			Permissions: "0x1b",
 		})
 		require.NotNil(t, response.RawResponse)
 		return response.RawResponse["data"].([][]any)
@@ -124,8 +126,9 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	assert.Equal(t, pending, timeline(), "history remains attributable without a running site")
 	for _, id := range []string{ids[0], ids[2]} {
 		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-			Method: "rum-sessions",
-			Args:   []string{"site:shop", "user_id:" + id},
+			Method:      "rum-sessions",
+			Args:        []string{"site:shop", "user_id:" + id},
+			Permissions: "0x1b",
 		})
 		require.NotNil(t, response.RawResponse)
 		rows := response.RawResponse["data"].([][]any)
@@ -137,8 +140,9 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 		assert.NotContains(t, columns, "user")
 	}
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method: "rum-sessions",
-		Args:   []string{"site:shop", "user_id:123"},
+		Method:      "rum-sessions",
+		Args:        []string{"site:shop", "user_id:123"},
+		Permissions: "0x1b",
 	})
 	require.NotNil(t, response.RawResponse)
 	assert.Empty(t, response.RawResponse["data"])

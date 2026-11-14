@@ -131,8 +131,9 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	// The old GUID still returns retained rows after in-place reassignment.
 	for _, method := range []string{"rum-sessions", "rum-errors"} {
 		response := rumfunc.New(service, nil).HandleRaw(ctx, funcapi.RawMethodRequest{
-			Method: method,
-			Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111"},
+			Method:      method,
+			Args:        []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111"},
+			Permissions: "0x1b",
 		})
 		require.NotEmpty(t, response.RawResponse["data"].([][]any))
 		help := response.RawResponse["help"].(string)
@@ -142,8 +143,9 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	// Actual Function requests carry both selectors and expose the stored group.
 	handler := rumfunc.New(service, nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method: "rum-session-events",
-		Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111", "session_id:shared"},
+		Method:      "rum-session-events",
+		Args:        []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111", "session_id:shared"},
+		Permissions: "0x1b",
 	})
 	require.Equal(t, 200, response.RawResponse["status"])
 	table := response.RawResponse["data"].([][]any)
