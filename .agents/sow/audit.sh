@@ -485,7 +485,11 @@ if [ -d .agents/skills ]; then
   done < <(git ls-files -- '.agents/skills/**' 'docs/netdata-ai/skills/**' \
              | while IFS= read -r skill_file; do
                  [ -f "$skill_file" ] || continue
-                 case "$skill_file" in *.md) src=$(md_markdown_lines "$skill_file") ;; *) src=$(cat "$skill_file") ;; esac
+                 # Leading "(" on the patterns: bash 3.2 (macOS /bin/bash) ends the enclosing <( ) at a bare ")".
+                 case "$skill_file" in
+                   (*.md) src=$(md_markdown_lines "$skill_file") ;;
+                   (*) src=$(cat "$skill_file") ;;
+                 esac
                  printf '%s\n' "$src" | grep -o -E '[A-Za-z0-9_./-]+\.md#[A-Za-z0-9_-]+' \
                    | sed "s|^|$skill_file\||"
                done | sort -u)
