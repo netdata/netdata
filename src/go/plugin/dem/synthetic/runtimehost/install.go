@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -28,8 +27,7 @@ func (s borrowedSource) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	m := s.consumer.Manifest()
-	return managedUse{use: use, identity: synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}}, nil
+	return managedUse{use: use, identity: s.consumer.Manifest().Identity()}, nil
 }
 
 type Qualifier interface {

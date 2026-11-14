@@ -123,8 +123,7 @@ func New(config Config) *Host {
 		}
 		return h
 	}
-	manifest := h.consumer.Manifest()
-	h.identity = &synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}
+	h.identity = new(h.consumer.Manifest().Identity())
 	h.state = StateReady
 	return h
 }
@@ -168,9 +167,7 @@ func (h *Host) Status() Snapshot {
 		result.Storage = &status
 		result.StorageError = errorText(err)
 		if result.Storage.Selected != nil && result.Storage.SelectionError == "" && result.Storage.InventoryError == "" {
-			m := result.Storage.Selected
-			selected := synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
-			result.RestartRequired = result.Running == nil || *result.Running != selected
+			result.RestartRequired = result.Running == nil || *result.Running != result.Storage.Selected.Identity()
 		}
 	}
 	if h.native != nil {

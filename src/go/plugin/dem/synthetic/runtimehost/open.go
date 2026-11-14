@@ -8,7 +8,6 @@ import (
 	goruntime "runtime"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -46,7 +45,7 @@ func OpenRuntime(cfg RuntimeConfig, varLibPath string) *RuntimeHandle {
 			paths, manifest, result.SetupError = runtime.ReadPreload(cfg.PreloadPath)
 			result.Manifest = &manifest
 			if result.SetupError == nil {
-				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: synthetic.RuntimeIdentity{Version: manifest.Version, SHA256: manifest.Archive.SHA256, Contract: manifest.Contract}}}
+				result.Source = preloadedRuntime{paths: runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: manifest.Identity()}}
 			}
 		}
 		if result.SetupError != nil {
