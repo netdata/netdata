@@ -33,13 +33,13 @@ type runtimeResult struct {
 	err            error
 }
 
-// runtimeRun runs a handled runtime command without a stdin control channel and
-// returns its raw output streams.
+// runtimeRun runs a `runtime ...` command line without a stdin control channel
+// and returns its raw output streams.
 func runtimeRun(t *testing.T, ctx context.Context, args ...string) runtimeResult {
 	t.Helper()
+	require.Equal(t, "runtime", args[0])
 	var out, diagnostic bytes.Buffer
-	handled, err := runRuntimeCommand(ctx, args, nil, &out, &diagnostic)
-	require.True(t, handled)
+	err := runRuntimeCommand(ctx, args[1:], nil, &out, &diagnostic)
 	return runtimeResult{stdout: out.String(), stderr: diagnostic.String(), err: err}
 }
 
@@ -306,13 +306,6 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 	assert.NoDirExists(t, filepath.Dir(cache))
 }
 func TestRuntimeDispatchAndBadArguments(t *testing.T) {
-	for _, args := range [][]string{nil, {"-d"}, {"--version"}} {
-		var out bytes.Buffer
-		handled, err := runRuntimeCommand(context.Background(), args, nil, &out, &out)
-		require.NoError(t, err)
-		assert.False(t, handled)
-		assert.Empty(t, out.String())
-	}
 	for _, args := range [][]string{
 		{"runtime"}, {"runtime", "unknown"}, {"runtime", "status", "stray"}, {"runtime", "install", "--url", "https://arbitrary.invalid"},
 		{"runtime", "import"}, {"runtime", "preload"}, {"runtime", "status", "--archive", "/tmp/archive"},

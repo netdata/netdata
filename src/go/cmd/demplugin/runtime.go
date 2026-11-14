@@ -23,29 +23,26 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// runRuntimeCommand handles `dem.plugin runtime ...` before cli.Parse; these
-// commands never enter the plugin protocol. Executable candidates require
-// publisher-authenticated release metadata. --cancel-on-stdin-close borrows
-// input as a private control channel; the caller retains ownership of input.
-func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) (bool, error) {
-	if len(args) == 0 || args[0] != "runtime" {
-		return false, nil
+// runRuntimeCommand runs `dem.plugin runtime <command> [flags]`; args start
+// after "runtime". main routes these commands before cli.Parse, so they never
+// enter the plugin protocol. --cancel-on-stdin-close borrows input as a private
+// control channel; the caller retains ownership of input.
+func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return errors.New("usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]")
 	}
-	if len(args) < 2 {
-		return true, errors.New("usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]")
-	}
-	command, flags := args[1], args[2:]
+	command, flags := args[0], args[1:]
 	switch {
 	case command == "setup-plan":
-		return true, runSetupPlan(flags, stdout, stderr)
+		return runSetupPlan(flags, stdout, stderr)
 	case strings.HasPrefix(command, "native-"):
-		return true, runNativeCommand(ctx, command, flags, stdout, stderr)
+		return runNativeCommand(ctx, command, flags, stdout, stderr)
 	}
 	switch command {
 	case "ensure", "install", "update", "repair", "uninstall", "preload", "status", "qualify":
-		return true, runAdminCommand(ctx, command, flags, input, stdout, stderr)
+		return runAdminCommand(ctx, command, flags, input, stdout, stderr)
 	default:
-		return true, fmt.Errorf("unknown runtime command %q", command)
+		return fmt.Errorf("unknown runtime command %q", command)
 	}
 }
 
@@ -89,12 +86,11 @@ func runAdminCommand(ctx context.Context, command string, args []string, input *
 		cfg.CachePath = f.cache
 	}
 	report := runtimeCommandReport{Command: command, Mode: cfg.Mode, State: "unavailable", DownloadAllowed: f.allowDownload, ReleasePath: f.release}
-	if command == "ensure" {
-		report.Outcome = "failed"
-	}
 	if command == "repair" {
 		report.State = "unknown"
 	}
+	// preload always prepares a fresh root through managed storage, whatever the
+	// configured mode.
 	if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
 		err = runFixedRuntimeCommand(ctx, command, cfg, &report)
 	} else {
@@ -225,6 +221,15 @@ func (r *runtimeCommandReport) setRuntime(identity synthetic.RuntimeIdentity) {
 	r.Generation = identity.SHA256
 }
 
+// inventory records the store inventory and its error in the report's storage
+// fields. Only status treats the error as its own failure.
+func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, error) {
+	status, err := store.Inspect()
+	r.Storage = &status
+	r.StorageError = errorString(err)
+	return status, err
+}
+
 // selectedInstallation reports executable selection independently of a candidate
 // and of damage to unrelated retained generations.
 func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
@@ -243,7 +248,8 @@ func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
 	}
 }
 
-// writeReport records a command failure in the report and prints it.
+// writeReport records a command failure in the report and prints it. It owns
+// the failed ensure outcome, including a close failure after a selection.
 func writeReport(stdout io.Writer, report runtimeCommandReport, err error) error {
 	if err != nil {
 		if report.Command == "ensure" {
@@ -273,8 +279,9 @@ func closeUnlessUndrained(err error, resource io.Closer) error {
 	return errors.Join(err, resource.Close())
 }
 
-// varLibDir resolves the Agent state directory the same way before plugin
-// configuration is initialized: environment, then build-time paths.
+// varLibDir returns the raw Agent state directory (environment, then build-time
+// paths); plugin configuration is not initialized for runtime commands, and
+// setup-plan validates this value before it is cleaned.
 func varLibDir() string {
 	if dir := os.Getenv("NETDATA_LIB_DIR"); dir != "" {
 		return dir

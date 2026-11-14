@@ -36,15 +36,11 @@ func init() {
 }
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
-	runtimeContext := context.Background()
-	stopRuntimeSignals := func() {}
 	if len(os.Args) > 1 && os.Args[1] == "runtime" {
-		runtimeContext, stopRuntimeSignals = signal.NotifyContext(runtimeContext, os.Interrupt, syscall.SIGTERM)
-	}
-	handled, runtimeError := runRuntimeCommand(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
-	stopRuntimeSignals()
-	if handled {
-		if err := runtimeError; err != nil {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		err := runRuntimeCommand(ctx, os.Args[2:], os.Stdin, os.Stdout, os.Stderr)
+		stop()
+		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}

@@ -10,11 +10,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
+
+const unchangedReleaseNotice = "Selected release is unchanged. Already running processes keep their startup release until restart."
+
+// releaseLoader returns publisher-authenticated release metadata; executable
+// candidates are never begun without it.
+type releaseLoader = func(context.Context) (runtime.VerifiedRelease, error)
 
 // runFixedRuntimeCommand serves status and qualify for preloaded and native
 // runtimes, whose files this CLI never changes.
@@ -48,13 +53,7 @@ func inspectFixedRuntime(ctx context.Context, command string, cfg runtimehost.Co
 	if command != "qualify" {
 		return nil
 	}
-	qualification, err := runner.Qualify(ctx, handle.Source)
-	report.Qualification = qualification
-	if err != nil {
-		return err
-	}
-	report.State = "qualified"
-	return nil
+	return qualifyInstalled(ctx, handle.Source, report)
 }
 
 // runManagedCommand runs a command against managed runtime storage; preload
@@ -88,8 +87,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	preparing := preparesCandidate(command)
-	if !preparing {
+	if !preparesCandidate(command) {
 		if _, err := os.Stat(storeConfig.Path); err != nil {
 			if command == "status" && !errors.Is(err, os.ErrNotExist) {
 				report.State = "unknown"
@@ -104,7 +102,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 		}
 		return err
 	}
-	sealed := false
+	load := cfg.ReleaseLoader(f.release, f.allowDownload)
 	switch command {
 	case "status":
 		err = reportStatus(store, report)
@@ -112,84 +110,187 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 		err = uninstallRuntime(ctx, store, report)
 	case "qualify":
 		err = qualifySelected(ctx, store, report)
+	case "ensure":
+		err = ensureRuntime(ctx, store, load, f.archive, report, stderr)
+	case "preload":
+		err = preloadRuntime(ctx, store, storeConfig.Path, load, f.archive, report)
 	default:
-		sealed, err = prepareRuntime(ctx, command, store, storeConfig.Path, cfg, f, report, stderr)
-	}
-	// Status reports its own inspection, ensure reports no inventory, and a sealed
-	// preload root is no longer managed storage. The rest report storage after
-	// their candidate or consumer closed.
-	if command != "status" && command != "ensure" && !sealed {
-		status, inspectErr := store.Inspect()
-		report.Storage = &status
-		report.StorageError = errorString(inspectErr)
-		if preparing {
-			report.selectedInstallation(status)
-			if err != nil && command == "repair" {
-				report.Notice = "Repair failed; selected installation state is shown separately from candidate progress. A cleared selection is not restored. Stop and drain all consumers before retrying repair."
-			}
-		}
+		err = installRuntime(ctx, command, store, load, f, report, stderr)
 	}
 	return closeUnlessUndrained(err, store)
 }
 
-// prepareRuntime runs one candidate transaction: begin, acquire, qualify, then
-// select the candidate or seal it as the preload root at path. sealed reports
-// a completed seal, even when closing the candidate fails afterwards.
-func prepareRuntime(ctx context.Context, command string, store *runtime.Store, path string, cfg runtimehost.Config, f adminFlags, report *runtimeCommandReport, stderr io.Writer) (sealed bool, err error) {
-	candidate, selected, err := beginCandidate(ctx, command, store, cfg, f, stderr)
+func reportStatus(store *runtime.Store, report *runtimeCommandReport) error {
+	status, err := report.inventory(store)
+	report.selectedInstallation(status)
+	report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
 	if err != nil {
-		return false, err
+		return err
+	}
+	if status.Selected == nil {
+		return runtime.ErrUnavailable
+	}
+	return nil
+}
+
+func uninstallRuntime(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
+	err := store.Uninstall(ctx)
+	if err == nil {
+		report.State = "uninstalled"
+		report.Notice = "Runtime files removed. This command does not change administrator-owned host policy; netdata-dem-runtime.sh handles high-level policy cleanup."
+	}
+	_, _ = report.inventory(store)
+	return err
+}
+
+// qualifySelected qualifies the selected generation, then reports the store
+// inventory after releasing it.
+func qualifySelected(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
+	consumer, err := store.AcquireSelected()
+	if err == nil {
+		report.setRuntime(consumer.Manifest().Identity())
+		report.State = "installed"
+		err = closeUnlessUndrained(qualifyInstalled(ctx, runtimehost.Borrow(consumer), report), consumer)
+	}
+	_, _ = report.inventory(store)
+	return err
+}
+
+// qualifyInstalled qualifies an installed runtime in a standalone execution
+// scope and reports it qualified when every check passes.
+func qualifyInstalled(ctx context.Context, source runner.Source, report *runtimeCommandReport) error {
+	qualification, err := runner.Qualify(ctx, source)
+	report.Qualification = qualification
+	if err != nil {
+		return err
+	}
+	report.State = "qualified"
+	return nil
+}
+
+// ensureRuntime enrolls a runtime only when none is selected. A usable selection
+// is reported without download, qualification or store inventory.
+func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader, archive string, report *runtimeCommandReport, stderr io.Writer) error {
+	candidate, selected, err := store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
+		fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
+		return load(ctx)
+	})
+	if err != nil {
+		return err
 	}
 	if selected != nil {
 		report.setRuntime(selected.Identity())
 		report.State = "installed"
 		report.Outcome = "already-selected"
 		report.Notice = "A usable runtime is already selected; no download, qualification or update policy change was performed. A new DEM process uses this selection. Running processes may require a restart; their active release was not inspected."
-		return false, nil
+		return nil
 	}
 	if candidate == nil {
-		report.Notice = "Selected release is unchanged. Already running processes keep their startup release until restart."
-		return false, nil
+		report.Notice = unchangedReleaseNotice
+		return nil
 	}
-	identity := candidate.Manifest().Identity()
-	report.Candidate = &identity
-	report.CandidateState = "requested"
-	err = finishCandidate(ctx, command, candidate, identity, path, f.archive, report)
-	sealed = command == "preload" && err == nil
-	return sealed, closeUnlessUndrained(err, candidate)
+	err = selectCandidate(ctx, candidate, archive, report)
+	if err == nil {
+		report.Outcome = "newly-selected"
+		report.setRuntime(candidate.Manifest().Identity())
+	}
+	return closeUnlessUndrained(err, candidate)
 }
 
-// beginCandidate starts the transaction. ensure returns the selected manifest
-// instead when a usable selection exists; no candidate and no selection means
-// the selected release already satisfies the command.
-func beginCandidate(ctx context.Context, command string, store *runtime.Store, cfg runtimehost.Config, f adminFlags, stderr io.Writer) (*runtime.Candidate, *runtime.Manifest, error) {
-	load := cfg.ReleaseLoader(f.release, f.allowDownload)
-	if command == "ensure" {
-		return store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
-			fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
-			return load(ctx)
-		})
+// installRuntime installs, updates or repairs the selection. Its report shows
+// the selected installation separately from candidate progress.
+func installRuntime(ctx context.Context, command string, store *runtime.Store, load releaseLoader, f adminFlags, report *runtimeCommandReport, stderr io.Writer) error {
+	err := installCandidate(ctx, command, store, load, f, report, stderr)
+	status, _ := report.inventory(store)
+	report.selectedInstallation(status)
+	if err != nil && command == "repair" {
+		report.Notice = "Repair failed; selected installation state is shown separately from candidate progress. A cleared selection is not restored. Stop and drain all consumers before retrying repair."
 	}
+	return err
+}
+
+func installCandidate(ctx context.Context, command string, store *runtime.Store, load releaseLoader, f adminFlags, report *runtimeCommandReport, stderr io.Writer) error {
 	options := runtime.ReleaseInstallOptions{Operation: runtime.ReleaseOperation(command)}
-	if command == "preload" {
-		options.Operation = runtime.InstallRelease
-	}
-	if options.Operation == runtime.InstallRelease || options.Operation == runtime.RepairRelease {
+	// install and repair set the update policy; update preserves the installed one.
+	if command != "update" {
 		options.Updates = runtime.AutomaticUpdates
-		if f.manualUpdates || command == "preload" {
+		if f.manualUpdates {
 			options.Updates = runtime.ManualUpdates
-		}
-		if options.Updates == runtime.AutomaticUpdates {
+		} else {
 			fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
 		}
 	}
 	candidate, err := store.BeginPublishedInstall(ctx, options, load)
-	return candidate, nil, err
+	if err != nil {
+		return err
+	}
+	if candidate == nil {
+		report.Notice = unchangedReleaseNotice
+		return nil
+	}
+	return closeUnlessUndrained(selectCandidate(ctx, candidate, f.archive, report), candidate)
 }
 
-// finishCandidate imports or downloads the candidate, qualifies it in a
-// standalone execution scope, and then selects it or seals it as a preload root.
-func finishCandidate(ctx context.Context, command string, candidate *runtime.Candidate, identity synthetic.RuntimeIdentity, path, archive string, report *runtimeCommandReport) error {
+// preloadRuntime prepares a candidate in a fresh final root and seals it there.
+// A sealed root is no longer managed storage, so only an unsealed attempt
+// reports the store inventory.
+func preloadRuntime(ctx context.Context, store *runtime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) error {
+	sealed, err := sealPreload(ctx, store, root, load, archive, report)
+	if !sealed {
+		status, _ := report.inventory(store)
+		report.selectedInstallation(status)
+	}
+	return err
+}
+
+// sealPreload reports a completed seal even when closing the candidate fails
+// afterwards.
+func sealPreload(ctx context.Context, store *runtime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) (sealed bool, err error) {
+	options := runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: runtime.ManualUpdates}
+	candidate, err := store.BeginPublishedInstall(ctx, options, load)
+	if err != nil {
+		return false, err
+	}
+	if candidate == nil {
+		report.Notice = unchangedReleaseNotice
+		return false, nil
+	}
+	err = prepareCandidate(ctx, candidate, archive, report)
+	if err == nil {
+		err = candidate.SealPreload()
+	}
+	if err == nil {
+		sealed = true
+		report.setRuntime(candidate.Manifest().Identity())
+		report.State = "installed"
+		report.CachePath = ""
+		report.PreloadPath = root
+		report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": root}}
+		report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
+	}
+	return sealed, closeUnlessUndrained(err, candidate)
+}
+
+// selectCandidate prepares the candidate and selects it.
+func selectCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
+	if err := prepareCandidate(ctx, candidate, archive, report); err != nil {
+		return err
+	}
+	if err := candidate.Select(); err != nil {
+		return err
+	}
+	report.CandidateState = "selected"
+	report.State = "installed"
+	report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
+	return nil
+}
+
+// prepareCandidate imports or downloads the candidate and qualifies it in a
+// standalone execution scope. A cancellation after qualification stops the
+// command before the candidate is published.
+func prepareCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
+	report.Candidate = new(candidate.Manifest().Identity())
+	report.CandidateState = "requested"
 	var err error
 	if archive != "" {
 		err = candidate.Import(ctx, archive)
@@ -204,68 +305,5 @@ func finishCandidate(ctx context.Context, command string, candidate *runtime.Can
 	if err != nil {
 		return err
 	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	if command == "preload" {
-		if err := candidate.SealPreload(); err != nil {
-			return err
-		}
-		report.setRuntime(identity)
-		report.CachePath = ""
-		report.PreloadPath = path
-		report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": path}}
-		report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
-	} else {
-		if err := candidate.Select(); err != nil {
-			return err
-		}
-		report.CandidateState = "selected"
-		if command == "ensure" {
-			report.Outcome = "newly-selected"
-			report.setRuntime(identity)
-		}
-		report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
-	}
-	report.State = "installed"
-	return nil
-}
-
-func reportStatus(store *runtime.Store, report *runtimeCommandReport) error {
-	status, err := store.Inspect()
-	report.Storage = &status
-	report.StorageError = errorString(err)
-	report.selectedInstallation(status)
-	report.Notice = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
-	if err != nil {
-		return err
-	}
-	if status.Selected == nil {
-		return runtime.ErrUnavailable
-	}
-	return nil
-}
-
-func uninstallRuntime(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
-	if err := store.Uninstall(ctx); err != nil {
-		return err
-	}
-	report.State = "uninstalled"
-	report.Notice = "Runtime files removed. This command does not change administrator-owned host policy; netdata-dem-runtime.sh handles high-level policy cleanup."
-	return nil
-}
-
-// qualifySelected qualifies the selected generation in a standalone execution scope.
-func qualifySelected(ctx context.Context, store *runtime.Store, report *runtimeCommandReport) error {
-	consumer, err := store.AcquireSelected()
-	if err != nil {
-		return err
-	}
-	report.setRuntime(consumer.Manifest().Identity())
-	report.State = "installed"
-	report.Qualification, err = runner.Qualify(ctx, runtimehost.Borrow(consumer))
-	if err == nil {
-		report.State = "qualified"
-	}
-	return closeUnlessUndrained(err, consumer)
+	return ctx.Err()
 }

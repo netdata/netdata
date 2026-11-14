@@ -54,9 +54,7 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 		if err := runtime.InitializeNativeProof(config); err != nil {
 			return err
 		}
-		return json.NewEncoder(stdout).Encode(struct {
-			Initialized bool `json:"initialized"`
-		}{true})
+		return json.NewEncoder(stdout).Encode(nativeInitialized{Initialized: true})
 	}
 	var target runtime.Manifest
 	if command == "native-qualify" {
@@ -122,32 +120,50 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 		return decodeNativeStatus(data)
 	}
 	if command == "native-prepare" {
-		control, err := runtime.InitializeNativeControl(ctx, config, int(identity.uid), int(identity.gid), func(ctx context.Context) error {
-			data, err := child.run(ctx, "native-initialize", nil)
-			if err != nil {
-				return err
-			}
-			var reply struct {
-				Initialized bool `json:"initialized"`
-			}
-			if err := decodeNativeProtocol(bytes.NewReader(data), &reply); err != nil {
-				return err
-			}
-			if !reply.Initialized {
-				return errors.New("native service proof initialization was not confirmed")
-			}
-			return nil
-		})
+		return closeNativeAdmission(ctx, config, identity, child, inspect, stdout)
+	}
+	return configureNative(ctx, config, child, inspect, stdout)
+}
+
+// nativeInitialized is the service child's native-initialize reply.
+type nativeInitialized struct {
+	Initialized bool `json:"initialized"`
+}
+
+// nativePhase is the root helper's result for package scriptlets.
+type nativePhase struct {
+	Phase string `json:"phase"`
+}
+
+// closeNativeAdmission initializes the service proof through the service child
+// and closes package admission.
+func closeNativeAdmission(ctx context.Context, config runtime.NativeConfig, identity nativeIdentity, child *nativeChild, inspect runtime.NativeInspector, stdout io.Writer) error {
+	control, err := runtime.InitializeNativeControl(ctx, config, int(identity.uid), int(identity.gid), func(ctx context.Context) error {
+		data, err := child.run(ctx, "native-initialize", nil)
 		if err != nil {
 			return err
 		}
-		if err := control.CloseAdmission(ctx, inspect); err != nil {
+		var reply nativeInitialized
+		if err := decodeNativeProtocol(bytes.NewReader(data), &reply); err != nil {
 			return err
 		}
-		return json.NewEncoder(stdout).Encode(struct {
-			Phase string `json:"phase"`
-		}{"closed"})
+		if !reply.Initialized {
+			return errors.New("native service proof initialization was not confirmed")
+		}
+		return nil
+	})
+	if err != nil {
+		return err
 	}
+	if err := control.CloseAdmission(ctx, inspect); err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(nativePhase{Phase: "closed"})
+}
+
+// configureNative qualifies the admitted target as the service UID and marks
+// the native runtime ready.
+func configureNative(ctx context.Context, config runtime.NativeConfig, child *nativeChild, inspect runtime.NativeInspector, stdout io.Writer) error {
 	control, err := runtime.OpenNativeControl(config)
 	if err != nil {
 		return err
@@ -165,9 +181,7 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 	}); err != nil {
 		return err
 	}
-	return json.NewEncoder(stdout).Encode(struct {
-		Phase string `json:"phase"`
-	}{"ready"})
+	return json.NewEncoder(stdout).Encode(nativePhase{Phase: "ready"})
 }
 
 func decodeNativeProtocol(reader io.Reader, value any) error {
