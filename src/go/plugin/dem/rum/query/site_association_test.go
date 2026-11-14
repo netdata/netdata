@@ -12,11 +12,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -130,7 +130,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	assert.Equal(t, "job-b", sites[0].Name)
 	// The old GUID still returns retained rows after in-place reassignment.
 	for _, method := range []string{"rum-sessions", "rum-errors"} {
-		response := rumfunctions.New(service, nil).HandleRaw(ctx, funcapi.RawMethodRequest{
+		response := rumfunc.New(service, nil).HandleRaw(ctx, funcapi.RawMethodRequest{
 			Method: method,
 			Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111"},
 		})
@@ -140,7 +140,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 		assert.Contains(t, help, "do not estimate all visitors or errors")
 	}
 	// Actual Function requests carry both selectors and expose the stored group.
-	handler := rumfunctions.New(service, nil)
+	handler := rumfunc.New(service, nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-session-events",
 		Args:   []string{"site:job-a", "vnode_guid:11111111-1111-4111-8111-111111111111", "session_id:shared"},

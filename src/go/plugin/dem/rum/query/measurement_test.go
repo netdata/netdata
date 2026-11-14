@@ -10,10 +10,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -28,7 +28,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	writer := history.NewWriter(store, discardCounters{})
 	owner.SetHistorySink(writer)
 	service := query.New(hub, store)
-	handler := functions.New(service, nil)
+	handler := rumfunc.New(service, nil)
 	now := time.Now()
 	b := &beacon.Beacon{
 		Site:         "shop",

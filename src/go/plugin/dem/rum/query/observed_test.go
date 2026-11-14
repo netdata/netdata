@@ -11,10 +11,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +51,7 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	// Another session's later receipt is in the same whole second, saved after promotion.
 	_, err = store.AppendEvent(ctx, history.EventRecord{Site: "shop", SessionID: "newer", Type: "pageview", ObservedUS: observed.UnixMicro() + 999_999})
 	require.NoError(t, err)
-	handler := functions.New(query.New(registry.New(), store), nil)
+	handler := rumfunc.New(query.New(registry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
 	}).RawResponse

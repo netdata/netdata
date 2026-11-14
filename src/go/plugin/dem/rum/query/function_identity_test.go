@@ -9,10 +9,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -45,7 +45,7 @@ func TestFunctionRowsHaveSiteScopedIdentities(t *testing.T) {
 		require.True(t, attempted)
 		require.NoError(t, err)
 	}
-	handler := functions.New(query.New(sites, retained), nil)
+	handler := rumfunc.New(query.New(sites, retained), nil)
 	for method, field := range map[string]string{"rum-errors": "fingerprint", "rum-pages": "page", "rum-sessions": "session_id"} {
 		t.Run(method, func(t *testing.T) {
 			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
@@ -100,7 +100,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}, {Name: "milestone"}},
 		})
 	}
-	handler := functions.New(query.New(sites, retained), nil)
+	handler := rumfunc.New(query.New(sites, retained), nil)
 	timeline := func() [][]any {
 		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 			Method: "rum-session-events",

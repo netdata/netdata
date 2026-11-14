@@ -12,16 +12,16 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -91,24 +91,24 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 			{
 				ID: "rum",
 				Functions: func() []funcapi.FunctionConfig {
-					return availableFunctions(rumfunctions.Declarations(), func() bool {
+					return availableFunctions(rumfunc.Declarations(), func() bool {
 						return rumRegistry.HasSites() || deps.History.HasObservedKind("rum")
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
-					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
+					return rumfunc.New(rumQueries, ctx.LookupVnodeGUID)
 				},
 			},
 			{
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
-					return availableFunctions(syntheticfunctions.Declarations(), func() bool {
+					return availableFunctions(syntheticfunc.Declarations(), func() bool {
 						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") ||
 							deps.Artifacts.HasObservedPublished()
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
-					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
+					return syntheticfunc.New(syntheticQueries, ctx.LookupVnodeGUID)
 				},
 			},
 			{

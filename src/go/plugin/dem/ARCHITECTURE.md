@@ -357,7 +357,7 @@ the same layers:
 ```mermaid
 flowchart TD
     UI("Netdata UI or API<br/>Function call")
-    Fn("Function adapters<br/>rum/functions · synthetic/functions · historyfunc")
+    Fn("Function adapters<br/>rum/rumfunc · synthetic/syntheticfunc · historyfunc")
     Q("Query services<br/>rum/query · synthetic/query")
     Reg("Registries<br/>running state")
     Hist("History codecs and reducers<br/>rum/history · synthetic/history")
@@ -487,7 +487,7 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
 | History | `rum/history` | RUM record encoding, retained-event reducers and the per-site queued writer |
 | Read side | `rum/query` | Copied site observations, live cursors, redaction and active/retained investigation results |
-| Read side | `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
+| Read side | `rum/rumfunc` | Function declarations, arguments, permissions, columns and response serialization |
 
 Synthetic packages:
 
@@ -498,7 +498,7 @@ Synthetic packages:
 | `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
-| `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
+| `synthetic/syntheticfunc` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
 | `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |
@@ -518,7 +518,7 @@ invariants: change one only together with the code and tests that rely on it.
 
 ```mermaid
 flowchart LR
-    Fn("*/functions") --> Q("*/query")
+    Fn("rumfunc · syntheticfunc") --> Q("*/query")
     Q --> Reg("*/registry")
     Q --> H("*/history")
     Q --> A("synthetic/artifacts")

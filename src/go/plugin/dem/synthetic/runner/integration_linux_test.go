@@ -25,11 +25,11 @@ import (
 	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
@@ -99,7 +99,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		retained, err := observedHistory.GetRun(context.Background(), run.JobID, run.ID)
 		require.NoError(t, err)
 		require.Equal(t, &expectedIdentity, retained.Runtime)
-		handler := syntheticfunctions.New(query.New(nil, observedHistory, captures, nil), nil)
+		handler := syntheticfunc.New(query.New(nil, observedHistory, captures, nil), nil)
 		response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: "synthetics-run", Args: []string{"job_id:" + run.JobID, "run_id:" + run.ID}, Permissions: "0x7b"})
 		require.NotNil(t, response.RawResponse, response.Message)
 		require.Equal(t, &expectedIdentity, response.RawResponse["run"].(map[string]any)["runtime"])
