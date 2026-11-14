@@ -19,67 +19,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func receive[T any](t *testing.T, ch <-chan T) T {
-	t.Helper()
-	select {
-	case value := <-ch:
-		return value
-	case <-time.After(3 * time.Second):
-		t.Fatal("timed out waiting for owned test operation")
-		var zero T
-		return zero
-	}
-}
-
-// waitQueued waits until jobID has n queued requests. Engine tests cannot use
-// synctest: their fake children block on real pipes, which never count as
-// durably blocked.
-func waitQueued(t *testing.T, e *Engine, jobID string, n int) {
-	t.Helper()
-	require.Eventually(t, func() bool {
-		e.mu.Lock()
-		defer e.mu.Unlock()
-		j := e.jobs[executionKey{jobID: jobID}]
-		return j != nil && len(j.waiters) == n
-	}, time.Second, time.Millisecond, "request did not join its job's queue")
-}
-
-func namedRequest(name, script string) synthetic.Request {
-	r := journey()
-	r.Name = name
-	r.Script = script
-	r.Timeout = 5 * time.Second
-	return r
-}
-
-func TestConstructorRequiresOwnersAndPositiveConcurrency(t *testing.T) {
-	history, store := &fakeHistory{}, &observedArtifacts{}
-	tests := map[string]struct {
-		history     historyWriter
-		artifacts   artifactStore
-		concurrency int
-		valid       bool
-	}{
-		"valid":                {history: history, artifacts: store, concurrency: 2, valid: true},
-		"zero concurrency":     {history: history, artifacts: store, concurrency: 0},
-		"negative concurrency": {history: history, artifacts: store, concurrency: -1},
-		"no history":           {artifacts: store, concurrency: 1},
-		"no artifacts":         {history: history, concurrency: 1},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			e, err := New(nil, tc.history, tc.artifacts, tc.concurrency)
-			if tc.valid {
-				require.NoError(t, err)
-				assert.NotNil(t, e)
-			} else {
-				require.Error(t, err)
-				assert.Nil(t, e)
-			}
-		})
-	}
-}
-
 // TestRehearsalSharesMonitoringAdmission runs a job's rehearsal only after its
 // monitoring attempt, even while another slot is free.
 func TestRehearsalSharesMonitoringAdmission(t *testing.T) {

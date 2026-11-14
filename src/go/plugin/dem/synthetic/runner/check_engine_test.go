@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -23,6 +24,63 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestCheckIsSupervisedWithoutWorkflowInput(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	e, _, a := testEngine(t)
+	paths := e.source.(fixtureRuntime).Paths
+	calls := 0
+	e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
+		calls++
+		assert.Empty(t, raw)
+		assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
+		fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, paths.Identity.Version, os.Geteuid(), os.Getegid())
+		return ndexec.TreeResult{Drained: true}
+	})
+	require.NoError(t, e.Check(context.Background()))
+	assert.Equal(t, 1, calls)
+	assert.Zero(t, a.finalized.Load())
+}
+
+func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	for _, tc := range []struct {
+		name, version      string
+		contract, uid, gid int
+		valid              bool
+	}{
+		{"qualified release", "release-a", synthetic.ExecutionContract, os.Geteuid(), os.Getegid(), true},
+		{"another release", "release-b", synthetic.ExecutionContract, os.Geteuid(), os.Getegid(), false},
+		{"another contract", "release-a", synthetic.ExecutionContract + 1, os.Geteuid(), os.Getegid(), false},
+		{"root", "release-a", synthetic.ExecutionContract, 0, os.Getegid(), false},
+		{"another uid", "release-a", synthetic.ExecutionContract, os.Geteuid() + 1, os.Getegid(), false},
+		{"another gid", "release-a", synthetic.ExecutionContract, os.Geteuid(), os.Getegid() + 1, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			paths := e.source.(fixtureRuntime).Paths
+			calls := 0
+			e.start = starter(t, func(_ context.Context, args []string, raw []byte, out, _ *os.File) ndexec.TreeResult {
+				calls++
+				assert.Equal(t, []string{paths.EntryPoint, "--check"}, args)
+				assert.Empty(t, raw)
+				fmt.Fprintf(out, `{"version":%q,"contract":%d,"uid":%d,"gid":%d}`, tc.version, tc.contract, tc.uid, tc.gid)
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(context.Background())
+			if tc.valid {
+				require.NoError(t, err)
+			} else {
+				require.Error(t, err)
+			}
+			assert.Equal(t, 1, calls)
+		})
+	}
+}
+
 func checkWaiters(t *testing.T, e *Engine, n int, retiring bool) {
 	t.Helper()
 	require.Eventually(t, func() bool {
@@ -32,10 +90,12 @@ func checkWaiters(t *testing.T, e *Engine, n int, retiring bool) {
 		return f != nil && f.waiters == n && (n == 0) == retiring
 	}, time.Second, time.Millisecond)
 }
+
 func checkReply(out *os.File) ndexec.TreeResult {
 	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
 	return ndexec.TreeResult{Drained: true, Err: err}
 }
+
 func TestConcurrentChecksShareOneProbeAndLaterCheckIsFresh(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
@@ -68,6 +128,7 @@ func TestConcurrentChecksShareOneProbeAndLaterCheckIsFresh(t *testing.T) {
 	assert.Nil(t, e.checks.flight)
 	e.checks.mu.Unlock()
 }
+
 func TestCheckWaitersCancelIndependentlyAndLastWaiterJoinsBeforeReplacement(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
@@ -141,6 +202,7 @@ func TestCheckWaitersCancelIndependentlyAndLastWaiterJoinsBeforeReplacement(t *t
 		assert.Equal(t, []bool{true}, u.finished())
 	}
 }
+
 func TestLoneCheckDeadlineJoinsAndDoesNotCacheFailure(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
@@ -174,6 +236,7 @@ func TestLoneCheckDeadlineJoinsAndDoesNotCacheFailure(t *testing.T) {
 	require.NoError(t, e.Check(t.Context()))
 	assert.Equal(t, int32(2), calls.Load())
 }
+
 func TestCandidateCheckFlightIsIndependentEvenForMatchingReleaseIdentity(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
@@ -205,6 +268,7 @@ func TestCandidateCheckFlightIsIndependentEvenForMatchingReleaseIdentity(t *test
 		require.NoError(t, receive(t, candidateDone))
 	}
 }
+
 func TestUnverifiedCheckDrainPoisonsCoalescedWaitersAndAllViews(t *testing.T) {
 	e, _, a := testEngine(t)
 	started, release := make(chan struct{}, 1), make(chan struct{})
@@ -230,6 +294,7 @@ func TestUnverifiedCheckDrainPoisonsCoalescedWaitersAndAllViews(t *testing.T) {
 	assert.False(t, e.execute(t.Context(), journey()).Drained)
 	assert.Equal(t, int32(1), calls.Load())
 }
+
 func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
@@ -302,6 +367,35 @@ func TestCheckResponseBounds(t *testing.T) {
 			} else {
 				assert.EqualError(t, err, tc.err)
 			}
+		})
+	}
+}
+
+func TestRejectInvalidReleaseBeforeLaunch(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		change func(*Paths)
+	}{
+		{"contract", func(p *Paths) { p.Identity.Contract++ }},
+		{"version", func(p *Paths) { p.Identity.Version = "" }},
+		{"digest", func(p *Paths) { p.Identity.SHA256 = "not-a-digest" }},
+		{"relative node", func(p *Paths) { p.Node = "node" }},
+		{"relative entrypoint", func(p *Paths) { p.EntryPoint = "run.mjs" }},
+		{"missing entrypoint", func(p *Paths) { p.EntryPoint += ".missing" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			source := e.source.(fixtureRuntime)
+			tc.change(&source.Paths)
+			e.source = source
+			e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+				t.Fatal("invalid release launched")
+				return nil, nil
+			}
+			require.Error(t, e.Check(context.Background()))
+			result := e.execute(context.Background(), journey())
+			require.Equal(t, synthetic.Error, result.Run.Outcome)
+			require.Nil(t, result.Run.Runtime)
 		})
 	}
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -15,10 +16,6 @@ import (
 type optionalStatus struct {
 	evidence, browser string // availability/reason/reporter_complete
 	captures, trace   string
-}
-
-func featureLine(feature, data string) string {
-	return `{"type":"extension","extension":{"feature":"` + feature + `","data":` + data + `}}`
 }
 
 // TestOptionalOutputStatusMatrix pins the stored status values, including

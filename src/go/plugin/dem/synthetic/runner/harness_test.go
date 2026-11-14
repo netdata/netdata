@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -8,6 +9,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
+
+func pointerResult(r reporterResult) *reporterResult { return &r }
 
 // frame builds baseline fixture output independently of the live wire decoder.
 type frame struct {
@@ -20,6 +23,7 @@ func emit(writer io.Writer, value any) {
 	raw, _ := json.Marshal(value)
 	_, _ = fmt.Fprintln(writer, string(raw))
 }
+
 func success() reporterResult {
 	return reporterResult{
 		Status: synthetic.Success,
@@ -29,4 +33,8 @@ func success() reporterResult {
 		},
 		CaptureState: "disabled",
 	}
+}
+
+func featureLine(feature, data string) string {
+	return `{"type":"extension","extension":{"feature":"` + feature + `","data":` + data + `}}`
 }

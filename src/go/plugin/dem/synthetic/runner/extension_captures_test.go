@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -21,9 +22,11 @@ func captureRecord(data any) string {
 	}
 	return string(raw)
 }
+
 func captureTest(id string, accepted, unaccepted int64) map[string]any {
 	return map[string]any{"record": "test", "test": synthetic.CaptureTest{ArtifactTest: synthetic.ArtifactTest{ID: id, Title: "Checkout"}, Status: "failed", ExpectedStatus: "passed", Accepted: accepted, Unaccepted: unaccepted}}
 }
+
 func captureLink(id, testID string) map[string]any {
 	return map[string]any{"record": "capture", "id": id, "test_id": testID}
 }

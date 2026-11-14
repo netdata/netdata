@@ -11,7 +11,34 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestDiscoveryCountIsTypedAndValidated(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw string
+		valid     bool
+		declared  int
+	}{
+		{"localized title", `{"type":"event","event":{"kind":"suite","phase":"discovery","title":"other language","declared_tests":3}}`, true, 3},
+		{"empty discovery", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":0}}`, true, 0},
+		{"missing typed count", `{"type":"event","event":{"kind":"suite","phase":"discovery","title":"Discovered 3 tests"}}`, false, 0},
+		{"negative count", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":-1}}`, false, 0},
+		{"fractional count", `{"type":"event","event":{"kind":"suite","phase":"discovery","declared_tests":1.5}}`, false, 0},
+		{"other event", `{"type":"event","event":{"kind":"step","declared_tests":1}}`, false, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
+			err := s.consume(strings.NewReader(tc.raw + "\n"))
+			if tc.valid {
+				require.NoError(t, err)
+				assert.Equal(t, tc.declared, s.declared)
+			} else {
+				require.Error(t, err)
+			}
+		})
+	}
+}
 
 // TestFrameEnvelopes pins which frames fail the stream and the error each one
 // records; frame errors reach the run's stored error text.

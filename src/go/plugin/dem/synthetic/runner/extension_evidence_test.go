@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -26,12 +27,15 @@ func evidenceRecord(record string, key string, value any) string {
 	}
 	return string(raw)
 }
+
 func evidenceStart(id string) synthetic.EvidenceTest {
 	return synthetic.EvidenceTest{ID: id, Title: "Checkout", Status: "running", ExpectedStatus: "passed", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 2, Column: 1}}
 }
+
 func evidenceStep(id, parent string) synthetic.EvidenceStep {
 	return synthetic.EvidenceStep{ID: id, TestID: "t1", ParentID: parent, Title: "Submit order", Category: "test.step", State: "running", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 3, Column: 2}}
 }
+
 func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence, sinkSnapshot) {
 	t.Helper()
 	terminal, err := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
@@ -45,7 +49,6 @@ func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence,
 	require.NoError(t, snap.err)
 	return snap.evidence, snap
 }
-func pointerResult(r reporterResult) *reporterResult { return &r }
 
 func TestEvidenceNegotiationAndOptionalErrors(t *testing.T) {
 	cases := map[string]struct {

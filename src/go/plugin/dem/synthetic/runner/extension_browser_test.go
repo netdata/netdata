@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -21,18 +22,22 @@ func browserRecord(t *testing.T, data any) string {
 	require.NoError(t, err)
 	return string(raw)
 }
+
 func browserRun(n int64) synthetic.BrowserAggregate {
 	return synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: n}, Counts: synthetic.BrowserCounts{Uncaught: n}}
 }
+
 func browserTestRecord(n int64) map[string]any {
 	return map[string]any{"record": "test", "test": synthetic.BrowserTest{ID: fmt.Sprintf("t%d", n), State: "observed", Counts: &synthetic.BrowserCounts{Uncaught: 1}}, "run": browserRun(n)}
 }
+
 func consumeBrowser(t *testing.T, lines ...string) sinkSnapshot {
 	t.Helper()
 	s := newSink(synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true}, newRedactor(map[string]string{"DEM_SECRET_X": "secret"}))
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
 	return s.snapshot()
 }
+
 func TestBrowserFeatureIsolationAndNegotiation(t *testing.T) {
 	for _, body := range []any{nil, 3, []any{}, map[string]any{"record": "future"}, map[string]any{"record": "complete", "run": 3}, map[string]any{"record": "complete", "run": map[string]any{"tests": map[string]any{"observed": 1.5}}}} {
 		t.Run(fmt.Sprint(body), func(t *testing.T) {
@@ -60,6 +65,7 @@ func TestBrowserFeatureIsolationAndNegotiation(t *testing.T) {
 	assert.Nil(t, s.snapshot().browser)
 	assert.Equal(t, "complete", s.snapshot().evidence.ReportingStatus())
 }
+
 func TestBrowserAtomicValidationAndTerminalPreservesPrior(t *testing.T) {
 	initial := browserTestRecord(1)
 	cases := map[string]map[string]any{
@@ -85,6 +91,7 @@ func TestBrowserAtomicValidationAndTerminalPreservesPrior(t *testing.T) {
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 	assert.False(t, s.browser.ReporterComplete)
 }
+
 func TestBrowserRedactionSamplesAndSnapshots(t *testing.T) {
 	raw := map[string]any{"record": "test", "run": synthetic.BrowserAggregate{Tests: synthetic.BrowserTestCounts{Observed: 1}, Counts: synthetic.BrowserCounts{HTTPError: 1, ConsoleError: 1}}, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &synthetic.BrowserCounts{HTTPError: 1, ConsoleError: 1}, SampleIDs: []int{1, 2}}, "samples": []any{map[string]any{"id": 1, "test_id": "t", "category": "http_error", "method": "GET", "url": "https://user:pass@example.com/private?q=secret#frag", "status": 1200}, map[string]any{"id": 2, "test_id": "t", "category": "console_error", "state": "resolved", "args": []any{map[string]any{"value": "secret"}, map[string]any{"value": nil}, map[string]any{"omitted": "unrepresentable"}}}}}
 	s := consumeBrowser(t, browserInit, browserRecord(t, raw))
@@ -105,6 +112,7 @@ func TestBrowserRedactionSamplesAndSnapshots(t *testing.T) {
 	assert.Contains(t, string(encoded), `{"omitted":"unrepresentable"}`)
 	assert.NotContains(t, string(encoded), "secret")
 }
+
 func TestBrowserUnusableURLPreservesEvidenceAndCompletion(t *testing.T) {
 	for _, category := range []string{"http_error", "transport"} {
 		t.Run(category, func(t *testing.T) {
@@ -154,6 +162,7 @@ func TestBrowserRowsPoolAndLateSamples(t *testing.T) {
 	assert.Len(t, s.browser.Samples, 1)
 	assert.Equal(t, int64(65), s.browser.Run.Tests.Observed)
 }
+
 func TestBrowserSharedEnvelopeCap(t *testing.T) {
 	raw := `{"type":"extension","extension":{"feature":"browser_summary.v1","data":{"record":"complete","extra":"` + strings.Repeat("x", 32<<10) + `"}}}`
 	s := consumeBrowser(t, browserInit, raw)
@@ -187,6 +196,7 @@ func TestBrowserFieldAndSemanticBudgets(t *testing.T) {
 	s := consumeBrowser(t, browserInit, browserRecord(t, map[string]any{"record": "test", "run": aggregate, "test": synthetic.BrowserTest{ID: "t", State: "observed", Counts: &counts}}))
 	assert.Equal(t, "partial", s.browser.ReportingStatus())
 }
+
 func TestBrowserStructuralByteCeilings(t *testing.T) {
 	// Combine structural maxima conservatively. The limits derive from collection
 	// quotas and field bounds; production never reserializes growing state.
@@ -279,6 +289,7 @@ func TestBrowserRepresentativePoolAndReferenceOwnership(t *testing.T) {
 	s = consumeBrowser(t, append(lines, browserRecord(t, fifth))...)
 	assert.Equal(t, "invalid", s.browser.ReportingStatus())
 }
+
 func TestBrowserPeerInvalidityAndUnknownAdditiveFields(t *testing.T) {
 	complete := map[string]any{"record": "complete", "run": browserRun(1), "future": strings.Repeat("secret", 1024)}
 	s := consumeBrowser(t, browserInit, evidenceRecord("unknown", "", nil), browserRecord(t, complete))
@@ -334,6 +345,7 @@ func TestBrowserWholeTextOmission(t *testing.T) {
 	assert.Empty(t, s.browser.Run.Omissions)
 	assert.Empty(t, s.browser.Truncated)
 }
+
 func TestBrowserEmbeddedURLSanitization(t *testing.T) {
 	r := newRedactor(nil)
 	assert.Equal(t, "failed https://example.com/assets response", browserSafeText("failed https://user:password@example.com/assets?tracking=private#fragment response", r))

@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -19,32 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
-
-type sourceFunc func() (Use, error)
-
-func (f sourceFunc) BeginUse() (Use, error) { return f() }
-
-type observedUse struct {
-	paths      Paths
-	completion ndexec.TreeCompletion
-	mu         sync.Mutex
-	finishes   []bool
-	finishErr  error
-}
-
-func (u *observedUse) Paths() Paths                       { return u.paths }
-func (u *observedUse) Completion() *ndexec.TreeCompletion { return &u.completion }
-func (u *observedUse) Finish(drained bool) error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.finishes = append(u.finishes, drained)
-	return u.finishErr
-}
-func (u *observedUse) finished() []bool {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	return append([]bool(nil), u.finishes...)
-}
 
 func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T) {
 	e, _, _ := testEngine(t)

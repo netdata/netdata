@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -47,6 +48,7 @@ func TestBrowserSummaryRequestSelectionAndOutcomeIndependence(t *testing.T) {
 		})
 	}
 }
+
 func TestBrowserRehearsalEvidenceIsFailureOnly(t *testing.T) {
 	for _, failure := range []bool{false, true} {
 		t.Run(map[bool]string{false: "success", true: "failure"}[failure], func(t *testing.T) {
