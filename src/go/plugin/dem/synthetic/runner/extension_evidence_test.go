@@ -221,9 +221,6 @@ func TestEvidencePayloadAndSourceBoundsAreNonfatal(t *testing.T) {
 	assert.Equal(t, "invalid", e.ReportingStatus())
 }
 
-// Baseline and extended streams use the same core parser. Benchmark separately
-// so optional-field overhead and requested evidence work remain attributable.
-
 func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 	test := evidenceStart("t1")
 	test.Status, test.ReportingComplete = "failed", true
