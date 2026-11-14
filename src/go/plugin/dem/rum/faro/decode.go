@@ -87,6 +87,7 @@ type faroPayload struct {
 // Bounds on client-supplied strings (cardinality and record size).
 const (
 	maxPathLen    = 512
+	maxGroupLen   = 200
 	maxUserIDLen  = 128
 	maxSelector   = 200
 	maxNameLen    = 64
@@ -336,7 +337,7 @@ func (o Options) attributedElement(vital string, ctx map[string]any) string {
 }
 
 // pageHost is the page URL's host (first-party resource
-// classification), independent of Path's query/fragment stripping.
+// classification), independent of urlPath's query/fragment stripping.
 // "" when the URL has no host (relative path, unparsable).
 func pageHost(raw string) string {
 	u, err := url.Parse(strings.TrimSpace(raw))

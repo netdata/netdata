@@ -539,9 +539,10 @@ Dependency direction:
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.
 - HTTP never imports the registry or collectors; its small `Processor` and `Routes` interfaces describe its consumers.
-- Faro is a pure protocol adapter. Its embedded bootstrap template requires no frontend build.
-- Configuration policy does not read the hostname or generate UI prose. Diagnostics derives fallback addresses and
-  Functions owns presentation.
+- Faro is an I/O-free protocol adapter that owns input policy. Its embedded bootstrap template requires no frontend
+  build.
+- Configuration policy does not read the hostname or generate UI prose. The sites query derives the fallback install
+  address and Functions own presentation.
 
 File layout within packages:
 
@@ -757,7 +758,7 @@ Vital attribution:
 Processing order:
 
 - The collector's processor calls aggregation and then each enabled exporter directly.
-- Aggregation leaves the normalized Beacon unchanged and returns acceptance/detail decisions plus a filtered
+- Aggregation leaves the normalized Beacon unchanged and returns page-view/detail decisions plus a filtered
   observation containing only newly eligible reports.
 - Exporters consume that filtered observation, including when it is empty. They MUST NOT fall back to the input batch.
 - History enqueue remains nonblocking under the aggregate lock and does not call back into it.

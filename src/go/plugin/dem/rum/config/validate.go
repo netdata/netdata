@@ -115,7 +115,8 @@ func (s Site) optionalErrors() []string {
 }
 
 // Validate checks the receiver's limits, proxies, public URL and TLS pairing
-// without binding or reading certificate files.
+// without binding or reading certificate files. The receiver job checks Listen
+// first, in Init, because resolving a named port can read the services database.
 func (r Receiver) Validate() error {
 	if r.MaxBodyBytes <= 0 || r.RateLimit.PerIPPerMin <= 0 || r.RateLimit.PerSitePerSec <= 0 {
 		return errors.New("body and rate limits must be positive")

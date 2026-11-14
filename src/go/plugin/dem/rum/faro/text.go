@@ -9,8 +9,6 @@ import (
 	"unicode/utf8"
 )
 
-const maxGroupLen = 200
-
 // urlPath reduces a page URL to its path: query and fragment are dropped
 // before any other use, control characters removed, length capped.
 // Unparsable or empty input yields "/".
