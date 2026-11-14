@@ -353,6 +353,12 @@ static void rrdeng_store_metric_clear_hot_time(struct rrdeng_collect_handle *han
     handle->hot_time_s = 0;
 }
 
+// in-memory instances: a closed page is packed into one exact-size allocation (see pgd_compact())
+static size_t rrdeng_in_memory_compact_page(void *data, void *arg __maybe_unused) {
+    PGD *pgd = data;
+    return pgd_compact(pgd) ? pgd_memory_footprint(pgd) : 0;
+}
+
 void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
@@ -362,15 +368,24 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
         return;
     }
 
+    struct rrdengine_instance *ctx = mrg_metric_ctx(handle->metric);
+    PGC *cache = ctx_page_cache(ctx);
+
     if(pgd_is_empty(handle->page_data))
-        pgc_page_to_clean_evict_or_release(main_cache, handle->pgc_page);
+        pgc_page_to_clean_evict_or_release(cache, handle->pgc_page);
 
     else {
         check_completed_page_consistency(handle);
         mrg_metric_set_clean_latest_time_s(main_mrg, handle->metric, pgc_page_end_time_s(handle->pgc_page));
 
-        // samples are charged when the page reaches disk, see extent_flush_to_open()
-        pgc_page_hot_to_dirty_and_release(main_cache, handle->pgc_page, false);
+        if(ctx->config.in_memory) {
+            // nothing saves it: pack it into one exact-size allocation and keep it as a clean page
+            pgc_page_hot_resize_exclusive(cache, handle->pgc_page, rrdeng_in_memory_compact_page, NULL);
+            pgc_page_hot_to_clean_and_release(cache, handle->pgc_page);
+        }
+        else
+            // samples are charged when the page reaches disk, see extent_flush_to_open()
+            pgc_page_hot_to_dirty_and_release(cache, handle->pgc_page, false);
     }
 
     rrdeng_store_metric_clear_hot_time(handle);
@@ -411,7 +426,8 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
 
     size_t conflicts = 0;
     bool added = true;
-    PGC_PAGE *pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+    PGC *cache = ctx_page_cache(handle->ctx);
+    PGC_PAGE *pgc_page = pgc_page_add_and_acquire(cache, page_entry, &added);
     while (unlikely(!added)) {
         conflicts++;
 
@@ -434,13 +450,13 @@ static void rrdeng_store_metric_create_new_page(struct rrdeng_collect_handle *ha
                     (int64_t)pgc_page_start_time_s(pgc_page), (int64_t)pgc_page_end_time_s(pgc_page), pgc_page_update_every_s(pgc_page)
               );
 
-        pgc_page_release(main_cache, pgc_page);
+        pgc_page_release(cache, pgc_page);
 
         point_in_time_ut -= handle->update_every_ut;
         point_in_time_s = (time_t)(point_in_time_ut / USEC_PER_SEC);
         page_entry.start_time_s = point_in_time_s;
         page_entry.end_time_s = point_in_time_s;
-        pgc_page = pgc_page_add_and_acquire(main_cache, page_entry, &added);
+        pgc_page = pgc_page_add_and_acquire(cache, page_entry, &added);
     }
 
     // page_entries_max, page_start_time_ut, page_end_time_ut and pgc_page are read without the collector's
@@ -572,7 +588,7 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
     }
     else {
         // update an existing page
-        pgc_page_hot_set_end_time_s(main_cache, handle->pgc_page,
+        pgc_page_hot_set_end_time_s(ctx_page_cache(handle->ctx), handle->pgc_page,
                                     (time_t) (point_in_time_ut / USEC_PER_SEC), additional_bytes);
         __atomic_store_n(&handle->page_end_time_ut, point_in_time_ut, __ATOMIC_RELAXED);
 
@@ -894,7 +910,7 @@ static ALWAYS_INLINE_HOT bool rrdeng_load_page_next(struct storage_engine_query_
 
     if (likely(handle->page)) {
         // we have a page to release
-        pgc_page_release(main_cache, handle->page);
+        pgc_page_release(ctx_page_cache(ctx), handle->page);
         handle->page = NULL;
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
@@ -1006,7 +1022,7 @@ ALWAYS_INLINE void rrdeng_load_metric_finalize(struct storage_engine_query_handl
     struct rrdeng_query_handle *handle = (struct rrdeng_query_handle *)seqh->handle;
 
     if (handle->page) {
-        pgc_page_release(main_cache, handle->page);
+        pgc_page_release(ctx_page_cache(mrg_metric_ctx(handle->metric)), handle->page);
         pgdc_reset(&handle->pgdc, NULL, UINT32_MAX);
     }
 
@@ -1297,6 +1313,96 @@ int rrdeng_init(
 
     rrd_stat_atomic_add(&global_stats.rrdeng_reserved_file_descriptors, -RRDENG_FD_BUDGET_PER_INSTANCE);
     return UV_EIO;
+}
+
+// ----------------------------------------------------------------------------
+// in-memory instances (db = ram / alloc)
+//
+// One instance per retention (in points), shared by all the hosts that have it: usually just one. They are never
+// freed while the agent runs, so queries and metrics never outlive their instance.
+
+static struct {
+    SPINLOCK spinlock;
+    size_t used;
+    size_t size;
+    struct rrdengine_instance **array;
+} in_memory_instances = {
+    .spinlock = SPINLOCK_INITIALIZER,
+};
+
+struct rrdengine_instance *rrdeng_in_memory_instance(size_t points) {
+    if(points < 5)
+        points = 5;
+
+    struct rrdengine_instance *ctx = NULL;
+
+    spinlock_lock(&in_memory_instances.spinlock);
+    for(size_t i = 0; i < in_memory_instances.used; i++) {
+        if(in_memory_instances.array[i]->config.in_memory_points == points) {
+            ctx = in_memory_instances.array[i];
+            break;
+        }
+    }
+    spinlock_unlock(&in_memory_instances.spinlock);
+
+    if(ctx)
+        return ctx;
+
+    ctx = mallocz(sizeof(*ctx));
+    initialize_single_ctx(ctx);
+
+    ctx->config.tier = 0;
+    ctx->config.page_type = RRDENG_PAGE_TYPE_GORILLA_32BIT;
+    ctx->config.global_compress_alg = dbengine_default_compression();
+    ctx->config.in_memory = true;
+    ctx->config.in_memory_points = points;
+    ctx->atomic.transaction_id = 1;
+    ctx->quiesce.enabled = false;
+    // like a disk tier that starts without data (rrdeng_readiness_wait()); the retention moves it forward
+    // (ram_cache_free_clean_page_callback())
+    ctx->atomic.first_time_s = now_realtime_sec();
+    rrdeng_reset_accounting_if_fresh(ctx, true);
+
+    // no datafiles to load: it is ready now
+    completion_init(&ctx->loading.load_mrg);
+    completion_mark_complete(&ctx->loading.load_mrg);
+
+    if(!rrdeng_dbengine_spawn(ctx))
+        fatal("DBENGINE: cannot start the event loop for an in-memory instance");
+
+    spinlock_lock(&in_memory_instances.spinlock);
+
+    // another thread may have added it while we were preparing ours
+    struct rrdengine_instance *existing = NULL;
+    for(size_t i = 0; i < in_memory_instances.used; i++) {
+        if(in_memory_instances.array[i]->config.in_memory_points == points) {
+            existing = in_memory_instances.array[i];
+            break;
+        }
+    }
+
+    if(existing) {
+        spinlock_unlock(&in_memory_instances.spinlock);
+        completion_destroy(&ctx->loading.load_mrg);
+        rrdeng_ctx_free(ctx);
+        return existing;
+    }
+
+    // created before the instance is published: a published instance means the cache exists
+    pgc_ram_cache_initialize();
+
+    if(in_memory_instances.used == in_memory_instances.size) {
+        in_memory_instances.size = in_memory_instances.size ? in_memory_instances.size * 2 : 2;
+        in_memory_instances.array = reallocz(in_memory_instances.array, in_memory_instances.size * sizeof(*in_memory_instances.array));
+    }
+    in_memory_instances.array[in_memory_instances.used++] = ctx;
+
+    spinlock_unlock(&in_memory_instances.spinlock);
+
+    nd_log(NDLS_DAEMON, NDLP_INFO,
+           "DBENGINE: in-memory instance created, keeping %zu points per metric", points);
+
+    return ctx;
 }
 
 size_t rrdeng_collectors_running(struct rrdengine_instance *ctx) {

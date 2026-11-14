@@ -379,7 +379,8 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
         PGC_PAGE *page;
         PGC_SEARCH method = PGC_SEARCH_FIRST;
         time_t page_first_time_s = 0;
-        while ((page = pgc_page_get_and_acquire(main_cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
+        PGC *cache = ctx_page_cache((struct rrdengine_instance *)section);
+        while ((page = pgc_page_get_and_acquire(cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
@@ -402,7 +403,7 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             if (counts && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
-            pgc_page_release(main_cache, page);
+            pgc_page_release(cache, page);
         }
 
         // pages already written to a datafile whose journal is not indexed yet: they are on disk. Scanned after

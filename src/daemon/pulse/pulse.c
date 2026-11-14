@@ -149,10 +149,12 @@ static void pulse_main_do_once(void) {
     pulse_heartbeat_do(pulse_extended_enabled);
 
 #ifdef ENABLE_DBENGINE
-    if(dbengine_enabled) {
+    // dbengine runs for the disk tiers, or only for the in-memory instances of db = ram / alloc
+    if(rrdeng_dbengine_spawned()) {
         worker_is_busy(WORKER_JOB_DBENGINE);
         pulse_dbengine_do(pulse_extended_enabled);
-        dbengine_retention_statistics(pulse_extended_enabled);
+        if(dbengine_enabled)
+            dbengine_retention_statistics(pulse_extended_enabled);
     }
 #endif
 

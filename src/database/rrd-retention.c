@@ -67,7 +67,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
         tier_info->disk_used = storage_engine_disk_space_used(eng->seb, localhost->db[tier].si);
         
 #ifdef ENABLE_DBENGINE
-        if(!tier_info->disk_max && eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE) {
+        if(!tier_info->disk_max && localhost->db[tier].mode == RRD_DB_MODE_DBENGINE) {
             tier_info->disk_max = rrdeng_get_directory_free_bytes_space(multidb_ctx[tier]);
             tier_info->disk_max += tier_info->disk_used;
         }
@@ -98,7 +98,7 @@ RRDSTATS_RETENTION rrdstats_retention_collect(void) {
                 // Get requested retention time
                 tier_info->requested_retention = 0;
 #ifdef ENABLE_DBENGINE
-                if(eng->seb == STORAGE_ENGINE_BACKEND_DBENGINE)
+                if(localhost->db[tier].mode == RRD_DB_MODE_DBENGINE)
                     tier_info->requested_retention = multidb_ctx[tier]->config.max_retention_s;
 #endif
 

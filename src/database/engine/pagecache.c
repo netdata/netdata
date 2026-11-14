@@ -6,6 +6,7 @@ MRG *main_mrg = NULL;
 PGC *main_cache = NULL;
 PGC *open_cache = NULL;
 PGC *extent_cache = NULL;
+PGC *ram_cache = NULL;
 struct rrdeng_cache_efficiency_stats rrdeng_cache_efficiency_stats = {};
 
 static void main_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry __maybe_unused)
@@ -396,8 +397,9 @@ static void pgc_inject_gap(struct rrdengine_instance *ctx, METRIC *metric, time_
     if(page_entry.start_time_s > page_entry.end_time_s)
         return;
 
-    PGC_PAGE *page = pgc_page_add_and_acquire(main_cache, page_entry, NULL);
-    pgc_page_release(main_cache, page);
+    PGC *cache = ctx_page_cache(ctx);
+    PGC_PAGE *page = pgc_page_add_and_acquire(cache, page_entry, NULL);
+    pgc_page_release(cache, page);
 }
 
 static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
@@ -491,7 +493,7 @@ static ALWAYS_INLINE_HOT size_t list_has_time_gaps(
         pages_pass3++;
 
         if(!pd->page) {
-            pd->page = pgc_page_get_and_acquire(main_cache, (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
+            pd->page = pgc_page_get_and_acquire(ctx_page_cache(ctx), (Word_t) ctx, (Word_t) metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
 
             if(pd->page) {
                 (*pages_found_pass4)++;
@@ -779,7 +781,7 @@ static ALWAYS_INLINE_HOT Pvoid_t get_page_list(
     // PASS 1: Check what the main page cache has available
 
     pass1_ut = now_monotonic_usec();
-    size_t pages_pass1 = get_page_list_from_pgc(main_cache, metric, ctx, wanted_start_time_s, wanted_end_time_s,
+    size_t pages_pass1 = get_page_list_from_pgc(ctx_page_cache(ctx), metric, ctx, wanted_start_time_s, wanted_end_time_s,
                                                 &JudyL_page_array, &cache_gaps,
                                                 false, PDC_PAGE_SOURCE_MAIN_CACHE);
     query_gaps += cache_gaps;
@@ -1020,7 +1022,7 @@ struct pgc_page *pg_cache_lookup_next(
         preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
         if(!page) {
             if(!completion_is_done(&pdc->page_completion)) {
-                page = pgc_page_get_and_acquire(main_cache, (Word_t)ctx,
+                page = pgc_page_get_and_acquire(ctx_page_cache(ctx), (Word_t)ctx,
                                                 pd->metric_id, pd->first_time_s, PGC_SEARCH_EXACT);
                 page_from_pd = false;
                 preloaded = pdc_page_status_check(pd, PDC_PAGE_PRELOADED);
@@ -1053,7 +1055,7 @@ struct pgc_page *pg_cache_lookup_next(
 
         if(unlikely(page_start_time_s == INVALID_TIME || page_end_time_s == INVALID_TIME)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_zero_time_skipped, 1, __ATOMIC_RELAXED);
-            pgc_page_to_clean_evict_or_release(main_cache, page);
+            pgc_page_to_clean_evict_or_release(ctx_page_cache(ctx), page);
             pdc_page_status_set(pd, PDC_PAGE_INVALID | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
             continue;
@@ -1081,7 +1083,7 @@ struct pgc_page *pg_cache_lookup_next(
 
         if(unlikely(page_end_time_s < now_s)) {
             __atomic_add_fetch(&rrdeng_cache_efficiency_stats.pages_past_time_skipped, 1, __ATOMIC_RELAXED);
-            pgc_page_release(main_cache, page);
+            pgc_page_release(ctx_page_cache(ctx), page);
             pdc_page_status_set(pd, PDC_PAGE_SKIP | PDC_PAGE_RELEASED);
             pd->page = page = NULL;
             continue;
@@ -1228,7 +1230,91 @@ size_t pgc_main_nominal_page_size(void *data) {
     return pgd_buffer_memory_footprint(data);
 }
 
-void pgc_and_mrg_initialize(void)
+// ----------------------------------------------------------------------------
+// the cache of the in-memory instances (db = ram / alloc)
+
+// A page of an in-memory instance has no other copy: when it is freed, the data it held is gone. The metric's
+// retention moves past it when nothing older remains: the page is the oldest one, or it ended before the retention
+// window (retention evicts every page that did, so nothing older is left). A newer page that the out of memory
+// protection evicts leaves a gap instead, and the metric's first time stays on the older data that is still there.
+// the time rrdeng_in_memory_enforce_retention() evaluates the retention at, while it evicts on this thread (the
+// evictions of the retention pass run inline): the free callback then judges the retention at the same time
+static __thread time_t in_memory_retention_now_s = 0;
+
+static void ram_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry)
+{
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *) entry.section;
+    time_t now_s = in_memory_retention_now_s ? in_memory_retention_now_s : now_realtime_sec();
+
+    // a gap marker (pgc_inject_gap()) holds no data: it does not move the retention
+    METRIC *metric = (entry.data == PGD_EMPTY) ? NULL :
+        mrg_metric_get_and_acquire_by_id(main_mrg, (UUIDMAP_ID)entry.metric_id, entry.section);
+    if (metric) {
+        time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
+        time_t cutoff_s = rrdeng_in_memory_retention_cutoff_s(ctx, entry.update_every_s, now_s);
+        bool out_of_retention = entry.end_time_s < cutoff_s;
+
+        if (entry.start_time_s <= first_time_s || out_of_retention)
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, entry.end_time_s + (time_t)entry.update_every_s);
+
+        // the instance's retention (reported by the retention API) starts at the window the retention keeps
+        if (out_of_retention) {
+            time_t expected = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
+            while (expected < cutoff_s &&
+                   !__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &expected, cutoff_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+                ;
+        }
+
+        // releasing it deletes it, when this was its last page and nothing collects it
+        mrg_metric_release(main_mrg, metric);
+    }
+
+    pgd_free(entry.data);
+}
+
+// In-memory instances have no datafiles to rotate: their pages that ended before the retention window are evicted.
+// The metrics' first time moves forward in ram_cache_free_clean_page_callback().
+static bool in_memory_page_is_out_of_retention(PGC_PAGE *page, void *data) {
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)pgc_page_section(page);
+    time_t now_s = *(time_t *)data;
+    return pgc_page_end_time_s(page) < rrdeng_in_memory_retention_cutoff_s(ctx, pgc_page_update_every_s(page), now_s);
+}
+
+void rrdeng_in_memory_enforce_retention(time_t now_s) {
+    if (!ram_cache)
+        return;
+
+    in_memory_retention_now_s = now_s;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_page_is_out_of_retention, &now_s);
+    in_memory_retention_now_s = 0;
+}
+
+void pgc_ram_cache_initialize(void) {
+    if (ram_cache)
+        return;
+
+    // The clean pages are the database itself: only the retention evicts them, never the cache size. The
+    // out of memory protection still applies. Nothing is saved: pages go from hot to clean.
+    ram_cache = pgc_create(
+        "RAM_PGC",
+        (size_t)1 << (sizeof(size_t) == 8 ? 40 : 30),
+        ram_cache_free_clean_page_callback,
+        1,
+        NULL,
+        NULL,
+        2,
+        pgc_max_evictors(),
+        1000,
+        1,
+        PGC_OPTIONS_EVICT_PAGES_NO_INLINE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_ON_SIGNAL_ONLY,
+        0,
+        0);
+    pgc_set_nominal_page_size_callback(ram_cache, pgc_main_nominal_page_size);
+}
+
+// ----------------------------------------------------------------------------
+
+void pgc_and_mrg_initialize(bool in_memory_only)
 {
     main_mrg = mrg_create();
 
@@ -1244,6 +1330,9 @@ void pgc_and_mrg_initialize(void)
 
     extent_cache_size += (size_t)(default_rrdeng_extent_cache_mb * 1024ULL * 1024ULL);
 
+    // with no disk tiers, these caches are never used: their evictors wake only when signaled
+    PGC_OPTIONS in_memory_only_options = in_memory_only ? PGC_OPTIONS_EVICT_ON_SIGNAL_ONLY : PGC_OPTIONS_NONE;
+
     main_cache = pgc_create(
             "MAIN_PGC",
             main_cache_size,
@@ -1255,7 +1344,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE | in_memory_only_options,
             0,
             0
     );
@@ -1272,7 +1361,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE,
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE | in_memory_only_options,
             0,
             sizeof(struct extent_io_data)
     );
@@ -1289,7 +1378,7 @@ void pgc_and_mrg_initialize(void)
             pgc_max_evictors(),
             1000,
             1,
-            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE, // no flushing needed
+            PGC_OPTIONS_AUTOSCALE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_PAGES_NO_INLINE | in_memory_only_options, // no flushing needed
             0,
             0
     );

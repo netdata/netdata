@@ -17,6 +17,7 @@ typedef enum __attribute__ ((__packed__)) {
     PGC_OPTIONS_EVICT_PAGES_NO_INLINE   = (1 << 0),
     PGC_OPTIONS_FLUSH_PAGES_NO_INLINE   = (1 << 1),
     PGC_OPTIONS_AUTOSCALE               = (1 << 2),
+    PGC_OPTIONS_EVICT_ON_SIGNAL_ONLY    = (1 << 3), // the evictor thread wakes only when signaled, not every second
 } PGC_OPTIONS;
 
 #define PGC_OPTIONS_DEFAULT (PGC_OPTIONS_EVICT_PAGES_NO_INLINE | PGC_OPTIONS_AUTOSCALE)
@@ -193,6 +194,14 @@ void pgc_page_release(PGC *cache, PGC_PAGE *page);
 // mark a hot page dirty, and release it
 void pgc_page_hot_to_dirty_and_release(PGC *cache, PGC_PAGE *page, bool never_flush);
 
+// mark a hot page clean, and release it (for caches whose pages are never saved)
+void pgc_page_hot_to_clean_and_release(PGC *cache, PGC_PAGE *page);
+
+// run cb on the data of a hot page the caller has acquired, only when nobody else holds the page; cb returns the
+// new size of the page data (0 = unchanged), which the cache then accounts for. Returns true when cb ran.
+typedef size_t (*pgc_page_exclusive_callback)(void *data, void *arg);
+bool pgc_page_hot_resize_exclusive(PGC *cache, PGC_PAGE *page, pgc_page_exclusive_callback cb, void *arg);
+
 // find a page from the cache
 typedef enum {
     PGC_SEARCH_EXACT,
@@ -237,6 +246,11 @@ void pgc_open_cache_to_journal_v2(
     void *data,
     bool startup);
 void pgc_open_evict_clean_pages_of_datafile(PGC *cache, struct rrdengine_datafile *datafile);
+
+// evict every clean page the filter matches (pages referenced by others are skipped); the filter runs under the
+// clean queue lock, so it MUST be cheap and MUST NOT take locks
+typedef bool (*pgc_page_filter)(PGC_PAGE *page, void *data);
+void pgc_evict_clean_pages_matching(PGC *cache, pgc_page_filter filter, void *data);
 size_t pgc_count_clean_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 size_t pgc_count_hot_pages_having_data_ptr(PGC *cache, Word_t section, void *ptr);
 

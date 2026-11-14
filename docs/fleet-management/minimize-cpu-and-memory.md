@@ -81,15 +81,13 @@ Local history lets the Child fill coverage gaps after reconnecting:
 | `[db] db` | What you get |
 |:--|:--|
 | `ram` | History in memory for recovery through network outages, with metric samples kept off the SD card |
-| `alloc` | History in memory with a smaller allocation at low retention settings |
+| `alloc` | The same as `ram` |
 | `none` | Current streaming with the smallest local history footprint |
 | `dbengine` | Persistent history that survives Agent restarts and device power loss |
 
-In RAM mode, `retention` requests sample entries per dimension, rounded up to whole memory pages. On devices with 4 KiB pages, `retention = 120` allocates 1,024 entries per dimension—the same memory as requesting 1,024. That provides about 85 minutes at five-second collection, 3.6 days at five-minute collection or 7.1 days at ten-minute collection. Each chart's interval determines its window; devices with larger memory pages retain more entries at this setting.
+In RAM mode, `retention` sets the number of samples each dimension keeps, with a minimum of five. `retention = 1024` provides about 85 minutes at five-second collection, 3.6 days at five-minute collection or 7.1 days at ten-minute collection. Each chart's interval determines its window. Samples are compressed in memory and the memory grows with the samples stored, so a lower retention uses less memory. `alloc` is the same as `ram`. Both keep metric history off the SD card and lose it when the Agent stops.
 
-With `alloc`, retention uses the requested entry count, with a minimum of five entries per dimension. For example, `retention = 120` keeps about ten hours at five-minute collection or twenty hours at ten-minute collection, using 480 bytes of metric sample storage per dimension. This trades a shorter recovery window for less memory than the RAM example above. Both modes keep metric history off the SD card and lose it when the Agent stops.
-
-On Pi 1, choosing `none` instead of `ram` saved about 5 MiB of memory at one-second collection. Choose `ram` or `alloc` when you want to backfill network outages, or DBengine when recovery must also cover restarts. The [disconnection guide](./disconnected-devices-and-failover.md) shows the replication configuration; [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md) covers persistent storage limits.
+Choosing `none` instead of `ram` saves the memory of the local history. Choose `ram` or `alloc` when you want to backfill network outages, or DBengine when recovery must also cover restarts. The [disconnection guide](./disconnected-devices-and-failover.md) shows the replication configuration; [Agent sizing](../netdata-agent/sizing-netdata-agents/README.md) covers persistent storage limits.
 
 ## Protect SD cards from continuous writes
 

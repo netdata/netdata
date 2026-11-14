@@ -78,6 +78,11 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     if(rrdset_flag_check(st, RRDSET_FLAG_STORE_FIRST))
         rd->collector.counter = 1;
 
+    rd->db.data = NULL;
+    rd->db.memsize = 0;
+
+#ifndef ENABLE_DBENGINE
+    // with dbengine, ram and alloc store in an in-memory dbengine instance (the host's db[0]), not in a ring
     if(ctr->memory_mode == RRD_DB_MODE_RAM) {
         size_t entries = st->db.entries;
         if(!entries) entries = 5;
@@ -92,8 +97,10 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
             ctr->memory_mode = RRD_DB_MODE_ALLOC;
         }
     }
+#endif
 
-    if(ctr->memory_mode == RRD_DB_MODE_ALLOC || ctr->memory_mode == RRD_DB_MODE_NONE) {
+    // alloc, none, and ram when its mmap() failed
+    if(!rd->db.data && rrd_db_mode_uses_ring(ctr->memory_mode)) {
         size_t entries = st->db.entries;
         if(entries < 5) entries = 5;
 
@@ -224,9 +231,10 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
     // Delete the dimension's SQLite metadata when freeing it leaves no queryable
     // data behind:
     //   - dbengine: only when no on-disk retention remains;
-    //   - ram/alloc/none: all use the in-memory rrddim storage backend, so data
-    //     lives only in RAM and a freed dimension is always orphaned (the
-    //     retention check above misreports these modes as retained).
+    //   - ram/alloc/none: data lives only in RAM (an in-memory dbengine instance,
+    //     or the in-memory ring), so it does not survive a restart and a freed
+    //     dimension is always orphaned (the retention check above reports the
+    //     data still in memory as retained).
     if ((rd->rrd_memory_mode == RRD_DB_MODE_DBENGINE && !has_db_retention) ||
         rd->rrd_memory_mode == RRD_DB_MODE_RAM ||
         rd->rrd_memory_mode == RRD_DB_MODE_ALLOC ||

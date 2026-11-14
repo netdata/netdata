@@ -22,6 +22,39 @@ static STORAGE_ENGINE engines[] = {
             .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
         }
     },
+#ifdef ENABLE_DBENGINE
+    // ram and alloc keep their tier 0 on an in-memory dbengine instance (rrdeng_in_memory_instance())
+    {
+        .id = RRD_DB_MODE_RAM,
+        .name = RRD_DB_MODE_RAM_NAME,
+        .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
+        .api = {
+            .metric_get_by_id = rrdeng_metric_get_by_id,
+            .metric_get_by_uuid = rrdeng_metric_get_by_uuid,
+            .metric_get_or_create = rrdeng_metric_get_or_create,
+            .metric_dup = rrdeng_metric_dup,
+            .metric_release = rrdeng_metric_release,
+            .metric_retention_by_id = rrdeng_metric_retention_by_id,
+            .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrdeng_metric_retention_delete_by_id,
+        }
+    },
+    {
+        .id = RRD_DB_MODE_ALLOC,
+        .name = RRD_DB_MODE_ALLOC_NAME,
+        .seb = STORAGE_ENGINE_BACKEND_DBENGINE,
+        .api = {
+            .metric_get_by_id = rrdeng_metric_get_by_id,
+            .metric_get_by_uuid = rrdeng_metric_get_by_uuid,
+            .metric_get_or_create = rrdeng_metric_get_or_create,
+            .metric_dup = rrdeng_metric_dup,
+            .metric_release = rrdeng_metric_release,
+            .metric_retention_by_id = rrdeng_metric_retention_by_id,
+            .metric_retention_by_uuid = rrdeng_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = rrdeng_metric_retention_delete_by_id,
+        }
+    },
+#else
     {
         .id = RRD_DB_MODE_RAM,
         .name = RRD_DB_MODE_RAM_NAME,
@@ -52,6 +85,7 @@ static STORAGE_ENGINE engines[] = {
             .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
         }
     },
+#endif
 #ifdef ENABLE_DBENGINE
     {
         .id = RRD_DB_MODE_DBENGINE,

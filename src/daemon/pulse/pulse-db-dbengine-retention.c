@@ -14,8 +14,9 @@ void dbengine_retention_statistics(bool extended __maybe_unused) {
     rrdeng_calculate_tier_disk_space_percentage();
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+        // the disk tiers only: a ram / alloc localhost has an in-memory instance at tier 0
         STORAGE_ENGINE *eng = localhost->db[tier].eng;
-        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+        if (!eng || localhost->db[tier].mode != RRD_DB_MODE_DBENGINE)
             continue;
 
         if (unlikely(!stats[tier].st)) {

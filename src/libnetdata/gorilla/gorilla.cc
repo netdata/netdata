@@ -284,6 +284,58 @@ bool gorilla_writer_serialize(const gorilla_writer_t *gw, uint8_t *dst, uint32_t
     return true;
 }
 
+// the bytes a buffer chain needs when packed into one allocation: every buffer but the last is full,
+// the last keeps its header and only the slots it uses (plus the read-ahead slot). 0 when it is empty.
+static uint32_t gorilla_compact_buffer_nbytes(const gorilla_buffer_t *gbuf) {
+    if (gbuf->header.next)
+        return RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+
+    if (!gbuf->header.nbits)
+        return 0;
+
+    uint32_t nbytes = sizeof(gorilla_header_t) + gorilla_buffer_nbytes(gbuf->header.nbits);
+    return (nbytes < RRDENG_GORILLA_32BIT_BUFFER_SIZE) ? nbytes : RRDENG_GORILLA_32BIT_BUFFER_SIZE;
+}
+
+uint32_t gorilla_writer_compact_nbytes(const gorilla_writer_t *gw) {
+    uint32_t nbytes = 0;
+
+    for (const gorilla_buffer_t *gbuf = gw->head_buffer; gbuf; gbuf = gbuf->header.next) {
+        uint32_t n = gorilla_compact_buffer_nbytes(gbuf);
+        if (!n)
+            return 0;
+
+        nbytes += n;
+    }
+
+    return nbytes;
+}
+
+// copies the chain into dst (sized by gorilla_writer_compact_nbytes()) and links the copies to each other,
+// so gorilla_reader_init(dst) reads the same values. The writer MUST NOT be written to any more.
+bool gorilla_writer_compact(const gorilla_writer_t *gw, uint8_t *dst, uint32_t dst_size) {
+    gorilla_buffer_t *prev = NULL;
+
+    for (const gorilla_buffer_t *gbuf = gw->head_buffer; gbuf; gbuf = gbuf->header.next) {
+        uint32_t bytes = gorilla_compact_buffer_nbytes(gbuf);
+        if (!bytes || bytes > dst_size)
+            return false;
+
+        memcpy(dst, gbuf, bytes);
+
+        auto *copy = static_cast<gorilla_buffer_t *>(static_cast<void *>(dst));
+        copy->header.next = NULL;
+        if (prev)
+            prev->header.next = copy;
+
+        prev = copy;
+        dst += bytes;
+        dst_size -= bytes;
+    }
+
+    return prev && dst_size == 0;
+}
+
 bool gorilla_buffer_patch(gorilla_buffer_t *gbuf, size_t nbuffers, uint32_t *entries) {
     gorilla_buffer_t *curr_gbuf = gbuf;
     uint32_t n = curr_gbuf->header.entries;

@@ -601,10 +601,17 @@ RRDHOST *rrdhost_create(
 #endif
     }
     else {
+        // db[0].mode stays the host's: dbengine as a db[tier].mode means a disk tier (multidb_ctx[tier])
         host->db[0].mode = host->rrd_memory_mode;
         host->db[0].eng = storage_engine_get(host->db[0].mode);
         host->db[0].si = NULL;
         host->db[0].tier_grouping = get_tier_grouping(0);
+
+#ifdef ENABLE_DBENGINE
+        if (host->rrd_memory_mode == RRD_DB_MODE_RAM || host->rrd_memory_mode == RRD_DB_MODE_ALLOC)
+            // dbengine without disk: one instance per retention, shared with the hosts that have the same
+            host->db[0].si = (STORAGE_INSTANCE *)rrdeng_in_memory_instance(host->rrd_history_entries);
+#endif
 
 #ifdef ENABLE_DBENGINE
         // the first tier is reserved for the non-dbengine modes

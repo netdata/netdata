@@ -59,6 +59,8 @@ inline long align_entries_to_pagesize(RRD_DB_MODE mode, long entries) {
     if(entries < 5) entries = 5;
     if(entries > RRD_HISTORY_ENTRIES_MAX) entries = RRD_HISTORY_ENTRIES_MAX;
 
+#ifndef ENABLE_DBENGINE
+    // the ring of db = ram is mmap()ed: fill whole pages (with dbengine, ram is an in-memory dbengine instance)
     if(mode == RRD_DB_MODE_RAM) {
         long header_size = 0;
 
@@ -72,6 +74,7 @@ inline long align_entries_to_pagesize(RRD_DB_MODE mode, long entries) {
             return n;
         }
     }
+#endif
 
     return entries;
 }

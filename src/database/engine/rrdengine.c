@@ -42,6 +42,7 @@ struct rrdeng_main {
     uv_timer_t retention_timer;
     pid_t tid;
     bool shutdown;                      // draining the pool work before the event loop exits
+    bool in_memory_only;                // spawned for an in-memory instance: there are no disk tiers
     bool drained;                       // the event loop exited with no pool work left
 
     size_t flushes_running;
@@ -2463,11 +2464,24 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
     rrdeng_main.cleanup_running--;
 }
 
+static void rrdeng_in_memory_retention(void) {
+    static time_t last_run_s = 0;
+    time_t now_s = now_realtime_sec();
+
+    // the cleanup runs every second, or every 10 seconds without disk tiers: tolerate the timer jitter
+    if(now_s - last_run_s < 9)
+        return;
+
+    last_run_s = now_s;
+    rrdeng_in_memory_enforce_retention(now_s);
+}
+
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
     worker_is_busy(UV_EVENT_DBENGINE_BUFFERS_CLEANUP);
 
     wal_cleanup1();
     extent_buffer_cleanup1();
+    rrdeng_in_memory_retention();
 
     {
         static time_t last_run_s = 0;
@@ -2560,8 +2574,8 @@ static void retention_timer_cb(uv_timer_t *handle __maybe_unused)
     worker_is_busy(RRDENG_RETENTION_TIMER_CB);
 
     for (size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        STORAGE_ENGINE *eng = localhost->db[tier].eng;
-        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE)
+        // a ram / alloc localhost has the dbengine backend on an in-memory instance at tier 0: not a disk tier
+        if (localhost->db[tier].mode != RRD_DB_MODE_DBENGINE)
             continue;
         check_and_schedule_db_rotation(multidb_ctx[tier]);
     }
@@ -2620,9 +2634,9 @@ static void dbengine_shutdown_drain_gave_up(usec_t started_ut) {
                   rrdeng_main.extent_waiters.deferred ? "with" : "no");
 }
 
-static void dbengine_initialize_structures(void) {
+static void dbengine_initialize_structures(bool in_memory_only) {
     pgd_init_arals();
-    pgc_and_mrg_initialize();
+    pgc_and_mrg_initialize(in_memory_only);
 
     pdc_init();
     page_details_init();
@@ -2637,14 +2651,20 @@ static void dbengine_initialize_structures(void) {
     extent_io_descriptor_init();
 }
 
-bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
-    static bool spawned = false;
+static bool dbengine_spawned = false;
+
+// true once the event loop runs: with disk tiers, or only for in-memory instances (dbengine_enabled is false then)
+bool rrdeng_dbengine_spawned(void) {
+    return __atomic_load_n(&dbengine_spawned, __ATOMIC_ACQUIRE);
+}
+
+bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     int ret;
 
     spinlock_lock(&spinlock);
 
-    if(!spawned) {
+    if(!dbengine_spawned) {
         ret = uv_loop_init(&rrdeng_main.loop);
         if (ret) {
             netdata_log_error("DBENGINE: uv_loop_init(): %s", uv_strerror(ret));
@@ -2677,14 +2697,21 @@ bool rrdeng_dbengine_spawn(struct rrdengine_instance *ctx __maybe_unused) {
         rrdeng_main.timer.data = &rrdeng_main;
         rrdeng_main.retention_timer.data = &rrdeng_main;
 
-        dbengine_initialize_structures();
+        // the disk tiers are initialized before any host is created, so a first spawn for an in-memory instance
+        // means there are none (not so in the unittests: their localhost is db = ram, and dbengine hosts follow)
+        rrdeng_main.in_memory_only = ctx->config.in_memory && !unittest_running;
+        dbengine_initialize_structures(rrdeng_main.in_memory_only);
 
         rrdeng_main.thread = nd_thread_create("DBEV", NETDATA_THREAD_OPTION_DEFAULT, dbengine_event_loop, &rrdeng_main);
 
         fatal_assert(0 != rrdeng_main.thread);
 
-        spawned = true;
+        __atomic_store_n(&dbengine_spawned, true, __ATOMIC_RELEASE);
     }
+    else if(rrdeng_main.in_memory_only && !ctx->config.in_memory)
+        nd_log(NDLS_DAEMON, NDLP_WARNING,
+               "DBENGINE: a disk tier started after dbengine was started for in-memory instances only: "
+               "its caches and flushes keep the in-memory timings (10 seconds)");
 
     spinlock_unlock(&spinlock);
     return true;
@@ -2748,8 +2775,8 @@ void rrdeng_calculate_tier_disk_space_percentage(void)
 
     uint64_t total_diskspace = 0;
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
-        STORAGE_ENGINE *eng = localhost->db[tier].eng;
-        if (!eng || eng->seb != STORAGE_ENGINE_BACKEND_DBENGINE) {
+        if (localhost->db[tier].mode != RRD_DB_MODE_DBENGINE) {
+            // not a disk tier (or an in-memory instance)
             tier_space[tier] = 0;
             continue;
         }
@@ -2825,7 +2852,10 @@ void dbengine_event_loop(void* arg) {
     struct rrdeng_cmd cmd;
     rmain->tid = gettid_cached();
 
-    fatal_assert(0 == uv_timer_start(&rmain->timer, timer_per_sec_cb, TIMER_PERIOD_MS, TIMER_PERIOD_MS));
+    // with no disk tiers, flushing has nothing to do and the cleanup only runs the in-memory retention: every
+    // 10 seconds is enough
+    uint64_t timer_period_ms = rmain->in_memory_only ? TIMER_PERIOD_MS * 10 : TIMER_PERIOD_MS;
+    fatal_assert(0 == uv_timer_start(&rmain->timer, timer_per_sec_cb, timer_period_ms, timer_period_ms));
     fatal_assert(0 == uv_timer_start(&rmain->retention_timer, retention_timer_cb, TIMER_PERIOD_MS * 60, TIMER_PERIOD_MS * 60));
 
     usec_t drain_started_ut = 0;

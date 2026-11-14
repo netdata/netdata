@@ -91,7 +91,7 @@ static inline void rrddim_set_by_pointer_fake_time(RRDDIM *rd, collected_number 
     rrddim_update_collected_max_from_int(rd, value);
 }
 
-static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
+static RRDHOST *dbengine_rrdhost_find_or_create_mode(char *name, RRD_DB_MODE mode, int history) {
     /* We don't want to drop metrics when generating load,
      * we prefer to block data generation itself */
 
@@ -107,8 +107,8 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         program_name,
         NETDATA_VERSION,
         nd_profile.update_every,
-        default_rrd_history_entries,
-        RRD_DB_MODE_DBENGINE,
+        history,
+        mode,
         health_plugin_enabled(),
         stream_send.enabled,
         stream_send.parents.destination,
@@ -127,6 +127,10 @@ static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
         rrdhost_pin_release(host);
 
     return host;
+}
+
+static RRDHOST *dbengine_rrdhost_find_or_create(char *name) {
+    return dbengine_rrdhost_find_or_create_mode(name, RRD_DB_MODE_DBENGINE, default_rrd_history_entries);
 }
 
 static void test_dbengine_create_charts(RRDHOST *host, RRDSET *st[CHARTS], RRDDIM *rd[CHARTS][DIMS],
@@ -717,6 +721,135 @@ static size_t dbengine_cadence_test_query_points(
     return errors;
 }
 
+// db = ram / alloc: tier 0 is an in-memory dbengine instance. Closed pages are packed and must read back the same;
+// a newer page lost to the out of memory protection leaves a gap without hiding the older data; the retention evicts
+// the pages that ended before it and moves the metric's first time past them.
+#define IN_MEMORY_TEST_POINTS 1000          // the retention of the test host, in points
+#define IN_MEMORY_TEST_PAGE_POINTS 50       // points per page (the test closes the pages)
+
+struct in_memory_test_page_filter {
+    Word_t section;
+    time_t start_time_s;
+};
+
+static bool in_memory_test_page_match(PGC_PAGE *page, void *data) {
+    struct in_memory_test_page_filter *f = data;
+    return pgc_page_section(page) == f->section && pgc_page_start_time_s(page) == f->start_time_s;
+}
+
+static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, time_t base_s, const char *what) {
+    size_t errors = 0, points = 0;
+    struct storage_engine_query_handle seqh = { 0 };
+    unittest_storage_engine_query_init(rd->tiers[0].seb, rd->tiers[0].smh, &seqh, start_s, end_s, STORAGE_PRIORITY_SYNCHRONOUS);
+
+    while(!unittest_storage_engine_query_is_finished(&seqh)) {
+        STORAGE_POINT sp = unittest_storage_engine_query_next_metric(&seqh);
+        if(storage_point_is_gap(sp))
+            continue;
+
+        NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(sp.end_time_s - base_s + 1), SN_DEFAULT_FLAGS));
+        if(sp.count != 1 || sp.sum != expected) {
+            fprintf(stderr, " >>> DBENGINE: in memory, %s: point at %jd is %f (count %u), expected %f\n",
+                    what, (intmax_t)sp.end_time_s, sp.sum, sp.count, expected);
+            errors++;
+        }
+        points++;
+    }
+    unittest_storage_engine_query_finalize(&seqh);
+
+    size_t expected_points = (size_t)(end_s - start_s + 1);
+    if(points != expected_points) {
+        fprintf(stderr, " >>> DBENGINE: in memory, %s: %zu points, expected %zu\n", what, points, expected_points);
+        errors++;
+    }
+
+    return errors;
+}
+
+static size_t test_dbengine_in_memory(void) {
+    fprintf(stderr, "\nDBENGINE: testing the in-memory instances of db = ram / alloc...\n");
+    size_t errors = 0;
+
+    RRDHOST *host = dbengine_rrdhost_find_or_create_mode("unittest-dbengine-in-memory", RRD_DB_MODE_RAM, IN_MEMORY_TEST_POINTS);
+    if(!host)
+        return 1;
+
+    struct rrdengine_instance *ctx = (struct rrdengine_instance *)host->db[0].si;
+    if(!ctx || !ctx->config.in_memory || ctx->config.in_memory_points != IN_MEMORY_TEST_POINTS || !ram_cache ||
+       host->db[0].mode != RRD_DB_MODE_RAM) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the host did not get an in-memory instance\n");
+        return 1;
+    }
+
+    if(rrdeng_in_memory_instance(IN_MEMORY_TEST_POINTS) != ctx) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the same retention did not share the instance\n");
+        errors++;
+    }
+
+    RRDDIM *rd = dbengine_cadence_test_create_metric(host, "unittest-in-memory", 1);
+    if(!rd)
+        return errors + 1;
+
+    // three pages of recent data (inside the retention by the wall clock, which the out of memory protection of
+    // step 2 judges by): points have value = seconds since base + 1
+    const time_t base_s = now_realtime_sec() - 4 * IN_MEMORY_TEST_PAGE_POINTS;
+    for(size_t page = 0; page < 3; page++) {
+        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
+            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
+            dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)(t - base_s + 1));
+        }
+        unittest_storage_engine_store_flush(rd->tiers[0].sch);
+    }
+
+    const time_t last_s = base_s + 3 * IN_MEMORY_TEST_PAGE_POINTS - 1;
+
+    // 1. the closed (packed) pages read back what was stored
+    errors += in_memory_test_query(rd, base_s, last_s, base_s, "after packing");
+
+    // 2. the middle page is lost (as the out of memory protection would do): the oldest page stays queryable and
+    //    the metric's retention still starts at it
+    struct in_memory_test_page_filter f = {
+        .section = (Word_t)ctx,
+        .start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS,
+    };
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+
+    time_t first_s = 0, newest_s = 0;
+    if(!rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &newest_s) || first_s != base_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: losing a newer page moved the first time to %jd (expected %jd)\n",
+                (intmax_t)first_s, (intmax_t)base_s);
+        errors++;
+    }
+    errors += in_memory_test_query(rd, base_s, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, base_s, "oldest page after a newer page was lost");
+    errors += in_memory_test_query(rd, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS, last_s, base_s, "newest page after a middle page was lost");
+
+    // 3. the retention: at last_s + 1000 points, the oldest page is out of it and the newest is not
+    rrdeng_in_memory_enforce_retention(base_s + IN_MEMORY_TEST_PAGE_POINTS - 1 + IN_MEMORY_TEST_POINTS + 1);
+
+    first_s = newest_s = 0;
+    rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &newest_s);
+    if(first_s != base_s + IN_MEMORY_TEST_PAGE_POINTS) {
+        fprintf(stderr, " >>> DBENGINE: in memory: after the retention the first time is %jd (expected %jd)\n",
+                (intmax_t)first_s, (intmax_t)(base_s + IN_MEMORY_TEST_PAGE_POINTS));
+        errors++;
+    }
+    errors += in_memory_test_query(rd, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS, last_s, base_s, "newest page after the retention");
+
+    // 4. everything out of the retention: the metric has no data left
+    rrdeng_in_memory_enforce_retention(last_s + IN_MEMORY_TEST_POINTS + 1);
+    first_s = newest_s = 0;
+    if(rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &newest_s) && first_s && first_s <= newest_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: retention %jd - %jd left after all pages were evicted\n",
+                (intmax_t)first_s, (intmax_t)newest_s);
+        errors++;
+    }
+
+    rrdset_free(rd->rrdset);
+
+    fprintf(stderr, "DBENGINE: in-memory instances: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}
+
 static size_t test_dbengine_long_collection_cadence(RRDHOST *host) {
     const time_t t = START_TIMESTAMP + 4000000;
     const uint32_t update_every = 90000;
@@ -1281,6 +1414,7 @@ int test_dbengine(void) {
         fatal("Failed to initialize host");
 
     errors += test_dbengine_datafile_names();
+    errors += test_dbengine_in_memory();
     errors += test_dbengine_burst_retention(host);
     errors += test_dbengine_page_close_time(host);
     errors += test_dbengine_page_phase_seed(host);

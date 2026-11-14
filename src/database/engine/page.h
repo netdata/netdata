@@ -28,6 +28,7 @@ void pgd_init_arals(void);
 PGD *pgd_create(uint8_t type, uint32_t slots);
 PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t size);
 void pgd_free(PGD *pg);
+size_t pgd_compact(PGD *pg);
 
 uint32_t pgd_type(PGD *pg);
 bool pgd_is_empty(PGD *pg);
