@@ -15,12 +15,17 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// FrameMaxBytes is the existing DEM transport's 4 MiB request/record ceiling.
-// Event retention is separate: a verbose workflow does not retain every frame.
+// FrameMaxBytes is the runner protocol's 4 MiB ceiling on the request and on
+// every record, shared with the JS runner (run.mjs framing limit).
 const FrameMaxBytes = 4 << 20
 
+// EventLimit is the per-run diagnostic event retention documented in the
+// plugin and runtime READMEs. Later events are counted as dropped; every
+// retained event is stored in the run's history record.
 const EventLimit = 500
 
+// TextLimit is the character budget of each diagnostic text, shared with the
+// JS runner's clipping (protocol.cjs) and documented in its README.
 const TextLimit = 2000
 
 const cleanupTimeout = 10 * time.Second
