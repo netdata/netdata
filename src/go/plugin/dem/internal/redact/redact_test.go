@@ -39,8 +39,12 @@ func TestTextCredentialPatterns(t *testing.T) {
 	}
 }
 
+// siteRedactor holds configured values that overlap each other and the
+// credential patterns, so replacement order matters.
+func siteRedactor() *Redactor { return NewRedactor("configured-value", "wxyz", "Bearer wxyzto") }
+
 func TestApplyRemoving(t *testing.T) {
-	r := NewRedactor("configured-value")
+	r := siteRedactor()
 	for input, want := range map[string]string{
 		"":                                "",
 		"ordinary text":                   "ordinary text",
@@ -58,15 +62,26 @@ func TestApplyRemoving(t *testing.T) {
 		// Configured values are replaced before the patterns run, as in Apply.
 		"Bearer configured-value-----BEGIN A KEY-----body-----END A KEY-----\x00": "Bearer [REDACTED]",
 		"Bearer configured-valuetoken=abc\x00":                                    "Bearer [REDACTED]token=[REDACTED]",
+		// An earlier configured value replaces text a later one would match.
+		"Bearer wxyztoken=QXSECRET\x00": "Bearer [REDACTED]token=[REDACTED]",
 	} {
 		assert.Equal(t, want, r.ApplyRemoving(input, unicode.IsControl), "input %q", input)
 	}
 }
 
+// Configured values are replaced in order, as in Apply: an earlier one can
+// remove text a later one would match and give a key its word boundary.
+func TestApplyRemovingFollowsValueOrder(t *testing.T) {
+	r := NewRedactor("abcd", "Bearer abcdto")
+	input := "Bearer abcdtoken=QXSECRET\x00"
+	assert.Equal(t, "Bearer [REDACTED]token=[REDACTED]", r.ApplyRemoving(input, unicode.IsControl))
+	assert.Equal(t, "Bearer [REDACTED]token=[REDACTED]", r.Apply(input))
+}
+
 // The span engine behind ApplyRemoving replaces what Apply replaces; only
 // adjacent markers may merge.
 func TestSpansMatchApply(t *testing.T) {
-	r := NewRedactor("configured-value")
+	r := siteRedactor()
 	collapse := func(s string) string {
 		for strings.Contains(s, redacted+redacted) {
 			s = strings.ReplaceAll(s, redacted+redacted, redacted)
@@ -88,6 +103,7 @@ func randomText(rng *rand.Rand) string {
 		"bearer", "Bearer", " ", "\t", "\n", "\x00", "\x01", "\u0085", "token", "password", "api_key", "=", "&", "'",
 		`"`, "akia", "AKIA", "0123456789abcdef", "ABCDEF", "-----BEGIN A KEY-----", "-----END A KEY-----", "[REDACTED]",
 		"x", "_", ".", "/", "configured-value", "configured", "-value", "QXSECRET",
+		"wxyz", "to", "Bearer wxyzto",
 	}
 	var b strings.Builder
 	for range 1 + rng.IntN(12) {
@@ -99,7 +115,7 @@ func randomText(rng *rand.Rand) string {
 // Redacted text passes through the redactor and the credential patterns
 // unchanged, so a later pattern pass over redacted output is a no-op.
 func TestApplyOutputIsStable(t *testing.T) {
-	site := NewRedactor("configured-value")
+	site := siteRedactor()
 	patterns := NewRedactor()
 	rng := rand.New(rand.NewPCG(1, 2))
 	for range 20000 {
@@ -117,7 +133,7 @@ func TestApplyOutputIsStable(t *testing.T) {
 // ApplyRemoving redacts at least what Apply redacts in either form: a planted
 // token survives it no more often than it survives either form's Apply.
 func TestApplyRemovingCoversBothForms(t *testing.T) {
-	r := NewRedactor("configured-value")
+	r := siteRedactor()
 	strip := func(s string) string {
 		return strings.Map(func(c rune) rune {
 			if unicode.IsControl(c) {

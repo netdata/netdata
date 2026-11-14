@@ -89,48 +89,60 @@ func (r *Redactor) ApplyRemoving(s string, remove func(rune) bool) string {
 // inserts one (a credential key without a value).
 type span struct{ start, end int }
 
-// spans lists the byte ranges Apply replaces in s, stage by stage in Apply's
-// order. A later stage reads earlier replacements as filler (see fill).
+// spans lists the byte ranges Apply replaces in s, step by step in Apply's
+// order: each configured value, then the standalone patterns, then key=value.
+// Each step reads the text with the earlier replacements filled (see filled).
 func (r *Redactor) spans(s string) []span {
 	var out []span
+	text := s
 	for _, v := range r.values {
 		if len(v) < 4 {
 			continue
 		}
+		n := len(out)
 		for i := 0; ; {
-			j := strings.Index(s[i:], v)
+			j := strings.Index(text[i:], v)
 			if j < 0 {
 				break
 			}
 			out = append(out, span{start: i + j, end: i + j + len(v)})
 			i += j + len(v)
 		}
+		text = filled(text, out[n:])
 	}
-	if len(out) == 0 && !r.standalone.MatchString(s) && !r.keyvalue.MatchString(s) {
-		return nil
+	n := len(out)
+	if r.standalone.MatchString(text) {
+		for _, m := range r.standalone.FindAllStringIndex(text, -1) {
+			out = append(out, span{start: m[0], end: m[1]})
+		}
+		text = filled(text, out[n:])
 	}
-	masked := []byte(s)
-	fill(masked, out)
-	values := len(out)
-	for _, m := range r.standalone.FindAllIndex(masked, -1) {
-		out = append(out, span{start: m[0], end: m[1]})
-	}
-	fill(masked, out[values:])
-	for _, m := range r.keyvalue.FindAllSubmatchIndex(masked, -1) {
-		out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
+	if r.keyvalue.MatchString(text) {
+		for _, m := range r.keyvalue.FindAllStringSubmatchIndex(text, -1) {
+			out = append(out, span{start: m[3] + 1, end: m[1]}) // the value after "key="
+		}
 	}
 	return out
 }
 
-// fill overwrites spans with a byte the patterns read like the marker: no
-// pattern class holds it except a key=value value, and it is a word boundary
-// on both sides.
-func fill(b []byte, spans []span) {
+// filler stands in for a replaced range. It is invalid UTF-8, so no configured
+// value contains it, and the patterns read it like the marker: only a key=value
+// value holds it, and it is not a word character.
+const filler = 0xFF
+
+// filled returns text with spans overwritten by filler, or text itself when
+// there are none.
+func filled(text string, spans []span) string {
+	if len(spans) == 0 {
+		return text
+	}
+	b := []byte(text)
 	for _, sp := range spans {
 		for i := sp.start; i < sp.end; i++ {
-			b[i] = '['
+			b[i] = filler
 		}
 	}
+	return string(b)
 }
 
 // keptToSource maps spans of s without the removed runes onto s.
