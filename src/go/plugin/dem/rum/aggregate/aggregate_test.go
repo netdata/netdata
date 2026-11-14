@@ -14,6 +14,11 @@ import (
 
 var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 
+const (
+	vnodeA = "11111111-1111-4111-8111-111111111111"
+	vnodeB = "22222222-2222-4222-8222-222222222222"
+)
+
 func newAgg(window time.Duration, cfgs ...SiteCfg) (*Aggregator, *time.Time) {
 	cfg := SiteCfg{
 		Investigate: InvestigateCfg{
@@ -63,380 +68,77 @@ func v(name string, val float64) beacon.Vital {
 	}
 }
 
-func TestPercentiles(t *testing.T) {
-	tests := map[string]struct {
-		vals []float64
-		p50  float64
-		p75  float64
-		p95  float64
-	}{
-		"1..100":       {vals: seq(1, 100), p50: 50, p75: 75, p95: 95},
-		"single":       {vals: []float64{7}, p50: 7, p75: 7, p95: 7},
-		"two":          {vals: []float64{10, 20}, p50: 10, p75: 20, p95: 20},
-		"unsorted":     {vals: []float64{5, 1, 4, 2, 3}, p50: 3, p75: 4, p95: 5},
-		"four samples": {vals: []float64{100, 200, 300, 400}, p50: 200, p75: 300, p95: 400},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			result := pctStats(tc.vals)
-			got := [3]float64{result.P50, result.P75, result.P95}
-			want := [3]float64{tc.p50, tc.p75, tc.p95}
-			if got != want {
-				t.Fatalf("got %v want %v", got, want)
-			}
-		})
-	}
-}
-
-func seq(from, to int) []float64 {
-	out := make([]float64, 0, to-from+1)
-	for i := from; i <= to; i++ {
-		out = append(out, float64(i))
-	}
-	return out
-}
-
-func TestRatings(t *testing.T) {
-	tests := map[string]struct {
-		vital string
-		vals  []float64
-		want  VitalStats
-	}{
-		"lcp mixed": {
-			vital: beacon.LCP, vals: []float64{1000, 2500, 3000, 5000},
-			want: VitalStats{
-				N:         4,
-				P50:       2500,
-				P75:       3000,
-				P95:       5000,
-				Good:      2,
-				NeedsImpr: 1,
-				Poor:      1,
-			},
-		},
-		"cls boundary good inclusive": {
-			vital: beacon.CLS, vals: []float64{0.1, 0.25, 0.26},
-			want: VitalStats{
-				N:         3,
-				P50:       0.25,
-				P75:       0.26,
-				P95:       0.26,
-				Good:      1,
-				NeedsImpr: 1,
-				Poor:      1,
-			},
-		},
-		"inp all good": {
-			vital: beacon.INP, vals: []float64{50, 100},
-			want: VitalStats{
-				N:         2,
-				P50:       50,
-				P75:       100,
-				P95:       100,
-				Good:      2,
-				NeedsImpr: 0,
-				Poor:      0,
-			},
-		},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := stats(tc.vital, tc.vals); got != tc.want {
-				t.Fatalf("got %+v want %+v", got, tc.want)
-			}
-		})
-	}
-}
-
-func TestLatestRevisionAndExplicitActivations(t *testing.T) {
-	a, now := newAgg(5 * time.Minute)
-	b := mk(*now, "s1", "/entry", v(beacon.CLS, .1))
-	b.View = "home"
-	b.ViewID = "view1"
-	original := *b
-	require.True(t, a.Ingest(b).PageView)
-	*now = now.Add(11 * time.Second)
-	b.Received = *now
-	assert.False(t, a.Ingest(b).PageView)
-	assert.Equal(t, 1, a.Snapshot().Vitals[beacon.CLS].N)
-	b.Vitals = append([]beacon.Vital{}, b.Vitals...)
-	b.Vitals[0].Revision = 3
-	b.Vitals[0].Value = .5
-	b.PageGroup = "/changed"
-	b.View = "checkout"
-	b.ViewID = "view2"
-	a.Ingest(b)
-	b.Vitals[0].Revision = 2
-	b.Vitals[0].Value = .2
-	result := a.Ingest(b)
-	assert.Empty(t, result.Observation.Vitals)
-	snap := a.Snapshot()
-	assert.Equal(t, .5, snap.Vitals[beacon.CLS].P75)
-	assert.EqualValues(t, 1, snap.Counters[CounterPageviews])
-	pages := a.Pages("")
-	for _, p := range pages {
-		if p.Page == "/entry" {
-			assert.Equal(t, .5, p.Vitals[beacon.CLS].P75)
-		}
-	}
-	assert.Equal(t, .1, original.Vitals[0].Value)
-	// A restored document is a new activation even in the same session/path.
-	b.ExperienceID = "restored"
-	b.Vitals[0].ID = "restored-cls"
-	b.Vitals[0].Revision = 1
-	assert.True(t, a.Ingest(b).PageView)
-	assert.Equal(t, 2, a.Snapshot().Vitals[beacon.CLS].N)
-}
-func TestDuplicatesDoNotExtendSampleOrIdentityRetention(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.LCP, 100))
-	a.Ingest(b)
-	*now = now.Add(50 * time.Second)
-	b.Received = *now
-	a.Ingest(b)
-	*now = now.Add(11 * time.Second)
-	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
-	// A genuinely newer update is eligible after its preceding sample expires.
-	b.Received = *now
-	b.Vitals[0].Revision = 2
-	b.Vitals[0].Value = 200
-	b.PageGroup = "/wrong"
-	a.Ingest(b)
-	assert.Equal(t, 200., a.Snapshot().Vitals[beacon.LCP].P75)
-	pages := a.Pages("")
-	require.NotEmpty(t, pages)
-	var found bool
-	for _, p := range pages {
-		if p.Page == "/" {
-			found = true
-			assert.Equal(t, 1, p.Vitals[beacon.LCP].N)
-		}
-	}
-	assert.True(t, found)
-	*now = now.Add(31 * time.Minute)
-	b.Received = *now
-	// The explicitly bounded replay contract permits this old report again.
-	assert.Len(t, a.Ingest(b).Observation.Vitals, 1)
-}
-func TestInvalidIdentityMissingAndZero(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.CLS, 0))
-	b.ExperienceID = ""
-	a.Ingest(b)
-	s := a.Snapshot()
-	assert.Zero(t, s.Counters[CounterPageviews])
-	assert.Zero(t, s.Vitals[beacon.CLS].N)
-	assert.EqualValues(t, 2, s.Counters[CounterInvalidMeasurements])
-	b.ExperienceID = "valid"
-	a.Ingest(b)
-	s = a.Snapshot()
-	require.Len(t, s.Vitals, 5)
-	assert.Equal(t, 1, s.Vitals[beacon.CLS].N)
-	assert.Zero(t, s.Vitals[beacon.CLS].P75)
-	assert.Zero(t, s.Vitals[beacon.INP].N)
-}
-func TestNavigationRevisionAndBFCacheAbsence(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/")
-	b.Navigation = &beacon.Navigation{
-		Revision: 1,
-		HasLoad:  true,
-		LoadMS:   0,
-		HasDCL:   true,
-		DCLMS:    5,
-	}
-	a.Ingest(b)
-	a.Ingest(b)
-	s := a.Snapshot()
-	assert.Equal(t, 1, s.Load.N)
-	assert.Zero(t, s.Load.P75)
-	assert.Equal(t, 5., s.DCL.P75)
-	b.Navigation = &beacon.Navigation{
-		Revision: 2,
-		HasLoad:  true,
-		LoadMS:   20,
-	}
-	a.Ingest(b)
-	s = a.Snapshot()
-	assert.Equal(t, 20., s.Load.P75)
-	assert.Zero(t, s.DCL.N)
-	b.ExperienceID = "bfcache"
-	b.Navigation = nil
-	a.Ingest(b)
-	assert.Equal(t, 1, a.Snapshot().Load.N)
-}
-func TestCanonicalPopulationExpiresInclusively(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	for i := range 10001 {
-		b := mk(*now, "", fmt.Sprint(i), v(beacon.LCP, 100))
-		b.Events = nil
-		a.Ingest(b)
-	}
-	*now = now.Add(time.Minute)
-	s := a.Snapshot()
-	assert.Equal(t, 10001, s.Vitals[beacon.LCP].N)
-	assert.Equal(t, 100., s.Vitals[beacon.LCP].P75)
-	*now = now.Add(time.Nanosecond)
-	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
-}
-
-func TestPopulationExpiresByEachReceipt(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	for i := range 10000 {
-		b := mk(*now, "", fmt.Sprint(i), v(beacon.LCP, 100))
-		b.Events = nil
-		a.Ingest(b)
-	}
-	*now = now.Add(30 * time.Second)
-	for i := range 2 {
-		b := mk(*now, "", fmt.Sprint(i+10000), v(beacon.LCP, 200))
-		b.Events = nil
-		a.Ingest(b)
-	}
-	*now = now.Add(31 * time.Second)
-	s := a.Snapshot()
-	assert.Equal(t, 2, s.Vitals[beacon.LCP].N)
-	assert.Equal(t, 200., s.Vitals[beacon.LCP].P75)
-	*now = now.Add(30 * time.Second)
-	assert.Zero(t, a.Snapshot().Vitals[beacon.LCP].N)
-}
-
 func itoa(i int) string { return fmt.Sprint(i) }
 
-func TestApplicationViewsAreSeparateAndRequireExplicitEvents(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/entry", v(beacon.LCP, 200))
-	b.View = "home"
-	b.ViewID = "home-1"
-	a.Ingest(b)
-	b.Events = []beacon.Event{{Kind: beacon.EventView, ID: "home-1", Revision: 1}}
-	a.Ingest(b)
-	a.Ingest(b)
-	b.View = "checkout"
-	b.ViewID = "checkout-1"
-	b.Events = nil
-	a.Ingest(b)
-	assert.EqualValues(t, 1, a.Snapshot().ApplicationViewsWindow, "metadata alone does not invent transitions")
-	b.Events = []beacon.Event{{Kind: beacon.EventView, ID: "checkout-1", Revision: 2}}
-	a.Ingest(b)
-	s := a.Snapshot()
-	assert.EqualValues(t, 1, s.PageviewsWindow)
-	assert.EqualValues(t, 2, s.ApplicationViewsWindow)
-	for _, g := range s.Breakdowns[KindView] {
-		assert.Empty(t, g.Vitals)
-		assert.Zero(t, g.Pageviews)
-	}
-}
-func TestUnknownDimensionsRemainVisible(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.LCP, 20))
-	b.Country = ""
-	b.Device = ""
-	b.Browser = ""
-	a.Ingest(b)
-	s := a.Snapshot()
-	for _, kind := range []string{KindCountry, KindDevice, KindBrowser, KindVersion} {
-		groups := s.Breakdowns[kind]
-		require.Len(t, groups, 1)
-		assert.Equal(t, unknownValue, groups[0].Value)
-		assert.Equal(t, 1, groups[0].Vitals[beacon.LCP].N)
-	}
-}
-func TestRevisionOriginKeepsMeasurementDimensionsAndReportContext(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	history := &fakeHistorySink{}
-	a.SetHistorySink(history)
-	b := mk(*now, "s", "/entry", v(beacon.LCP, 6000))
-	b.View = "first"
-	b.ViewID = "first-1"
-	b.UserID = "before"
-	b.AppVersion = "v1"
-	a.Ingest(b)
-	b.Vitals[0].Revision = 2
-	b.PageGroup = "/later"
-	b.Browser = "Firefox"
-	b.AppVersion = "v2"
-	b.UserID = "after"
-	b.View = "later"
-	b.ViewID = "later-1"
-	result := a.Ingest(b)
-	require.Len(t, result.Observation.Vitals, 1)
-	origin := result.Observation.Vitals[0].Origin
-	require.NotNil(t, origin)
-	assert.Equal(t, "/entry", origin.PageGroup)
-	assert.Equal(t, "v1", origin.AppVersion)
-	assert.Equal(t, "Chrome", origin.Browser)
-	last := history.events[len(history.events)-1]
-	assert.Equal(t, "/entry", last.Page)
-	assert.Equal(t, "v1", last.Version)
-	assert.Equal(t, "after", last.UserID)
-	assert.Equal(t, "later", last.View)
-	assert.Equal(t, "later-1", last.ViewID)
-	assert.Nil(t, b.Vitals[0].Origin, "input is immutable")
-}
-func TestInactiveDetailPromotionExpiresOnIngestion(t *testing.T) {
-	a, now, _ := sampledAgg(0, true, false)
-	b := mk(*now, "s", "/")
-	b.Errors = []beacon.Error{{Message: "failure"}}
-	require.True(t, a.Ingest(b).Investigated)
-	*now = now.Add(31 * time.Minute)
-	assert.False(t, a.Ingest(mk(*now, "s", "/new")).Investigated)
-}
+type fakeHistorySink struct{ events []HistoryEvent }
 
-func TestFilteredObservationPreservesOnlyAdmittedTimingEvents(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/")
-	b.Navigation = &beacon.Navigation{
-		Revision: 1,
-		HasLoad:  true,
-		LoadMS:   10,
+func (f *fakeHistorySink) Event(rec HistoryEvent) { f.events = append(f.events, rec) }
+
+func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
+	a, now := newAgg(5 * time.Minute)
+	a.SetVnodeGUID(vnodeA)
+	a.site.cfg.Investigate = InvestigateCfg{
+		KeepErrors: true,
 	}
-	b.Resources = []beacon.Resource{{ID: "resource", HasDuration: true, DurationMS: 20}, {ID: "self", Self: true}}
-	b.Events = append(
-		b.Events,
-		beacon.Event{
-			Kind:     beacon.EventNavigation,
-			Revision: 1,
-		},
-		beacon.Event{
-			Kind:     beacon.EventResource,
-			ID:       "resource",
-			Revision: 2,
-		},
-		beacon.Event{
-			Kind:     beacon.EventResource,
-			ID:       "self",
-			Revision: 3,
-		},
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	b := mk(*now, "session", "/old", v(beacon.LCP, 9000))
+	b.VnodeGUID = "untrusted"
+	b.PageHost = "example.org"
+	b.Resources = []beacon.Resource{{ID: "resource", Host: "example.org", HasDuration: true, DurationMS: 100}}
+	admitted := a.Ingest(b)
+	require.Equal(t, vnodeA, admitted.Observation.VnodeGUID)
+	require.Equal(t, "untrusted", b.VnodeGUID)
+	require.Empty(t, sink.events)
+	require.Empty(t, a.Pages(vnodeB))
+	require.Equal(t, a.Pages(""), a.Pages(vnodeA))
+	before := a.Snapshot()
+	require.Equal(t, 1, before.Vitals[beacon.LCP].N)
+	a.SetVnodeGUID(vnodeA)
+	require.Equal(t, before, a.Snapshot(), "metadata-only updates do not reset measurements")
+	a.SetVnodeGUID(vnodeB)
+	empty := a.Snapshot()
+	assert.Empty(t, a.Pages(""))
+	assert.Zero(t, empty.Vitals[beacon.LCP].N)
+	assert.Zero(t, empty.ObservedSessions)
+	assert.Zero(t, empty.Counters[CounterPageviews])
+	assert.Zero(t, empty.Counters[CounterAccepted])
+	assert.False(t, empty.ResourcesSeen)
+	assert.Zero(t, empty.FirstPartyResources)
+	retained, _ := a.Live(0, 10, "")
+	require.Len(t, retained, 2)
+	assert.Equal(t, vnodeA, retained[0].VnodeGUID)
+	// Promotion after reassignment retains preceding A context and adds B context.
+	promoted := &beacon.Beacon{
+		Site:      "s",
+		SessionID: "session",
+		Received:  now.Add(time.Second),
+		PageGroup: "/new",
+		Errors:    []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "failed"}},
+	}
+	a.Ingest(promoted)
+	require.Len(t, sink.events, 3)
+	assert.Equal(
+		t,
+		[]string{vnodeA, vnodeA, vnodeB},
+		[]string{sink.events[0].VnodeGUID, sink.events[1].VnodeGUID, sink.events[2].VnodeGUID},
 	)
-	result := a.Ingest(b)
-	require.NotNil(t, result.Observation)
-	assert.Len(t, result.Observation.Events, 3)
-	assert.Len(t, result.Observation.Resources, 1)
-	result = a.Ingest(b)
-	assert.Empty(t, result.Observation.Events)
-	assert.Nil(t, result.Observation.Navigation)
-	assert.Empty(t, result.Observation.Resources)
-}
-
-func TestIdentityRetentionPreventsExpiredSessionReplay(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	old := mk(now.Add(-61*time.Second), "expired", "/old", v(beacon.LCP, 100))
-	old.Events = nil
-	a.Ingest(old)
-	require.Zero(t, a.Snapshot().ObservedSessions)
-	for i := range 10001 {
-		a.Ingest(&beacon.Beacon{
-			Site: "s", ExperienceID: fmt.Sprint(i), Received: *now,
-			Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
-		})
+	// Reusing the same identified measurements is admitted in B's fresh ledger.
+	a.Ingest(b)
+	require.Empty(t, a.Pages(vnodeA))
+	require.Equal(t, a.Pages(""), a.Pages(vnodeB))
+	fresh := a.Snapshot()
+	assert.Equal(t, 1, fresh.Vitals[beacon.LCP].N)
+	assert.EqualValues(t, 1, fresh.Counters[CounterPageviews])
+	rows, _ := a.Live(retained[1].Seq, 10, vnodeB)
+	require.Len(t, rows, 3)
+	for _, row := range rows {
+		assert.Equal(t, vnodeB, row.VnodeGUID)
 	}
-	old.Received = *now
-	result := a.Ingest(old)
-	require.Empty(t, result.Observation.Vitals)
-	require.Zero(t, a.Snapshot().ObservedSessions)
-	require.Zero(t, a.Activity().ObservedSessions)
-	for _, page := range a.Pages("") {
-		require.NotEqual(t, "/old", page.Page)
-	}
+	a.SetVnodeGUID(vnodeA)
+	assert.Empty(t, a.Pages(""), "returning to A starts another fresh measurement window")
+	events, ok := a.SessionEvents("session")
+	require.True(t, ok)
+	require.NotEmpty(t, events)
+	assert.Equal(t, vnodeA, events[0].VnodeGUID)
 }

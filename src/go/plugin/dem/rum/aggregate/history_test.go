@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -10,10 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type fakeHistorySink struct{ events []HistoryEvent }
-
-func (f *fakeHistorySink) Event(rec HistoryEvent) { f.events = append(f.events, rec) }
 
 func TestHistoryEventsAreSelfContained(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
@@ -35,6 +32,7 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	assert.Empty(t, last.UserID)
 	assert.Equal(t, now.UnixMicro(), last.ObservedUS)
 }
+
 func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 	for _, session := range []string{"sess1", ""} {
 		t.Run(session, func(t *testing.T) {
@@ -75,10 +73,10 @@ func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 }
 
 // Session and sessionless errors persist the same complete record: the site's
-// configured vnode, the arrival context and bounded error detail. Only a
-// session timeline defaults an empty page group to "/".
+// configured vnode, the arrival context and the decoder-bounded error detail.
+// Only a session timeline defaults an empty page group to "/".
 func TestErrorHistoryRecordIsComplete(t *testing.T) {
-	message, stack := strings.Repeat("m", 250), strings.Repeat("s", errMaxStackBytes+100)
+	message, stack := strings.Repeat("m", 250), strings.Repeat("s", 4096)
 	tests := map[string]struct {
 		session, page string
 	}{
@@ -130,7 +128,7 @@ func TestErrorHistoryRecordIsComplete(t *testing.T) {
 				Fingerprint:  "fingerprint",
 				ErrorType:    "TypeError",
 				Message:      message,
-				SampleStack:  stack[:errMaxStackBytes],
+				SampleStack:  stack,
 			}}, sink.events)
 		})
 	}
@@ -153,6 +151,40 @@ func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	require.Len(t, timeline, 1)
 	assert.Equal(t, "pageview", timeline[0].Type)
 }
+
+func TestHistoryRecordsAcceptedGoodVitalActivity(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	b := mk(*now, "session", "/entry")
+	a.Ingest(b)
+	require.Len(t, sink.events, 1)
+
+	*now = now.Add(10 * time.Second)
+	b.Received = *now
+	b.Events = nil
+	b.Vitals = []beacon.Vital{v(beacon.LCP, 100)}
+	result := a.Ingest(b)
+	require.Len(t, result.Observation.Vitals, 1)
+	require.Len(t, sink.events, 2)
+	activity := sink.events[1]
+	assert.Equal(t, "activity", activity.Type)
+	assert.Equal(t, now.UnixMicro(), activity.ObservedUS)
+	assert.Equal(t, b.SessionID, activity.SessionID)
+	assert.Equal(t, b.ExperienceID, activity.ExperienceID)
+	assert.Equal(t, "/entry", activity.Page)
+
+	*now = now.Add(10 * time.Second)
+	b.Received = *now
+	result = a.Ingest(b)
+	assert.Empty(t, result.Observation.Vitals)
+	assert.Len(t, sink.events, 2, "replayed vital does not write fresh activity")
+	timeline, ok := a.SessionEvents(b.SessionID)
+	require.True(t, ok)
+	require.Len(t, timeline, 1)
+	assert.Equal(t, "pageview", timeline[0].Type)
+}
+
 func TestNilHistorySinkIsSafe(t *testing.T) {
 	a, _ := newAgg(30 * time.Minute)
 	a.Ingest(mk(t0, "sess1", "/a"))

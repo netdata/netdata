@@ -74,6 +74,14 @@ func tracedBeacon() *beacon.Beacon {
 	return b
 }
 
+func newTraceExporter(t *testing.T, endpoint, site string, c Counters, r *redact.Redactor) *Traces {
+	t.Helper()
+	e, err := NewTraces(context.Background(), destination(endpoint), site, c, r)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, e.Close()) })
+	return e
+}
+
 // Browser spans preserve normalized values and IDs and carry the RUM resource.
 func TestResourceSpans(t *testing.T) {
 	e := newTraceExporter(t, "127.0.0.1:1", "s1", newRecCounters(), newRedactor(t, "hunter2"))
@@ -153,12 +161,4 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 		},
 		attrs,
 	)
-}
-
-func newTraceExporter(t *testing.T, endpoint, site string, c Counters, r *redact.Redactor) *Traces {
-	t.Helper()
-	e, err := NewTraces(context.Background(), destination(endpoint), site, c, r)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, e.Close()) })
-	return e
 }

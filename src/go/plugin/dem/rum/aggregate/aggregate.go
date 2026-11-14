@@ -23,10 +23,6 @@ const (
 	KindVersion = "version"
 )
 
-// Kinds lists the breakdowns in emission order. Application views carry
-// activity and error counts, without document-scoped vital distributions.
-var Kinds = []string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
-
 // versionTopN is the fixed top-N for the version breakdown ("top-10 by pageviews"); unlike page/country it has no per-site config.
 const versionTopN = 10
 
@@ -106,7 +102,6 @@ type Aggregator struct {
 type attributes struct{ browser, device, country, page, version, view string }
 type observationKey struct{ experience, name string }
 type vitalObservation struct {
-	key      observationKey
 	metricID string
 	revision uint64
 	value    float64
@@ -114,20 +109,14 @@ type vitalObservation struct {
 	attrs    *attributes
 }
 type identityKey struct{ kind, experience, item string }
-type identity struct {
-	key      identityKey
-	revision uint64
-}
 
 // vitalIdentity is the replay evidence of one vital: its SDK metric identity
 // and the dimensions frozen when it was first admitted.
 type vitalIdentity struct {
-	key      observationKey
 	metricID string
 	revision uint64
 	attrs    *attributes
 }
-type sessionObservation struct{ key, page string }
 type activityObservation struct {
 	attrs                                  *attributes
 	documents, views, errors, frustrations uint64
@@ -136,23 +125,23 @@ type activityObservation struct {
 	api                                    bool
 }
 
+// siteState owns one site's retained populations. Keyed indexes hold one entry
+// per identity; activity and resources hold every admitted report item.
 type siteState struct {
-	cfg                                                        SiteCfg
-	window                                                     time.Duration
-	counters                                                   map[string]uint64
-	observations                                               map[observationKey]*receiptEntry[vitalObservation]
-	observationOrder                                           receiptHeap[vitalObservation]
-	identities                                                 map[identityKey]*receiptEntry[identity]
-	identityOrder                                              receiptHeap[identity]
-	vitalIdentities                                            map[observationKey]*receiptEntry[vitalIdentity]
-	vitalIdentityOrder                                         receiptHeap[vitalIdentity]
-	activity, resources                                        receiptHeap[activityObservation]
-	sessions                                                   map[string]*receiptEntry[sessionObservation]
-	sessionOrder                                               receiptHeap[sessionObservation]
-	pageSessions                                               map[string]*receiptEntry[sessionObservation]
-	pageSessionOrder                                           receiptHeap[sessionObservation]
-	resourceIdentities                                         map[identityKey]*receiptEntry[identity]
-	resourceIdentityOrder                                      receiptHeap[identity]
+	cfg      SiteCfg
+	window   time.Duration
+	counters map[string]uint64
+	// observations is the latest canonical value per (experience, vital).
+	observations receiptIndex[observationKey, vitalObservation]
+	// identities hold the latest admitted revision per activation, session,
+	// navigation or resource identity; vitalIdentities hold vital replay evidence.
+	identities, resourceIdentities receiptIndex[identityKey, uint64]
+	vitalIdentities                receiptIndex[observationKey, vitalIdentity]
+	activity, resources            receiptHeap[struct{}, activityObservation]
+	// sessions and pageSessions count observed sessions; a page session is keyed
+	// by session and page and holds the page.
+	sessions                                                   receiptIndex[string, struct{}]
+	pageSessions                                               receiptIndex[string, string]
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -176,12 +165,12 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		cfg:                cfg,
 		window:             window,
 		counters:           map[string]uint64{},
-		observations:       map[observationKey]*receiptEntry[vitalObservation]{},
-		identities:         map[identityKey]*receiptEntry[identity]{},
-		vitalIdentities:    map[observationKey]*receiptEntry[vitalIdentity]{},
-		sessions:           map[string]*receiptEntry[sessionObservation]{},
-		pageSessions:       map[string]*receiptEntry[sessionObservation]{},
-		resourceIdentities: map[identityKey]*receiptEntry[identity]{},
+		observations:       newReceiptIndex[observationKey, vitalObservation](),
+		identities:         newReceiptIndex[identityKey, uint64](),
+		resourceIdentities: newReceiptIndex[identityKey, uint64](),
+		vitalIdentities:    newReceiptIndex[observationKey, vitalIdentity](),
+		sessions:           newReceiptIndex[string, struct{}](),
+		pageSessions:       newReceiptIndex[string, string](),
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},
 	}

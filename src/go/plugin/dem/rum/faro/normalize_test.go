@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package faro
 
 import (
@@ -12,6 +13,48 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestObservationIdentityNormalization(t *testing.T) {
+	for _, tc := range []struct {
+		name, id, revision     string
+		validID, validRevision bool
+	}{
+		{"valid", "v5-1234567890123-1234567890123", "42", true, true},
+		{"boundary", strings.Repeat("x", 128), "9007199254740991", true, true},
+		{"missing", "", "", false, false},
+		{"noncanonical revision", "metric", "01", true, false},
+		{"unbounded revision", "metric", strings.Repeat("0", 1024) + "1", true, false},
+		{"long", strings.Repeat("x", 129), "9007199254740992", false, false},
+		{"control", "metric\n1", "-1", false, false},
+		{"opaque URL", "https://example.org", "1.5", false, false},
+		{"unicode", "metric☃", "0", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{
+				"meta":         map[string]any{"session": map[string]string{"id": tc.id}, "page": map[string]string{"id": tc.id, "url": "https://example.org/entry"}, "view": map[string]string{"id": tc.id, "name": "checkout"}},
+				"measurements": []any{map[string]any{"values": map[string]float64{"cls": 0}, "context": map[string]string{"id": tc.id, "observation_sequence": tc.revision}}},
+				"events":       []any{map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": tc.id, "observation_sequence": tc.revision}}},
+			})
+			require.NoError(t, err)
+			b, err := Decode(raw, Options{
+				Now: now,
+			})
+			require.NoError(t, err)
+			require.Len(t, b.Vitals, 1)
+			require.Len(t, b.Events, 1)
+			assert.Equal(t, "/entry", b.PageGroup)
+			assert.Equal(t, "checkout", b.View)
+			assert.Equal(t, tc.validID, b.SessionID != "")
+			assert.Equal(t, tc.validID, b.ExperienceID != "")
+			assert.Equal(t, tc.validID, b.ViewID != "")
+			assert.Equal(t, tc.validID, b.Vitals[0].ID != "")
+			assert.Equal(t, tc.validID, b.Events[0].ID != "")
+			assert.Equal(t, tc.validRevision, b.Vitals[0].Revision != 0)
+			assert.Equal(t, tc.validRevision, b.Events[0].Revision != 0)
+			assert.Equal(t, beacon.EventDocument, b.Events[0].Kind)
+		})
+	}
+}
 
 func TestCaptureNormalizesBeforeFingerprinting(t *testing.T) {
 	opt := Options{Site: "shop", Now: now, EventLogs: true, FrustrationSignals: true,
@@ -43,7 +86,7 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
 	raw := []byte(`{"events":[
   {"name":"session_start","attributes":{"unused":"value"}},
   {"name":"view_changed","attributes":{"fromView":"/users/123456","toView":"/users/987654","unused":"value"}},
-  {"name":"custom","attributes":{"context":"value"}},
+  {"name":"custom","attributes":{"context":"value","observation_id":"not an id"}},
   {"name":"faro.performance.navigation","attributes":{"pageLoadTime":"100","domContentLoadHandlerTime":"10","unused":"value"}},
   {"name":"faro.performance.resource","attributes":{"name":"https://example.org/a?private=value","httpHost":"example.org","duration":"25","transferSize":"500","initiatorType":"fetch","unused":"value"}},
   {"name":"faro.tracing.fetch","attributes":{"url.full":"/api?private=value","http.request.method":"GET","http.response.status_code":"200","duration_ns":"25000000","unused":"value"},"trace":{"trace_id":"1234567890abcdef1234567890abcdef"}},
@@ -74,6 +117,8 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, enabled.Events, 7)
 	assert.Equal(t, "value", enabled.Events[2].Attrs["context"])
+	// Observation identity is protocol data only for identified event kinds.
+	assert.Equal(t, "not an id", enabled.Events[2].Attrs["observation_id"])
 	assert.Equal(t, "button#:id", enabled.Events[6].Attrs["target"])
 }
 
@@ -100,17 +145,25 @@ func TestCaptureSpanAttributeSemanticsPrecedeKeyRedaction(t *testing.T) {
 	assert.Equal(t, "https://example.org/api", b.Spans[0].Attrs[0].Str)
 }
 
+// Both performance events name a URL. A resource name identifies the snippet's
+// own requests, so it is native; a navigation name is optional diagnostics.
 func TestCapturePerformanceEventNamesAreStructuredURLs(t *testing.T) {
-	for _, name := range []string{navigationEvent, resourceEvent} {
+	for name, native := range map[string]bool{navigationEvent: false, resourceEvent: true} {
 		t.Run(name, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"events": []any{map[string]any{
 				"name": name, "attributes": map[string]string{"name": "page.html?private=value#fragment"},
 			}}})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now, EventLogs: true})
-			require.NoError(t, err)
-			require.Len(t, b.Events, 1)
-			assert.Equal(t, "page.html", b.Events[0].Attrs["name"])
+			for _, logs := range []bool{false, true} {
+				b, err := Decode(raw, Options{Now: now, EventLogs: logs})
+				require.NoError(t, err)
+				require.Len(t, b.Events, 1)
+				if native || logs {
+					assert.Equal(t, map[string]string{"name": "page.html"}, b.Events[0].Attrs, "event logs %v", logs)
+				} else {
+					assert.Empty(t, b.Events[0].Attrs)
+				}
+			}
 		})
 	}
 }

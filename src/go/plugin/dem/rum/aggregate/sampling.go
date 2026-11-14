@@ -32,7 +32,7 @@ func SessionSampled(sessionID string, rate float64) bool {
 // as the charts and page selectors. Unsupported names never rate poor.
 func poorVital(v beacon.Vital) bool {
 	th, ok := thresholds[v.Name]
-	return ok && v.Value > th[1]
+	return ok && th.isPoor(v.Value)
 }
 
 // hasPoorVital reports whether any vital in the beacon rates "poor".

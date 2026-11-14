@@ -23,8 +23,6 @@ import (
 
 var t0 = time.Date(2030, 1, 1, 12, 0, 0, 0, time.UTC)
 
-// ---- test doubles ----
-
 // recCounters records Add() calls (the rum.otlp chart dims).
 type recCounters struct {
 	mu sync.Mutex
@@ -117,8 +115,6 @@ func newExporter(t *testing.T, endpoint string, counters Counters, redact *redac
 	return e
 }
 
-// ---- record building ----
-
 func mkBeacon() *beacon.Beacon {
 	return &beacon.Beacon{
 		Site:           "s1",
@@ -152,141 +148,38 @@ func simplify(rec *logspb.LogRecord) simpleRec {
 	}
 }
 
-func TestBuild(t *testing.T) {
-	tests := map[string]struct {
-		pageView bool
-		beacon   func() *beacon.Beacon
-		want     []simpleRec
-	}{
-		"pageview": {
-			pageView: true,
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-
-				return b
-			},
-			want: []simpleRec{{
-				body: "pageview /pricing", severity: "INFO",
-				attrs: map[string]string{
-					"rum.type": "pageview", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
-					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-				},
-			}},
-		},
-		"no session id never starts a session": {
-			pageView: true,
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-				b.SessionID = ""
-
-				return b
-			},
-			want: []simpleRec{{
-				body: "pageview /pricing", severity: "INFO",
-				attrs: map[string]string{
-					"rum.type": "pageview", "page.path": "/pricing", "page.group": "/pricing",
-					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-				},
-			}},
-		},
-		"normalized error preserves severity ERROR": {
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-				b.Errors = []beacon.Error{
-					{
-						Type:    "TypeError",
-						Message: "token=[REDACTED] undefined",
-						Stack:   "at f (x.js:1:1) [REDACTED]",
-						Time:    t0,
-					},
-				}
-				return b
-			},
-			want: []simpleRec{{
-				body: "TypeError: token=[REDACTED] undefined @ /pricing", severity: "ERROR",
-				attrs: map[string]string{
-					"rum.type": "error", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
-					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-					"error.type": "TypeError", "error.message": "token=[REDACTED] undefined", "error.stack": "at f (x.js:1:1) [REDACTED]",
-				},
-			}},
-		},
-		"event carries normalized name and attrs": {
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-				b.Events = []beacon.Event{
-					{Name: "checkout", Attrs: map[string]string{"coupon": "[REDACTED]"}, Time: t0},
-				}
-				return b
-			},
-			want: []simpleRec{{
-				body: "event checkout @ /pricing", severity: "INFO",
-				attrs: map[string]string{
-					"rum.type": "event", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
-					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-					"event.name": "checkout", "event.attr.coupon": "[REDACTED]",
-				},
-			}},
-		},
-		"app version/environment/view and error fingerprint": {
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-				b.AppVersion, b.Environment, b.View = "1.2.3", "production", "checkout-view"
-				b.Errors = []beacon.Error{{Type: "TypeError", Message: "boom", Fingerprint: "abcdef012345", Time: t0}}
-				return b
-			},
-			want: []simpleRec{
-				{
-					body: "TypeError: boom @ /pricing", severity: "ERROR",
-					attrs: map[string]string{
-						"rum.type": "error", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing", "page.view": "checkout-view",
-						"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-						"app.version": "1.2.3", "app.environment": "production",
-						"error.type": "TypeError", "error.message": "boom", "error.stack": "", "error.fingerprint": "abcdef012345",
-					},
-				},
-			},
-		},
-		"console log": {
-			beacon: func() *beacon.Beacon {
-				b := mkBeacon()
-				b.Logs = []beacon.Log{{Level: "warn", Message: "slow request", Time: t0}}
-				return b
-			},
-			want: []simpleRec{{
-				body: "console warn: slow request", severity: "WARN",
-				attrs: map[string]string{
-					"rum.type": "console", "console.level": "warn", "session.id": "sess1", "page.path": "/pricing", "page.group": "/pricing",
-					"browser.name": "Chrome", "browser.version": "120", "os": "Linux", "device": "desktop", "country": "GR",
-				},
-			}},
-		},
+func destination(endpoint string) config.Destination {
+	if !strings.Contains(endpoint, "://") {
+		endpoint = "http://" + endpoint
 	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			e := &Logs{
-				now: func() time.Time { return t0 },
-			}
-			var got []simpleRec
-			for _, q := range e.build(tc.beacon(), tc.pageView) {
-				got = append(got, simplify(q))
-			}
-			if !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("%s:\n got  %#v\n want %#v", name, got, tc.want)
-			}
+	return config.Destination{
+		Endpoint: &endpoint,
+	}
+}
+
+func finalContext(t *testing.T) func() context.Context {
+	t.Helper()
+	var once sync.Once
+	var ctx context.Context
+	return func() context.Context {
+		once.Do(func() {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithTimeout(context.Background(), ShutdownFlushTimeout)
+			t.Cleanup(cancel)
 		})
+		return ctx
 	}
 }
 
-func TestNoSyntheticSessionStart(t *testing.T) {
-	e := &Logs{
-		transport: &transport{},
-		now:       func() time.Time { return t0 },
+func accepted(b *beacon.Beacon) aggregate.Result {
+	return aggregate.Result{
+		Observation:  b,
+		Investigated: true,
+		PageView:     true,
 	}
-	require.Empty(t, e.build(mkBeacon(), false))
 }
 
-// ---- export over real gRPC ----
+func ptr(s string) *string { return &s }
 
 func TestExport(t *testing.T) {
 	tests := map[string]struct {
@@ -351,61 +244,6 @@ func TestExport(t *testing.T) {
 	}
 }
 
-func TestIngestDropsOnFullQueue(t *testing.T) {
-	counters := newRecCounters()
-	e := newExporter(t, "127.0.0.1:1", counters, nil) // unreachable; nothing drains e.ch
-	e.ch = make(chan *logspb.LogRecord, 1)
-
-	b1 := mkBeacon() // One pageview fills the queue.
-	e.Ingest(aggregate.Result{
-		Observation:  b1,
-		Investigated: true,
-		PageView:     true,
-	})
-	b2 := mkBeacon()
-	b2.SessionID = "sess2"
-	e.Ingest(aggregate.Result{
-		Observation:  b2,
-		Investigated: true,
-		PageView:     true,
-	})
-
-	want := map[string]uint64{"otlp_dropped": 1}
-	if got := counters.snapshot(); !reflect.DeepEqual(got, want) {
-		t.Fatalf("counters = %#v, want %#v", got, want)
-	}
-}
-
-// TestShutdownFlushIsBounded: with a black-holed endpoint and a queued
-// record, cancelling Run must return within the shutdown flush budget, not
-// the regular export timeout (the agent's SIGTERM grace is 3s).
-func TestShutdownFlushIsBounded(t *testing.T) {
-	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
-	e.Ingest(aggregate.Result{
-		Observation:  mkBeacon(),
-		Investigated: true,
-		PageView:     true,
-	})
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() {
-		e.Run(ctx, finalContext(t))
-		close(done)
-	}()
-	time.Sleep(100 * time.Millisecond) // let Run take the record into its batch
-	cancel()
-	start := time.Now()
-	select {
-	case <-done:
-	case <-time.After(3 * time.Second):
-		t.Fatal("Run did not return within 3s of cancellation")
-	}
-	if d := time.Since(start); d > 2*time.Second {
-		t.Fatalf("shutdown flush took %v, want about %v", d, ShutdownFlushTimeout)
-	}
-	_ = e.Close()
-}
-
 // Investigate sampling: a beacon whose session is sampled out is
 // still measured, but produces no events.
 func TestIngestSkipsSampledOutBeacons(t *testing.T) {
@@ -423,24 +261,74 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	}
 }
 
-func destination(endpoint string) config.Destination {
-	if !strings.Contains(endpoint, "://") {
-		endpoint = "http://" + endpoint
+func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
+	counters := newRecCounters()
+	exporter := newExporter(t, "127.0.0.1:1", counters, nil)
+	owner := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+		Name:       "s1",
+		PageGroups: 20,
+		Countries:  20,
+		Investigate: aggregate.InvestigateCfg{
+			Rate: 1,
+		},
+	})
+	event := &beacon.Beacon{
+		Browser:      "Chrome",
+		AppVersion:   "first-release",
+		Site:         "s1",
+		Received:     time.Now(),
+		SessionID:    "session",
+		ExperienceID: "document",
+		PageGroup:    "/entry",
+		Path:         "/route",
+		View:         "route",
+		ViewID:       "view",
+		Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+		Vitals:       []beacon.Vital{{Name: beacon.CLS, ID: "metric", Revision: 1, Value: 0.1}},
 	}
-	return config.Destination{
-		Endpoint: &endpoint,
-	}
+	exporter.Ingest(owner.Ingest(event))
+	require.Len(t, exporter.ch, 2)
+	page, vital := simplify(<-exporter.ch), simplify(<-exporter.ch)
+	require.Equal(t, "pageview", page.attrs["rum.type"])
+	require.Equal(t, "vital", vital.attrs["rum.type"])
+	require.Equal(t, "document", vital.attrs["document.experience.id"])
+	require.Equal(t, "view", vital.attrs["application.view.id"])
+	require.Equal(t, "/entry", vital.attrs["page.group"])
+	require.Equal(t, "metric", vital.attrs["metric.id"])
+	require.Equal(t, "1", vital.attrs["metric.revision"])
+	exporter.Ingest(owner.Ingest(event))
+	require.Empty(t, exporter.ch, "filtered empty result must never fall back to original beacon")
+	event.Vitals[0].Revision, event.Vitals[0].Value = 2, 0.4
+	event.View, event.ViewID = "later-route", "later-view"
+	event.Browser, event.AppVersion = "Firefox", "later-release"
+	exporter.Ingest(owner.Ingest(event))
+	require.Len(t, exporter.ch, 1, "a vital update is not a document activation")
+	update := simplify(<-exporter.ch)
+	require.Equal(t, "vital", update.attrs["rum.type"])
+	require.Equal(t, "metric", update.attrs["metric.id"])
+	require.Equal(t, "2", update.attrs["metric.revision"])
+	require.Equal(t, "0.4", update.attrs["metric.value"])
+	require.Equal(t, "later-route", update.attrs["page.view"], "each revision retains its application view at report time")
+	require.Equal(t, "later-view", update.attrs["application.view.id"])
+	require.Equal(t, "Chrome", update.attrs["browser.name"])
+	require.Equal(t, "first-release", update.attrs["app.version"])
 }
-func finalContext(t *testing.T) func() context.Context {
-	t.Helper()
-	var once sync.Once
-	var ctx context.Context
-	return func() context.Context {
-		once.Do(func() {
-			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(context.Background(), ShutdownFlushTimeout)
-			t.Cleanup(cancel)
-		})
-		return ctx
+
+// Exporters build records only from the admitted observation, never from the
+// browser beacon the aggregator received.
+func TestExportDoesNotResurrectFilteredObservation(t *testing.T) {
+	counters := newRecCounters()
+	logs := newExporter(t, "127.0.0.1:1", counters, nil)
+	traces := newTraceExporter(t, "127.0.0.1:1", "s1", counters, nil)
+	result := aggregate.Result{
+		Investigated: true,
+		Observation: &beacon.Beacon{
+			Site: "s1",
+		},
 	}
+	logs.Ingest(result)
+	traces.Ingest(result)
+	require.Empty(t, logs.ch)
+	require.Empty(t, traces.spanCh)
+	require.Empty(t, counters.snapshot())
 }

@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
 	"fmt"
-	"strings"
 	"testing"
 	"time"
-	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/assert"
@@ -19,6 +18,7 @@ func errBeacon(session, page, browser string, errs ...beacon.Error) *beacon.Beac
 	b.Errors = errs
 	return b
 }
+
 func TestErrorsRankCurrentWindowAndFoldComplement(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	for i := range 15 {
@@ -48,9 +48,4 @@ func TestErrorsRankCurrentWindowAndFoldComplement(t *testing.T) {
 	require.Len(t, groups, 1)
 	assert.Equal(t, "current", groups[0].Fingerprint)
 	assert.EqualValues(t, 1, groups[0].Count)
-}
-func TestTruncateStackKeepsValidUTF8(t *testing.T) {
-	s := truncateStack(strings.Repeat("界", errMaxStackBytes))
-	assert.True(t, utf8.ValidString(s))
-	assert.LessOrEqual(t, len(s), errMaxStackBytes)
 }

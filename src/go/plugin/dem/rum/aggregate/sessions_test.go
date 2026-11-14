@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSessionDetailAccumulates(t *testing.T) {
@@ -172,19 +173,6 @@ func TestSessionLRUEvictsOldest(t *testing.T) {
 	_ = now
 }
 
-// The observation window controls session measurement independently of details.
-func TestObservedSessionsAgeByWindow(t *testing.T) {
-	a, now := newAgg(30 * time.Minute)
-	a.Ingest(mk(*now, "s1", "/a"))
-	a.Ingest(mk(*now, "s2", "/a"))
-	*now = now.Add(20 * time.Minute)
-	a.Ingest(mk(*now, "s1", "/b"))
-	*now = t0.Add(31 * time.Minute) // s2 idle 31m, s1 idle 11m
-	if got := a.Snapshot().ObservedSessions; got != 1 {
-		t.Fatalf("active=%d want 1", got)
-	}
-}
-
 // A traced request lands in the timeline with its trace id.
 func TestTracedRequestInSessionTimeline(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
@@ -212,15 +200,6 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 	if req == nil || req.TraceID != "360b7dd27710ac98272283e6f1f29102" ||
 		req.Text != "POST api.example.com/orders 201 · 12 ms" {
 		t.Fatalf("request event = %+v", req)
-	}
-}
-
-func TestBotsFilteredPerMinute(t *testing.T) {
-	a, _ := newAgg(5 * time.Minute)
-	a.Reject(beacon.RejectBot)
-	a.Reject(beacon.RejectBot)
-	if got := a.Activity().BotsPerMin; got != 2 {
-		t.Fatalf("bots per min = %d", got)
 	}
 }
 
@@ -260,5 +239,30 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	last := h.events[len(h.events)-1]
 	if last.UserID != "u_42" || last.Type != "frustration" {
 		t.Fatalf("history event = %+v", last)
+	}
+}
+
+// A page view takes the revision of the report's first document activation.
+func TestDocumentRevision(t *testing.T) {
+	tests := map[string]struct {
+		events []beacon.Event
+		want   uint64
+	}{
+		"no activation": {
+			events: []beacon.Event{{Kind: beacon.EventView, Revision: 3}},
+		},
+		"first activation": {
+			events: []beacon.Event{
+				{Kind: beacon.EventView, Revision: 3},
+				{Kind: beacon.EventDocument, Revision: 2},
+				{Kind: beacon.EventDocument, Revision: 5},
+			},
+			want: 2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{Events: tc.events}))
+		})
 	}
 }

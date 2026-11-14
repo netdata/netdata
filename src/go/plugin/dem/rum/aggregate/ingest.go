@@ -47,21 +47,87 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	if now.IsZero() {
 		now = clock
 	}
+	st.countAccepted(now)
+	obs := *b
+	obs.VnodeGUID = st.cfg.VnodeGUID
+	obs.Vitals, obs.Events, obs.Resources, obs.Navigation = nil, nil, nil, nil
+	r := report{
+		in:  b,
+		out: &obs,
+		now: now,
+	}
+	// Section order fixes receipt-heap insertion order for equal receipt times.
+	st.admitEvents(&r)
+	st.admitVitals(&r)
+	st.admitNavigation(&r)
+	st.admitErrors(&r)
+	st.admitResources(&r)
+	// Identified observations renew session membership only when newly admitted.
+	// Errors, logs, spans and custom events do not carry this replay guarantee.
+	if len(obs.Vitals) > 0 || len(obs.Events) > 0 || len(obs.Errors) > 0 || len(obs.Logs) > 0 || len(obs.Spans) > 0 ||
+		obs.Navigation != nil ||
+		len(obs.Resources) > 0 {
+		st.observeSession(b.SessionID, b.PageGroup, now)
+	}
+	pageView := r.documents > 0
+	var investigated bool
+	if b.SessionID != "" {
+		investigated = st.touchSession(&obs, pageView, now, a.history)
+	} else {
+		investigated = st.recordSessionless(&obs, now, a.history)
+	}
+	a.appendLive(&obs, pageView, now)
+	return Result{
+		PageView:     pageView,
+		Investigated: investigated,
+		Observation:  &obs,
+	}
+}
+func validMeasurement(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
+
+func (st *siteState) countAccepted(now time.Time) {
 	st.counters[CounterAccepted]++
 	st.accepted = append(st.accepted, now)
 	if now.After(st.lastAccepted) {
 		st.lastAccepted = now
 	}
-	obs := *b
-	obs.VnodeGUID = st.cfg.VnodeGUID
-	obs.Vitals, obs.Events, obs.Resources, obs.Navigation = nil, nil, nil, nil
-	attrs := reportAttributes{
-		source: b,
+}
+
+// report is one beacon's admission state: the filtered observation it builds
+// and the timing events that pair with its typed navigation and resources.
+// navigationEvent points into the unchanged input.
+type report struct {
+	in, out          *beacon.Beacon
+	now              time.Time
+	attrs            *attributes
+	documents, views uint64
+	navigationEvent  *beacon.Event
+	resourceEvents   []beacon.Event
+}
+
+// shared yields one attribute set for everything a report retains, allocated
+// only when the report adds a retained item.
+func (r *report) shared() *attributes {
+	if r.attrs == nil {
+		r.attrs = &attributes{
+			browser: r.in.Browser,
+			device:  r.in.Device,
+			country: r.in.Country,
+			page:    r.in.PageGroup,
+			version: r.in.AppVersion,
+			view:    r.in.View,
+		}
 	}
-	var documents, views, frustrations uint64
-	var resourceEvents []beacon.Event
-	var navigationEvent *beacon.Event
-	for _, ev := range b.Events {
+	return r.attrs
+}
+
+// admitEvents counts activations and admits session lifecycle occurrences once
+// per identity, and keeps custom, request and frustration events. Timing events
+// wait for the typed navigation and resources they describe.
+func (st *siteState) admitEvents(r *report) {
+	b := r.in
+	var frustrations uint64
+	for i, ev := range b.Events {
 		switch ev.Kind {
 		case beacon.EventDocument, beacon.EventView:
 			if b.ExperienceID == "" || ev.ID == "" || ev.Revision == 0 ||
@@ -81,13 +147,13 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 					item:       b.ViewID,
 				}
 			}
-			if !st.admitIdentity(key, 1, now) {
+			if !st.admitIdentity(key, 1, r.now) {
 				continue
 			}
 			if ev.Kind == beacon.EventDocument {
-				documents++
+				r.documents++
 			} else {
-				views++
+				r.views++
 			}
 		case beacon.EventSession:
 			if b.ExperienceID == "" || b.SessionID == "" || ev.ID == "" || ev.Revision == 0 {
@@ -98,43 +164,47 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 				kind:       "session",
 				experience: b.ExperienceID,
 				item:       ev.ID,
-			}, 1, now) {
+			}, 1, r.now) {
 				continue
 			}
 		case beacon.EventNavigation:
-			if b.Navigation != nil && ev.Revision == b.Navigation.Revision && navigationEvent == nil {
-				event := ev
-				navigationEvent = &event
+			if b.Navigation != nil && ev.Revision == b.Navigation.Revision && r.navigationEvent == nil {
+				r.navigationEvent = &b.Events[i]
 			}
 			continue
 		case beacon.EventResource:
-			resourceEvents = append(resourceEvents, ev)
+			r.resourceEvents = append(r.resourceEvents, ev)
 			continue // Typed resources preserve decoder event order.
-
 		}
 		if c, ok := frustrationCounters[ev.Name]; ok {
 			st.counters[c]++
 			frustrations++
 		}
-		obs.Events = append(obs.Events, ev)
+		r.out.Events = append(r.out.Events, ev)
 	}
-	st.counters[CounterPageviews] += documents
-	st.counters[CounterApplicationViews] += views
-	if documents+views+frustrations > 0 {
-		st.appendActivity(now, activityObservation{
-			attrs:        attrs.shared(),
-			documents:    documents,
-			views:        views,
+	st.counters[CounterPageviews] += r.documents
+	st.counters[CounterApplicationViews] += r.views
+	if r.documents+r.views+frustrations > 0 {
+		st.appendActivity(r.now, activityObservation{
+			attrs:        r.shared(),
+			documents:    r.documents,
+			views:        r.views,
 			frustrations: frustrations,
 		})
 	}
+}
+
+// admitVitals admits new vitals and newer revisions; an accepted update carries
+// the dimensions frozen at the vital's first admission.
+func (st *siteState) admitVitals(r *report) {
+	b := r.in
 	for _, v := range b.Vitals {
 		if _, supported := thresholds[v.Name]; !supported || b.ExperienceID == "" || v.ID == "" || v.Revision == 0 ||
 			!validMeasurement(v.Value) {
 			st.counters[CounterInvalidMeasurements]++
 			continue
 		}
-		if origin, admitted := st.observeVital(b.ExperienceID, v, &attrs, now); admitted {
+		if origin, admitted := st.observeVital(r, v); admitted {
 			v.Origin = &beacon.VitalOrigin{
 				PageGroup:  origin.page,
 				Browser:    origin.browser,
@@ -142,197 +212,144 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 				Country:    origin.country,
 				AppVersion: origin.version,
 			}
-			obs.Vitals = append(obs.Vitals, v)
+			r.out.Vitals = append(r.out.Vitals, v)
 		}
 	}
-	if nav := b.Navigation; nav != nil {
-		if b.ExperienceID == "" || nav.Revision == 0 {
-			st.counters[CounterInvalidMeasurements]++
-		} else if st.admitIdentity(identityKey{
-			kind:       "navigation",
-			experience: b.ExperienceID,
-		}, nav.Revision, now) {
-			n := *nav
-			if n.HasLoad && !validMeasurement(n.LoadMS) {
-				n.HasLoad = false
-				st.counters[CounterInvalidMeasurements]++
-			}
-			if n.HasDCL && !validMeasurement(n.DCLMS) {
-				n.HasDCL = false
-				st.counters[CounterInvalidMeasurements]++
-			}
-			// Revision replacement also removes a field absent from the newer report.
-			for _, metric := range []struct {
-				name    string
-				value   float64
-				present bool
-			}{{navLoadName, n.LoadMS, n.HasLoad}, {navDCLName, n.DCLMS, n.HasDCL}} {
-				key := observationKey{b.ExperienceID, metric.name}
-				if metric.present {
-					st.putObservation(now, vitalObservation{
-						key:      key,
-						metricID: b.ExperienceID,
-						revision: n.Revision,
-						value:    metric.value,
-						attrs:    attrs.shared(),
-					})
-				} else if el := st.observations[key]; el != nil {
-					st.observationOrder.remove(el)
-					delete(st.observations, key)
-				}
-			}
-			obs.Navigation = &n
-			if navigationEvent != nil {
-				obs.Events = append(obs.Events, *navigationEvent)
-			}
+}
+
+// admitNavigation replaces a document's navigation timing with a newer revision.
+func (st *siteState) admitNavigation(r *report) {
+	b := r.in
+	nav := b.Navigation
+	if nav == nil {
+		return
+	}
+	if b.ExperienceID == "" || nav.Revision == 0 {
+		st.counters[CounterInvalidMeasurements]++
+		return
+	}
+	if !st.admitIdentity(identityKey{
+		kind:       "navigation",
+		experience: b.ExperienceID,
+	}, nav.Revision, r.now) {
+		return
+	}
+	n := *nav
+	if n.HasLoad && !validMeasurement(n.LoadMS) {
+		n.HasLoad = false
+		st.counters[CounterInvalidMeasurements]++
+	}
+	if n.HasDCL && !validMeasurement(n.DCLMS) {
+		n.HasDCL = false
+		st.counters[CounterInvalidMeasurements]++
+	}
+	// Revision replacement also removes a field absent from the newer report.
+	for _, metric := range []struct {
+		name    string
+		value   float64
+		present bool
+	}{{navLoadName, n.LoadMS, n.HasLoad}, {navDCLName, n.DCLMS, n.HasDCL}} {
+		key := observationKey{b.ExperienceID, metric.name}
+		if metric.present {
+			st.observations.put(r.now, key, vitalObservation{
+				metricID: b.ExperienceID,
+				revision: n.Revision,
+				value:    metric.value,
+				attrs:    r.shared(),
+			})
+		} else if el := st.observations.get(key); el != nil {
+			st.observations.remove(el)
 		}
 	}
-	for _, e := range b.Errors {
+	r.out.Navigation = &n
+	if r.navigationEvent != nil {
+		r.out.Events = append(r.out.Events, *r.navigationEvent)
+	}
+}
+
+func (st *siteState) admitErrors(r *report) {
+	for _, e := range r.in.Errors {
 		st.counters[CounterJSErrors]++
-		st.appendActivity(now, activityObservation{
-			attrs:       attrs.shared(),
+		st.appendActivity(r.now, activityObservation{
+			attrs:       r.shared(),
 			errors:      1,
 			fingerprint: e.Fingerprint,
 			message:     e.Message,
 		})
 	}
-	for i, r := range b.Resources {
-		if r.Self {
+}
+
+// admitResources admits each resource identity once and classifies ownership.
+// The decoder creates one resource per resource event, so they pair by position.
+func (st *siteState) admitResources(r *report) {
+	b := r.in
+	for i, res := range b.Resources {
+		if res.Self {
 			continue
 		}
-		if b.ExperienceID == "" || r.ID == "" {
+		if b.ExperienceID == "" || res.ID == "" {
 			st.counters[CounterInvalidMeasurements]++
 			continue
 		}
 		if !st.admitIdentity(identityKey{
 			kind:       "resource",
 			experience: b.ExperienceID,
-			item:       r.ID,
-		}, 1, now) {
+			item:       res.ID,
+		}, 1, r.now) {
 			continue
 		}
-		if r.HasDuration && !validMeasurement(r.DurationMS) {
-			r.HasDuration = false
+		if res.HasDuration && !validMeasurement(res.DurationMS) {
+			res.HasDuration = false
 			st.counters[CounterInvalidMeasurements]++
 		}
 		st.resourcesSeen = true
-		firstParty := isFirstParty(b.PageHost, r.Host)
+		firstParty := isFirstParty(b.PageHost, res.Host)
 		switch {
-		case b.PageHost == "" || r.Host == "":
+		case b.PageHost == "" || res.Host == "":
 			st.unknownResources++
 		case firstParty:
 			st.firstPartyResources++
 		default:
 			st.thirdPartyResources++
 		}
-		st.appendActivity(now, activityObservation{
-			attrs:    attrs.shared(),
-			resource: &r,
-			api:      firstParty && r.HasDuration && (r.Initiator == "fetch" || r.Initiator == "xmlhttprequest"),
+		st.appendActivity(r.now, activityObservation{
+			attrs:    r.shared(),
+			resource: &res,
+			api:      firstParty && res.HasDuration && (res.Initiator == "fetch" || res.Initiator == "xmlhttprequest"),
 		})
-		obs.Resources = append(obs.Resources, r)
-		if i < len(resourceEvents) && resourceEvents[i].ID == r.ID {
-			obs.Events = append(obs.Events, resourceEvents[i])
+		r.out.Resources = append(r.out.Resources, res)
+		if i < len(r.resourceEvents) && r.resourceEvents[i].ID == res.ID {
+			r.out.Events = append(r.out.Events, r.resourceEvents[i])
 		}
 	}
-	// Identified observations renew session membership only when newly admitted.
-	// Errors, logs, spans and custom events do not carry this replay guarantee.
-	if len(obs.Vitals) > 0 || len(obs.Events) > 0 || len(obs.Errors) > 0 || len(obs.Logs) > 0 || len(obs.Spans) > 0 ||
-		obs.Navigation != nil ||
-		len(obs.Resources) > 0 {
-		st.observeSession(b.SessionID, b.PageGroup, now)
-	}
-	pageView := documents > 0
-	var investigated bool
-	if b.SessionID != "" {
-		investigated = st.touchSession(&obs, pageView, now, a.history)
-	} else {
-		investigated = st.cfg.Investigate.Rate >= 1 || st.cfg.Investigate.alwaysKeep(&obs)
-	}
-	if investigated && b.SessionID == "" && a.history != nil {
-		// A sessionless error has no timeline; its page group stays as reported.
-		context := newEventContext(&obs)
-		for _, e := range obs.Errors {
-			event, detail := newErrorEvent(e, now, b.PageGroup)
-			event.context = context
-			rec := event.history(st.cfg.Name, "")
-			detail.apply(&rec)
-			a.history.Event(rec)
-		}
-	}
-	a.appendLive(&obs, pageView, now)
-	return Result{
-		PageView:     pageView,
-		Investigated: investigated,
-		Observation:  &obs,
-	}
-}
-func validMeasurement(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
-
-// reportAttributes yields one attribute set for everything a report retains,
-// allocated only when the report adds a retained item.
-type reportAttributes struct {
-	source *beacon.Beacon
-	set    *attributes
-}
-
-func (r *reportAttributes) shared() *attributes {
-	if r.set == nil {
-		r.set = &attributes{
-			browser: r.source.Browser,
-			device:  r.source.Device,
-			country: r.source.Country,
-			page:    r.source.PageGroup,
-			version: r.source.AppVersion,
-			view:    r.source.View,
-		}
-	}
-	return r.set
 }
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
-	index, order := st.identities, &st.identityOrder
+	index := &st.identities
 	if key.kind == "resource" {
-		index, order = st.resourceIdentities, &st.resourceIdentityOrder
+		index = &st.resourceIdentities
 	}
-	if el := index[key]; el != nil {
-		if now.Sub(el.received) <= identityRetention {
-			if revision <= el.Value.revision {
-				return false
-			}
-			el.Value.revision = revision
-			order.renew(el, now)
-			return true
+	if el := index.current(key, now, identityRetention); el != nil {
+		if revision <= el.Value {
+			return false
 		}
-		order.remove(el)
-		delete(index, key)
+		el.Value = revision
+		index.renew(el, now)
+		return true
 	}
-	index[key] = order.add(now, identity{
-		key:      key,
-		revision: revision,
-	})
+	index.add(now, key, revision)
 	return true
 }
 
 // observeVital admits a new vital or a newer revision of a known one. A known
 // vital keeps the dimensions of its first admission; the returned set is that origin.
-func (st *siteState) observeVital(
-	experience string,
-	v beacon.Vital,
-	report *reportAttributes,
-	now time.Time,
-) (*attributes, bool) {
-	key := observationKey{experience, v.Name}
+func (st *siteState) observeVital(r *report, v beacon.Vital) (*attributes, bool) {
+	now := r.now
+	key := observationKey{r.in.ExperienceID, v.Name}
 	var attrs *attributes
-	if el := st.observations[key]; el != nil {
+	if el := st.observations.get(key); el != nil {
 		attrs = el.Value.attrs
 	}
-	evidence := st.vitalIdentities[key]
-	if evidence != nil && now.Sub(evidence.received) > identityRetention {
-		st.vitalIdentityOrder.remove(evidence)
-		delete(st.vitalIdentities, key)
-		evidence = nil
-	}
-	if evidence != nil {
+	if evidence := st.vitalIdentities.current(key, now, identityRetention); evidence != nil {
 		if evidence.Value.metricID != v.ID {
 			st.counters[CounterInvalidMeasurements]++
 			return nil, false
@@ -342,20 +359,18 @@ func (st *siteState) observeVital(
 		}
 		attrs = evidence.Value.attrs
 		evidence.Value.revision = v.Revision
-		st.vitalIdentityOrder.renew(evidence, now)
+		st.vitalIdentities.renew(evidence, now)
 	} else {
 		if attrs == nil {
-			attrs = report.shared()
+			attrs = r.shared()
 		}
-		st.vitalIdentities[key] = st.vitalIdentityOrder.add(now, vitalIdentity{
-			key:      key,
+		st.vitalIdentities.add(now, key, vitalIdentity{
 			metricID: v.ID,
 			revision: v.Revision,
 			attrs:    attrs,
 		})
 	}
-	st.putObservation(now, vitalObservation{
-		key:      key,
+	st.observations.put(now, key, vitalObservation{
 		metricID: v.ID,
 		revision: v.Revision,
 		value:    v.Value,
@@ -364,42 +379,17 @@ func (st *siteState) observeVital(
 	})
 	return attrs, true
 }
-
-// putObservation replaces a retained value; its receipt time never moves backwards.
-func (st *siteState) putObservation(received time.Time, v vitalObservation) {
-	if el := st.observations[v.key]; el != nil {
-		el.Value = v
-		st.observationOrder.renew(el, received)
-		return
-	}
-	st.observations[v.key] = st.observationOrder.add(received, v)
-}
 func (st *siteState) appendActivity(received time.Time, v activityObservation) {
 	order := &st.activity
 	if v.resource != nil {
 		order = &st.resources
 	}
-	order.add(received, v)
+	order.add(received, struct{}{}, v)
 }
 func (st *siteState) observeSession(id, page string, now time.Time) {
 	if id == "" {
 		return
 	}
-	st.touchObservedSession(st.sessions, &st.sessionOrder, id, "", now)
-	st.touchObservedSession(st.pageSessions, &st.pageSessionOrder, strconv.Itoa(len(id))+":"+id+page, page, now)
-}
-func (st *siteState) touchObservedSession(
-	index map[string]*receiptEntry[sessionObservation],
-	order *receiptHeap[sessionObservation],
-	key, page string,
-	now time.Time,
-) {
-	if el := index[key]; el != nil {
-		order.renew(el, now)
-		return
-	}
-	index[key] = order.add(now, sessionObservation{
-		key:  key,
-		page: page,
-	})
+	st.sessions.put(now, id, struct{}{})
+	st.pageSessions.put(now, strconv.Itoa(len(id))+":"+id+page, page)
 }

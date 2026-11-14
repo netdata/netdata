@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// live.go is the rum-live FUNCTION data source: a bounded ring of recently admitted
+// The rum-live Function data source is a bounded ring of recently admitted
 // document activations, application-view occurrences, vital reports and JS errors.
 // The ring belongs to this aggregator runtime and is guarded by its mutex.
+
 package aggregate
 
 import (
@@ -70,12 +71,7 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	if pageView {
 		row := base
 		row.Kind = "document"
-		for _, ev := range b.Events {
-			if ev.Kind == beacon.EventDocument {
-				row.Revision = ev.Revision
-				break
-			}
-		}
+		row.Revision = documentRevision(b)
 		row.PageView = true
 		appendRow(row)
 	}

@@ -152,8 +152,10 @@ type Vital struct {
 }
 
 type Error struct {
-	Type        string
-	Message     string
+	Type    string
+	Message string
+	// Stack is bounded by its producer to 4096 bytes, cut on a rune boundary;
+	// consumers retain it as is.
 	Stack       string
 	Time        time.Time
 	Fingerprint string // sha1(type+normalized message+first frame)[:12]

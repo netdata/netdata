@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -21,8 +22,8 @@ type elemSample struct {
 	poor       bool
 }
 
-func hasPageElement(v *vitalObservation) bool {
-	return v.element != "" && (v.key.name == beacon.LCP || v.key.name == beacon.INP || v.key.name == beacon.CLS)
+func hasPageElement(vital, element string) bool {
+	return element != "" && (vital == beacon.LCP || vital == beacon.INP || vital == beacon.CLS)
 }
 
 // Pages returns all retained page groups, independent of the chart top-N.

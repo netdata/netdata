@@ -2,7 +2,9 @@
 
 package faro
 
-import "testing"
+import (
+	"testing"
+)
 
 // The receiver classifies the User-Agent of every beacon. A browser is the
 // common and most expensive case because no entry ends the scan early. Each

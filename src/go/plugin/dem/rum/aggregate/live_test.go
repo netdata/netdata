@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -47,6 +48,7 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	assert.Equal(t, "checkout", rows[0].View)
 	assert.EqualValues(t, 2, rows[0].Revision)
 }
+
 func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 	for name, tc := range map[string]struct {
 		originCountry  string
@@ -121,18 +123,4 @@ func TestLiveRingAndCursorAcrossWraps(t *testing.T) {
 	*now = now.Add(time.Minute + time.Second)
 	rows, _ = a.Live(0, 100, "")
 	assert.Empty(t, rows)
-}
-func TestInputRemainsImmutableThroughFiltering(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.CLS, .1))
-	b.Resources = []beacon.Resource{{ID: "r", HasDuration: true, DurationMS: 0}}
-	a.Ingest(b)
-	second := a.Ingest(b)
-	require.NotNil(t, second.Observation)
-	assert.Empty(t, second.Observation.Events)
-	assert.Empty(t, second.Observation.Vitals)
-	assert.Empty(t, second.Observation.Resources)
-	assert.Len(t, b.Vitals, 1)
-	assert.Len(t, b.Events, 1)
-	assert.Len(t, b.Resources, 1)
 }

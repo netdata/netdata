@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import "time"
@@ -40,7 +41,7 @@ func (a *Aggregator) Activity() SiteActivity {
 		BotsPerMin:             len(st.bots),
 		LastBeaconAgeS:         age,
 		LastBeaconAt:           st.lastAccepted,
-		ObservedSessions:       len(st.sessions),
+		ObservedSessions:       st.sessions.len(),
 		InvestigatedSessions:   st.investigatedSessions(),
 		PageviewsWindow:        int(documents),
 		JSErrorsWindow:         errors,
@@ -61,4 +62,16 @@ func (st *siteState) evictActivity(now time.Time) {
 	st.accepted = evictTimes(st.accepted, cutoff)
 	st.rejected = evictTimes(st.rejected, cutoff)
 	st.bots = evictTimes(st.bots, cutoff)
+}
+func evictTimes(ts []time.Time, cutoff time.Time) []time.Time {
+	n := 0
+	for i, t := range ts {
+		if !t.Before(cutoff) {
+			if n != i {
+				ts[n] = t
+			}
+			n++
+		}
+	}
+	return ts[:n]
 }
