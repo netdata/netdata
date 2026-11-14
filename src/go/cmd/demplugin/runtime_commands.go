@@ -115,7 +115,7 @@ func runManagedCommand(ctx context.Context, command string, cfg runtimehost.Conf
 	case "preload":
 		err = preloadRuntime(ctx, store, storeConfig.Path, load, f.archive, report)
 	default:
-		err = installRuntime(ctx, command, store, load, f, report, stderr)
+		err = installRuntime(ctx, command, store, load, f.archive, f.manualUpdates, report, stderr)
 	}
 	return closeUnlessUndrained(err, store)
 }
@@ -168,8 +168,9 @@ func qualifyInstalled(ctx context.Context, source runner.Source, report *runtime
 	return nil
 }
 
-// ensureRuntime enrolls a runtime only when none is selected. A usable selection
-// is reported without download, qualification or store inventory.
+// ensureRuntime enrolls a runtime only when none is selected; a usable selection
+// is reported without download or qualification. ensure never reports store
+// inventory.
 func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader, archive string, report *runtimeCommandReport, stderr io.Writer) error {
 	candidate, selected, err := store.BeginPublishedEnsure(ctx, func(ctx context.Context) (runtime.VerifiedRelease, error) {
 		fmt.Fprintln(stderr, "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.")
@@ -186,8 +187,9 @@ func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader
 		return nil
 	}
 	if candidate == nil {
-		report.Notice = unchangedReleaseNotice
-		return nil
+		// A recorded release always comes back as the selection, so ensure never
+		// sees the unchanged-release result.
+		return errors.New("runtime ensure began neither a candidate nor a selection")
 	}
 	err = selectCandidate(ctx, candidate, archive, report)
 	if err == nil {
@@ -199,8 +201,8 @@ func ensureRuntime(ctx context.Context, store *runtime.Store, load releaseLoader
 
 // installRuntime installs, updates or repairs the selection. Its report shows
 // the selected installation separately from candidate progress.
-func installRuntime(ctx context.Context, command string, store *runtime.Store, load releaseLoader, f adminFlags, report *runtimeCommandReport, stderr io.Writer) error {
-	err := installCandidate(ctx, command, store, load, f, report, stderr)
+func installRuntime(ctx context.Context, command string, store *runtime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
+	err := installCandidate(ctx, command, store, load, archive, manualUpdates, report, stderr)
 	status, _ := report.inventory(store)
 	report.selectedInstallation(status)
 	if err != nil && command == "repair" {
@@ -209,12 +211,12 @@ func installRuntime(ctx context.Context, command string, store *runtime.Store, l
 	return err
 }
 
-func installCandidate(ctx context.Context, command string, store *runtime.Store, load releaseLoader, f adminFlags, report *runtimeCommandReport, stderr io.Writer) error {
+func installCandidate(ctx context.Context, command string, store *runtime.Store, load releaseLoader, archive string, manualUpdates bool, report *runtimeCommandReport, stderr io.Writer) error {
 	options := runtime.ReleaseInstallOptions{Operation: runtime.ReleaseOperation(command)}
 	// install and repair set the update policy; update preserves the installed one.
 	if command != "update" {
 		options.Updates = runtime.AutomaticUpdates
-		if f.manualUpdates {
+		if manualUpdates {
 			options.Updates = runtime.ManualUpdates
 		} else {
 			fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
@@ -228,7 +230,7 @@ func installCandidate(ctx context.Context, command string, store *runtime.Store,
 		report.Notice = unchangedReleaseNotice
 		return nil
 	}
-	return closeUnlessUndrained(selectCandidate(ctx, candidate, f.archive, report), candidate)
+	return closeUnlessUndrained(selectCandidate(ctx, candidate, archive, report), candidate)
 }
 
 // preloadRuntime prepares a candidate in a fresh final root and seals it there.
@@ -243,8 +245,9 @@ func preloadRuntime(ctx context.Context, store *runtime.Store, root string, load
 	return err
 }
 
-// sealPreload reports a completed seal even when closing the candidate fails
-// afterwards.
+// sealPreload begins a candidate without automatic updates, qualifies it and
+// seals it as the preload root. sealed reports a completed seal even when
+// closing the candidate fails afterwards.
 func sealPreload(ctx context.Context, store *runtime.Store, root string, load releaseLoader, archive string, report *runtimeCommandReport) (sealed bool, err error) {
 	options := runtime.ReleaseInstallOptions{Operation: runtime.InstallRelease, Updates: runtime.ManualUpdates}
 	candidate, err := store.BeginPublishedInstall(ctx, options, load)
@@ -255,7 +258,7 @@ func sealPreload(ctx context.Context, store *runtime.Store, root string, load re
 		report.Notice = unchangedReleaseNotice
 		return false, nil
 	}
-	err = prepareCandidate(ctx, candidate, archive, report)
+	err = qualifyCandidate(ctx, candidate, archive, report)
 	if err == nil {
 		err = candidate.SealPreload()
 	}
@@ -271,9 +274,9 @@ func sealPreload(ctx context.Context, store *runtime.Store, root string, load re
 	return sealed, closeUnlessUndrained(err, candidate)
 }
 
-// selectCandidate prepares the candidate and selects it.
+// selectCandidate qualifies the candidate and selects it.
 func selectCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
-	if err := prepareCandidate(ctx, candidate, archive, report); err != nil {
+	if err := qualifyCandidate(ctx, candidate, archive, report); err != nil {
 		return err
 	}
 	if err := candidate.Select(); err != nil {
@@ -285,10 +288,10 @@ func selectCandidate(ctx context.Context, candidate *runtime.Candidate, archive 
 	return nil
 }
 
-// prepareCandidate imports or downloads the candidate and qualifies it in a
+// qualifyCandidate imports or downloads the candidate and qualifies it in a
 // standalone execution scope. A cancellation after qualification stops the
 // command before the candidate is published.
-func prepareCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
+func qualifyCandidate(ctx context.Context, candidate *runtime.Candidate, archive string, report *runtimeCommandReport) error {
 	report.Candidate = new(candidate.Manifest().Identity())
 	report.CandidateState = "requested"
 	var err error
