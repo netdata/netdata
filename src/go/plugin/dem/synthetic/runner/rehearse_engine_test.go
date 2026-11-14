@@ -158,6 +158,9 @@ func TestRehearseSharesAdmissionAndHonorsCancellation(t *testing.T) {
 }
 
 func TestRehearseUnverifiedDrainPoisonsSharedOwnerAndPreservesWork(t *testing.T) {
+	// The rehearsal store is created under TMPDIR; the test directory removes
+	// its preserved uncertain work.
+	t.Setenv("TMPDIR", t.TempDir())
 	e, history, _ := testEngine(t)
 	var work, alias string
 	e.start = starter(t, func(_ context.Context, _ []string, raw []byte, _, _ *os.File) ndexec.TreeResult {
@@ -181,8 +184,6 @@ func TestRehearseUnverifiedDrainPoisonsSharedOwnerAndPreservesWork(t *testing.T)
 	require.NoError(t, err, "uncertain child ownership must preserve the workspace")
 	assert.False(t, e.execute(t.Context(), journey()).Drained)
 	assert.Empty(t, history.runs)
-	// The fake child has joined. Only this test may remove its simulated uncertain work.
-	require.NoError(t, os.RemoveAll(filepath.Dir(filepath.Dir(work))))
 	if alias != work {
 		require.NoError(t, os.Remove(alias))
 	}

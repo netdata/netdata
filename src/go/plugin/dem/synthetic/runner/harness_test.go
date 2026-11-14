@@ -21,7 +21,10 @@ type frame struct {
 }
 
 func emit(writer io.Writer, value any) {
-	raw, _ := json.Marshal(value)
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
 	_, _ = fmt.Fprintln(writer, string(raw))
 }
 
