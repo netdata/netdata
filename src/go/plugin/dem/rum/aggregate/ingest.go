@@ -169,16 +169,14 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 			}{{navLoadName, n.LoadMS, n.HasLoad}, {navDCLName, n.DCLMS, n.HasDCL}} {
 				key := observationKey{b.ExperienceID, metric.name}
 				if metric.present {
-					st.putObservation(now, vitalObservation{
-						key:      key,
+					st.observations.put(now, key, vitalObservation{
 						metricID: b.ExperienceID,
 						revision: n.Revision,
 						value:    metric.value,
 						attrs:    attrs.shared(),
 					})
-				} else if el := st.observations[key]; el != nil {
-					st.observationOrder.remove(el)
-					delete(st.observations, key)
+				} else if el := st.observations.get(key); el != nil {
+					st.observations.remove(el)
 				}
 			}
 			obs.Navigation = &n
@@ -290,26 +288,19 @@ func (r *reportAttributes) shared() *attributes {
 	return r.set
 }
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
-	index, order := st.identities, &st.identityOrder
+	index := &st.identities
 	if key.kind == "resource" {
-		index, order = st.resourceIdentities, &st.resourceIdentityOrder
+		index = &st.resourceIdentities
 	}
-	if el := index[key]; el != nil {
-		if now.Sub(el.received) <= identityRetention {
-			if revision <= el.Value.revision {
-				return false
-			}
-			el.Value.revision = revision
-			order.renew(el, now)
-			return true
+	if el := index.current(key, now, identityRetention); el != nil {
+		if revision <= el.Value {
+			return false
 		}
-		order.remove(el)
-		delete(index, key)
+		el.Value = revision
+		index.renew(el, now)
+		return true
 	}
-	index[key] = order.add(now, identity{
-		key:      key,
-		revision: revision,
-	})
+	index.add(now, key, revision)
 	return true
 }
 
@@ -323,16 +314,10 @@ func (st *siteState) observeVital(
 ) (*attributes, bool) {
 	key := observationKey{experience, v.Name}
 	var attrs *attributes
-	if el := st.observations[key]; el != nil {
+	if el := st.observations.get(key); el != nil {
 		attrs = el.Value.attrs
 	}
-	evidence := st.vitalIdentities[key]
-	if evidence != nil && now.Sub(evidence.received) > identityRetention {
-		st.vitalIdentityOrder.remove(evidence)
-		delete(st.vitalIdentities, key)
-		evidence = nil
-	}
-	if evidence != nil {
+	if evidence := st.vitalIdentities.current(key, now, identityRetention); evidence != nil {
 		if evidence.Value.metricID != v.ID {
 			st.counters[CounterInvalidMeasurements]++
 			return nil, false
@@ -342,20 +327,18 @@ func (st *siteState) observeVital(
 		}
 		attrs = evidence.Value.attrs
 		evidence.Value.revision = v.Revision
-		st.vitalIdentityOrder.renew(evidence, now)
+		st.vitalIdentities.renew(evidence, now)
 	} else {
 		if attrs == nil {
 			attrs = report.shared()
 		}
-		st.vitalIdentities[key] = st.vitalIdentityOrder.add(now, vitalIdentity{
-			key:      key,
+		st.vitalIdentities.add(now, key, vitalIdentity{
 			metricID: v.ID,
 			revision: v.Revision,
 			attrs:    attrs,
 		})
 	}
-	st.putObservation(now, vitalObservation{
-		key:      key,
+	st.observations.put(now, key, vitalObservation{
 		metricID: v.ID,
 		revision: v.Revision,
 		value:    v.Value,
@@ -364,42 +347,17 @@ func (st *siteState) observeVital(
 	})
 	return attrs, true
 }
-
-// putObservation replaces a retained value; its receipt time never moves backwards.
-func (st *siteState) putObservation(received time.Time, v vitalObservation) {
-	if el := st.observations[v.key]; el != nil {
-		el.Value = v
-		st.observationOrder.renew(el, received)
-		return
-	}
-	st.observations[v.key] = st.observationOrder.add(received, v)
-}
 func (st *siteState) appendActivity(received time.Time, v activityObservation) {
 	order := &st.activity
 	if v.resource != nil {
 		order = &st.resources
 	}
-	order.add(received, v)
+	order.add(received, struct{}{}, v)
 }
 func (st *siteState) observeSession(id, page string, now time.Time) {
 	if id == "" {
 		return
 	}
-	st.touchObservedSession(st.sessions, &st.sessionOrder, id, "", now)
-	st.touchObservedSession(st.pageSessions, &st.pageSessionOrder, strconv.Itoa(len(id))+":"+id+page, page, now)
-}
-func (st *siteState) touchObservedSession(
-	index map[string]*receiptEntry[sessionObservation],
-	order *receiptHeap[sessionObservation],
-	key, page string,
-	now time.Time,
-) {
-	if el := index[key]; el != nil {
-		order.renew(el, now)
-		return
-	}
-	index[key] = order.add(now, sessionObservation{
-		key:  key,
-		page: page,
-	})
+	st.sessions.put(now, id, struct{}{})
+	st.pageSessions.put(now, strconv.Itoa(len(id))+":"+id+page, page)
 }

@@ -138,12 +138,12 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	}
 	// Count the same retained population before copying. This extra traversal
 	// trades slice growth/copying for exact buffers without persistent accounting.
-	for _, el := range st.observationOrder.entries {
-		v := &el.Value
+	for _, el := range st.observations.order.entries {
+		v, name := &el.Value, el.key.name
 		if el.received.Before(cutoff) {
 			continue
 		}
-		index, ok := vitalIndex(v.key.name)
+		index, ok := vitalIndex(name)
 		if !ok {
 			continue
 		}
@@ -153,7 +153,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
 			g.countVital(index)
-			if pageOnly && hasPageElement(v) {
+			if pageOnly && hasPageElement(name, v.element) {
 				g.vitalValues.elementCount++
 			}
 		}
@@ -164,15 +164,15 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 			g.reserveVitals()
 		}
 	}
-	for _, el := range st.observationOrder.entries {
-		v := &el.Value
+	for _, el := range st.observations.order.entries {
+		v, name := &el.Value, el.key.name
 		if el.received.Before(cutoff) {
 			continue
 		}
-		index, ok := vitalIndex(v.key.name)
+		index, ok := vitalIndex(name)
 		if !ok {
 			if !pageOnly {
-				switch v.key.name {
+				switch name {
 				case navLoadName:
 					r.load = append(r.load, v.value)
 				case navDCLName:
@@ -187,11 +187,11 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 		for _, kv := range attributePairs(v.attrs, pageOnly) {
 			g := r.group(kv.kind, kv.value)
 			g.vitalValues.values[index] = append(g.vitalValues.values[index], v.value)
-			if pageOnly && hasPageElement(v) {
+			if pageOnly && hasPageElement(name, v.element) {
 				g.elements = append(g.elements, elemSample{
-					vital: v.key.name,
+					vital: name,
 					sel:   v.element,
-					poor:  v.value > thresholds[v.key.name][1],
+					poor:  v.value > thresholds[name][1],
 				})
 			}
 		}
@@ -226,59 +226,15 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 			r.addResource(&el.Value)
 		}
 	}
-	r.sessions = len(st.sessions)
-	for _, el := range st.pageSessionOrder.entries {
+	r.sessions = st.sessions.len()
+	for _, el := range st.pageSessions.order.entries {
 		if !el.received.Before(cutoff) {
-			r.group(facetPage, el.Value.page).sessions++
+			r.group(facetPage, el.Value).sessions++
 		}
 	}
 	return r
 }
 
-// Expiry removes only expired heap roots. Each removal costs O(log retained).
-func (st *siteState) expireMeasurements(now time.Time) {
-	cutoff := now.Add(-st.window)
-	for el := st.observationOrder.oldest(); el != nil && el.received.Before(cutoff); el = st.observationOrder.oldest() {
-		delete(st.observations, el.Value.key)
-		st.observationOrder.pop()
-	}
-	identityCutoff := now.Add(-identityRetention)
-	expireIdentities(st.identities, &st.identityOrder, identityCutoff)
-	expireIdentities(st.resourceIdentities, &st.resourceIdentityOrder, identityCutoff)
-	for el := st.vitalIdentityOrder.oldest(); el != nil && el.received.Before(identityCutoff); el = st.vitalIdentityOrder.oldest() {
-		delete(st.vitalIdentities, el.Value.key)
-		st.vitalIdentityOrder.pop()
-	}
-	for _, order := range []*receiptHeap[activityObservation]{&st.activity, &st.resources} {
-		for el := order.oldest(); el != nil && el.received.Before(cutoff); el = order.oldest() {
-			order.pop()
-		}
-	}
-	expireObservedSessions(st.sessions, &st.sessionOrder, cutoff)
-	expireObservedSessions(st.pageSessions, &st.pageSessionOrder, cutoff)
-}
-
-func (st *siteState) expire(now time.Time) {
-	st.expireMeasurements(now)
-	st.evictActivity(now)
-	st.evictSessions(now)
-}
-func expireIdentities(index map[identityKey]*receiptEntry[identity], order *receiptHeap[identity], cutoff time.Time) {
-	for el := order.oldest(); el != nil && el.received.Before(cutoff); el = order.oldest() {
-		delete(index, el.Value.key)
-		order.pop()
-	}
-}
-func expireObservedSessions(
-	index map[string]*receiptEntry[sessionObservation],
-	order *receiptHeap[sessionObservation],
-	cutoff time.Time,
-) {
-	for el := order.oldest(); el != nil && el.received.Before(cutoff); el = order.oldest() {
-		delete(index, el.Value.key)
-		order.pop()
-	}
-}
 func (a *Aggregator) Snapshot() Snapshot {
 	a.mu.Lock()
 	st := &a.site

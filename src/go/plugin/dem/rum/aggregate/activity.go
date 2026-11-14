@@ -40,7 +40,7 @@ func (a *Aggregator) Activity() SiteActivity {
 		BotsPerMin:             len(st.bots),
 		LastBeaconAgeS:         age,
 		LastBeaconAt:           st.lastAccepted,
-		ObservedSessions:       len(st.sessions),
+		ObservedSessions:       st.sessions.len(),
 		InvestigatedSessions:   st.investigatedSessions(),
 		PageviewsWindow:        int(documents),
 		JSErrorsWindow:         errors,

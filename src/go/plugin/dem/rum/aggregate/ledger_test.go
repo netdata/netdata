@@ -105,11 +105,11 @@ func TestReportItemsShareAttributes(t *testing.T) {
 
 	lcp := observationKey{b.ExperienceID, beacon.LCP}
 	cls := observationKey{b.ExperienceID, beacon.CLS}
-	shared := a.site.observations[lcp].Value.attrs
+	shared := a.site.observations.get(lcp).Value.attrs
 	require.NotNil(t, shared)
-	assert.Same(t, shared, a.site.observations[cls].Value.attrs)
-	assert.Same(t, shared, a.site.vitalIdentities[lcp].Value.attrs)
-	assert.Same(t, shared, a.site.vitalIdentities[cls].Value.attrs)
+	assert.Same(t, shared, a.site.observations.get(cls).Value.attrs)
+	assert.Same(t, shared, a.site.vitalIdentities.get(lcp).Value.attrs)
+	assert.Same(t, shared, a.site.vitalIdentities.get(cls).Value.attrs)
 	assert.Same(t, shared, a.site.activity.entries[0].Value.attrs)
 	assert.Same(t, shared, a.site.resources.entries[0].Value.attrs)
 
@@ -119,63 +119,64 @@ func TestReportItemsShareAttributes(t *testing.T) {
 	update.Browser = "Firefox"
 	update.Vitals = []beacon.Vital{{ID: beacon.LCP, Revision: 2, Name: beacon.LCP, Value: 200}}
 	a.Ingest(&update)
-	assert.Same(t, shared, a.site.observations[lcp].Value.attrs)
+	assert.Same(t, shared, a.site.observations.get(lcp).Value.attrs)
 	assert.Equal(t, "Chrome", shared.browser)
 }
 
-func TestReceiptHeapOrder(t *testing.T) {
+func TestReceiptIndexOrder(t *testing.T) {
 	t0 := time.Date(2030, 1, 1, 0, 0, 0, 0, time.UTC)
-	drain := func(h *receiptHeap[string]) []string {
-		var out []string
-		for h.Len() > 0 {
-			out = append(out, h.pop().Value)
-		}
-		return out
-	}
+	type index = receiptIndex[string, struct{}]
 	tests := map[string]struct {
-		change func(h *receiptHeap[string], entries map[string]*receiptEntry[string])
+		change func(x *index)
 		want   []string
 	}{
 		"receipt time, then insertion order": {
-			change: func(*receiptHeap[string], map[string]*receiptEntry[string]) {},
+			change: func(*index) {},
 			want:   []string{"a", "b", "c", "d"},
 		},
 		"a later receipt moves the entry": {
-			change: func(h *receiptHeap[string], e map[string]*receiptEntry[string]) {
-				h.renew(e["a"], t0.Add(time.Minute))
-			},
-			want: []string{"b", "c", "d", "a"},
+			change: func(x *index) { x.renew(x.get("a"), t0.Add(time.Minute)) },
+			want:   []string{"b", "c", "d", "a"},
 		},
 		"an earlier receipt keeps the entry in place": {
-			change: func(h *receiptHeap[string], e map[string]*receiptEntry[string]) {
-				h.renew(e["d"], t0.Add(-time.Minute))
-			},
-			want: []string{"a", "b", "c", "d"},
+			change: func(x *index) { x.renew(x.get("d"), t0.Add(-time.Minute)) },
+			want:   []string{"a", "b", "c", "d"},
 		},
 		"an equal receipt keeps insertion order": {
-			change: func(h *receiptHeap[string], e map[string]*receiptEntry[string]) {
-				h.renew(e["b"], t0.Add(time.Second))
-			},
-			want: []string{"a", "b", "c", "d"},
+			change: func(x *index) { x.renew(x.get("b"), t0.Add(time.Second)) },
+			want:   []string{"a", "b", "c", "d"},
 		},
 		"removal leaves the rest ordered": {
-			change: func(h *receiptHeap[string], e map[string]*receiptEntry[string]) {
-				h.remove(e["b"])
+			change: func(x *index) { x.remove(x.get("b")) },
+			want:   []string{"a", "c", "d"},
+		},
+		"expiry removes only entries received before the cutoff": {
+			change: func(x *index) { x.expire(t0.Add(time.Second)) },
+			want:   []string{"b", "c", "d"},
+		},
+		"a stale entry is removed on lookup": {
+			change: func(x *index) {
+				require.Nil(t, x.current("a", t0.Add(time.Minute+time.Nanosecond), time.Minute))
+				require.NotNil(t, x.current("b", t0.Add(time.Minute+time.Second), time.Minute))
 			},
-			want: []string{"a", "c", "d"},
+			want: []string{"b", "c", "d"},
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			var h receiptHeap[string]
-			entries := map[string]*receiptEntry[string]{
-				"d": h.add(t0.Add(2*time.Second), "d"),
-				"b": h.add(t0.Add(time.Second), "b"),
-				"a": h.add(t0, "a"),
-				"c": h.add(t0.Add(time.Second), "c"),
+			x := newReceiptIndex[string, struct{}]()
+			x.add(t0.Add(2*time.Second), "d", struct{}{})
+			x.add(t0.Add(time.Second), "b", struct{}{})
+			x.add(t0, "a", struct{}{})
+			x.add(t0.Add(time.Second), "c", struct{}{})
+			tc.change(&x)
+			require.Equal(t, len(tc.want), x.len())
+			var got []string
+			for e := x.order.popExpired(t0.Add(time.Hour)); e != nil; e = x.order.popExpired(t0.Add(time.Hour)) {
+				got = append(got, e.key)
+				assert.Same(t, e, x.get(e.key))
 			}
-			tc.change(&h, entries)
-			assert.Equal(t, tc.want, drain(&h))
+			assert.Equal(t, tc.want, got)
 		})
 	}
 }

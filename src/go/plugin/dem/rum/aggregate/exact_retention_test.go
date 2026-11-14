@@ -44,21 +44,21 @@ func TestIngestExpiresCanonicalStateWithoutReads(t *testing.T) {
 	*now = now.Add(5*time.Minute + time.Nanosecond)
 	a.Ingest(mk(*now, "current", "/current", v(beacon.LCP, 200)))
 	// Inspect retained ownership before any reader can trigger cleanup.
-	require.Len(t, a.site.observations, 1)
+	require.Equal(t, 1, a.site.observations.len())
 	require.Equal(t, 1, a.site.activity.Len())
 	require.Zero(t, a.site.resources.Len())
-	require.Len(t, a.site.sessions, 1)
-	require.Len(t, a.site.pageSessions, 1)
-	identities := func() int { return len(a.site.identities) + len(a.site.vitalIdentities) }
+	require.Equal(t, 1, a.site.sessions.len())
+	require.Equal(t, 1, a.site.pageSessions.len())
+	identities := func() int { return a.site.identities.len() + a.site.vitalIdentities.len() }
 	require.Equal(t, 4, identities(), "identity evidence outlives measurement windows")
-	require.Len(t, a.site.resourceIdentities, 1)
+	require.Equal(t, 1, a.site.resourceIdentities.len())
 	*now = now.Add(30 * time.Minute)
 	a.Ingest(mk(*now, "last", "/last"))
 	require.Equal(t, 3, identities(), "the exact 30-minute boundary remains included")
 	*now = now.Add(time.Nanosecond)
 	a.Ingest(&beacon.Beacon{Site: "s", Received: *now})
 	require.Equal(t, 1, identities())
-	require.Empty(t, a.site.resourceIdentities)
+	require.Zero(t, a.site.resourceIdentities.len())
 }
 
 func TestReceiverActivityExpiresWithoutPublication(t *testing.T) {
