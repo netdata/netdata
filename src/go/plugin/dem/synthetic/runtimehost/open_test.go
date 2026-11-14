@@ -32,7 +32,7 @@ func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
 	handle := Open(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.Nil(t, handle.Host)
-	require.Nil(t, handle.Store)
+	require.Nil(t, handle.store)
 	_, err := handle.Source.BeginUse()
 	require.Error(t, err)
 	require.NoError(t, handle.Close())

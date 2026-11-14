@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
@@ -24,59 +25,47 @@ type Qualifier interface {
 	Qualify(context.Context, runner.Source) (*runner.Qualification, error)
 }
 
-// PrepareRelease owns one complete managed transaction. Qualification must use
-// the process's existing execution owner when called inside a running plugin.
-// A nil result with no error means no candidate needed preparation.
-func PrepareRelease(ctx context.Context, store *runtime.Store, options runtime.ReleaseInstallOptions,
-	load func(context.Context) (runtime.Release, error), archive string, qualifier Qualifier) (_ *runner.Qualification, result error) {
-	if qualifier == nil {
-		return nil, errors.New("runtime qualifier is unavailable")
-	}
-	candidate, err := store.BeginPublishedInstall(ctx, options, load)
-	if err != nil || candidate == nil {
-		return nil, err
-	}
-	defer func() {
-		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
-			result = errors.Join(result, candidate.Close())
-		}
-	}()
-	if archive == "" {
-		err = candidate.Download(ctx)
-	} else {
-		err = candidate.Import(ctx, archive)
-	}
-	if err != nil {
-		return nil, err
-	}
-	qualification, err := qualifier.Qualify(ctx, Borrow(candidate))
-	if err != nil {
-		return qualification, err
-	}
-	return qualification, candidate.Select()
-}
-
 // Updater is a process service, independent of monitor configuration and storage
 // maintenance. It prepares selections; it never restarts or switches consumers.
 type Updater struct {
-	host      *Host
+	store     *runtime.Store
 	qualifier Qualifier
 	load      func(context.Context) (runtime.Release, error)
 	delay     func(bool) time.Duration
+	log       *logger.Logger
 	mu        sync.Mutex
+	status    UpdateStatus
+	err       error // last completed check; cleared only by a later successful check
 	started   bool
 	closed    bool
 	cancel    context.CancelFunc
 	done      chan struct{}
 }
 
-func NewUpdater(host *Host, qualifier Qualifier, load func(context.Context) (runtime.Release, error)) *Updater {
-	return &Updater{host: host, qualifier: qualifier, load: load, done: make(chan struct{}), delay: func(initial bool) time.Duration {
-		if initial {
-			return time.Duration(rand.Int64N(int64(5 * time.Minute)))
-		}
-		return 23*time.Hour + time.Duration(rand.Int64N(int64(2*time.Hour)))
-	}}
+// NewUpdater attaches automatic release preparation to a managed host, at most
+// once. Host.Status reports its progress and Host.Close joins it before
+// releasing process protection. Hosts without a managed store return nil.
+func (h *Host) NewUpdater(qualifier Qualifier, load func(context.Context) (runtime.Release, error)) *Updater {
+	if h.store == nil {
+		return nil
+	}
+	u := &Updater{
+		store:     h.store,
+		qualifier: qualifier,
+		load:      load,
+		log:       h.log,
+		done:      make(chan struct{}),
+		delay: func(initial bool) time.Duration {
+			if initial {
+				return time.Duration(rand.Int64N(int64(5 * time.Minute)))
+			}
+			return 23*time.Hour + time.Duration(rand.Int64N(int64(2*time.Hour)))
+		},
+	}
+	h.mu.Lock()
+	h.updater = u
+	h.mu.Unlock()
+	return u
 }
 
 func (u *Updater) Run(ctx context.Context) {
@@ -106,33 +95,60 @@ func (u *Updater) Run(ctx context.Context) {
 }
 
 func (u *Updater) check(ctx context.Context) error {
-	if u.host == nil || u.host.store == nil {
-		return nil
-	}
-	u.host.mu.Lock()
-	u.host.update.Checking = true
-	u.host.mu.Unlock()
+	u.mu.Lock()
+	u.status.Checking = true
+	u.mu.Unlock()
 	discovered := false
-	_, err := PrepareRelease(ctx, u.host.store, runtime.ReleaseInstallOptions{Operation: runtime.AutomaticReleaseUpdate}, func(ctx context.Context) (runtime.Release, error) {
+	err := u.prepare(ctx, func(ctx context.Context) (runtime.Release, error) {
 		discovered = true
-		u.host.mu.Lock()
-		u.host.update.LastCheckUS = time.Now().UnixMicro()
-		u.host.mu.Unlock()
-		if u.load == nil {
-			return runtime.Release{}, errors.New("runtime release discovery is not configured")
-		}
+		u.mu.Lock()
+		u.status.LastCheckUS = time.Now().UnixMicro()
+		u.mu.Unlock()
 		return u.load(ctx)
-	}, "", u.qualifier)
-	u.host.mu.Lock()
-	u.host.update.Checking = false
+	})
+	u.mu.Lock()
+	u.status.Checking = false
 	if discovered && err == nil {
-		u.host.update.LastSuccessUS = time.Now().UnixMicro()
+		u.status.LastSuccessUS = time.Now().UnixMicro()
 	}
-	u.host.mu.Unlock()
+	var change healthChange
 	if ctx.Err() == nil {
-		u.host.setMaintenance("update", err)
+		change = trackHealth("update", u.err, err)
+		u.err = err
 	}
+	u.mu.Unlock()
+	change.log(u.log)
 	return err
+}
+
+// prepare runs one complete managed transaction. Qualification uses the
+// process's existing execution owner. Without consent or a newer release no
+// candidate is begun.
+func (u *Updater) prepare(ctx context.Context, load func(context.Context) (runtime.Release, error)) (result error) {
+	options := runtime.ReleaseInstallOptions{Operation: runtime.AutomaticReleaseUpdate}
+	candidate, err := u.store.BeginPublishedInstall(ctx, options, load)
+	if err != nil || candidate == nil {
+		return err
+	}
+	defer func() {
+		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
+			result = errors.Join(result, candidate.Close())
+		}
+	}()
+	if err := candidate.Download(ctx); err != nil {
+		return err
+	}
+	if _, err := u.qualifier.Qualify(ctx, Borrow(candidate)); err != nil {
+		return err
+	}
+	return candidate.Select()
+}
+
+// state reports the progress and last failure that Host.Status publishes.
+func (u *Updater) state() (UpdateStatus, error) {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+	return u.status, u.err
 }
 
 // Close cancels acquisition and joins qualification before its caller closes

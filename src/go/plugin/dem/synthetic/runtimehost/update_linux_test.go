@@ -72,7 +72,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 		return runtime.VerifyRelease(envelope, public)
 	}
 	calls := 0
-	u := NewUpdater(host, qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
 		calls++
 		status, err := store.Inspect()
 		require.NoError(t, err)
@@ -117,7 +117,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
 	failure := errors.New("sandbox qualification failed")
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
 		func(context.Context) (runtime.Release, error) { return next, nil })
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
@@ -137,7 +137,7 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	host := NewManaged(store)
 	defer host.Close()
 	entered := make(chan struct{})
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}), func(ctx context.Context) (runtime.Release, error) {
@@ -158,11 +158,37 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	require.NoError(t, store.Uninstall(context.Background()), "cancelled updater must release installation exclusion")
 }
 
+func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
+	store := testStore(t)
+	first, data := publishedBundle(t, "first", 1)
+	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	host := NewManaged(store)
+	entered := make(chan struct{})
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+		t.Error("unexpected qualification")
+		return nil, nil
+	}), func(ctx context.Context) (runtime.Release, error) {
+		close(entered)
+		<-ctx.Done()
+		return runtime.Release{}, ctx.Err()
+	})
+	u.delay = func(bool) time.Duration { return 0 }
+	go u.Run(context.Background())
+	<-entered
+	require.NoError(t, host.Close())
+	select {
+	case <-u.done:
+	default:
+		t.Fatal("host released protection before joining its updater")
+	}
+	require.NoError(t, store.Uninstall(context.Background()), "closed host and updater release the installation")
+}
+
 func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 	store := testStore(t)
 	host := NewManaged(store)
 	defer host.Close()
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}),

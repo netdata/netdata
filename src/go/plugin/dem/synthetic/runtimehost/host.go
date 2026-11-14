@@ -60,7 +60,7 @@ type Host struct {
 	sweepInterval   time.Duration
 	closeOnce       sync.Once
 	closeErr        error
-	update          UpdateStatus
+	updater         *Updater
 }
 
 type processConsumer interface {
@@ -159,12 +159,20 @@ func errorText(err error) string {
 
 func (h *Host) Status() Snapshot {
 	h.mu.Lock()
-	result := Snapshot{Mode: h.mode, State: h.state, SetupError: errorText(h.setupErr), MaintenanceError: errorText(h.maintenanceErrorLocked()), Update: h.update}
+	result := Snapshot{Mode: h.mode, State: h.state, SetupError: errorText(h.setupErr)}
+	maintenance := h.maintenanceErrorLocked()
 	if h.identity != nil {
 		identity := *h.identity
 		result.Running = &identity
 	}
+	updater := h.updater
 	h.mu.Unlock()
+	if updater != nil {
+		var updateErr error
+		result.Update, updateErr = updater.state()
+		maintenance = errors.Join(maintenance, labelled("update", updateErr))
+	}
+	result.MaintenanceError = errorText(maintenance)
 	if h.store != nil {
 		status, err := h.store.Inspect()
 		result.Storage = &status
@@ -243,13 +251,20 @@ func (h *Host) sweep() {
 		change = h.updateMaintenanceLocked("execution completion", nil)
 	}
 	h.mu.Unlock()
-	h.logHealth(change)
+	change.log(h.log)
 }
 
-// Close follows joined jobs, releases process protection, and leaves the
-// caller-supplied Store open. Uncertain executions retain their own receipts.
+// Close follows joined jobs, joins the updater and the maintenance worker,
+// releases process protection, and leaves the caller-supplied store open.
+// Uncertain executions retain their own receipts.
 func (h *Host) Close() error {
 	h.closeOnce.Do(func() {
+		h.mu.Lock()
+		updater := h.updater
+		h.mu.Unlock()
+		if updater != nil {
+			h.closeErr = updater.Close()
+		}
 		h.mu.Lock()
 		h.closed = true
 		if h.cancel != nil {
@@ -261,7 +276,7 @@ func (h *Host) Close() error {
 			<-h.done
 		}
 		if h.consumer != nil {
-			h.closeErr = h.consumer.Close()
+			h.closeErr = errors.Join(h.closeErr, h.consumer.Close())
 		}
 	})
 	return h.closeErr

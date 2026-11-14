@@ -26,9 +26,8 @@ type Handle struct {
 	Manifest *runtime.Manifest
 	// SetupError reports why the runtime is unusable. RUM keeps working.
 	SetupError error
-	Store      *runtime.Store
-	Native     *runtime.Native
-	Updater    *Updater
+	store      *runtime.Store
+	native     *runtime.Native
 	closeOnce  sync.Once
 	closeErr   error
 }
@@ -69,12 +68,12 @@ func (h *Handle) openPreload(path string) {
 
 func (h *Handle) openNative() {
 	if h.SetupError == nil {
-		h.Native, h.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
+		h.native, h.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
 	}
 	if h.SetupError != nil {
 		h.Host = NewUnavailable(ModeNative, h.SetupError)
 	} else {
-		h.Host = NewNative(h.Native)
+		h.Host = NewNative(h.native)
 	}
 	h.SetupError = h.Host.Ready()
 	h.Source = h.Host
@@ -85,31 +84,29 @@ func (h *Handle) openManaged(cfg Config, varLibPath string) {
 		var storeConfig runtime.Config
 		storeConfig, h.SetupError = cfg.StoreConfig(varLibPath)
 		if h.SetupError == nil {
-			h.Store, h.SetupError = runtime.Open(storeConfig)
+			h.store, h.SetupError = runtime.Open(storeConfig)
 		}
 	}
 	if h.SetupError != nil {
 		h.Host = NewUnavailable(ModeManaged, h.SetupError)
 	} else {
-		h.Host = NewManaged(h.Store)
+		h.Host = NewManaged(h.store)
 	}
 	h.SetupError = h.Host.Ready()
 	h.Source = h.Host
 }
 
+// Close joins the host (and its updater) before closing the storage it opened.
 func (h *Handle) Close() error {
 	h.closeOnce.Do(func() {
-		if h.Updater != nil {
-			h.closeErr = h.Updater.Close()
-		}
 		if h.Host != nil {
-			h.closeErr = errors.Join(h.closeErr, h.Host.Close())
+			h.closeErr = h.Host.Close()
 		}
-		if h.Store != nil {
-			h.closeErr = errors.Join(h.closeErr, h.Store.Close())
+		if h.store != nil {
+			h.closeErr = errors.Join(h.closeErr, h.store.Close())
 		}
-		if h.Native != nil {
-			h.closeErr = errors.Join(h.closeErr, h.Native.Close())
+		if h.native != nil {
+			h.closeErr = errors.Join(h.closeErr, h.native.Close())
 		}
 	})
 	return h.closeErr

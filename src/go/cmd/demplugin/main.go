@@ -128,8 +128,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "initializing DEM browser execution: %v\n", err)
 		os.Exit(1)
 	}
-	if runtimeHandle.Store != nil && runtimeHandle.Host != nil {
-		runtimeHandle.Updater = runtimehost.NewUpdater(runtimeHandle.Host, executor, cfg.Runtime.ReleaseLoader("", true))
+	var updater *runtimehost.Updater
+	if runtimeHandle.Host != nil {
+		updater = runtimeHandle.Host.NewUpdater(executor, cfg.Runtime.ReleaseLoader("", true))
 	}
 	components := dem.New(
 		dem.Dependencies{
@@ -146,8 +147,8 @@ func main() {
 	if runtimeHandle.Host != nil {
 		services = append(services, runtimeHandle.Host)
 	}
-	if runtimeHandle.Updater != nil {
-		services = append(services, runtimeHandle.Updater)
+	if updater != nil {
+		services = append(services, updater)
 	}
 	a := agent.New(agent.Config{
 		Name:                      executable.Name,

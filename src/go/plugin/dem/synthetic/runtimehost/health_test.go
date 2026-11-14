@@ -44,6 +44,7 @@ func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
 	require.ErrorContains(t, dependencies[0].Ready(), "runtime unavailable")
 	_, err = h.BeginUse()
 	require.Error(t, err)
+	require.Nil(t, h.NewUpdater(nil, nil), "only a managed store prepares updates")
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
