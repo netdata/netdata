@@ -87,9 +87,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err := ctx.Err(); err != nil {
 		return statusError(err)
 	}
-	if h.deps == nil {
-		return funcapi.UnavailableResponse("history storage is unavailable")
-	}
 	status, err := h.deps.Status(ctx)
 	if err != nil {
 		return statusError(err)

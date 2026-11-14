@@ -325,8 +325,12 @@ func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
 	history, err := demjournal.Open(t.Context(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
+	captures, err := artifacts.Open("")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, captures.Close()) })
 	components := dem.New(dem.Dependencies{
-		History: history,
+		History:   history,
+		Artifacts: captures,
 	}, dem.DefaultConfig())
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"), 0600))

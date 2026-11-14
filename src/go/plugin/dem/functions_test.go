@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -48,6 +49,23 @@ func syntheticHandler(t *testing.T, components dem.Components) *syntheticfunctio
 	t.Helper()
 	return provider(t, components, "synthetics").
 		NewHandlerWithContext(funcapi.ProcessFunctionContext{}).(*syntheticfunctions.Handler)
+}
+
+// privateHistory and privateCaptures are the temporary stores debug runs use.
+func privateHistory(t *testing.T) *demjournal.Store {
+	t.Helper()
+	history, err := demjournal.Open(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, history.Close()) })
+	return history
+}
+
+func privateCaptures(t *testing.T) *artifacts.Store {
+	t.Helper()
+	captures, err := artifacts.Open("")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, captures.Close()) })
+	return captures
 }
 
 // Hold the scheduled attempt before admission. Inventory reads cannot create
@@ -98,14 +116,42 @@ func assertAvailability(t *testing.T, components dem.Components, rum, synthetics
 	}
 }
 
+func TestOnlySyntheticCollectorsWaitForTheBrowserRuntime(t *testing.T) {
+	browser := []collectorapi.ActivationDependency{{Kind: "dem-runtime", Name: "browser"}}
+	for name, activation := range map[string]func(map[string]any) ([]collectorapi.ActivationDependency, error){
+		"runtime host": func(map[string]any) ([]collectorapi.ActivationDependency, error) { return browser, nil },
+		"preload":      nil,
+	} {
+		t.Run(name, func(t *testing.T) {
+			components := dem.New(dem.Dependencies{
+				History:           privateHistory(t),
+				Artifacts:         privateCaptures(t),
+				BrowserActivation: activation,
+			}, dem.DefaultConfig())
+			for _, module := range []string{"rum", "receiver"} {
+				assert.Nil(t, components.Collectors[module].ActivationDependencies, module)
+			}
+			for _, module := range []string{"journey", "lighthouse"} {
+				dependencies := components.Collectors[module].ActivationDependencies
+				if activation == nil {
+					assert.Nil(t, dependencies, module)
+					continue
+				}
+				require.NotNil(t, dependencies, module)
+				got, err := dependencies(nil)
+				require.NoError(t, err)
+				assert.Equal(t, browser, got, module)
+			}
+		})
+	}
+}
+
 func TestFunctionAvailabilityWithActiveCollectors(t *testing.T) {
 	for _, module := range []string{"rum", "journey", "lighthouse", "receiver"} {
 		t.Run(module, func(t *testing.T) {
-			history, err := demjournal.Open(t.Context(), "")
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, history.Close()) })
 			components := dem.New(dem.Dependencies{
-				History: history,
+				History:   privateHistory(t),
+				Artifacts: privateCaptures(t),
 				Executor: inventoryExecutor{
 					waiting: make(chan struct{}),
 				},
@@ -170,8 +216,10 @@ func TestFunctionAvailabilityFromRetainedHistory(t *testing.T) {
 			history, err := demjournal.Open(t.Context(), root)
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, history.Close()) })
+			captures := privateCaptures(t)
 			components := dem.New(dem.Dependencies{
-				History: history,
+				History:   history,
+				Artifacts: captures,
 			}, dem.DefaultConfig())
 			assertAvailability(t, components, false, false)
 			now := time.Now().UnixMicro()
@@ -201,7 +249,8 @@ func TestFunctionAvailabilityFromRetainedHistory(t *testing.T) {
 			history, err = demjournal.Open(t.Context(), root)
 			require.NoError(t, err)
 			restarted := dem.New(dem.Dependencies{
-				History: history,
+				History:   history,
+				Artifacts: captures,
 			}, dem.DefaultConfig())
 			assertAvailability(t, restarted, kind == "rum", kind == "synthetic")
 		})
@@ -213,7 +262,9 @@ func TestFunctionAvailabilityFromCapturesAlone(t *testing.T) {
 	captures, err := artifacts.Open(root)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, captures.Close()) })
+	history := privateHistory(t)
 	components := dem.New(dem.Dependencies{
+		History:   history,
 		Artifacts: captures,
 	}, dem.DefaultConfig())
 	assertAvailability(t, components, false, false)
@@ -230,6 +281,7 @@ func TestFunctionAvailabilityFromCapturesAlone(t *testing.T) {
 	captures, err = artifacts.Open(root)
 	require.NoError(t, err)
 	restarted := dem.New(dem.Dependencies{
+		History:   history,
 		Artifacts: captures,
 	}, dem.DefaultConfig())
 	assertAvailability(t, restarted, false, true)
@@ -242,6 +294,7 @@ func TestFunctionAvailabilityFromCapturesAlone(t *testing.T) {
 	captures, err = artifacts.Open(root)
 	require.NoError(t, err)
 	assertAvailability(t, dem.New(dem.Dependencies{
+		History:   history,
 		Artifacts: captures,
 	}, dem.DefaultConfig()), false, false)
 }
@@ -261,7 +314,8 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 	})
 	require.NoError(t, err)
 	components := dem.New(dem.Dependencies{
-		History: journalStore,
+		History:   journalStore,
+		Artifacts: privateCaptures(t),
 	}, dem.DefaultConfig())
 	handler := rumHandler(t, components)
 	response := handler.HandleRaw(
@@ -308,7 +362,7 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, runs.Sync(ctx))
-	components := dem.New(dem.Dependencies{History: journal}, dem.DefaultConfig())
+	components := dem.New(dem.Dependencies{History: journal, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
 	for name, tc := range map[string]struct {
 		method string
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
@@ -401,6 +455,8 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
 	waiting := make(chan struct{})
 	components := dem.New(dem.Dependencies{
+		History:   privateHistory(t),
+		Artifacts: privateCaptures(t),
 		Executor: inventoryExecutor{
 			waiting: waiting,
 		},

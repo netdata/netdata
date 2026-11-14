@@ -32,6 +32,7 @@ import (
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"go.uber.org/automaxprocs/maxprocs"
 )
 
@@ -129,17 +130,19 @@ func main() {
 		os.Exit(1)
 	}
 	var updater *runtimehost.Updater
+	var browserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
 	if runtimeHandle.Host != nil {
 		updater = runtimeHandle.Host.NewUpdater(executor, cfg.Runtime.ReleaseLoader("", true))
+		browserActivation = runtimeHandle.Host.Dependencies
 	}
 	components := dem.New(
 		dem.Dependencies{
-			History:        history,
-			GeoIPPaths:     geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
-			Artifacts:      captures,
-			Executor:       executor,
-			Runtime:        runtimeHandle.Host,
-			ConfigProvider: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
+			History:           history,
+			GeoIPPaths:        geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
+			Artifacts:         captures,
+			Executor:          executor,
+			BrowserActivation: browserActivation,
+			ConfigProvider:    func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
 		},
 		cfg,
 	)

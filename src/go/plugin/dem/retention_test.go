@@ -22,6 +22,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func privateCaptures(t *testing.T) *artifacts.Store {
+	t.Helper()
+	captures, err := artifacts.Open("")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, captures.Close()) })
+	return captures
+}
+
+// keptArtifacts is an artifact store with nothing to expire.
+var keptArtifacts = artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
+	return artifacts.Status{}, nil
+})
+
 type observedRetention struct {
 	*demjournal.Store
 	swept chan error
@@ -47,12 +60,14 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	})
 	require.NoError(t, err)
 	components := New(Dependencies{
-		History: st,
+		History:   st,
+		Artifacts: privateCaptures(t),
 	}, Config{
 		History: RetentionConfig{
 			Days:     1,
 			MaxBytes: 1 << 30,
 		},
+		Artifacts: DefaultConfig().Artifacts,
 	})
 	service := components.Retention
 	observed := &observedRetention{
@@ -95,9 +110,11 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 		entered: make(chan struct{}),
 	}
 	service := &Retention{
-		store:  backend,
-		policy: DefaultConfig().History,
-		log:    logger.New(),
+		store:          backend,
+		policy:         DefaultConfig().History,
+		artifactStore:  keptArtifacts,
+		artifactPolicy: DefaultConfig().Artifacts,
+		log:            logger.New(),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -115,8 +132,13 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dem.conf")
+	history, err := demjournal.Open(context.Background(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	components := New(
 		Dependencies{
+			History:        history,
+			Artifacts:      privateCaptures(t),
 			ConfigProvider: func() (Config, error) { return LoadConfig(multipath.New(dir)) },
 		},
 		DefaultConfig(),
@@ -164,9 +186,11 @@ func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
 		calls: make(chan int, 2),
 	}
 	service := &Retention{
-		store:  backend,
-		policy: DefaultConfig().History,
-		log:    logger.New(),
+		store:          backend,
+		policy:         DefaultConfig().History,
+		artifactStore:  keptArtifacts,
+		artifactPolicy: DefaultConfig().Artifacts,
+		log:            logger.New(),
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
@@ -352,6 +376,7 @@ func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 	edited.History.Days = 7
 	components := New(Dependencies{
 		History:        store,
+		Artifacts:      privateCaptures(t),
 		ConfigProvider: func() (Config, error) { return edited, reloadErr },
 	}, initial)
 	var handler funcapi.RawMethodHandler
@@ -380,19 +405,4 @@ func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 	reloadErr = nil
 	components.Retention.reloadPolicy()
 	assert.Nil(t, read()[10])
-}
-
-func TestStatusWithoutHistoryDependencyIsUnavailable(t *testing.T) {
-	components := New(Dependencies{}, DefaultConfig())
-	for _, provider := range components.Functions {
-		if provider.ID == "dem-history" {
-			handler := provider.NewHandler().(funcapi.RawMethodHandler)
-			assert.Equal(t, 503, handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-				Method:      "dem-history-status",
-				Permissions: "0x1b",
-			}).Status)
-			return
-		}
-	}
-	t.Fatal("history status provider missing")
 }
