@@ -229,7 +229,7 @@ func inspectNativeEmpty(ctx context.Context, inspect NativeInspector) error {
 	if inspect == nil {
 		return errors.New("native service-UID inspector is required")
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	status, err := inspect(ctx)
@@ -242,9 +242,6 @@ func inspectNativeEmpty(ctx context.Context, inspect NativeInspector) error {
 func lockNativeGate(ctx context.Context, config NativeConfig, exclusive bool) (*flock.Flock, error) {
 	if _, err := readNativeControl(config); err != nil {
 		return nil, err
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	lock := flock.New(filepath.Join(config.ControlPath, nativeGateName), flock.SetFlag(os.O_RDONLY))
 	var held bool

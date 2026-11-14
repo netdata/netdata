@@ -3,7 +3,6 @@
 package runtime
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -87,7 +86,7 @@ func Open(config Config) (*Store, error) {
 	if !filepath.IsAbs(config.Path) {
 		return nil, errors.New("runtime store requires an absolute path")
 	}
-	path, root, err := openStoreRoot(config.Path)
+	path, root, err := openRuntimeRoot(config.Path, managedRootLayout)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func Open(config Config) (*Store, error) {
 		return nil, err
 	}
 	s.syncSelection = func() error { return syncDirectory(root, ".") }
-	err = s.withLock(func() error { return validateStoreLayout(root) })
+	err = s.withLock(func() error { return managedRootLayout.validate(root) })
 	if err != nil {
 		s.Close()
 		return nil, err
@@ -263,25 +262,6 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
 	}
 	return boundPaths(filepath.Join(path, "generations", m.Archive.SHA256), m.Layout), nil
-}
-
-func checkContext(ctx context.Context) error {
-	if ctx == nil {
-		return nil
-	}
-	return ctx.Err()
-}
-
-// Available verifies prepared identity without acquiring execution ownership or
-// changing retention timestamps. Consumer.BeginUse must precede executable access.
-func (s *Store) Available(m Manifest) error {
-	if err := m.Validate(); err != nil {
-		return err
-	}
-	return s.withLock(func() error {
-		_, err := s.prepared(m)
-		return err
-	})
 }
 
 func requireManaged(root *os.Root) error {

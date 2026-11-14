@@ -22,13 +22,10 @@ import (
 // Package recipes must assign root ownership before distribution. A failed stage
 // is retained for inspection; only a successful call authorizes packaging it.
 func PrepareNativePackage(ctx context.Context, m Manifest, archivePath, output string) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	config := DefaultNativeConfig()
@@ -46,7 +43,7 @@ func PrepareNativePackage(ctx context.Context, m Manifest, archivePath, output s
 	if err := normalizeNativeModes(root); err != nil {
 		return err
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	return publishNativeMetadata(root, parent, output, NativePackage{

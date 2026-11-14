@@ -54,10 +54,6 @@ type storePublication struct {
 
 // The initialization record distinguishes interrupted bootstrap from lost safety
 // state. Ready stores never recreate ownership namespaces or lock identities.
-func openStoreRoot(path string) (string, *os.Root, error) {
-	return openRuntimeRoot(path, managedRootLayout)
-}
-
 func openRuntimeRoot(path string, layout runtimeRootLayout) (string, *os.Root, error) {
 	canonical, err := ensureRuntimeRoot(filepath.Clean(path), layout)
 	if err != nil {
@@ -172,10 +168,6 @@ func (layout runtimeRootLayout) finishInitialization(root *os.Root) error {
 	})
 }
 
-func readStoreLayout(root *os.Root) (storeLayout, error) {
-	return managedRootLayout.read(root)
-}
-
 func (layout runtimeRootLayout) read(root *os.Root) (storeLayout, error) {
 	var record storeLayout
 	if err := readJSON(root, layoutName, &record); err != nil {
@@ -271,13 +263,6 @@ func retireStorePublication(path string, origin storePublication) (result error)
 	return syncDirectory(root, ".")
 }
 
-// Existing roots, including mountpoints, need no operations on their parents.
-// Every directory of a missing suffix advertises its publication debt, including
-// to another store creating a different path beneath a shared new ancestor.
-func ensureStoreRoot(path string) (string, error) {
-	return ensureRuntimeRoot(path, managedRootLayout)
-}
-
 // CanonicalRoot resolves existing symlink ancestors and appends a missing suffix
 // without creating a store or reconciling its publication state. Existing roots
 // and ancestors must resolve to directories.
@@ -320,6 +305,9 @@ func resolveRuntimeAncestor(path string) (string, []string, error) {
 	return canonical, missing, nil
 }
 
+// Existing roots, including mountpoints, need no operations on their parents.
+// Every directory of a missing suffix advertises its publication debt, including
+// to another store creating a different path beneath a shared new ancestor.
 func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
 	canonical, missing, err := resolveRuntimeAncestor(path)
 	if err != nil {
@@ -399,10 +387,6 @@ func ensureRuntimeRoot(path string, layout runtimeRootLayout) (string, error) {
 	return filepath.Join(append([]string{canonical}, missing...)...), nil
 }
 
-func validateStoreLayout(root *os.Root) error {
-	return managedRootLayout.validate(root)
-}
-
 func (layout runtimeRootLayout) validate(root *os.Root) error {
 	for _, name := range layout.locks() {
 		info, err := root.Lstat(name)
@@ -425,13 +409,15 @@ func (layout runtimeRootLayout) validate(root *os.Root) error {
 	return nil
 }
 
-func validateReadyStore(root *os.Root) error {
-	record, err := readStoreLayout(root)
+// validateReady accepts only a completed root whose safety structure exists.
+// Readers of a ready root must never bootstrap or repair it.
+func (layout runtimeRootLayout) validateReady(root *os.Root) error {
+	record, err := layout.read(root)
 	if err != nil {
 		return err
 	}
 	if record.Phase != "ready" {
 		return errors.New("runtime initialization is incomplete")
 	}
-	return validateStoreLayout(root)
+	return layout.validate(root)
 }

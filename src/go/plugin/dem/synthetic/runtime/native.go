@@ -75,14 +75,7 @@ func OpenNative(config NativeConfig) (*Native, error) {
 	if err != nil {
 		return nil, err
 	}
-	record, err := ownershipRootLayout.read(root)
-	if err == nil && record.Phase != "ready" {
-		err = errors.New("native ownership initialization is incomplete")
-	}
-	if err == nil {
-		err = ownershipRootLayout.validate(root)
-	}
-	if err != nil {
+	if err := ownershipRootLayout.validateReady(root); err != nil {
 		return nil, errors.Join(err, root.Close())
 	}
 	// Keep the validated root. An established native owner must never enter

@@ -520,7 +520,7 @@ func TestBootstrapExitBeforeParentSyncProcess(t *testing.T) {
 	if path == "" {
 		return
 	}
-	_, err := ensureStoreRoot(path)
+	_, err := ensureRuntimeRoot(path, managedRootLayout)
 	require.NoError(t, err)
 	os.Exit(73)
 }
@@ -599,7 +599,7 @@ func TestSharedCreatedAncestorRetainsPublicationBarrier(t *testing.T) {
 	parent := t.TempDir()
 	first := filepath.Join(parent, "new", "nested", "first")
 	// The first initializer exits after publication, before syncing parent.
-	_, err := ensureStoreRoot(first)
+	_, err := ensureRuntimeRoot(first, managedRootLayout)
 	require.NoError(t, err)
 	alias := filepath.Join(t.TempDir(), "alias")
 	require.NoError(t, os.Symlink(filepath.Dir(first), alias))
@@ -634,7 +634,7 @@ func TestSharedCreatedAncestorRetainsPublicationBarrier(t *testing.T) {
 func TestConcurrentStoresShareCreatedAncestors(t *testing.T) {
 	parent := filepath.Join(t.TempDir(), "new", "nested")
 	first := filepath.Join(parent, "first")
-	_, err := ensureStoreRoot(first)
+	_, err := ensureRuntimeRoot(first, managedRootLayout)
 	require.NoError(t, err)
 	var group sync.WaitGroup
 	errs := make(chan error, 8)

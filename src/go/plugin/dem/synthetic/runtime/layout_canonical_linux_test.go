@@ -20,7 +20,7 @@ func TestCanonicalRootMatchesPublishedStore(t *testing.T) {
 	expected, err := CanonicalRoot(path)
 	require.NoError(t, err)
 	assert.NoDirExists(t, filepath.Join(real, "new"))
-	actual, root, err := openStoreRoot(path)
+	actual, root, err := openRuntimeRoot(path, managedRootLayout)
 	require.NoError(t, err)
 	require.NoError(t, root.Close())
 	assert.Equal(t, expected, actual)

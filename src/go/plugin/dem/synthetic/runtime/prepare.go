@@ -32,16 +32,13 @@ func (s *Store) importArchive(ctx context.Context, m Manifest, archive string) e
 }
 
 func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadCloser, error)) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if err := m.Validate(); err != nil {
 		return err
 	}
 	if m.Platform != "linux/"+goruntime.GOARCH {
 		return errors.New("runtime archive does not match this architecture")
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	// Cleanup errors are exposed independently; a matching prepared runtime
@@ -98,7 +95,7 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	if err := syncTree(payload); err != nil {
 		return err
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	return s.withLock(func() error {
@@ -224,7 +221,7 @@ type contextReader struct {
 }
 
 func (r contextReader) Read(p []byte) (int, error) {
-	if err := checkContext(r.ctx); err != nil {
+	if err := r.ctx.Err(); err != nil {
 		return 0, err
 	}
 	return r.source.Read(p)

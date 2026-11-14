@@ -134,7 +134,7 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 		next.AutomaticUpdates = options.Updates == AutomaticUpdates
 	}
 	if current.Release != nil {
-		changed, err := ReleaseUpdate(*current.Release, release)
+		changed, err := releaseUpdate(*current.Release, release)
 		if err != nil {
 			return nil, nil, err
 		}

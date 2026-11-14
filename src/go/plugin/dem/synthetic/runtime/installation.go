@@ -170,9 +170,6 @@ type Candidate struct {
 }
 
 func (s *Store) lockInstallation(ctx context.Context) (*flock.Flock, error) {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	lock := flock.New(filepath.Join(s.path, "installation.lock"), flock.SetFlag(os.O_RDWR))
 	locked, err := lock.TryLockContext(ctx, 50*time.Millisecond)
 	if !locked || err != nil {
