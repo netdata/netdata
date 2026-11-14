@@ -12,6 +12,19 @@ endmeta-->
 
 Concrete recipes for the most common failures, organised by symptom. Most issues are diagnosable from the [plugin health charts](/docs/npm/network-flows/visualization/dashboard-cards.md), the Netdata journal logs, and a couple of OS-level commands.
 
+## The package can't be installed
+
+`apt`, `dnf`, or `zypper` reports `Unable to locate package netdata-plugin-netflow` (or the equivalent "no package available" / "no provider of `netdata-plugin-netflow` found").
+
+**What this means:** the plugin package is **not published for every distribution release**. The main Netdata repository may be configured and the core `netdata` package may install fine, while this separately-packaged plugin has not been published for your distribution's codename or version yet.
+
+**What to do:**
+
+1. Confirm the Netdata repository is configured for your distribution's codename. See [Native Linux Distribution packages](/packaging/installer/methods/packages.md) for the repository structure and how codename directories work.
+2. If the repository is correctly configured and the package is still missing, install via the static kickstart installer or build from source — both include the plugin on supported architectures. See [Installation: Static install (kickstart)](/docs/npm/network-flows/installation.md#static-install-kickstart) and [Installation: Source build](/docs/npm/network-flows/installation.md#source-build) for the steps.
+
+The static install (`--static-only`) bundles the plugin on x86_64, ARMv7, and ARM64. The ARMv6 static build (Raspberry Pi 1 / Zero) does not include it; build from source there.
+
 ## The plugin doesn't start
 
 The plugin won't come up at all, or starts and immediately exits.
