@@ -390,7 +390,8 @@ What makes this layer predictable:
   (signed in, same Space, paid Space, sensitive data): viewing Real User Monitoring, browser tests and DEM history
   status requires a paid plan or an active trial. Collection, journeys, audits and history storage run on every plan.
   Every handler also requires member access (`0x1b`) for data, and `synthetics-artifact` bytes require administrator
-  access (`0x7b`); `info` stays available for discovery. The checks live in `internal/rawfunc`.
+  access (`0x7b`); `info` stays available for discovery. The access masks, the permission test and the member check
+  are in `internal/rawfunc`; `synthetic/syntheticfunc` applies the administrator check to artifact bytes.
 - **Independent of collector selection.** Disabling `rum` or `journey`, or every collector, keeps retained history
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
