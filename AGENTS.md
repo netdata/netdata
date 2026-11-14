@@ -533,8 +533,8 @@ evidence-backed reason it is unaffected.
 ### Enforcement
 
 - `.agents/sow/audit.sh`: local consistency audit for SOW rules, the local-only queue/spec layout, framework files,
-  the skills layout, and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner it and CI use. Hard
-  failures:
+  the skills layout, `mktemp` templates, and sensitive data. `.agents/sow/scan-sensitive.sh` is the shared scanner
+  it and CI use. Hard failures:
   - the marker line under "SOW System"; the exact CRITICAL sensitive-data sentence; legacy `SOW-NNNN` references;
     relocated spec paths; missing or untracked framework files; a `q/` or `specs/` path that is not gitignored;
   - a `current/` SOW with a missing or invalid `Status:`; a committed SOW or spec working file;
@@ -544,6 +544,8 @@ evidence-backed reason it is unaffected.
     from the `AGENTS.md` skills index, or an index entry with no directory; a `.agents/skills/` path named in a tracked
     file, or a relative `../` path in a skill file, that does not exist; an owner-section citation `path.md#anchor` in a
     skill file whose file or heading (GitHub slug) does not exist; a failed reference scan;
+  - a `mktemp` template in a tracked `.agents/` or `docs/netdata-ai/` file that continues after its run of X's
+    (BSD/macOS `mktemp` randomizes only trailing X's, so the name never changes and concurrent runs collide);
   - a sensitive-data hit in the committed durable artifacts it scans (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
     `.agents/ENV.md`, the framework files, `.agents/skills/**`, `.agents/skill-verification/**`).
   Advisory: in-flight SOW files under `q/current/` are checked for the template's required sections for their kind,
