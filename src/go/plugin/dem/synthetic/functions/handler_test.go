@@ -545,13 +545,13 @@ func TestArtifactAccessAndExpiryThroughRealStore(t *testing.T) {
 	_, err = store.Enforce(context.Background(), 7, 1)
 	require.NoError(t, err)
 	got = call(h, "synthetics-artifact", args...)
-	assert.Equal(t, model.CaptureState("expired_or_unavailable"), got.RawResponse["capture_state"])
+	assert.Equal(t, model.CaptureExpired, got.RawResponse["capture_state"])
 	assert.Equal(t, "expired_or_unavailable", rowValues(t, got, responseData(t, got)[0])["availability"])
 	validate(t, got)
 	got = call(h, "synthetics-artifact", append(args, "artifact_id:report")...)
 	require.NotNil(t, got.RawResponse)
 	assert.Equal(t, 404, got.RawResponse["status"])
-	assert.Equal(t, model.CaptureState("expired_or_unavailable"), got.RawResponse["capture_state"])
+	assert.Equal(t, model.CaptureExpired, got.RawResponse["capture_state"])
 	validate(t, got)
 }
 

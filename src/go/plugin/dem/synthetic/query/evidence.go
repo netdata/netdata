@@ -9,11 +9,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
-// Availability of retained capture bytes. An expired run reports the same
-// word as its capture state.
+// Availability of retained capture bytes; an expired artifact reports its
+// run's expired capture state.
 const (
 	available            = "available"
-	expiredOrUnavailable = "expired_or_unavailable"
+	expiredOrUnavailable = string(synthetic.CaptureExpired)
 )
 
 type Artifact struct {
@@ -73,7 +73,7 @@ func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string)
 	}
 	metadata, body, err := s.artifacts.Fetch(ctx, jobID, runID, artifactID)
 	if errors.Is(err, artifacts.ErrNotFound) {
-		result.CaptureState = expiredOrUnavailable
+		result.CaptureState = synthetic.CaptureExpired
 		return result, ErrExpired
 	}
 	if err != nil {
@@ -108,7 +108,7 @@ func (s *Service) absentEvidence(ctx context.Context, jobID, runID, artifactID s
 		})
 	}
 	if len(run.Artifacts) > 0 {
-		result.CaptureState = expiredOrUnavailable
+		result.CaptureState = synthetic.CaptureExpired
 	}
 	if artifactID != "" {
 		if !recorded {

@@ -33,6 +33,9 @@ const (
 	CaptureNotNeeded   CaptureState = "not_needed" // the runner had nothing to capture
 	CaptureUnavailable CaptureState = "unavailable"
 	CaptureAvailable   CaptureState = "available"
+	// CaptureExpired is reported when reading evidence whose recorded captures
+	// are no longer retained; history never records it.
+	CaptureExpired CaptureState = "expired_or_unavailable"
 )
 
 // Capture is a candidate file the runner reports under the run's output
