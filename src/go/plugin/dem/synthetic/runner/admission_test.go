@@ -173,3 +173,21 @@ func TestAdmissionQualificationDoesNotQueueBehindUserJob(t *testing.T) {
 		assertIdle(t, o)
 	})
 }
+
+// TestAdmissionReleasesGrantRacingWithdrawal covers a grant that lands while
+// its caller stops: withdrawing the granted request releases its slot.
+func TestAdmissionReleasesGrantRacingWithdrawal(t *testing.T) {
+	o := newExecutionOwner(1)
+	key := jobKey("a")
+	job := &admissionJob{key: key}
+	waiter := &admissionWaiter{ready: make(chan struct{}), job: job}
+	job.waiters = []*admissionWaiter{waiter}
+	o.jobs[key] = job
+	o.ready = []*admissionJob{job}
+	o.mu.Lock()
+	o.dispatch()
+	o.mu.Unlock()
+	require.True(t, waiter.granted)
+	o.remove(waiter)
+	assertIdle(t, o)
+}

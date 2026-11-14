@@ -94,9 +94,11 @@ func TestCheckLastCallerCancelsAndJoinsBeforeReplacement(t *testing.T) {
 		o, poisoned := &checkOwner{}, make(chan struct{})
 		joined := make(chan struct{})
 		var runs atomic.Int32
+		var stopped atomic.Bool
 		probe := func(ctx context.Context) error {
 			if runs.Add(1) == 1 {
 				<-ctx.Done()
+				stopped.Store(true)
 				<-joined // its process tree has not joined yet
 				return ctx.Err()
 			}
@@ -107,8 +109,10 @@ func TestCheckLastCallerCancelsAndJoinsBeforeReplacement(t *testing.T) {
 		synctest.Wait()
 		require.True(t, first.returned(), "a caller leaves on its own stop")
 		assert.ErrorIs(t, first.err, context.Canceled)
+		assert.False(t, stopped.Load(), "the probe keeps running for the remaining caller, detached from the first")
 		second.cancel()
 		synctest.Wait()
+		assert.True(t, stopped.Load(), "the last caller cancels the probe")
 		assert.False(t, second.returned(), "the last caller waits for the cancelled probe to join")
 		replacement := callCheck(t.Context(), o, poisoned, probe)
 		expired, expire := context.WithCancel(t.Context())

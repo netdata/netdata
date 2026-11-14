@@ -213,3 +213,62 @@ func TestUnverifiedDrainPoisonsAllSlotsWithoutReleasingUnknownAttempt(t *testing
 	assert.Empty(t, e.ready)
 	e.mu.Unlock()
 }
+
+// stopAfterGrant reports no error to acquire's first check and a cancellation
+// afterwards; its Done channel never fires, so the slot is granted first.
+type stopAfterGrant struct {
+	context.Context
+	calls atomic.Int32
+}
+
+func (c *stopAfterGrant) Err() error {
+	if c.calls.Add(1) == 1 {
+		return nil
+	}
+	return context.Canceled
+}
+
+func (c *stopAfterGrant) Done() <-chan struct{} { return nil }
+
+// TestAdmissionReleasesSlotGrantedAfterStop releases a slot whose grant raced
+// the caller's stop: the attempt is cancelled before it starts.
+func TestAdmissionReleasesSlotGrantedAfterStop(t *testing.T) {
+	e, history, _ := testEngine(t)
+	e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+		t.Error("a stopped caller launched")
+		return nil, errors.New("unexpected launch")
+	}
+	got := e.execute(&stopAfterGrant{Context: t.Context()}, journey())
+	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
+	assert.Equal(t, synthetic.CallerCancelled, got.Run.TerminationReason)
+	assert.Zero(t, got.Run.StartedUS)
+	assert.Empty(t, history.runs)
+	requireSlotFree(t, e)
+}
+
+// TestAdmissionReleasesSlotGrantedAfterPoison never keeps a slot granted to a
+// request that the poisoned owner then refuses, whichever way the grant and
+// the poison race.
+func TestAdmissionReleasesSlotGrantedAfterPoison(t *testing.T) {
+	for range 20 {
+		e, _, _ := testEngine(t)
+		ctx := &poisonOnWait{Context: t.Context(), poison: func() { e.poison(errors.New("unknown descendant")) }}
+		got := e.execute(ctx, journey())
+		assert.False(t, got.Drained)
+		e.mu.Lock()
+		assert.Zero(t, e.active, "the refused request kept its slot")
+		e.mu.Unlock()
+	}
+}
+
+// poisonOnWait poisons the owner when acquire starts waiting, after the slot
+// was already granted under the owner's lock.
+type poisonOnWait struct {
+	context.Context
+	poison func()
+}
+
+func (c *poisonOnWait) Done() <-chan struct{} {
+	c.poison()
+	return nil
+}
