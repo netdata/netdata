@@ -139,6 +139,7 @@ func TestRuntimeConfigOverrides(t *testing.T) {
 	loaded, err := LoadConfig(multipath.New(dir))
 	require.NoError(t, err)
 	assert.Equal(t, runtimehost.ModeManaged, loaded.Runtime.Mode)
+	assert.EqualValues(t, 2147483648, loaded.Runtime.MaxBytes)
 	assert.Equal(t, 0, loaded.Runtime.PreviousRetentionDays)
 }
 
@@ -185,18 +186,18 @@ func TestRuntimeConfigErrorsReferToOriginalInput(t *testing.T) {
 }
 
 func TestRuntimeConfigMergeValidation(t *testing.T) {
-	for name, body := range map[string]string{
-		"merged unknown":   "runtime:\n  <<: {node_path: /tmp/node}\n",
-		"merged duplicate": "runtime:\n  <<: {max_bytes: 2048, max_bytes: 4096}\n",
-		"alias unknown":    "base: &base {allow_downlaod: false}\nruntime: {<<: *base}\n",
-		"alias duplicate":  "base: &base {mode: managed, mode: preloaded}\nruntime: {<<: *base}\n",
-		"top duplicate":    "enabled: true\nenabled: false\nruntime: {max_bytes: 2048}\n",
+	for name, tc := range map[string]struct{ body, detail string }{
+		"merged unknown":   {"runtime:\n  <<: {node_path: /tmp/node}\n", "field node_path not found"},
+		"merged duplicate": {"runtime:\n  <<: {max_bytes: 2048, max_bytes: 4096}\n", "field max_bytes already set"},
+		"alias unknown":    {"base: &base {allow_downlaod: false}\nruntime: {<<: *base}\n", "field allow_downlaod not found"},
+		"alias duplicate":  {"base: &base {mode: managed, mode: preloaded}\nruntime: {<<: *base}\n", "field mode already set"},
+		"top duplicate":    {"enabled: true\nenabled: false\nruntime: {max_bytes: 2048}\n", `key "enabled" already set`},
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(body), 0600))
+			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(tc.body), 0600))
 			_, err := LoadConfig(multipath.New(dir))
-			require.Error(t, err)
+			require.ErrorContains(t, err, tc.detail)
 		})
 	}
 }

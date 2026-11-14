@@ -13,6 +13,7 @@ import (
 
 func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
 	cfg := DefaultConfig()
+	cfg.Mode = ModeManaged // independent of the build default
 	cache := filepath.Join(t.TempDir(), "cache")
 	cfg.CachePath = cache
 	handle := Open(cfg, "")

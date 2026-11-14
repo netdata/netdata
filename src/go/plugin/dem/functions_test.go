@@ -403,12 +403,8 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 
 func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	ctx := context.Background()
-	history, err := demjournal.Open(ctx, "")
-	require.NoError(t, err)
-	defer history.Close()
-	captures, err := artifacts.Open("")
-	require.NoError(t, err)
-	defer captures.Close()
+	history := privateHistory(t)
+	captures := privateCaptures(t)
 	run := synthetic.Run{
 		ID:           "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		JobID:        "journey:retired",
@@ -420,7 +416,7 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 		Events:       []synthetic.Event{{Kind: "error", Message: "assertion failed"}},
 	}
 	run.CompletedUS = run.StartedUS + 1
-	_, err = synthetichistory.NewStore(history).AppendRun(ctx, "complete", run)
+	_, err := synthetichistory.NewStore(history).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
 	components := dem.New(dem.Dependencies{
 		History:   history,

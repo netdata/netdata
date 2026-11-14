@@ -14,9 +14,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// processConfig keeps the browser runtime store out of the state directory.
+// processConfig keeps the managed browser runtime store out of the state
+// directory, independent of the build's default mode.
 func processConfig(t *testing.T) Config {
 	cfg := DefaultConfig()
+	cfg.Runtime.Mode = runtimehost.ModeManaged
 	cfg.Runtime.CachePath = filepath.Join(t.TempDir(), "runtime")
 	return cfg
 }
