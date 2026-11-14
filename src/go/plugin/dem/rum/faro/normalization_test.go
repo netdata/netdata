@@ -100,17 +100,25 @@ func TestCaptureSpanAttributeSemanticsPrecedeKeyRedaction(t *testing.T) {
 	assert.Equal(t, "https://example.org/api", b.Spans[0].Attrs[0].Str)
 }
 
+// Both performance events name a URL. A resource name identifies the snippet's
+// own requests, so it is native; a navigation name is optional diagnostics.
 func TestCapturePerformanceEventNamesAreStructuredURLs(t *testing.T) {
-	for _, name := range []string{navigationEvent, resourceEvent} {
+	for name, native := range map[string]bool{navigationEvent: false, resourceEvent: true} {
 		t.Run(name, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"events": []any{map[string]any{
 				"name": name, "attributes": map[string]string{"name": "page.html?private=value#fragment"},
 			}}})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now, EventLogs: true})
-			require.NoError(t, err)
-			require.Len(t, b.Events, 1)
-			assert.Equal(t, "page.html", b.Events[0].Attrs["name"])
+			for _, logs := range []bool{false, true} {
+				b, err := Decode(raw, Options{Now: now, EventLogs: logs})
+				require.NoError(t, err)
+				require.Len(t, b.Events, 1)
+				if native || logs {
+					assert.Equal(t, map[string]string{"name": "page.html"}, b.Events[0].Attrs, "event logs %v", logs)
+				} else {
+					assert.Empty(t, b.Events[0].Attrs)
+				}
+			}
 		})
 	}
 }
