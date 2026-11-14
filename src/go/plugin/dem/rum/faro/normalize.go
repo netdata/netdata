@@ -61,11 +61,7 @@ func (o Options) view(value string) string {
 
 func (o Options) selector(value string) string {
 	// Apply credential patterns before the selector and size transformations.
-	r := o.Redactor
-	if r == nil {
-		r = defaultRedactor
-	}
-	return clean(redactSelector(r.Apply(value)), maxSelector)
+	return clean(redactSelector(o.apply(value)), maxSelector)
 }
 
 type stackFrame struct {
@@ -82,61 +78,110 @@ func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 	return function + "@" + filename
 }
 
-// Typed event attributes serve native measurements even with optional logs off.
-func keepEventAttr(kind beacon.EventKind, name, key string) bool {
-	if key == "observation_id" || key == "observation_sequence" {
-		return kind == beacon.EventDocument || kind == beacon.EventView || kind == beacon.EventNavigation ||
-			kind == beacon.EventResource || kind == beacon.EventSession
-	}
-	switch kind {
-	case beacon.EventNavigation:
-		return key == "pageLoadTime" || key == "domContentLoadHandlerTime"
-	case beacon.EventResource:
-		return key == "name" || key == "httpHost" || key == "duration" || key == "transferSize" || key == "initiatorType"
-	case beacon.EventRequest:
-		return key == "url.full" || key == "http.request.method" || key == "http.response.status_code" || key == "duration_ns"
-	case beacon.EventView:
-		return key == "fromView" || key == "toView"
-	default:
-		return beacon.IsFrustration(name) && key == "target"
-	}
+// attrSemantic is how an event attribute value is read.
+type attrSemantic uint8
+
+const (
+	attrByKey    attrSemantic = iota // by its key, like any attribute (cleanAttr)
+	attrID                           // opaque observation identity
+	attrRevision                     // observation sequence
+	attrNumber                       // finite non-negative number
+	attrURL                          // URL without query or fragment
+)
+
+// attrRule says how to read one event attribute. A native attribute serves
+// measurements: it is kept with optional event logs off and its key is never
+// rewritten as free text.
+type attrRule struct {
+	semantic attrSemantic
+	native   bool
 }
 
-// Numeric protocol values are measurements, not free text. Interpret each field
-// by its original key, before custom-key redaction can change that meaning.
-func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bool) {
-	if keepEventAttr(kind, "", key) {
-		if key == "observation_id" {
-			id := observationID(value)
-			return id, id != ""
-		}
-		if key == "observation_sequence" {
-			return value, observationRevision(value) != 0
-		}
-	}
+func nativeAttr(semantic attrSemantic) attrRule { return attrRule{semantic: semantic, native: true} }
 
-	if (kind == beacon.EventResource || kind == beacon.EventNavigation) && key == "name" {
-		return o.url(value, maxAttrLen), true
+// eventAttrRule declares, per event kind, the protocol attributes measurements
+// read. Values are interpreted by their original key, before custom-key
+// redaction can change its meaning. Every other attribute is diagnostic text.
+func eventAttrRule(kind beacon.EventKind, name, key string) attrRule {
+	if key == "observation_id" || key == "observation_sequence" {
+		switch kind {
+		case beacon.EventDocument, beacon.EventView, beacon.EventNavigation, beacon.EventResource, beacon.EventSession:
+			if key == "observation_id" {
+				return nativeAttr(attrID)
+			}
+			return nativeAttr(attrRevision)
+		}
+		return attrRule{}
 	}
-	numeric := false
 	switch kind {
 	case beacon.EventNavigation:
-		numeric = key == "pageLoadTime" || key == "domContentLoadHandlerTime"
+		switch key {
+		case "pageLoadTime", "domContentLoadHandlerTime":
+			return nativeAttr(attrNumber)
+		case "name":
+			return attrRule{semantic: attrURL}
+		}
 	case beacon.EventResource:
-		numeric = key == "duration" || key == "transferSize"
+		switch key {
+		case "name":
+			return nativeAttr(attrURL)
+		case "duration", "transferSize":
+			return nativeAttr(attrNumber)
+		case "httpHost", "initiatorType":
+			return nativeAttr(attrByKey)
+		}
 	case beacon.EventRequest:
-		numeric = key == "http.response.status_code" || key == "duration_ns"
+		switch key {
+		case "http.response.status_code", "duration_ns":
+			return nativeAttr(attrNumber)
+		case "url.full", "http.request.method":
+			return nativeAttr(attrByKey)
+		}
+	case beacon.EventView:
+		switch key {
+		case "fromView", "toView":
+			return nativeAttr(attrByKey)
+		}
 	}
-	if numeric {
+	if key == "target" && beacon.IsFrustration(name) {
+		return nativeAttr(attrByKey)
+	}
+	return attrRule{}
+}
+
+// eventAttr reads value under rule. Malformed identities and numbers are
+// dropped: numeric protocol values are measurements, not free text.
+func (o Options) eventAttr(rule attrRule, key, value string) (string, bool) {
+	switch rule.semantic {
+	case attrID:
+		id := observationID(value)
+		return id, id != ""
+	case attrRevision:
+		return value, observationRevision(value) != 0
+	case attrNumber:
 		value = clean(value, len(value))
-		n, err := strconv.ParseFloat(value, 64)
-		if err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+		if _, ok := parseNonNegative(value); !ok {
 			return "", false
 		}
 		return truncate(value, maxAttrLen), true
+	case attrURL:
+		return o.url(value, maxAttrLen), true
+	default:
+		return o.cleanAttr(key, value), true
 	}
-	return o.cleanAttr(key, value), true
 }
+
+// parseNonNegative reads a finite, non-negative protocol number; anything else
+// is absent.
+func parseNonNegative(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || !nonNegativeFinite(v) {
+		return 0, false
+	}
+	return v, true
+}
+
+func nonNegativeFinite(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 // IDs are opaque and must survive unchanged. Reject, rather than truncate or
 // redact, malformed values so unrelated observations cannot collapse together.
