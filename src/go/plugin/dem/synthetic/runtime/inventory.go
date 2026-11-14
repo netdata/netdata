@@ -69,7 +69,7 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		inv.release = record.Release
 		inv.automaticUpdates = record.AutomaticUpdates
 	}
-	names, err := s.childDirectories("generations")
+	names, err := s.ledger.childDirectories("generations")
 	if err != nil {
 		return inv, err
 	}
@@ -122,7 +122,7 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 }
 
 func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
-	owned, err := s.ownershipLedger.inventoryLocked(reconcile)
+	owned, err := s.ledger.inventoryLocked(reconcile)
 	inv := inventory{
 		ownershipInventory: owned,
 		generations:        make(map[string]generation),
@@ -132,12 +132,12 @@ func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
 	if err != nil {
 		return inv, err
 	}
-	staging, err := s.childDirectories("staging")
+	staging, err := s.ledger.childDirectories("staging")
 	if err != nil {
 		return inv, err
 	}
 	for _, name := range staging {
-		alive, err := s.ownerAlive(name)
+		alive, err := s.ledger.ownerAlive(name)
 		if err != nil {
 			return inv, err
 		}
@@ -185,6 +185,8 @@ func (inv inventory) protected(id string) bool {
 	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
 }
 
+// inUse reports consumers, candidates, executions or reservations that block
+// uninstall and repair.
 func (inv inventory) inUse() bool {
-	return inv.ownershipInventory.inUse() || len(inv.reservations) > 0
+	return len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0 || len(inv.reservations) > 0
 }

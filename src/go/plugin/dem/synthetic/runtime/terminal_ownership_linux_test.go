@@ -45,7 +45,7 @@ func TestPreparationCoordinationFailureReleasesTerminalOwners(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, status.CleanupError)
 	for _, dir := range []string{"claims", "staging", "trash"} {
-		entries, err := s.childDirectories(dir)
+		entries, err := s.ledger.childDirectories(dir)
 		require.NoError(t, err)
 		require.Empty(t, entries)
 	}
@@ -60,7 +60,7 @@ func TestOlderSweepPreservesPreparationCleanupHealth(t *testing.T) {
 	s, _ := testStore(t)
 	m, _ := bundleFixture(t, "preparation-health")
 	var version uint64
-	require.NoError(t, s.withLock(func() error { version = s.cleanupErrorVersion; return nil }))
+	require.NoError(t, s.withLock(func() error { version = s.ledger.cleanupErrorVersion; return nil }))
 	var restore func()
 	err := s.prepare(context.Background(), m, func() (io.ReadCloser, error) {
 		restore = blockCoordination(t, s)
@@ -69,7 +69,7 @@ func TestOlderSweepPreservesPreparationCleanupHealth(t *testing.T) {
 	restore()
 	require.Error(t, err)
 	require.NoError(t, s.flushTrash())
-	s.finishSweep(version, nil)
+	s.ledger.finishSweep(version, nil)
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.NotEmpty(t, status.CleanupError, "older sweep cannot clear finalizer failure")
@@ -148,7 +148,7 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 			} else {
 				require.Zero(t, status.ExecutionPins)
 			}
-			require.Empty(t, s.releasingOwners)
+			require.Empty(t, s.ledger.releasingOwners)
 		})
 	}
 }
@@ -162,10 +162,10 @@ func TestStoreCloseRetriesTerminalOwnerRelease(t *testing.T) {
 	claim.lock = closer
 	require.Error(t, claim.Close())
 	require.ErrorContains(t, s.Close(), "owner unlock failed")
-	require.Len(t, s.releasingOwners, 1)
+	require.Len(t, s.ledger.releasingOwners, 1)
 	closer.fail = false
 	require.NoError(t, s.Close())
-	require.Empty(t, s.releasingOwners)
+	require.Empty(t, s.ledger.releasingOwners)
 }
 
 func TestBeginUseConstructorCleanupFailureReportsHealth(t *testing.T) {
@@ -192,17 +192,17 @@ func TestBeginUseConstructorCleanupFailureReportsHealth(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, status.CleanupError)
 	require.Zero(t, status.ExecutionPins)
-	require.Empty(t, s.completedUses)
+	require.Empty(t, s.ledger.completedUses)
 }
 
 func TestOlderSweepPreservesNewerSweepFailure(t *testing.T) {
 	s, _ := testStore(t)
 	var version uint64
-	require.NoError(t, s.withLock(func() error { version = s.cleanupErrorVersion; return nil }))
+	require.NoError(t, s.withLock(func() error { version = s.ledger.cleanupErrorVersion; return nil }))
 	restore := blockCoordination(t, s)
 	require.Error(t, s.Sweep())
 	restore()
-	s.finishSweep(version, nil)
+	s.ledger.finishSweep(version, nil)
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.NotEmpty(t, status.CleanupError)

@@ -85,7 +85,7 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 	transferred := false
 	defer func() {
 		if !transferred {
-			result = errors.Join(result, s.releaseOwner(operation))
+			result = errors.Join(result, s.ledger.releaseOwner(operation))
 		}
 	}()
 	var current selection
@@ -207,7 +207,7 @@ func (s *Store) candidateWithOperation(operation *flock.Flock, publication selec
 		} else if _, err := s.selectedLocked(true); err != nil {
 			return err
 		}
-		owner, err := s.claimLocked(m.Archive.SHA256, "candidate")
+		owner, err := s.ledger.claimLocked(m.Archive.SHA256, "candidate")
 		if err == nil {
 			consumer = &Consumer{
 				store:    s,
@@ -221,7 +221,7 @@ func (s *Store) candidateWithOperation(operation *flock.Flock, publication selec
 		if consumer != nil {
 			err = errors.Join(err, consumer.Close())
 		}
-		return nil, errors.Join(err, s.releaseOwner(operation))
+		return nil, errors.Join(err, s.ledger.releaseOwner(operation))
 	}
 	return &Candidate{
 		Consumer:    consumer,
@@ -276,12 +276,12 @@ func (c *Candidate) Close() error {
 	c.closed = true
 	var err error
 	if c.sealed {
-		err = c.store.releaseOwner(c.claim.lock)
+		err = c.store.ledger.releaseOwner(c.claim.lock)
 	} else {
 		err = c.store.closeClaim(c.claim)
 	}
 	// Failed releases remain in Store's retry list, independently of the caller.
-	err = errors.Join(err, c.store.releaseOwner(c.operation))
+	err = errors.Join(err, c.store.ledger.releaseOwner(c.operation))
 	c.finished = true
 	return err
 }
@@ -293,7 +293,7 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 	if err != nil {
 		return err
 	}
-	defer func() { result = errors.Join(result, s.releaseOwner(operation)) }()
+	defer func() { result = errors.Join(result, s.ledger.releaseOwner(operation)) }()
 	err = s.withLock(func() error {
 		inv, err := s.inspectInventoryLocked(true)
 		if err != nil {

@@ -174,7 +174,7 @@ func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
 	require.True(t, process.Wait().Drained)
 	require.NoError(t, s.Sweep())
 	require.NoError(t, use.Finish(true), "a receipt may be reconciled before its caller finishes")
-	require.Empty(t, s.completedUses)
+	require.Empty(t, s.ledger.completedUses)
 }
 
 func TestReservationReusesPublishedGeneration(t *testing.T) {
@@ -464,15 +464,15 @@ func TestKernelBootProvenance(t *testing.T) {
 	}
 	s, now := testStore(t)
 	m := importFixture(t, s, "boot")
-	s.boot = bootIdentity{ID: "11111111-1111-1111-1111-111111111111", Verified: true}
+	s.ledger.boot = bootIdentity{ID: "11111111-1111-1111-1111-111111111111", Verified: true}
 	use, err := s.beginUse(m)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	*now = now.Add(100 * 24 * time.Hour)
-	s.boot = bootIdentity{ID: "22222222-2222-2222-2222-222222222222", Verified: false}
+	s.ledger.boot = bootIdentity{ID: "22222222-2222-2222-2222-222222222222", Verified: false}
 	require.NoError(t, s.Sweep())
 	require.FileExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256, "prepared.json"))
-	s.boot.Verified = true
+	s.ledger.boot.Verified = true
 	require.NoError(t, s.Sweep())
 	*now = now.Add(8 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
@@ -534,6 +534,6 @@ func requirePrepared(t *testing.T, s *Store, m Manifest) {
 
 func (s *Store) testProcessClaim(id string) (*claim, error) {
 	var owner *claim
-	err := s.withLock(func() error { var err error; owner, err = s.claimLocked(id, "process"); return err })
+	err := s.withLock(func() error { var err error; owner, err = s.ledger.claimLocked(id, "process"); return err })
 	return owner, err
 }

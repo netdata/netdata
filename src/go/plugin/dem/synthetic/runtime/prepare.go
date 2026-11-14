@@ -130,11 +130,11 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 }
 
 func (s *Store) finishPreparation(name string, owner io.Closer) {
-	err := s.releaseOwner(owner)
+	err := s.ledger.releaseOwner(owner)
 	if err == nil {
 		err = s.withLock(func() error { return s.removeOwned(name) })
 	}
-	s.recordCleanupError(errors.Join(err, s.flushTrash()))
+	s.ledger.recordCleanupError(errors.Join(err, s.flushTrash()))
 }
 
 func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
@@ -175,7 +175,7 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 				return err
 			}
 			if status.UsedBytes <= s.config.MaxBytes && status.ReservedBytes <= s.config.MaxBytes-status.UsedBytes && needed <= s.config.MaxBytes-status.UsedBytes-status.ReservedBytes {
-				name, owner, err = s.newOwner("staging", reservation{Generation: m.Archive.SHA256, Bytes: needed})
+				name, owner, err = s.ledger.newOwner("staging", reservation{Generation: m.Archive.SHA256, Bytes: needed})
 				return err
 			}
 			ids := s.candidates(inv, true)

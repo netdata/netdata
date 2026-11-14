@@ -160,7 +160,7 @@ func (s *Store) AcquireSelected() (*Consumer, error) {
 		if m == nil {
 			return ErrUnavailable
 		}
-		owner, err := s.claimLocked(m.Archive.SHA256, "process")
+		owner, err := s.ledger.claimLocked(m.Archive.SHA256, "process")
 		if err == nil {
 			consumer = &Consumer{
 				store:    s,

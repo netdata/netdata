@@ -136,10 +136,6 @@ func (s *ownershipLedger) finishSweep(cleanupVersion uint64, result error) {
 	}
 }
 
-func (inv ownershipInventory) inUse() bool {
-	return len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0
-}
-
 // trashSnapshotLocked requires the payload owner's barriers first when sharing
 // its root. This method never sweeps or deletes managed payloads by itself.
 func (s *ownershipLedger) trashSnapshotLocked() ([]string, error) {

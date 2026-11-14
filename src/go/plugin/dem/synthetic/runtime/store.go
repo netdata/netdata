@@ -53,7 +53,11 @@ func DefaultConfig(path string) Config {
 // Executable access requires an acquired Consumer or Candidate.
 // The directory must remain on one host and may not be copied or network-shared.
 type Store struct {
-	*ownershipLedger
+	// path and root name the managed store. The ledger shares root and closes it;
+	// Store methods add the managed checks, so ledger calls stay explicit.
+	path          string
+	root          *os.Root
+	ledger        *ownershipLedger
 	config        Config
 	now           func() time.Time
 	syncSelection func() error // Directory durability barrier before selection-dependent operations.
@@ -80,9 +84,11 @@ func Open(config Config) (*Store, error) {
 		return nil, err
 	}
 	s := &Store{
-		ownershipLedger: newOwnershipLedger(path, root),
-		config:          config,
-		now:             time.Now,
+		path:   path,
+		root:   root,
+		ledger: newOwnershipLedger(path, root),
+		config: config,
+		now:    time.Now,
 	}
 	if err := requireManaged(root); err != nil {
 		root.Close()
@@ -99,10 +105,10 @@ func Open(config Config) (*Store, error) {
 
 // Close requires the caller to have joined preparation and released its claims
 // and use handles. It does not manufacture completion for retained pins.
-func (s *Store) Close() error { return s.ownershipLedger.Close() }
+func (s *Store) Close() error { return s.ledger.Close() }
 
 func (s *Store) withLock(fn func() error) error {
-	return s.ownershipLedger.withLock(func() error {
+	return s.ledger.withLock(func() error {
 		if err := requireManaged(s.root); err != nil {
 			return err
 		}
@@ -184,7 +190,7 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 		if err != nil {
 			return err
 		}
-		lease, err := s.newUseLocked(m.Archive.SHA256)
+		lease, err := s.ledger.newUseLocked(m.Archive.SHA256)
 		if err != nil {
 			return err
 		}
@@ -219,7 +225,7 @@ func (s *Store) closeClaim(c *claim) error {
 	retired, err := c.close()
 	if retired && err == nil {
 		err = s.withLock(func() error { _, err := s.inventoryLocked(true); return err })
-		s.recordCleanupError(err)
+		s.ledger.recordCleanupError(err)
 	}
 	return err
 }
@@ -229,7 +235,7 @@ func (s *Store) closeClaim(c *claim) error {
 func (s *Store) removeOwned(name string) error {
 	switch filepath.Dir(name) {
 	case "claims", "uses", "initializing":
-		return s.ownershipLedger.removeOwned(name)
+		return s.ledger.removeOwned(name)
 	case "staging":
 		if _, err := s.root.Lstat(name); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err

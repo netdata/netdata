@@ -54,7 +54,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		AutomaticUpdates:      inv.automaticUpdates,
 		LimitBytes:            s.config.MaxBytes,
 		ProcessGenerations:    len(inv.processes),
-		BootRecoveryAvailable: s.boot.Verified,
+		BootRecoveryAvailable: s.ledger.boot.Verified,
 	}
 	if inv.selectionError != nil {
 		status.SelectionError = inv.selectionError.Error()
@@ -65,7 +65,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 			status.GenerationErrors[id] = err.Error()
 		}
 	}
-	if err := errors.Join(inv.cleanupError, s.cleanupError); err != nil {
+	if err := errors.Join(inv.cleanupError, s.ledger.cleanupError); err != nil {
 		status.CleanupError = err.Error()
 	}
 	var err error
@@ -135,7 +135,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 func (s *Store) Inspect() (Status, error) {
 	status := Status{
 		LimitBytes:            s.config.MaxBytes,
-		BootRecoveryAvailable: s.boot.Verified,
+		BootRecoveryAvailable: s.ledger.boot.Verified,
 	}
 	err := s.withLock(func() error {
 		inv, err := s.inspectInventoryLocked(false)
@@ -160,8 +160,8 @@ func (s *Store) Inspect() (Status, error) {
 func (s *Store) Sweep() error {
 	var cleanupVersion uint64
 	err := s.withLock(func() error {
-		cleanupVersion = s.cleanupErrorVersion
-		if err := s.retryOwnerReleasesLocked(); err != nil {
+		cleanupVersion = s.ledger.cleanupErrorVersion
+		if err := s.ledger.retryOwnerReleasesLocked(); err != nil {
 			return err
 		}
 		inv, err := s.inventoryLocked(true)
@@ -176,7 +176,7 @@ func (s *Store) Sweep() error {
 		return inv.cleanupError
 	})
 	result := errors.Join(err, s.flushTrash())
-	s.finishSweep(cleanupVersion, result)
+	s.ledger.finishSweep(cleanupVersion, result)
 	return result
 }
 
@@ -264,11 +264,11 @@ func (s *Store) flushTrash() error {
 			}
 		}
 		var err error
-		names, err = s.trashSnapshotLocked()
+		names, err = s.ledger.trashSnapshotLocked()
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	return s.deleteTrash(names)
+	return s.ledger.deleteTrash(names)
 }
