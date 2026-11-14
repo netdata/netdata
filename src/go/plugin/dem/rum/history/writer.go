@@ -6,14 +6,13 @@ package history
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-// The existing burst budget bounds queued browser detail; a full queue reports
-// drops without blocking measurement. Small batches amortize counter updates.
+// The existing burst budget bounds queued browser detail; a full queue counts
+// drops without blocking measurement. Batches amortize journal syncs.
 const (
 	maxBatch    = 500
 	batchPeriod = 5 * time.Second
@@ -21,6 +20,8 @@ const (
 )
 
 // Counters receives the writer's accounting; the owning site job publishes it.
+// Event calls Add under the producer's lock, so Add must not block or call back
+// into the producer.
 type Counters interface {
 	Add(counter string, n uint64)
 }
@@ -37,12 +38,10 @@ type eventWriter interface {
 }
 
 type Writer struct {
-	siteName  string
-	st        eventWriter
-	counters  Counters
-	ch        chan EventRecord
-	dropMu    sync.Mutex
-	chanDrops uint64
+	siteName string
+	st       eventWriter
+	counters Counters
+	ch       chan EventRecord
 	// Run owns pendingSync; attempted appends can need a sync even after an error.
 	pendingSync bool
 }
@@ -57,6 +56,7 @@ func NewWriter(siteName string, st *Store, counters Counters) *Writer {
 	}
 }
 
+// Event enqueues one record without blocking; a full queue counts it as dropped.
 func (w *Writer) Event(rec EventRecord) {
 	if rec.Site != w.siteName {
 		return
@@ -64,18 +64,7 @@ func (w *Writer) Event(rec EventRecord) {
 	select {
 	case w.ch <- rec:
 	default:
-		w.dropMu.Lock()
-		w.chanDrops++
-		w.dropMu.Unlock()
-	}
-}
-func (w *Writer) reportQueueDrops() {
-	w.dropMu.Lock()
-	drops := w.chanDrops
-	w.chanDrops = 0
-	w.dropMu.Unlock()
-	if drops != 0 {
-		w.counters.Add(CounterDropped, drops)
+		w.counters.Add(CounterDropped, 1)
 	}
 }
 
@@ -133,7 +122,6 @@ steady:
 // flush returns the consumed prefix. Only cancelled admission leaves a suffix
 // for final drain: journal appends have no batch transaction or rollback.
 func (w *Writer) flush(ctx context.Context, batch []EventRecord) int {
-	w.reportQueueDrops()
 	if len(batch) == 0 && !w.pendingSync {
 		return 0
 	}

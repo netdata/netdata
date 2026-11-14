@@ -218,19 +218,24 @@ func (w *recordingEventWriter) Sync(context.Context) error {
 	return w.syncErr
 }
 
-func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
+func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter("site", nil, counters)
-	disk := &recordingEventWriter{}
-	w.st = disk
 	for range queueCap + 1 {
 		w.Event(aggregate.HistoryEvent{
 			Site: "site",
 		})
 	}
+	assert.EqualValues(t, 1, counters.get(CounterDropped), "a full queue counts without waiting for a flush")
+	assert.Zero(t, counters.get(CounterWritten))
+}
+
+func TestEmptyFlushSkipsJournalSync(t *testing.T) {
+	w := NewWriter("site", nil, newFakeCounters())
+	disk := &recordingEventWriter{}
+	w.st = disk
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Zero(t, disk.syncs)
-	assert.EqualValues(t, 1, counters.get(CounterDropped))
 	assert.Equal(t, 1, w.flush(context.Background(), []aggregate.HistoryEvent{{Site: "site", Type: "event"}}))
 	assert.Equal(t, 1, disk.appends)
 	assert.Equal(t, 1, disk.syncs)
