@@ -476,7 +476,7 @@ update_available
             ('ol', '9', '', 'ol/9/fixture-arch'),
             ('rocky', '9.6', '', 'el/9/fixture-arch'),
         ]:
-            with self.subTest(distro=distro):
+            with self.subTest(distro=distro, version=version):
                 release_file = self.root / 'os-release'
                 release_file.write_text(f'ID={distro}\nVERSION_ID={version}\nVERSION_CODENAME={codename}\n')
                 functions = FUNCTIONS.replace('/etc/os-release', str(release_file))
