@@ -90,7 +90,7 @@ func (c *Collector) Init(ctx context.Context) error {
 		}
 	}
 	// Retained inactive credentials still need output redaction.
-	c.redactor = redact.NewRedactor(c.EventLogs.Destination.AuthToken, c.Tracing.Destination.AuthToken)
+	c.redactor = redact.NewRedactor(c.Secrets()...)
 	c.aggregator = aggregate.New(time.Duration(c.Window), aggregate.SiteCfg{
 		Name:               c.Name,
 		VnodeGUID:          c.vnodeGUID,

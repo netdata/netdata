@@ -10,8 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
@@ -53,16 +51,13 @@ func addSite(t *testing.T, hub *rumregistry.Registry, key, generation string) (*
 		DisplayName:    "site opaque-secret",
 		AllowedOrigins: []string{"https://example.org"},
 	}
-	state := diagnostics.New()
-	route := httpapi.NewRoute(cfg, measurementProcessor{a}, state)
+	route := httpapi.NewRoute(cfg, measurementProcessor{a}, redact.NewRedactor("opaque-secret"))
 	retire, err := hub.Register(
 		key,
 		&rumregistry.Site{
-			Route:       route,
-			Diagnostics: state,
-			Aggregator:  a,
-			Generation:  generation,
-			Redactor:    redact.NewRedactor("opaque-secret"),
+			Route:      route,
+			Aggregator: a,
+			Generation: generation,
 		},
 	)
 	require.NoError(t, err)
@@ -411,12 +406,10 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 					AlwaysKeep: tc.keep,
 				},
 			}
-			state := diagnostics.New()
 			retire, err := hub.Register("shop", &rumregistry.Site{
-				Route:       httpapi.NewRoute(cfg, measurementProcessor{a}, state),
-				Diagnostics: state,
-				Aggregator:  a,
-				Generation:  "first",
+				Route:      httpapi.NewRoute(cfg, measurementProcessor{a}, nil),
+				Aggregator: a,
+				Generation: "first",
 			})
 			require.NoError(t, err)
 			t.Cleanup(retire)

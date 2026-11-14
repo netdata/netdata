@@ -87,7 +87,20 @@ type EventLogs struct {
 	Destination        Destination `yaml:"destination"          json:"destination"`
 }
 
-func (s Site) EventLogsOn() bool   { return s.EventLogs != nil && s.EventLogs.Enabled }
+func (s Site) EventLogsOn() bool { return s.EventLogs != nil && s.EventLogs.Enabled }
+
+// Secrets are the configured credentials site output must mask, including
+// those of disabled exports, which stay in the stored configuration.
+func (s Site) Secrets() []string {
+	var secrets []string
+	if s.EventLogs != nil {
+		secrets = append(secrets, s.EventLogs.Destination.AuthToken)
+	}
+	if s.Tracing != nil {
+		secrets = append(secrets, s.Tracing.Destination.AuthToken)
+	}
+	return secrets
+}
 func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.IncludeConsoleLogs }
 
 // Effective returns defaults without changing the stored configuration.

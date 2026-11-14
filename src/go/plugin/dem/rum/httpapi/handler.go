@@ -42,7 +42,7 @@ func New(cfg *config.Receiver, routes Routes, geo CountryResolver) *Server {
 	}
 }
 
-// acquire fences policy, processor and diagnostics to one site runtime. Closing an
+// acquire fences policy, processor and rejection evidence to one site runtime. Closing an
 // admitted body on retirement also interrupts a slow producer inside ReadAll.
 func (s *Server) acquire(w http.ResponseWriter, r *http.Request, key string) (*Route, func(), bool) {
 	route, ctx, release, ok := s.routes.Acquire(key)

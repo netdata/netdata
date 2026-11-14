@@ -9,7 +9,6 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
@@ -46,8 +45,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	}
 	writer := history.NewWriter(c.Name, c.deps.History, c.transport)
 	c.aggregator.SetHistorySink(writer)
-	state := diagnostics.New()
-	route := httpapi.NewRoute(c.Site, p, state)
+	route := httpapi.NewRoute(c.Site, p, c.redactor)
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return err
@@ -55,11 +53,9 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 	retire, err := c.deps.Registry.Register(
 		c.Name,
 		&rumregistry.Site{
-			Route:       route,
-			Diagnostics: state,
-			Aggregator:  c.aggregator,
-			Generation:  hex.EncodeToString(id[:]),
-			Redactor:    c.redactor,
+			Route:      route,
+			Aggregator: c.aggregator,
+			Generation: hex.EncodeToString(id[:]),
 		},
 	)
 	if err != nil {

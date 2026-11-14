@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
@@ -48,15 +47,13 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 		})
 		w := history.NewWriter(job, store, discardCounters{})
 		a.SetHistorySink(w)
-		d := diagnostics.New()
 		route := httpapi.NewRoute(config.Site{
 			Name: job,
-		}, measurementProcessor{a}, d)
+		}, measurementProcessor{a}, nil)
 		retire, err := hub.Register(job, &rumregistry.Site{
-			Route:       route,
-			Diagnostics: d,
-			Aggregator:  a,
-			Generation:  generation,
+			Route:      route,
+			Aggregator: a,
+			Generation: generation,
 		})
 		require.NoError(t, err)
 		t.Cleanup(retire)

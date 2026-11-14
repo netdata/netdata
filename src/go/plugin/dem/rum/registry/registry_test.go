@@ -13,7 +13,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
@@ -51,13 +50,11 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 		Name:           "shop",
 		AllowedOrigins: []string{"https://example.org"},
 	}
-	state := diagnostics.New()
-	route := httpapi.NewRoute(cfg, measurementProcessor{aggregator}, state)
+	route := httpapi.NewRoute(cfg, measurementProcessor{aggregator}, nil)
 	retire, err := hub.Register("shop", &rumregistry.Site{
-		Route:       route,
-		Diagnostics: state,
-		Aggregator:  aggregator,
-		Generation:  "first",
+		Route:      route,
+		Aggregator: aggregator,
+		Generation: "first",
 	})
 	require.NoError(t, err)
 	observed := &observedRoutes{
