@@ -470,7 +470,7 @@ Shared and process-wide packages:
 |---|---|
 | `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication; journey and lighthouse embed the shared synthetic job and keep request building and their own metrics |
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
-| `journalstore` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
+| `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
@@ -936,8 +936,10 @@ flowchart LR
 
 - The shared append boundary derives `DEM_SCHEMA=1` and one canonical decimal minute field: `DEM_RUM_MINUTE` or
   `DEM_SYNTHETIC_MINUTE`, computed as floor(domain microseconds / 60,000,000).
-- Callers cannot supply envelope metadata.
-- Domain decoders check required scalar multiplicity, identity and timestamp agreement.
+- Producers write only the kind and their domain clock; the schema and minute fields are reserved, and an append that
+  supplies them is rejected.
+- The store's envelope decoder checks envelope field multiplicity and clock/bucket agreement. Domain decoders check
+  their own field multiplicity, identity and timestamp agreement.
 - Each snapshot captures both bucket FIELD heads and schema posting counts while admission excludes
   append/rotation/retention. The current schema must cover every committed entry.
 - Opening owns bounded SDK buffers rather than a vector of all ENTRY offsets.

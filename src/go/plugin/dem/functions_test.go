@@ -344,12 +344,12 @@ func TestHistoryFunctionsRemainAvailableWithoutActiveSites(t *testing.T) {
 // Retained grouping must work with no live collector, receiver or browser runtime.
 func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 	ctx := context.Background()
-	journal, err := journalstore.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journal.Close()) })
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	now := time.Now().Add(-time.Minute).UnixMicro()
-	rum := rumhistory.NewStore(journal)
-	runs := synthetichistory.NewStore(journal)
+	rum := rumhistory.NewStore(journalStore)
+	runs := synthetichistory.NewStore(journalStore)
 	for i, association := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		_, err := rum.AppendEvent(ctx, rumhistory.EventRecord{
 			Site: "browser-traffic", VnodeGUID: association, SessionID: "same-session",
@@ -364,7 +364,7 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, runs.Sync(ctx))
-	components := dem.New(dem.Dependencies{History: journal, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
+	components := dem.New(dem.Dependencies{History: journalStore, Artifacts: privateCaptures(t)}, dem.DefaultConfig())
 	for name, tc := range map[string]struct {
 		method string
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
