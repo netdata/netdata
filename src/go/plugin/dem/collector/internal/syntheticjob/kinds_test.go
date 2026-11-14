@@ -52,9 +52,12 @@ func (s settings) apply(name *string, checkEvery, updateEvery *int) {
 type kind struct {
 	kind    synthetic.Kind
 	cadence int
-	// target is the registered target of the default kind configuration.
+	// target is the registered target of the kind configuration built by new.
 	target string
-	new    func(syntheticjob.Executor, *registry.Registry, settings) job
+	// request is what the executor receives from that configuration with default settings; new sets every option
+	// that changes it away from its zero value.
+	request synthetic.Request
+	new     func(syntheticjob.Executor, *registry.Registry, settings) job
 	// measurements are the kind metrics published from fixture(); charts are their contexts and dimensions.
 	measurements map[string]float64
 	charts       map[string][]string
@@ -65,12 +68,24 @@ var kinds = map[string]kind{
 		kind:    synthetic.Journey,
 		cadence: 900,
 		target:  "",
+		request: synthetic.Request{
+			Kind:                synthetic.Journey,
+			Name:                "checkout",
+			Script:              "export {};",
+			Secrets:             map[string]string{"DEM_SECRET_LOGIN": "synthetic-password"},
+			Timeout:             2 * time.Minute,
+			Capture:             true,
+			Trace:               true,
+			BrowserErrorSummary: true,
+		},
 		new: func(e syntheticjob.Executor, hub *registry.Registry, s settings) job {
 			c := journey.New(journey.Dependencies{
 				Executor: e,
 				Registry: hub,
 			})
 			c.Script = "export {};"
+			c.Secrets = []journey.Secret{{Name: "DEM_SECRET_LOGIN", Value: "synthetic-password"}}
+			c.ScreenshotOnFailure, c.TraceOnFailure, c.BrowserErrorSummary = true, true, true
 			s.apply(&c.Name, &c.CheckEvery, &c.UpdateEvery)
 			return c
 		},
@@ -99,12 +114,20 @@ var kinds = map[string]kind{
 		kind:    synthetic.Lighthouse,
 		cadence: 1800,
 		target:  "https://example.org/",
+		request: synthetic.Request{
+			Kind:    synthetic.Lighthouse,
+			Name:    "checkout",
+			URL:     "https://example.org/",
+			Timeout: 3 * time.Minute,
+			Capture: true,
+		},
 		new: func(e syntheticjob.Executor, hub *registry.Registry, s settings) job {
 			c := lighthouse.New(lighthouse.Dependencies{
 				Executor: e,
 				Registry: hub,
 			})
 			c.URL = "https://example.org/"
+			c.SaveReport = true
 			s.apply(&c.Name, &c.CheckEvery, &c.UpdateEvery)
 			return c
 		},

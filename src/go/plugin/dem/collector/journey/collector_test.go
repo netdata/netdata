@@ -23,7 +23,11 @@ import (
 
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: syntheticjobtest.Executor{},
+		Executor: syntheticjobtest.Executor{
+			ExecuteFunc: func(context.Context, model.Request, func(string)) model.Execution {
+				panic("unexpected execution during config validation")
+			},
+		},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "login"
@@ -31,12 +35,23 @@ func configured() *Collector {
 	return c
 }
 
-// request builds the execution request Init validates for the current configuration.
+// request returns the request Init stores for the configuration of c, as the executor receives it.
 func request(t *testing.T, c *Collector) model.Request {
 	t.Helper()
-	r, err := c.newRequest("")
-	require.NoError(t, err)
-	return r
+	var sent model.Request
+	probe := New(Dependencies{
+		Executor: syntheticjobtest.Executor{
+			RehearseFunc: func(_ context.Context, r model.Request) error {
+				sent = r
+				return nil
+			},
+		},
+		Registry: syntheticregistry.New(),
+	})
+	probe.Config = c.Config
+	require.NoError(t, probe.Init(t.Context()))
+	require.NoError(t, probe.Test(t.Context()))
+	return sent
 }
 
 var _ dyncfg.Testable = (*Collector)(nil)
@@ -217,25 +232,6 @@ func TestBrowserErrorSummaryOption(t *testing.T) {
 	c := configured()
 	require.NoError(t, c.Init(context.Background()))
 	assert.False(t, request(t, c).BrowserErrorSummary)
-}
-
-func TestRequestFromConfiguration(t *testing.T) {
-	c := configured()
-	c.Secrets = []Secret{{Name: "DEM_SECRET_LOGIN", Value: "synthetic-password"}}
-	c.ScreenshotOnFailure = true
-	require.NoError(t, c.Init(t.Context()))
-	assert.Equal(
-		t,
-		model.Request{
-			Kind:    model.Journey,
-			Name:    "login",
-			Script:  "test('login', async () => {});",
-			Secrets: map[string]string{"DEM_SECRET_LOGIN": "synthetic-password"},
-			Timeout: 2 * time.Minute,
-			Capture: true,
-		},
-		request(t, c),
-	)
 }
 
 func TestTraceRequestAndDependency(t *testing.T) {

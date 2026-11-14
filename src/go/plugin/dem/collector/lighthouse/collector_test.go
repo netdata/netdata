@@ -21,20 +21,16 @@ import (
 
 func configured() *Collector {
 	c := New(Dependencies{
-		Executor: syntheticjobtest.Executor{},
+		Executor: syntheticjobtest.Executor{
+			ExecuteFunc: func(context.Context, model.Request, func(string)) model.Execution {
+				panic("unexpected execution during config validation")
+			},
+		},
 		Registry: syntheticregistry.New(),
 	})
 	c.Name = "home"
 	c.URL = "https://example.org/"
 	return c
-}
-
-// request builds the execution request Init validates for the current configuration.
-func request(t *testing.T, c *Collector) model.Request {
-	t.Helper()
-	r, err := c.newRequest("")
-	require.NoError(t, err)
-	return r
 }
 
 func TestConfiguration(t *testing.T) {
@@ -148,23 +144,6 @@ func TestPreparedCheckAndArtifacts(t *testing.T) {
 		collecttest.ConfigSchemaCheck{
 			Defaults: true,
 		},
-	)
-}
-
-func TestRequestFromConfiguration(t *testing.T) {
-	c := configured()
-	c.SaveReport = true
-	require.NoError(t, c.Init(t.Context()))
-	assert.Equal(
-		t,
-		model.Request{
-			Kind:    model.Lighthouse,
-			Name:    "home",
-			URL:     "https://example.org/",
-			Timeout: 3 * time.Minute,
-			Capture: true,
-		},
-		request(t, c),
 	)
 }
 

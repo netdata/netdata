@@ -149,7 +149,7 @@ func TestRunExecutesWithoutCollectAndRepeatedCollectionsHoldLatest(t *testing.T)
 			ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
 				calls.Add(1)
 				state("running")
-				assert.Equal(t, k.kind, r.Kind)
+				assert.Equal(t, k.request, r, "Init stores the configured request and Run hands it to the executor")
 				return synthetic.Execution{
 					Drained: true,
 					Run:     fixture(),
