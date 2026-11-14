@@ -80,6 +80,17 @@ func (w *Writer) Run(ctx context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
 	batch := make([]EventRecord, 0, maxBatch)
+	// flushSteady keeps an unattempted suffix for the final drain and reports
+	// whether the whole batch was consumed.
+	flushSteady := func() bool {
+		consumed := w.flush(ctx, batch)
+		if consumed < len(batch) {
+			batch = batch[consumed:]
+			return false
+		}
+		batch = batch[:0]
+		return true
+	}
 steady:
 	for {
 		select {
@@ -87,25 +98,11 @@ steady:
 			break steady
 		case rec := <-w.ch:
 			batch = append(batch, rec)
-			if len(batch) >= maxBatch {
-				consumed := w.flush(ctx, batch)
-				if consumed == len(batch) {
-					batch = batch[:0]
-				} else {
-					batch = batch[consumed:]
-				}
-				if len(batch) != 0 {
-					break steady
-				}
+			if len(batch) >= maxBatch && !flushSteady() {
+				break steady
 			}
 		case <-ticker.C:
-			consumed := w.flush(ctx, batch)
-			if consumed == len(batch) {
-				batch = batch[:0]
-			} else {
-				batch = batch[consumed:]
-			}
-			if len(batch) != 0 {
+			if !flushSteady() {
 				break steady
 			}
 		}

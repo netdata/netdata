@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 )
 
 type benchmarkCounters struct{}
@@ -23,7 +24,7 @@ func BenchmarkIngest(b *testing.B) {
 	e := &Logs{
 		transport: shared,
 		now:       func() time.Time { return t0 },
-		ch:        make(chan queued, queueCap),
+		ch:        make(chan *logspb.LogRecord, queueCap),
 	}
 	traces := &Traces{
 		transport: shared,

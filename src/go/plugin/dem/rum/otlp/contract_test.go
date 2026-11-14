@@ -33,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	logs "go.opentelemetry.io/proto/otlp/collector/logs/v1"
 	traces "go.opentelemetry.io/proto/otlp/collector/trace/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -208,7 +209,7 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				for range attempts {
 					l.Ingest(b, accepted(b))
 					tr.Ingest(b, accepted(b))
-					l.export(context.Background(), []queued{<-l.ch}, exportTimeout)
+					l.export(context.Background(), []*logspb.LogRecord{<-l.ch}, exportTimeout)
 					tr.exportSpans(context.Background(), []spanItem{<-tr.spanCh}, exportTimeout)
 				}
 				// Suppressing repeated diagnostics must not suppress delivery accounting.
@@ -236,7 +237,9 @@ func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 		now: func() time.Time { return t0 },
 	}
 	for level, want := range map[string]string{"info": "INFO", "warn": "WARN", "error": "ERROR", "debug": "DEBUG", "trace": "TRACE"} {
-		frame, err := json.Marshal(map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"})
+		frame, err := json.Marshal(
+			map[string]any{"function": strings.Repeat("é", 3000) + "secret-value", "filename": "app.js"},
+		)
 		require.NoError(t, err)
 		raw, err := json.Marshal(map[string]any{"logs": []any{map[string]any{
 			"level": level, "message": "secret-value",

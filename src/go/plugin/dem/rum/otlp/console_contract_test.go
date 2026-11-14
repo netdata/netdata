@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -59,7 +60,7 @@ func TestDecodedConsoleUnicodeRemainsExportable(t *testing.T) {
 			e := newExporter(t, "127.0.0.1:1", newRecCounters(), nil)
 			records := e.build(b, false)
 			require.Len(t, records, 1)
-			_, err = proto.Marshal(records[0].rec)
+			_, err = proto.Marshal(records[0])
 			require.NoError(t, err, "one truncated console value must not prevent protobuf encoding")
 		})
 	}
@@ -91,7 +92,7 @@ func BenchmarkConsoleIngest(b *testing.B) {
 					counters: benchmarkCounters{},
 				},
 				now: func() time.Time { return t0 },
-				ch:  make(chan queued, queueCap),
+				ch:  make(chan *logspb.LogRecord, queueCap),
 			}
 			event := mkBeacon()
 			event.Logs = []beacon.Log{log}

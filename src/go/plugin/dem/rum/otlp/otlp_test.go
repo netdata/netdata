@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/stretchr/testify/require"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
 	"google.golang.org/grpc"
 )
 
@@ -139,14 +140,14 @@ type simpleRec struct {
 	attrs    map[string]string
 }
 
-func simplify(q queued) simpleRec {
+func simplify(rec *logspb.LogRecord) simpleRec {
 	attrs := map[string]string{}
-	for _, kv := range q.rec.Attributes {
+	for _, kv := range rec.Attributes {
 		attrs[kv.Key] = kv.GetValue().GetStringValue()
 	}
 	return simpleRec{
-		body:     q.rec.GetBody().GetStringValue(),
-		severity: q.rec.SeverityText,
+		body:     rec.GetBody().GetStringValue(),
+		severity: rec.SeverityText,
 		attrs:    attrs,
 	}
 }
@@ -353,7 +354,7 @@ func TestExport(t *testing.T) {
 func TestIngestDropsOnFullQueue(t *testing.T) {
 	counters := newRecCounters()
 	e := newExporter(t, "127.0.0.1:1", counters, nil) // unreachable; nothing drains e.ch
-	e.ch = make(chan queued, 1)
+	e.ch = make(chan *logspb.LogRecord, 1)
 
 	b1 := mkBeacon() // One pageview fills the queue.
 	e.Ingest(b1, aggregate.Result{

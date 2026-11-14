@@ -9,6 +9,7 @@ package otlp
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -52,7 +53,7 @@ type Logs struct {
 	*transport
 	client collogspb.LogsServiceClient
 	now    func() time.Time
-	ch     chan queued
+	ch     chan *logspb.LogRecord
 }
 
 func NewLogs(
@@ -70,75 +71,23 @@ func NewLogs(
 		transport: t,
 		client:    collogspb.NewLogsServiceClient(t.conn),
 		now:       time.Now,
-		ch:        make(chan queued, queueCap),
+		ch:        make(chan *logspb.LogRecord, queueCap),
 	}, nil
 }
 
-// Run drives the batching/export loop until ctx is done, then flushes
-// whatever is queued once more and returns. Callers run it in its own
-// goroutine; Close releases the gRPC connection afterwards. The owner joins
-// producers before cancellation and supplies one shared, bounded final context.
+// Run exports queued records until ctx is done, then drains them once with the
+// owner's shared, bounded final context (see runQueue). Callers run it in its own
+// goroutine; Close releases the gRPC connection afterwards.
 func (e *Logs) Run(ctx context.Context, final func() context.Context) {
 	e.conn.Connect()
-	ticker := time.NewTicker(batchPeriod)
-	defer ticker.Stop()
-	batch := make([]queued, 0, maxBatch)
-	// An unattempted normal batch belongs to the final drain. An attempted
-	// export is consumed even on failure, since retrying could duplicate data.
-	flush := func(parent context.Context) bool {
-		if len(batch) == 0 {
-			return true
-		}
-		if !e.export(parent, batch, exportTimeout) {
-			return false
-		}
-		batch = batch[:0]
-		return true
-	}
-normal:
-	for {
-		select {
-		case <-ctx.Done():
-			break normal
-		case it, ok := <-e.ch:
-			if !ok {
-				break normal
-			}
-			batch = append(batch, it)
-			if len(batch) >= maxBatch && !flush(ctx) {
-				break normal
-			}
-		case <-ticker.C:
-			if !flush(ctx) {
-				break normal
-			}
-		}
-	}
-	// Producers have been joined by the owner. Use its shared budget once,
-	// including for a batch whose normal export never began.
-	parent := final()
-	flushFinal := func() {
-		if !flush(parent) {
-			e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(batch)))
-			batch = batch[:0]
-		}
-	}
-	for {
-		if len(batch) >= maxBatch {
-			flushFinal()
-		}
-		select {
-		case it, ok := <-e.ch:
-			if !ok {
-				flushFinal()
-				return
-			}
-			batch = append(batch, it)
-		default:
-			flushFinal()
-			return
-		}
-	}
+	runQueue(
+		ctx,
+		final,
+		e.ch,
+		maxBatch,
+		func(ctx context.Context, batch []*logspb.LogRecord) bool { return e.export(ctx, batch, exportTimeout) },
+		func(batch []*logspb.LogRecord) { e.counters.Add(aggregate.CounterOTLPDropped, uint64(len(batch))) },
+	)
 }
 
 // Ingest consumes an aggregation result, builds records and enqueues them,
@@ -154,9 +103,9 @@ func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
 		return
 	}
 	recs := e.build(result.Observation, result.PageView)
-	for _, q := range recs {
+	for _, rec := range recs {
 		select {
-		case e.ch <- q:
+		case e.ch <- rec:
 		default:
 			e.counters.Add(aggregate.CounterOTLPDropped, 1)
 		}
@@ -164,14 +113,12 @@ func (e *Logs) Ingest(b *beacon.Beacon, result aggregate.Result) {
 }
 
 // export reports whether a send was attempted, including failed attempts.
-func (e *Logs) export(parent context.Context, batch []queued, timeout time.Duration) bool {
+// The request copies the record pointers because the queue reuses batch.
+func (e *Logs) export(parent context.Context, batch []*logspb.LogRecord, timeout time.Duration) bool {
 	if parent.Err() != nil {
 		return false
 	}
-	recs := make([]*logspb.LogRecord, 0, len(batch))
-	for _, q := range batch {
-		recs = append(recs, q.rec)
-	}
+	recs := slices.Clone(batch)
 	req := &collogspb.ExportLogsServiceRequest{
 		ResourceLogs: []*logspb.ResourceLogs{{
 			Resource: &resourcepb.Resource{
