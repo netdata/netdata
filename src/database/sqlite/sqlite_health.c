@@ -32,6 +32,28 @@ extern __thread bool is_health_thread;
     "UPDATE health_log_detail SET updated_by_id = @updated_by, flags = @flags, exec_run_timestamp = @exec_time, "      \
     "exec_code = @exec_code WHERE unique_id = @unique_id AND alarm_id = @alarm_id AND transition_id = @transaction"
 
+// The fields of a published entry that other threads change while it is saved: a newer transition sets UPDATED
+// and updated_by_id, the notification sets the EXEC_* flags, exec_run_timestamp and exec_code, and the savers set
+// SAVED. Each writer stores its field before the flags change that announces it (release), so loading the flags
+// first (acquire) never gives a flag without its field. A save that races a writer can persist an intermediate
+// row; the entry's next save persists the final one.
+struct health_ae_mutable_fields {
+    uint32_t flags;
+    uint32_t updated_by_id;
+    time_t exec_run_timestamp;
+    int exec_code;
+};
+
+static inline struct health_ae_mutable_fields health_ae_mutable_fields_get(ALARM_ENTRY *ae)
+{
+    struct health_ae_mutable_fields f;
+    f.flags = atomic_flags_get(&ae->flags);
+    f.updated_by_id = __atomic_load_n(&ae->updated_by_id, __ATOMIC_RELAXED);
+    f.exec_run_timestamp = __atomic_load_n(&ae->exec_run_timestamp, __ATOMIC_RELAXED);
+    f.exec_code = __atomic_load_n(&ae->exec_code, __ATOMIC_RELAXED);
+    return f;
+}
+
 static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
 {
     static __thread sqlite3_stmt *compiled_res = NULL;
@@ -49,12 +71,13 @@ static void sql_health_alarm_log_update(RRDHOST *host, ALARM_ENTRY *ae)
     }
 
     int rc;
+    struct health_ae_mutable_fields f = health_ae_mutable_fields_get(ae);
 
     int param = 0;
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->updated_by_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->flags));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->exec_run_timestamp));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->exec_code));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) f.updated_by_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) f.flags));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) f.exec_run_timestamp));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, f.exec_code));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64) ae->alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC));
@@ -250,22 +273,23 @@ static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     }
 
     int rc = SQLITE_ERROR;
+    struct health_ae_mutable_fields f = health_ae_mutable_fields_get(ae);
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)health_log_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->unique_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->alarm_event_id));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updated_by_id));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)f.updated_by_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->updates_id));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->when));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->duration));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->non_clear_duration));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->flags));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->exec_run_timestamp));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)f.flags));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)f.exec_run_timestamp));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int64(res, ++param, (sqlite3_int64)ae->delay_up_to_timestamp));
     SQLITE_BIND_FAIL(done, SQLITE3_BIND_STRING_OR_NULL(res, ++param, ae->info));
-    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->exec_code));
+    SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, f.exec_code));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->new_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->old_status));
     SQLITE_BIND_FAIL(done, sqlite3_bind_int(res, ++param, ae->delay));
@@ -279,7 +303,7 @@ static bool sql_health_alarm_log_insert_detail(RRDHOST *host, uint64_t health_lo
     param = 0;
     rc = sqlite3_step_monitored(res);
     if (rc == SQLITE_DONE)
-        ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
+        atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_SAVED);
     else
         error_report(
             "HEALTH [%s]: Failed to execute SQL_INSERT_HEALTH_LOG_DETAIL, rc = %d", rrdhost_hostname(host), rc);
@@ -405,15 +429,30 @@ done:
         SQLITE_FINALIZE(res);
 }
 
+// The same entry can be saved by two threads at once: the metadata worker saves queued transitions while the
+// health thread saves the entry it just notified. Both would see SAVED clear and insert the transition twice, so
+// the SAVED decision and the insert or update it picks run under one lock. db_meta is a single connection that runs
+// one statement at a time, so this costs no parallelism. Nothing under this lock takes a health-log, alert or chart
+// lock.
+static netdata_mutex_t health_log_save_mutex;
+
+static void __attribute__((constructor)) health_log_save_mutex_init(void) {
+    netdata_mutex_init(&health_log_save_mutex);
+}
+
 void sql_health_alarm_log_save(RRDHOST *host, ALARM_ENTRY *ae)
 {
     if (!REQUIRE_HEALTH_DB_OPEN())
         return;
 
-    if (ae->flags & HEALTH_ENTRY_FLAG_SAVED)
+    netdata_mutex_lock(&health_log_save_mutex);
+
+    if (atomic_flags_check(&ae->flags, HEALTH_ENTRY_FLAG_SAVED))
         sql_health_alarm_log_update(host, ae);
     else
         sql_health_alarm_log_insert(host, ae);
+
+    netdata_mutex_unlock(&health_log_save_mutex);
 }
 
 /*

@@ -1640,6 +1640,63 @@ static int aq_test_pending_for_alarm(nd_uuid_t *host_id, uint32_t alarm_id, int6
     return rows;
 }
 
+// Two threads save one entry at once, as the metadata worker (a queued transition) and the health thread (the
+// entry it just notified) do. The notifier changes the fields a notification changes before it saves. Releasing both
+// workers together makes the saves overlap often but not always, so this is a stress test: before the save mutex it
+// duplicated the row in most rounds. Forcing the overlap inside the save would deadlock against that mutex.
+struct aq_concurrent_save {
+    RRDHOST *host;
+    ALARM_ENTRY *ae;
+    bool go;
+};
+
+static void aq_concurrent_wait_go(struct aq_concurrent_save *s)
+{
+    while (!__atomic_load_n(&s->go, __ATOMIC_ACQUIRE))
+        tinysleep();
+}
+
+static void aq_concurrent_saver(void *arg)
+{
+    struct aq_concurrent_save *s = arg;
+    aq_concurrent_wait_go(s);
+    sql_health_alarm_log_save(s->host, s->ae);
+}
+
+static void aq_concurrent_notifier(void *arg)
+{
+    struct aq_concurrent_save *s = arg;
+    aq_concurrent_wait_go(s);
+    __atomic_store_n(&s->ae->exec_run_timestamp, s->ae->when + 1, __ATOMIC_RELAXED);
+    __atomic_store_n(&s->ae->exec_code, 3, __ATOMIC_RELAXED);
+    atomic_flags_set(&s->ae->flags, HEALTH_ENTRY_FLAG_PROCESSED | HEALTH_ENTRY_FLAG_EXEC_RUN);
+    sql_health_alarm_log_save(s->host, s->ae);
+}
+
+// rows of the transition, and the saved fields of the last one
+static int aq_test_detail_rows(ALARM_ENTRY *ae, uint32_t *flags, int64_t *exec_run_timestamp, int *exec_code)
+{
+    sqlite3_stmt *res = NULL;
+    int rows = 0;
+
+    if (!PREPARE_STATEMENT(
+            db_meta, "SELECT flags, exec_run_timestamp, exec_code FROM health_log_detail WHERE transition_id = @tid",
+            &res))
+        return 0;
+
+    if (sqlite3_bind_blob(res, 1, &ae->transition_id, sizeof(ae->transition_id), SQLITE_STATIC) == SQLITE_OK) {
+        while (sqlite3_step_monitored(res) == SQLITE_ROW) {
+            *flags = (uint32_t)sqlite3_column_int64(res, 0);
+            *exec_run_timestamp = sqlite3_column_int64(res, 1);
+            *exec_code = sqlite3_column_int(res, 2);
+            rows++;
+        }
+    }
+
+    SQLITE_FINALIZE(res);
+    return rows;
+}
+
 int alert_queue_unittest(void)
 {
     int failures = 0;
@@ -2060,6 +2117,62 @@ int alert_queue_unittest(void)
             raised, removed, attached, reraised, older, newer, first, second, saved, lost, unsaved, expired, current};
         for (size_t i = 0; i < _countof(all); i++)
             aq_test_ae_free(all[i]);
+
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        freez(h->aclk_host_config);
+        freez(h);
+    }
+
+    // --- the same entry saved by two threads at once is inserted once, and its row holds the entry's final fields
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+
+        const int rounds = 200;
+        int duplicated = 0, missing = 0, stale = 0, threads_failed = 0;
+        for (int round = 0; round < rounds; round++) {
+            ALARM_ENTRY *ae =
+                aq_test_ae(7, 7000 + round, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, "concurrent");
+            struct aq_concurrent_save s = {.host = h, .ae = ae, .go = false};
+
+            ND_THREAD *saver = nd_thread_create("AQSAVE", NETDATA_THREAD_OPTION_DONT_LOG, aq_concurrent_saver, &s);
+            ND_THREAD *notifier =
+                nd_thread_create("AQNOTIFY", NETDATA_THREAD_OPTION_DONT_LOG, aq_concurrent_notifier, &s);
+            __atomic_store_n(&s.go, true, __ATOMIC_RELEASE);
+            if (saver)
+                nd_thread_join(saver);
+            if (notifier)
+                nd_thread_join(notifier);
+
+            if (!saver || !notifier) {
+                // one save alone cannot duplicate the row: fail instead of passing without the race
+                aq_test_ae_free(ae);
+                threads_failed++;
+                continue;
+            }
+
+            uint32_t flags = 0;
+            int64_t exec_run_timestamp = 0;
+            int exec_code = 0;
+            rows = aq_test_detail_rows(ae, &flags, &exec_run_timestamp, &exec_code);
+            if (rows > 1)
+                duplicated++;
+            else if (rows == 0)
+                missing++;
+            else if (
+                flags != atomic_flags_get(&ae->flags) || exec_run_timestamp != (int64_t)ae->exec_run_timestamp ||
+                exec_code != ae->exec_code)
+                stale++;
+
+            aq_test_ae_free(ae);
+        }
+
+        AQ_CHECK(
+            !duplicated && !missing && !stale && !threads_failed,
+            "concurrent saves: each transition is inserted once and holds the final fields "
+            "(%d rounds: %d duplicated, %d missing, %d stale, %d without both threads)",
+            rounds, duplicated, missing, stale, threads_failed);
 
         (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
         freez(h->aclk_host_config);

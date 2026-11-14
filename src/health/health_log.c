@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "health.h"
+#include "health_internals.h"
 #include "health-alert-entry.h"
 
 // ----------------------------------------------------------------------------
@@ -261,7 +262,11 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     return ae;
 }
 
-inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async)
+// Link ae into the health log and mark the previous transition of the same alert as updated by it. Returns that
+// previous entry, or NULL. Both entries are pinned (pending_save_count) before the lock is released: the previous
+// entry becomes UPDATED here, and retention cleanup frees old UPDATED entries that are not pinned, so without the pin
+// it could be freed before it is saved. health_alarm_log_save_pinned() saves and unpins them.
+static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae)
 {
     __atomic_add_fetch(&host->health_transitions, 1, __ATOMIC_RELAXED);
 
@@ -277,9 +282,11 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
     // marked as updated by ae.
     for(ALARM_ENTRY *t = ae->next ; t ; t = t->next) {
         if(t->alarm_id == ae->alarm_id) {
-            if(!(t->flags & HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
-                t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
-                t->updated_by_id = ae->unique_id;
+            if(!atomic_flags_check(&t->flags, HEALTH_ENTRY_FLAG_UPDATED) && !t->updated_by_id) {
+                // t is published: the notification pass and the savers read its fields without the health-log
+                // lock. updated_by_id is stored before the flag that announces it (release).
+                __atomic_store_n(&t->updated_by_id, ae->unique_id, __ATOMIC_RELAXED);
+                atomic_flags_set(&t->flags, HEALTH_ENTRY_FLAG_UPDATED);
                 ae->updates_id = t->unique_id;
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
@@ -295,18 +302,58 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
         }
     }
 
+    __atomic_add_fetch(&ae->pending_save_count, 1, __ATOMIC_RELAXED);
+    if(update_ae)
+        __atomic_add_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELAXED);
+
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 
     netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
-    if (update_ae)
+    return update_ae;
+}
+
+// Save a linked transition after the previous one it updated, and drop the pins health_alarm_log_link_entry() took.
+// async queues the saves to the metadata worker, which pins each entry again until it is saved.
+static void health_alarm_log_save_pinned(RRDHOST *host, ALARM_ENTRY *update_ae, ALARM_ENTRY *ae, bool async)
+{
+    if (update_ae) {
         health_alarm_log_save(host, update_ae, async);
+        // release: the save happens before whoever frees the entry sees the pin drop
+        __atomic_sub_fetch(&update_ae->pending_save_count, 1, __ATOMIC_RELEASE);
+    }
 
     health_alarm_log_save(host, ae, async);
+    __atomic_sub_fetch(&ae->pending_save_count, 1, __ATOMIC_RELEASE);
+}
+
+// Add a transition, log it, and queue its save (and its predecessor's) to the metadata worker. For callers that hold
+// dictionary locks: nothing here waits for SQLite. The entry is logged here, while it is pinned: once the pin drops,
+// the metadata worker can save it and the notification pass can free it, so callers must not use ae afterwards.
+inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    ALARM_ENTRY *update_ae = health_alarm_log_link_entry(host, ae);
+    health_log_alert(host, ae);
+    health_alarm_log_save_pinned(host, update_ae, ae, true);
+}
+
+// Add a transition now and save it later, synchronously, with health_alarm_log_save_linked(): for the health loop,
+// which creates transitions while it walks the alert dictionary and must not wait for SQLite under its lock.
+// Returns the previous transition it updated (or NULL); both stay pinned until saved.
+ALARM_ENTRY *health_alarm_log_add_entry_linked(RRDHOST *host, ALARM_ENTRY *ae)
+{
+    return health_alarm_log_link_entry(host, ae);
+}
+
+// Save a transition added with health_alarm_log_add_entry_linked(), after the previous one it updated, and unpin both.
+void health_alarm_log_save_linked(RRDHOST *host, ALARM_ENTRY *update_ae, ALARM_ENTRY *ae)
+{
+    health_alarm_log_save_pinned(host, update_ae, ae, false);
 }
 
 inline void health_alarm_log_free_one_nochecks_nounlink(ALARM_ENTRY *ae) {
-    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED))
+    // acquire: pairs with the release that drops each pin, so the pin holder's last use happens before the free
+    if(__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE))
         metadata_queue_ae_deletion(ae);
     else {
         string_freez(ae->name);
@@ -369,8 +416,10 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     while(ae) {
         // Check if entry is old enough to be deleted
         if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
-           (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
+           // Only remove entries that have been processed/updated, and whose notification is not running: the
+           // in-progress queue keeps the pointer until health_alarm_wait_for_execution()
+           (atomic_flags_get(&ae->flags) & (HEALTH_ENTRY_FLAG_UPDATED | HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) == HEALTH_ENTRY_FLAG_UPDATED &&
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0) { // Only remove entries not pending save
             
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;
