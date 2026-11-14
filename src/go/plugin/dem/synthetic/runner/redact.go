@@ -51,10 +51,22 @@ func (r *textRedactor) redacted(value string) string {
 	value = r.patterns.Apply(r.exact.Replace(value))
 	// An upstream text cap or cancellation may remove a PEM closing marker.
 	// Retain no suffix of an unfinished block just because it no longer matches.
-	if start := strings.Index(strings.ToLower(value), "-----begin "); start >= 0 {
+	if start := strings.Index(asciiLower(value), "-----begin "); start >= 0 {
 		value = value[:start] + "[REDACTED]"
 	}
 	return value
+}
+
+// asciiLower lowers ASCII letters only, so byte offsets match the input;
+// strings.ToLower can change the encoded length of other characters.
+func asciiLower(s string) string {
+	b := []byte(s)
+	for i, c := range b {
+		if 'A' <= c && c <= 'Z' {
+			b[i] = c + 'a' - 'A'
+		}
+	}
+	return string(b)
 }
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= textLimit {
