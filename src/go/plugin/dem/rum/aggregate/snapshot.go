@@ -191,7 +191,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 				g.elements = append(g.elements, elemSample{
 					vital: name,
 					sel:   v.element,
-					poor:  v.value > thresholds[name][1],
+					poor:  thresholds[name].isPoor(v.value),
 				})
 			}
 		}

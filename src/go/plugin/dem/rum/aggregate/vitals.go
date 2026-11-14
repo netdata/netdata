@@ -46,53 +46,52 @@ func vitalIndex(name string) (int, bool) {
 	}
 }
 
-// thresholds are the CWV good/poor boundaries (good ≤ first, poor > second).
-var thresholds = map[string][2]float64{
-	beacon.LCP:  {2500, 4000},
-	beacon.FCP:  {1800, 3000},
-	beacon.TTFB: {800, 1800},
-	beacon.INP:  {200, 500},
-	beacon.CLS:  {0.1, 0.25},
+// threshold holds one vital's Core Web Vitals boundaries. Promotion, chart
+// ratings and page selectors all rate through it.
+type threshold struct{ good, poor float64 }
+
+// isGood reports a value at or below the good boundary.
+func (t threshold) isGood(v float64) bool { return v <= t.good }
+
+// isPoor reports a value above the poor boundary.
+func (t threshold) isPoor(v float64) bool { return v > t.poor }
+
+// thresholds lists the supported vitals; values between the boundaries need improvement.
+var thresholds = map[string]threshold{
+	beacon.LCP:  {good: 2500, poor: 4000},
+	beacon.FCP:  {good: 1800, poor: 3000},
+	beacon.TTFB: {good: 800, poor: 1800},
+	beacon.INP:  {good: 200, poor: 500},
+	beacon.CLS:  {good: 0.1, poor: 0.25},
 }
 
-// pctStats consumes an owned read distribution; navigation timing has no CWV rating.
+// pctStats consumes an owned read distribution, sorting it in place;
+// navigation timing has no CWV rating.
 func pctStats(vals []float64) VitalStats {
-	sorted := vals
-	sort.Float64s(sorted)
+	sort.Float64s(vals)
 	return VitalStats{
-		N:   len(sorted),
-		P50: pctSorted(sorted, 0.50),
-		P75: pctSorted(sorted, 0.75),
-		P95: pctSorted(sorted, 0.95),
+		N:   len(vals),
+		P50: pctSorted(vals, 0.50),
+		P75: pctSorted(vals, 0.75),
+		P95: pctSorted(vals, 0.95),
 	}
 }
 
-// stats consumes an owned read distribution without copying its values again.
+// stats adds ratings to the percentiles of an owned read distribution.
 func stats(vital string, vals []float64) VitalStats {
-	sorted := vals
-	sort.Float64s(sorted)
-	st := VitalStats{
-		N:   len(sorted),
-		P50: pctSorted(sorted, 0.50),
-		P75: pctSorted(sorted, 0.75),
-		P95: pctSorted(sorted, 0.95),
-	}
+	st := pctStats(vals)
 	th := thresholds[vital]
-	good, poor := 0, 0
-	for _, v := range sorted {
+	for _, v := range vals {
 		switch {
-		case v <= th[0]:
-			good++
-		case v > th[1]:
-			poor++
+		case th.isGood(v):
+			st.Good++
+		case th.isPoor(v):
+			st.Poor++
 		}
 	}
-	n := len(sorted)
 	// Counts combine only for aligned, complete and disjoint populations;
 	// overlapping rolling windows must not be summed over time.
-	st.Good = good
-	st.Poor = poor
-	st.NeedsImpr = n - good - poor
+	st.NeedsImpr = st.N - st.Good - st.Poor
 	return st
 }
 
