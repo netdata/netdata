@@ -102,7 +102,7 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Journey, true, newRedactor(nil), true, true)
+			s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true, Trace: true}, newRedactor(nil))
 			require.NoError(t, s.consume(strings.NewReader(strings.Join(tc.lines, "\n"))))
 			snap := s.snapshot()
 			got := optionalStatus{
@@ -130,7 +130,7 @@ func TestOptionalOutputsFollowTheRequest(t *testing.T) {
 		"journey all":     {kind: synthetic.Journey, capture: true, browser: true, trace: true, evidence: true, captures: true, br: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			snap := newSink(tc.kind, tc.capture, newRedactor(nil), tc.browser, tc.trace).snapshot()
+			snap := newSink(synthetic.Request{Kind: tc.kind, Capture: tc.capture, BrowserErrorSummary: tc.browser, Trace: tc.trace}, newRedactor(nil)).snapshot()
 			assert.Equal(t, tc.evidence, snap.evidence != nil)
 			assert.Equal(t, tc.captures, snap.captures != nil)
 			assert.Equal(t, tc.br, snap.browser != nil)
@@ -140,6 +140,26 @@ func TestOptionalOutputsFollowTheRequest(t *testing.T) {
 		})
 	}
 	// Lighthouse ignores optional frames entirely, malformed ones included.
-	s := newSink(synthetic.Lighthouse, false, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Lighthouse}, newRedactor(nil))
 	require.NoError(t, s.consume(strings.NewReader(`{"type":"extension","extension":{"data":{}}}`)))
+}
+
+// TestRequestedFeaturesWireOrder pins the extensions list sent to the runtime.
+func TestRequestedFeaturesWireOrder(t *testing.T) {
+	for name, tc := range map[string]struct {
+		request synthetic.Request
+		want    []string
+	}{
+		"lighthouse":      {synthetic.Request{Kind: synthetic.Lighthouse, Capture: true}, nil},
+		"journey":         {synthetic.Request{Kind: synthetic.Journey}, []string{failureEvidenceFeature}},
+		"journey browser": {synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true}, []string{failureEvidenceFeature, browserSummaryFeature}},
+		"journey all": {
+			synthetic.Request{Kind: synthetic.Journey, Capture: true, Trace: true, BrowserErrorSummary: true},
+			[]string{failureEvidenceFeature, captureDetailsFeature, failureTraceFeature, browserSummaryFeature},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, requestedFeatures(tc.request))
+		})
+	}
 }

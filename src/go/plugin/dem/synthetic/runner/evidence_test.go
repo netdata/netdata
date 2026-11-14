@@ -37,7 +37,7 @@ func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence,
 	terminal, err := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
 	require.NoError(t, err)
 	lines = append(lines, string(terminal))
-	s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
 	snap := s.snapshot()
 	require.NotNil(t, snap.result)
@@ -98,11 +98,11 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 	}
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
+			s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
 			require.Error(t, s.consume(strings.NewReader(evidenceInit+"\n"+line)))
 		})
 	}
-	s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
 	raw, _ := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
 	require.ErrorContains(t, s.consume(strings.NewReader(string(raw)+"\n"+evidenceInit)), "after its terminal")
 }
@@ -204,7 +204,7 @@ func TestEvidenceRedactsBeforePersistenceAndSnapshotsOwnData(t *testing.T) {
 	step.Title = "private-value"
 	step.Message = "token=private-value"
 	step.TextTruncated = true
-	s := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "private-value"}), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "private-value"}))
 	require.NoError(t, s.consume(strings.NewReader(strings.Join([]string{evidenceInit, evidenceRecord("test", "test", test), evidenceRecord("step", "step", step)}, "\n"))))
 	snapshot := s.snapshot()
 	raw, err := json.Marshal(snapshot.evidence)
@@ -228,7 +228,7 @@ func TestEvidencePayloadAndSourceBoundsAreNonfatal(t *testing.T) {
 			assert.Equal(t, "invalid", e.ReportingStatus())
 		})
 	}
-	e, _ := consumeEvidence(t, evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","large":"`+strings.Repeat("x", evidencePayloadLimit)+`"}}}`)
+	e, _ := consumeEvidence(t, evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","large":"`+strings.Repeat("x", extensionBodyLimit)+`"}}}`)
 	assert.Equal(t, "invalid", e.ReportingStatus())
 }
 
@@ -244,7 +244,7 @@ func BenchmarkFailureEvidenceStream(b *testing.B) {
 		b.Run(name, func(b *testing.B) {
 			b.ReportAllocs()
 			for b.Loop() {
-				s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
+				s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
 				if err := s.consume(strings.NewReader(input)); err != nil {
 					b.Fatal(err)
 				}
@@ -258,7 +258,7 @@ func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
 	test := evidenceStart("t1")
 	test.Status, test.ReportingComplete = "failed", true
 	failure := synthetic.FailureDetail{Test: test, Message: strings.Repeat("token=a ", 200) + strings.Repeat("z", 400)}
-	s := newSink(synthetic.Journey, false, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
 	require.NoError(t, s.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("failure", "failure", failure))))
 	got := s.snapshot().evidence.FirstFailure
 	require.NotNil(t, got)
@@ -321,7 +321,7 @@ func TestStopContextRedactionAndSnapshotOwnership(t *testing.T) {
 	step := evidenceStep("s", "")
 	step.Title = "secret-value"
 	stop := synthetic.FailureDetail{Test: test, Path: []synthetic.EvidenceStep{step}}
-	sink := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "secret-value"}), false, false)
+	sink := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": "secret-value"}))
 	require.NoError(t, sink.consume(strings.NewReader(evidenceInit+"\n"+evidenceRecord("stop", "stop", stop))))
 	snapshot := sink.snapshot()
 	encoded, err := json.Marshal(snapshot.evidence)

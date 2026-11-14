@@ -11,25 +11,22 @@ import (
 )
 
 type browserState struct {
-	value    *synthetic.BrowserSummary
-	terminal bool
-	late     int
+	featureState
+	value synthetic.BrowserSummary
+	late  int
 }
 
-func (b *browserState) invalid(reason string) {
-	if b == nil || b.value.Availability == "invalid" {
-		return
-	}
-	b.value.Availability = "invalid"
-	b.value.Reason = reason
-	b.value.ReporterComplete = false
-	b.terminal = true
+func newBrowserState() *browserState {
+	return &browserState{value: synthetic.BrowserSummary{Coverage: "fixture_context"}}
 }
+
 func (b *browserState) snapshot() *synthetic.BrowserSummary {
 	if b == nil {
 		return nil
 	}
-	return synthetic.CloneBrowserSummary(b.value)
+	out := synthetic.CloneBrowserSummary(&b.value)
+	out.FeatureStatus = b.status()
+	return out
 }
 
 var browserFlags = []string{"args_limit", "rpc_budget", "candidate_limit", "pending", "unavailable", "too_long", "pool_full", "row_limit", "identity_limit"}
@@ -106,14 +103,9 @@ func (b *browserState) aggregate(a *synthetic.BrowserAggregate) bool {
 	}
 	return true
 }
+
+// accept decodes one record of a selected, incomplete stream.
 func (b *browserState) accept(raw json.RawMessage, r *textRedactor) {
-	if b == nil || b.value.Availability == "invalid" {
-		return
-	}
-	if b.terminal {
-		b.invalid("record_after_completion")
-		return
-	}
 	var d struct {
 		Record  string                      `json:"record"`
 		Run     *synthetic.BrowserAggregate `json:"run"`
@@ -124,16 +116,16 @@ func (b *browserState) accept(raw json.RawMessage, r *textRedactor) {
 		Reason  string                      `json:"reason"`
 	}
 	if json.Unmarshal(raw, &d) != nil {
-		b.invalid("invalid_record")
+		b.invalidate("invalid_record")
 		return
 	}
-	bad := func() { b.invalid("invalid_record") }
+	bad := func() { b.invalidate("invalid_record") }
 	if d.Record == "invalid" {
 		if d.Run != nil || d.Test != nil || d.Sample != nil || len(d.Samples) > 0 || d.Scope != "" || !slices.Contains([]string{"counter_overflow", "annotation_limit"}, d.Reason) {
 			bad()
 			return
 		}
-		b.invalid(d.Reason)
+		b.invalidate(d.Reason)
 		return
 	}
 	if !b.aggregate(d.Run) || d.Reason != "" {
@@ -238,8 +230,7 @@ func (b *browserState) accept(raw json.RawMessage, r *textRedactor) {
 			bad()
 			return
 		}
-		b.terminal = true
-		b.value.ReporterComplete = true
+		b.complete()
 	default:
 		bad()
 		return

@@ -34,7 +34,7 @@ func consumeCaptures(t *testing.T, lines ...string) sinkSnapshot {
 	r.CaptureState = "not_needed"
 	terminal, err := json.Marshal(frame{Type: "result", Result: &r})
 	require.NoError(t, err)
-	s := newSink(synthetic.Journey, true, newRedactor(map[string]string{"token": "synthetic-secret"}), true, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true}, newRedactor(map[string]string{"token": "synthetic-secret"}))
 	require.NoError(t, s.consume(strings.NewReader(strings.Join(append(lines, string(terminal)), "\n"))))
 	snap := s.snapshot()
 	require.NoError(t, snap.err)
@@ -128,7 +128,7 @@ func TestCaptureDetailLimitNeverLimitsCandidateAuthority(t *testing.T) {
 }
 
 func TestCaptureMetadataCannotWidenCoreWire(t *testing.T) {
-	s := newSink(synthetic.Journey, true, newRedactor(nil), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true}, newRedactor(nil))
 	err := s.consume(strings.NewReader(`{"type":"result","result":{"status":"failed","capture_state":"available","artifacts":[{"id":"s1","kind":"screenshot","path":"output/x.png","mime":"image/png","test":{"id":"t1"}}]}}`))
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), `unknown field "test"`)
@@ -164,7 +164,7 @@ func TestTraceSupportReporting(t *testing.T) {
 		"unrequested selection":   {lines: []string{selected}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			s := newSink(synthetic.Journey, true, newRedactor(nil), true, tc.trace)
+			s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, BrowserErrorSummary: true, Trace: tc.trace}, newRedactor(nil))
 			r := success()
 			r.CaptureState = "not_needed"
 			terminal, err := json.Marshal(frame{Type: "result", Result: &r})
@@ -208,7 +208,7 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 					}
 					raw, err := json.Marshal(frame{Type: "result", Result: &r})
 					require.NoError(t, err)
-					s := newSink(synthetic.Journey, true, newRedactor(nil), false, trace)
+					s := newSink(synthetic.Request{Kind: synthetic.Journey, Capture: true, Trace: trace}, newRedactor(nil))
 					err = s.consume(strings.NewReader(strings.TrimSpace(init + "\n" + string(raw))))
 					if trace {
 						require.NoError(t, err)

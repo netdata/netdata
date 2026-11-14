@@ -35,13 +35,8 @@ func diagnosticText(events []synthetic.Event) string {
 }
 func TestBootstrapStderrRedactsAcrossReadBoundaries(t *testing.T) {
 	s := newSink(
-		synthetic.Journey,
-		false,
-		newRedactor(
-			map[string]string{"DEM_SECRET_TOKEN": "fixture-only-secret-0123456789", "DEM_SECRET_UTF": "秘密🔐value"},
-		),
-		false,
-		false,
+		synthetic.Request{Kind: synthetic.Journey},
+		newRedactor(map[string]string{"DEM_SECRET_TOKEN": "fixture-only-secret-0123456789", "DEM_SECRET_UTF": "秘密🔐value"}),
 	)
 	chunks := []string{
 		"before fixture-only-secret-",
@@ -72,7 +67,7 @@ func TestBootstrapStderrRedactsAcrossReadBoundaries(t *testing.T) {
 func TestDiagnosticStreamsKeepBoundariesAndEvidence(t *testing.T) {
 	secret := "fixture-only-secret-0123456789"
 	r := newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret})
-	s := newSink(synthetic.Journey, false, r, false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, r)
 	var wire strings.Builder
 	for _, event := range []synthetic.Event{
 		{Kind: "stdout", Phase: "worker", Message: "before fixture-only-secret-"},
@@ -105,7 +100,7 @@ func TestDiagnosticStreamsKeepBoundariesAndEvidence(t *testing.T) {
 }
 func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	secret := strings.Repeat("private-fixture-", 300)
-	s := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret}), false, false)
+	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret}))
 	chunks := []string{
 		secret[:2001],
 		secret[2001:] + "\n",
@@ -143,7 +138,7 @@ func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {
 	}
 	input := "ordinary 界 abc abcdef 秘密🔐value first\nsecond ! tail abcde"
 	for width := 1; width <= len(input); width++ {
-		s := newSink(synthetic.Journey, false, newRedactor(values), false, false)
+		s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(values))
 		var chunks []string
 		for left := input; len(left) > 0; {
 			n := min(width, len(left))

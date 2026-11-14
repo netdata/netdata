@@ -205,6 +205,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		}
 	}
 	req := wireRequest{
+		Extensions: requestedFeatures(request),
 		Version:    SupportedContract,
 		Kind:       request.Kind,
 		RunID:      run.ID,
@@ -217,16 +218,6 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Secrets:    request.Secrets,
 	}
 	if request.Kind == synthetic.Journey {
-		req.Extensions = []string{failureEvidenceFeature}
-		if request.Capture {
-			req.Extensions = append(req.Extensions, captureDetailsFeature)
-		}
-		if request.Trace {
-			req.Extensions = append(req.Extensions, failureTraceFeature)
-		}
-		if request.BrowserErrorSummary {
-			req.Extensions = append(req.Extensions, browserSummaryFeature)
-		}
 		deadline, _ := attempt.Deadline()
 		req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt)
 		if err != nil {
@@ -247,7 +238,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 			Drained: true,
 		}
 	}
-	sink := newSink(request.Kind, request.Capture, redact, request.BrowserErrorSummary, request.Trace)
+	sink := newSink(request, redact)
 	started := time.Now()
 	if state != nil {
 		state("running")

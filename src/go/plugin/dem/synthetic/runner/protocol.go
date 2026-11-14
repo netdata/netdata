@@ -118,14 +118,16 @@ type sinkSnapshot struct {
 	partial  *synthetic.TestCounts
 }
 
-func newSink(kind synthetic.Kind, capture bool, redact *textRedactor, browser, trace bool) *sink {
+// newSink reads one attempt's output; the request decides which results and
+// optional outputs are legal.
+func newSink(request synthetic.Request, redact *textRedactor) *sink {
 	return &sink{
-		extensions:   newExtensions(kind, browser, capture, trace),
+		extensions:   newExtensions(request),
 		streams:      make(map[string]*diagnosticStream),
 		streamEvents: make(map[string]synthetic.Event),
-		kind:         kind,
-		capture:      capture,
-		trace:        trace,
+		kind:         request.Kind,
+		capture:      request.Capture,
+		trace:        request.Trace,
 		redact:       redact,
 		events:       []synthetic.Event{},
 		tests:        make(map[string]synthetic.Event),

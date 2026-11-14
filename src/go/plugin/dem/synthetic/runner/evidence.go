@@ -11,8 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-const failureEvidenceFeature = "failure_evidence.v1"
-
 // Diagnostic quotas bound arbitrary user-script detail independently of core
 // outcomes. Separate pools reserve test and user-step detail against API noise.
 // With the per-item limits below, retained data is <544 KiB and the producer's
@@ -21,35 +19,20 @@ const (
 	evidenceTestLimit      = 64
 	evidenceUserStepLimit  = 128
 	evidenceOtherStepLimit = 64
-	evidencePayloadLimit   = 32 << 10
 	maxSafeInteger         = 1<<53 - 1
 )
 
 type evidenceState struct {
-	value      *synthetic.FailureEvidence
+	featureState
+	value      synthetic.FailureEvidence
 	tests      map[string]int
 	steps      map[string]int
 	userSteps  int
 	otherSteps int
 }
 
-func newEvidenceState(kind synthetic.Kind) *evidenceState {
-	if kind != synthetic.Journey {
-		return nil
-	}
-	return &evidenceState{
-		value: &synthetic.FailureEvidence{Availability: "unavailable", Reason: "negotiation_not_reported"},
-		tests: make(map[string]int), steps: make(map[string]int),
-	}
-}
-
-func (e *evidenceState) invalid(reason string) {
-	if e == nil || e.value.Availability == "invalid" {
-		return
-	}
-	e.value.Availability = "invalid"
-	e.value.Reason = reason
-	e.value.ReporterComplete = false
+func newEvidenceState() *evidenceState {
+	return &evidenceState{tests: make(map[string]int), steps: make(map[string]int)}
 }
 
 func (e *evidenceState) truncate(scope string) {
@@ -58,14 +41,8 @@ func (e *evidenceState) truncate(scope string) {
 	}
 }
 
+// accept decodes one record of a selected, incomplete stream.
 func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
-	if e == nil || e.value.Availability == "invalid" {
-		return
-	}
-	if e.value.ReporterComplete {
-		e.invalid("record_after_completion")
-		return
-	}
 	var data struct {
 		Record  string                   `json:"record"`
 		Test    *synthetic.EvidenceTest  `json:"test"`
@@ -75,7 +52,7 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		Scope   string                   `json:"scope"`
 	}
 	if json.Unmarshal(raw, &data) != nil {
-		e.invalid("invalid_record")
+		e.invalidate("invalid_record")
 		return
 	}
 	valid := false
@@ -115,12 +92,12 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 		}
 	case "complete":
 		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" {
-			e.value.ReporterComplete = true
+			e.complete()
 			valid = true
 		}
 	}
 	if !valid {
-		e.invalid("invalid_record")
+		e.invalidate("invalid_record")
 	}
 }
 
@@ -228,7 +205,9 @@ func (e *evidenceState) snapshot() *synthetic.FailureEvidence {
 	if e == nil {
 		return nil
 	}
-	return synthetic.CloneFailureEvidence(e.value)
+	out := synthetic.CloneFailureEvidence(&e.value)
+	out.FeatureStatus = e.status()
+	return out
 }
 
 func boundedJSON(value any, limit int) bool {
@@ -288,7 +267,7 @@ func validStop(f synthetic.FailureDetail) bool {
 func validDetail(f synthetic.FailureDetail) bool {
 	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
 		len(f.Path) > 16 || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
-		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f.Message, 12002) || !boundedJSON(f, evidencePayloadLimit) {
+		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f.Message, 12002) || !boundedJSON(f, extensionBodyLimit) {
 		return false
 	}
 	seen := make(map[string]bool, len(f.Path))

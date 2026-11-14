@@ -10,40 +10,29 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
-const captureDetailsFeature = "capture_details.v1"
-
 // Match the producer: 32 eligible tests with four screenshots need 160 records.
 // This bounds optional detail only; terminal candidates have no new count cap.
 const captureDetailLimit = 256
 
+// captureState decodes capture_details.v1. failure_trace.v1 has no records;
+// its lifecycle is stored with the capture report.
 type captureState struct {
-	value   *synthetic.CaptureReport
+	featureState
+	trace   *featureState // nil unless traces were requested
+	value   synthetic.CaptureReport
 	tests   map[string]int
 	ids     map[string]int
 	records int
 }
 
 func newCaptureState() *captureState {
-	return &captureState{
-		value: &synthetic.CaptureReport{Reporting: "negotiation_not_reported"},
-		tests: make(map[string]int), ids: make(map[string]int),
-	}
+	return &captureState{tests: make(map[string]int), ids: make(map[string]int)}
 }
 
-func (c *captureState) invalid() {
-	if c != nil {
-		c.value.Reporting = "invalid"
-	}
-}
+func (c *captureState) invalid() { c.invalidate("invalid_record") }
 
+// accept decodes one record of a selected, incomplete stream.
 func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
-	if c == nil || c.value.Reporting == "invalid" {
-		return
-	}
-	if c.value.Reporting == "complete" {
-		c.invalid()
-		return
-	}
 	var data struct {
 		Record string `json:"record"`
 		Test   *struct {
@@ -116,7 +105,7 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 		if data.Record == "truncated" {
 			c.value.Truncated = true
 		} else {
-			c.value.Reporting = "complete"
+			c.complete()
 		}
 	default:
 		c.invalid()
@@ -143,7 +132,12 @@ func (c *captureState) snapshot() *synthetic.CaptureReport {
 	if c == nil {
 		return nil
 	}
-	return synthetic.CloneCaptureReport(c.value)
+	out := synthetic.CloneCaptureReport(&c.value)
+	out.Reporting = c.word("partial")
+	if c.trace != nil {
+		out.Trace = c.trace.word("supported")
+	}
+	return out
 }
 
 // joinCaptures adds labels only to already admitted terminal candidates. Metadata

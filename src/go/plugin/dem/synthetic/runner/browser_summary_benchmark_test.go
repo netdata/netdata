@@ -37,7 +37,7 @@ func BenchmarkBrowserSummaryStream(b *testing.B) {
 			b.SetBytes(int64(len(input)))
 			b.ResetTimer()
 			for b.Loop() {
-				s := newSink(synthetic.Journey, false, newRedactor(nil), true, false)
+				s := newSink(synthetic.Request{Kind: synthetic.Journey, BrowserErrorSummary: true}, newRedactor(nil))
 				if err := s.consume(strings.NewReader(input)); err != nil {
 					b.Fatal(err)
 				}
