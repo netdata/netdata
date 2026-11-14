@@ -74,6 +74,6 @@ func consumeWithResult(t *testing.T, request synthetic.Request, secrets map[stri
 	t.Helper()
 	snapshot := consume(t, request, secrets, append(lines, resultLine(result))...)
 	require.NotNil(t, snapshot.result)
-	require.Equal(t, result.Status, snapshot.result.Status, "optional output must not rewrite the core result")
+	require.Equal(t, result, *snapshot.result, "optional output must not rewrite the core result")
 	return snapshot
 }
