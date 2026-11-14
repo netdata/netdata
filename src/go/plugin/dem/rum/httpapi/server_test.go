@@ -660,13 +660,14 @@ func TestLimiterSweepIsAmortizedWhenNothingIsIdle(t *testing.T) {
 	for i := 0; i < 5000; i++ {
 		l.allow(fmt.Sprintf("new-%d", i), now.Add(time.Duration(i)*time.Microsecond))
 	}
-	if l.sweeps > 1 {
-		t.Fatalf("%d sweeps for 5000 new clients within one second, want at most 1", l.sweeps)
+	// Only the first new client swept; a later sweep would have moved lastSweep.
+	if !l.lastSweep.Equal(now) {
+		t.Fatalf("last sweep at %v for 5000 new clients within one second, want only the first at %v", l.lastSweep, now)
 	}
 	now = now.Add(2 * time.Second)
 	l.allow("later", now)
-	if l.sweeps != 2 {
-		t.Fatalf("a new client a second later must sweep again: sweeps = %d", l.sweeps)
+	if !l.lastSweep.Equal(now) {
+		t.Fatalf("a new client a second later must sweep again: last sweep at %v", l.lastSweep)
 	}
 }
 

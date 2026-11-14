@@ -82,17 +82,10 @@ func (s *Route) allowSite(rate float64, now time.Time) bool {
 	defer s.rateMu.Unlock()
 	if s.rate != rate {
 		s.rate = rate
-		s.bucket.tokens = rate
-		s.bucket.last = now
+		s.bucket = bucket{
+			tokens: rate,
+			last:   now,
+		}
 	}
-	elapsed := now.Sub(s.bucket.last).Seconds()
-	if elapsed > 0 {
-		s.bucket.tokens = min(rate, s.bucket.tokens+elapsed*rate)
-		s.bucket.last = now
-	}
-	if s.bucket.tokens < 1 {
-		return false
-	}
-	s.bucket.tokens--
-	return true
+	return s.bucket.take(rate, rate, now)
 }
