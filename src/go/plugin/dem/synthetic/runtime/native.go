@@ -5,6 +5,7 @@ package runtime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -76,7 +77,8 @@ func OpenNative(config NativeConfig) (*Native, error) {
 		return nil, err
 	}
 	if err := ownershipRootLayout.validateReady(root); err != nil {
-		return nil, errors.Join(err, root.Close())
+		// Name the native proof root: the shared layout check also serves managed stores.
+		return nil, errors.Join(fmt.Errorf("native ownership proof: %w", err), root.Close())
 	}
 	// Keep the validated root. An established native owner must never enter
 	// bootstrap through a second open, even if state disappears in between.
