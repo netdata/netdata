@@ -1419,8 +1419,12 @@ update_binpkg() {
     DISTRO_COMPAT_NAME="${DISTRO}"
   else
     case "${DISTRO}" in
-      opensuse-leap|opensuse-tumbleweed)
+      opensuse-leap)
         DISTRO_COMPAT_NAME="opensuse"
+        ;;
+      opensuse-tumbleweed)
+        DISTRO_COMPAT_NAME="opensuse"
+        SYSVERSION="tumbleweed"
         ;;
       cloudlinux|almalinux|rocky|rhel)
         DISTRO_COMPAT_NAME="centos"
@@ -1436,6 +1440,11 @@ update_binpkg() {
         ;;
     esac
   fi
+
+  # Match the repository layout (and kickstart.sh): Oracle Linux repositories are per major version.
+  case "${DISTRO_COMPAT_NAME}" in
+    ol) SYSVERSION="$(echo "${SYSVERSION}" | cut -f 1 -d '.')" ;;
+  esac
 
   interactive_opts=""
   env=""
