@@ -29,9 +29,10 @@ const checkTimeout = 10 * time.Second
 const checkReplyLimit = 4096
 
 // A failing check writes {"error": text} to stderr with text clipped to
-// textLimit characters (src/dem-runtime/runner/protocol.cjs); the Agent keeps
-// at most textLimit bytes of it as the check error's diagnostic.
-const checkDiagnosticLimit = textLimit
+// textLimit characters (src/dem-runtime/runner/protocol.cjs). The Agent reads
+// one byte past textLimit and clips the result to textLimit characters for the
+// check error's diagnostic.
+const checkDiagnosticLimit = textLimit + 1
 
 func runtimeAllowed() error {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {

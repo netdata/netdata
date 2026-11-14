@@ -90,9 +90,10 @@ func TestCheckResponseBounds(t *testing.T) {
 		failed         bool
 		err            string
 	}{
-		"reply at limit":     {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
-		"reply over limit":   {stdout: reply + strings.Repeat(" ", 4097-len(reply)), err: "prepared runtime check: runtime check response exceeds 4096 bytes"},
-		"clipped diagnostic": {stderr: strings.Repeat("z", 3*textLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", textLimit) + ")"},
+		"reply at limit":       {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
+		"reply over limit":     {stdout: reply + strings.Repeat(" ", 4097-len(reply)), err: "prepared runtime check: runtime check response exceeds 4096 bytes"},
+		"clipped diagnostic":   {stderr: strings.Repeat("z", 3*textLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", textLimit) + ")"},
+		"multibyte diagnostic": {stderr: "a" + strings.Repeat("é", 1500), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (a" + strings.Repeat("é", 1000) + ")"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
