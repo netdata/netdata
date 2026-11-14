@@ -129,7 +129,7 @@ func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 			if scenario.change != nil {
 				scenario.change(&next)
 			}
-			update, err := ReleaseUpdate(current, next)
+			update, err := releaseUpdate(current, next)
 			if scenario.err != "" {
 				assert.ErrorContains(t, err, scenario.err)
 			} else {

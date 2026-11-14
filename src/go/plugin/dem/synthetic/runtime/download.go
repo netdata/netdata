@@ -14,13 +14,7 @@ import (
 
 const downloadIdleTimeout = 60 * time.Second
 
-type inactivityError struct{}
-
-func (*inactivityError) Error() string   { return "runtime download network inactivity timeout" }
-func (*inactivityError) Timeout() bool   { return true }
-func (*inactivityError) Temporary() bool { return true }
-
-var errDownloadInactive = &inactivityError{}
+var errDownloadInactive = errors.New("runtime download network inactivity timeout")
 
 // downloadActivity owns one HTTP request chain. Its timer only measures time
 // waiting for the network, never archive writes or other local preparation work.
@@ -137,9 +131,6 @@ func openDownload(ctx context.Context, address string, idle time.Duration) (io.R
 
 // Downloads are explicit candidate operations, never monitor lifecycle work.
 func (s *Store) download(ctx context.Context, m Manifest) error {
-	if ctx == nil {
-		ctx = context.Background()
-	}
 	if m.Archive.URL == "" {
 		return errors.New("runtime manifest has no download source")
 	}

@@ -49,9 +49,6 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 			return err
 		}
 	}
-	if err := validatePayloadLayout(root, m); err != nil {
-		return err
-	}
 	fonts, launcher, err := boundConfiguration(final, m.Layout)
 	if err != nil {
 		return err
@@ -59,7 +56,11 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 	if err := writeNewFile(root, "fonts.conf", fonts, 0400); err != nil {
 		return err
 	}
-	return writeNewFile(root, "chrome", launcher, 0500)
+	if err := writeNewFile(root, "chrome", launcher, 0500); err != nil {
+		return err
+	}
+	// Staging is owned and, for managed generations, later executed by this account.
+	return verifyBoundPayload(root, m, ownerExecute)
 }
 
 // payloadLayoutError records a directly observed structural violation.
@@ -67,25 +68,43 @@ type payloadLayoutError string
 
 func (e payloadLayoutError) Error() string { return string(e) }
 
-// Check fixed entry paths without walking the payload or executing it.
-func validatePayloadLayout(root *os.Root, m Manifest) error {
-	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader} {
-		if err := plainExistingParents(root, name); err != nil {
-			return err
-		}
-		info, err := root.Lstat(name)
+// Execute permission classes for verifyBoundPayload. Linux grants execution
+// through the owner bits when the caller owns the file, the group bits when it
+// is in the file's group, and the other bits otherwise. Managed generations are
+// owned and executed by the service account. Native payloads are root-owned and
+// executed by the non-root service UID, so their owner bit never authorizes it;
+// qualification, which runs the payload as that UID, remains the full proof.
+const (
+	ownerExecute    os.FileMode = 0100
+	nonOwnerExecute os.FileMode = 0011
+)
+
+// verifyBoundPayload checks the fixed entry paths of a bound payload without
+// walking or executing it: every path has plain directory parents, the declared
+// executables and the generated launcher are regular files with the execute bit
+// of the class that runs them, the entrypoint and generated font configuration
+// are regular files, and the data paths are directories.
+func verifyBoundPayload(root *os.Root, m Manifest, execute os.FileMode) error {
+	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, "chrome"} {
+		info, err := lstatPlain(root, name)
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() || info.Mode()&0100 == 0 {
+		if !info.Mode().IsRegular() || info.Mode()&execute == 0 {
 			return payloadLayoutError(fmt.Sprintf("runtime executable is missing or not a plain executable: %s", name))
 		}
 	}
-	for _, name := range []string{m.Layout.Dependencies, m.Layout.Fonts} {
-		if err := plainExistingParents(root, name); err != nil {
+	for _, name := range []string{m.Layout.EntryPoint, "fonts.conf"} {
+		info, err := lstatPlain(root, name)
+		if err != nil {
 			return err
 		}
-		info, err := root.Lstat(name)
+		if !info.Mode().IsRegular() {
+			return payloadLayoutError(fmt.Sprintf("runtime file is not a plain regular file: %s", name))
+		}
+	}
+	for _, name := range []string{m.Layout.Dependencies, m.Layout.Fonts} {
+		info, err := lstatPlain(root, name)
 		if err != nil {
 			return err
 		}
@@ -93,17 +112,24 @@ func validatePayloadLayout(root *os.Root, m Manifest) error {
 			return payloadLayoutError(fmt.Sprintf("runtime directory is missing: %s", name))
 		}
 	}
-	if err := plainExistingParents(root, m.Layout.EntryPoint); err != nil {
-		return err
-	}
-	info, err := root.Lstat(m.Layout.EntryPoint)
-	if err != nil {
-		return err
-	}
-	if !info.Mode().IsRegular() {
-		return payloadLayoutError("runtime entrypoint must be a plain regular file")
-	}
 	return nil
+}
+
+func lstatPlain(root *os.Root, name string) (os.FileInfo, error) {
+	if err := plainExistingParents(root, name); err != nil {
+		return nil, err
+	}
+	return root.Lstat(name)
+}
+
+// boundPaths names the executable entry points of a payload bound to prefix.
+func boundPaths(prefix string, layout Layout) Paths {
+	return Paths{
+		EntryPoint:   filepath.Join(prefix, layout.EntryPoint),
+		Node:         filepath.Join(prefix, layout.Node),
+		Dependencies: filepath.Join(prefix, layout.Dependencies),
+		Browser:      filepath.Join(prefix, "chrome"),
+	}
 }
 
 func boundConfiguration(final string, layout Layout) ([]byte, []byte, error) {

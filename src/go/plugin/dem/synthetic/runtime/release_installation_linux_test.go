@@ -83,12 +83,10 @@ func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 }
 
 func TestAutomaticReleaseDoesNotDiscoverWithoutConsent(t *testing.T) {
-	for _, state := range []string{"absent", "local", "manual", "uninstalled"} {
+	for _, state := range []string{"absent", "manual", "uninstalled"} {
 		t.Run(state, func(t *testing.T) {
 			s, _ := testStore(t)
 			switch state {
-			case "local":
-				installFixture(t, s, "trusted-local")
 			case "manual":
 				installPublishedFixture(t, s, 1, ManualUpdates)
 			case "uninstalled":

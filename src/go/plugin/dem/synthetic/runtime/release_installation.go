@@ -37,23 +37,14 @@ type ReleaseInstallOptions struct {
 	Updates UpdatePolicy
 }
 
-func (s selection) validateRelease() error {
+func (s selection) validate() error {
 	if s.Release == nil {
 		if s.AutomaticUpdates {
 			return errors.New("automatic runtime updates require an authenticated release")
 		}
 		return nil
 	}
-	if s.Manifest == nil {
-		return errors.New("uninstalled runtime retains release metadata")
-	}
-	if err := s.Release.Validate(); err != nil {
-		return err
-	}
-	if s.Manifest.Archive.URL != s.Release.Manifest.Archive.URL || !sameManifest(*s.Manifest, s.Release.Manifest) {
-		return errors.New("selected runtime differs from its authenticated release")
-	}
-	return nil
+	return s.Release.Validate()
 }
 
 // BeginPublishedInstall takes installer exclusion BEFORE reading eligibility or
@@ -114,16 +105,16 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 		}
 		var err error
 		current, err = s.readSelectionRecord()
-		if err == nil && options.Operation == ensureRelease && current.Manifest != nil {
-			err = s.validateEnsureSelection(*current.Manifest)
+		if m := current.manifest(); err == nil && options.Operation == ensureRelease && m != nil {
+			err = s.validateEnsureSelection(*m)
 		}
 		return err
 	})
 	if err != nil {
 		return nil, nil, err
 	}
-	if options.Operation == ensureRelease && current.Manifest != nil {
-		return nil, current.Manifest, nil
+	if m := current.manifest(); options.Operation == ensureRelease && m != nil {
+		return nil, m, nil
 	}
 	if options.Operation == AutomaticReleaseUpdate && !current.AutomaticUpdates {
 		return nil, nil, nil
@@ -138,12 +129,12 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 	if err := release.Validate(); err != nil {
 		return nil, nil, err
 	}
-	next := selection{Manifest: &release.Manifest, Release: &release, AutomaticUpdates: current.AutomaticUpdates}
+	next := selection{Release: &release, AutomaticUpdates: current.AutomaticUpdates}
 	if options.Operation == InstallRelease || options.Operation == RepairRelease || options.Operation == ensureRelease {
 		next.AutomaticUpdates = options.Updates == AutomaticUpdates
 	}
 	if current.Release != nil {
-		changed, err := ReleaseUpdate(*current.Release, release)
+		changed, err := releaseUpdate(*current.Release, release)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -151,18 +142,17 @@ func (s *Store) beginPublishedInstall(ctx context.Context, options ReleaseInstal
 			// Reinstalling the exact release can explicitly change consent
 			// without acquiring or executing unchanged payload bytes.
 			if current.AutomaticUpdates != next.AutomaticUpdates {
-				err = s.withLock(func() error { return s.selectRecordLocked(next) })
+				err = s.withLock(func() error { return s.selectLocked(next) })
 			}
 			return nil, nil, err
 		}
 	}
 	// candidateWithOperation owns releasing operation even on failure.
 	transferred = true
-	candidate, err := s.candidateWithOperation(operation, release.Manifest, options.Operation == RepairRelease)
+	candidate, err := s.candidateWithOperation(operation, next, options.Operation == RepairRelease)
 	if err != nil {
 		return nil, nil, err
 	}
-	candidate.publication = &next
 	return candidate, nil, nil
 }
 
@@ -172,17 +162,8 @@ func (s *Store) validateEnsureSelection(m Manifest) (result error) {
 		return selectedPayloadError(err)
 	}
 	defer func() { result = errors.Join(result, root.Close()) }()
-	if err := validatePayloadLayout(root, m); err != nil {
+	if err := verifyBoundPayload(root, m, ownerExecute); err != nil {
 		return selectedPayloadError(err)
-	}
-	for _, name := range []string{"chrome", "fonts.conf"} {
-		info, err := root.Lstat(name)
-		if err != nil {
-			return selectedPayloadError(err)
-		}
-		if !info.Mode().IsRegular() || (name == "chrome" && info.Mode()&0100 == 0) {
-			return fmt.Errorf("%w: selected runtime bound file is missing or invalid: %s", ErrDamaged, name)
-		}
 	}
 	return nil
 }
@@ -192,7 +173,7 @@ func selectedPayloadError(err error) error {
 	// and other inconclusive failures retain their cause for diagnosis or retry.
 	var invalid payloadLayoutError
 	if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.As(err, &invalid) {
-		return fmt.Errorf("%w: selected runtime payload: %v", ErrDamaged, err)
+		return damaged(fmt.Errorf("selected runtime payload: %w", err))
 	}
 	return fmt.Errorf("selected runtime payload: %w", err)
 }

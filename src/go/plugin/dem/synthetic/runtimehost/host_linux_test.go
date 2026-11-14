@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	goruntime "runtime"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -93,18 +94,15 @@ func testStore(t *testing.T) *runtime.Store {
 	return store
 }
 
+var installSequence atomic.Uint64
+
 // These synthetic bytes prove storage/host ownership, not browser qualification.
+// Each installation publishes a sequence above every earlier one in this process.
 func installBundle(t *testing.T, store *runtime.Store, version string) runtime.Manifest {
 	t.Helper()
-	manifest, data := testBundle(t, version)
-	file := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.WriteFile(file, data, 0600))
-	candidate, err := store.BeginInstall(t.Context(), manifest)
-	require.NoError(t, err)
-	require.NoError(t, candidate.Import(t.Context(), file))
-	require.NoError(t, candidate.Select())
-	require.NoError(t, candidate.Close())
-	return manifest
+	release, data := publishedBundle(t, version, installSequence.Add(1))
+	selectPublished(t, store, release, data, runtime.ManualUpdates)
+	return release.Manifest
 }
 
 func newTestHost(t *testing.T, store *runtime.Store) *Host {

@@ -116,7 +116,7 @@ func TestReleaseSignaturePolicyAndPacketBounds(t *testing.T) {
 	require.NoError(t, weakPacket.Serialize(&weakBuffer))
 	weak := weakBuffer.Bytes()
 	for name, sig := range map[string][]byte{
-		"text": text.Bytes(), "weak": weak, "empty": nil, "oversized": bytes.Repeat([]byte{0}, ReleaseSignatureLimit+1),
+		"text": text.Bytes(), "weak": weak, "empty": nil, "oversized": bytes.Repeat([]byte{0}, releaseSignatureLimit+1),
 		"multiple": append(bytes.Clone(signature), signature...), "trailing": append(bytes.Clone(signature), 0),
 		"unknown-packet": append(bytes.Clone(signature), 0xff, 0), "truncated": signature[:len(signature)-1],
 		"oversized-declaration": oversizedDeclaration, "hidden-packet": hiddenPacket,
@@ -147,7 +147,7 @@ func TestReleasePublicKeyringBoundsAndMaterial(t *testing.T) {
 	_, err = ParseReleaseKeyring(armored.Bytes())
 	require.NoError(t, err)
 	// A valid keyring at the raw boundary remains usable.
-	atLimit := append(bytes.Clone(armored.Bytes()), bytes.Repeat([]byte(" "), ReleaseKeyringLimit-armored.Len())...)
+	atLimit := append(bytes.Clone(armored.Bytes()), bytes.Repeat([]byte(" "), releaseKeyringLimit-armored.Len())...)
 	_, err = ParseReleaseKeyring(atLimit)
 	require.NoError(t, err)
 	var secret bytes.Buffer
@@ -181,7 +181,7 @@ func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	require.ErrorContains(t, err, "503")
 	require.Equal(t, 2, calls)
 	status = http.StatusOK
-	body = bytes.Repeat([]byte(" "), ReleaseKeyringLimit+1)
+	body = bytes.Repeat([]byte(" "), releaseKeyringLimit+1)
 	_, err = FetchReleaseKeyring(context.Background())
 	require.ErrorContains(t, err, "size limit")
 	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) { <-r.Context().Done(); return nil, r.Context().Err() })

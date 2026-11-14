@@ -32,6 +32,13 @@ func damagedMetadata(name string, err error) error {
 	}
 }
 
+// damaged reports damage at a public boundary. The cause is kept as text only:
+// a declared but unusable record must never satisfy errors.Is for an ordinary
+// condition such as ErrUnavailable or os.ErrNotExist.
+func damaged(err error) error {
+	return fmt.Errorf("%w: %v", ErrDamaged, err)
+}
+
 func metadataDecodeError(name string, err error) error {
 	// os.File.Read wraps operational errors in PathError. They must not become
 	// permission to replace data, including an error from the trailing-value read.
@@ -71,7 +78,7 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		}
 		inv.selectionError = err
 	} else {
-		inv.selected = record.Manifest
+		inv.selected = record.manifest()
 		inv.release = record.Release
 		inv.automaticUpdates = record.AutomaticUpdates
 	}
@@ -131,7 +138,7 @@ func (inv inventory) damageError() error {
 	if inv.selectionError == nil && len(inv.generationErrors) == 0 {
 		return nil
 	}
-	errs := []error{ErrDamaged, inv.selectionError}
+	errs := []error{inv.selectionError}
 	ids := make([]string, 0, len(inv.generationErrors))
 	for id := range inv.generationErrors {
 		ids = append(ids, id)
@@ -140,5 +147,5 @@ func (inv inventory) damageError() error {
 	for _, id := range ids {
 		errs = append(errs, inv.generationErrors[id])
 	}
-	return errors.Join(errs...)
+	return damaged(errors.Join(errs...))
 }

@@ -43,6 +43,7 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 		{name: "fonts/font.ttf", contents: []byte("font"), mode: 0644},
 	}
 	a, archive := archiveFixture(t, entries)
+	a.URL = "https://artifacts.example.invalid/" + a.SHA256 + ".tar.zst"
 	m := Manifest{Format: 1, Contract: 2, Version: "test-1", Platform: "linux/" + goruntime.GOARCH, Archive: a,
 		Layout:   Layout{EntryPoint: "runner/run.mjs", Node: "node/bin/node", Dependencies: "dependencies", Browser: "browser/browser", Loader: "lib/loader.so", Fonts: "fonts"},
 		Bindings: []Binding{{Path: "node/bin/node", Offset: 32, Expected: expected}, {Path: "browser/browser", Offset: 32, Expected: expected}},
@@ -202,6 +203,109 @@ func TestBindingRejectsPayloadBeyondAbsolutePathLimit(t *testing.T) {
 	prefix := strings.Repeat("/"+strings.Repeat("p", 99), length/100) + strings.Repeat("p", length%100)
 	require.Len(t, prefix+"/"+m.Layout.Loader, 4095)
 	require.ErrorContains(t, bindPrefix(root, prefix, m), "absolute path limit")
+}
+
+func boundPayloadFixture(t *testing.T) (*os.Root, Manifest) {
+	t.Helper()
+	m, archive := bundleFixture(t, "bound")
+	root, err := os.OpenRoot(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, root.Close()) })
+	require.NoError(t, extractArchive(bytes.NewReader(archive), root, m.Archive))
+	require.NoError(t, bindPrefix(root, "/prepared/runtime", m))
+	return root, m
+}
+
+func TestBoundPayloadRequiresExecuteBitOfRunningClass(t *testing.T) {
+	tests := map[string]struct {
+		execute os.FileMode
+		base    os.FileMode
+		mode    os.FileMode
+		valid   bool
+	}{
+		"owner class accepts owner execute": {
+			execute: ownerExecute,
+			base:    0500,
+			mode:    0500,
+			valid:   true,
+		},
+		"owner class rejects group and other execute only": {
+			execute: ownerExecute,
+			base:    0500,
+			mode:    0455,
+		},
+		"non-owner class accepts other execute": {
+			execute: nonOwnerExecute,
+			base:    0755,
+			mode:    0705,
+			valid:   true,
+		},
+		"non-owner class accepts group execute": {
+			execute: nonOwnerExecute,
+			base:    0755,
+			mode:    0750,
+			valid:   true,
+		},
+		"non-owner class rejects owner execute only": {
+			execute: nonOwnerExecute,
+			base:    0755,
+			mode:    0744,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, m := boundPayloadFixture(t)
+			executables := []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, "chrome"}
+			for _, executable := range executables {
+				require.NoError(t, root.Chmod(executable, test.base))
+			}
+			require.NoError(t, verifyBoundPayload(root, m, test.execute))
+			for _, executable := range executables {
+				require.NoError(t, root.Chmod(executable, test.mode))
+				err := verifyBoundPayload(root, m, test.execute)
+				if test.valid {
+					require.NoError(t, err, executable)
+				} else {
+					var layout payloadLayoutError
+					require.ErrorAs(t, err, &layout, executable)
+				}
+				require.NoError(t, root.Chmod(executable, test.base))
+			}
+		})
+	}
+}
+
+func TestBoundPayloadStructuralDamageIsDamage(t *testing.T) {
+	tests := map[string]func(t *testing.T, root *os.Root, m Manifest){
+		"missing launcher": func(t *testing.T, root *os.Root, _ Manifest) {
+			require.NoError(t, root.Remove("chrome"))
+		},
+		"missing font configuration": func(t *testing.T, root *os.Root, _ Manifest) {
+			require.NoError(t, root.Remove("fonts.conf"))
+		},
+		"entrypoint is a directory": func(t *testing.T, root *os.Root, m Manifest) {
+			require.NoError(t, root.Remove(m.Layout.EntryPoint))
+			require.NoError(t, root.Mkdir(m.Layout.EntryPoint, 0700))
+		},
+		"fonts path is a file": func(t *testing.T, root *os.Root, m Manifest) {
+			require.NoError(t, root.RemoveAll(m.Layout.Fonts))
+			require.NoError(t, writeNewFile(root, m.Layout.Fonts, nil, 0400))
+		},
+		"linked executable parent": func(t *testing.T, root *os.Root, m Manifest) {
+			parent := filepath.Dir(m.Layout.Loader)
+			require.NoError(t, root.Rename(parent, parent+"-target"))
+			require.NoError(t, root.Symlink(parent+"-target", parent))
+		},
+	}
+	for name, damage := range tests {
+		t.Run(name, func(t *testing.T) {
+			root, m := boundPayloadFixture(t)
+			damage(t, root, m)
+			err := verifyBoundPayload(root, m, ownerExecute)
+			require.Error(t, err)
+			require.ErrorIs(t, selectedPayloadError(err), ErrDamaged)
+		})
+	}
 }
 
 func TestArchiveZstdIntegrityAndBounds(t *testing.T) {

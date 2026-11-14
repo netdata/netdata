@@ -124,11 +124,11 @@ func decodeReleaseJSON(data []byte, target any) error {
 	return nil
 }
 
-// ReleaseUpdate checks normal latest-based updates, including explicitly
+// releaseUpdate checks normal latest-based updates, including explicitly
 // requested latest checks. Choosing an older authenticated offline release is a
 // separate administrator recovery operation. Compare with selected state only;
 // this is not a historical high-water mark or proof of newest availability.
-func ReleaseUpdate(current, next Release) (bool, error) {
+func releaseUpdate(current, next Release) (bool, error) {
 	if err := current.Validate(); err != nil {
 		return false, fmt.Errorf("installed runtime release: %w", err)
 	}

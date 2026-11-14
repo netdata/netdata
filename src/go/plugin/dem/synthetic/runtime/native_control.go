@@ -152,68 +152,84 @@ func (c *NativeControl) QualifyAndReady(ctx context.Context, inspect NativeInspe
 	if qualify == nil {
 		return errors.New("native qualification callback is required")
 	}
+	target, qualifying, err := c.beginQualification(ctx, inspect)
+	if err != nil || !qualifying {
+		return err
+	}
+	// The gate is released during qualification: the service-UID checks take it
+	// shared for their candidate and uses.
+	if err := qualify(ctx, target); err != nil {
+		return err
+	}
+	return c.finishQualification(ctx, inspect, target)
+}
+
+// beginQualification records the installed payload as the qualifying target
+// under the exclusive gate. An unchanged ready package needs no qualification.
+func (c *NativeControl) beginQualification(ctx context.Context, inspect NativeInspector) (_ Manifest, qualifying bool, result error) {
+	gate, err := lockNativeGate(ctx, c.config, true)
+	if err != nil {
+		return Manifest{}, false, err
+	}
+	defer func() { result = errors.Join(result, gate.Close()) }()
+	state, err := readNativeControl(c.config)
+	if err != nil {
+		return Manifest{}, false, err
+	}
+	if state.Phase == "initializing" {
+		return Manifest{}, false, errors.New("native bootstrap is incomplete")
+	}
+	if err := inspectNativeEmpty(ctx, inspect); err != nil {
+		return Manifest{}, false, err
+	}
+	_, target, err := readNativePayload(c.config.PayloadPath)
+	if err != nil {
+		return Manifest{}, false, err
+	}
+	if state.Phase == "ready" {
+		if state.Target == nil || !sameNativeManifest(*state.Target, target) {
+			return Manifest{}, false, errors.New("native package changed without closed admission")
+		}
+		return target, false, nil
+	}
+	state.Phase, state.Target = "qualifying", &target
+	return target, true, writeNativeControl(c.config, state)
+}
+
+// finishQualification opens ordinary admission only while the gate and payload
+// still name the qualified target and qualification left no proof behind.
+func (c *NativeControl) finishQualification(ctx context.Context, inspect NativeInspector, target Manifest) (result error) {
 	gate, err := lockNativeGate(ctx, c.config, true)
 	if err != nil {
 		return err
 	}
+	defer func() { result = errors.Join(result, gate.Close()) }()
 	state, err := readNativeControl(c.config)
 	if err != nil {
-		return errors.Join(err, gate.Close())
+		return err
 	}
-	if state.Phase == "initializing" {
-		return errors.Join(errors.New("native bootstrap is incomplete"), gate.Close())
+	if state.Phase != "qualifying" || state.Target == nil || !sameNativeManifest(*state.Target, target) {
+		return errors.New("native qualification admission changed before completion")
+	}
+	_, actual, err := readNativePayload(c.config.PayloadPath)
+	if err != nil {
+		return err
+	}
+	if !sameNativeManifest(actual, target) {
+		return errors.New("native payload changed during qualification")
 	}
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
-		return errors.Join(err, gate.Close())
-	}
-	_, target, err := readNativePayload(c.config.PayloadPath)
-	if err != nil {
-		return errors.Join(err, gate.Close())
-	}
-	if state.Phase == "ready" {
-		if state.Target == nil || !sameNativeManifest(*state.Target, target) {
-			err = errors.New("native package changed without closed admission")
-		}
-		return errors.Join(err, gate.Close())
-	}
-	state.Phase, state.Target = "qualifying", &target
-	err = errors.Join(writeNativeControl(c.config, state), gate.Close())
-	if err != nil {
 		return err
 	}
-	if err := qualify(ctx, target); err != nil {
-		return err
-	}
-	gate, err = lockNativeGate(ctx, c.config, true)
-	if err != nil {
-		return err
-	}
-	state, err = readNativeControl(c.config)
-	if err == nil && (state.Phase != "qualifying" || state.Target == nil || !sameNativeManifest(*state.Target, target)) {
-		err = errors.New("native qualification admission changed before completion")
-	}
-	if err == nil {
-		_, actual, readErr := readNativePayload(c.config.PayloadPath)
-		err = readErr
-		if err == nil && !sameNativeManifest(actual, target) {
-			err = errors.New("native payload changed during qualification")
-		}
-	}
-	if err == nil {
-		err = inspectNativeEmpty(ctx, inspect)
-	}
-	if err == nil {
-		state.Phase = "ready"
-		err = writeNativeControl(c.config, state)
-	}
-	return errors.Join(err, gate.Close())
+	state.Phase = "ready"
+	return writeNativeControl(c.config, state)
 }
 
 func inspectNativeEmpty(ctx context.Context, inspect NativeInspector) error {
 	if inspect == nil {
 		return errors.New("native service-UID inspector is required")
 	}
-	if err := checkContext(ctx); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	status, err := inspect(ctx)
@@ -226,9 +242,6 @@ func inspectNativeEmpty(ctx context.Context, inspect NativeInspector) error {
 func lockNativeGate(ctx context.Context, config NativeConfig, exclusive bool) (*flock.Flock, error) {
 	if _, err := readNativeControl(config); err != nil {
 		return nil, err
-	}
-	if ctx == nil {
-		ctx = context.Background()
 	}
 	lock := flock.New(filepath.Join(config.ControlPath, nativeGateName), flock.SetFlag(os.O_RDONLY))
 	var held bool

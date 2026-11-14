@@ -24,11 +24,20 @@ func damageRuntime(t *testing.T, s *Store, old, selected Manifest, damage string
 	case "missing-selection":
 		require.NoError(t, os.Rename(filepath.Join(s.path, name), filepath.Join(t.TempDir(), "lost")))
 		return
-	case "mismatched-selection":
-		selected.Version = "different-version"
-		data, err := json.Marshal(selection{
-			Manifest: &selected,
-		})
+	case "mismatched-selection", "legacy-selection":
+		record, err := s.readSelectionRecord()
+		require.NoError(t, err)
+		var value any = record
+		if damage == "mismatched-selection" {
+			record.Release.Manifest.Version = "different-version"
+		} else {
+			// The former record stored the manifest beside its release.
+			value = map[string]any{
+				"manifest": record.Release.Manifest,
+				"release":  record.Release,
+			}
+		}
+		data, err := json.Marshal(value)
 		require.NoError(t, err)
 		require.NoError(t, os.WriteFile(filepath.Join(s.path, name), data, 0600))
 		return
@@ -59,9 +68,12 @@ func damageRuntime(t *testing.T, s *Store, old, selected Manifest, damage string
 	case "null-selection-record":
 		content = "null"
 	case "trailing-selection":
-		content = "{\"manifest\":null} {}"
+		content = "{\"release\":null} {}"
 	case "invalid-selection":
-		content = "{\"manifest\":{}}"
+		content = "{\"release\":{}}"
+	case "legacy-selection-variant":
+		// Only the exact empty record earlier builds wrote means uninstalled.
+		content = "{\"manifest\":null,\"release\":null}\n"
 	case "unknown-selection-field":
 		content = "{\"unexpected\":true}"
 	case "invalid-prepared-fields":
@@ -80,6 +92,8 @@ var metadataDamageCases = []string{
 	"invalid-selection",
 	"unknown-selection-field",
 	"mismatched-selection",
+	"legacy-selection",
+	"legacy-selection-variant",
 	"missing-selected",
 	"missing-prepared",
 	"invalid-prepared",
@@ -143,9 +157,15 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 			old := installFixture(t, s, "old")
 			selected := installFixture(t, s, "selected")
 			damageRuntime(t, s, old, selected, damage)
-			require.ErrorIs(t, s.Sweep(), ErrDamaged)
+			// Damage never reads as an ordinary absence through the strict inventory.
+			err := s.Sweep()
+			require.ErrorIs(t, err, ErrDamaged)
+			require.NotErrorIs(t, err, ErrUnavailable)
+			require.NotErrorIs(t, err, os.ErrNotExist)
 			status, err := s.Inspect()
 			require.ErrorIs(t, err, ErrDamaged)
+			require.NotErrorIs(t, err, ErrUnavailable)
+			require.NotErrorIs(t, err, os.ErrNotExist)
 			require.Empty(t, status.InventoryError)
 			if damage == "invalid-unselected" {
 				require.Empty(t, status.SelectionError)
@@ -157,7 +177,7 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 				// An unknown/broken selection cannot authorize reclamation.
 				require.Positive(t, status.ProtectedBytes)
 			}
-			candidate, err := s.BeginRepair(context.Background(), selected)
+			candidate, err := s.beginFixture(context.Background(), selected, RepairRelease)
 			require.NoError(t, err)
 			_, err = s.AcquireSelected()
 			require.ErrorIs(t, err, ErrUnavailable)
@@ -187,7 +207,7 @@ func TestRepairPreservesHealthyDifferentSelectionOnFailure(t *testing.T) {
 	old := installFixture(t, s, "old")
 	selected := installFixture(t, s, "selected")
 	damageRuntime(t, s, old, selected, "invalid-unselected")
-	candidate, err := s.BeginRepair(context.Background(), old)
+	candidate, err := s.beginFixture(context.Background(), old, RepairRelease)
 	require.NoError(t, err)
 	require.Error(t, candidate.Import(context.Background(), filepath.Join(t.TempDir(), "missing")))
 	require.NoError(t, candidate.Close())
@@ -224,7 +244,7 @@ func TestRepairRefusesProtectedOrUnverifiableOwnership(t *testing.T) {
 			damageRuntime(t, s, m, m, "malformed-selection")
 			before, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
 			require.NoError(t, err)
-			_, err = s.BeginRepair(context.Background(), m)
+			_, err = s.beginFixture(context.Background(), m, RepairRelease)
 			require.Error(t, err)
 			require.Error(t, s.Uninstall(context.Background()))
 			after, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
@@ -264,7 +284,7 @@ func TestRepairPreservesOperationalFailures(t *testing.T) {
 			require.ErrorIs(t, err, os.ErrPermission)
 			require.NotErrorIs(t, err, ErrDamaged)
 			require.NotEmpty(t, status.InventoryError)
-			_, err = s.BeginRepair(context.Background(), m)
+			_, err = s.beginFixture(context.Background(), m, RepairRelease)
 			require.ErrorIs(t, err, os.ErrPermission)
 			require.ErrorIs(t, s.Uninstall(context.Background()), os.ErrPermission)
 			require.DirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
@@ -284,15 +304,15 @@ func TestRepairClearUncertaintyRetainsBytesUntilRetry(t *testing.T) {
 		}
 		return original()
 	}
-	_, err := s.BeginRepair(context.Background(), m)
+	_, err := s.beginFixture(context.Background(), m, RepairRelease)
 	var uncertain *SelectionError
 	require.ErrorAs(t, err, &uncertain)
 	require.DirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
-	_, err = s.BeginRepair(context.Background(), m)
+	_, err = s.beginFixture(context.Background(), m, RepairRelease)
 	require.Error(t, err)
 	require.DirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
 	s.syncSelection = original
-	candidate, err := s.BeginRepair(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 	require.NoError(t, err)
 	require.NoDirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
 	require.NoError(t, candidate.Close())
@@ -319,7 +339,7 @@ func TestRepairWriterExitProcess(t *testing.T) {
 			return original()
 		}
 	}
-	_, err = s.BeginRepair(context.Background(), *m)
+	_, err = s.beginFixture(context.Background(), *m, RepairRelease)
 	require.NoError(t, err)
 	os.Exit(73)
 }
@@ -337,7 +357,7 @@ func TestRepairRetryAfterCallerExit(t *testing.T) {
 			var exit *exec.ExitError
 			require.ErrorAs(t, err, &exit, string(output))
 			require.Equal(t, 73, exit.ExitCode(), string(output))
-			candidate, err := s.BeginRepair(context.Background(), m)
+			candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 			require.NoError(t, err)
 			_, archive := bundleFixture(t, "selected")
 			input := filepath.Join(t.TempDir(), "archive")
@@ -463,13 +483,13 @@ func TestRepairSerializesStartupAndInstallers(t *testing.T) {
 			}
 		}()
 		close(start)
-		candidate, repairErr := s.BeginRepair(context.Background(), m)
+		candidate, repairErr := s.beginFixture(context.Background(), m, RepairRelease)
 		result := <-acquired
 		if repairErr == nil {
 			require.ErrorIs(t, result.err, ErrUnavailable)
 			ctx, cancel := context.WithCancel(context.Background())
 			cancel()
-			_, err := other.BeginInstall(ctx, m)
+			_, err := other.beginFixture(ctx, m, InstallRelease)
 			require.ErrorIs(t, err, context.Canceled)
 			require.ErrorIs(t, other.Uninstall(ctx), context.Canceled)
 			require.NoError(t, candidate.Close())
@@ -490,13 +510,13 @@ func TestRepairRetirementFailureIsRetryable(t *testing.T) {
 	m := installFixture(t, s, "selected")
 	trash := filepath.Join(s.path, "trash")
 	require.NoError(t, os.Chmod(trash, 0))
-	_, err := s.BeginRepair(context.Background(), m)
+	_, err := s.beginFixture(context.Background(), m, RepairRelease)
 	require.ErrorIs(t, err, os.ErrPermission)
 	require.NoError(t, os.Chmod(trash, 0700))
 	require.DirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
 	_, err = s.AcquireSelected()
 	require.ErrorIs(t, err, ErrUnavailable)
-	candidate, err := s.BeginRepair(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 	require.NoError(t, err)
 	require.NoDirExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256))
 	require.NoError(t, candidate.Close())
@@ -507,7 +527,7 @@ func TestBootstrapExitBeforeParentSyncProcess(t *testing.T) {
 	if path == "" {
 		return
 	}
-	_, err := ensureStoreRoot(path)
+	_, err := ensureRuntimeRoot(path, managedRootLayout)
 	require.NoError(t, err)
 	os.Exit(73)
 }
@@ -574,7 +594,7 @@ func TestPrecreatedMountedStoreRoot(t *testing.T) {
 	s, err = Open(DefaultConfig(path))
 	require.NoError(t, err)
 	defer s.Close()
-	candidate, err := s.BeginRepair(context.Background(), m)
+	candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Close())
 }
@@ -586,7 +606,7 @@ func TestSharedCreatedAncestorRetainsPublicationBarrier(t *testing.T) {
 	parent := t.TempDir()
 	first := filepath.Join(parent, "new", "nested", "first")
 	// The first initializer exits after publication, before syncing parent.
-	_, err := ensureStoreRoot(first)
+	_, err := ensureRuntimeRoot(first, managedRootLayout)
 	require.NoError(t, err)
 	alias := filepath.Join(t.TempDir(), "alias")
 	require.NoError(t, os.Symlink(filepath.Dir(first), alias))
@@ -621,7 +641,7 @@ func TestSharedCreatedAncestorRetainsPublicationBarrier(t *testing.T) {
 func TestConcurrentStoresShareCreatedAncestors(t *testing.T) {
 	parent := filepath.Join(t.TempDir(), "new", "nested")
 	first := filepath.Join(parent, "first")
-	_, err := ensureStoreRoot(first)
+	_, err := ensureRuntimeRoot(first, managedRootLayout)
 	require.NoError(t, err)
 	var group sync.WaitGroup
 	errs := make(chan error, 8)

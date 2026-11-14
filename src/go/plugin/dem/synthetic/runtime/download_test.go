@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,9 +32,6 @@ func requireInactivity(t *testing.T, err error) {
 	t.Helper()
 	require.ErrorIs(t, err, errDownloadInactive)
 	require.False(t, errors.Is(err, context.Canceled))
-	var timeout net.Error
-	require.ErrorAs(t, err, &timeout)
-	require.True(t, timeout.Timeout())
 	require.Contains(t, err.Error(), "network inactivity timeout")
 }
 

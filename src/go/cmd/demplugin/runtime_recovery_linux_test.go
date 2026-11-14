@@ -27,16 +27,18 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	writeAdminTrust(t, root, "")
 	cfg := dem.DefaultRuntimeConfig()
 	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
-	release, err := cfg.ReleaseLoader(manifest, false)(context.Background())
-	require.NoError(t, err)
-	m := release.Manifest
 	cache = filepath.Join(root, "cache")
 	store, err := runtime.Open(runtime.DefaultConfig(cache))
 	require.NoError(t, err)
-	candidate, err := store.BeginInstall(context.Background(), m)
+	options := runtime.ReleaseInstallOptions{
+		Operation: runtime.InstallRelease,
+		Updates:   runtime.ManualUpdates,
+	}
+	candidate, err := store.BeginPublishedInstall(context.Background(), options, cfg.ReleaseLoader(manifest, false))
 	require.NoError(t, err)
 	require.NoError(t, candidate.Import(context.Background(), archive))
 	require.NoError(t, candidate.Select())
+	m := candidate.Manifest()
 	require.NoError(t, candidate.Close())
 	require.NoError(t, store.Close())
 	return root, cache, manifest, archive, m

@@ -346,8 +346,17 @@ func TestNativeReadyStateNeverReinitializesMissingProof(t *testing.T) {
 	require.Error(t, f.control.CloseAdmission(ctx, f.inspect(t)))
 }
 
+func TestNativeIncompleteOwnershipProofIsNamed(t *testing.T) {
+	f := newNativeFixture(t)
+	layout := filepath.Join(f.config.ControlPath, "owners", layoutName)
+	require.NoError(t, os.WriteFile(layout, []byte("{\"format\":2,\"phase\":\"initializing\"}\n"), 0600))
+	data, err := f.command(t, "inspect", nil).CombinedOutput()
+	require.Error(t, err)
+	require.Contains(t, string(data), "native ownership proof: runtime initialization is incomplete")
+}
+
 func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
-	for _, damage := range []string{"writable-file", "writable-ancestor", "foreign-owner", "misbound", "external-link"} {
+	for _, damage := range []string{"writable-file", "writable-ancestor", "foreign-owner", "misbound", "external-link", "owner-only-execute"} {
 		t.Run(damage, func(t *testing.T) {
 			f := newNativeFixture(t)
 			switch damage {
@@ -361,6 +370,9 @@ func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
 				require.NoError(t, os.WriteFile(filepath.Join(f.config.PayloadPath, "chrome"), []byte("#!/bin/sh\nexit 0\n"), 0755))
 			case "external-link":
 				require.NoError(t, os.Symlink("/bin/true", filepath.Join(f.config.PayloadPath, "outside")))
+			case "owner-only-execute":
+				// Only root could execute it; the service UID never can.
+				require.NoError(t, os.Chmod(filepath.Join(f.config.PayloadPath, f.manifest.Layout.Browser), 0744))
 			}
 			called := false
 			err := f.control.QualifyAndReady(context.Background(), f.inspect(t), func(context.Context, Manifest) error { called = true; return nil })

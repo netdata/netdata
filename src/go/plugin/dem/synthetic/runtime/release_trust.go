@@ -21,8 +21,8 @@ import (
 
 // These bounds apply before parsing attacker-controlled OpenPGP data. Public
 // package key history fits within the metadata bound; signatures contain one packet.
-const ReleaseKeyringLimit = 1 << 20
-const ReleaseSignatureLimit = 64 << 10
+const releaseKeyringLimit = 1 << 20
+const releaseSignatureLimit = 64 << 10
 const ReleaseKeyringURL = "https://repository.netdata.cloud/netdatabot.gpg.key"
 
 // ReleaseTrust is scoped to one preparation attempt, never persisted or refreshed
@@ -40,7 +40,7 @@ func validateReleaseTrust(trusted *ReleaseTrust) error {
 // ParseReleaseKeyring accepts only public key packets, identities and signatures.
 // Expired/revoked historical keys are retained; validity is checked for the signer.
 func ParseReleaseKeyring(data []byte) (*ReleaseTrust, error) {
-	if len(data) == 0 || len(data) > ReleaseKeyringLimit {
+	if len(data) == 0 || len(data) > releaseKeyringLimit {
 		return nil, errors.New("runtime public keyring exceeds protocol size limit or is empty")
 	}
 	binary := data
@@ -55,8 +55,8 @@ func ParseReleaseKeyring(data []byte) (*ReleaseTrust, error) {
 		if err != nil || block.Type != openpgp.PublicKeyType {
 			return nil, errors.New("invalid public OpenPGP armor")
 		}
-		binary, err = io.ReadAll(io.LimitReader(block.Body, ReleaseKeyringLimit+1))
-		if err != nil || len(binary) > ReleaseKeyringLimit {
+		binary, err = io.ReadAll(io.LimitReader(block.Body, releaseKeyringLimit+1))
+		if err != nil || len(binary) > releaseKeyringLimit {
 			return nil, errors.New("invalid public OpenPGP armor body")
 		}
 	}
@@ -100,7 +100,7 @@ func ReadReleaseKeyring(path string) (*ReleaseTrust, error) {
 }
 
 func readReleaseKeyring(reader io.Reader) (*ReleaseTrust, error) {
-	data, err := io.ReadAll(io.LimitReader(reader, ReleaseKeyringLimit+1))
+	data, err := io.ReadAll(io.LimitReader(reader, releaseKeyringLimit+1))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func verifyReleaseSignature(payload, signature []byte, trust *ReleaseTrust) erro
 	if err := validateReleaseTrust(trust); err != nil {
 		return err
 	}
-	if len(signature) == 0 || len(signature) > ReleaseSignatureLimit {
+	if len(signature) == 0 || len(signature) > releaseSignatureLimit {
 		return errors.New("invalid runtime release signature size")
 	}
 	reader := bytes.NewReader(signature)
