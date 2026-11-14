@@ -8,7 +8,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
@@ -22,7 +22,7 @@ import (
 // readiness: qualify must reject it.
 func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	t.Helper()
-	b := demruntimetest.NewBundle(t, "cli-fixture")
+	b := browserruntimetest.NewBundle(t, "cli-fixture")
 	manifest := browserruntime.Manifest{
 		Format:   1,
 		Contract: 2,

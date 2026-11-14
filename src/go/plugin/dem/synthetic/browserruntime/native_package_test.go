@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,7 +97,7 @@ func TestPrepareNativePackageFailuresNeverComplete(t *testing.T) {
 			case "bounds":
 				m.Archive.Entries++
 			case "native metadata":
-				m.Archive, data = archiveFixture(t, []demruntimetest.Entry{{Name: "native.json", Contents: []byte(`{"format":1}`), Mode: 0644}})
+				m.Archive, data = archiveFixture(t, []browserruntimetest.Entry{{Name: "native.json", Contents: []byte(`{"format":1}`), Mode: 0644}})
 			}
 			archive := filepath.Join(t.TempDir(), "archive")
 			require.NoError(t, os.WriteFile(archive, data, 0600))
@@ -143,7 +143,7 @@ func TestPrepareNativePackageRejectsNativeLayoutThroughSymlink(t *testing.T) {
 	// requires each declared executable/data layout path to have plain parents.
 	m.Layout.Loader = "alias/loader.so"
 	program := append(make([]byte, 32), m.Bindings[0].Expected...)
-	entries := []demruntimetest.Entry{
+	entries := []browserruntimetest.Entry{
 		{Name: m.Layout.Node, Contents: program, Mode: 0755},
 		{Name: m.Layout.Browser, Contents: program, Mode: 0755},
 		{Name: "lib/loader.so", Contents: []byte("loader"), Mode: 0755},

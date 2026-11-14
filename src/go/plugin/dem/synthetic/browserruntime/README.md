@@ -210,7 +210,7 @@ Tests cover archive bounds/path handling, interpreter binding, selection/activat
 idle and pressure protection, serialization, refused uninstall, publication failure,
 process death, uncertain uses, receipt recovery and boot provenance. Native admission
 tests need root and a `netdata` account and otherwise skip. Runtime, host, CLI and
-release-tool tests share one synthetic archive builder, `internal/demruntimetest`.
+release-tool tests share one synthetic archive builder, `internal/browserruntimetest`.
 `DEM_RUNTIME_TEST_HELPER` enables real supervisor receipt tests; run under the same
 unprivileged identity as the helper. Real CLI qualification covers journeys and
 Lighthouse. Filesystem fault tests do not simulate physical power loss or establish

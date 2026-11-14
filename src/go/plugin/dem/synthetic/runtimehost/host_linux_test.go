@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
@@ -44,7 +44,7 @@ func installBundle(t *testing.T, store *browserruntime.Store, version string) br
 // qualification.
 func publishedBundle(t *testing.T, version string, sequence uint64) (browserruntime.Release, []byte) {
 	t.Helper()
-	b := demruntimetest.NewBundle(t, version)
+	b := browserruntimetest.NewBundle(t, version)
 	m := browserruntime.Manifest{
 		Format:   1,
 		Contract: 2,

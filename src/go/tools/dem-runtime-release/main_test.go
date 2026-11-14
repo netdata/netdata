@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/assert"
@@ -198,7 +198,7 @@ func TestStageNativeUsesBuilderManifestWithoutSigningKey(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
 			f := newFixture(t, arch)
-			b := demruntimetest.NewBundle(t, "stage-"+arch)
+			b := browserruntimetest.NewBundle(t, "stage-"+arch)
 			f.manifest.Layout = browserruntime.Layout(b.Layout)
 			f.manifest.Bindings = nil
 			for _, binding := range b.Bindings {

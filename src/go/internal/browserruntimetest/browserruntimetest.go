@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package demruntimetest builds synthetic DEM browser-runtime archives without
+// Package browserruntimetest builds synthetic DEM browser-runtime archives without
 // runtime dependencies, so the runtime store, its host and the commands that
 // administer it test against one payload.
-package demruntimetest
+package browserruntimetest
 
 import (
 	"archive/tar"

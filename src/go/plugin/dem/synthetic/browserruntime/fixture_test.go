@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +17,7 @@ import (
 // bundleFixture is the shared payload described by a manifest for this host.
 func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 	t.Helper()
-	b := demruntimetest.NewBundle(t, label)
+	b := browserruntimetest.NewBundle(t, label)
 	m := Manifest{
 		Format:   1,
 		Contract: 2,
@@ -34,9 +34,9 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 	return m, b.Data
 }
 
-func archiveFixture(t testing.TB, entries []demruntimetest.Entry) (Archive, []byte) {
+func archiveFixture(t testing.TB, entries []browserruntimetest.Entry) (Archive, []byte) {
 	t.Helper()
-	a := demruntimetest.NewArchive(t, entries)
+	a := browserruntimetest.NewArchive(t, entries)
 	return Archive(a.Bounds), a.Data
 }
 

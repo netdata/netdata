@@ -13,12 +13,12 @@ import (
 	"testing"
 
 	"github.com/klauspost/compress/zstd"
-	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/stretchr/testify/require"
 )
 
 func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
-	cases := map[string][]demruntimetest.Entry{
+	cases := map[string][]browserruntimetest.Entry{
 		"escape":           {{Name: "../outside", Contents: []byte("no"), Mode: 0600}},
 		"absolute":         {{Name: "/outside", Contents: []byte("no"), Mode: 0600}},
 		"hardlink":         {{Name: "alias", Link: "file", Kind: tar.TypeLink}},
@@ -71,7 +71,7 @@ func TestArchiveRejectsUnsafeAndMismatchedInput(t *testing.T) {
 }
 
 func TestArchiveZstdIntegrityAndBounds(t *testing.T) {
-	a, compressed := archiveFixture(t, []demruntimetest.Entry{{Name: "file", Contents: []byte("payload"), Mode: 0600}})
+	a, compressed := archiveFixture(t, []browserruntimetest.Entry{{Name: "file", Contents: []byte("payload"), Mode: 0600}})
 	decoder, err := zstd.NewReader(nil)
 	require.NoError(t, err)
 	raw, err := decoder.DecodeAll(compressed, nil)
