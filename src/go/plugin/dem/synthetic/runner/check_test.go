@@ -6,9 +6,12 @@ package runner
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -270,4 +273,41 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 	require.NoError(t, receive(t, qualification))
 	close(release)
 	require.Equal(t, synthetic.Success, receive(t, monitorDone).Run.Outcome)
+}
+
+// TestCheckResponseBounds pins the --check stdout cap and the stderr
+// diagnostic kept from a failing check.
+func TestCheckResponseBounds(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	reply := fmt.Sprintf(`{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+	tests := map[string]struct {
+		stdout, stderr string
+		failed         bool
+		err            string
+	}{
+		"reply at limit":     {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
+		"reply over limit":   {stdout: reply + strings.Repeat(" ", 4097-len(reply)), err: "prepared runtime check: runtime check response exceeds 4096 bytes"},
+		"clipped diagnostic": {stderr: strings.Repeat("z", 3*TextLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", TextLimit) + ")"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, _, _ := testEngine(t)
+			e.start = starter(t, func(_ context.Context, _ []string, _ []byte, out, stderr *os.File) ndexec.TreeResult {
+				_, _ = io.WriteString(out, tc.stdout)
+				_, _ = io.WriteString(stderr, tc.stderr)
+				if tc.failed {
+					return ndexec.TreeResult{Drained: true, Err: errors.New("exit status 1")}
+				}
+				return ndexec.TreeResult{Drained: true}
+			})
+			err := e.Check(t.Context(), synthetic.Journey)
+			if tc.err == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.EqualError(t, err, tc.err)
+			}
+		})
+	}
 }

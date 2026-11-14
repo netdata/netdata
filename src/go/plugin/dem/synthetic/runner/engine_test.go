@@ -55,6 +55,22 @@ func (h *fakeHistory) Sync(context.Context) error {
 type observedArtifacts struct {
 	*artifacts.Store
 	finalized atomic.Int32
+	beginErr  error
+	mu        sync.Mutex
+	begun     []string
+}
+
+func (a *observedArtifacts) Begin(runID, jobID, vnodeGUID string) (string, error) {
+	if a.beginErr != nil {
+		return "", a.beginErr
+	}
+	work, err := a.Store.Begin(runID, jobID, vnodeGUID)
+	if err == nil {
+		a.mu.Lock()
+		a.begun = append(a.begun, work)
+		a.mu.Unlock()
+	}
+	return work, err
 }
 
 func (a *observedArtifacts) Finalize(
@@ -824,4 +840,256 @@ func TestExecutionSnapshotsAssociationBeforeLaunchAndThroughCompletion(t *testin
 	result := engine.Execute(ctx, request, nil)
 	assert.Equal(t, synthetic.Cancelled, result.Run.Outcome)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", result.Run.VnodeGUID)
+}
+
+// requireSlotFree proves the attempt released its admission slot.
+func requireSlotFree(t *testing.T, e *Engine) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	job, err := e.acquire(ctx, executionKey{jobID: "slot-probe"})
+	require.NoError(t, err, "the attempt kept its admission slot")
+	e.release(job)
+}
+
+// TestExecutionExits pins every way an attempt ends: its outcome, the history
+// phases it records, whether its run work directory is finalized, and whether
+// the process tree is known drained.
+func TestExecutionExits(t *testing.T) {
+	failure := errors.New("fixture failure")
+	type want struct {
+		outcome   synthetic.Outcome
+		reason    synthetic.TerminationReason
+		err       string
+		phases    []string
+		finalized int32
+		work      bool // a run work directory was created
+		kept      bool // the work directory survives the attempt
+		undrained bool
+		admitted  bool
+		completed bool
+	}
+	unstarted := want{completed: true}
+	prelaunch := want{outcome: synthetic.Error, phases: []string{"start", "complete"}, admitted: true, completed: true}
+	launched := want{phases: []string{"start", "complete"}, finalized: 1, work: true, admitted: true, completed: true}
+	with := func(base want, change func(*want)) want { change(&base); return base }
+	waitForStop := func(ctx context.Context, _ []string, _ []byte, _, _ *os.File) ndexec.TreeResult {
+		<-ctx.Done()
+		return ndexec.TreeResult{Drained: true, Err: ctx.Err()}
+	}
+	tests := map[string]struct {
+		setup func(*Engine, *observedArtifacts, *synthetic.Request) context.Context
+		want  want
+	}{
+		"poisoned before admission": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.poison(failure)
+				return t.Context()
+			},
+			want: with(unstarted, func(w *want) {
+				w.outcome, w.err, w.undrained = synthetic.Error, ndexec.ErrTreeNotDrained.Error(), true
+			}),
+		},
+		"cancelled before admission": {
+			setup: func(*Engine, *observedArtifacts, *synthetic.Request) context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				cancel()
+				return ctx
+			},
+			want: with(unstarted, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Cancelled, synthetic.CallerCancelled, "context canceled"
+			}),
+		},
+		"expired before admission": {
+			setup: func(*Engine, *observedArtifacts, *synthetic.Request) context.Context {
+				ctx, cancel := context.WithDeadline(t.Context(), time.Now().Add(-time.Second))
+				t.Cleanup(cancel)
+				return ctx
+			},
+			want: with(unstarted, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Cancelled, synthetic.CallerDeadline, "context deadline exceeded"
+			}),
+		},
+		"invalid request": {
+			setup: func(_ *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
+				r.Script = " "
+				return t.Context()
+			},
+			want: with(prelaunch, func(w *want) { w.err = "script must not be blank" }),
+		},
+		"platform rejected": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.platform = func() error { return failure }
+				return t.Context()
+			},
+			want: with(prelaunch, func(w *want) { w.err = failure.Error() }),
+		},
+		"runtime unavailable": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.source = sourceFunc(func() (Use, error) { return nil, failure })
+				return t.Context()
+			},
+			want: with(prelaunch, func(w *want) { w.err = failure.Error() }),
+		},
+		"untrusted release": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				paths := e.source.(fixtureRuntime).Paths
+				paths.Identity.SHA256 = "not-a-digest"
+				e.source = fixtureRuntime{Paths: paths}
+				return t.Context()
+			},
+			want: with(prelaunch, func(w *want) { w.err = "runtime source supplied an invalid trusted release identity" }),
+		},
+		"work directory": {
+			setup: func(_ *Engine, a *observedArtifacts, _ *synthetic.Request) context.Context {
+				a.beginErr = failure
+				return t.Context()
+			},
+			want: with(prelaunch, func(w *want) { w.err = "create run work directory: " + failure.Error() }),
+		},
+		"oversize request": {
+			setup: func(_ *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
+				r.Script = strings.Repeat("x", FrameMaxBytes)
+				return t.Context()
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.err = synthetic.Error, "runner request exceeds 4 MiB transport limit"
+			}),
+		},
+		"launch failure": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+					return nil, failure
+				}
+				return t.Context()
+			},
+			want: with(launched, func(w *want) { w.outcome, w.err = synthetic.Error, failure.Error() }),
+		},
+		"launch after attempt deadline": {
+			setup: func(e *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
+				r.Timeout = 20 * time.Millisecond
+				e.start = func(ctx context.Context, _ ndexec.TreeOptions, _ string, _ ...string) (treeProcess, error) {
+					<-ctx.Done()
+					return nil, ctx.Err()
+				}
+				return t.Context()
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Timeout, synthetic.ExecutionDeadline, "context deadline exceeded"
+			}),
+		},
+		"launch after caller cancellation": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+					cancel()
+					return nil, failure
+				}
+				return ctx
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Cancelled, synthetic.CallerCancelled, failure.Error()
+			}),
+		},
+		"reported success": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.start = starter(t, resultPayload(success()))
+				return t.Context()
+			},
+			want: with(launched, func(w *want) { w.outcome = synthetic.Success }),
+		},
+		"no terminal result": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
+					return ndexec.TreeResult{Drained: true}
+				})
+				return t.Context()
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.err = synthetic.Error, "runner exited without a terminal result: no result"
+			}),
+		},
+		"attempt deadline": {
+			setup: func(e *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
+				r.Timeout = 50 * time.Millisecond
+				e.start = starter(t, waitForStop)
+				return t.Context()
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Timeout, synthetic.ExecutionDeadline, "overall execution deadline exceeded"
+			}),
+		},
+		"caller deadline": {
+			setup: func(e *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
+				r.Timeout = 10 * time.Second
+				ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+				t.Cleanup(cancel)
+				e.start = starter(t, waitForStop)
+				return ctx
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Timeout, synthetic.CallerDeadline, "caller deadline exceeded"
+			}),
+		},
+		"caller cancellation": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+					cancel()
+					return waitForStop(ctx, args, raw, out, stderr)
+				})
+				return ctx
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Cancelled, synthetic.CallerCancelled, "execution cancelled"
+			}),
+		},
+		"undrained tree": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
+					return ndexec.TreeResult{Err: failure}
+				})
+				return t.Context()
+			},
+			want: want{
+				outcome:   synthetic.Error,
+				err:       "process-tree completion is unverified: " + failure.Error(),
+				phases:    []string{"start"},
+				work:      true,
+				kept:      true,
+				undrained: true,
+				admitted:  true,
+			},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, history, a := testEngine(t)
+			e.start = func(context.Context, ndexec.TreeOptions, string, ...string) (treeProcess, error) {
+				t.Error("unexpected launch")
+				return nil, errors.New("unexpected launch")
+			}
+			request := journey()
+			ctx := tc.setup(e, a, &request)
+			got := e.Execute(ctx, request, nil)
+
+			run := got.Run
+			assert.Equal(t, tc.want.outcome, run.Outcome)
+			assert.Equal(t, tc.want.reason, run.TerminationReason)
+			assert.Equal(t, tc.want.err, run.Error)
+			assert.Equal(t, !tc.want.undrained, got.Drained)
+			assert.Equal(t, tc.want.admitted, run.StartedUS > 0, "admission timestamp")
+			assert.Equal(t, tc.want.completed, run.CompletedUS > 0, "completion timestamp")
+			assert.Equal(t, tc.want.phases, history.phases)
+			assert.Equal(t, tc.want.finalized, a.finalized.Load())
+			require.Equal(t, tc.want.work, len(a.begun) == 1, "run work directory")
+			if tc.want.work {
+				_, err := os.Stat(a.begun[0])
+				assert.Equal(t, tc.want.kept, err == nil, "work directory kept: %v", err)
+			}
+			if !tc.want.undrained {
+				requireSlotFree(t, e)
+			}
+		})
+	}
 }
