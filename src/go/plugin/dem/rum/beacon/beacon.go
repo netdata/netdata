@@ -56,6 +56,16 @@ func IsFrustration(name string) bool {
 	return name == RageClickEvent || name == DeadClickEvent || name == ErrorClickEvent
 }
 
+// Location is the receiver-resolved approximate client location. Lat and Lon
+// are rounded to one decimal degree and valid only when HasGeo.
+type Location struct {
+	Country string // ISO 3166-1 alpha-2, "" when unknown
+	City    string // "" when unknown
+	Lat     float64
+	Lon     float64
+	HasGeo  bool
+}
+
 // Beacon is one accepted Faro payload after origin/limit checks, URL
 // stripping and GeoIP. Client IPs never appear here.
 type Beacon struct {

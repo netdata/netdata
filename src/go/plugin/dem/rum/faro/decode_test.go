@@ -245,7 +245,7 @@ func TestParseFaro(t *testing.T) {
 				Options{
 					Site:               "s",
 					Now:                now,
-					Country:            "GR",
+					Location:           beacon.Location{Country: "GR"},
 					ConsoleLogs:        tc.consoleLogs,
 					EventLogs:          true,
 					FrustrationSignals: true,
@@ -318,13 +318,15 @@ func TestParseFaroSetsGeoFields(t *testing.T) {
 	got, err := Decode(
 		[]byte(`{}`),
 		Options{
-			Site:    "s",
-			Now:     now,
-			Country: "GR",
-			City:    "Athens",
-			Lat:     38.0,
-			Lon:     23.7,
-			HasGeo:  true,
+			Site: "s",
+			Now:  now,
+			Location: beacon.Location{
+				Country: "GR",
+				City:    "Athens",
+				Lat:     38.0,
+				Lon:     23.7,
+				HasGeo:  true,
+			},
 		},
 	)
 	if err != nil {

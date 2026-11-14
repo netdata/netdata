@@ -123,23 +123,20 @@ func (s *Server) collect(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	var country, city string
-	var lat, lon float64
-	var hasGeo bool
-	if cfg.GeolocationMode() != config.GeolocationOff && s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
-		country, city, lat, lon, hasGeo = s.geo.Lookup(ipKey)
+	var location beacon.Location
+	mode := cfg.GeolocationMode()
+	if mode != config.GeolocationOff && s.geo != nil && ip.IsValid() && !ip.IsLoopback() && !ip.IsPrivate() {
+		location = s.geo.Lookup(ipKey)
 	}
-	if cfg.GeolocationMode() != config.GeolocationCity {
-		city, lat, lon, hasGeo = "", 0, 0, false
+	if mode != config.GeolocationCity {
+		location = beacon.Location{
+			Country: location.Country,
+		}
 	}
 	b, err := faro.Decode(body, faro.Options{
 		Site:               cfg.Name,
 		Now:                now,
-		Country:            country,
-		City:               city,
-		Lat:                lat,
-		Lon:                lon,
-		HasGeo:             hasGeo,
+		Location:           location,
 		EventLogs:          cfg.EventLogsOn(),
 		FrustrationSignals: cfg.FrustrationSignalsOn(),
 		Redactor:           route.redactor,

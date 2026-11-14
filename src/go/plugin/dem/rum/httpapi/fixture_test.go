@@ -31,7 +31,7 @@ type fixtureServer struct {
 	sink    Processor
 }
 
-func newFixture(cfg *fixtureConfig, sink Processor, geo CountryResolver) *fixtureServer {
+func newFixture(cfg *fixtureConfig, sink Processor, geo Locator) *fixtureServer {
 	routes := &fixtureRoutes{}
 	s := &fixtureServer{
 		Server:  New(&cfg.Receiver, routes, geo),

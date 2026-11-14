@@ -18,9 +18,15 @@ import (
 
 type samplingGeo struct{ calls atomic.Int64 }
 
-func (g *samplingGeo) Lookup(string) (string, string, float64, float64, bool) {
+func (g *samplingGeo) Lookup(string) beacon.Location {
 	g.calls.Add(1)
-	return "GR", "Athens", 38, 23.7, true
+	return beacon.Location{
+		Country: "GR",
+		City:    "Athens",
+		Lat:     38,
+		Lon:     23.7,
+		HasGeo:  true,
+	}
 }
 
 func samplingConfig(t *testing.T, rate float64) *fixtureConfig {

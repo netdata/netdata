@@ -112,11 +112,7 @@ var vitalKeys = map[string]string{
 type Options struct {
 	Site               string
 	Now                time.Time
-	Country            string
-	City               string
-	Lat                float64
-	Lon                float64
-	HasGeo             bool
+	Location           beacon.Location
 	EventLogs          bool
 	FrustrationSignals bool
 	Redactor           *redact.Redactor
@@ -155,11 +151,11 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		BrowserVersion: opt.text(p.Meta.Browser.Version, maxNameLen),
 		OS:             opt.text(p.Meta.Browser.OS, maxNameLen),
 		Device:         beacon.DeviceDesktop,
-		Country:        opt.Country,
-		City:           opt.City,
-		Lat:            opt.Lat,
-		Lon:            opt.Lon,
-		HasGeo:         opt.HasGeo,
+		Country:        opt.Location.Country,
+		City:           opt.Location.City,
+		Lat:            opt.Location.Lat,
+		Lon:            opt.Location.Lon,
+		HasGeo:         opt.Location.HasGeo,
 		View:           opt.view(p.Meta.View.Name),
 		AppVersion:     opt.text(p.Meta.App.Version, maxNameLen),
 		UserID:         opt.text(p.Meta.User.ID, maxUserIDLen),

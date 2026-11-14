@@ -56,8 +56,10 @@ func (r *recSink) snapshot() (int, map[string]int) {
 
 type fixedGeo string
 
-func (g fixedGeo) Lookup(string) (string, string, float64, float64, bool) {
-	return string(g), "", 0, 0, false
+func (g fixedGeo) Lookup(string) beacon.Location {
+	return beacon.Location{
+		Country: string(g),
+	}
 }
 
 func testCfg() *fixtureConfig {
@@ -92,7 +94,7 @@ func newTestServer(
 	t *testing.T,
 	cfg *fixtureConfig,
 	sink Processor,
-	geo CountryResolver,
+	geo Locator,
 ) (*fixtureServer, *httptest.Server) {
 	t.Helper()
 	s := newFixture(cfg, sink, geo)
@@ -495,17 +497,11 @@ func TestGeoIPAppliedOnlyForPublicClients(t *testing.T) {
 	}
 }
 
-// fullGeo is a CountryResolver stub carrying city/lat/lon too, for asserting the server → faro.Decode wiring end to end
-// (faro_test.go covers faro.Decode's own decoding in isolation).
-type fullGeo struct {
-	country, city string
-	lat, lon      float64
-	hasGeo        bool
-}
+// fullGeo is a Locator stub carrying city/lat/lon too, for asserting the server → faro.Decode wiring end to end
+// (decode_test.go covers faro.Decode's own decoding in isolation).
+type fullGeo beacon.Location
 
-func (g fullGeo) Lookup(string) (string, string, float64, float64, bool) {
-	return g.country, g.city, g.lat, g.lon, g.hasGeo
-}
+func (g fullGeo) Lookup(string) beacon.Location { return beacon.Location(g) }
 
 func TestGeoCityLatLonAppliedFromResolver(t *testing.T) {
 	cfg := testCfg()
@@ -518,11 +514,11 @@ func TestGeoCityLatLonAppliedFromResolver(t *testing.T) {
 		cfg,
 		sink,
 		fullGeo{
-			country: "GR",
-			city:    "Athens",
-			lat:     38.0,
-			lon:     23.7,
-			hasGeo:  true,
+			Country: "GR",
+			City:    "Athens",
+			Lat:     38.0,
+			Lon:     23.7,
+			HasGeo:  true,
 		},
 	)
 	post(
