@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-package aggregate_test
+
+package aggregate
 
 import (
+	"fmt"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 type discardHistory struct{}
 
-func (discardHistory) Event(aggregate.HistoryEvent) {}
+func (discardHistory) Event(HistoryEvent) {}
 
 // Fixed experiences with monotonically newer reports measure real update work.
 // These fixed receipt times exercise replacement without heap reordering.
@@ -25,9 +26,9 @@ func BenchmarkIngest(b *testing.B) {
 			name = "investigate"
 		}
 		b.Run(name, func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+			a := New(5*time.Minute, SiteCfg{
 				VnodeGUID: "11111111-1111-4111-8111-111111111111",
-				Investigate: aggregate.InvestigateCfg{
+				Investigate: InvestigateCfg{
 					Rate: 1,
 				},
 				Name:       "shop",
@@ -62,46 +63,14 @@ func BenchmarkIngest(b *testing.B) {
 		})
 	}
 }
-func BenchmarkSnapshot(b *testing.B) {
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
-		VnodeGUID: "11111111-1111-4111-8111-111111111111",
-		Investigate: aggregate.InvestigateCfg{
-			Rate: 1,
-		},
-		Name:       "shop",
-		PageGroups: 20,
-		Countries:  20,
-	})
-	for i := range 100 {
-		a.Ingest(
-			&beacon.Beacon{
-				ExperienceID: strconv.Itoa(i),
-				Site:         "shop",
-				SessionID:    "browser",
-				Path:         "/products",
-				PageGroup:    "/products",
-				Browser:      "Chrome",
-				Device:       "desktop",
-				Country:      "GR",
-				Received:     time.Now(),
-				Vitals:       []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64(i + 1)}},
-			},
-		)
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		a.Snapshot()
-	}
-}
 
 // Error ingestion adds one immutable metadata object per error to retain detail
 // for later session promotion. Work stays bounded by the beacon and live ring;
 // it does not traverse persisted history. Timings are local trends, not CI gates.
 func BenchmarkIngestErrors(b *testing.B) {
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+	a := New(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",
-		Investigate: aggregate.InvestigateCfg{
+		Investigate: InvestigateCfg{
 			Rate: 1,
 		},
 		Name:       "shop",
@@ -134,9 +103,9 @@ func BenchmarkIngestErrors(b *testing.B) {
 // A report without a session has no timeline: an investigated error goes
 // straight to history without retaining session detail.
 func BenchmarkIngestSessionlessErrors(b *testing.B) {
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+	a := New(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",
-		Investigate: aggregate.InvestigateCfg{
+		Investigate: InvestigateCfg{
 			Rate: 1,
 		},
 		Name:       "shop",
@@ -167,7 +136,7 @@ func BenchmarkIngestSessionlessErrors(b *testing.B) {
 
 // Replayed SDK batches must not allocate work proportional to retained state.
 func BenchmarkIngestDuplicate(b *testing.B) {
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+	a := New(5*time.Minute, SiteCfg{
 		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 		Name:       "shop",
 		PageGroups: 20,
@@ -192,7 +161,7 @@ func BenchmarkIngestDuplicate(b *testing.B) {
 func BenchmarkIngestDuplicateRetained(b *testing.B) {
 	for _, size := range []int{1, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+			a := New(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -216,12 +185,41 @@ func BenchmarkIngestDuplicateRetained(b *testing.B) {
 	}
 }
 
+// Cyclic updates exercise receipt-order maintenance at a full retained population.
+// Receipt updates require O(log retained) heap work; duplicate checks remain O(1).
+func BenchmarkRetainedUpdate(b *testing.B) {
+	a := New(5*time.Minute, SiteCfg{
+		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
+		Name:       "shop",
+		PageGroups: 20,
+		Countries:  20,
+	})
+	inputs := make([]beacon.Beacon, 10000)
+	for i := range inputs {
+		inputs[i] = beacon.Beacon{
+			Site:         "shop",
+			ExperienceID: strconv.Itoa(i),
+			Received:     time.Now(),
+			Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
+		}
+		a.Ingest(&inputs[i])
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v := &inputs[i%len(inputs)]
+		v.Received = time.Now()
+		v.Vitals[0].Revision++
+		a.Ingest(v)
+	}
+}
+
 // Site-list reads need counts, not facet materialization. Allocation growth
 // with retained observations would make polling compete with ingestion.
 func BenchmarkActivity(b *testing.B) {
 	for _, size := range []int{100, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+			a := New(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -254,32 +252,88 @@ func BenchmarkActivity(b *testing.B) {
 	}
 }
 
-// Cyclic updates exercise receipt-order maintenance at a full retained population.
-// Receipt updates require O(log retained) heap work; duplicate checks remain O(1).
-func BenchmarkRetainedUpdate(b *testing.B) {
-	a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
-		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
+func BenchmarkSnapshot(b *testing.B) {
+	a := New(5*time.Minute, SiteCfg{
+		VnodeGUID: "11111111-1111-4111-8111-111111111111",
+		Investigate: InvestigateCfg{
+			Rate: 1,
+		},
 		Name:       "shop",
 		PageGroups: 20,
 		Countries:  20,
 	})
-	inputs := make([]beacon.Beacon, 10000)
-	for i := range inputs {
-		inputs[i] = beacon.Beacon{
-			Site:         "shop",
-			ExperienceID: strconv.Itoa(i),
-			Received:     time.Now(),
-			Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
-		}
-		a.Ingest(&inputs[i])
+	for i := range 100 {
+		a.Ingest(
+			&beacon.Beacon{
+				ExperienceID: strconv.Itoa(i),
+				Site:         "shop",
+				SessionID:    "browser",
+				Path:         "/products",
+				PageGroup:    "/products",
+				Browser:      "Chrome",
+				Device:       "desktop",
+				Country:      "GR",
+				Received:     time.Now(),
+				Vitals:       []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64(i + 1)}},
+			},
+		)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		v := &inputs[i%len(inputs)]
-		v.Received = time.Now()
-		v.Vitals[0].Revision++
-		a.Ingest(v)
+	for range b.N {
+		a.Snapshot()
+	}
+}
+
+// Sparse activity and attributed measurements exercise the per-read group
+// allocation envelope independently of the dense-window benchmark. Capture is
+// O(retained observations + facet memberships); sorting is per distribution.
+// Timings are local trends, not CI gates. No cross-read state is retained.
+func BenchmarkSnapshotPopulations(b *testing.B) {
+	for _, shape := range []string{"empty", "activity", "sparse", "attributed"} {
+		b.Run(shape, func(b *testing.B) {
+			a, now := newAgg(5*time.Minute, SiteCfg{
+				Name:       "s",
+				PageGroups: 20,
+				Countries:  20,
+			})
+			if shape != "empty" {
+				for i := range 10000 {
+					input := mk(*now, fmt.Sprint(i), "/page")
+					input.PageGroup = fmt.Sprintf("/page_%d", i%1000)
+					input.Browser = fmt.Sprintf("browser_%d", i%7)
+					input.Country = fmt.Sprintf("country_%d", i%31)
+					input.AppVersion = fmt.Sprintf("version_%d", i%37)
+					if shape == "attributed" || shape == "sparse" && i%10 == 0 {
+						for j, name := range beacon.Vitals {
+							if shape == "sparse" && j != 0 {
+								break
+							}
+							value := float64((i*37 + j*23) % 10000)
+							if name == beacon.CLS {
+								value /= 10000
+							}
+							metric := v(name, value)
+							metric.Element = fmt.Sprintf("#element_%d", i%11)
+							input.Vitals = append(input.Vitals, metric)
+						}
+					}
+					a.Ingest(input)
+				}
+			}
+			for _, kind := range []string{"snapshot", "pages"} {
+				b.Run(kind, func(b *testing.B) {
+					b.ReportAllocs()
+					for range b.N {
+						if kind == "snapshot" {
+							a.Snapshot()
+						} else {
+							a.Pages("")
+						}
+					}
+				})
+			}
+		})
 	}
 }
 
@@ -288,7 +342,7 @@ func BenchmarkRetainedUpdate(b *testing.B) {
 func BenchmarkHighCardinalityReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+			a := New(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -327,7 +381,7 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 func BenchmarkDenseWindowReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
-			a := aggregate.New(5*time.Minute, aggregate.SiteCfg{
+			a := New(5*time.Minute, SiteCfg{
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,

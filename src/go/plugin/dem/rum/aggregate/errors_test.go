@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -17,6 +18,7 @@ func errBeacon(session, page, browser string, errs ...beacon.Error) *beacon.Beac
 	b.Errors = errs
 	return b
 }
+
 func TestErrorsRankCurrentWindowAndFoldComplement(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	for i := range 15 {
