@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"math"
 	"os"
 	"path/filepath"
 	"testing"
@@ -436,8 +435,6 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 		DroppedEvents: 2,
 		Metrics: &model.LabMetrics{
 			Performance: ptr(0),
-			LCPMS:       ptr(math.NaN()),
-			CLS:         ptr(math.Inf(1)),
 		},
 		CaptureState: "unavailable",
 	}

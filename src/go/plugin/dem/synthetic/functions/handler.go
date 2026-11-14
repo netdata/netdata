@@ -6,7 +6,6 @@ package functions
 import (
 	"context"
 	"errors"
-	"math"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -129,8 +128,10 @@ func timestamp(value int64) any {
 	return value
 }
 
+// number reports an absent measurement as null. Values are finite: the runner
+// validates reported ones, and history JSON cannot hold NaN or infinity.
 func number(value *float64) any {
-	if value == nil || math.IsNaN(*value) || math.IsInf(*value, 0) {
+	if value == nil {
 		return nil
 	}
 	return *value
