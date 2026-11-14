@@ -9,24 +9,25 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-// FrameMaxBytes is the runner protocol's 4 MiB ceiling on the request and on
+// frameMaxBytes is the runner protocol's 4 MiB ceiling on the request and on
 // every record, shared with the JS runner (run.mjs framing limit).
-const FrameMaxBytes = 4 << 20
+const frameMaxBytes = 4 << 20
 
-// EventLimit is the per-run diagnostic event retention documented in the
+// eventLimit is the per-run diagnostic event retention documented in the
 // plugin and runtime READMEs. Later events are counted as dropped; every
 // retained event is stored in the run's history record.
-const EventLimit = 500
+const eventLimit = 500
 
-// TextLimit is the character budget of each diagnostic text, shared with the
+// textLimit is the character budget of each diagnostic text, shared with the
 // JS runner's clipping (protocol.cjs) and documented in its README.
-const TextLimit = 2000
+const textLimit = 2000
 
 const cleanupTimeout = 10 * time.Second
 
@@ -36,8 +37,10 @@ type historyWriter interface {
 	Sync(context.Context) error
 }
 
-type ArtifactStore interface {
-	Begin(string, string, string) (string, error)
+// artifactStore creates each attempt's run work directory and finalizes it:
+// publishing its captures and removing the work.
+type artifactStore interface {
+	Begin(runID, jobID, vnodeGUID string) (string, error)
 	Finalize(context.Context, string, []synthetic.Capture) ([]synthetic.Artifact, error)
 }
 
@@ -45,37 +48,43 @@ type Engine struct {
 	*executionOwner
 	source        Source
 	history       historyWriter
-	unrecorded    bool
-	artifacts     ArtifactStore
+	unrecorded    bool // rehearsal and qualification views record no history
+	artifacts     artifactStore
 	start         startFunc
 	platform      func() error
 	checks        *checkOwner
 	qualification bool
 }
 
-func New(source Source, history historyWriter, artifacts ArtifactStore, concurrency int) (*Engine, error) {
+// New returns the monitoring engine. Every monitored attempt records history
+// and owns a run work directory, so both owners are required.
+func New(source Source, history historyWriter, artifacts artifactStore, concurrency int) (*Engine, error) {
 	if concurrency <= 0 {
 		return nil, errors.New("browser concurrency must be positive")
 	}
+	if history == nil || artifacts == nil {
+		return nil, errors.New("runner requires history and artifact owners")
+	}
+	return newEngine(source, history, artifacts, concurrency), nil
+}
+
+func newEngine(source Source, history historyWriter, artifacts artifactStore, concurrency int) *Engine {
 	return &Engine{
-		executionOwner: &executionOwner{
-			limit:    concurrency,
-			jobs:     make(map[executionKey]*admissionJob),
-			fatal:    make(chan error, 1),
-			poisoned: make(chan struct{}),
-		},
-		checks:    &checkOwner{},
-		source:    source,
-		history:   history,
-		artifacts: artifacts,
-		platform:  runtimeAllowed,
+		executionOwner: newExecutionOwner(concurrency),
+		checks:         &checkOwner{},
+		source:         source,
+		history:        history,
+		artifacts:      artifacts,
+		platform:       runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
 		},
-	}, nil
+	}
 }
 
-func (e *Engine) unrecordedView(source Source, artifacts ArtifactStore) *Engine {
+// unrecordedView shares this engine's admission and fatal owner but records no
+// history and uses its own source, artifact store and check coalescing.
+func (e *Engine) unrecordedView(source Source, artifacts artifactStore) *Engine {
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
@@ -99,311 +108,357 @@ func (e *Engine) poison(err error) {
 	})
 }
 
-func (e *Engine) Execute(ctx context.Context, request synthetic.Request, state func(string)) synthetic.Execution {
-	return e.ExecuteScheduled(ctx, request, state, nil)
+// attempt is one execution's mutable record: the redacted run and the run
+// work directory, which exists once created and must then be finalized.
+type attempt struct {
+	request synthetic.Request
+	redact  *textRedactor
+	run     synthetic.Run
+	work    string
 }
 
-// ExecuteScheduled snapshots the latest pending occurrence only after admission.
-// Immediate diagnostics and qualification use Execute without scheduling metadata.
-func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(string), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+func newAttempt(request synthetic.Request) *attempt {
 	redact := newRedactor(request.Secrets)
-	run := synthetic.Run{
-		JobID:        request.JobID(),
-		VnodeGUID:    request.VnodeGUID,
-		Kind:         request.Kind,
-		Name:         redact.text(request.Name),
-		Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
-		Outcome:      synthetic.Error,
-		CaptureState: synthetic.CaptureDisabled,
-		Events:       []synthetic.Event{},
-		Artifacts:    []synthetic.Artifact{},
+	var id [16]byte
+	_, _ = rand.Read(id[:]) // never returns an error since Go 1.24
+	a := &attempt{
+		request: request,
+		redact:  redact,
+		run: synthetic.Run{
+			ID:           hex.EncodeToString(id[:]),
+			JobID:        request.JobID(),
+			VnodeGUID:    request.VnodeGUID,
+			Kind:         request.Kind,
+			Name:         redact.text(request.Name),
+			Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
+			Outcome:      synthetic.Error,
+			CaptureState: synthetic.CaptureDisabled,
+			Events:       []synthetic.Event{},
+			Artifacts:    []synthetic.Artifact{},
+		},
 	}
 	if request.Capture {
-		run.CaptureState = synthetic.CaptureUnavailable
+		a.run.CaptureState = synthetic.CaptureUnavailable
 	}
-	var random [16]byte
-	if _, err := rand.Read(random[:]); err != nil {
-		run.Error = redact.text(err.Error())
-		return synthetic.Execution{
-			Run:     run,
-			Drained: true,
-		}
-	}
-	run.ID = hex.EncodeToString(random[:])
-	finishUnstarted := func(err error, drained bool) synthetic.Execution {
-		if errors.Is(err, context.Canceled) {
-			run.Outcome = synthetic.Cancelled
-			run.TerminationReason = synthetic.CallerCancelled
-		} else if errors.Is(err, context.DeadlineExceeded) {
-			run.TerminationReason = synthetic.CallerDeadline
-			run.Outcome = synthetic.Cancelled
-			if run.StartedUS > 0 {
-				run.Outcome = synthetic.Timeout
-			}
-		}
-		run.Error = redact.text(err.Error())
-		run.CompletedUS = time.Now().UnixMicro()
-		return synthetic.Execution{
-			Run:     run,
-			Drained: drained,
-		}
-	}
-	if e.isPoisoned() {
-		return finishUnstarted(ndexec.ErrTreeNotDrained, false)
-	}
-	if state != nil {
-		state("waiting")
-	}
-	job, err := e.acquire(ctx, executionKey{jobID: request.JobID(), qualification: e.qualification})
+	return a
+}
+
+// execute runs an immediate attempt without scheduling metadata, as
+// rehearsal and qualification do.
+func (e *Engine) execute(ctx context.Context, request synthetic.Request) synthetic.Execution {
+	return e.ExecuteScheduled(ctx, request, nil, nil)
+}
+
+// ExecuteScheduled runs one attempt through admission. admitted, when set,
+// snapshots the latest pending occurrence only after admission. Drained is
+// false when the process tree may still be alive; the slot then stays held.
+func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+	a := newAttempt(request)
+	job, err := e.admit(ctx, request.JobID(), state)
 	if err != nil {
-		return finishUnstarted(err, !errors.Is(err, ndexec.ErrTreeNotDrained))
+		// Nothing ran: no history, no work directory.
+		a.stop(err, ctx, ctx)
+		a.run.Error = a.redact.text(err.Error())
+		a.run.CompletedUS = time.Now().UnixMicro()
+		return synthetic.Execution{Run: a.run, Drained: !errors.Is(err, ndexec.ErrTreeNotDrained)}
 	}
-	drained := true
-	defer func() {
-		if drained {
-			e.release(job)
-		}
-	}()
+	drained := e.runAdmitted(ctx, a, state, admitted)
+	if drained {
+		e.release(job)
+	}
+	return synthetic.Execution{Run: a.run, Drained: drained}
+}
+
+// admit waits for the job's turn at a browser slot. A slot granted after
+// poisoning or after the caller stopped is released again.
+func (e *Engine) admit(ctx context.Context, jobID string, state func(synthetic.JobState)) (*admissionJob, error) {
 	if e.isPoisoned() {
-		return finishUnstarted(ndexec.ErrTreeNotDrained, false)
+		return nil, ndexec.ErrTreeNotDrained
+	}
+	notify(state, synthetic.JobWaiting)
+	job, err := e.acquire(ctx, executionKey{jobID: jobID, qualification: e.qualification})
+	if err != nil {
+		return nil, err
+	}
+	if e.isPoisoned() {
+		e.release(job)
+		return nil, ndexec.ErrTreeNotDrained
 	}
 	if err := ctx.Err(); err != nil {
-		return finishUnstarted(err, true)
+		e.release(job)
+		return nil, err
 	}
+	return job, nil
+}
+
+// runAdmitted runs an admitted attempt to completion and reports whether its
+// process tree is known drained. Every drained path records completion once.
+func (e *Engine) runAdmitted(ctx context.Context, a *attempt, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) (drained bool) {
 	admittedAt := time.Now()
 	if admitted != nil {
 		schedule := admitted(admittedAt)
-		run.ScheduledUS = schedule.DueUS
-		run.QueuedUS = schedule.QueuedUS
+		a.run.ScheduledUS, a.run.QueuedUS = schedule.DueUS, schedule.QueuedUS
 	}
-	run.StartedUS = admittedAt.UnixMicro()
-	attempt, cancel := context.WithTimeout(ctx, request.Timeout)
+	a.run.StartedUS = admittedAt.UnixMicro()
+	attemptCtx, cancel := context.WithTimeout(ctx, a.request.Timeout)
 	defer cancel()
-	if err := synthetic.ValidateRequest(request); err != nil {
-		return e.failAdmitted(&run, err, redact)
+
+	if err := synthetic.ValidateRequest(a.request); err != nil {
+		e.failBeforeStart(a, err)
+		return true
 	}
 	if err := e.platform(); err != nil {
-		return e.failAdmitted(&run, err, redact)
+		e.failBeforeStart(a, err)
+		return true
 	}
 	use, err := e.beginUse()
 	if err != nil {
-		return e.failAdmitted(&run, err, redact)
+		e.failBeforeStart(a, err)
+		return true
 	}
 	defer func() { _ = use.Finish(drained) }()
 	paths := use.Paths()
-	if err := e.checkFiles(request.Kind, paths); err != nil {
-		return e.failAdmitted(&run, err, redact)
-	}
-	if e.artifacts == nil {
-		return e.failAdmitted(&run, errors.New("artifact owner is unavailable"), redact)
+	if err := checkFiles(paths); err != nil {
+		e.failBeforeStart(a, err)
+		return true
 	}
 	identity := paths.Identity
-	run.Runtime = &identity
-	e.save(attempt, synthetic.HistoryStart, &run, redact)
-	work, err := e.artifacts.Begin(run.ID, run.JobID, run.VnodeGUID)
+	a.run.Runtime = &identity
+	e.save(attemptCtx, synthetic.HistoryStart, a)
+
+	raw, err := e.prepareWork(attemptCtx, a, admittedAt)
 	if err != nil {
-		run.Error = redact.text("create run work directory: " + err.Error())
-		e.complete(&run, nil, redact)
-		return synthetic.Execution{
-			Run:     run,
-			Drained: true,
-		}
+		a.run.Error = a.redact.text(err.Error())
+		e.complete(a, nil)
+		return true
 	}
+	captures, drained := e.launch(ctx, attemptCtx, a, use, raw, state)
+	if !drained {
+		// Fatal was signalled before executeProcess joined the local pipe readers.
+		// The command owner must fail-stop without closing stores or this work.
+		return false
+	}
+	e.complete(a, captures)
+	return true
+}
+
+// failBeforeStart records an admitted attempt that failed before its start
+// record as an observed error. No work directory exists yet.
+func (e *Engine) failBeforeStart(a *attempt, err error) {
+	a.run.Error = a.redact.text(err.Error())
+	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
+	defer cancel()
+	e.save(cleanup, synthetic.HistoryStart, a)
+	e.complete(a, nil)
+}
+
+// prepareWork creates the run work directory and encodes the wire request.
+func (e *Engine) prepareWork(attemptCtx context.Context, a *attempt, admittedAt time.Time) ([]byte, error) {
+	work, err := e.artifacts.Begin(a.run.ID, a.run.JobID, a.run.VnodeGUID)
+	if err != nil {
+		return nil, fmt.Errorf("create run work directory: %w", err)
+	}
+	a.work = work
+	r := a.request
 	req := wireRequest{
-		Extensions: requestedFeatures(request),
-		Version:    SupportedContract,
-		Kind:       request.Kind,
-		RunID:      run.ID,
+		Extensions: requestedFeatures(r),
+		Version:    synthetic.ExecutionContract,
+		Kind:       r.Kind,
+		RunID:      a.run.ID,
 		WorkDir:    work,
-		Script:     request.Script,
-		ScriptPath: request.ScriptPath,
-		URL:        request.URL,
-		TimeoutMS:  request.Timeout.Milliseconds(),
-		Capture:    request.Capture,
-		Secrets:    request.Secrets,
+		Script:     r.Script,
+		ScriptPath: r.ScriptPath,
+		URL:        r.URL,
+		TimeoutMS:  r.Timeout.Milliseconds(),
+		Capture:    r.Capture,
+		Secrets:    r.Secrets,
 	}
-	if request.Kind == synthetic.Journey {
-		deadline, _ := attempt.Deadline()
-		req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt)
-		if err != nil {
-			run.Error = redact.text(err.Error())
-			e.complete(&run, []synthetic.Capture{}, redact)
-			return synthetic.Execution{Run: run, Drained: true}
+	if r.Kind == synthetic.Journey {
+		deadline, _ := attemptCtx.Deadline()
+		if req.StopAtMonotonicMS, err = journeyStopAt(deadline, admittedAt); err != nil {
+			return nil, err
 		}
 	}
 	raw, err := json.Marshal(req)
-	if err == nil && len(raw) > FrameMaxBytes {
+	if err == nil && len(raw) > frameMaxBytes {
 		err = errors.New("runner request exceeds 4 MiB transport limit")
 	}
-	if err != nil {
-		run.Error = redact.text(err.Error())
-		e.complete(&run, []synthetic.Capture{}, redact)
-		return synthetic.Execution{
-			Run:     run,
-			Drained: true,
-		}
-	}
-	sink := newSink(request, redact)
+	return raw, err
+}
+
+// launch runs the prepared request and records what the supervisor and the
+// reporter observed. It returns the captures eligible for publication and
+// whether the process tree is known drained.
+func (e *Engine) launch(ctx, attemptCtx context.Context, a *attempt, use Use, raw []byte, state func(synthetic.JobState)) ([]synthetic.Capture, bool) {
+	sink := newSink(a.request, a.redact)
 	started := time.Now()
-	if state != nil {
-		state("running")
+	notify(state, synthetic.JobRunning)
+	paths := use.Paths()
+	tree, err := e.executeProcess(attemptCtx, paths, use.Completion(), []string{paths.EntryPoint}, raw, sink.consume, sink.stderr)
+	if err != nil {
+		// Nothing started, so nothing was reported.
+		a.stop(attemptCtx.Err(), ctx, attemptCtx)
+		a.run.Error = a.redact.text(err.Error())
+		return nil, true
 	}
-	result, startErr := e.executeProcess(
-		attempt,
-		paths,
-		use.Completion(),
-		[]string{paths.EntryPoint},
-		raw,
-		sink.consume,
-		sink.stderr,
-	)
-	if startErr != nil {
-		if errors.Is(attempt.Err(), context.Canceled) {
-			run.Outcome = synthetic.Cancelled
-			run.TerminationReason = synthetic.CallerCancelled
-		} else if errors.Is(attempt.Err(), context.DeadlineExceeded) {
-			run.Outcome = synthetic.Timeout
-			run.TerminationReason = deadlineReason(ctx, attempt)
-		}
-		run.Error = redact.text(startErr.Error())
-	} else {
-		elapsed := float64(time.Since(started)) / float64(time.Millisecond)
-		run.DurationMS = &elapsed
-		drained = result.Drained
-		snapshot := sink.snapshot()
-		run.FailureEvidence = snapshot.evidence
-		run.BrowserSummary = snapshot.browser
-		run.Captures = snapshot.captures
-		run.Events = snapshot.events
-		run.DroppedEvents = snapshot.dropped
-		run.Tests = snapshot.partial
-		if snapshot.err == nil && snapshot.result != nil {
-			// Observed test/measurement facts survive a later shutdown deadline.
-			if snapshot.result.Tests != nil {
-				run.Tests = snapshot.result.Tests
-			}
-			run.Metrics = snapshot.result.Metrics
-		}
-		switch {
-		case !drained:
-			run.Error = redact.text("process-tree completion is unverified: " + errorText(result.Err))
-		case errors.Is(attempt.Err(), context.DeadlineExceeded):
-			run.Outcome = synthetic.Timeout
-			run.TerminationReason = deadlineReason(ctx, attempt)
-			run.Error = "overall execution deadline exceeded"
-			if run.TerminationReason == synthetic.CallerDeadline {
-				run.Error = "caller deadline exceeded"
-			}
-		case errors.Is(attempt.Err(), context.Canceled):
-			run.Outcome = synthetic.Cancelled
-			run.TerminationReason = synthetic.CallerCancelled
-			run.Error = "execution cancelled"
-		case snapshot.err != nil:
-			run.Error = redact.text(snapshot.err.Error())
-		case snapshot.result == nil:
-			run.Error = redact.text("runner exited without a terminal result: " + errorText(result.Err))
-		case snapshot.result.Status == synthetic.Success && result.Err != nil:
-			run.Error = redact.text("runner exited unsuccessfully after reporting success")
-		default:
-			run.Outcome = snapshot.result.Status
-			run.TerminationReason = snapshot.result.TerminationReason
-			run.Error = redact.text(snapshot.result.Error)
-			run.CaptureState = snapshot.result.CaptureState
-		}
-		if !drained {
-			// Fatal was signalled before executeProcess joined the local pipe readers.
-			// The command owner must fail-stop without closing stores or this work.
-			return synthetic.Execution{
-				Run:     run,
-				Drained: false,
-			}
-		}
-		captures := []synthetic.Capture{}
-		var ineligible []synthetic.Capture
-		if snapshot.err == nil && snapshot.result != nil {
-			captures = append(captures, snapshot.result.Artifacts...)
-			if run.TerminationReason == synthetic.ExecutionBudget {
-				captures = append(captures, snapshot.result.InterruptedArtifacts...)
-			} else {
-				ineligible = snapshot.result.InterruptedArtifacts
-			}
-			// A shutdown deadline or cancellation does not erase a reported first failure.
-			if run.TerminationReason != "" && snapshot.result.Error != "" {
-				run.Error = redact.text(snapshot.result.Error)
-			}
-		}
-		joinCaptures(&run, captures, ineligible)
-		e.complete(&run, captures, redact)
-		return synthetic.Execution{
-			Run:     run,
-			Drained: true,
-		}
+	elapsed := float64(time.Since(started)) / float64(time.Millisecond)
+	a.run.DurationMS = &elapsed
+	snapshot := sink.snapshot()
+	a.observe(snapshot)
+	a.classify(ctx, attemptCtx, tree, snapshot)
+	if !tree.Drained {
+		return nil, false
 	}
-	e.complete(&run, []synthetic.Capture{}, redact)
-	return synthetic.Execution{
-		Run:     run,
-		Drained: true,
+	captures, ineligible := eligibleCaptures(&a.run, snapshot)
+	joinCaptures(&a.run, captures, ineligible)
+	return captures, true
+}
+
+// observe copies the reporter's observations into the run. Observed test and
+// measurement facts survive a later shutdown deadline.
+func (a *attempt) observe(s sinkSnapshot) {
+	run := &a.run
+	run.FailureEvidence = s.evidence
+	run.BrowserSummary = s.browser
+	run.Captures = s.captures
+	run.Events = s.events
+	run.DroppedEvents = s.dropped
+	run.Tests = s.partial
+	if s.err == nil && s.result != nil {
+		if s.result.Tests != nil {
+			run.Tests = s.result.Tests
+		}
+		run.Metrics = s.result.Metrics
 	}
 }
 
-// A slot was admitted, so infrastructure/validation failure is an actual error
-// observation. There was no child or workspace to finalize on this path.
-func (e *Engine) failAdmitted(run *synthetic.Run, err error, redact *textRedactor) synthetic.Execution {
-	run.Error = redact.text(err.Error())
+// classify decides the outcome. Supervisor facts outrank the reporter: an
+// unverified tree, a deadline or a cancellation wins over a reported result,
+// but a reported first failure keeps its text.
+func (a *attempt) classify(ctx, attemptCtx context.Context, tree ndexec.TreeResult, s sinkSnapshot) {
+	run := &a.run
+	if !tree.Drained {
+		run.Error = a.redact.text("process-tree completion is unverified: " + errorText(tree.Err))
+		return
+	}
+	reported := s.err == nil && s.result != nil
+	switch {
+	case a.stop(attemptCtx.Err(), ctx, attemptCtx):
+		run.Error = stopText(run.TerminationReason)
+	case s.err != nil:
+		run.Error = a.redact.text(s.err.Error())
+	case s.result == nil:
+		run.Error = a.redact.text("runner exited without a terminal result: " + errorText(tree.Err))
+	case s.result.Status == synthetic.Success && tree.Err != nil:
+		run.Error = a.redact.text("runner exited unsuccessfully after reporting success")
+	default:
+		run.Outcome = s.result.Status
+		run.TerminationReason = s.result.TerminationReason
+		run.Error = a.redact.text(s.result.Error)
+		run.CaptureState = s.result.CaptureState
+	}
+	if reported && run.TerminationReason != "" && s.result.Error != "" {
+		run.Error = a.redact.text(s.result.Error)
+	}
+}
+
+// stop records a caller cancellation or an expired deadline and reports
+// whether err was one. Before admission attemptCtx is the caller's context and
+// no workflow ran, so an expired deadline is a cancellation, not a timeout.
+func (a *attempt) stop(err error, ctx, attemptCtx context.Context) bool {
+	switch {
+	case errors.Is(err, context.Canceled):
+		a.run.Outcome, a.run.TerminationReason = synthetic.Cancelled, synthetic.CallerCancelled
+	case errors.Is(err, context.DeadlineExceeded):
+		a.run.Outcome, a.run.TerminationReason = synthetic.Timeout, deadlineReason(ctx, attemptCtx)
+		if a.run.StartedUS == 0 {
+			a.run.Outcome = synthetic.Cancelled
+		}
+	default:
+		return false
+	}
+	return true
+}
+
+func stopText(reason synthetic.TerminationReason) string {
+	switch reason {
+	case synthetic.CallerCancelled:
+		return "execution cancelled"
+	case synthetic.CallerDeadline:
+		return "caller deadline exceeded"
+	default:
+		return "overall execution deadline exceeded"
+	}
+}
+
+// eligibleCaptures splits reported candidates into those to publish and those
+// to explain: interrupted captures publish only after a journey budget stop.
+func eligibleCaptures(run *synthetic.Run, s sinkSnapshot) (captures, ineligible []synthetic.Capture) {
+	if s.err != nil || s.result == nil {
+		return nil, nil
+	}
+	captures = append(captures, s.result.Artifacts...)
+	if run.TerminationReason == synthetic.ExecutionBudget {
+		return append(captures, s.result.InterruptedArtifacts...), nil
+	}
+	return captures, s.result.InterruptedArtifacts
+}
+
+// complete finalizes the run work directory, when one exists, and records
+// completion. It owns a fixed cleanup budget independent of cancelled workflow input.
+func (e *Engine) complete(a *attempt, captures []synthetic.Capture) {
 	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
-	e.save(cleanup, synthetic.HistoryStart, run, redact)
-	e.complete(run, nil, redact)
-	return synthetic.Execution{Run: *run, Drained: true}
+	if a.work != "" {
+		e.publish(cleanup, a, captures)
+	}
+	a.run.CompletedUS = time.Now().UnixMicro()
+	e.save(cleanup, synthetic.HistoryComplete, a)
 }
 
-// complete owns a fixed cleanup budget independent of cancelled workflow input.
-func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, redact *textRedactor) {
-	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
-	defer cancel()
-	if captures != nil {
-		artifacts, err := e.artifacts.Finalize(cleanup, run.ID, captures)
-		if err != nil {
-			capturePublicationFailed(run, captures, err)
-			run.Error = joinText(run.Error, redact.text("artifact publication: "+err.Error()))
-			if run.CaptureState != synthetic.CaptureDisabled {
-				run.CaptureState = synthetic.CaptureUnavailable
-			}
-		} else {
-			run.Artifacts = artifacts
-			capturePublicationSucceeded(run, captures)
-			if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
-				run.CaptureState = synthetic.CaptureUnavailable
-				if len(artifacts) > 0 {
-					run.CaptureState = synthetic.CaptureAvailable
-				}
-			}
+func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.Capture) {
+	run := &a.run
+	artifacts, err := e.artifacts.Finalize(ctx, run.ID, captures)
+	if err != nil {
+		capturePublicationFailed(run, captures, err)
+		run.Error = joinText(run.Error, a.redact.text("artifact publication: "+err.Error()))
+		if run.CaptureState != synthetic.CaptureDisabled {
+			run.CaptureState = synthetic.CaptureUnavailable
+		}
+		return
+	}
+	run.Artifacts = artifacts
+	capturePublicationSucceeded(run, captures)
+	if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
+		run.CaptureState = synthetic.CaptureUnavailable
+		if len(artifacts) > 0 {
+			run.CaptureState = synthetic.CaptureAvailable
 		}
 	}
-	run.CompletedUS = time.Now().UnixMicro()
-	e.save(cleanup, synthetic.HistoryComplete, run, redact)
 }
 
-func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, run *synthetic.Run, redact *textRedactor) {
+func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, a *attempt) {
 	if e.unrecorded {
 		return
 	}
-	if e.history == nil {
-		run.HistoryError = joinText(run.HistoryError, "history owner is unavailable")
-		return
-	}
+	run := &a.run
 	// A value snapshot is immutable; later completion must not alter start data.
-	snapshot := synthetic.CloneRun(*run)
-	attempted, err := e.history.AppendRun(ctx, phase, snapshot)
+	attempted, err := e.history.AppendRun(ctx, phase, synthetic.CloneRun(*run))
 	if err != nil {
 		qualifier := "not appended"
 		if attempted {
 			qualifier = "append outcome uncertain"
 		}
-		run.HistoryError = joinText(run.HistoryError, redact.text(string(phase)+" history "+qualifier+": "+err.Error()))
+		run.HistoryError = joinText(run.HistoryError, a.redact.text(string(phase)+" history "+qualifier+": "+err.Error()))
 	}
 	if err = e.history.Sync(ctx); err != nil {
-		run.HistoryError = joinText(run.HistoryError, redact.text(string(phase)+" history sync: "+err.Error()))
+		run.HistoryError = joinText(run.HistoryError, a.redact.text(string(phase)+" history sync: "+err.Error()))
+	}
+}
+
+func notify(state func(synthetic.JobState), value synthetic.JobState) {
+	if state != nil {
+		state(value)
 	}
 }
 
@@ -419,4 +474,24 @@ func joinText(first, second string) string {
 		return clip(second)
 	}
 	return clip(first + "; " + second)
+}
+
+// journeyStopAt reserves reporting time inside the effective admitted budget.
+// Sample the shared clock first so sampling latency cannot extend the deadline.
+func journeyStopAt(deadline, admitted time.Time) (int64, error) {
+	now, err := monotonicNow()
+	if err != nil {
+		return 0, err
+	}
+	reserve := min(5*time.Second, max(0, deadline.Sub(admitted))/5)
+	return now.Milliseconds() + (time.Until(deadline) - reserve).Milliseconds(), nil
+}
+
+func deadlineReason(caller, attempt context.Context) synthetic.TerminationReason {
+	callerDeadline, ok := caller.Deadline()
+	attemptDeadline, _ := attempt.Deadline()
+	if ok && !callerDeadline.After(attemptDeadline) {
+		return synthetic.CallerDeadline
+	}
+	return synthetic.ExecutionDeadline
 }

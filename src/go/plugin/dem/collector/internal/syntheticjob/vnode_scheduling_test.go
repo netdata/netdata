@@ -18,20 +18,20 @@ import (
 
 type vnodeAttempt struct {
 	request synthetic.Request
-	state   func(string)
+	state   func(synthetic.JobState)
 	finish  chan struct{}
 }
 
 // heldExecutor hands each admitted attempt to the test and holds it until finish or cancellation.
 func heldExecutor(calls chan<- vnodeAttempt) syntheticjobtest.Executor {
 	return syntheticjobtest.Executor{
-		ExecuteFunc: func(ctx context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
+		ExecuteFunc: func(ctx context.Context, r synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
 			call := vnodeAttempt{
 				request: r,
 				state:   state,
 				finish:  make(chan struct{}),
 			}
-			state("running")
+			state(synthetic.JobRunning)
 			calls <- call
 			outcome := synthetic.Success
 			select {
@@ -113,7 +113,7 @@ func TestSyntheticVnodeChangeFencesBackgroundPublication(t *testing.T) {
 					})
 				}
 				assert.Equal(t, a, old.request.VnodeGUID)
-				old.state("running") // A delayed callback must obey the same fence as completion.
+				old.state(synthetic.JobRunning) // A delayed callback must obey the same fence as completion.
 				if name != "metadata" {
 					assert.Equal(t, synthetic.JobUnknown, hub.Snapshot(time.Now())[0].State)
 				}

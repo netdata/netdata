@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -20,32 +20,22 @@ func evidenceRecord(record string, key string, value any) string {
 	if key != "" {
 		data[key] = value
 	}
-	raw, err := json.Marshal(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": data}})
-	if err != nil {
-		panic(err)
-	}
-	return string(raw)
+	return extensionLine(failureEvidenceFeature, data)
 }
+
 func evidenceStart(id string) synthetic.EvidenceTest {
 	return synthetic.EvidenceTest{ID: id, Title: "Checkout", Status: "running", ExpectedStatus: "passed", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 2, Column: 1}}
 }
+
 func evidenceStep(id, parent string) synthetic.EvidenceStep {
 	return synthetic.EvidenceStep{ID: id, TestID: "t1", ParentID: parent, Title: "Submit order", Category: "test.step", State: "running", Location: &synthetic.EvidenceLocation{File: "journey.spec.ts", Line: 3, Column: 2}}
 }
+
 func consumeEvidence(t *testing.T, lines ...string) (*synthetic.FailureEvidence, sinkSnapshot) {
 	t.Helper()
-	terminal, err := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
-	require.NoError(t, err)
-	lines = append(lines, string(terminal))
-	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	require.NoError(t, s.consume(strings.NewReader(strings.Join(lines, "\n"))))
-	snap := s.snapshot()
-	require.NotNil(t, snap.result)
-	require.Equal(t, synthetic.Success, snap.result.Status, "optional diagnostics must not rewrite core truth")
-	require.NoError(t, snap.err)
-	return snap.evidence, snap
+	snapshot := consumeWithResult(t, synthetic.Request{Kind: synthetic.Journey}, nil, success(), lines...)
+	return snapshot.evidence, snapshot
 }
-func pointerResult(r reporterResult) *reporterResult { return &r }
 
 func TestEvidenceNegotiationAndOptionalErrors(t *testing.T) {
 	cases := map[string]struct {
@@ -94,7 +84,7 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 		"two values":               `{"type":"extension"} {}`,
 		"core unknown key":         `{"type":"event","event":{"kind":"suite","new":true}}`,
 		"core bad enum":            `{"type":"event","event":{"kind":"future"}}`,
-		"oversize":                 `{"type":"extension","extension":{"data":"` + strings.Repeat("x", FrameMaxBytes) + `"}}`,
+		"oversize":                 `{"type":"extension","extension":{"data":"` + strings.Repeat("x", frameMaxBytes) + `"}}`,
 	}
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -103,8 +93,7 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 		})
 	}
 	s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-	raw, _ := json.Marshal(frame{Type: "result", Result: pointerResult(success())})
-	require.ErrorContains(t, s.consume(strings.NewReader(string(raw)+"\n"+evidenceInit)), "after its terminal")
+	require.ErrorContains(t, s.consume(strings.NewReader(resultLine(success())+"\n"+evidenceInit)), "after its terminal")
 }
 
 func TestEvidenceUpsertsAndPreservesFirstFailureAcrossLaterInterruption(t *testing.T) {
@@ -230,28 +219,6 @@ func TestEvidencePayloadAndSourceBoundsAreNonfatal(t *testing.T) {
 	}
 	e, _ := consumeEvidence(t, evidenceInit, `{"type":"extension","extension":{"feature":"failure_evidence.v1","data":{"record":"complete","large":"`+strings.Repeat("x", extensionBodyLimit)+`"}}}`)
 	assert.Equal(t, "invalid", e.ReportingStatus())
-}
-
-// Baseline and extended streams use the same core parser. Benchmark separately
-// so optional-field overhead and requested evidence work remain attributable.
-func BenchmarkFailureEvidenceStream(b *testing.B) {
-	var baseline bytes.Buffer
-	for i := 0; i < 30; i++ {
-		emit(&baseline, frame{Type: "event", Event: &synthetic.Event{Kind: "step", AtMS: 1, Title: "normal step", Status: "passed"}})
-	}
-	emit(&baseline, frame{Type: "result", Result: pointerResult(success())})
-	for name, input := range map[string]string{"baseline": baseline.String(), "extended": evidenceInit + "\n" + evidenceRecord("test", "test", evidenceStart("t1")) + "\n" + evidenceRecord("step", "step", evidenceStep("s1", "")) + "\n" + baseline.String()} {
-		b.Run(name, func(b *testing.B) {
-			b.ReportAllocs()
-			for b.Loop() {
-				s := newSink(synthetic.Request{Kind: synthetic.Journey}, newRedactor(nil))
-				if err := s.consume(strings.NewReader(input)); err != nil {
-					b.Fatal(err)
-				}
-				_ = s.snapshot()
-			}
-		})
-	}
 }
 
 func TestEvidenceRedactionExpansionDisclosesAllClipping(t *testing.T) {
@@ -400,9 +367,9 @@ func TestEvidenceWireBounds(t *testing.T) {
 		"step bytes past limit":    {"step", "step", sizedStep(2049), "invalid"},
 		"path at limit":            {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(16)}, "partial"},
 		"path past limit":          {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(17)}, "invalid"},
-		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit)}, "partial"},
-		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit+1)}, "invalid"},
-		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", TextLimit)}, "partial"},
+		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit)}, "partial"},
+		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit+1)}, "invalid"},
+		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", textLimit)}, "partial"},
 		"omitted ancestors safe":   {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger}, "partial"},
 		"omitted ancestors unsafe": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger + 1}, "invalid"},
 	}

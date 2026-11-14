@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -15,10 +17,6 @@ import (
 type optionalStatus struct {
 	evidence, browser string // availability/reason/reporter_complete
 	captures, trace   string
-}
-
-func featureLine(feature, data string) string {
-	return `{"type":"extension","extension":{"feature":"` + feature + `","data":` + data + `}}`
 }
 
 // TestOptionalOutputStatusMatrix pins the stored status values, including
@@ -47,12 +45,14 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 		"all selected":   {[]string{all}, optionalStatus{supported, supported, "partial", "supported"}},
 		"none selected":  {[]string{none}, optionalStatus{"unsupported/runtime_declined/false", "unsupported/runtime_declined/false", "unsupported", "unsupported"}},
 		"all complete": {
-			[]string{all, featureLine(failureEvidenceFeature, complete), featureLine(browserSummaryFeature, browserEnd), featureLine(captureDetailsFeature, complete)},
+			[]string{all, extensionLine(failureEvidenceFeature, json.RawMessage(complete)), extensionLine(browserSummaryFeature, json.RawMessage(browserEnd)), extensionLine(captureDetailsFeature, json.RawMessage(complete))},
 			optionalStatus{done, done, "complete", "supported"},
 		},
-		"duplicate evidence selection": {[]string{selected(failureEvidenceFeature, failureEvidenceFeature)}, optionalStatus{invalid("invalid_init"), invalid("invalid_init"), "invalid", "invalid"}},
+		// A repeated selection records the same reason for every output.
+		"duplicate evidence selection": {[]string{selected(failureEvidenceFeature, failureEvidenceFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"duplicate browser selection":  {[]string{selected(browserSummaryFeature, browserSummaryFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"duplicate capture selection":  {[]string{selected(captureDetailsFeature, captureDetailsFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
+		"duplicate trace selection":    {[]string{selected(captureDetailsFeature, failureTraceFeature, failureTraceFeature)}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"unknown selection":            {[]string{selected("future.v1")}, optionalStatus{invalid("unrequested_selection"), invalid("unrequested_selection"), "invalid", "invalid"}},
 		"malformed init":               {[]string{`{"type":"extension_init","extension_init":{"selected":null}}`}, optionalStatus{invalid("invalid_init"), invalid("invalid_init"), "invalid", "invalid"}},
 		"late init":                    {[]string{event, all}, optionalStatus{invalid("late_or_duplicate_init"), invalid("late_or_duplicate_init"), "invalid", "invalid"}},
@@ -62,41 +62,41 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 			[]string{badFrame, all}, optionalStatus{invalid("invalid_extension"), invalid("invalid_extension"), "invalid", "invalid"},
 		},
 		"complete then malformed envelope": {
-			[]string{all, featureLine(failureEvidenceFeature, complete), badFrame},
+			[]string{all, extensionLine(failureEvidenceFeature, json.RawMessage(complete)), badFrame},
 			optionalStatus{invalid("invalid_extension"), invalid("invalid_extension"), "invalid", "invalid"},
 		},
 		"evidence before init": {
-			[]string{featureLine(failureEvidenceFeature, complete), all}, optionalStatus{invalid("data_before_init"), supported, "partial", "supported"},
+			[]string{extensionLine(failureEvidenceFeature, json.RawMessage(complete)), all}, optionalStatus{invalid("data_before_init"), supported, "partial", "supported"},
 		},
 		"browser before init": {
-			[]string{featureLine(browserSummaryFeature, browserEnd), all}, optionalStatus{supported, invalid("data_before_init"), "partial", "supported"},
+			[]string{extensionLine(browserSummaryFeature, json.RawMessage(browserEnd)), all}, optionalStatus{supported, invalid("data_before_init"), "partial", "supported"},
 		},
 		"captures before init": {
-			[]string{featureLine(captureDetailsFeature, complete), all}, optionalStatus{supported, supported, "invalid", "supported"},
+			[]string{extensionLine(captureDetailsFeature, json.RawMessage(complete)), all}, optionalStatus{supported, supported, "invalid", "supported"},
 		},
 		"unknown feature before init": {
-			[]string{featureLine("future.v1", complete), all}, optionalStatus{supported, supported, "partial", "supported"},
+			[]string{extensionLine("future.v1", json.RawMessage(complete)), all}, optionalStatus{supported, supported, "partial", "supported"},
 		},
 		"evidence after completion": {
-			[]string{all, featureLine(failureEvidenceFeature, complete), featureLine(failureEvidenceFeature, complete)},
+			[]string{all, extensionLine(failureEvidenceFeature, json.RawMessage(complete)), extensionLine(failureEvidenceFeature, json.RawMessage(complete))},
 			optionalStatus{invalid("record_after_completion"), supported, "partial", "supported"},
 		},
 		"browser after completion": {
-			[]string{all, featureLine(browserSummaryFeature, browserEnd), featureLine(browserSummaryFeature, browserEnd)},
+			[]string{all, extensionLine(browserSummaryFeature, json.RawMessage(browserEnd)), extensionLine(browserSummaryFeature, json.RawMessage(browserEnd))},
 			optionalStatus{supported, invalid("record_after_completion"), "partial", "supported"},
 		},
 		"captures after completion": {
-			[]string{all, featureLine(captureDetailsFeature, complete), featureLine(captureDetailsFeature, complete)},
+			[]string{all, extensionLine(captureDetailsFeature, json.RawMessage(complete)), extensionLine(captureDetailsFeature, json.RawMessage(complete))},
 			optionalStatus{supported, supported, "invalid", "supported"},
 		},
-		"invalid evidence record": {[]string{all, featureLine(failureEvidenceFeature, `{"record":"future"}`)}, optionalStatus{invalid("invalid_record"), supported, "partial", "supported"}},
-		"invalid browser record":  {[]string{all, featureLine(browserSummaryFeature, `{"record":"future"}`)}, optionalStatus{supported, invalid("invalid_record"), "partial", "supported"}},
+		"invalid evidence record": {[]string{all, extensionLine(failureEvidenceFeature, json.RawMessage(`{"record":"future"}`))}, optionalStatus{invalid("invalid_record"), supported, "partial", "supported"}},
+		"invalid browser record":  {[]string{all, extensionLine(browserSummaryFeature, json.RawMessage(`{"record":"future"}`))}, optionalStatus{supported, invalid("invalid_record"), "partial", "supported"}},
 		"browser producer invalid": {
-			[]string{all, featureLine(browserSummaryFeature, `{"record":"invalid","reason":"counter_overflow"}`)},
+			[]string{all, extensionLine(browserSummaryFeature, json.RawMessage(`{"record":"invalid","reason":"counter_overflow"}`))},
 			optionalStatus{supported, invalid("counter_overflow"), "partial", "supported"},
 		},
 		"declined feature data": {
-			[]string{none, featureLine(failureEvidenceFeature, `{"record":"future"}`), featureLine(browserSummaryFeature, `{"record":"future"}`), featureLine(captureDetailsFeature, `{"record":"future"}`)},
+			[]string{none, extensionLine(failureEvidenceFeature, json.RawMessage(`{"record":"future"}`)), extensionLine(browserSummaryFeature, json.RawMessage(`{"record":"future"}`)), extensionLine(captureDetailsFeature, json.RawMessage(`{"record":"future"}`))},
 			optionalStatus{"unsupported/runtime_declined/false", "unsupported/runtime_declined/false", "unsupported", "unsupported"},
 		},
 	}

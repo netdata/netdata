@@ -104,12 +104,12 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	chunks := []string{
 		secret[:2001],
 		secret[2001:] + "\n",
-		strings.Repeat("safe ", TextLimit),
+		strings.Repeat("safe ", textLimit),
 		"token=hidden-tail\n",
 		"-----BEGIN PRIVATE KEY-----\n",
 		strings.Repeat("private-material", 1000),
 		"\n-----END -----\nstill-private\n-----END PRIVATE KEY-----\n",
-		strings.Repeat("safe line\n", EventLimit+5),
+		strings.Repeat("safe line\n", eventLimit+5),
 		"unfinished " + secret[:80],
 	}
 	s.stderr(&fragmentReader{
@@ -117,7 +117,7 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	})
 	got := s.snapshot()
 	recovered := diagnosticText(got.events)
-	assert.Len(t, got.events, EventLimit)
+	assert.Len(t, got.events, eventLimit)
 	assert.Greater(t, got.dropped, 0)
 	for _, part := range []string{"private-fixture-", "hidden-tail", "private-material", "still-private"} {
 		assert.NotContains(t, recovered, part)
@@ -125,7 +125,7 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	assert.Contains(t, recovered, "[REDACTED]")
 	assert.Contains(t, recovered, "diagnostic line exceeded")
 	for _, event := range got.events {
-		assert.LessOrEqual(t, utf8.RuneCountInString(event.Message), TextLimit)
+		assert.LessOrEqual(t, utf8.RuneCountInString(event.Message), textLimit)
 	}
 }
 func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {

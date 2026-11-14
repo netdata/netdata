@@ -162,8 +162,8 @@ Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates
 History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
 and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
 A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
-Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned, including
-records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
+Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned: no
+current-config backfill or speculative migration is performed.
 
 DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
 All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
@@ -557,7 +557,7 @@ File layout within packages:
 | `rum/aggregate` | State/construction, ingestion/results, activity, snapshots/ranking, vital statistics and cohesive topic operations, without creating extra state owners |
 | Function packages | Methods keep their columns beside their row builders |
 | History packages | Record codecs are separate from reducers |
-| `synthetic/runner` | Configuration, preparation, execution, process ownership and reporter decoding |
+| `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
 | `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |
 
 - Pure DEM helpers stay under their domain or `internal/`.
@@ -1032,7 +1032,8 @@ Draft rehearsal:
 - Explicit journey DynCfg `Test` uses resolved submitted configuration after `Init`; activation still uses `Check`.
 - `Engine.Rehearse` shares the installed source, admission and fail-stop owner with scheduled execution. It uses
   an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
-  disabled. A missing history owner remains an error for ordinary monitoring.
+  disabled. The monitoring engine cannot be constructed without its history and artifact owners; standalone runtime
+  administration qualifies through its own one-slot scope instead.
 - Rehearsal never calls collector `Run` or `Collect`, registers a monitor session, or writes metrics.
   After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
   or polling API exists.

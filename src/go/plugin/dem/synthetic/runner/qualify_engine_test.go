@@ -40,22 +40,22 @@ func TestQualificationViewSharesAdmissionAndKeepsMonitoringSource(t *testing.T) 
 	paths.Identity.SHA256 = strings.Repeat("b", 64)
 	candidate := e.unrecordedView(fixtureRuntime{Paths: paths}, artifacts)
 	done := make(chan synthetic.Execution, 1)
-	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { done <- e.execute(context.Background(), journey()) }()
 	<-started
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	queued := candidate.Execute(ctx, journey(), nil)
+	queued := candidate.execute(ctx, journey())
 	assert.Equal(t, synthetic.Cancelled, queued.Run.Outcome)
 	assert.Zero(t, queued.Run.StartedUS)
 	assert.Equal(t, int32(1), calls.Load())
 	close(release)
 	require.Equal(t, synthetic.Success, (<-done).Run.Outcome)
-	qualified := candidate.Execute(context.Background(), journey(), nil)
+	qualified := candidate.execute(context.Background(), journey())
 	require.Equal(t, synthetic.Success, qualified.Run.Outcome)
 	assert.Empty(t, qualified.Run.HistoryError)
 	require.NotNil(t, qualified.Run.Runtime)
 	assert.Equal(t, "candidate-b", qualified.Run.Runtime.Version)
-	monitored := e.Execute(context.Background(), journey(), nil)
+	monitored := e.execute(context.Background(), journey())
 	require.Equal(t, synthetic.Success, monitored.Run.Outcome)
 	require.NotNil(t, monitored.Run.Runtime)
 	assert.Equal(t, "release-a", monitored.Run.Runtime.Version)
@@ -74,7 +74,7 @@ func TestQualificationViewReportsUnverifiedDrainToMonitoringOwner(t *testing.T) 
 		return ndexec.TreeResult{Drained: false, Err: errors.New("qualification lost drainage proof")}
 	})
 	candidate := e.unrecordedView(e.source, artifacts)
-	result := candidate.Execute(context.Background(), journey(), nil)
+	result := candidate.execute(context.Background(), journey())
 	assert.False(t, result.Drained)
 	select {
 	case err := <-e.Fatal():
@@ -82,7 +82,7 @@ func TestQualificationViewReportsUnverifiedDrainToMonitoringOwner(t *testing.T) 
 	default:
 		t.Fatal("candidate failure did not reach the process fatal owner")
 	}
-	assert.False(t, e.Execute(context.Background(), journey(), nil).Drained)
+	assert.False(t, e.execute(context.Background(), journey()).Drained)
 	assert.Equal(t, int32(1), calls.Load(), "poisoned monitoring cannot start another child")
 }
 
@@ -138,4 +138,43 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 	assert.Equal(t, paths.Identity, *qualified.Runtime)
 	assert.Empty(t, history.runs)
 	assert.Equal(t, "release-a", e.source.(fixtureRuntime).Paths.Identity.Version)
+}
+
+func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("requires unprivileged identity")
+	}
+	e, _, _ := testEngineSlots(t, 2)
+	monitoring, qualified, release := make(chan struct{}, 1), make(chan struct{}, 1), make(chan struct{})
+	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
+		if slices.Contains(args, "--check") {
+			return checkReply(out)
+		}
+		var r wireRequest
+		if err := json.Unmarshal(raw, &r); err != nil {
+			return ndexec.TreeResult{Drained: true, Err: err}
+		}
+		if r.Script == "monitor" {
+			monitoring <- struct{}{}
+			<-release
+		} else if r.Kind == synthetic.Journey {
+			qualified <- struct{}{}
+		}
+		result := success()
+		if r.Kind == synthetic.Lighthouse {
+			result.Tests = nil
+			score := 100.0
+			result.Metrics = &synthetic.LabMetrics{Performance: &score}
+		}
+		return resultPayload(result)(ctx, args, raw, out, stderr)
+	})
+	monitorDone := make(chan synthetic.Execution, 1)
+	go func() { monitorDone <- e.execute(t.Context(), namedRequest("runtime-qualification", "monitor")) }()
+	receive(t, monitoring)
+	qualification := make(chan error, 1)
+	go func() { _, err := e.Qualify(t.Context(), e.source); qualification <- err }()
+	receive(t, qualified)
+	require.NoError(t, receive(t, qualification))
+	close(release)
+	require.Equal(t, synthetic.Success, receive(t, monitorDone).Run.Outcome)
 }

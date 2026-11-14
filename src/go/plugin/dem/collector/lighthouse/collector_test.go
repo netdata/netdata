@@ -22,7 +22,7 @@ import (
 func configured() *Collector {
 	c := New(Dependencies{
 		Executor: syntheticjobtest.Executor{
-			ExecuteFunc: func(context.Context, model.Request, func(string)) model.Execution {
+			ExecuteFunc: func(context.Context, model.Request, func(model.JobState)) model.Execution {
 				panic("unexpected execution during config validation")
 			},
 		},

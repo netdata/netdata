@@ -20,7 +20,7 @@ import (
 // admission and supervised completion. Drained=false requires process fail-stop even if the collector has already
 // retired.
 type Executor interface {
-	Check(context.Context, synthetic.Kind) error
+	Check(context.Context) error
 	monitor.Executor
 	Rehearse(context.Context, synthetic.Request) error
 }

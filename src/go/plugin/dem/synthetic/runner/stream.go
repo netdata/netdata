@@ -9,7 +9,7 @@ import (
 
 // diagnosticStream owns one byte stream, independent of callback/read boundaries.
 // Its exact-match carry is bounded by the longest supplied secret plus one read;
-// its line buffer uses the existing text limit. Overflow discards through newline.
+// its line buffer uses textLimit. Overflow discards through newline.
 // Neither retained-event exhaustion nor EOF may flush an unresolved secret prefix.
 type diagnosticStream struct {
 	redact     *textRedactor
@@ -141,7 +141,7 @@ func (d *diagnosticStream) decoded(value string) {
 	}
 }
 func (d *diagnosticStream) character(r rune) {
-	// Existing generic redaction recognizes multiline PEM blocks. Suppress from
+	// Generic pattern redaction recognizes whole multiline PEM blocks. Suppress from
 	// the BEGIN prefix through the END line, without retaining the block itself.
 	copy(d.window[:], d.window[1:])
 	var ascii byte
@@ -189,7 +189,7 @@ func (d *diagnosticStream) character(r rune) {
 		d.flushLine()
 		return
 	}
-	if len(d.line) == TextLimit {
+	if len(d.line) == textLimit {
 		d.line = nil
 		d.dropping = true
 		d.emit("[diagnostic line exceeded 2000 characters; omitted]\n")

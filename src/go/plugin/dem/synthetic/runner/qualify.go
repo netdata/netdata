@@ -26,8 +26,14 @@ type Qualification struct {
 	Scope                    string                     `json:"scope"`
 }
 
-// Qualify checks a candidate using this process's existing admission and fatal
-// owner. It never replaces the monitoring source or appends monitor history.
+// Qualify checks a candidate runtime for standalone administration, which has
+// no monitoring engine: it owns a one-slot admission and fatal scope.
+func Qualify(ctx context.Context, source Source) (*Qualification, error) {
+	return newEngine(nil, nil, nil, 1).Qualify(ctx, source)
+}
+
+// Qualify checks a candidate through this engine's admission and fatal owner.
+// It never replaces the monitoring source or appends monitor history.
 func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, error) {
 	captures, err := artifacts.Open("")
 	if err != nil {
@@ -42,26 +48,21 @@ func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, er
 	return result, err
 }
 
-type qualificationExecutor interface {
-	Check(context.Context, synthetic.Kind) error
-	Execute(context.Context, synthetic.Request, func(string)) synthetic.Execution
-}
-
 // Qualification exercises the normal adapter and sandbox in the caller's
 // environment; it does not certify another daemon's security policy.
-func qualify(ctx context.Context, engine qualificationExecutor) (*Qualification, error) {
+func qualify(ctx context.Context, engine *Engine) (*Qualification, error) {
 	result := &Qualification{Scope: fmt.Sprintf("Current process uid=%d gid=%d and environment: release contract check, sandboxed local Playwright journey and desktop Lighthouse audit on loopback content; does not certify other process confinement or hosts/platforms.", os.Geteuid(), os.Getegid())}
-	if err := engine.Check(ctx, synthetic.Journey); err != nil {
+	if err := engine.Check(ctx); err != nil {
 		return result, err
 	}
 	result.ExecutionContract = true
-	execution := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Journey, Name: "runtime-qualification", Timeout: 30 * time.Second,
+	execution := engine.execute(ctx, synthetic.Request{Kind: synthetic.Journey, Name: "runtime-qualification", Timeout: 30 * time.Second,
 		Script: `import { test, expect } from '@playwright/test';
  test('sandboxed local page', async ({ page }) => {
    await page.setContent('<title>DEM runtime qualification</title><h1>ready</h1>');
    await expect(page).toHaveTitle('DEM runtime qualification');
    await expect(page.locator('h1')).toHaveText('ready');
- });`, Capture: false}, nil)
+ });`, Capture: false})
 	drained := execution.Drained
 	result.ProcessTreeDrained = drained
 	if !drained {
@@ -92,7 +93,7 @@ func qualify(ctx context.Context, engine qualificationExecutor) (*Qualification,
 		_ = server.Close()
 		<-served
 	}()
-	audit := engine.Execute(ctx, synthetic.Request{Kind: synthetic.Lighthouse, Name: "runtime-qualification-audit", URL: "http://" + listener.Addr().String(), Timeout: 90 * time.Second, Capture: false}, nil)
+	audit := engine.execute(ctx, synthetic.Request{Kind: synthetic.Lighthouse, Name: "runtime-qualification-audit", URL: "http://" + listener.Addr().String(), Timeout: 90 * time.Second, Capture: false})
 	drained = audit.Drained
 	result.ProcessTreeDrained = drained
 	if !drained {

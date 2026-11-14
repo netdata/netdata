@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -58,21 +59,21 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 						return ndexec.TreeResult{Drained: true, Err: err}
 					}
 					candidates = append(candidates, synthetic.Capture{ID: id, Kind: "screenshot", Path: name, MIME: "image/png"})
-					_, err = fmt.Fprintln(out, captureRecord(captureTest(testID, 1, 0)), "\n"+captureRecord(captureLink(id, testID)))
+					_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, captureTest(testID, 1, 0)), "\n"+extensionLine(captureDetailsFeature, captureLink(id, testID)))
 					assert.NoError(t, err)
 				}
 				if mode == "invalid metadata" {
-					_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "future"}))
+					_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, map[string]any{"record": "future"}))
 					assert.NoError(t, err)
 				}
 				if mode == "unknown metadata ID" {
-					_, err = fmt.Fprintln(out, captureRecord(captureLink("unoffered", "t0")))
+					_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, captureLink("unoffered", "t0")))
 					assert.NoError(t, err)
 				}
 				if mode == "missing terminal" {
 					return ndexec.TreeResult{Drained: true}
 				}
-				_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "complete"}))
+				_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 				assert.NoError(t, err)
 				r := reporterResult{Status: synthetic.Failed, Error: "assertion", CaptureState: "available", Artifacts: candidates, Tests: &synthetic.TestCounts{Declared: count, Failed: count}}
 				assert.Zero(t, store.finalized.Load())
@@ -82,7 +83,7 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 			req.Capture = true
 			// This test writes up to 150 files; deadline behavior is tested separately.
 			req.Timeout = 30 * time.Second
-			ex := e.Execute(t.Context(), req, nil)
+			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
 			require.NotNil(t, ex.Run.Captures)
 			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
@@ -179,7 +180,7 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 		r := reporterResult{Status: synthetic.Success, CaptureState: "available", Metrics: &synthetic.LabMetrics{Performance: &performance}, Artifacts: []synthetic.Capture{{ID: "lighthouse-report", Kind: "report", MIME: "text/html", Path: "output/report.html"}}}
 		return resultPayload(r)(ctx, args, raw, out, stderr)
 	})
-	ex := e.Execute(t.Context(), synthetic.Request{Kind: synthetic.Lighthouse, Name: "audit", URL: "https://example.org", Capture: true, Timeout: time.Second}, nil)
+	ex := e.execute(t.Context(), synthetic.Request{Kind: synthetic.Lighthouse, Name: "audit", URL: "https://example.org", Capture: true, Timeout: time.Second})
 	require.True(t, ex.Drained)
 	assert.Equal(t, synthetic.Success, ex.Run.Outcome)
 	assert.Empty(t, ex.Run.Error)
@@ -222,13 +223,13 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 					assert.NoError(t, err)
 				}
 				if mode != "old runtime" {
-					_, err := fmt.Fprintln(out, captureRecord(captureTest("t1", 1, 0)), "\n"+captureRecord(captureLink("screen", "t1")), "\n"+captureRecord(captureLink("trace1", "t1")))
+					_, err := fmt.Fprintln(out, extensionLine(captureDetailsFeature, captureTest("t1", 1, 0)), "\n"+extensionLine(captureDetailsFeature, captureLink("screen", "t1")), "\n"+extensionLine(captureDetailsFeature, captureLink("trace1", "t1")))
 					assert.NoError(t, err)
 					if mode == "invalid capture details" {
-						_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "future"}))
+						_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, map[string]any{"record": "future"}))
 						assert.NoError(t, err)
 					}
-					_, err = fmt.Fprintln(out, captureRecord(map[string]any{"record": "complete"}))
+					_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 					assert.NoError(t, err)
 				}
 				for path, body := range map[string][]byte{"output/screen.png": []byte("\x89PNG\r\n\x1a\nfixture"), "output/trace.zip": []byte("PK\x03\x04fixture")} {
@@ -249,7 +250,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			req := journey()
 			req.Capture = true
 			req.Trace = true
-			ex := e.Execute(t.Context(), req, nil)
+			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
 			assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 			require.NotNil(t, ex.Run.Captures)

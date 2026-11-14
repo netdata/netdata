@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -23,7 +24,7 @@ func TestBrowserSummaryRequestSelectionAndOutcomeIndependence(t *testing.T) {
 			e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 				var request wireRequest
 				assert.NoError(t, json.Unmarshal(raw, &request))
-				assert.Equal(t, SupportedContract, request.Version)
+				assert.Equal(t, synthetic.ExecutionContract, request.Version)
 				assert.Equal(t, enabled, slices.Contains(request.Extensions, browserSummaryFeature))
 				encoder := json.NewEncoder(out)
 				assert.NoError(t, encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": request.Extensions}}))
@@ -34,7 +35,7 @@ func TestBrowserSummaryRequestSelectionAndOutcomeIndependence(t *testing.T) {
 			})
 			request := journey()
 			request.BrowserErrorSummary = enabled
-			execution := e.Execute(t.Context(), request, nil)
+			execution := e.execute(t.Context(), request)
 			require.True(t, execution.Drained)
 			assert.Equal(t, synthetic.Success, execution.Run.Outcome)
 			if enabled {
@@ -47,6 +48,7 @@ func TestBrowserSummaryRequestSelectionAndOutcomeIndependence(t *testing.T) {
 		})
 	}
 }
+
 func TestBrowserRehearsalEvidenceIsFailureOnly(t *testing.T) {
 	for _, failure := range []bool{false, true} {
 		t.Run(map[bool]string{false: "success", true: "failure"}[failure], func(t *testing.T) {

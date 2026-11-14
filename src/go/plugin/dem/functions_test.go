@@ -72,7 +72,7 @@ func privateCaptures(t *testing.T) *artifacts.Store {
 // another attempt or alter its request.
 type inventoryExecutor struct{ waiting chan struct{} }
 
-func (inventoryExecutor) Check(context.Context, synthetic.Kind) error { return nil }
+func (inventoryExecutor) Check(context.Context) error { return nil }
 func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
 	panic("inventory must not rehearse a browser")
 }
@@ -80,10 +80,10 @@ func (inventoryExecutor) Rehearse(context.Context, synthetic.Request) error {
 func (e inventoryExecutor) ExecuteScheduled(
 	ctx context.Context,
 	_ synthetic.Request,
-	state func(string),
+	state func(synthetic.JobState),
 	_ func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
-	state("waiting")
+	state(synthetic.JobWaiting)
 	close(e.waiting)
 	<-ctx.Done()
 	return synthetic.Execution{

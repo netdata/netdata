@@ -18,7 +18,7 @@ type Executor interface {
 	ExecuteScheduled(
 		context.Context,
 		synthetic.Request,
-		func(string),
+		func(synthetic.JobState),
 		func(time.Time) synthetic.Schedule,
 	) synthetic.Execution
 }
@@ -146,7 +146,7 @@ func (s *Session) run(
 				inflight = true
 				attemptEpoch = s.associationEpoch
 				go func(request synthetic.Request, epoch uint64) {
-					state := func(value string) { s.setState(epoch, value) }
+					state := func(value synthetic.JobState) { s.setState(epoch, value) }
 					result <- s.executor.ExecuteScheduled(workerCtx, request, state, s.admit)
 				}(s.request, attemptEpoch)
 			}
@@ -243,11 +243,11 @@ func (s *Session) clearPending() {
 }
 
 // setState records the executor-reported phase of an attempt of the current association.
-func (s *Session) setState(epoch uint64, state string) {
+func (s *Session) setState(epoch uint64, state synthetic.JobState) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if epoch == s.associationEpoch {
-		s.state = synthetic.JobState(state)
+		s.state = state
 	}
 }
 

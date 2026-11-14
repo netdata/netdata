@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -19,32 +20,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
-
-type sourceFunc func() (Use, error)
-
-func (f sourceFunc) BeginUse() (Use, error) { return f() }
-
-type observedUse struct {
-	paths      Paths
-	completion ndexec.TreeCompletion
-	mu         sync.Mutex
-	finishes   []bool
-	finishErr  error
-}
-
-func (u *observedUse) Paths() Paths                       { return u.paths }
-func (u *observedUse) Completion() *ndexec.TreeCompletion { return &u.completion }
-func (u *observedUse) Finish(drained bool) error {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	u.finishes = append(u.finishes, drained)
-	return u.finishErr
-}
-func (u *observedUse) finished() []bool {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	return append([]bool(nil), u.finishes...)
-}
 
 func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T) {
 	e, _, _ := testEngine(t)
@@ -65,7 +40,7 @@ func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T)
 		assert.Empty(t, u.finished())
 		return child(ctx, opts, bin, args...)
 	}
-	got := e.Execute(context.Background(), journey(), nil)
+	got := e.execute(context.Background(), journey())
 	require.True(t, got.Drained)
 	require.Equal(t, synthetic.Success, got.Run.Outcome)
 	assert.Equal(t, []bool{true}, u.finished())
@@ -109,7 +84,7 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 					return child(ctx, opts, bin, args...)
 				}
 				if probe {
-					result, err := e.probe(context.Background(), synthetic.Journey, func(Paths) []string { return []string{"--version"} })
+					result, err := e.probe(context.Background(), func(Paths) []string { return []string{"--version"} })
 					if tc.metadataFailure {
 						require.NoError(t, err)
 						assert.Equal(t, "version", string(result))
@@ -117,7 +92,7 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 						require.Error(t, err)
 					}
 				} else {
-					result := e.Execute(context.Background(), journey(), nil)
+					result := e.execute(context.Background(), journey())
 					assert.Equal(t, !tc.undrained, result.Drained)
 					if tc.metadataFailure {
 						assert.Equal(t, synthetic.Success, result.Run.Outcome)
@@ -159,7 +134,7 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 			return ndexec.TreeResult{Drained: true}
 		})(ctx, opts, bin, args...)
 	}
-	require.NoError(t, e.Check(context.Background(), synthetic.Journey))
+	require.NoError(t, e.Check(context.Background()))
 	require.Len(t, uses, 1)
 	assert.Equal(t, []bool{true}, uses[0].finished())
 }
@@ -185,7 +160,7 @@ func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 		return &notifyingTree{treeProcess: process, waited: waited}, nil
 	}
 	result := make(chan synthetic.Execution, 1)
-	go func() { result <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { result <- e.execute(context.Background(), journey()) }()
 	select {
 	case <-waited:
 	case got := <-result:
@@ -223,9 +198,9 @@ func TestUnavailableSourceDoesNotLaunch(t *testing.T) {
 			return nil, nil
 		}
 		if probe {
-			require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "runtime unavailable")
+			require.ErrorContains(t, e.Check(context.Background()), "runtime unavailable")
 		} else {
-			got := e.Execute(context.Background(), journey(), nil)
+			got := e.execute(context.Background(), journey())
 			assert.True(t, got.Drained)
 			assert.Contains(t, got.Run.Error, "runtime unavailable")
 		}
@@ -275,13 +250,13 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 		})(ctx, opts, bin, args...)
 	}
 	done := make(chan synthetic.Execution, 1)
-	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { done <- e.execute(context.Background(), journey()) }()
 	select {
 	case <-running:
 	case got := <-done:
 		t.Fatalf("execution returned before starting the concurrent fixture: %+v", got)
 	}
-	checkErr := e.Check(context.Background(), synthetic.Journey)
+	checkErr := e.Check(context.Background())
 	close(release)
 	got := <-done
 	require.NoError(t, checkErr)

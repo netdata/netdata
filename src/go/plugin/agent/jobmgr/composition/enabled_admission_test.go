@@ -164,7 +164,7 @@ func (*admissionTestJourneyExecutor) Rehearse(context.Context, synthetic.Request
 	panic("unexpected journey rehearsal during activation")
 }
 
-func (e *admissionTestJourneyExecutor) Check(context.Context, synthetic.Kind) error {
+func (e *admissionTestJourneyExecutor) Check(context.Context) error {
 	e.checks.Add(1)
 	if !e.ready.Load() {
 		return errors.New("browser probe unavailable")
@@ -172,7 +172,7 @@ func (e *admissionTestJourneyExecutor) Check(context.Context, synthetic.Kind) er
 	return nil
 }
 func (*admissionTestJourneyExecutor) ExecuteScheduled(
-	ctx context.Context, _ synthetic.Request, _ func(string), _ func(time.Time) synthetic.Schedule,
+	ctx context.Context, _ synthetic.Request, _ func(synthetic.JobState), _ func(time.Time) synthetic.Schedule,
 ) synthetic.Execution {
 	<-ctx.Done()
 	return synthetic.Execution{Drained: true}

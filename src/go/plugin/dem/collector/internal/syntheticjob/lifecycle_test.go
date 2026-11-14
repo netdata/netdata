@@ -28,15 +28,14 @@ func TestPreparationDoesNotRunOrRegister(t *testing.T) {
 		hub := registry.New()
 		calls := 0
 		c := k.new(syntheticjobtest.Executor{
-			CheckFunc: func(ctx context.Context, kind synthetic.Kind) error {
+			CheckFunc: func(ctx context.Context) error {
 				calls++
-				assert.Equal(t, k.kind, kind)
 				deadline, ok := ctx.Deadline()
 				assert.True(t, ok)
 				assert.LessOrEqual(t, time.Until(deadline), 15*time.Second)
 				return errors.New("prepared browser missing")
 			},
-			ExecuteFunc: func(context.Context, synthetic.Request, func(string)) synthetic.Execution {
+			ExecuteFunc: func(context.Context, synthetic.Request, func(synthetic.JobState)) synthetic.Execution {
 				t.Error("preparation executed workflow")
 				return synthetic.Execution{}
 			},
@@ -104,9 +103,9 @@ func TestOutcomesAndMissingObservations(t *testing.T) {
 					},
 				}
 				c := k.new(syntheticjobtest.Executor{
-					ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
+					ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
 						assert.Equal(t, "checkout", r.Name)
-						state("running")
+						state(synthetic.JobRunning)
 						assert.Equal(t, synthetic.JobRunning, hub.Snapshot(time.Now())[0].State)
 						return synthetic.Execution{
 							Drained: true,
@@ -145,9 +144,9 @@ func TestRunExecutesWithoutCollectAndRepeatedCollectionsHoldLatest(t *testing.T)
 		hub := registry.New()
 		var calls atomic.Int32
 		c := k.new(syntheticjobtest.Executor{
-			ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(string)) synthetic.Execution {
+			ExecuteFunc: func(_ context.Context, r synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
 				calls.Add(1)
-				state("running")
+				state(synthetic.JobRunning)
 				assert.Equal(t, k.request, r, "Init stores the configured request and Run hands it to the executor")
 				return synthetic.Execution{
 					Drained: true,
@@ -198,7 +197,7 @@ func TestLaterObservationWithMissingValuesCreatesGaps(t *testing.T) {
 		hub := registry.New()
 		var calls atomic.Int32
 		c := k.new(syntheticjobtest.Executor{
-			ExecuteFunc: func(context.Context, synthetic.Request, func(string)) synthetic.Execution {
+			ExecuteFunc: func(context.Context, synthetic.Request, func(synthetic.JobState)) synthetic.Execution {
 				run := fixture()
 				if calls.Add(1) == 1 {
 					// Zero values are measurements, not gaps.
@@ -258,7 +257,7 @@ func TestNeverObservedAndStaleSnapshotsOmitMeasurementsAndRetainCharts(t *testin
 			hub := registry.New()
 			var calls atomic.Int32
 			c := k.new(syntheticjobtest.Executor{
-				ExecuteFunc: func(ctx context.Context, _ synthetic.Request, _ func(string)) synthetic.Execution {
+				ExecuteFunc: func(ctx context.Context, _ synthetic.Request, _ func(synthetic.JobState)) synthetic.Execution {
 					if calls.Add(1) == 1 {
 						return synthetic.Execution{
 							Drained: true,
@@ -328,8 +327,8 @@ func TestNativeJobExecutionCancellationAndOutput(t *testing.T) {
 		entered, cancelled := make(chan struct{}), make(chan struct{})
 		var attempts atomic.Int32
 		c := k.new(syntheticjobtest.Executor{
-			ExecuteFunc: func(ctx context.Context, _ synthetic.Request, state func(string)) synthetic.Execution {
-				state("running")
+			ExecuteFunc: func(ctx context.Context, _ synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
+				state(synthetic.JobRunning)
 				if attempts.Add(1) == 1 {
 					return synthetic.Execution{
 						Drained: true,
@@ -411,12 +410,12 @@ func TestStopJoinsLateCallbacksBeforeSuccessorCanActivate(t *testing.T) {
 		var unblock sync.Once
 		t.Cleanup(func() { unblock.Do(func() { close(release) }) })
 		c := k.new(syntheticjobtest.Executor{
-			ExecuteFunc: func(ctx context.Context, _ synthetic.Request, state func(string)) synthetic.Execution {
+			ExecuteFunc: func(ctx context.Context, _ synthetic.Request, state func(synthetic.JobState)) synthetic.Execution {
 				close(entered)
 				<-ctx.Done()
 				close(cancelled)
 				<-release
-				state("running")
+				state(synthetic.JobRunning)
 				return synthetic.Execution{
 					Drained: true,
 					Run: synthetic.Run{
@@ -461,7 +460,7 @@ func TestUnverifiedCompletionFailsRunEvenAfterCancellation(t *testing.T) {
 				var once sync.Once
 				t.Cleanup(func() { once.Do(func() { close(release) }) })
 				c := k.new(syntheticjobtest.Executor{
-					ExecuteFunc: func(context.Context, synthetic.Request, func(string)) synthetic.Execution {
+					ExecuteFunc: func(context.Context, synthetic.Request, func(synthetic.JobState)) synthetic.Execution {
 						close(entered)
 						<-release
 						return synthetic.Execution{

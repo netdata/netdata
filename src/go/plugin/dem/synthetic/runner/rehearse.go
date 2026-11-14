@@ -26,7 +26,7 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 	}
 	request.Capture = false
 	request.Trace = false
-	execution := e.unrecordedView(e.source, captures).Execute(ctx, request, nil)
+	execution := e.unrecordedView(e.source, captures).execute(ctx, request)
 	if !execution.Drained {
 		// The shared fatal owner stops the process; uncertain live work must remain.
 		return ndexec.ErrTreeNotDrained

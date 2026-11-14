@@ -82,7 +82,7 @@ Existing RUM `site` fields identify the physical RUM job. RUM observations captu
 synthetic attempts capture it when submitted to the execution queue, before waiting for browser admission. Saved and
 buffered investigation records, runs and captures retain that GUID after reassignment. A changed RUM GUID starts a fresh rolling measurement window and Pages view; hostname or label
 edits with the same GUID do not reset measurements. Transport and history counters remain job-wide. Old evidence without
-a captured GUID stays unassigned; legacy `site_id` text is not mapped to a vnode or rewritten.
+a captured GUID stays unassigned.
 
 Vnode placement does not combine RUM populations, change artifact ownership or increase browser capacity. Execution,
 receiver service and retention remain shared by the collecting Agent.

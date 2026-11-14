@@ -1,6 +1,7 @@
 //go:build linux || darwin || freebsd
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -33,7 +34,7 @@ func TestEngineEvidenceSurvivesHardDeadlineBeforeTerminal(t *testing.T) {
 	})
 	request := journey()
 	request.Timeout = 100 * time.Millisecond
-	execution := engine.Execute(context.Background(), request, nil)
+	execution := engine.execute(context.Background(), request)
 	require.True(t, execution.Drained)
 	require.Equal(t, synthetic.Timeout, execution.Run.Outcome)
 	require.NotNil(t, execution.Run.FailureEvidence)
@@ -51,10 +52,10 @@ func TestEngineOptionalCorruptionDoesNotCancelOrOverrideResult(t *testing.T) {
 		fmt.Fprintln(out, evidenceRecord("test", "test", evidenceStart("t1")))
 		fmt.Fprintln(out, `{"type":"extension","extension":false}`)
 		assert.NoError(t, ctx.Err())
-		emit(out, frame{Type: "result", Result: pointerResult(success())})
+		emit(out, frame{Type: "result", Result: new(success())})
 		return ndexec.TreeResult{Drained: true}
 	})
-	execution := engine.Execute(context.Background(), journey(), nil)
+	execution := engine.execute(context.Background(), journey())
 	require.Equal(t, synthetic.Success, execution.Run.Outcome)
 	assert.Empty(t, execution.Run.Error)
 	assert.Empty(t, execution.Run.HistoryError)
@@ -73,7 +74,7 @@ func TestEngineCoreCorruptionStillKeepsEarlierOptionalObservations(t *testing.T)
 		<-ctx.Done()
 		return ndexec.TreeResult{Drained: true, Err: ctx.Err()}
 	})
-	execution := engine.Execute(context.Background(), journey(), nil)
+	execution := engine.execute(context.Background(), journey())
 	require.Equal(t, synthetic.Error, execution.Run.Outcome)
 	require.NotNil(t, execution.Run.FailureEvidence)
 	require.Len(t, execution.Run.FailureEvidence.Tests, 1)

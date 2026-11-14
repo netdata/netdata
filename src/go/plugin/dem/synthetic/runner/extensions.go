@@ -194,12 +194,7 @@ func (e *extensions) init(raw json.RawMessage) {
 	selected := make(map[string]bool, len(body.Selected))
 	for _, feature := range body.Selected {
 		if selected[feature] || e.state(feature) == nil {
-			// Stored reasons distinguish a repeated failure-evidence selection.
-			reason := "unrequested_selection"
-			if feature == failureEvidenceFeature {
-				reason = "invalid_init"
-			}
-			e.invalid(reason)
+			e.invalid("unrequested_selection")
 			return
 		}
 		selected[feature] = true
