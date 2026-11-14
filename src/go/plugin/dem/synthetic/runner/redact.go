@@ -68,6 +68,7 @@ func asciiLower(s string) string {
 	}
 	return string(b)
 }
+
 func clip(s string) string {
 	if utf8.RuneCountInString(s) <= textLimit {
 		return s
