@@ -78,6 +78,7 @@ int do_PerflibSMBClient(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
 int do_PerflibPagingFile(int update_every, usec_t dt __maybe_unused);
+int do_PerflibNPS(int update_every, usec_t dt __maybe_unused);
 
 // WMI
 int do_GetFSRMQuota(int update_every, usec_t dt);
@@ -477,6 +478,21 @@ enum PERFLIB_PRIO {
     PRIO_FSRM_QUOTAS,
     PRIO_FSRM_QUOTA_SPACE,
     PRIO_FSRM_QUOTA_STATE,
+
+    PRIO_NPS_AUTHENTICATION_REQUESTS,
+    PRIO_NPS_AUTHENTICATION_PACKETS,
+    PRIO_NPS_AUTHENTICATION_ERRORS,
+    PRIO_NPS_AUTHENTICATION_UPTIME,
+    PRIO_NPS_ACCOUNTING_REQUESTS,
+    PRIO_NPS_ACCOUNTING_PACKETS,
+    PRIO_NPS_ACCOUNTING_ERRORS,
+    PRIO_NPS_ACCOUNTING_UPTIME,
+    PRIO_NPS_AUTHENTICATION_REQUESTS_TOTAL,
+    PRIO_NPS_AUTHENTICATION_PACKETS_TOTAL,
+    PRIO_NPS_AUTHENTICATION_ERRORS_TOTAL,
+    PRIO_NPS_ACCOUNTING_REQUESTS_TOTAL,
+    PRIO_NPS_ACCOUNTING_PACKETS_TOTAL,
+    PRIO_NPS_ACCOUNTING_ERRORS_TOTAL,
 
     PRIO_IIS_EXTRA_WEBSITE = 25000,
     PRIO_IIS_EXTRA_WORKER = 25100,

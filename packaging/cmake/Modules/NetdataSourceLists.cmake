@@ -795,6 +795,7 @@ set(WINDOWS_PLUGIN_FILES
         src/collectors/windows.plugin/perflib-numa.c
         src/collectors/windows.plugin/perflib-asp.c
         src/collectors/windows.plugin/perflib-pagefile.c
+        src/collectors/windows.plugin/perflib-nps.c
 )
 
 set(PROC_PLUGIN_FILES
