@@ -189,7 +189,7 @@ func (d *diagnosticStream) character(r rune) {
 		d.flushLine()
 		return
 	}
-	if len(d.line) == TextLimit {
+	if len(d.line) == textLimit {
 		d.line = nil
 		d.dropping = true
 		d.emit("[diagnostic line exceeded 2000 characters; omitted]\n")

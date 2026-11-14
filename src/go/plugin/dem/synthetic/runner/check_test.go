@@ -233,7 +233,7 @@ func TestUnverifiedCheckDrainPoisonsCoalescedWaitersAndAllViews(t *testing.T) {
 	}
 	assert.ErrorIs(t, receive(t, e.Fatal()), ndexec.ErrTreeNotDrained)
 	assert.ErrorIs(t, e.Check(t.Context(), synthetic.Journey), ndexec.ErrTreeNotDrained)
-	assert.False(t, e.Execute(t.Context(), journey(), nil).Drained)
+	assert.False(t, e.execute(t.Context(), journey()).Drained)
 	assert.Equal(t, int32(1), calls.Load())
 }
 func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
@@ -265,7 +265,7 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 		return resultPayload(result)(ctx, args, raw, out, stderr)
 	})
 	monitorDone := make(chan synthetic.Execution, 1)
-	go func() { monitorDone <- e.Execute(t.Context(), namedRequest("runtime-qualification", "monitor"), nil) }()
+	go func() { monitorDone <- e.execute(t.Context(), namedRequest("runtime-qualification", "monitor")) }()
 	receive(t, monitoring)
 	qualification := make(chan error, 1)
 	go func() { _, err := e.Qualify(t.Context(), e.source); qualification <- err }()
@@ -289,7 +289,7 @@ func TestCheckResponseBounds(t *testing.T) {
 	}{
 		"reply at limit":     {stdout: reply + strings.Repeat(" ", 4096-len(reply))},
 		"reply over limit":   {stdout: reply + strings.Repeat(" ", 4097-len(reply)), err: "prepared runtime check: runtime check response exceeds 4096 bytes"},
-		"clipped diagnostic": {stderr: strings.Repeat("z", 3*TextLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", TextLimit) + ")"},
+		"clipped diagnostic": {stderr: strings.Repeat("z", 3*textLimit), failed: true, err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat("z", textLimit) + ")"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

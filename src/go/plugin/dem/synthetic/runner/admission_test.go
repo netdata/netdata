@@ -48,15 +48,32 @@ func namedRequest(name, script string) synthetic.Request {
 	return r
 }
 
-func TestConstructorRequiresPositiveConcurrency(t *testing.T) {
-	for _, n := range []int{-1, 0} {
-		e, err := New(nil, nil, nil, n)
-		require.Error(t, err)
-		assert.Nil(t, e)
+func TestConstructorRequiresOwnersAndPositiveConcurrency(t *testing.T) {
+	history, store := &fakeHistory{}, &observedArtifacts{}
+	tests := map[string]struct {
+		history     historyWriter
+		artifacts   artifactStore
+		concurrency int
+		valid       bool
+	}{
+		"valid":                {history: history, artifacts: store, concurrency: 2, valid: true},
+		"zero concurrency":     {history: history, artifacts: store, concurrency: 0},
+		"negative concurrency": {history: history, artifacts: store, concurrency: -1},
+		"no history":           {artifacts: store, concurrency: 1},
+		"no artifacts":         {history: history, concurrency: 1},
 	}
-	e, err := New(nil, nil, nil, 2)
-	require.NoError(t, err)
-	require.NotNil(t, e)
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, err := New(nil, tc.history, tc.artifacts, tc.concurrency)
+			if tc.valid {
+				require.NoError(t, err)
+				assert.NotNil(t, e)
+			} else {
+				require.Error(t, err)
+				assert.Nil(t, e)
+			}
+		})
+	}
 }
 
 func TestAdmissionLimitsAttemptsAndSerializesMonitoringWithRehearsal(t *testing.T) {
@@ -81,15 +98,15 @@ func TestAdmissionLimitsAttemptsAndSerializesMonitoringWithRehearsal(t *testing.
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	monitoring := make(chan synthetic.Execution, 1)
-	go func() { monitoring <- e.Execute(t.Context(), namedRequest("a", "a-monitor"), nil) }()
+	go func() { monitoring <- e.execute(t.Context(), namedRequest("a", "a-monitor")) }()
 	require.Equal(t, "a-monitor", receive(t, started))
 	rehearsal := make(chan error, 1)
 	go func() { rehearsal <- e.Rehearse(t.Context(), namedRequest("a", "a-test")) }()
 	queued(t, e, "a", 1)
 	other := make(chan synthetic.Execution, 2)
-	go func() { other <- e.Execute(t.Context(), namedRequest("b", "b"), nil) }()
+	go func() { other <- e.execute(t.Context(), namedRequest("b", "b")) }()
 	require.Equal(t, "b", receive(t, started))
-	go func() { other <- e.Execute(t.Context(), namedRequest("c", "c"), nil) }()
+	go func() { other <- e.execute(t.Context(), namedRequest("c", "c")) }()
 	queued(t, e, "c", 1)
 	close(releases["b"])
 	require.Equal(t, synthetic.Success, receive(t, other).Run.Outcome)
@@ -128,7 +145,7 @@ func TestAdmissionGivesReadyJobsTurnsInsteadOfDrainingOneJobBacklog(t *testing.T
 	})
 	done := make(chan synthetic.Execution, 6)
 	launch := func(name, script string) {
-		go func() { done <- e.Execute(t.Context(), namedRequest(name, script), nil) }()
+		go func() { done <- e.execute(t.Context(), namedRequest(name, script)) }()
 	}
 	launch("a", "a1")
 	require.Equal(t, "a1", receive(t, started))
@@ -174,15 +191,15 @@ func TestAdmissionCancellationRemovesReadyJobWithoutChangingOtherPositions(t *te
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	done := make(chan synthetic.Execution, 3)
-	go func() { done <- e.Execute(t.Context(), namedRequest("hold", "hold"), nil) }()
+	go func() { done <- e.execute(t.Context(), namedRequest("hold", "hold")) }()
 	require.Equal(t, "hold", receive(t, started))
 	cancelled := make(chan synthetic.Execution, 1)
 	ctx, cancel := context.WithCancel(t.Context())
-	go func() { cancelled <- e.Execute(ctx, namedRequest("cancel", "must-not-start"), nil) }()
+	go func() { cancelled <- e.execute(ctx, namedRequest("cancel", "must-not-start")) }()
 	queued(t, e, "cancel", 1)
-	go func() { done <- e.Execute(t.Context(), namedRequest("b", "b"), nil) }()
+	go func() { done <- e.execute(t.Context(), namedRequest("b", "b")) }()
 	queued(t, e, "b", 1)
-	go func() { done <- e.Execute(t.Context(), namedRequest("c", "c"), nil) }()
+	go func() { done <- e.execute(t.Context(), namedRequest("c", "c")) }()
 	queued(t, e, "c", 1)
 	cancel()
 	result := receive(t, cancelled)
@@ -217,7 +234,7 @@ func TestScheduledExecutionSnapshotsLatestOccurrenceAfterAdmission(t *testing.T)
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	first := make(chan synthetic.Execution, 1)
-	go func() { first <- e.Execute(t.Context(), namedRequest("hold", "hold"), nil) }()
+	go func() { first <- e.execute(t.Context(), namedRequest("hold", "hold")) }()
 	receive(t, running)
 	var due atomic.Int64
 	due.Store(100)
@@ -299,11 +316,11 @@ func TestUnverifiedDrainPoisonsAllSlotsWithoutReleasingUnknownAttempt(t *testing
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	bad, good, waiting := make(chan synthetic.Execution, 1), make(chan synthetic.Execution, 1), make(chan synthetic.Execution, 1)
-	go func() { bad <- e.Execute(t.Context(), namedRequest("bad", "bad"), nil) }()
+	go func() { bad <- e.execute(t.Context(), namedRequest("bad", "bad")) }()
 	require.Equal(t, "bad", receive(t, started))
-	go func() { good <- e.Execute(t.Context(), namedRequest("good", "good"), nil) }()
+	go func() { good <- e.execute(t.Context(), namedRequest("good", "good")) }()
 	require.Equal(t, "good", receive(t, started))
-	go func() { waiting <- e.Execute(t.Context(), namedRequest("waiting", "must-not-start"), nil) }()
+	go func() { waiting <- e.execute(t.Context(), namedRequest("waiting", "must-not-start")) }()
 	queued(t, e, "waiting", 1)
 	close(releaseBad)
 	assert.False(t, receive(t, bad).Drained)
@@ -311,7 +328,7 @@ func TestUnverifiedDrainPoisonsAllSlotsWithoutReleasingUnknownAttempt(t *testing
 	assert.ErrorIs(t, receive(t, e.Fatal()), ndexec.ErrTreeNotDrained)
 	close(releaseGood)
 	require.Equal(t, synthetic.Success, receive(t, good).Run.Outcome)
-	assert.False(t, e.Execute(t.Context(), namedRequest("future", "must-not-start"), nil).Drained)
+	assert.False(t, e.execute(t.Context(), namedRequest("future", "must-not-start")).Drained)
 	e.mu.Lock()
 	assert.Equal(t, 1, e.active)
 	assert.Len(t, e.jobs, 1)

@@ -155,7 +155,7 @@ func testEngineSlots(t *testing.T, concurrency int) (*Engine, *fakeHistory, *obs
 		fixtureRuntime{Paths: Paths{
 			Node:       bin,
 			EntryPoint: entrypoint,
-			Identity:   synthetic.RuntimeIdentity{Version: "release-a", SHA256: strings.Repeat("a", 64), Contract: SupportedContract},
+			Identity:   synthetic.RuntimeIdentity{Version: "release-a", SHA256: strings.Repeat("a", 64), Contract: synthetic.ExecutionContract},
 		}},
 		history,
 		owner,
@@ -189,7 +189,7 @@ func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	e, h, a := testEngine(t)
 	e.start = starter(t, resultPayload(success()))
 	var states []string
-	execution := e.Execute(context.Background(), journey(), func(state string) { states = append(states, state) })
+	execution := e.ExecuteScheduled(context.Background(), journey(), func(state string) { states = append(states, state) }, nil)
 	require.True(t, execution.Drained)
 	assert.Equal(t, synthetic.Success, execution.Run.Outcome)
 	require.NotNil(t, execution.Run.DurationMS)
@@ -232,7 +232,7 @@ func TestRealFailureSurvivesNonzeroExit(t *testing.T) {
 			Err:     errors.New("exit status 1"),
 		}
 	})
-	got := e.Execute(context.Background(), journey(), nil)
+	got := e.execute(context.Background(), journey())
 	assert.Equal(t, synthetic.Failed, got.Run.Outcome)
 	assert.Equal(t, 1, got.Run.Tests.Failed)
 }
@@ -256,7 +256,7 @@ func TestMalformedReporterCancelsAndDrains(t *testing.T) {
 						Result: &r,
 					})
 				case "oversize":
-					fmt.Fprintln(out, strings.Repeat("x", FrameMaxBytes+1))
+					fmt.Fprintln(out, strings.Repeat("x", frameMaxBytes+1))
 				case "contradictory-success":
 					r := success()
 					r.Tests.Skipped = 1
@@ -306,7 +306,7 @@ func TestMalformedReporterCancelsAndDrains(t *testing.T) {
 					Timeout: time.Second,
 				}
 			}
-			got := e.Execute(context.Background(), r, nil)
+			got := e.execute(context.Background(), r)
 			assert.True(t, got.Drained)
 			assert.Equal(t, synthetic.Error, got.Run.Outcome)
 			assert.NotEmpty(t, got.Run.Error)
@@ -369,7 +369,7 @@ func TestDeadlineKeepsIncrementalEvidence(t *testing.T) {
 	})
 	r := journey()
 	r.Timeout = 30 * time.Millisecond
-	got := e.Execute(context.Background(), r, nil)
+	got := e.execute(context.Background(), r)
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Timeout, got.Run.Outcome)
 	require.NotNil(t, got.Run.Tests)
@@ -391,18 +391,18 @@ func TestQueuedCancellationNeverStartsAChild(t *testing.T) {
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
 	done := make(chan synthetic.Execution, 1)
-	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { done <- e.execute(context.Background(), journey()) }()
 	<-started
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	got := e.Execute(ctx, journey(), nil)
+	got := e.execute(ctx, journey())
 	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
 	assert.Nil(t, got.Run.DurationMS)
 	assert.Zero(t, got.Run.StartedUS)
 	assert.Equal(t, int32(1), calls.Load())
 	expiry, cancelExpiry := context.WithTimeout(context.Background(), 5*time.Millisecond)
 	defer cancelExpiry()
-	expired := e.Execute(expiry, journey(), nil)
+	expired := e.execute(expiry, journey())
 	assert.Equal(t, synthetic.Cancelled, expired.Run.Outcome, "queued lifecycle expiry is not a workflow timeout")
 	assert.Zero(t, expired.Run.StartedUS)
 	assert.Nil(t, expired.Run.DurationMS)
@@ -430,7 +430,7 @@ func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 		return p, nil
 	}
 	done := make(chan synthetic.Execution, 1)
-	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { done <- e.execute(context.Background(), journey()) }()
 	select {
 	case err := <-e.Fatal():
 		assert.ErrorIs(t, err, ndexec.ErrTreeNotDrained)
@@ -446,7 +446,7 @@ func TestUnverifiedDrainPoisonsBeforeReaderJoin(t *testing.T) {
 	}
 	assert.Zero(t, a.finalized.Load())
 	assert.Equal(t, 1, e.active)
-	assert.False(t, e.Execute(context.Background(), journey(), nil).Drained)
+	assert.False(t, e.execute(context.Background(), journey()).Drained)
 }
 func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 	e, h, _ := testEngine(t)
@@ -460,14 +460,14 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 			return ndexec.TreeResult{Drained: true, Err: err}
 		}
 		assert.Equal(t, request.Secrets, sent.Secrets)
-		for i := 0; i < EventLimit+4; i++ {
+		for i := 0; i < eventLimit+4; i++ {
 			emit(
 				out,
 				frame{
 					Type: "event",
 					Event: &synthetic.Event{
 						Kind:    "stdout",
-						Message: "long-secret x " + strings.Repeat("界", TextLimit+10) + "\n",
+						Message: "long-secret x " + strings.Repeat("界", textLimit+10) + "\n",
 					},
 				},
 			)
@@ -481,14 +481,14 @@ func TestSecretInputRedactionAndDiagnosticBounds(t *testing.T) {
 			Drained: true,
 		}
 	})
-	got := e.Execute(context.Background(), request, nil)
+	got := e.execute(context.Background(), request)
 	assert.Equal(t, synthetic.Success, got.Run.Outcome)
-	assert.Len(t, got.Run.Events, EventLimit)
+	assert.Len(t, got.Run.Events, eventLimit)
 	assert.Equal(t, 4, got.Run.DroppedEvents)
 	for _, event := range got.Run.Events {
 		assert.NotContains(t, event.Message, "long-secret")
 		assert.NotContains(t, event.Message, " x ")
-		assert.LessOrEqual(t, len([]rune(event.Message)), TextLimit)
+		assert.LessOrEqual(t, len([]rune(event.Message)), textLimit)
 		assert.Equal(t, "stdout", event.Kind)
 	}
 	raw, err := json.Marshal(h.runs)
@@ -501,7 +501,7 @@ func TestHistoryUncertaintyIsNotReplayed(t *testing.T) {
 	h.err = errors.New("uncertain write")
 	h.syncErr = errors.New("sync failed")
 	e.start = starter(t, resultPayload(success()))
-	got := e.Execute(context.Background(), journey(), nil)
+	got := e.execute(context.Background(), journey())
 	assert.Equal(t, synthetic.Success, got.Run.Outcome)
 	assert.Contains(t, got.Run.HistoryError, "append outcome uncertain")
 	assert.Contains(t, got.Run.HistoryError, "sync failed")
@@ -515,8 +515,8 @@ func TestOversizeRequestNeverStartsWorkflow(t *testing.T) {
 		return nil, errors.New("unexpected start")
 	}
 	r := journey()
-	r.Script = strings.Repeat("x", FrameMaxBytes)
-	got := e.Execute(context.Background(), r, nil)
+	r.Script = strings.Repeat("x", frameMaxBytes)
+	got := e.execute(context.Background(), r)
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
 	assert.Nil(t, got.Run.DurationMS)
 	assert.Contains(t, got.Run.Error, "4 MiB")
@@ -603,7 +603,7 @@ func TestHistorySnapshotOwnsNullableMetricsAndEventDurations(t *testing.T) {
 			Drained: true,
 		}
 	})
-	got := e.Execute(
+	got := e.execute(
 		context.Background(),
 		synthetic.Request{
 			Kind:    synthetic.Lighthouse,
@@ -611,7 +611,6 @@ func TestHistorySnapshotOwnsNullableMetricsAndEventDurations(t *testing.T) {
 			URL:     "https://example.test",
 			Timeout: time.Second,
 		},
-		nil,
 	)
 	require.Equal(t, synthetic.Success, got.Run.Outcome)
 	require.Len(t, h.runs, 2)
@@ -684,7 +683,7 @@ func TestCancellationRedactsLateBootstrapAndProtocolOutputBeforeHistory(t *testi
 			}
 		},
 	)
-	got := e.Execute(ctx, request, nil)
+	got := e.execute(ctx, request)
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
 	assert.Contains(t, diagnosticText(got.Run.Events), "[REDACTED]")
@@ -709,7 +708,7 @@ func TestLighthouseTargetRedactionBeforeHistory(t *testing.T) {
 			Drained: true,
 		}
 	})
-	got := e.Execute(context.Background(), request, nil)
+	got := e.execute(context.Background(), request)
 	assert.NotContains(t, got.Run.Target, "private-query-value")
 	for _, run := range h.runs {
 		assert.NotContains(t, run.Target, "private-query-value")
@@ -724,7 +723,7 @@ func TestWhitespaceScriptRejectedBeforeExecution(t *testing.T) {
 	}
 	request := journey()
 	request.Script = " \t\n\u2003"
-	got := e.Execute(context.Background(), request, nil)
+	got := e.execute(context.Background(), request)
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
 	assert.Equal(t, "script must not be blank", got.Run.Error)
@@ -739,12 +738,12 @@ func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
 		contract, uid, gid int
 		valid              bool
 	}{
-		{"qualified release", "release-a", SupportedContract, os.Geteuid(), os.Getegid(), true},
-		{"another release", "release-b", SupportedContract, os.Geteuid(), os.Getegid(), false},
-		{"another contract", "release-a", SupportedContract + 1, os.Geteuid(), os.Getegid(), false},
-		{"root", "release-a", SupportedContract, 0, os.Getegid(), false},
-		{"another uid", "release-a", SupportedContract, os.Geteuid() + 1, os.Getegid(), false},
-		{"another gid", "release-a", SupportedContract, os.Geteuid(), os.Getegid() + 1, false},
+		{"qualified release", "release-a", synthetic.ExecutionContract, os.Geteuid(), os.Getegid(), true},
+		{"another release", "release-b", synthetic.ExecutionContract, os.Geteuid(), os.Getegid(), false},
+		{"another contract", "release-a", synthetic.ExecutionContract + 1, os.Geteuid(), os.Getegid(), false},
+		{"root", "release-a", synthetic.ExecutionContract, 0, os.Getegid(), false},
+		{"another uid", "release-a", synthetic.ExecutionContract, os.Geteuid() + 1, os.Getegid(), false},
+		{"another gid", "release-a", synthetic.ExecutionContract, os.Geteuid(), os.Getegid() + 1, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			e, _, _ := testEngine(t)
@@ -782,7 +781,7 @@ func TestExecutionRecordsAcquiredIdentityBeforeStart(t *testing.T) {
 		assert.NotContains(t, request, "browser_path")
 		return resultPayload(success())(ctx, args, raw, out, errOut)
 	})
-	got := e.Execute(context.Background(), journey(), nil)
+	got := e.execute(context.Background(), journey())
 	require.Equal(t, synthetic.Success, got.Run.Outcome)
 	require.Len(t, h.runs, 2)
 	assert.Equal(t, &expected, got.Run.Runtime)
@@ -815,7 +814,7 @@ func TestExecutionSnapshotsAssociationBeforeLaunchAndThroughCompletion(t *testin
 			} else {
 				engine.start = starter(t, resultPayload(success()))
 			}
-			execution := engine.Execute(context.Background(), request, nil)
+			execution := engine.execute(context.Background(), request)
 			require.True(t, execution.Drained)
 			assert.Equal(t, "journey:checkout", execution.Run.JobID)
 			assert.Equal(t, "11111111-1111-4111-8111-111111111111", execution.Run.VnodeGUID)
@@ -837,7 +836,7 @@ func TestExecutionSnapshotsAssociationBeforeLaunchAndThroughCompletion(t *testin
 	engine, _, _ := testEngine(t)
 	request := journey()
 	request.VnodeGUID = "11111111-1111-4111-8111-111111111111"
-	result := engine.Execute(ctx, request, nil)
+	result := engine.execute(ctx, request)
 	assert.Equal(t, synthetic.Cancelled, result.Run.Outcome)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", result.Run.VnodeGUID)
 }
@@ -949,7 +948,7 @@ func TestExecutionExits(t *testing.T) {
 		},
 		"oversize request": {
 			setup: func(_ *Engine, _ *observedArtifacts, r *synthetic.Request) context.Context {
-				r.Script = strings.Repeat("x", FrameMaxBytes)
+				r.Script = strings.Repeat("x", frameMaxBytes)
 				return t.Context()
 			},
 			want: with(launched, func(w *want) {
@@ -1071,7 +1070,7 @@ func TestExecutionExits(t *testing.T) {
 			}
 			request := journey()
 			ctx := tc.setup(e, a, &request)
-			got := e.Execute(ctx, request, nil)
+			got := e.execute(ctx, request)
 
 			run := got.Run
 			assert.Equal(t, tc.want.outcome, run.Outcome)

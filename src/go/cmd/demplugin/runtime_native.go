@@ -104,11 +104,7 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 		}
 	}()
 	source := runtimehost.Borrow(candidate)
-	executor, err := runner.New(source, nil, nil, 1)
-	if err != nil {
-		return err
-	}
-	qualification, err := executor.Qualify(ctx, source)
+	qualification, err := runner.Qualify(ctx, source)
 	if err != nil {
 		return err
 	}

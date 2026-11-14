@@ -33,7 +33,7 @@ func TestRejectInvalidReleaseBeforeLaunch(t *testing.T) {
 				return nil, nil
 			}
 			require.Error(t, e.Check(context.Background(), synthetic.Journey))
-			result := e.Execute(context.Background(), journey(), nil)
+			result := e.execute(context.Background(), journey())
 			require.Equal(t, synthetic.Error, result.Run.Outcome)
 			require.Nil(t, result.Run.Runtime)
 		})

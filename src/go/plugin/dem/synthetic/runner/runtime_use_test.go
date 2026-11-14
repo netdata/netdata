@@ -65,7 +65,7 @@ func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T)
 		assert.Empty(t, u.finished())
 		return child(ctx, opts, bin, args...)
 	}
-	got := e.Execute(context.Background(), journey(), nil)
+	got := e.execute(context.Background(), journey())
 	require.True(t, got.Drained)
 	require.Equal(t, synthetic.Success, got.Run.Outcome)
 	assert.Equal(t, []bool{true}, u.finished())
@@ -117,7 +117,7 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 						require.Error(t, err)
 					}
 				} else {
-					result := e.Execute(context.Background(), journey(), nil)
+					result := e.execute(context.Background(), journey())
 					assert.Equal(t, !tc.undrained, result.Drained)
 					if tc.metadataFailure {
 						assert.Equal(t, synthetic.Success, result.Run.Outcome)
@@ -185,7 +185,7 @@ func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 		return &notifyingTree{treeProcess: process, waited: waited}, nil
 	}
 	result := make(chan synthetic.Execution, 1)
-	go func() { result <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { result <- e.execute(context.Background(), journey()) }()
 	select {
 	case <-waited:
 	case got := <-result:
@@ -225,7 +225,7 @@ func TestUnavailableSourceDoesNotLaunch(t *testing.T) {
 		if probe {
 			require.ErrorContains(t, e.Check(context.Background(), synthetic.Journey), "runtime unavailable")
 		} else {
-			got := e.Execute(context.Background(), journey(), nil)
+			got := e.execute(context.Background(), journey())
 			assert.True(t, got.Drained)
 			assert.Contains(t, got.Run.Error, "runtime unavailable")
 		}
@@ -275,7 +275,7 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 		})(ctx, opts, bin, args...)
 	}
 	done := make(chan synthetic.Execution, 1)
-	go func() { done <- e.Execute(context.Background(), journey(), nil) }()
+	go func() { done <- e.execute(context.Background(), journey()) }()
 	select {
 	case <-running:
 	case got := <-done:

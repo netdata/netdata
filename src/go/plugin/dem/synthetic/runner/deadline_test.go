@@ -104,7 +104,7 @@ func TestBudgetStopCapturePolicyAfterDrain(t *testing.T) {
 				assert.Zero(t, a.finalized.Load(), "terminal reporting cannot publish before drainage")
 				return ndexec.TreeResult{Drained: true}
 			})
-			ex := e.Execute(ctx, request, nil)
+			ex := e.execute(ctx, request)
 			require.True(t, ex.Drained)
 			assert.Equal(t, tc.outcome, ex.Run.Outcome)
 			assert.Equal(t, tc.reason, ex.Run.TerminationReason)
@@ -175,7 +175,7 @@ func TestBudgetTerminalWithoutCountsPreservesIncrementalTestFacts(t *testing.T) 
 		}})
 		return ndexec.TreeResult{Drained: true}
 	})
-	ex := e.Execute(context.Background(), journey(), nil)
+	ex := e.execute(context.Background(), journey())
 	require.True(t, ex.Drained)
 	assert.Equal(t, synthetic.Timeout, ex.Run.Outcome)
 	require.NotNil(t, ex.Run.Tests)

@@ -66,10 +66,10 @@ func (s *sink) consume(reader io.Reader) error {
 		}
 	}()
 	scanner := bufio.NewScanner(reader)
-	scanner.Buffer(make([]byte, 64<<10), FrameMaxBytes+1)
+	scanner.Buffer(make([]byte, 64<<10), frameMaxBytes+1)
 	for scanner.Scan() {
 		raw := scanner.Bytes()
-		if len(raw) > FrameMaxBytes {
+		if len(raw) > frameMaxBytes {
 			return s.fail(errors.New("runner frame exceeds 4 MiB transport limit"))
 		}
 		decoder := json.NewDecoder(strings.NewReader(string(raw)))
@@ -190,7 +190,7 @@ func (s *sink) retain(event synthetic.Event) {
 	event.Title = s.redact.text(event.Title)
 	event.Message = s.redact.text(event.Message)
 	event.Phase = s.redact.text(event.Phase)
-	if len(s.events) < EventLimit {
+	if len(s.events) < eventLimit {
 		s.events = append(s.events, event)
 	} else {
 		s.dropped++

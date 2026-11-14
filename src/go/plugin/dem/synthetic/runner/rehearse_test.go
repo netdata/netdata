@@ -50,13 +50,11 @@ func TestRehearseIsolatesOutputsAndUsesResolvedRequest(t *testing.T) {
 	assert.Zero(t, captures.finalized.Load())
 	// Ordinary monitoring still records through the same engine afterward.
 	e.start = starter(t, resultPayload(success()))
-	result := e.Execute(t.Context(), journey(), nil)
+	result := e.execute(t.Context(), journey())
 	require.True(t, result.Drained)
 	require.Equal(t, synthetic.Success, result.Run.Outcome)
 	assert.Len(t, history.runs, 2)
 	assert.Equal(t, int32(1), captures.finalized.Load())
-	e.history = nil
-	assert.Contains(t, e.Execute(t.Context(), journey(), nil).Run.HistoryError, "history owner is unavailable")
 }
 
 func TestRehearseRejectsFailureAndIncompleteCoverage(t *testing.T) {
@@ -141,7 +139,7 @@ func TestRehearseSharesAdmissionAndHonorsCancellation(t *testing.T) {
 	<-started
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
 	defer cancel()
-	queued := e.Execute(ctx, journey(), nil)
+	queued := e.execute(ctx, journey())
 	assert.Equal(t, synthetic.Cancelled, queued.Run.Outcome)
 	assert.Zero(t, queued.Run.StartedUS)
 	assert.Equal(t, int32(1), calls.Load())
@@ -181,7 +179,7 @@ func TestRehearseUnverifiedDrainPoisonsSharedOwnerAndPreservesWork(t *testing.T)
 	require.NotEmpty(t, work)
 	_, err := os.Stat(work)
 	require.NoError(t, err, "uncertain child ownership must preserve the workspace")
-	assert.False(t, e.Execute(t.Context(), journey(), nil).Drained)
+	assert.False(t, e.execute(t.Context(), journey()).Drained)
 	assert.Empty(t, history.runs)
 	// The fake child has joined. Only this test may remove its simulated uncertain work.
 	require.NoError(t, os.RemoveAll(filepath.Dir(filepath.Dir(work))))

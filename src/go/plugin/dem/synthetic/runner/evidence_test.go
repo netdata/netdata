@@ -94,7 +94,7 @@ func TestEvidenceKeepsSharedAndCoreFramesStrict(t *testing.T) {
 		"two values":               `{"type":"extension"} {}`,
 		"core unknown key":         `{"type":"event","event":{"kind":"suite","new":true}}`,
 		"core bad enum":            `{"type":"event","event":{"kind":"future"}}`,
-		"oversize":                 `{"type":"extension","extension":{"data":"` + strings.Repeat("x", FrameMaxBytes) + `"}}`,
+		"oversize":                 `{"type":"extension","extension":{"data":"` + strings.Repeat("x", frameMaxBytes) + `"}}`,
 	}
 	for name, line := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -400,9 +400,9 @@ func TestEvidenceWireBounds(t *testing.T) {
 		"step bytes past limit":    {"step", "step", sizedStep(2049), "invalid"},
 		"path at limit":            {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(16)}, "partial"},
 		"path past limit":          {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: chain(17)}, "invalid"},
-		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit)}, "partial"},
-		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", TextLimit+1)}, "invalid"},
-		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", TextLimit)}, "partial"},
+		"message at rune limit":    {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit)}, "partial"},
+		"message past rune limit":  {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("é", textLimit+1)}, "invalid"},
+		"message at widest escape": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, Message: strings.Repeat("\x01", textLimit)}, "partial"},
 		"omitted ancestors safe":   {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger}, "partial"},
 		"omitted ancestors unsafe": {"failure", "failure", synthetic.FailureDetail{Test: ended(evidenceStart("t1")), Path: []synthetic.EvidenceStep{}, OmittedAncestors: maxSafeInteger + 1}, "invalid"},
 	}

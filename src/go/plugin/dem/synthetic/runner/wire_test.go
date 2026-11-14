@@ -48,9 +48,9 @@ func TestFrameEnvelopes(t *testing.T) {
 		"two values":                   {lines: []string{step + ` {}`}, err: "multiple values in runner protocol frame"},
 		"event after result":           {lines: []string{result, step}, err: "runner sent a frame after its terminal result"},
 		"unknown type after result":    {lines: []string{result, `{"type":"future"}`}, err: "runner sent a frame after its terminal result"},
-		"frame at limit":               {lines: []string{strings.Repeat(" ", FrameMaxBytes-len(step)) + step}},
-		"frame one byte over":          {lines: []string{strings.Repeat(" ", FrameMaxBytes+1-len(step)) + step}, err: "read runner protocol: bufio.Scanner: token too long"},
-		"unterminated frame over":      {lines: []string{strings.Repeat(" ", FrameMaxBytes+1-len(step)) + step}, unterminated: true, err: "runner frame exceeds 4 MiB transport limit"},
+		"frame at limit":               {lines: []string{strings.Repeat(" ", frameMaxBytes-len(step)) + step}},
+		"frame one byte over":          {lines: []string{strings.Repeat(" ", frameMaxBytes+1-len(step)) + step}, err: "read runner protocol: bufio.Scanner: token too long"},
+		"unterminated frame over":      {lines: []string{strings.Repeat(" ", frameMaxBytes+1-len(step)) + step}, unterminated: true, err: "runner frame exceeds 4 MiB transport limit"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {

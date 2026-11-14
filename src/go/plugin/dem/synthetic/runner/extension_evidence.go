@@ -31,9 +31,9 @@ const (
 	categoryBytes    = 64
 	stepMessageBytes = 1024
 	stepBytes        = 2048 // one serialized step; field budgets alone allow more
-	// A first-failure message is clipped to TextLimit runes; at the widest JSON
+	// A first-failure message is clipped to textLimit runes; at the widest JSON
 	// escape (\u00XX) that encodes to this many bytes.
-	failureMessageBytes = 6*TextLimit + 2
+	failureMessageBytes = 6*textLimit + 2
 )
 
 // maxSafeInteger is JavaScript's Number.MAX_SAFE_INTEGER: the producer's counts
@@ -289,7 +289,7 @@ func validStop(f synthetic.FailureDetail) bool {
 func validDetail(f synthetic.FailureDetail) bool {
 	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
 		len(f.Path) > failurePathLimit || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
-		utf8.RuneCountInString(f.Message) > TextLimit || !boundedJSON(f, extensionBodyLimit) {
+		utf8.RuneCountInString(f.Message) > textLimit || !boundedJSON(f, extensionBodyLimit) {
 		return false
 	}
 	seen := make(map[string]bool, len(f.Path))
@@ -310,7 +310,7 @@ func evidenceText(value string, limit int, redact *textRedactor) (string, bool) 
 	return clippedEvidenceText(redact.redacted(value), limit)
 }
 func clippedEvidenceText(value string, limit int) (string, bool) {
-	clipped := utf8.RuneCountInString(value) > TextLimit
+	clipped := utf8.RuneCountInString(value) > textLimit
 	value = clip(value)
 	if boundedJSON(value, limit) {
 		return value, clipped

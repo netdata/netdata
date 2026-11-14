@@ -82,7 +82,7 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 			req.Capture = true
 			// This test writes up to 150 files; deadline behavior is tested separately.
 			req.Timeout = 30 * time.Second
-			ex := e.Execute(t.Context(), req, nil)
+			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
 			require.NotNil(t, ex.Run.Captures)
 			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
@@ -184,7 +184,7 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 		r := reporterResult{Status: synthetic.Success, CaptureState: "available", Metrics: &synthetic.LabMetrics{Performance: &performance}, Artifacts: []synthetic.Capture{{ID: "lighthouse-report", Kind: "report", MIME: "text/html", Path: "output/report.html"}}}
 		return resultPayload(r)(ctx, args, raw, out, stderr)
 	})
-	ex := e.Execute(t.Context(), synthetic.Request{Kind: synthetic.Lighthouse, Name: "audit", URL: "https://example.org", Capture: true, Timeout: time.Second}, nil)
+	ex := e.execute(t.Context(), synthetic.Request{Kind: synthetic.Lighthouse, Name: "audit", URL: "https://example.org", Capture: true, Timeout: time.Second})
 	require.True(t, ex.Drained)
 	assert.Equal(t, synthetic.Success, ex.Run.Outcome)
 	assert.Empty(t, ex.Run.Error)
@@ -254,7 +254,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			req := journey()
 			req.Capture = true
 			req.Trace = true
-			ex := e.Execute(t.Context(), req, nil)
+			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
 			assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 			require.NotNil(t, ex.Run.Captures)

@@ -34,8 +34,8 @@ func (e *Engine) checkFiles(kind synthetic.Kind, paths Paths) error {
 	if kind != synthetic.Journey && kind != synthetic.Lighthouse {
 		return errors.New("unsupported synthetic kind")
 	}
-	if paths.Identity.Contract != SupportedContract {
-		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d)", paths.Identity.Contract, SupportedContract)
+	if paths.Identity.Contract != synthetic.ExecutionContract {
+		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d)", paths.Identity.Contract, synthetic.ExecutionContract)
 	}
 	digest, err := hex.DecodeString(paths.Identity.SHA256)
 	if paths.Identity.Version == "" || err != nil || len(digest) != 32 {

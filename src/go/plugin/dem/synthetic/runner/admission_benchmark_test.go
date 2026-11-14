@@ -15,10 +15,7 @@ import (
 func BenchmarkAdmissionReadyJobs(b *testing.B) {
 	for _, population := range []int{1, 100, 1000} {
 		b.Run(fmt.Sprint(population), func(b *testing.B) {
-			engine, err := New(nil, nil, nil, 1)
-			if err != nil {
-				b.Fatal(err)
-			}
+			engine := newEngine(nil, nil, nil, 1)
 			ctx, cancel := context.WithCancel(context.Background())
 			holder, err := engine.acquire(ctx, executionKey{jobID: "holder"})
 			if err != nil {

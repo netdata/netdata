@@ -57,8 +57,8 @@ func (r *textRedactor) redacted(value string) string {
 	return value
 }
 func clip(s string) string {
-	if utf8.RuneCountInString(s) <= TextLimit {
+	if utf8.RuneCountInString(s) <= textLimit {
 		return s
 	}
-	return string([]rune(s)[:TextLimit])
+	return string([]rune(s)[:textLimit])
 }

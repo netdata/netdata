@@ -198,7 +198,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	}
 	run := func(t *testing.T, ctx context.Context, name, script string, timeout time.Duration, capture bool) synthetic.Execution {
 		t.Helper()
-		execution := engine.Execute(
+		execution := engine.ExecuteScheduled(
 			ctx,
 			synthetic.Request{
 				Kind:    synthetic.Journey,
@@ -207,6 +207,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 				Timeout: timeout,
 				Capture: capture,
 			},
+			nil,
 			nil,
 		)
 		if !execution.Drained {
@@ -413,7 +414,7 @@ test('selected entry',async({message},info)=>{
 });`), 0600))
 		require.NoError(t, os.WriteFile(filepath.Join(input, "unselected.spec.ts"), []byte(`throw new Error('unselected entry must never load');`), 0600))
 		t.Setenv("DEM_RUNTIME_INHERITED", "must-not-reach-worker")
-		got := engine.Execute(context.Background(), synthetic.Request{Kind: synthetic.Journey, Name: "file-contract", ScriptPath: entry, Timeout: 30 * time.Second, Secrets: map[string]string{"DEM_SECRET_TEST": "private-fixture-value"}}, nil)
+		got := engine.ExecuteScheduled(context.Background(), synthetic.Request{Kind: synthetic.Journey, Name: "file-contract", ScriptPath: entry, Timeout: 30 * time.Second, Secrets: map[string]string{"DEM_SECRET_TEST": "private-fixture-value"}}, nil, nil)
 		if !got.Drained {
 			safe = false
 			t.Fatal("file-contract tree not drained")
@@ -438,7 +439,7 @@ test('selected entry',async({message},info)=>{
 		unavailable, err := runner.New(nil, synthetichistory.NewStore(history), captures, 1)
 		require.NoError(t, err)
 		require.Error(t, unavailable.Check(context.Background(), synthetic.Journey))
-		got := unavailable.Execute(
+		got := unavailable.ExecuteScheduled(
 			context.Background(),
 			synthetic.Request{
 				Kind:    synthetic.Journey,
@@ -446,6 +447,7 @@ test('selected entry',async({message},info)=>{
 				Script:  prefix + "test('unused',async()=>{});",
 				Timeout: time.Second,
 			},
+			nil,
 			nil,
 		)
 		assert.True(t, got.Drained)
@@ -495,12 +497,12 @@ test('selected entry',async({message},info)=>{
 		defer cancel()
 		done := make(chan synthetic.Execution, 1)
 		go func() {
-			done <- engine.Execute(ctx, synthetic.Request{
+			done <- engine.ExecuteScheduled(ctx, synthetic.Request{
 				Kind:    synthetic.Journey,
 				Name:    "cancel",
 				Script:  browserPrefix + "test('cancel',async({page})=>{await new Promise(()=>{})});",
 				Timeout: 30 * time.Second,
-			}, nil)
+			}, nil, nil)
 		}()
 		select {
 		case <-signal:
@@ -532,7 +534,7 @@ test('selected entry',async({message},info)=>{
 	})
 	t.Run("Lighthouse-desktop-report", func(t *testing.T) {
 		require.NoError(t, engine.Check(context.Background(), synthetic.Lighthouse))
-		got := engine.Execute(
+		got := engine.ExecuteScheduled(
 			context.Background(),
 			synthetic.Request{
 				Kind:    synthetic.Lighthouse,
@@ -541,6 +543,7 @@ test('selected entry',async({message},info)=>{
 				Timeout: 90 * time.Second,
 				Capture: true,
 			},
+			nil,
 			nil,
 		)
 		if !got.Drained {
