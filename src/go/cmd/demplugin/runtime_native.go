@@ -10,51 +10,45 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 const nativeProtocolLimit = 1 << 20
-const nativeDiagnosticLimit = 16 << 10
 
-// These verbs are the installed package helper interface, not runtime source or
-// path overrides. Package hooks own service stop/restart and transaction ordering.
-func runNativeRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Writer) (bool, error) {
-	if len(args) < 2 || args[0] != "runtime" || !strings.HasPrefix(args[1], "native-") {
-		return false, nil
-	}
-	command := args[1]
+// runNativeCommand serves the installed package helper interface. These verbs
+// take no runtime source or path overrides; package hooks own service
+// stop/restart and transaction ordering.
+func runNativeCommand(ctx context.Context, command string, args []string, stdout, stderr io.Writer) error {
 	root := false
 	switch command {
 	case "native-prepare", "native-configure":
 		root = true
 	case "native-initialize", "native-inspect", "native-qualify":
 	default:
-		return true, fmt.Errorf("unknown internal native runtime command %q", command)
+		return fmt.Errorf("unknown internal native runtime command %q", command)
 	}
-	if len(args) != 2 {
-		return true, errors.New("internal native runtime commands accept no flags or positional arguments")
+	if len(args) != 0 {
+		return errors.New("internal native runtime commands accept no flags or positional arguments")
 	}
 	if err := nativeCommandPlatform(); err != nil {
-		return true, err
+		return err
 	}
 	if root && os.Geteuid() != 0 {
-		return true, errors.New("native package preparation/configuration requires root")
+		return errors.New("native package preparation/configuration requires root")
 	}
 	if !root && os.Geteuid() == 0 {
-		return true, errors.New("native proof and qualification commands must run as the configured service UID")
+		return errors.New("native proof and qualification commands must run as the configured service UID")
 	}
 	if root {
-		return true, runNativeRootCommand(ctx, command, stdout, stderr)
+		return runNativeRootCommand(ctx, command, stdout, stderr)
 	}
-	return true, runNativeServiceCommand(ctx, command, os.Stdin, stdout)
+	return runNativeServiceCommand(ctx, command, os.Stdin, stdout)
 }
 
-func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reader, stdout io.Writer) (result error) {
+func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reader, stdout io.Writer) error {
 	config := runtime.DefaultNativeConfig()
 	if command == "native-initialize" {
 		if err := runtime.InitializeNativeProof(config); err != nil {
@@ -77,38 +71,37 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// An undrained execution retains its proof and work. Process exit releases
-		// local locks; the persistent receipt remains the authority for recovery.
-		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
-			result = errors.Join(result, native.Close())
-		}
-	}()
 	if command == "native-inspect" {
-		if err := native.Sweep(); err != nil {
-			return err
-		}
-		status, err := native.Inspect()
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(stdout).Encode(status)
+		err = inspectNative(native, stdout)
+	} else {
+		err = qualifyNative(ctx, native, target, stdout)
 	}
+	// An undrained execution retains its proof and work. Process exit releases
+	// local locks; the persistent receipt remains the authority for recovery.
+	return closeUnlessUndrained(err, native)
+}
+
+func inspectNative(native *runtime.Native, stdout io.Writer) error {
+	if err := native.Sweep(); err != nil {
+		return err
+	}
+	status, err := native.Inspect()
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(status)
+}
+
+func qualifyNative(ctx context.Context, native *runtime.Native, target runtime.Manifest, stdout io.Writer) error {
 	candidate, err := native.AcquireCandidate(target)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
-			result = errors.Join(result, candidate.Close())
-		}
-	}()
-	source := runtimehost.Borrow(candidate)
-	qualification, err := runner.Qualify(ctx, source)
-	if err != nil {
-		return err
+	qualification, err := runner.Qualify(ctx, runtimehost.Borrow(candidate))
+	if err == nil {
+		err = json.NewEncoder(stdout).Encode(qualification)
 	}
-	return json.NewEncoder(stdout).Encode(qualification)
+	return closeUnlessUndrained(err, candidate)
 }
 
 func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {

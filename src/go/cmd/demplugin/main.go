@@ -41,7 +41,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "runtime" {
 		runtimeContext, stopRuntimeSignals = signal.NotifyContext(runtimeContext, os.Interrupt, syscall.SIGTERM)
 	}
-	handled, runtimeError := runRuntimeCommandWithInput(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
+	handled, runtimeError := runRuntimeCommand(runtimeContext, os.Args[1:], os.Stdin, os.Stdout, os.Stderr)
 	stopRuntimeSignals()
 	if handled {
 		if err := runtimeError; err != nil {

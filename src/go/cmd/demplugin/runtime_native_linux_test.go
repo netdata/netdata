@@ -26,7 +26,7 @@ func TestNativeRuntimeRoleRouting(t *testing.T) {
 	}
 	for _, command := range commands {
 		var output bytes.Buffer
-		handled, err := runRuntimeCommand(context.Background(), []string{"runtime", command}, &output, &output)
+		handled, err := runRuntimeCommand(context.Background(), []string{"runtime", command}, nil, &output, &output)
 		require.True(t, handled)
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), "unknown runtime command")

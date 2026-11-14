@@ -7,45 +7,40 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
 
-// setup-plan is a read-only, bounded protocol for the administrator-owned host
-// policy helper. It must never open a store or acquire/qualify executable bytes.
-func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) {
-	if len(args) < 2 || args[0] != "runtime" || args[1] != "setup-plan" {
-		return false, nil
-	}
+// runSetupPlan serves a read-only, bounded protocol for the administrator-owned
+// host policy helper. It must never open a store or acquire/qualify executable bytes.
+func runSetupPlan(args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("runtime setup-plan", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	configDir := flags.String("config-dir", "", "directory containing administrator dem.conf")
 	cache := flags.String("cache", "", "managed installation directory")
 	root := flags.String("root", "", "preload final root")
-	if err := flags.Parse(args[2:]); err != nil {
+	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			return true, nil
+			return nil
 		}
-		return true, err
+		return err
 	}
 	if flags.NArg() != 0 {
-		return true, errors.New("unexpected positional setup-plan arguments")
+		return errors.New("unexpected positional setup-plan arguments")
 	}
 	var argumentError error
 	flags.Visit(func(f *flag.Flag) {
 		argumentError = errors.Join(argumentError, validateSetupPlanPath(f.Value.String()))
 	})
 	if argumentError != nil {
-		return true, argumentError
+		return argumentError
 	}
 	if *cache != "" && *root != "" {
-		return true, errors.New("setup-plan accepts either --cache or --root")
+		return errors.New("setup-plan accepts either --cache or --root")
 	}
 	var dirs []string
 	if *configDir != "" {
@@ -53,7 +48,7 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 	}
 	config, err := dem.LoadConfig(pluginconfig.ResolveConfigDirs(dirs))
 	if err != nil {
-		return true, err
+		return err
 	}
 	cfg := config.Runtime
 	mode := cfg.Mode
@@ -69,34 +64,28 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 		if *cache != "" {
 			cfg.CachePath = *cache
 		}
-		varlib := os.Getenv("NETDATA_LIB_DIR")
-		if varlib == "" {
-			varlib = buildinfo.VarLibDir
-		}
-		if varlib == "" {
-			varlib = buildinfo.DefaultVarLibDir
-		}
+		varlib := varLibDir()
 		// StoreConfig joins the default suffix; validate the input before it is cleaned.
 		if cfg.CachePath == "" {
 			if err := validateSetupPlanPath(varlib); err != nil {
-				return true, err
+				return err
 			}
 		}
 		storeConfig, err := cfg.StoreConfig(varlib)
 		if err != nil {
-			return true, err
+			return err
 		}
 		path = storeConfig.Path
 	}
 	if err := validateSetupPlanPath(path); err != nil {
-		return true, err
+		return err
 	}
 	canonical, err := runtime.CanonicalRoot(path)
 	if err != nil {
-		return true, err
+		return err
 	}
 	if err := validateSetupPlanPath(canonical); err != nil {
-		return true, err
+		return err
 	}
 	// Native packaging fixes this build default. Runtime configuration may change
 	// the selected mode, but must not change who owns automatic host setup.
@@ -107,10 +96,10 @@ func runRuntimeSetupPlan(args []string, stdout, stderr io.Writer) (bool, error) 
 	case runtimehost.ModeNative:
 		delivery = "native-package"
 	default:
-		return true, errors.New("unknown runtime build default")
+		return errors.New("unknown runtime build default")
 	}
 	_, err = fmt.Fprintf(stdout, "netdata-dem-runtime-setup-v1\n%s\n%s\n%s\n", delivery, mode, canonical)
-	return true, err
+	return err
 }
 
 func validateSetupPlanPath(path string) error {

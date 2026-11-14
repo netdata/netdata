@@ -27,6 +27,7 @@ func setupPlan(t *testing.T, args ...string) (string, error) {
 	handled, err := runRuntimeCommand(
 		context.Background(),
 		append([]string{"runtime", "setup-plan"}, args...),
+		nil,
 		&out,
 		&diagnostic,
 	)

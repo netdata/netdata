@@ -38,7 +38,7 @@ type runtimeResult struct {
 func runtimeRun(t *testing.T, ctx context.Context, args ...string) runtimeResult {
 	t.Helper()
 	var out, diagnostic bytes.Buffer
-	handled, err := runRuntimeCommandWithInput(ctx, args, nil, &out, &diagnostic)
+	handled, err := runRuntimeCommand(ctx, args, nil, &out, &diagnostic)
 	require.True(t, handled)
 	return runtimeResult{stdout: out.String(), stderr: diagnostic.String(), err: err}
 }
@@ -308,7 +308,7 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 	for _, args := range [][]string{nil, {"-d"}, {"--version"}} {
 		var out bytes.Buffer
-		handled, err := runRuntimeCommand(context.Background(), args, &out, &out)
+		handled, err := runRuntimeCommand(context.Background(), args, nil, &out, &out)
 		require.NoError(t, err)
 		assert.False(t, handled)
 		assert.Empty(t, out.String())
