@@ -78,8 +78,8 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if spec.ID == artifactMethod.ID && args["artifact_id"] != "" && !rawfunc.Permitted(req, rawfunc.AdminAccess) {
 		return funcapi.ErrorResponse(403, "administrator permissions are required for artifact bytes")
 	}
-	if err := ctx.Err(); err != nil {
-		return functionError(err)
+	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
+		return r
 	}
 	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)

@@ -489,7 +489,7 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
 | History | `rum/history` | RUM record encoding, retained-event reducers and the per-site queued writer |
 | Read side | `rum/query` | Copied site observations, live cursors, redaction and active/retained investigation results |
-| Read side | `rum/rumfunc` | Function declarations, arguments, permissions, columns and response serialization |
+| Read side | `rum/rumfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 
 Synthetic packages:
 
@@ -500,7 +500,7 @@ Synthetic packages:
 | `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
-| `synthetic/syntheticfunc` | Function declarations, arguments, permissions, columns and response serialization |
+| `synthetic/syntheticfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
 | `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |

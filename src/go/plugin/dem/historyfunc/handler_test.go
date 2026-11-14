@@ -3,6 +3,7 @@ package historyfunc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -125,4 +126,22 @@ func TestCancellationReachesStorage(t *testing.T) {
 		return journal.Status{}, got.Err()
 	}), func() string { return "" })
 	assert.Equal(t, 499, h.HandleRaw(ctx, request()).Status)
+}
+
+func TestStorageErrorStatuses(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		want *funcapi.FunctionResponse
+	}{
+		"cancelled": {err: context.Canceled, want: funcapi.ErrorResponse(499, "request cancelled")},
+		"deadline":  {err: context.DeadlineExceeded, want: funcapi.ErrorResponse(504, "request timed out")},
+		"storage":   {err: errors.New("journal closed"), want: funcapi.UnavailableResponse("journal closed")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := New(statusFunc(func(context.Context) (journal.Status, error) {
+				return journal.Status{}, tc.err
+			}), func() string { return "" })
+			assert.Equal(t, tc.want, h.HandleRaw(context.Background(), request()))
+		})
+	}
 }

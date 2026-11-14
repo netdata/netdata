@@ -28,9 +28,9 @@ const (
 	AdminAccess uint64 = 0x7b
 )
 
-// MaxRows bounds the rows of one table response. The synthetic limit argument
-// accepts 1 to MaxRows and its help states the cap; RUM live pages and session
-// summaries use the same bound.
+// MaxRows is the row bound of the DEM tables that cap their rows. The synthetic
+// limit argument accepts 1 to MaxRows and its help states the cap; RUM live
+// pages and session summaries use the same bound.
 const MaxRows = 2000
 
 // Permitted reports whether the request's access mask holds every required bit.
