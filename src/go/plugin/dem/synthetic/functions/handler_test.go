@@ -18,13 +18,10 @@ import (
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	functions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
-	history "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
-	registry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -760,12 +757,12 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	journal, err := demjournal.Open(ctx, t.TempDir())
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
-	store := history.NewStore(journal)
+	store := synthetichistory.NewStore(journal)
 	active := activeJobs{runs: map[string]model.Run{}}
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		name := []string{"checkout", "search", "legacy"}[i]
 		jobID := "journey:" + name
-		active.jobs = append(active.jobs, registry.Job{Snapshot: monitor.Snapshot{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site}})
+		active.jobs = append(active.jobs, syntheticregistry.Job{Snapshot: monitor.Snapshot{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site}})
 		run := model.Run{ID: name, JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site, Outcome: model.Success, StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro()}
 		if i == 0 {
 			run.VnodeGUID = "33333333-3333-4333-8333-333333333333"
@@ -774,7 +771,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 		require.NoError(t, err)
 		active.runs[jobID] = run
 	}
-	h := functions.New(query.New(active, store, nil, nil), nil)
+	h := syntheticfunctions.New(query.New(active, store, nil, nil), nil)
 	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)

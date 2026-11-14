@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -459,7 +458,7 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 
 func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	root := t.TempDir()
-	j, err := journal.Open(t.Context(), root)
+	j, err := demjournal.Open(t.Context(), root)
 	require.NoError(t, err)
 	test := synthetic.ArtifactTest{ID: "t1", Title: "Checkout"}
 	run := synthetic.Run{ID: "capture-run", JobID: "journey:test", Kind: synthetic.Journey, Name: "test", StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro(), Outcome: synthetic.Failed, CaptureState: "unavailable",
@@ -468,7 +467,7 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
 	require.NoError(t, err)
 	require.NoError(t, j.Close())
-	j, err = journal.Open(t.Context(), root)
+	j, err = demjournal.Open(t.Context(), root)
 	require.NoError(t, err)
 	defer j.Close()
 	got, err := history.NewStore(j).GetRun(t.Context(), run.JobID, run.ID)
