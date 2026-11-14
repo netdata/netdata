@@ -3,8 +3,9 @@
 package aggregate
 
 // HistorySink accepts self-contained investigation events. Event is called
-// under the aggregator lock: it must enqueue without I/O or blocking and must
-// never call back into the aggregator. Normalization precedes ingestion; persistence runs off-lock.
+// under the aggregator lock: it must not perform I/O, wait for queue space or
+// call back into the aggregator; a short leaf lock, such as a counter update,
+// is allowed. Normalization precedes ingestion; persistence runs off-lock.
 type HistorySink interface {
 	Event(HistoryEvent)
 }

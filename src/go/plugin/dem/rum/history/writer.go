@@ -20,7 +20,8 @@ const (
 )
 
 // Counters receives the writer's accounting; the owning site job publishes it.
-// Event calls Add under the producer's lock, so Add must not block or call back
+// Event calls Add under the producer's lock when the queue is full, so Add must
+// be a short update under at most a leaf lock, with no I/O and no call back
 // into the producer.
 type Counters interface {
 	Add(counter string, n uint64)
