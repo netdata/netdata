@@ -12,12 +12,12 @@ import (
 
 func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 	for _, rich := range []bool{false, true} {
-		name := "old history"
+		name := "without optional outputs"
 		if rich {
 			name = "rich history"
 		}
 		t.Run(name, func(t *testing.T) {
-			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step_end", Title: "legacy event"}}}
+			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step", Title: "observed step"}}}
 			if rich {
 				run.Captures = &model.CaptureReport{Reporting: "partial", Unpublished: []model.CaptureOmission{{ID: "s1", Reason: "not_in_final_report"}}}
 				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Tests: model.BrowserTestCounts{Observed: 1}, Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
@@ -33,7 +33,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			detailResponse := call(h, "synthetics-run", "job_id:journey:a", "run_id:r")
 			rows := responseData(t, detailResponse)
 			require.Len(t, rows, 1)
-			assert.Equal(t, "legacy event", rowValues(t, detailResponse, rows[0])["title"])
+			assert.Equal(t, "observed step", rowValues(t, detailResponse, rows[0])["title"])
 			detail := detailResponse.RawResponse["run"].(map[string]any)
 			status := "not_recorded"
 			if rich {

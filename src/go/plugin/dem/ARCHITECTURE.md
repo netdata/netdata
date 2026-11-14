@@ -162,8 +162,8 @@ Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates
 History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
 and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
 A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
-Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned, including
-records with legacy `site_id` text: no current-config backfill or speculative migration is performed.
+Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned: no
+current-config backfill or speculative migration is performed.
 
 DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
 All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or

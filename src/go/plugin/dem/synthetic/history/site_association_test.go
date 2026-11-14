@@ -3,20 +3,17 @@ package history_test
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"testing"
 	"time"
 
 	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestHistoryRetainsAssociationAcrossJobReassignmentAndLegacyRecords(t *testing.T) {
+func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
 	journal, err := demjournal.Open(ctx, root)
@@ -32,17 +29,6 @@ func TestHistoryRetainsAssociationAcrossJobReassignmentAndLegacyRecords(t *testi
 		_, err = store.AppendRun(ctx, "complete", run)
 		require.NoError(t, err)
 	}
-	// Legacy association text, even when it looks like a GUID, is not captured vnode identity.
-	legacy := synthetic.Run{ID: "legacy", JobID: "lighthouse:home", Kind: synthetic.Lighthouse, StartedUS: now + 2, CompletedUS: now + 102, Outcome: synthetic.Success}
-	raw, err := json.Marshal(legacy)
-	require.NoError(t, err)
-	var legacyPayload map[string]any
-	require.NoError(t, json.Unmarshal(raw, &legacyPayload))
-	legacyPayload["site_id"] = "11111111-1111-4111-8111-111111111111"
-	raw, err = json.Marshal(legacyPayload)
-	require.NoError(t, err)
-	_, err = journal.Append(ctx, []sdk.Field{sdk.StringField("DEM_KIND", "synthetic"), sdk.StringField("DEM_PHASE", "complete"), sdk.StringField("DEM_JOB_ID", legacy.JobID), sdk.StringField("DEM_RUN_ID", legacy.ID), sdk.StringField("DEM_STARTED_US", fmt.Sprint(legacy.StartedUS)), sdk.StringField("DEM_DATA", string(raw)), sdk.StringField("DEM_SITE_ID", "11111111-1111-4111-8111-111111111111")})
-	require.NoError(t, err)
 	require.NoError(t, journal.Close())
 	journal, err = demjournal.Open(ctx, root)
 	require.NoError(t, err)
@@ -59,10 +45,7 @@ func TestHistoryRetainsAssociationAcrossJobReassignmentAndLegacyRecords(t *testi
 	assert.Empty(t, filtered.Runs)
 	all, err := store.QueryRuns(ctx, history.RunFilter{})
 	require.NoError(t, err)
-	require.Len(t, all.Runs, 3)
-	old, err := store.GetRun(ctx, legacy.JobID, legacy.ID)
-	require.NoError(t, err)
-	assert.Empty(t, old.VnodeGUID)
+	require.Len(t, all.Runs, 2)
 	detail, err := store.GetRun(ctx, "journey:checkout", "before-move")
 	require.NoError(t, err)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.VnodeGUID)

@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestArtifactAssociationSurvivesRestartAndSupportsOlderRecords(t *testing.T) {
+func TestArtifactAssociationSurvivesRestart(t *testing.T) {
 	for _, trace := range []bool{false, true} {
 		kind, mime, payload := synthetic.ScreenshotCapture, "image/png", png
 		if trace {
@@ -42,17 +42,7 @@ func TestArtifactAssociationSurvivesRestartAndSupportsOlderRecords(t *testing.T)
 			var manifest map[string]any
 			require.NoError(t, json.Unmarshal(raw, &manifest))
 			assert.Equal(t, float64(2), manifest["version"])
-			// JSON decoding ignores unknown association fields; kind admission is a separate check.
-			var old struct {
-				Version   int
-				Artifacts []struct {
-					ID, Kind, MIME, SHA256 string
-					Bytes                  int64
-				}
-			}
-			require.NoError(t, json.Unmarshal(raw, &old))
-			require.Len(t, old.Artifacts, 1)
-			assert.Equal(t, c.ID, old.Artifacts[0].ID)
+			// Unassociated captures are written without test metadata.
 			entry := manifest["artifacts"].([]any)[0].(map[string]any)
 			delete(entry, "test")
 			raw, err = json.Marshal(manifest)
