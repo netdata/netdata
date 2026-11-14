@@ -10,8 +10,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
-// Match the producer: 32 eligible tests with four screenshots need 160 records.
-// This bounds optional detail only; terminal candidates have no new count cap.
+// captureDetailLimit matches the producer (src/dem-runtime/runner/capture-details.cjs):
+// 32 eligible tests with four screenshots need 160 test and link records. It
+// bounds optional detail only; terminal candidates have no count cap.
 const captureDetailLimit = 256
 
 // captureState decodes capture_details.v1. failure_trace.v1 has no records;
@@ -70,12 +71,12 @@ func (c *captureState) accept(raw json.RawMessage, redact *textRedactor) {
 			return
 		}
 		var clipped bool
-		value.Title, clipped = evidenceText(value.Title, 256, redact)
+		value.Title, clipped = evidenceText(value.Title, titleBytes, redact)
 		value.TextTruncated = value.TextTruncated || clipped
 		c.tests[data.Test.ID] = len(c.value.Tests)
 		c.value.Tests = append(c.value.Tests, value)
 	case "capture":
-		if data.Test != nil || !artifacts.ValidArtifactID(data.ID) || !validEvidenceID(data.TestID, 128) {
+		if data.Test != nil || !artifacts.ValidArtifactID(data.ID) || !validEvidenceID(data.TestID, testIDBytes) {
 			c.invalid()
 			return
 		}
@@ -122,7 +123,7 @@ func (c *captureState) admit() bool {
 }
 
 func validCaptureTest(t synthetic.CaptureTest) bool {
-	return validEvidenceID(t.ID, 128) && boundedJSON(t.Title, 256) &&
+	return validEvidenceID(t.ID, testIDBytes) && boundedJSON(t.Title, titleBytes) &&
 		slices.Contains([]string{"failed", "timedOut", "interrupted"}, t.Status) &&
 		slices.Contains([]string{"passed", "failed", "skipped"}, t.ExpectedStatus) &&
 		t.Accepted >= 0 && t.Accepted <= maxSafeInteger && t.Unaccepted >= 0 && t.Unaccepted <= maxSafeInteger

@@ -577,3 +577,44 @@ func TestBrowserWireRejectsNullAndAmbiguousMembers(t *testing.T) {
 		})
 	}
 }
+
+// TestBrowserRowStates pins which test-row states, counts and reasons a
+// test record may carry.
+func TestBrowserRowStates(t *testing.T) {
+	// Errors are counted only for observed fixture contexts.
+	record := func(state, extra string) string {
+		run := `"tests":{"observed":1},"counts":{"uncaught":1}`
+		switch state {
+		case "incomplete", "invalid":
+			run = `"tests":{"` + state + `":1},"counts":{}`
+		}
+		data := `{"record":"test","run":{` + run + `},"test":{"id":"t","state":"` + state + `"` + extra + `}}`
+		return `{"type":"extension","extension":{"feature":"browser_summary.v1","data":` + data + `}}`
+	}
+	for name, tc := range map[string]struct {
+		line string
+		want string
+	}{
+		"observed":                     {record("observed", `,"counts":{"uncaught":1}`), "partial"},
+		"observed without counts":      {record("observed", ``), "invalid"},
+		"observed with zero counts":    {record("observed", `,"counts":{}`), "invalid"},
+		"observed with reason":         {record("observed", `,"counts":{"uncaught":1},"reason":"invalid_annotation"`), "invalid"},
+		"observed with unsafe count":   {record("observed", `,"counts":{"uncaught":9007199254740992}`), "invalid"},
+		"row counts exceed run counts": {record("observed", `,"counts":{"uncaught":2}`), "invalid"},
+		"incomplete":                   {record("incomplete", ``), "partial"},
+		"incomplete with counts":       {record("incomplete", `,"counts":{"uncaught":1}`), "invalid"},
+		"incomplete with sample IDs":   {record("incomplete", `,"sample_ids":[1]`), "invalid"},
+		"incomplete with reason":       {record("incomplete", `,"reason":"invalid_annotation"`), "invalid"},
+		"invalid":                      {record("invalid", ``), "partial"},
+		"invalid annotation":           {record("invalid", `,"reason":"invalid_annotation"`), "partial"},
+		"duplicate annotation":         {record("invalid", `,"reason":"duplicate_annotation"`), "partial"},
+		"invalid with unknown reason":  {record("invalid", `,"reason":"other"`), "invalid"},
+		"invalid with counts":          {record("invalid", `,"counts":{"uncaught":1}`), "invalid"},
+		"unknown state":                {record("future", `,"counts":{"uncaught":1}`), "invalid"},
+		"row class does not advance":   {strings.Replace(record("incomplete", ``), `"incomplete":1`, `"invalid":1`, 1), "invalid"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, consumeBrowser(t, browserInit, tc.line).browser.ReportingStatus())
+		})
+	}
+}

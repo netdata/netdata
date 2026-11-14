@@ -3,7 +3,6 @@ package synthetic
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -47,7 +46,9 @@ type BrowserArgument struct {
 	Omitted string `json:"omitted,omitempty"`
 }
 
-// MarshalJSON preserves a null primitive while omission objects carry only their reason.
+// MarshalJSON stores a null primitive as {"value":null} and an omission as its
+// reason alone; plain decoding reads both back. The runner decodes the wire
+// form with stricter rules.
 func (a BrowserArgument) MarshalJSON() ([]byte, error) {
 	if a.Omitted != "" {
 		return json.Marshal(struct {
@@ -57,24 +58,6 @@ func (a BrowserArgument) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Value any `json:"value"`
 	}{a.Value})
-}
-func (a *BrowserArgument) UnmarshalJSON(raw []byte) error {
-	var wire struct {
-		Value   json.RawMessage `json:"value"`
-		Omitted string          `json:"omitted"`
-	}
-	if err := json.Unmarshal(raw, &wire); err != nil {
-		return err
-	}
-	if (wire.Value == nil) == (wire.Omitted == "") {
-		return errors.New("argument requires exactly one value or omission")
-	}
-	a.Omitted = wire.Omitted
-	a.Value = nil
-	if wire.Value != nil {
-		return json.Unmarshal(wire.Value, &a.Value)
-	}
-	return nil
 }
 
 type BrowserSample struct {
@@ -149,61 +132,4 @@ func (b *BrowserSummary) Summary() string {
 		text += " [omissions: " + strings.Join(b.Run.Omissions, ", ") + "]"
 	}
 	return text
-}
-
-// Typed JSON boundaries reject explicit null counters; omitted counters within
-// the required aggregate objects retain their sparse-zero meaning.
-func validateBrowserCounters(raw []byte, keys []string) error {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return err
-	}
-	if fields == nil {
-		return errors.New("missing counter object")
-	}
-	for _, key := range keys {
-		if value, ok := fields[key]; ok {
-			if string(value) == "null" {
-				return errors.New("null counter")
-			}
-			var n int64
-			if err := json.Unmarshal(value, &n); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-func (c *BrowserCounts) UnmarshalJSON(raw []byte) error {
-	if err := validateBrowserCounters(raw, []string{"uncaught", "console_error", "transport", "http_error"}); err != nil {
-		return err
-	}
-	type plain BrowserCounts
-	return json.Unmarshal(raw, (*plain)(c))
-}
-func (c *BrowserTestCounts) UnmarshalJSON(raw []byte) error {
-	if err := validateBrowserCounters(raw, []string{"observed", "incomplete", "invalid", "no_summary"}); err != nil {
-		return err
-	}
-	type plain BrowserTestCounts
-	return json.Unmarshal(raw, (*plain)(c))
-}
-func (a *BrowserAggregate) UnmarshalJSON(raw []byte) error {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return err
-	}
-	if fields["tests"] == nil || fields["counts"] == nil {
-		return errors.New("missing aggregate objects")
-	}
-	type plain BrowserAggregate
-	return json.Unmarshal(raw, (*plain)(a))
-}
-
-func (s *BrowserSample) UnmarshalJSON(raw []byte) error {
-	if err := validateBrowserCounters(raw, []string{"id", "args_omitted", "status"}); err != nil {
-		return err
-	}
-	type plain BrowserSample
-	return json.Unmarshal(raw, (*plain)(s))
 }
