@@ -203,7 +203,6 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 				t.Cleanup(func() { require.NoError(t, l.Close()) })
 				tr := newTraceExporter(t, lis.Addr().String(), site, c, nil)
 				b := tracedBeacon()
-				b.Site = site
 				for range attempts {
 					l.Ingest(accepted(b))
 					tr.Ingest(accepted(b))

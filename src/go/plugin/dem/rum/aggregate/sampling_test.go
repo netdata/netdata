@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
 )
 
 func sampledAgg(rate float64, keepErrors, keepPoor bool) (*Aggregator, *time.Time, *fakeHistorySink) {
@@ -188,16 +189,17 @@ func TestHasPoorVital(t *testing.T) {
 	}
 }
 
-// Session promotion and chart ratings read one threshold table, so a vital
-// promotes a session exactly when the charts count it as poor.
-func TestPoorVitalMatchesChartRating(t *testing.T) {
+// A vital promotes an otherwise unsampled session exactly when the charts
+// rate it poor, at and just above each Core Web Vitals poor limit.
+func TestPoorVitalPromotionMatchesChartRating(t *testing.T) {
+	limits := map[string]float64{beacon.LCP: 4000, beacon.FCP: 3000, beacon.TTFB: 1800, beacon.INP: 500, beacon.CLS: 0.25}
 	for _, name := range beacon.Vitals {
-		limit := thresholds[name][1]
-		for _, value := range []float64{limit, limit * 1.001} {
-			rated := stats(name, []float64{value}).Poor == 1
-			if got := poorVital(beacon.Vital{Name: name, Value: value}); got != rated {
-				t.Errorf("%s=%v: promotion %v, chart poor %v", name, value, got, rated)
-			}
+		for _, value := range []float64{limits[name], limits[name] * 1.001} {
+			a, now, _ := sampledAgg(0, false, true)
+			promoted := a.Ingest(mk(*now, "session", "/", v(name, value))).Investigated
+			chartPoor := a.Snapshot().Vitals[name].Poor == 1
+			assert.Equal(t, value > limits[name], promoted, "%s=%v promotion", name, value)
+			assert.Equal(t, promoted, chartPoor, "%s=%v promotion vs chart rating", name, value)
 		}
 	}
 }

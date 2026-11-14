@@ -242,6 +242,13 @@ func TestInitValidationContract(t *testing.T) {
 			},
 			want: "bots must be exclude or include",
 		},
+		"site rules reported before window": {
+			mutate: func(c *rum.Collector) {
+				c.PageGroups = 0
+				c.Window = confopt.Duration(30 * time.Second)
+			},
+			want: "page_groups and countries must be between 1 and 100",
+		},
 		"rates reported before public_url": {
 			mutate: func(c *rum.Collector) {
 				c.MeasureSampleRate = new(2.0)
