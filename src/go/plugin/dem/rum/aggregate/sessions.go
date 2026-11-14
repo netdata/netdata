@@ -2,6 +2,7 @@
 
 // Session detail state holds per-session summaries and bounded event rings
 // for rum-sessions and rum-session-events, independent of window session measurement.
+
 package aggregate
 
 import (

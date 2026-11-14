@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// live.go is the rum-live FUNCTION data source: a bounded ring of recently admitted
+// The rum-live Function data source is a bounded ring of recently admitted
 // document activations, application-view occurrences, vital reports and JS errors.
 // The ring belongs to this aggregator runtime and is guarded by its mutex.
+
 package aggregate
 
 import (
