@@ -2041,8 +2041,8 @@ send_fleep() {
 
     for hook in ${webhooks}; do
       data="{ "
-      data="${data} 'message': '${message}', "
-      data="${data} 'user': '${FLEEP_SENDER}' "
+      data="${data} \"message\": \"${message}\", "
+      data="${data} \"user\": \"${FLEEP_SENDER}\" "
       data="${data} }"
 
       httpcode=$(docurl -X POST --data "${data}" "https://fleep.io/hook/${hook}")
