@@ -416,7 +416,8 @@ What makes this layer predictable:
 
 ## Startup and shutdown
 
-`dem.Open` (`process.go`) builds the process in a fixed order; the command tears it down only after a clean exit:
+The command loads `dem.conf`, then `dem.Open` (`process.go`) builds the process in a fixed order; the command tears it
+down only after a clean exit:
 
 ```mermaid
 flowchart TD
@@ -443,7 +444,7 @@ flowchart TD
 ```
 
 - The journal opens first, and the configured history budget applies before any producer can append.
-- The browser runtime is either a managed host holding the installed startup selection or an administrator preload.
+- The browser runtime is either a host holding the managed or native startup selection or an administrator preload.
   The host maintains storage but never downloads or changes its selection. The runner owns the shared configured
   admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
