@@ -64,6 +64,81 @@ func BenchmarkIngest(b *testing.B) {
 	}
 }
 
+// One report touching every ingestion section and timeline kind: a paired
+// navigation revision, poor vitals, a new resource with its timing event,
+// session lifecycle, frustration, traced request and custom events, and an
+// error. "new-document" also admits a new activation each time. Timings are
+// local trends; allocation counts define the per-report envelope.
+func BenchmarkIngestFullReport(b *testing.B) {
+	for _, newDocument := range []bool{false, true} {
+		name := "same-document"
+		if newDocument {
+			name = "new-document"
+		}
+		b.Run(name, func(b *testing.B) {
+			a := New(5*time.Minute, SiteCfg{
+				VnodeGUID: "11111111-1111-4111-8111-111111111111",
+				Investigate: InvestigateCfg{
+					Rate: 1,
+				},
+				Name:       "shop",
+				PageGroups: 20,
+				Countries:  20,
+			})
+			a.SetHistorySink(discardHistory{})
+			resources, documents := make([]string, b.N), make([]string, b.N)
+			for i := range b.N {
+				resources[i], documents[i] = "resource-"+strconv.Itoa(i), "document-"+strconv.Itoa(i)
+			}
+			input := &beacon.Beacon{
+				ExperienceID: "document",
+				Site:         "shop",
+				SessionID:    "browser",
+				PageGroup:    "/products",
+				PageHost:     "shop.example.com",
+				Browser:      "Chrome",
+				Country:      "GR",
+				Device:       "desktop",
+				Received:     time.Now(),
+				Vitals: []beacon.Vital{
+					{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 5000, Element: "img.hero"},
+					{ID: "cls", Revision: 1, Name: beacon.CLS, Value: .5},
+				},
+				Navigation: &beacon.Navigation{Revision: 1, LoadMS: 900, HasLoad: true, DCLMS: 20, HasDCL: true},
+				Resources: []beacon.Resource{
+					{ID: "resource", Host: "cdn.example.com", HasDuration: true, DurationMS: 30, Initiator: "fetch"},
+				},
+				Events: []beacon.Event{
+					{Kind: beacon.EventDocument, ID: "activation", Revision: 1},
+					{Kind: beacon.EventSession, ID: "browser", Revision: 1},
+					{Kind: beacon.EventNavigation, ID: "navigation", Revision: 1},
+					{Kind: beacon.EventResource, ID: "resource", Revision: 1},
+					{Kind: beacon.EventCustom, Name: beacon.RageClickEvent, Attrs: map[string]string{"target": "button#buy"}},
+					{
+						Kind:    beacon.EventRequest,
+						TraceID: "0123456789abcdef0123456789abcdef",
+						Attrs:   map[string]string{"url.full": "https://api.example.com/cart", "http.request.method": "POST"},
+					},
+					{Kind: beacon.EventCustom, Name: "add_to_cart"},
+				},
+				Errors: []beacon.Error{{Type: "TypeError", Message: "checkout failed", Fingerprint: "6c0f3e2a91d4"}},
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := range b.N {
+				revision := uint64(i + 1)
+				if newDocument {
+					input.ExperienceID = documents[i]
+				}
+				input.Navigation.Revision, input.Events[2].Revision = revision, revision
+				input.Vitals[0].Revision, input.Vitals[1].Revision = revision, revision
+				input.Resources[0].ID, input.Events[3].ID = resources[i], resources[i]
+				a.Ingest(input)
+			}
+		})
+	}
+}
+
 // Error ingestion adds one immutable metadata object per error to retain detail
 // for later session promotion. Work stays bounded by the beacon and live ring;
 // it does not traverse persisted history. Timings are local trends, not CI gates.
