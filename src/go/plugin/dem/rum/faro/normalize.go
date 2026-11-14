@@ -171,6 +171,23 @@ func (o Options) eventAttr(rule attrRule, key, value string) (string, bool) {
 	}
 }
 
+// urlAttrKeys hold URLs; they lose query and fragment like page URLs.
+var urlAttrKeys = map[string]bool{"url.full": true, "http.url": true, "url": true, "name": true}
+
+// cleanAttr applies field semantics before text bounds and shared ingestion.
+func (o Options) cleanAttr(key, value string) string {
+	switch {
+	case urlAttrKeys[key] && (key != "name" || strings.Contains(value, "://") || strings.HasPrefix(value, "/")):
+		return o.url(value, maxAttrLen)
+	case key == "target":
+		return o.selector(value)
+	case key == "fromView" || key == "toView":
+		return o.view(value)
+	default:
+		return o.text(value, maxAttrLen)
+	}
+}
+
 // parseNonNegative reads a finite, non-negative protocol number; anything else
 // is absent.
 func parseNonNegative(s string) (float64, bool) {
