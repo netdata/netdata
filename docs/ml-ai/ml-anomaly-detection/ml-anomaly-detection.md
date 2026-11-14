@@ -12,7 +12,7 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 
 | Aspect                  | Implementation                                                                              | Benefit                                              |
 |-------------------------|---------------------------------------------------------------------------------------------|------------------------------------------------------|
-| **Algorithm**           | Unsupervised k-means clustering (k=2) via [dlib](https://github.com/davisking/dlib)        | No manual training or labeled data required          |
+| **Algorithm**           | Unsupervised k-means clustering (k=2), built into the Agent                                 | No manual training or labeled data required          |
 | **Model Architecture**  | Rolling 18 models per metric, 3-hour staggered training                                     | Eliminates 99% of false positives through consensus  |
 | **Processing Location** | Edge computation on each Netdata Agent                                                       | No cloud dependency, no data egress                  |
 | **Resource Usage**      | ~18KB RAM per metric, 2-4% of a single CPU for 10k metrics                                  | Predictable linear scaling                           |

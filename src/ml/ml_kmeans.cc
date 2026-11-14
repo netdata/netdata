@@ -2,7 +2,10 @@
 
 #include "ml_kmeans.h"
 #include "libnetdata/libnetdata.h"
-#include <dlib/clustering.h>
+
+#include <algorithm>
+#include <limits>
+#include <vector>
 
 // gcc with libstdc++ may require this,
 // but with libc++ it does not work correctly.
@@ -33,6 +36,116 @@ static inline bool ml_int64_fits_nonnegative_time_t(int64_t value)
 
 }
 
+// The k=2 k-means below replaced the dlib library (https://dlib.net, Boost
+// Software License; the agent used v19.24.8). It follows the behaviour of
+// dlib's pick_initial_centers() (linear kernel, percentile 0.01) and
+// find_clusters_using_kmeans(), down to the order of floating-point
+// operations, so that models trained, stored or streamed by agents that used
+// dlib keep producing the same results. Do not reorder the arithmetic.
+
+static constexpr size_t ML_KMEANS_K = 2;
+
+// Euclidean distance, summed from zero in row order.
+static inline calculated_number_t ml_sample_distance(const DSample &a, const DSample &b)
+{
+    calculated_number_t sum = 0.0;
+    for (size_t i = 0; i != DSample::size(); i++) {
+        calculated_number_t d = a(i) - b(i);
+        sum += d * d;
+    }
+    return std::sqrt(sum);
+}
+
+// Dot product, starting from the first product.
+static inline calculated_number_t ml_sample_dot(const DSample &a, const DSample &b)
+{
+    calculated_number_t sum = a(0) * b(0);
+    for (size_t i = 1; i != DSample::size(); i++)
+        sum += a(i) * b(i);
+    return sum;
+}
+
+// Deterministic seeding in the spirit of k-means++: the first sample is one
+// center, and the other is the sample at the 99th percentile of squared
+// distance from it (the 1% farthest are skipped as likely outliers).
+static void ml_kmeans_pick_initial_centers(std::vector<DSample> &centers, const std::vector<DSample> &samples)
+{
+    struct candidate {
+        size_t idx;
+        calculated_number_t dist;
+        bool operator<(const candidate &other) const { return dist < other.dist; }
+    };
+
+    const size_t n = samples.size();
+    std::vector<candidate> scores(n, candidate{0, std::numeric_limits<calculated_number_t>::infinity()});
+
+    centers.clear();
+    centers.push_back(samples[0]);
+
+    const DSample &first = centers[0];
+    const calculated_number_t first_sq = ml_sample_dot(first, first);
+    for (size_t s = 0; s != n; s++) {
+        const calculated_number_t dist = first_sq + ml_sample_dot(samples[s], samples[s]) - 2 * ml_sample_dot(samples[s], first);
+        if (dist < scores[s].dist)
+            scores[s] = candidate{s, dist};
+    }
+
+    std::sort(scores.begin(), scores.end());
+
+    const size_t pick = static_cast<size_t>(std::max(0.0, (double) n - (double) n * 0.01 - 1));
+    centers.push_back(samples[scores[pick].idx]);
+}
+
+// Lloyd's algorithm: assign every sample to its nearest center, move each
+// center to the mean of its samples, stop when no assignment changes.
+static void ml_kmeans_find_clusters(std::vector<DSample> &centers, const std::vector<DSample> &samples, unsigned max_iters)
+{
+    const size_t n = samples.size();
+    std::vector<size_t> assignments(n, n);
+
+    bool changed = true;
+    for (unsigned iter = 0; changed && iter < max_iters; iter++) {
+        changed = false;
+        size_t counts[ML_KMEANS_K] = {};
+
+        for (size_t i = 0; i != n; i++) {
+            calculated_number_t best_dist = std::numeric_limits<calculated_number_t>::max();
+            size_t best = 0;
+            for (size_t c = 0; c != ML_KMEANS_K; c++) {
+                calculated_number_t dist = ml_sample_distance(centers[c], samples[i]);
+                if (dist < best_dist) {
+                    best_dist = dist;
+                    best = c;
+                }
+            }
+
+            if (assignments[i] != best) {
+                changed = true;
+                assignments[i] = best;
+            }
+            counts[best]++;
+        }
+
+        for (DSample &center : centers)
+            center.fill(0.0);
+
+        for (size_t i = 0; i != n; i++) {
+            DSample &center = centers[assignments[i]];
+            for (size_t r = 0; r != DSample::size(); r++)
+                center(r) += samples[i](r);
+        }
+
+        for (size_t c = 0; c != ML_KMEANS_K; c++) {
+            if (counts[c] == 0)
+                continue;
+
+            const calculated_number_t scale = 1.0 / (calculated_number_t) counts[c];
+            for (calculated_number_t &x : centers[c])
+                x = x * scale;
+        }
+    }
+}
+
 void
 ml_kmeans_init(ml_kmeans_t *kmeans)
 {
@@ -61,20 +174,14 @@ ml_kmeans_train(ml_kmeans_t *kmeans, const std::vector<DSample> &preprocessed_fe
         return;
     }
 
-    // Reserve capacity for cluster centers BEFORE calling dlib functions to prevent
-    // reallocation during lazy evaluation. dlib uses expression templates that hold
-    // references to vector elements, and reallocation would invalidate those references,
-    // causing heap-use-after-free when multiple threads train models concurrently.
-    kmeans->cluster_centers.reserve(2);
-
-    dlib::pick_initial_centers(2, kmeans->cluster_centers, preprocessed_features);
-    dlib::find_clusters_using_kmeans(preprocessed_features, kmeans->cluster_centers, max_iters);
+    ml_kmeans_pick_initial_centers(kmeans->cluster_centers, preprocessed_features);
+    ml_kmeans_find_clusters(kmeans->cluster_centers, preprocessed_features, max_iters);
 
     for (const auto &preprocessed_feature : preprocessed_features) {
         calculated_number_t mean_dist = 0.0;
 
         for (const auto &cluster_center : kmeans->cluster_centers) {
-            mean_dist += dlib::length(cluster_center - preprocessed_feature);
+            mean_dist += ml_sample_distance(cluster_center, preprocessed_feature);
         }
 
         mean_dist /= kmeans->cluster_centers.size();
@@ -115,7 +222,7 @@ ml_kmeans_anomaly_score(const ml_kmeans_inlined_t *inlined_km, const DSample &DS
 
     calculated_number_t mean_dist = 0.0;
     for (const auto &CC: inlined_km->cluster_centers)
-        mean_dist += dlib::length(CC - DS);
+        mean_dist += ml_sample_distance(CC, DS);
 
     mean_dist /= inlined_km->cluster_centers.size();
 
@@ -295,12 +402,11 @@ bool ml_kmeans_deserialize(ml_kmeans_inlined_t *inlined_km, struct json_object *
         }
 
         size_t size = json_object_array_length(cc_obj);
-        if (size != 6) {
+        if (size != DSample::size()) {
             netdata_log_error("Failed to deserialize kmeans: expected cluster center array of size 6");
             return false;
         }
 
-        inlined_km->cluster_centers[i].set_size(size);
         for (size_t j = 0; j < size; j++) {
             struct json_object *value = json_object_array_get_idx(cc_obj, j);
             calculated_number_t cn;

@@ -2,9 +2,14 @@
 
 #include "ml_private.h"
 
+#include <algorithm>
 #include <array>
-
-#include <dlib/error.h>
+#include <chrono>
+#include <cmath>
+#include <limits>
+#include <thread>
+#include <utility>
+#include <vector>
 
 #include "ad_charts.h"
 #include "sqlite3.h"
@@ -395,12 +400,11 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    for (const DSample &ds : inlined_km->cluster_centers) {
-        if (ds.size() != 6)
-            fatal("Expected dsample with 6 dimensions, got %ld", ds.size());
+    // The models table has 6 columns per cluster center.
+    static_assert(DSample::size() == 6, "models table stores 6 values per cluster center");
 
-        for (long idx = 0; idx != ds.size(); idx++) {
-            calculated_number_t cn = ds(idx);
+    for (const DSample &ds : inlined_km->cluster_centers) {
+        for (calculated_number_t cn : ds) {
             int rc = sqlite3_bind_double(res, ++param, cn);
             if (unlikely(rc != SQLITE_OK))
                 goto bind_fail;
@@ -569,7 +573,6 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
 
-        km.cluster_centers[0].set_size(Cfg.lag_n + 1);
         km.cluster_centers[0](0) = sqlite3_column_double(res, 4);
         km.cluster_centers[0](1) = sqlite3_column_double(res, 5);
         km.cluster_centers[0](2) = sqlite3_column_double(res, 6);
@@ -577,7 +580,6 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[0](4) = sqlite3_column_double(res, 8);
         km.cluster_centers[0](5) = sqlite3_column_double(res, 9);
 
-        km.cluster_centers[1].set_size(Cfg.lag_n + 1);
         km.cluster_centers[1](0) = sqlite3_column_double(res, 10);
         km.cluster_centers[1](1) = sqlite3_column_double(res, 11);
         km.cluster_centers[1](2) = sqlite3_column_double(res, 12);
@@ -1100,27 +1102,7 @@ ml_dimension_train_model(ml_worker_t *worker, ml_dimension_t *dim)
         }
 
         ml_kmeans_init(&worker->training_kmeans);
-        try {
-            ml_kmeans_train(&worker->training_kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
-        }
-        catch (const dlib::error &e) {
-            // dlib (kmeans/matrix) can throw dlib::fatal_error (and other
-            // dlib::error subtypes) on numerical edge cases. Letting it escape
-            // ml_train_main terminates the process. Skip this dimension's model
-            // for this round instead. A non-dlib std::exception such as
-            // std::bad_alloc is a genuine fatal condition, not a transient
-            // training failure, so it is intentionally left to propagate.
-            // Clear training_in_progress here (the normal path clears it via
-            // ml_dimension_update_models()); otherwise the precheck would keep
-            // returning TRAINING_IN_PROGRESS and the dimension would be stuck.
-            // Do NOT finalize constant state -- this is a transient failure and
-            // the dimension should retrain normally next round.
-            netdata_log_error("ML: KMeans training raised an exception (%s); skipping model creation for this dimension this round", e.what());
-            spinlock_lock(&dim->slock);
-            dim->training_in_progress = false;
-            spinlock_unlock(&dim->slock);
-            return ML_WORKER_RESULT_NOT_ENOUGH_COLLECTED_VALUES;
-        }
+        ml_kmeans_train(&worker->training_kmeans, worker->training_samples, Cfg.max_kmeans_iters, training_response.query_after_t, training_response.query_before_t);
     }
 
     // update models
