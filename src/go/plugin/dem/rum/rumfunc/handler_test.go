@@ -59,16 +59,21 @@ func TestDataRequiresMemberPermissionsAndInfoDoesNot(t *testing.T) {
 				t.Run(name, func(t *testing.T) {
 					var reads []string
 					handler := rumfunc.New(recordingSource{&reads}, nil)
-					response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-						Method:      declaration.ID,
-						Args:        args,
-						Permissions: permissions,
-					})
-					assert.Equal(t, funcapi.ErrorResponse(403, "member permissions are required"), response)
-					// Sessions and errors read site sampling policy for their help before the check.
-					assert.Subset(t, []string{"Sites"}, reads, "no rows are read without member permissions")
+					denied := funcapi.ErrorResponse(403, "member permissions are required")
+					for _, requestArgs := range [][]string{
+						args,
+						append([]string{"unsupported:1"}, args...),
+						append([]string{"vnode:a", "vnode_guid:"}, args...),
+					} {
+						response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+							Method:      declaration.ID,
+							Args:        requestArgs,
+							Permissions: permissions,
+						})
+						assert.Equal(t, denied, response, "checked before arguments: %v", requestArgs)
+					}
+					assert.Empty(t, reads, "nothing is read without member permissions")
 
-					reads = nil
 					info := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 						Method:      declaration.ID,
 						Info:        true,
@@ -81,17 +86,21 @@ func TestDataRequiresMemberPermissionsAndInfoDoesNot(t *testing.T) {
 			}
 			for _, permissions := range []string{"0x1b", "0x7b"} {
 				var reads []string
-				response := rumfunc.New(recordingSource{&reads}, nil).HandleRaw(
-					context.Background(),
-					funcapi.RawMethodRequest{
-						Method:      declaration.ID,
-						Args:        args,
-						Permissions: permissions,
-					},
-				)
+				handler := rumfunc.New(recordingSource{&reads}, nil)
+				response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+					Method:      declaration.ID,
+					Args:        args,
+					Permissions: permissions,
+				})
 				require.NotNil(t, response.RawResponse, permissions)
 				assert.Equal(t, 200, response.RawResponse["status"])
 				assert.Len(t, response.RawResponse["data"], 1)
+				unsupported := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+					Method:      declaration.ID,
+					Args:        append([]string{"unsupported:1"}, args...),
+					Permissions: permissions,
+				})
+				assert.Equal(t, funcapi.ErrorResponse(400, `unsupported argument "unsupported"`), unsupported)
 			}
 		})
 	}

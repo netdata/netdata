@@ -72,6 +72,12 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	spec := methods[i]
+	// Info is metadata; data needs member access before any argument or source is read.
+	if !req.Info {
+		if r := rawfunc.RequireMember(req); r != nil {
+			return r
+		}
+	}
 	args, err := rawfunc.ParseArgs(req, spec.Params)
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
@@ -93,9 +99,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			Help:   response["help"].(string),
 		}
 	}
-	if r := rawfunc.RequireMember(req); r != nil {
-		return r
-	}
 	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r
 	}
@@ -103,6 +106,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if err != nil {
 		return functionError(err)
 	}
+	// The table already holds an empty data list for methods without rows.
 	if rows != nil {
 		response["data"] = rows
 	}
