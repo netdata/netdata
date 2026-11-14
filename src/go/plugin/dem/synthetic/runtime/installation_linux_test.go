@@ -240,6 +240,25 @@ func TestPublishedInstallRefusesUnverifiedRelease(t *testing.T) {
 	require.Nil(t, status.Release)
 }
 
+// A caller changing the manifest a candidate hands out cannot change what the
+// candidate prepares or selects: only the verified release is installed.
+func TestCandidateManifestChangesDoNotReachSelection(t *testing.T) {
+	s, _ := testStore(t)
+	release, archive, load := publishedFixture(t, 1)
+	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: InstallRelease, Updates: ManualUpdates}, load)
+	require.NoError(t, err)
+	changed := candidate.Manifest()
+	changed.Bindings[0].Offset++
+	changed.Bindings[0].Expected[0] = '!'
+	require.Equal(t, release.Manifest, candidate.Manifest())
+	require.NoError(t, candidate.Import(context.Background(), archive))
+	require.NoError(t, candidate.Select())
+	require.NoError(t, candidate.Close())
+	status, err := s.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, release, *status.Release)
+}
+
 // A mirror may move the archive without changing executable identity: the
 // prepared generation is reused and the selection stays healthy.
 func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {

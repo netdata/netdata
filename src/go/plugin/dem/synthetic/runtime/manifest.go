@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"path"
 	goruntime "runtime"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -141,6 +142,16 @@ func hostPlatform() string { return "linux/" + goruntime.GOARCH }
 
 func supportedPlatform(platform string) bool {
 	return platform == "linux/amd64" || platform == "linux/arm64"
+}
+
+// clone returns a copy that shares no binding bytes with m. Accessors hand out
+// clones, so a caller cannot change a manifest that a candidate later selects.
+func (m Manifest) clone() Manifest {
+	m.Bindings = slices.Clone(m.Bindings)
+	for i := range m.Bindings {
+		m.Bindings[i].Expected = bytes.Clone(m.Bindings[i].Expected)
+	}
+	return m
 }
 
 // sameManifest compares every signed field, including the archive URL.

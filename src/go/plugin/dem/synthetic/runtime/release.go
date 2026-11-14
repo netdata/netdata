@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
-	"slices"
 
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
@@ -98,10 +97,7 @@ type VerifiedRelease struct{ release Release }
 // changes what an installation selects.
 func (v VerifiedRelease) Release() Release {
 	r := v.release
-	r.Manifest.Bindings = slices.Clone(r.Manifest.Bindings)
-	for i := range r.Manifest.Bindings {
-		r.Manifest.Bindings[i].Expected = bytes.Clone(r.Manifest.Bindings[i].Expected)
-	}
+	r.Manifest = r.Manifest.clone()
 	return r
 }
 

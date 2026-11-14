@@ -132,7 +132,7 @@ type Consumer struct {
 	closed   bool
 }
 
-func (c *Consumer) Manifest() Manifest { return c.manifest }
+func (c *Consumer) Manifest() Manifest { return c.manifest.clone() }
 
 func (c *Consumer) BeginUse() (*Use, error) {
 	c.mu.Lock()
