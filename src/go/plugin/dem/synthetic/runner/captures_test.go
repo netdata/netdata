@@ -224,7 +224,8 @@ func TestTraceCandidatesUseRequestAuthority(t *testing.T) {
 }
 
 // TestCaptureWireBounds accepts each capture_details.v1 field budget at its
-// limit and invalidates the feature one past it.
+// limit and invalidates the feature one past it. Records past the record
+// budget are truncated instead; the feature stays valid.
 func TestCaptureWireBounds(t *testing.T) {
 	text := func(n int) string { return strings.Repeat("x", n-2) }
 	withTitle := func(n int) map[string]any {
