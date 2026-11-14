@@ -205,14 +205,14 @@ func (n *Native) acquire(phase string, expected *Manifest) (consumer *NativeCons
 	if state.Phase != phase || state.Target == nil {
 		return nil, ErrNativeClosed
 	}
-	if expected != nil && !sameNativeManifest(*state.Target, *expected) {
+	if expected != nil && !sameManifest(*state.Target, *expected) {
 		return nil, errors.New("native qualification target differs from the root gate")
 	}
 	paths, m, err := readNativePayload(n.config.PayloadPath)
 	if err != nil {
 		return nil, err
 	}
-	if !sameNativeManifest(m, *state.Target) {
+	if !sameManifest(m, *state.Target) {
 		return nil, errors.New("native payload differs from the admitted target")
 	}
 	var owner *claim
@@ -260,7 +260,7 @@ func (c *NativeConsumer) BeginUse() (use *Use, result error) {
 	if err != nil {
 		return nil, err
 	}
-	if state.Phase != c.phase || state.Target == nil || !sameNativeManifest(*state.Target, c.manifest) {
+	if state.Phase != c.phase || state.Target == nil || !sameManifest(*state.Target, c.manifest) {
 		return nil, ErrNativeClosed
 	}
 	err = c.native.ledger.withLock(func() error {

@@ -9,13 +9,12 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"strings"
 	"syscall"
 )
 
 func validateNativeConfig(config NativeConfig) error {
-	if goruntime.GOARCH != "amd64" && goruntime.GOARCH != "arm64" {
+	if !SupportedHost() {
 		return errors.New("native browser runtime requires Linux amd64 or arm64")
 	}
 	for _, path := range []string{config.ControlPath, config.PayloadPath} {
@@ -173,7 +172,7 @@ func readNativeRecord(root *os.Root, path string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	m := record.Manifest
-	if record.Format != 1 || record.Path != path || m.Platform != "linux/"+goruntime.GOARCH {
+	if record.Format != 1 || record.Path != path || !m.MatchesHost() {
 		return Manifest{}, errors.New("native package identity, platform or bound prefix differs")
 	}
 	if err := m.Validate(); err != nil {

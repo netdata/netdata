@@ -7,7 +7,6 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -16,7 +15,7 @@ import (
 )
 
 // bindPrefix operates only on unpublished, digest-verified staging files. The
-// interpreter names the FINAL generation, never the staging directory.
+// interpreter names the final generation, never the staging directory.
 func bindPrefix(root *os.Root, final string, m Manifest) error {
 	if !filepath.IsAbs(final) || filepath.Clean(final) != final || strings.ContainsAny(final, "\x00\r\n") || !utf8.ValidString(final) {
 		return errors.New("runtime prefix must be a clean absolute UTF-8 path")
@@ -122,6 +121,13 @@ func lstatPlain(root *os.Root, name string) (os.FileInfo, error) {
 	return root.Lstat(name)
 }
 
+type Paths struct {
+	EntryPoint   string
+	Node         string
+	Dependencies string
+	Browser      string
+}
+
 // boundPaths names the executable entry points of a payload bound to prefix.
 func boundPaths(prefix string, layout Layout) Paths {
 	return Paths{
@@ -193,16 +199,6 @@ func plainExistingParents(root *os.Root, name string) error {
 		}
 	}
 	return nil
-}
-
-func writeNewFile(root *os.Root, name string, contents []byte, mode os.FileMode) error {
-	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
-	if err != nil {
-		return err
-	}
-	_, err = io.Copy(f, bytes.NewReader(contents))
-	err = errors.Join(err, f.Chmod(mode), f.Sync())
-	return errors.Join(err, f.Close())
 }
 
 func shellQuote(value string) string {

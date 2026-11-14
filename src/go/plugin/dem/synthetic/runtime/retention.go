@@ -12,23 +12,6 @@ import (
 	"strings"
 )
 
-type reservation struct {
-	Generation string `json:"generation"`
-	Bytes      int64  `json:"bytes"`
-}
-
-type inventory struct {
-	ownershipInventory
-	selected         *Manifest
-	release          *Release
-	automaticUpdates bool
-	selectionError   error
-	generationErrors map[string]error
-	generations      map[string]generation
-	preparing        map[string]int
-	reservations     map[string]reservation
-}
-
 // Status describes logical managed files and protection. ReservedBytes is the
 // unwritten remainder of active reservations, not additional used disk bytes.
 // ProtectedBytes and ReclaimableBytes count each owned file once. CandidateBytes,
@@ -64,50 +47,6 @@ type Status struct {
 	CleanupError          string            `json:"cleanup_error,omitempty"`
 }
 
-func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
-	owned, err := s.ownershipLedger.inventoryLocked(reconcile)
-	inv := inventory{
-		ownershipInventory: owned,
-		generations:        make(map[string]generation),
-		preparing:          make(map[string]int),
-		reservations:       make(map[string]reservation),
-	}
-	if err != nil {
-		return inv, err
-	}
-	staging, err := s.childDirectories("staging")
-	if err != nil {
-		return inv, err
-	}
-	for _, name := range staging {
-		alive, err := s.ownerAlive(name)
-		if err != nil {
-			return inv, err
-		}
-		if !alive {
-			inv.reclaimableRecords[name] = true
-			if !reconcile {
-				continue
-			}
-			if err := s.removeOwned(name); err != nil {
-				return inv, err
-			}
-			continue
-		}
-		var r reservation
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
-			return inv, err
-		}
-		if !validID(r.Generation) || r.Bytes <= 0 {
-			return inv, errors.New("invalid runtime reservation")
-		}
-		inv.reservations[name] = r
-		inv.protectedRecords[name] = true
-		inv.preparing[r.Generation]++
-	}
-	return inv, nil
-}
-
 func (s *Store) statusLocked(inv inventory) (Status, error) {
 	status := Status{
 		Selected:              inv.selected,
@@ -115,7 +54,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		AutomaticUpdates:      inv.automaticUpdates,
 		LimitBytes:            s.config.MaxBytes,
 		ProcessGenerations:    len(inv.processes),
-		BootRecoveryAvailable: s.boot.Verified,
+		BootRecoveryAvailable: s.ledger.boot.Verified,
 	}
 	if inv.selectionError != nil {
 		status.SelectionError = inv.selectionError.Error()
@@ -126,7 +65,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 			status.GenerationErrors[id] = err.Error()
 		}
 	}
-	if err := errors.Join(inv.cleanupError, s.cleanupError); err != nil {
+	if err := errors.Join(inv.cleanupError, s.ledger.cleanupError); err != nil {
 		status.CleanupError = err.Error()
 	}
 	var err error
@@ -136,7 +75,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 		return status, err
 	}
 	for name, r := range inv.reservations {
-		// Use the SAME observation for used and reserved bytes: writers run
+		// Use the same observation for used and reserved bytes: writers run
 		// outside exclusion, so two scans could undercount a growing operation.
 		written := bytesByRecord[name]
 		status.PreparingBytes += written
@@ -196,7 +135,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 func (s *Store) Inspect() (Status, error) {
 	status := Status{
 		LimitBytes:            s.config.MaxBytes,
-		BootRecoveryAvailable: s.boot.Verified,
+		BootRecoveryAvailable: s.ledger.boot.Verified,
 	}
 	err := s.withLock(func() error {
 		inv, err := s.inspectInventoryLocked(false)
@@ -221,8 +160,8 @@ func (s *Store) Inspect() (Status, error) {
 func (s *Store) Sweep() error {
 	var cleanupVersion uint64
 	err := s.withLock(func() error {
-		cleanupVersion = s.cleanupErrorVersion
-		if err := s.retryOwnerReleasesLocked(); err != nil {
+		cleanupVersion = s.ledger.cleanupErrorVersion
+		if err := s.ledger.retryOwnerReleasesLocked(); err != nil {
 			return err
 		}
 		inv, err := s.inventoryLocked(true)
@@ -237,7 +176,7 @@ func (s *Store) Sweep() error {
 		return inv.cleanupError
 	})
 	result := errors.Join(err, s.flushTrash())
-	s.finishSweep(cleanupVersion, result)
+	s.ledger.finishSweep(cleanupVersion, result)
 	return result
 }
 
@@ -325,15 +264,11 @@ func (s *Store) flushTrash() error {
 			}
 		}
 		var err error
-		names, err = s.trashSnapshotLocked()
+		names, err = s.ledger.trashSnapshotLocked()
 		return err
 	})
 	if err != nil {
 		return err
 	}
-	return s.deleteTrash(names)
-}
-
-func (inv inventory) protected(id string) bool {
-	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 || inv.candidates[id] > 0 || inv.preparing[id] > 0 || inv.uses[id] > 0
+	return s.ledger.deleteTrash(names)
 }

@@ -4,33 +4,20 @@ package runtime
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 
-	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func releaseFixture(t *testing.T) (Release, *openpgp.Entity) {
-	t.Helper()
-	m, _ := bundleFixture(t, "signed-release")
-	m.Platform = "linux/arm64"
-	m.Archive.URL = "https://artifacts.example.invalid/dem-runtime/1/arm64/" + m.Archive.SHA256 + ".tar.zst"
-	return Release{
-		Format:   1,
-		Sequence: 23,
-		Manifest: m,
-		Sources: ReleaseSource{
-			URL:    "https://artifacts.example.invalid/dem-runtime/1/sources.tar.zst",
-			SHA256: strings.Repeat("a", 64),
-			Bytes:  100,
-		},
-	}, pgptest.Key(t, 1)
-}
 
 func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	release, key := releaseFixture(t)
@@ -39,7 +26,12 @@ func TestReleaseAuthenticatesCompletePreparation(t *testing.T) {
 	require.NoError(t, err)
 	verified, err := VerifyRelease(data, testTrust(t, public))
 	require.NoError(t, err)
-	assert.Equal(t, release, verified)
+	assert.Equal(t, release, verified.Release())
+	// The accessor returns a copy: changing it cannot change what is installed.
+	changed := verified.Release()
+	changed.Manifest.Bindings[0].Expected[0] = '!'
+	changed.Manifest.Bindings[1].Offset++
+	assert.Equal(t, release, verified.Release())
 	for _, field := range []string{"binding", "layout", "bounds", "sequence", "sources"} {
 		t.Run(field, func(t *testing.T) {
 			var envelope releaseEnvelope
@@ -113,21 +105,21 @@ func TestReleaseVerificationRequiresLocalTrustAndBoundedMetadata(t *testing.T) {
 
 func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 	current, _ := releaseFixture(t)
-	for _, scenario := range []struct {
-		name   string
+	scenarios := map[string]struct {
 		change func(*Release)
 		update bool
 		err    string
 	}{
-		{name: "same release"},
-		{name: "new publication", change: func(r *Release) { r.Sequence++ }, update: true},
-		{name: "replayed older release", change: func(r *Release) { r.Sequence-- }, err: "regress"},
-		{name: "reused sequence", change: func(r *Release) { r.Manifest.Version += ".changed" }, err: "reused"},
-		{name: "changed binding with same archive", change: func(r *Release) { r.Manifest.Bindings[0].Offset++ }, err: "reused"},
-		{name: "other architecture", change: func(r *Release) { r.Manifest.Platform = "linux/amd64" }, err: "platform differs"},
-		{name: "missing publication order", change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
-	} {
-		t.Run(scenario.name, func(t *testing.T) {
+		"same release":                      {},
+		"new publication":                   {change: func(r *Release) { r.Sequence++ }, update: true},
+		"replayed older release":            {change: func(r *Release) { r.Sequence-- }, err: "regress"},
+		"reused sequence":                   {change: func(r *Release) { r.Manifest.Version += ".changed" }, err: "reused"},
+		"changed binding with same archive": {change: func(r *Release) { r.Manifest.Bindings[0].Offset++ }, err: "reused"},
+		"other architecture":                {change: func(r *Release) { r.Manifest.Platform = "linux/amd64" }, err: "platform differs"},
+		"missing publication order":         {change: func(r *Release) { r.Sequence = 0 }, err: "sequence"},
+	}
+	for name, scenario := range scenarios {
+		t.Run(name, func(t *testing.T) {
 			data, err := json.Marshal(current)
 			require.NoError(t, err)
 			var next Release
@@ -146,9 +138,58 @@ func TestReleaseUpdatePreservesPublicationOrder(t *testing.T) {
 	}
 }
 
-func testTrust(t *testing.T, key *openpgp.Entity) *ReleaseTrust {
-	t.Helper()
-	trust, err := ParseReleaseKeyring(pgptest.Public(t, key))
+func TestReleaseAcquisitionAuthenticatesRemoteAndOffline(t *testing.T) {
+	release, key := releaseFixture(t)
+	keys := testTrust(t, key)
+	signed, err := pgptest.Release(release, key)
 	require.NoError(t, err)
-	return trust
+	var calls atomic.Int32
+	server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		_, _ = w.Write(signed)
+	})
+	got, err := FetchRelease(context.Background(), server.URL, keys)
+	require.NoError(t, err)
+	require.Equal(t, release, got.Release())
+	path := filepath.Join(t.TempDir(), "release.json")
+	require.NoError(t, os.WriteFile(path, signed, 0600))
+	got, err = ReadRelease(path, keys)
+	require.NoError(t, err)
+	require.Equal(t, release, got.Release())
+	_, err = FetchRelease(context.Background(), server.URL, nil)
+	require.ErrorContains(t, err, "no runtime release verification key")
+	require.Equal(t, int32(1), calls.Load(), "missing trust must fail before network access")
+	wrong := pgptest.Key(t, 9)
+	_, err = ReadRelease(path, testTrust(t, wrong))
+	require.ErrorContains(t, err, "not signed by a trusted key")
+}
+
+func TestReleaseAcquisitionBoundsAndTransport(t *testing.T) {
+	_, key := releaseFixture(t)
+	keys := testTrust(t, key)
+	for _, address := range []string{"http://example.invalid/release", "https://user:secret@example.invalid/release", "https://example.invalid/release#fragment"} {
+		_, err := FetchRelease(context.Background(), address, keys)
+		require.ErrorContains(t, err, "requires HTTPS")
+		require.NotContains(t, err.Error(), "secret")
+	}
+	server := inactivityServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/redirect":
+			http.Redirect(w, r, "http://example.invalid/release", http.StatusFound)
+		case "/failure":
+			w.WriteHeader(http.StatusServiceUnavailable)
+		default:
+			_, _ = io.WriteString(w, strings.Repeat(" ", ReleaseEnvelopeLimit+1))
+		}
+	})
+	_, err := FetchRelease(context.Background(), server.URL, keys)
+	require.ErrorContains(t, err, "exceeds protocol size limit")
+	_, err = FetchRelease(context.Background(), server.URL+"/redirect", keys)
+	require.ErrorIs(t, err, errDownloadRedirect)
+	_, err = FetchRelease(context.Background(), server.URL+"/failure", keys)
+	require.ErrorContains(t, err, "HTTP 503")
+	path := filepath.Join(t.TempDir(), "oversized.json")
+	require.NoError(t, os.WriteFile(path, bytes.Repeat([]byte{' '}, ReleaseEnvelopeLimit+1), 0600))
+	_, err = ReadRelease(path, keys)
+	require.ErrorContains(t, err, "exceeds protocol size limit")
 }

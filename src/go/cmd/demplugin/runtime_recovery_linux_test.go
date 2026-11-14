@@ -126,7 +126,7 @@ func TestRuntimeRepairValidatesTrustBeforeChangingDamagedStore(t *testing.T) {
 				release, err := runtime.ReadRelease(releasePath, adminTrust(t))
 				require.NoError(t, err)
 				wrong := pgptest.Key(t, 30)
-				data, err := pgptest.Release(release, wrong)
+				data, err := pgptest.Release(release.Release(), wrong)
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(releasePath, data, 0600))
 			}

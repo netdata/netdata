@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/internal/demruntimetest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -96,7 +97,7 @@ func TestPrepareNativePackageFailuresNeverComplete(t *testing.T) {
 			case "bounds":
 				m.Archive.Entries++
 			case "native metadata":
-				m.Archive, data = archiveFixture(t, []fixtureEntry{{name: "native.json", contents: []byte(`{"format":1}`), mode: 0644}})
+				m.Archive, data = archiveFixture(t, []demruntimetest.Entry{{Name: "native.json", Contents: []byte(`{"format":1}`), Mode: 0644}})
 			}
 			archive := filepath.Join(t.TempDir(), "archive")
 			require.NoError(t, os.WriteFile(archive, data, 0600))
@@ -142,14 +143,14 @@ func TestPrepareNativePackageRejectsNativeLayoutThroughSymlink(t *testing.T) {
 	// requires each declared executable/data layout path to have plain parents.
 	m.Layout.Loader = "alias/loader.so"
 	program := append(make([]byte, 32), m.Bindings[0].Expected...)
-	entries := []fixtureEntry{
-		{name: m.Layout.Node, contents: program, mode: 0755},
-		{name: m.Layout.Browser, contents: program, mode: 0755},
-		{name: "lib/loader.so", contents: []byte("loader"), mode: 0755},
-		{name: "alias", link: "lib", kind: tar.TypeSymlink},
-		{name: m.Layout.EntryPoint, contents: []byte("export {}"), mode: 0644},
-		{name: "dependencies/package.json", contents: []byte("{}"), mode: 0644},
-		{name: "fonts/font.ttf", contents: []byte("font"), mode: 0644},
+	entries := []demruntimetest.Entry{
+		{Name: m.Layout.Node, Contents: program, Mode: 0755},
+		{Name: m.Layout.Browser, Contents: program, Mode: 0755},
+		{Name: "lib/loader.so", Contents: []byte("loader"), Mode: 0755},
+		{Name: "alias", Link: "lib", Kind: tar.TypeSymlink},
+		{Name: m.Layout.EntryPoint, Contents: []byte("export {}"), Mode: 0644},
+		{Name: "dependencies/package.json", Contents: []byte("{}"), Mode: 0644},
+		{Name: "fonts/font.ttf", Contents: []byte("font"), Mode: 0644},
 	}
 	var data []byte
 	m.Archive, data = archiveFixture(t, entries)

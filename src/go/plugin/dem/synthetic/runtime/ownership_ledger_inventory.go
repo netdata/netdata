@@ -136,6 +136,27 @@ func (s *ownershipLedger) finishSweep(cleanupVersion uint64, result error) {
 	}
 }
 
-func (inv ownershipInventory) inUse() bool {
-	return len(inv.processes) > 0 || len(inv.candidates) > 0 || len(inv.uses) > 0
+// trashSnapshotLocked requires the payload owner's barriers first when sharing
+// its root. This method never sweeps or deletes managed payloads by itself.
+func (s *ownershipLedger) trashSnapshotLocked() ([]string, error) {
+	names, err := s.childDirectories("trash")
+	if err != nil {
+		return nil, err
+	}
+	for _, parent := range []string{"uses", "claims", "trash", "initializing"} {
+		if err := syncDirectory(s.root, parent); err != nil {
+			return nil, err
+		}
+	}
+	return names, nil
+}
+
+// Delete only the established snapshot outside coordination exclusion. New
+// retirements are left for a later sweep with their own durability barriers.
+func (s *ownershipLedger) deleteTrash(names []string) error {
+	var result error
+	for _, name := range names {
+		result = errors.Join(result, s.root.RemoveAll(name))
+	}
+	return errors.Join(result, syncDirectory(s.root, "trash"))
 }

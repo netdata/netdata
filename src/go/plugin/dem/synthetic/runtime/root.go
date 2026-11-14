@@ -14,10 +14,11 @@ import (
 )
 
 var storeDirectories = []string{"generations", "claims", "uses", "staging", "trash", "initializing"}
+
 var storeLocks = []string{"coordination.lock", "installation.lock"}
 
-// The existing managed format is unchanged. Proof-only roots have a distinct
-// format so neither owner can reinterpret or bootstrap the other's state.
+// Managed stores and proof-only ownership roots have distinct formats, so
+// neither owner can reinterpret or bootstrap the other's state.
 type runtimeRootLayout int
 
 const (
@@ -40,7 +41,9 @@ func (layout runtimeRootLayout) locks() []string {
 }
 
 const layoutName = "layout.json"
+
 const layoutTemporaryPrefix = ".dem-layout-"
+
 const publicationName = ".dem-runtime-publication.json"
 
 type storeLayout struct {
@@ -393,7 +396,7 @@ func (layout runtimeRootLayout) validate(root *os.Root) error {
 		if err != nil {
 			return err
 		}
-		if !info.Mode().IsRegular() || info.Mode().Perm() != 0600 || info.Size() != 0 {
+		if !validLockFile(info) {
 			return fmt.Errorf("invalid runtime lock: %s", name)
 		}
 	}

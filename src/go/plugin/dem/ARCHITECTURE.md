@@ -501,7 +501,7 @@ Synthetic packages:
 | `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
-| `synthetic/runtime` | Trusted bundle verification, installation inventory, process/execution protection and automatic retirement |
+| `synthetic/runtime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement and native package admission |
 | `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
@@ -1106,7 +1106,8 @@ Explicit installation and protection (`synthetic/runtime`):
   and lock identities are preserved. Preload readers require ready state without modifying it.
 - Administrator commands hold candidate protection and serialize installation, update, repair and uninstall.
   Install/update/repair verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse,
-  then publish the selection.
+  then publish the selection. Installation accepts only a `VerifiedRelease`, which only signature verification
+  against a trusted keyring produces.
 - Selected installation, process claims, candidates and each invocation's durable use pin protect files independently.
   Preparation reservations account for workspace. The selected release never expires for inactivity; process and
   execution protection keep older releases safe after an update.

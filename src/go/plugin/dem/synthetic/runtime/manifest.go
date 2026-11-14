@@ -4,12 +4,16 @@
 package runtime
 
 import (
+	"bytes"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/url"
 	"path"
+	goruntime "runtime"
+	"slices"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -73,7 +77,7 @@ func (m Manifest) Identity() synthetic.RuntimeIdentity {
 }
 
 func (m Manifest) Validate() error {
-	if m.Format != 1 || m.Version == "" || (m.Platform != "linux/amd64" && m.Platform != "linux/arm64") || !validID(m.Archive.SHA256) {
+	if m.Format != 1 || m.Version == "" || !supportedPlatform(m.Platform) || !validID(m.Archive.SHA256) {
 		return errors.New("invalid runtime identity or platform")
 	}
 	if m.Contract != synthetic.ExecutionContract {
@@ -84,11 +88,8 @@ func (m Manifest) Validate() error {
 		return errors.New("invalid runtime archive bounds")
 	}
 	// Offline-only manifests may omit a URL; they retain the same digest checks.
-	if a.URL != "" {
-		u, err := url.Parse(a.URL)
-		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Fragment != "" {
-			return errors.New("runtime download requires an installed HTTPS URL without credentials")
-		}
+	if a.URL != "" && !ValidHTTPSURL(a.URL) {
+		return errors.New("runtime download requires an installed HTTPS URL without credentials")
 	}
 	for _, name := range []string{m.Layout.EntryPoint, m.Layout.Node, m.Layout.Dependencies, m.Layout.Browser, m.Layout.Loader, m.Layout.Fonts} {
 		if !localName(name) || reservedName(name) {
@@ -118,4 +119,55 @@ func reservedName(name string) bool {
 		}
 	}
 	return false
+}
+
+// ValidHTTPSURL is the rule for runtime archive, source and release discovery
+// URLs: absolute HTTPS with a host, without credentials or a fragment.
+func ValidHTTPSURL(address string) bool {
+	u, err := url.Parse(address)
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Fragment == ""
+}
+
+// SupportedHost reports whether this process can run browser runtimes at all.
+func SupportedHost() bool {
+	return goruntime.GOOS == "linux" && supportedPlatform(hostPlatform())
+}
+
+// MatchesHost reports whether m was built for this process's architecture.
+func (m Manifest) MatchesHost() bool { return m.Platform == hostPlatform() }
+
+// hostPlatform names the release platform for this architecture; runtime
+// releases exist only for Linux.
+func hostPlatform() string { return "linux/" + goruntime.GOARCH }
+
+func supportedPlatform(platform string) bool {
+	return platform == "linux/amd64" || platform == "linux/arm64"
+}
+
+// clone returns a copy that shares no binding bytes with m. Accessors hand out
+// clones, so a caller cannot change a manifest that a candidate later selects.
+func (m Manifest) clone() Manifest {
+	m.Bindings = slices.Clone(m.Bindings)
+	for i := range m.Bindings {
+		m.Bindings[i].Expected = bytes.Clone(m.Bindings[i].Expected)
+	}
+	return m
+}
+
+// sameManifest compares every signed field, including the archive URL.
+func sameManifest(a, b Manifest) bool { return sameJSON(a, b) }
+
+// sameExecutable ignores the archive URL: mirrors may change transport without
+// changing executable identity.
+func sameExecutable(a, b Manifest) bool {
+	a.Archive.URL, b.Archive.URL = "", ""
+	return sameJSON(a, b)
+}
+
+// sameJSON compares values in the JSON form in which manifests and releases are
+// signed and persisted. A value that cannot be encoded never compares equal.
+func sameJSON(a, b any) bool {
+	left, errA := json.Marshal(a)
+	right, errB := json.Marshal(b)
+	return errA == nil && errB == nil && bytes.Equal(left, right)
 }

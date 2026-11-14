@@ -42,7 +42,7 @@ func TestInstalledReleaseFollowsRegularFileSymlink(t *testing.T) {
 	require.NoError(t, os.Symlink(target, link))
 	got, err := cfg.ReleaseLoader(link, false)(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 }
 
 func TestOfflineKeyringRejectsFIFOAndAcceptsRegularSymlink(t *testing.T) {
@@ -54,7 +54,7 @@ func TestOfflineKeyringRejectsFIFOAndAcceptsRegularSymlink(t *testing.T) {
 	require.NoError(t, os.Symlink(cfg.OfflineKeyring, linked.OfflineKeyring))
 	got, err := linked.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, release, got)
+	require.Equal(t, release, got.Release())
 	piped := cfg
 	piped.OfflineKeyring = filepath.Join(t.TempDir(), "key-fifo")
 	require.NoError(t, unix.Mkfifo(piped.OfflineKeyring, 0600))

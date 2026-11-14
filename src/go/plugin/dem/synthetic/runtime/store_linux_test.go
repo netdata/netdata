@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,25 +20,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/require"
 )
-
-func testStore(t *testing.T) (*Store, *time.Time) {
-	t.Helper()
-	s, err := Open(DefaultConfig(filepath.Join(t.TempDir(), "store")))
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, s.Close()) })
-	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	s.now = func() time.Time { return now }
-	return s, &now
-}
-
-func importFixture(t *testing.T, s *Store, label string) Manifest {
-	t.Helper()
-	m, archive := bundleFixture(t, label)
-	file := filepath.Join(t.TempDir(), "archive.tar.zst")
-	require.NoError(t, os.WriteFile(file, archive, 0600))
-	require.NoError(t, s.importUnselected(context.Background(), m, file))
-	return m
-}
 
 func TestStoreGraceProcessAndRestart(t *testing.T) {
 	s, now := testStore(t)
@@ -83,8 +63,7 @@ func TestStorePressureNeverEvictsProcessOrUncertainUse(t *testing.T) {
 	claim, err := s.testProcessClaim(first.Archive.SHA256)
 	require.NoError(t, err)
 	second, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
-	file := filepath.Join(t.TempDir(), "archive")
-	require.NoError(t, os.WriteFile(file, archive, 0600))
+	file := archiveFile(t, archive)
 	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
 	use, err := s.beginUse(first)
 	require.NoError(t, err)
@@ -174,7 +153,7 @@ func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
 	require.True(t, process.Wait().Drained)
 	require.NoError(t, s.Sweep())
 	require.NoError(t, use.Finish(true), "a receipt may be reconciled before its caller finishes")
-	require.Empty(t, s.completedUses)
+	require.Empty(t, s.ledger.completedUses)
 }
 
 func TestReservationReusesPublishedGeneration(t *testing.T) {
@@ -378,8 +357,7 @@ func startRuntimeOwner(t *testing.T, s *Store, m Manifest, mode string) func() {
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(file, data, 0600))
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRuntimeOwnerProcess$")
-	cmd.Env = append(os.Environ(), "DEM_RUNTIME_OWNER_MODE="+mode, "DEM_RUNTIME_OWNER_STORE="+s.path, "DEM_RUNTIME_OWNER_MANIFEST="+file)
+	cmd := helperCommand(ctx, "TestRuntimeOwnerProcess", "DEM_RUNTIME_OWNER_MODE="+mode, "DEM_RUNTIME_OWNER_STORE="+s.path, "DEM_RUNTIME_OWNER_MANIFEST="+file)
 	input, err := cmd.StdinPipe()
 	require.NoError(t, err)
 	output, err := cmd.StdoutPipe()
@@ -443,43 +421,6 @@ func TestAbandonedPreparationAndProcessClaim(t *testing.T) {
 	require.Empty(t, staging)
 }
 
-func TestKernelBootProvenance(t *testing.T) {
-	for name, fixture := range map[string]struct {
-		mount string
-		valid bool
-	}{
-		"normal":           {"20 1 0:1 / /proc rw - proc proc rw", true},
-		"readonly-sys":     {"20 1 0:1 /sys /proc/sys ro - proc proc rw", true},
-		"container-file":   {"20 1 0:2 /boot-id /proc/sys/kernel/random/boot_id ro - tmpfs tmpfs rw", false},
-		"random-uuid-bind": {"20 1 0:1 /sys/kernel/random/uuid /proc/sys/kernel/random/boot_id ro - proc proc rw", false},
-		"wrong-id":         {"21 1 0:1 / /proc rw - proc proc rw", false},
-	} {
-		t.Run(name, func(t *testing.T) {
-			require.Equal(t, fixture.valid, kernelBootMount(strings.NewReader(fixture.mount+"\n"), 20, "/proc/sys/kernel/random/boot_id"))
-		})
-	}
-	actual := hostBoot()
-	if actual.Verified {
-		require.True(t, validBootID(actual.ID))
-	}
-	s, now := testStore(t)
-	m := importFixture(t, s, "boot")
-	s.boot = bootIdentity{ID: "11111111-1111-1111-1111-111111111111", Verified: true}
-	use, err := s.beginUse(m)
-	require.NoError(t, err)
-	require.NoError(t, use.Finish(false))
-	*now = now.Add(100 * 24 * time.Hour)
-	s.boot = bootIdentity{ID: "22222222-2222-2222-2222-222222222222", Verified: false}
-	require.NoError(t, s.Sweep())
-	require.FileExists(t, filepath.Join(s.path, "generations", m.Archive.SHA256, "prepared.json"))
-	s.boot.Verified = true
-	require.NoError(t, s.Sweep())
-	*now = now.Add(8 * 24 * time.Hour)
-	require.NoError(t, s.Sweep())
-	_, err = s.beginUse(m)
-	require.ErrorIs(t, err, ErrUnavailable)
-}
-
 // Includes durable use creation, actual supervisor launch/drain/join and pin
 // retirement. Local filesystem trend only; bulk preparation/GC is separate.
 func BenchmarkRuntimeUse(b *testing.B) {
@@ -492,8 +433,7 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	require.NoError(b, err)
 	defer s.Close()
 	m, archive := bundleFixture(b, "benchmark")
-	file := filepath.Join(b.TempDir(), "archive")
-	require.NoError(b, os.WriteFile(file, archive, 0600))
+	file := archiveFile(b, archive)
 	require.NoError(b, s.importUnselected(context.Background(), m, file))
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -511,29 +451,39 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	require.NoError(b, s.Sweep())
 }
 
-// These helpers exercise unselected-generation retention and individual owner
-// reclamation. Installation behavior is tested through the public API separately.
-func (s *Store) importUnselected(ctx context.Context, m Manifest, path string) error {
-	candidate, err := s.beginFixture(ctx, m, InstallRelease)
-	if err != nil {
-		return err
+func TestManagedClaimCloseStartsGraceImmediately(t *testing.T) {
+	for _, kind := range []string{"consumer", "candidate"} {
+		t.Run(kind, func(t *testing.T) {
+			s, now := testStore(t)
+			var manifest Manifest
+			var owner io.Closer
+			if kind == "consumer" {
+				manifest = installFixture(t, s, "old-consumer")
+				consumer, err := s.AcquireSelected()
+				require.NoError(t, err)
+				owner = consumer
+				installFixture(t, s, "replacement")
+			} else {
+				manifest = importFixture(t, s, "unselected-candidate")
+				candidate, err := s.beginFixture(context.Background(), manifest, InstallRelease)
+				require.NoError(t, err)
+				owner = candidate
+			}
+			// Establish that the live claim prevents a grace deadline.
+			require.NoError(t, s.Sweep())
+			before, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.True(t, before.Unneeded.IsZero())
+			*now = now.Add(time.Hour)
+			require.NoError(t, owner.Close())
+			after, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.Equal(t, now.UTC(), after.Unneeded, "close must reconcile grace without waiting for a sweep")
+			*now = now.Add(time.Hour)
+			require.NoError(t, owner.Close())
+			again, err := s.loadGeneration(manifest.Archive.SHA256)
+			require.NoError(t, err)
+			require.Equal(t, after.Unneeded, again.Unneeded)
+		})
 	}
-	defer candidate.Close()
-	return candidate.Import(ctx, path)
-}
-
-// requirePrepared asserts that m is published and intact without acquiring
-// execution ownership or changing retention timestamps.
-func requirePrepared(t *testing.T, s *Store, m Manifest) {
-	t.Helper()
-	require.NoError(t, s.withLock(func() error {
-		_, err := s.prepared(m)
-		return err
-	}))
-}
-
-func (s *Store) testProcessClaim(id string) (*claim, error) {
-	var owner *claim
-	err := s.withLock(func() error { var err error; owner, err = s.claimLocked(id, "process"); return err })
-	return owner, err
 }

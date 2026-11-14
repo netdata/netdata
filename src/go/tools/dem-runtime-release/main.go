@@ -139,10 +139,11 @@ func verify(key, descriptor, archive, sources string) error {
 	if err != nil {
 		return err
 	}
-	release, err := runtime.VerifyRelease(data, public)
+	verified, err := runtime.VerifyRelease(data, public)
 	if err != nil {
 		return err
 	}
+	release := verified.Release()
 	if archive != "" {
 		if err := checkFile(archive, release.Manifest.Archive.SHA256, release.Manifest.Archive.Bytes); err != nil {
 			return fmt.Errorf("runtime archive: %w", err)

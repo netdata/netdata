@@ -8,11 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
 	"time"
 
 	"github.com/gofrs/flock"
@@ -31,11 +29,21 @@ func (s *Store) importArchive(ctx context.Context, m Manifest, archive string) e
 	})
 }
 
+// Downloads are explicit candidate operations, never monitor lifecycle work.
+func (s *Store) download(ctx context.Context, m Manifest) error {
+	if m.Archive.URL == "" {
+		return errors.New("runtime manifest has no download source")
+	}
+	return s.prepare(ctx, m, func() (io.ReadCloser, error) {
+		return openDownload(ctx, m.Archive.URL, downloadIdleTimeout)
+	})
+}
+
 func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadCloser, error)) error {
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	if m.Platform != "linux/"+goruntime.GOARCH {
+	if !m.MatchesHost() {
 		return errors.New("runtime archive does not match this architecture")
 	}
 	if err := ctx.Err(); err != nil {
@@ -120,6 +128,14 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 	})
 }
 
+func (s *Store) finishPreparation(name string, owner io.Closer) {
+	err := s.ledger.releaseOwner(owner)
+	if err == nil {
+		err = s.withLock(func() error { return s.removeOwned(name) })
+	}
+	s.ledger.recordCleanupError(errors.Join(err, s.flushTrash()))
+}
+
 func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 	needed, err := s.preparationBytes(m)
 	if err != nil {
@@ -158,7 +174,7 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 				return err
 			}
 			if status.UsedBytes <= s.config.MaxBytes && status.ReservedBytes <= s.config.MaxBytes-status.UsedBytes && needed <= s.config.MaxBytes-status.UsedBytes-status.ReservedBytes {
-				name, owner, err = s.newOwner("staging", reservation{Generation: m.Archive.SHA256, Bytes: needed})
+				name, owner, err = s.ledger.newOwner("staging", reservation{Generation: m.Archive.SHA256, Bytes: needed})
 				return err
 			}
 			ids := s.candidates(inv, true)
@@ -201,28 +217,4 @@ func (s *Store) preparationBytes(m Manifest) (int64, error) {
 		total += amount
 	}
 	return total, nil
-}
-
-func syncTree(root *os.Root) error {
-	return fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() {
-			return syncDirectory(root, name)
-		}
-		return nil
-	})
-}
-
-type contextReader struct {
-	ctx    context.Context
-	source io.Reader
-}
-
-func (r contextReader) Read(p []byte) (int, error) {
-	if err := r.ctx.Err(); err != nil {
-		return 0, err
-	}
-	return r.source.Read(p)
 }

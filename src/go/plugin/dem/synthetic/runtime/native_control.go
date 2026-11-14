@@ -4,7 +4,6 @@ package runtime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -14,6 +13,7 @@ import (
 )
 
 const nativeGateName = "coordination.lock"
+
 const nativeStateName = "admission.json"
 
 // NativePackage is installed with the package payload, after build-time binding
@@ -187,7 +187,7 @@ func (c *NativeControl) beginQualification(ctx context.Context, inspect NativeIn
 		return Manifest{}, false, err
 	}
 	if state.Phase == "ready" {
-		if state.Target == nil || !sameNativeManifest(*state.Target, target) {
+		if state.Target == nil || !sameManifest(*state.Target, target) {
 			return Manifest{}, false, errors.New("native package changed without closed admission")
 		}
 		return target, false, nil
@@ -208,14 +208,14 @@ func (c *NativeControl) finishQualification(ctx context.Context, inspect NativeI
 	if err != nil {
 		return err
 	}
-	if state.Phase != "qualifying" || state.Target == nil || !sameNativeManifest(*state.Target, target) {
+	if state.Phase != "qualifying" || state.Target == nil || !sameManifest(*state.Target, target) {
 		return errors.New("native qualification admission changed before completion")
 	}
 	_, actual, err := readNativePayload(c.config.PayloadPath)
 	if err != nil {
 		return err
 	}
-	if !sameNativeManifest(actual, target) {
+	if !sameManifest(actual, target) {
 		return errors.New("native payload changed during qualification")
 	}
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
@@ -317,27 +317,9 @@ func writeNativeControl(config NativeConfig, state nativeControlRecord) error {
 		return err
 	}
 	defer root.Close()
-	data, err := json.Marshal(state)
-	if err != nil {
-		return err
-	}
-	id, err := randomID()
-	if err != nil {
-		return err
-	}
-	name := ".admission-" + id
-	if err := writeNewFile(root, name, append(data, '\n'), 0644); err != nil {
-		return err
-	}
-	defer root.Remove(name)
-	if err := root.Rename(name, nativeStateName); err != nil {
+	// Root-owned and world-readable: the service UID reads admission state.
+	if err := publishJSON(root, nativeStateName, state, 0644); err != nil {
 		return err
 	}
 	return syncDirectory(root, ".")
-}
-
-func sameNativeManifest(a, b Manifest) bool {
-	left, errA := json.Marshal(a)
-	right, errB := json.Marshal(b)
-	return errA == nil && errB == nil && string(left) == string(right)
 }
