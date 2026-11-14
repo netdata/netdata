@@ -84,7 +84,7 @@ For high availability configurations, see [Clustering and High Availability of N
 
 For organizations requiring complete control over their monitoring infrastructure, Netdata Cloud On-Prem provides the full control plane within the datacenter (air-gapped).
 
-Netdata Cloud is a Kubernetes cluster (Kubernetes 1.23+):
+Netdata Cloud On-Prem runs on Kubernetes:
 
 | Monitored Nodes | CPU Cores | Memory | Storage | Notes                  |
 |-----------------|-----------|--------|---------|------------------------|
@@ -226,9 +226,15 @@ Comprehensive alert customization includes custom thresholds, complex conditions
 **Extensibility:**
 The plugin architecture supports custom collectors in multiple languages (Go recommended, Python, Bash, Node.js). Custom exporters offer format customization, filtering rules, transformation options, and batch processing. API extensions enable webhook development, custom endpoints, data processing, and event handling.
 
-## Total Cost of Ownership
+## Cost Efficiency
 
-A standalone node uses under 5% of one CPU core, about 200 MB of RAM and a few GB of disk; Parents need about 20 cores and 80 GB of RAM per 500 nodes (see the sizing above). There is no separate database to run, tune or back up, and dashboards and alerts come ready-made.
+Netdata costs less to run than centralized observability stacks, for three reasons:
+
+1. **Agents run on spare capacity.** A standalone Agent uses under 5% of one CPU core, about 200 MB of RAM and a few GB of disk, which fits in the headroom servers already keep. Agents streaming to a Parent can use even less, with no local disk.
+2. **Parents scale out on ordinary VMs.** Each Parent is independent and sized for 100 to 500 nodes (about 20 cores and 80 GB of RAM per 500 nodes), on standard disks. There is no central database cluster or high-performance storage tier to buy, run or back up.
+3. **Pricing is predictable.** Plans are priced per node. Metrics and system logs have no volume charge, and there is no retention fee. Application logs and trace spans come with large allowances, pooled across all nodes, and only usage above the pool is billed. Spikes don't raise the bill: the node count excludes the busiest 2 hours of each day and the busiest 3 days of each month.
+
+For current pricing, see [netdata.cloud/pricing](https://www.netdata.cloud/pricing/).
 
 **Return on Investment:**
 Value starts at installation: auto-discovery collects every system and application it finds, with working dashboards and alerts from the first minute. Over time, machine-learning anomaly ranking and AI investigations shorten troubleshooting, and one platform for metrics, logs, traces and alerts reduces tool sprawl.
