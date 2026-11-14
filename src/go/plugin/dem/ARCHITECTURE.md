@@ -525,7 +525,7 @@ flowchart LR
     H --> J("journal")
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
-    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip")
+    Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip · monitor")
     Reg --> Dom
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
@@ -534,7 +534,8 @@ flowchart LR
 
 Dependency direction:
 
-- Function adapters depend on query results and shared domain values.
+- Function adapters call only query services. They also use shared value types: RUM values come through `rum/query`,
+  while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and `artifacts.Filter` directly.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
@@ -1030,7 +1031,7 @@ Draft rehearsal:
 - `Engine.Rehearse` shares the installed source, admission and fail-stop owner with scheduled execution. It uses
   an explicitly unrecorded view, as runtime qualification does, and a private temporary artifact store with capture
   disabled. A missing history owner remains an error for ordinary monitoring.
-- Rehearsal never calls collector `Run` or `Collect`, registers an observation generation, or writes metrics.
+- Rehearsal never calls collector `Run` or `Collect`, registers a monitor session, or writes metrics.
   After verified drainage, it closes the temporary store and returns only an error/pass result; no result registry
   or polling API exists.
 - Caller deadlines include admission waiting. Unverified drainage signals the shared fatal owner and preserves
