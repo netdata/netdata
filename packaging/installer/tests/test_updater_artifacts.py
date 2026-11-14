@@ -468,6 +468,13 @@ update_available
             ('debian', '12', 'bookworm', 'debian/bookworm'),
             ('fedora', '43', '', 'fedora/43/fixture-arch'),
             ('opensuse-leap', '15.6', '', 'opensuse/15.6/fixture-arch'),
+            ('opensuse-leap', '16.0', '', 'opensuse/16.0/fixture-arch'),
+            ('opensuse-tumbleweed', '20261111', '', 'opensuse/tumbleweed/fixture-arch'),
+            ('ol', '8.10', '', 'ol/8/fixture-arch'),
+            ('ol', '9.8', '', 'ol/9/fixture-arch'),
+            ('ol', '10.2', '', 'ol/10/fixture-arch'),
+            ('ol', '9', '', 'ol/9/fixture-arch'),
+            ('rocky', '9.6', '', 'el/9/fixture-arch'),
         ]:
             with self.subTest(distro=distro):
                 release_file = self.root / 'os-release'
