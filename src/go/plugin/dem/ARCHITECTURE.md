@@ -357,7 +357,7 @@ the same layers:
 ```mermaid
 flowchart TD
     UI("Netdata UI or API<br/>Function call")
-    Fn("Function adapters<br/>rum/functions · synthetic/functions · historyfunc")
+    Fn("Function adapters<br/>rum/rumfunc · synthetic/syntheticfunc · historyfunc")
     Q("Query services<br/>rum/query · synthetic/query")
     Reg("Registries<br/>running state")
     Hist("History codecs and reducers<br/>rum/history · synthetic/history")
@@ -389,7 +389,9 @@ What makes this layer predictable:
 - **Plan-gated viewing.** Every DEM Function (`rum`, `synthetics` and `dem-history-status`) publishes access `0x0017`
   (signed in, same Space, paid Space, sensitive data): viewing Real User Monitoring, browser tests and DEM history
   status requires a paid plan or an active trial. Collection, journeys, audits and history storage run on every plan.
-  `dem-history-status` also checks member permissions in its handler.
+  Every handler also requires member access (`0x1b`) for data, and `synthetics-artifact` bytes require administrator
+  access (`0x7b`); `info` stays available for discovery. The access masks, the permission test and the member check
+  are in `internal/rawfunc`; `synthetic/syntheticfunc` applies the administrator check to artifact bytes.
 - **Independent of collector selection.** Disabling `rum` or `journey`, or every collector, keeps retained history
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
@@ -470,6 +472,7 @@ Shared and process-wide packages:
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
 | `journal` | Shared root policy, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
+| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
 | `config/` | Installed configuration files; not a Go package |
 
@@ -487,7 +490,7 @@ RUM packages, in data-path order. RUM processing is separate from investigation 
 | Running state | `rum/registry` | Admitted sites, exact-generation request/read leases and receiver availability |
 | History | `rum/history` | RUM record encoding, retained-event reducers and the per-site queued writer |
 | Read side | `rum/query` | Copied site observations, live cursors, redaction and active/retained investigation results |
-| Read side | `rum/functions` | Function declarations, arguments, permissions, columns and response serialization |
+| Read side | `rum/rumfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 
 Synthetic packages:
 
@@ -498,7 +501,7 @@ Synthetic packages:
 | `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
 | `synthetic/history` | Synthetic record encoding and run reduction |
-| `synthetic/functions` | Function declarations, arguments, permissions, columns and response serialization |
+| `synthetic/syntheticfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
 | `synthetic/runtime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement and native package admission |
@@ -518,7 +521,7 @@ invariants: change one only together with the code and tests that rely on it.
 
 ```mermaid
 flowchart LR
-    Fn("*/functions") --> Q("*/query")
+    Fn("rumfunc · syntheticfunc") --> Q("*/query")
     Q --> Reg("*/registry")
     Q --> H("*/history")
     Q --> A("synthetic/artifacts")
@@ -537,7 +540,7 @@ Dependency direction:
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
   through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
   `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
-  store dependency.
+  store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journal.Store`. They cannot close it or independently apply retention.
@@ -555,7 +558,7 @@ File layout within packages:
 | Package | Files are split by |
 |---|---|
 | `rum/aggregate` | State/construction, ingestion/results, activity, snapshots/ranking, vital statistics and cohesive topic operations, without creating extra state owners |
-| Function packages | Methods keep their columns beside their row builders |
+| Function packages | Each method keeps its ordered column list, which defines both the column map and every row, beside its row reader |
 | History packages | Record codecs are separate from reducers |
 | `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
 | `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |

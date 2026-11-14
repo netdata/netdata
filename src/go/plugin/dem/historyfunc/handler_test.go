@@ -3,6 +3,7 @@ package historyfunc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -17,7 +18,7 @@ type statusFunc func(context.Context) (journal.Status, error)
 func (f statusFunc) Status(ctx context.Context) (journal.Status, error) { return f(ctx) }
 func request() funcapi.RawMethodRequest {
 	return funcapi.RawMethodRequest{
-		Method:      method,
+		Method:      method.ID,
 		Permissions: "0x1b",
 	}
 }
@@ -52,7 +53,7 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 			return journal.Status{
 				Inventory: inventory,
 			}, nil
-		}), nil)
+		}), func() string { return "" })
 		row := h.HandleRaw(context.Background(), request()).Data.([][]any)[0]
 		assert.Nil(t, row[0])
 		assert.Nil(t, row[1])
@@ -79,24 +80,24 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 		want int
 	}{
 		{"info", funcapi.RawMethodRequest{
-			Method: method,
+			Method: method.ID,
 			Info:   true,
 			Args:   []string{"info"},
 		}, 200},
 		{"missing permission", funcapi.RawMethodRequest{
-			Method: method,
+			Method: method.ID,
 		}, 403},
 		{"insufficient permission", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1",
 		}, 403},
 		{"payload", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1b",
 			Payload:     []byte("{}"),
 		}, 400},
 		{"time filter", funcapi.RawMethodRequest{
-			Method:      method,
+			Method:      method.ID,
 			Permissions: "0x1b",
 			Args:        []string{"after:1"},
 		}, 400},
@@ -123,6 +124,24 @@ func TestCancellationReachesStorage(t *testing.T) {
 		assert.Same(t, ctx, got)
 		cancel()
 		return journal.Status{}, got.Err()
-	}), nil)
+	}), func() string { return "" })
 	assert.Equal(t, 499, h.HandleRaw(ctx, request()).Status)
+}
+
+func TestStorageErrorStatuses(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		want *funcapi.FunctionResponse
+	}{
+		"cancelled": {err: context.Canceled, want: funcapi.ErrorResponse(499, "request cancelled")},
+		"deadline":  {err: context.DeadlineExceeded, want: funcapi.ErrorResponse(504, "request timed out")},
+		"storage":   {err: errors.New("journal closed"), want: funcapi.UnavailableResponse("journal closed")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			h := New(statusFunc(func(context.Context) (journal.Status, error) {
+				return journal.Status{}, tc.err
+			}), func() string { return "" })
+			assert.Equal(t, tc.want, h.HandleRaw(context.Background(), request()))
+		})
+	}
 }

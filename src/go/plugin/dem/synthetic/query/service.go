@@ -55,18 +55,12 @@ func New(active Observations, history History, artifacts Artifacts, policyError 
 }
 
 func (s *Service) Jobs(now time.Time) []registry.Job {
-	if s.active == nil {
-		return nil
-	}
 	return s.active.Snapshot(now)
 }
 
 func (s *Service) Runs(ctx context.Context, filter history.RunFilter) (history.RunPage, error) {
 	if err := ctx.Err(); err != nil {
 		return history.RunPage{}, err
-	}
-	if s.history == nil {
-		return history.RunPage{}, errors.New("history unavailable")
 	}
 	page, err := s.history.QueryRuns(ctx, filter)
 	return page, queryError(err)
@@ -78,13 +72,8 @@ func (s *Service) Run(ctx context.Context, jobID, runID string) (synthetic.Run, 
 	if err := ctx.Err(); err != nil {
 		return synthetic.Run{}, err
 	}
-	if s.active != nil {
-		if run, ok := s.active.Latest(jobID, runID); ok {
-			return run, nil
-		}
-	}
-	if s.history == nil {
-		return synthetic.Run{}, errors.New("history unavailable")
+	if run, ok := s.active.Latest(jobID, runID); ok {
+		return run, nil
 	}
 	run, err := s.history.GetRun(ctx, jobID, runID)
 	return run, queryError(err)

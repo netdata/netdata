@@ -23,9 +23,10 @@ func (s *Service) Sessions(
 	ctx context.Context,
 	site, userID string,
 	after, before int64,
+	limit int,
 	vnodeGUID string,
 ) ([]Session, error) {
-	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, 2000, vnodeGUID)
+	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, limit, vnodeGUID)
 	if err != nil {
 		return nil, err
 	}
