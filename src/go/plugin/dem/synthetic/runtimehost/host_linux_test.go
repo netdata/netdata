@@ -50,16 +50,10 @@ func publishedBundle(t *testing.T, version string, sequence uint64) (runtime.Rel
 		Contract: 2,
 		Version:  version,
 		Platform: "linux/" + goruntime.GOARCH,
-		Archive: runtime.Archive{
-			URL:           "https://artifacts.example.invalid/runtime.tar.zst",
-			SHA256:        b.SHA256,
-			Bytes:         b.Bytes,
-			TarBytes:      b.TarBytes,
-			ExpandedBytes: b.ExpandedBytes,
-			Entries:       b.Entries,
-		},
-		Layout: runtime.Layout(b.Layout),
+		Archive:  runtime.Archive(b.Bounds),
+		Layout:   runtime.Layout(b.Layout),
 	}
+	m.Archive.URL = "https://artifacts.example.invalid/runtime.tar.zst"
 	for _, binding := range b.Bindings {
 		m.Bindings = append(m.Bindings, runtime.Binding(binding))
 	}

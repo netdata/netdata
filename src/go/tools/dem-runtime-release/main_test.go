@@ -204,13 +204,7 @@ func TestStageNativeUsesBuilderManifestWithoutSigningKey(t *testing.T) {
 			for _, binding := range b.Bindings {
 				f.manifest.Bindings = append(f.manifest.Bindings, runtime.Binding(binding))
 			}
-			f.manifest.Archive = runtime.Archive{
-				SHA256:        b.SHA256,
-				Bytes:         b.Bytes,
-				TarBytes:      b.TarBytes,
-				ExpandedBytes: b.ExpandedBytes,
-				Entries:       b.Entries,
-			}
+			f.manifest.Archive = runtime.Archive(b.Bounds)
 			archive := filepath.Join(f.dir, "archive")
 			require.NoError(t, os.WriteFile(archive, b.Data, 0600))
 			raw, err := json.Marshal(f.manifest)

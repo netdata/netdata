@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -230,12 +231,19 @@ func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 	moved := first
 	moved.Sequence = 3
 	moved.Manifest.Archive.URL = "https://mirror.example.invalid/runtime.tar.zst"
+	var requests atomic.Int32
+	previous := http.DefaultTransport
+	http.DefaultTransport = downloadTransport(func(*http.Request) (*http.Response, error) {
+		requests.Add(1)
+		return nil, errors.New("unexpected archive acquisition")
+	})
+	t.Cleanup(func() { http.DefaultTransport = previous })
 	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: UpdateRelease},
 		func(context.Context) (VerifiedRelease, error) { return verifyFixture(moved) })
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
-	// The mirror host does not resolve: success proves no acquisition happened.
 	require.NoError(t, candidate.Download(context.Background()))
+	require.Zero(t, requests.Load(), "the prepared generation must be reused without acquisition")
 	require.NoError(t, candidate.Select())
 	require.NoError(t, candidate.Close())
 	status, err := s.Inspect()

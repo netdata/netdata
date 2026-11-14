@@ -28,14 +28,8 @@ func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 		Contract: 2,
 		Version:  "cli-fixture",
 		Platform: "linux/" + goruntime.GOARCH,
-		Archive: runtime.Archive{
-			SHA256:        b.SHA256,
-			Bytes:         b.Bytes,
-			TarBytes:      b.TarBytes,
-			ExpandedBytes: b.ExpandedBytes,
-			Entries:       b.Entries,
-		},
-		Layout: runtime.Layout(b.Layout),
+		Archive:  runtime.Archive(b.Bounds),
+		Layout:   runtime.Layout(b.Layout),
 	}
 	for _, binding := range b.Bindings {
 		manifest.Bindings = append(manifest.Bindings, runtime.Binding(binding))

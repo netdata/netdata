@@ -28,7 +28,14 @@ type Entry struct {
 
 // Archive is a zstd-compressed tar and the bounds a runtime manifest signs.
 type Archive struct {
-	Data          []byte
+	Data []byte
+	Bounds
+}
+
+// Bounds, Layout and Binding mirror the runtime manifest types field for field,
+// so consumers convert them directly. Bounds leaves the URL to the consumer.
+type Bounds struct {
+	URL           string
 	SHA256        string
 	Bytes         int64
 	TarBytes      int64
@@ -70,17 +77,17 @@ func NewArchive(t testing.TB, entries []Entry) Archive {
 	require.NoError(t, encoder.Close())
 	sum := sha256.Sum256(compressed.Bytes())
 	return Archive{
-		Data:          compressed.Bytes(),
-		SHA256:        hex.EncodeToString(sum[:]),
-		Bytes:         int64(compressed.Len()),
-		TarBytes:      int64(raw.Len()),
-		ExpandedBytes: expanded,
-		Entries:       len(entries),
+		Data: compressed.Bytes(),
+		Bounds: Bounds{
+			SHA256:        hex.EncodeToString(sum[:]),
+			Bytes:         int64(compressed.Len()),
+			TarBytes:      int64(raw.Len()),
+			ExpandedBytes: expanded,
+			Entries:       len(entries),
+		},
 	}
 }
 
-// Layout and Binding mirror the runtime manifest types field for field, so
-// consumers convert them directly.
 type Layout struct {
 	EntryPoint   string
 	Node         string
@@ -105,9 +112,9 @@ type Bundle struct {
 	Bindings []Binding
 }
 
-// SlotOffset places the interpreter slot after a header, so binding must honor
+// slotOffset places the interpreter slot after a header, so binding must honor
 // the authenticated offset.
-const SlotOffset = 32
+const slotOffset = 32
 
 // NewBundle builds the standard payload: nested executable and loader paths, a
 // dependency tree with an internal symlink, an entrypoint and fonts. The
@@ -116,7 +123,7 @@ const SlotOffset = 32
 func NewBundle(t testing.TB, label string) Bundle {
 	t.Helper()
 	slot := func() []byte { return append([]byte("/not-prepared/"), make([]byte, 1010)...) }
-	program := append([]byte(strings.Repeat("H", SlotOffset)), slot()...)
+	program := append([]byte(strings.Repeat("H", slotOffset)), slot()...)
 	archive := NewArchive(t, []Entry{
 		{Name: "node/bin/node", Contents: program, Mode: 0755},
 		{Name: "browser/browser", Contents: program, Mode: 0755},
@@ -138,8 +145,8 @@ func NewBundle(t testing.TB, label string) Bundle {
 			Fonts:        "fonts",
 		},
 		Bindings: []Binding{
-			{Path: "node/bin/node", Offset: SlotOffset, Expected: slot()},
-			{Path: "browser/browser", Offset: SlotOffset, Expected: slot()},
+			{Path: "node/bin/node", Offset: slotOffset, Expected: slot()},
+			{Path: "browser/browser", Offset: slotOffset, Expected: slot()},
 		},
 	}
 }

@@ -23,7 +23,7 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 		Contract: 2,
 		Version:  "test-1",
 		Platform: hostPlatform(),
-		Archive:  archiveBounds(b.Archive),
+		Archive:  Archive(b.Bounds),
 		Layout:   Layout(b.Layout),
 	}
 	m.Archive.URL = "https://artifacts.example.invalid/" + m.Archive.SHA256 + ".tar.zst"
@@ -37,17 +37,7 @@ func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
 func archiveFixture(t testing.TB, entries []demruntimetest.Entry) (Archive, []byte) {
 	t.Helper()
 	a := demruntimetest.NewArchive(t, entries)
-	return archiveBounds(a), a.Data
-}
-
-func archiveBounds(a demruntimetest.Archive) Archive {
-	return Archive{
-		SHA256:        a.SHA256,
-		Bytes:         a.Bytes,
-		TarBytes:      a.TarBytes,
-		ExpandedBytes: a.ExpandedBytes,
-		Entries:       a.Entries,
-	}
+	return Archive(a.Bounds), a.Data
 }
 
 // boundPayloadFixture extracts and binds the shared payload without a store.
