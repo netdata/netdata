@@ -11,7 +11,6 @@ import (
 	"testing"
 	"time"
 
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sys/unix"
 )
@@ -46,22 +45,26 @@ func TestInstalledReleaseFollowsRegularFileSymlink(t *testing.T) {
 	require.Equal(t, release, got)
 }
 
-func TestReleaseKeyRejectsFIFOAndAcceptsRegularSymlink(t *testing.T) {
-	cfg, _, _ := signedSetupFixture(t)
-	link := filepath.Join(t.TempDir(), "key-link")
-	require.NoError(t, os.Symlink(cfg.OfflineKeyring, link))
-	key, err := runtime.ReadReleaseKeyring(link)
+func TestOfflineKeyringRejectsFIFOAndAcceptsRegularSymlink(t *testing.T) {
+	cfg, release, raw := signedSetupFixture(t)
+	path := filepath.Join(t.TempDir(), "release.json")
+	require.NoError(t, os.WriteFile(path, raw, 0600))
+	linked := cfg
+	linked.OfflineKeyring = filepath.Join(t.TempDir(), "key-link")
+	require.NoError(t, os.Symlink(cfg.OfflineKeyring, linked.OfflineKeyring))
+	got, err := linked.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
-	require.NotNil(t, key)
-	fifo := filepath.Join(t.TempDir(), "key-fifo")
-	require.NoError(t, unix.Mkfifo(fifo, 0600))
+	require.Equal(t, release, got)
+	piped := cfg
+	piped.OfflineKeyring = filepath.Join(t.TempDir(), "key-fifo")
+	require.NoError(t, unix.Mkfifo(piped.OfflineKeyring, 0600))
 	result := make(chan error, 1)
-	go func() { _, err := runtime.ReadReleaseKeyring(fifo); result <- err }()
+	go func() { _, err := piped.ReleaseLoader(path, false)(context.Background()); result <- err }()
 	select {
 	case err := <-result:
 		require.ErrorContains(t, err, "regular")
 	case <-time.After(time.Second):
-		writer, err := os.OpenFile(fifo, os.O_RDWR|unix.O_NONBLOCK, 0)
+		writer, err := os.OpenFile(piped.OfflineKeyring, os.O_RDWR|unix.O_NONBLOCK, 0)
 		require.NoError(t, err)
 		<-result
 		require.NoError(t, writer.Close())

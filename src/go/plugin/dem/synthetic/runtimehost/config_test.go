@@ -85,18 +85,7 @@ func TestInstalledReleaseTrust(t *testing.T) {
 	loaded, err := cfg.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, release, loaded)
-	for name, body := range map[string][]byte{
-		"trailing JSON":    append(append([]byte{}, raw...), []byte(" {}")...),
-		"unknown field":    []byte(strings.Replace(string(raw), `"format":1`, `"format":1,"download_override":"https://untrusted.invalid"`, 1)),
-		"invalid envelope": []byte(`{"format":1}`),
-		"oversized":        bytes.Repeat([]byte(" "), runtime.ReleaseEnvelopeLimit+1),
-	} {
-		t.Run(name, func(t *testing.T) {
-			require.NoError(t, os.WriteFile(path, body, 0600))
-			_, err := cfg.ReleaseLoader(path, false)(context.Background())
-			require.Error(t, err)
-		})
-	}
+	// Envelope decoding (trailing data, unknown fields, size) is the runtime package's contract.
 	_, err = cfg.ReleaseLoader("relative.json", false)(context.Background())
 	require.ErrorContains(t, err, "absolute")
 	_, err = cfg.ReleaseLoader(t.TempDir(), false)(context.Background())
