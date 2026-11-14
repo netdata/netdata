@@ -45,7 +45,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				"started_us": nil, "scheduled_us": nil, "queued_us": nil, "completed_us": nil,
 				"duration_ms": nil, "outcome": model.Timeout, "termination_reason": model.ExecutionBudget,
 				"error": "core error", "tests": (*model.TestCounts)(nil),
-				"capture_state": "", "artifacts": []model.Artifact(nil), "history_error": "",
+				"capture_state": model.CaptureState(""), "artifacts": []model.Artifact(nil), "history_error": "",
 				"captures":       run.Captures,
 				"dropped_events": 0, "metrics": nil, "runtime": (*model.RuntimeIdentity)(nil),
 				"failure_evidence": run.FailureEvidence, "failure_evidence_status": status,

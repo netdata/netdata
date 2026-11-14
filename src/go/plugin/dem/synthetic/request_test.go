@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -63,4 +64,20 @@ func TestBlankScriptDiagnostic(t *testing.T) {
 	require.EqualError(t, ValidateRequest(Request{
 		Kind: Journey, Name: "check", Script: " \t\n\u2003", Timeout: time.Minute,
 	}), "script must not be blank")
+}
+
+func TestValidJobID(t *testing.T) {
+	for id, want := range map[string]bool{
+		Request{Kind: Journey, Name: "checkout"}.JobID(): true,
+		Request{Kind: Lighthouse, Name: "home"}.JobID():  true,
+		Request{Kind: Journey, Name: "a:b"}.JobID():      true,
+		"journey:":         false,
+		"journey: \t":      false,
+		"journey":          false,
+		"browser:checkout": false,
+		":checkout":        false,
+		"Journey:checkout": false,
+	} {
+		assert.Equal(t, want, ValidJobID(id), id)
+	}
 }

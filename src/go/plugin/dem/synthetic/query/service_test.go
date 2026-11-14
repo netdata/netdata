@@ -118,7 +118,7 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	evidence, err = service.Evidence(ctx, run.JobID, run.ID, "report")
 	require.NoError(t, err)
 	assert.Equal(t, content, evidence.Body)
-	assert.Equal(t, "available", evidence.CaptureState)
+	assert.Equal(t, synthetic.CaptureAvailable, evidence.CaptureState)
 	run.Artifacts = manifest
 	registration.Complete(run)
 	_, err = captures.Enforce(ctx, 7, 1)
@@ -132,7 +132,7 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	assert.ErrorIs(t, err, query.ErrExpired)
 	assert.Equal(t, run.ID, evidence.RunID)
 	assert.Equal(t, run.JobID, evidence.JobID)
-	assert.Equal(t, "expired_or_unavailable", evidence.CaptureState)
+	assert.Equal(t, synthetic.CaptureState("expired_or_unavailable"), evidence.CaptureState)
 	assert.Empty(t, evidence.Body)
 }
 
@@ -278,7 +278,7 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 				result, err := service.Evidence(ctx, jobID, runID, id)
 				require.Error(t, err)
 				assert.Empty(t, result.Body)
-				assert.NotEqual(t, "expired_or_unavailable", result.CaptureState)
+				assert.NotEqual(t, synthetic.CaptureState("expired_or_unavailable"), result.CaptureState)
 				if damage != "wrong owner" {
 					assert.NotErrorIs(t, err, query.ErrNotFound)
 				}

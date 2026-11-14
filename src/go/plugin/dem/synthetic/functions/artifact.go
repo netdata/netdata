@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 )
 
@@ -55,10 +56,10 @@ func (h *Handler) artifact(
 	rows := make([][]any, 0, len(evidence.Artifacts))
 	for _, item := range evidence.Artifacts {
 		label, title := "Screenshot", item.Test.Title
-		if item.Kind == "report" {
+		if item.Kind == model.ReportCapture {
 			label = "Lighthouse report"
 		} else {
-			if item.Kind == "trace" {
+			if item.Kind == model.TraceCapture {
 				label = "Trace"
 			}
 			if item.Test.ID == "" {

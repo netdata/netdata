@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -49,11 +48,6 @@ var (
 type manifest struct {
 	Version int `json:"version"`
 	Manifest
-}
-
-func validJobID(id string) bool {
-	kind, name, ok := strings.Cut(id, ":")
-	return ok && (kind == "journey" || kind == "lighthouse") && strings.TrimSpace(name) != ""
 }
 
 type captureOwner struct{ JobID, VnodeGUID string }

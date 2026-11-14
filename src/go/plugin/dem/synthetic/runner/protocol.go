@@ -78,7 +78,7 @@ type reporterResult struct {
 	Tests                *synthetic.TestCounts       `json:"tests,omitempty"`
 	Metrics              *synthetic.LabMetrics       `json:"metrics,omitempty"`
 	Artifacts            []synthetic.Capture         `json:"artifacts,omitempty"`
-	CaptureState         string                      `json:"capture_state"`
+	CaptureState         synthetic.CaptureState      `json:"capture_state"`
 }
 
 // wireEnvelope separates strict core decoding from optional-body validation.
@@ -375,16 +375,16 @@ func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterRe
 		return errors.New("invalid terminal outcome")
 	}
 	candidateCount := len(result.Artifacts) + len(result.InterruptedArtifacts)
-	if !capture && (result.CaptureState != "disabled" || candidateCount != 0) {
+	if !capture && (result.CaptureState != synthetic.CaptureDisabled || candidateCount != 0) {
 		return errors.New("runner captured content while capture was disabled")
 	}
 	if capture {
 		switch result.CaptureState {
-		case "not_needed", "unavailable", "available":
+		case synthetic.CaptureNotNeeded, synthetic.CaptureUnavailable, synthetic.CaptureAvailable:
 		default:
 			return errors.New("invalid capture state")
 		}
-		if (result.CaptureState == "available") != (candidateCount > 0) {
+		if (result.CaptureState == synthetic.CaptureAvailable) != (candidateCount > 0) {
 			return errors.New("capture state contradicts artifact candidates")
 		}
 	}
@@ -466,14 +466,18 @@ func validateResult(kind synthetic.Kind, capture, trace bool, result *reporterRe
 		if kind == synthetic.Journey && !validJourneyCapture(a, trace) {
 			return errors.New("unsupported journey capture")
 		}
-		if kind == synthetic.Lighthouse && (a.Kind != "report" || a.MIME != "text/html") {
+		if kind == synthetic.Lighthouse && !validCapture(a, synthetic.ReportCapture) {
 			return errors.New("unsupported audit capture")
 		}
 	}
 	return nil
 }
 func validJourneyCapture(a synthetic.Capture, trace bool) bool {
-	return a.Kind == "screenshot" && a.MIME == "image/png" || trace && a.Kind == "trace" && a.MIME == "application/zip"
+	return validCapture(a, synthetic.ScreenshotCapture) || trace && validCapture(a, synthetic.TraceCapture)
+}
+
+func validCapture(a synthetic.Capture, kind synthetic.CaptureKind) bool {
+	return a.Kind == kind && a.MIME == kind.MIME()
 }
 func finite(value float64) bool { return !math.IsNaN(value) && !math.IsInf(value, 0) }
 

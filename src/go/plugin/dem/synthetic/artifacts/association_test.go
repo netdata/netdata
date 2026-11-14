@@ -15,11 +15,11 @@ import (
 
 func TestArtifactAssociationSurvivesRestartAndSupportsOlderRecords(t *testing.T) {
 	for _, trace := range []bool{false, true} {
-		kind, mime, payload := "screenshot", "image/png", png
+		kind, mime, payload := synthetic.ScreenshotCapture, "image/png", png
 		if trace {
-			kind, mime, payload = "trace", "application/zip", []byte("PK\x03\x04fixture")
+			kind, mime, payload = synthetic.TraceCapture, "application/zip", []byte("PK\x03\x04fixture")
 		}
-		t.Run(kind, func(t *testing.T) {
+		t.Run(string(kind), func(t *testing.T) {
 			s, root := store(t)
 			work, c := captured(t, s, run1, payload)
 			c.Kind, c.MIME = kind, mime

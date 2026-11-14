@@ -92,7 +92,7 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	if err := ctx.Err(); err != nil {
 		return Page{}, err
 	}
-	if vnodeguid.Validate(filter.VnodeGUID) != nil || filter.Limit < 1 || (filter.JobID != "" && !validJobID(filter.JobID)) ||
+	if vnodeguid.Validate(filter.VnodeGUID) != nil || filter.Limit < 1 || (filter.JobID != "" && !synthetic.ValidJobID(filter.JobID)) ||
 		(filter.Before != nil && (filter.Before.PublishedUS <= 0 || !runIDPattern.MatchString(filter.Before.RunID))) {
 		return Page{}, fmt.Errorf("%w: invalid artifact catalogue filter", ErrInvalidID)
 	}

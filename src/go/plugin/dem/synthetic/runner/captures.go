@@ -144,7 +144,7 @@ func (c *captureState) snapshot() *synthetic.CaptureReport {
 // joinCaptures adds labels only to already admitted terminal candidates. Metadata
 // IDs absent from that authority remain explanations, never offered files.
 func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture) {
-	if run.CaptureState == "disabled" {
+	if run.CaptureState == synthetic.CaptureDisabled {
 		return
 	}
 	if run.Captures == nil {

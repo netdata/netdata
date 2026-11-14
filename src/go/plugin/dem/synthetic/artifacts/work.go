@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 func (s *Store) Begin(runID, jobID, vnodeGUID string) (_ string, retErr error) {
@@ -19,7 +20,7 @@ func (s *Store) Begin(runID, jobID, vnodeGUID string) (_ string, retErr error) {
 	if s.closed {
 		return "", ErrClosed
 	}
-	if !runIDPattern.MatchString(runID) || !validJobID(jobID) || vnodeguid.Validate(vnodeGUID) != nil {
+	if !runIDPattern.MatchString(runID) || !synthetic.ValidJobID(jobID) || vnodeguid.Validate(vnodeGUID) != nil {
 		return "", ErrInvalidID
 	}
 	for _, prefix := range []string{"work", "staging", "runs", "drained", "deleting"} {

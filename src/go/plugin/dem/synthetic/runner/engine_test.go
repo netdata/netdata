@@ -38,10 +38,10 @@ type fakeHistory struct {
 	syncCalls int
 }
 
-func (h *fakeHistory) AppendRun(_ context.Context, phase string, run synthetic.Run) (bool, error) {
+func (h *fakeHistory) AppendRun(_ context.Context, phase synthetic.HistoryPhase, run synthetic.Run) (bool, error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.phases = append(h.phases, phase)
+	h.phases = append(h.phases, string(phase))
 	h.runs = append(h.runs, run)
 	return true, h.err
 }

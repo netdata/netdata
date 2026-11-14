@@ -14,7 +14,7 @@ import (
 	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, visit func(string, synthetic.Run)) error {
+func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, visit func(synthetic.HistoryPhase, synthetic.Run)) error {
 	before := int64(math.MaxInt64)
 	if f.Before != nil {
 		before = *f.Before
@@ -47,7 +47,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 		if f.Kind != "" && run.Kind != f.Kind {
 			return nil
 		}
-		if phase == "start" {
+		if phase == synthetic.HistoryStart {
 			run.Outcome = synthetic.Unknown
 			run.CompletedUS = 0
 			run.DurationMS = nil
@@ -63,7 +63,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 
 // Both phases carry their immutable start clock, so indexed membership includes
 // a retained completion even when it was written after the selected interval.
-func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, error) {
+func decodeSynthetic(entry *sdk.SnapshotEntry) (synthetic.HistoryPhase, synthetic.Run, bool, error) {
 	var envelope demjournal.Envelope
 	var phase, jobID, runID string
 	var run synthetic.Run
@@ -126,11 +126,11 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 	if dataErr != nil {
 		return "", run, false, fmt.Errorf("decode synthetic history: %w", dataErr)
 	}
-	if (phase != "start" && phase != "complete") || run.ID != runID || run.JobID != jobID || run.StartedUS != started {
+	if !validPhase(synthetic.HistoryPhase(phase)) || run.ID != runID || run.JobID != jobID || run.StartedUS != started {
 		return "", run, false, fmt.Errorf("invalid synthetic journal identity or start time")
 	}
-	if phase == "complete" && run.CompletedUS <= 0 {
+	if synthetic.HistoryPhase(phase) == synthetic.HistoryComplete && run.CompletedUS <= 0 {
 		return "", run, false, fmt.Errorf("invalid synthetic completion time")
 	}
-	return phase, run, true, nil
+	return synthetic.HistoryPhase(phase), run, true, nil
 }

@@ -53,6 +53,15 @@ type LabMetrics struct {
 	CLS         *float64 `json:"cls,omitempty"`
 }
 
+// HistoryPhase names one of a run's two history records: written at admission
+// and at completion.
+type HistoryPhase string
+
+const (
+	HistoryStart    HistoryPhase = "start"
+	HistoryComplete HistoryPhase = "complete"
+)
+
 // ExecutionContract is the semantic Agent/runtime request and result contract.
 const ExecutionContract = 2
 
@@ -95,7 +104,7 @@ type Run struct {
 	Metrics           *LabMetrics       `json:"metrics,omitempty"`
 	Events            []Event           `json:"events"`
 	DroppedEvents     int               `json:"dropped_events"`
-	CaptureState      string            `json:"capture_state"`
+	CaptureState      CaptureState      `json:"capture_state"`
 	Artifacts         []Artifact        `json:"artifacts"`
 	HistoryError      string            `json:"history_error,omitempty"`
 }

@@ -3,10 +3,11 @@
 package history
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
@@ -17,9 +18,9 @@ import (
 // queryable. Memory is O(selected runs), with bounded SDK traversal buffers.
 func (s *Store) QueryRuns(ctx context.Context, f RunFilter) (RunPage, error) {
 	runs := make(map[string]synthetic.Run)
-	err := s.scanSynthetic(ctx, f, "", func(phase string, r synthetic.Run) {
+	err := s.scanSynthetic(ctx, f, "", func(phase synthetic.HistoryPhase, r synthetic.Run) {
 		old, ok := runs[r.ID]
-		if !ok || (phase == "complete" && r.CompletedUS >= old.CompletedUS) {
+		if !ok || (phase == synthetic.HistoryComplete && r.CompletedUS >= old.CompletedUS) {
 			r.Events = nil // Summary queries retain no full diagnostic timelines.
 			runs[r.ID] = r
 		}
@@ -35,12 +36,11 @@ func (s *Store) QueryRuns(ctx context.Context, f RunFilter) (RunPage, error) {
 			page.Runs = append(page.Runs, r)
 		}
 	}
-	sort.Slice(page.Runs, func(i, j int) bool {
-		a, b := page.Runs[i], page.Runs[j]
-		if a.StartedUS != b.StartedUS {
-			return a.StartedUS > b.StartedUS
+	slices.SortFunc(page.Runs, func(a, b synthetic.Run) int {
+		if c := cmp.Compare(b.StartedUS, a.StartedUS); c != 0 {
+			return c
 		}
-		return a.ID < b.ID
+		return cmp.Compare(a.ID, b.ID)
 	})
 	if f.Limit > 0 && len(page.Runs) > f.Limit {
 		page.Truncated = true
@@ -56,8 +56,8 @@ func (s *Store) GetRun(ctx context.Context, jobID, runID string) (synthetic.Run,
 	ok := false
 	err := s.scanSynthetic(ctx, RunFilter{
 		JobID: jobID,
-	}, runID, func(phase string, r synthetic.Run) {
-		if !ok || (phase == "complete" && r.CompletedUS >= found.CompletedUS) {
+	}, runID, func(phase synthetic.HistoryPhase, r synthetic.Run) {
+		if !ok || (phase == synthetic.HistoryComplete && r.CompletedUS >= found.CompletedUS) {
 			found = r
 			ok = true
 		}

@@ -32,7 +32,7 @@ const cleanupTimeout = 10 * time.Second
 
 // historyWriter borrows the process journal; uncertain appends must not be replayed.
 type historyWriter interface {
-	AppendRun(context.Context, string, synthetic.Run) (bool, error)
+	AppendRun(context.Context, synthetic.HistoryPhase, synthetic.Run) (bool, error)
 	Sync(context.Context) error
 }
 
@@ -114,12 +114,12 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		Name:         redact.text(request.Name),
 		Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
 		Outcome:      synthetic.Error,
-		CaptureState: "disabled",
+		CaptureState: synthetic.CaptureDisabled,
 		Events:       []synthetic.Event{},
 		Artifacts:    []synthetic.Artifact{},
 	}
 	if request.Capture {
-		run.CaptureState = "unavailable"
+		run.CaptureState = synthetic.CaptureUnavailable
 	}
 	var random [16]byte
 	if _, err := rand.Read(random[:]); err != nil {
@@ -199,7 +199,7 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 	}
 	identity := paths.Identity
 	run.Runtime = &identity
-	e.save(attempt, "start", &run, redact)
+	e.save(attempt, synthetic.HistoryStart, &run, redact)
 	work, err := e.artifacts.Begin(run.ID, run.JobID, run.VnodeGUID)
 	if err != nil {
 		run.Error = redact.text("create run work directory: " + err.Error())
@@ -352,7 +352,7 @@ func (e *Engine) failAdmitted(run *synthetic.Run, err error, redact *textRedacto
 	run.Error = redact.text(err.Error())
 	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
-	e.save(cleanup, "start", run, redact)
+	e.save(cleanup, synthetic.HistoryStart, run, redact)
 	e.complete(run, nil, redact)
 	return synthetic.Execution{Run: *run, Drained: true}
 }
@@ -366,25 +366,25 @@ func (e *Engine) complete(run *synthetic.Run, captures []synthetic.Capture, reda
 		if err != nil {
 			capturePublicationFailed(run, captures, err)
 			run.Error = joinText(run.Error, redact.text("artifact publication: "+err.Error()))
-			if run.CaptureState != "disabled" {
-				run.CaptureState = "unavailable"
+			if run.CaptureState != synthetic.CaptureDisabled {
+				run.CaptureState = synthetic.CaptureUnavailable
 			}
 		} else {
 			run.Artifacts = artifacts
 			capturePublicationSucceeded(run, captures)
-			if run.CaptureState != "disabled" && len(captures) > 0 {
-				run.CaptureState = "unavailable"
+			if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
+				run.CaptureState = synthetic.CaptureUnavailable
 				if len(artifacts) > 0 {
-					run.CaptureState = "available"
+					run.CaptureState = synthetic.CaptureAvailable
 				}
 			}
 		}
 	}
 	run.CompletedUS = time.Now().UnixMicro()
-	e.save(cleanup, "complete", run, redact)
+	e.save(cleanup, synthetic.HistoryComplete, run, redact)
 }
 
-func (e *Engine) save(ctx context.Context, phase string, run *synthetic.Run, redact *textRedactor) {
+func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, run *synthetic.Run, redact *textRedactor) {
 	if e.unrecorded {
 		return
 	}
@@ -400,10 +400,10 @@ func (e *Engine) save(ctx context.Context, phase string, run *synthetic.Run, red
 		if attempted {
 			qualifier = "append outcome uncertain"
 		}
-		run.HistoryError = joinText(run.HistoryError, redact.text(phase+" history "+qualifier+": "+err.Error()))
+		run.HistoryError = joinText(run.HistoryError, redact.text(string(phase)+" history "+qualifier+": "+err.Error()))
 	}
 	if err = e.history.Sync(ctx); err != nil {
-		run.HistoryError = joinText(run.HistoryError, redact.text(phase+" history sync: "+err.Error()))
+		run.HistoryError = joinText(run.HistoryError, redact.text(string(phase)+" history sync: "+err.Error()))
 	}
 }
 

@@ -104,7 +104,7 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				}
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 				assert.Equal(t, "assertion", ex.Run.Error)
-				assert.Equal(t, "available", ex.Run.CaptureState)
+				assert.Equal(t, synthetic.CaptureAvailable, ex.Run.CaptureState)
 				require.Len(t, ex.Run.Artifacts, 1)
 				assert.Equal(t, publishedID, ex.Run.Artifacts[0].ID)
 				assert.Equal(t, testID, ex.Run.Artifacts[0].Test.ID)
@@ -113,13 +113,13 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 				assert.Equal(t, "assertion", ex.Run.Error)
 				assert.Empty(t, ex.Run.Artifacts)
-				assert.Equal(t, "unavailable", ex.Run.CaptureState)
+				assert.Equal(t, synthetic.CaptureUnavailable, ex.Run.CaptureState)
 				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "too_large"}, {ID: "s1", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
 			case "invalid after oversize":
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
 				assert.Contains(t, ex.Run.Error, "artifact publication:")
 				assert.Empty(t, ex.Run.Artifacts)
-				assert.Equal(t, "unavailable", ex.Run.CaptureState)
+				assert.Equal(t, synthetic.CaptureUnavailable, ex.Run.CaptureState)
 				assert.Equal(t, []synthetic.CaptureOmission{{ID: "s0", Reason: "publication_failed"}, {ID: "s1", Reason: "publication_failed"}}, ex.Run.Captures.Unpublished)
 			default:
 				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
@@ -192,7 +192,7 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 	require.NotNil(t, ex.Run.Metrics.Performance)
 	assert.Equal(t, 90.0, *ex.Run.Metrics.Performance)
 	assert.Empty(t, ex.Run.Artifacts)
-	assert.Equal(t, "unavailable", ex.Run.CaptureState)
+	assert.Equal(t, synthetic.CaptureUnavailable, ex.Run.CaptureState)
 	require.NotNil(t, ex.Run.Captures)
 	assert.Empty(t, ex.Run.Captures.Reporting)
 	assert.Equal(t, []synthetic.CaptureOmission{{ID: "lighthouse-report", Reason: "too_large"}}, ex.Run.Captures.Unpublished)
@@ -282,7 +282,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			}
 			require.Len(t, ex.Run.Artifacts, count)
 			if mode == "old runtime" {
-				assert.Equal(t, "screenshot", ex.Run.Artifacts[0].Kind)
+				assert.Equal(t, synthetic.ScreenshotCapture, ex.Run.Artifacts[0].Kind)
 				assert.Empty(t, ex.Run.Artifacts[0].Test)
 			}
 			if mode != "old runtime" && mode != "malformed init" {
@@ -292,7 +292,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			if count == 2 {
 				meta, body, err := store.Fetch(t.Context(), ex.Run.JobID, ex.Run.ID, "trace1")
 				require.NoError(t, err)
-				assert.Equal(t, "trace", meta.Kind)
+				assert.Equal(t, synthetic.TraceCapture, meta.Kind)
 				assert.Equal(t, []byte("PK\x03\x04fixture"), body)
 			}
 		})

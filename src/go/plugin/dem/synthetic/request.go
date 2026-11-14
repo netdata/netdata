@@ -44,7 +44,14 @@ type Request struct {
 	Trace               bool
 }
 
+// JobID is the job's history and artifact identity: "<kind>:<name>".
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
+
+// ValidJobID reports whether id is a JobID of a journey or Lighthouse job.
+func ValidJobID(id string) bool {
+	kind, name, ok := strings.Cut(id, ":")
+	return ok && (Kind(kind) == Journey || Kind(kind) == Lighthouse) && strings.TrimSpace(name) != ""
+}
 
 // ValidateRequest checks the execution contract without acquiring resources or reading files.
 func ValidateRequest(r Request) error {
