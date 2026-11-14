@@ -329,6 +329,7 @@ set(LIBNETDATA_FILES
         os/random.h
         socket/nd-sock.c
         socket/nd-sock.h
+        socket/nd-sock-unittest.c
         socket/listen-sockets.c
         socket/listen-sockets.h
         socket/poll-events.c

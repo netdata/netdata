@@ -243,6 +243,7 @@ void replication_initialize(void);
 void bearer_tokens_init(void);
 int unittest_stream_compressions(void);
 int stream_conf_unittest(void);
+int nd_sock_ssl_unittest(void);
 int uuid_unittest(void);
 int progress_unittest(void);
 int dyncfg_unittest(void);
@@ -530,6 +531,7 @@ int netdata_main(int argc, char **argv) {
                             if (web_client_forwarded_for_unittest()) return 1;
                             if (rrdhost_machine_guid_unittest()) return 1;
                             if (stream_conf_unittest()) return 1;
+                            if (nd_sock_ssl_unittest()) return 1;
                             if (unit_test_static_threads()) return 1;
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
