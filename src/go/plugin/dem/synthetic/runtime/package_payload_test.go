@@ -138,8 +138,8 @@ func TestPrepareNativePackageStagingIsolation(t *testing.T) {
 
 func TestPrepareNativePackageRejectsNativeLayoutThroughSymlink(t *testing.T) {
 	m, _ := bundleFixture(t, "layout")
-	// Managed extraction permits internal links, but native admission requires
-	// each declared executable/data layout path to have plain directory parents.
+	// Extraction permits internal links, but binding (managed and native alike)
+	// requires each declared executable/data layout path to have plain parents.
 	m.Layout.Loader = "alias/loader.so"
 	program := append(make([]byte, 32), m.Bindings[0].Expected...)
 	entries := []fixtureEntry{

@@ -136,33 +136,56 @@ func createNativeControl(config NativeConfig, uid, gid int) error {
 	return errors.Join(syncDirectory(parentRoot, "."), parentRoot.Close())
 }
 
+// readNativePayload admits an installed package only when its record names this
+// prefix and platform, the whole tree is root-controlled, the bound layout is
+// intact, and interpreter slots and generated configuration name this prefix.
 func readNativePayload(path string) (Paths, Manifest, error) {
-	var empty Manifest
 	if err := nativeProtectedPath(path); err != nil {
-		return Paths{}, empty, err
+		return Paths{}, Manifest{}, err
 	}
 	root, err := os.OpenRoot(path)
 	if err != nil {
-		return Paths{}, empty, err
+		return Paths{}, Manifest{}, err
 	}
 	defer root.Close()
-	var record NativePackage
-	if err := nativeProtectedFile(root, "native.json", false); err != nil {
-		return Paths{}, empty, err
+	m, err := readNativeRecord(root, path)
+	if err != nil {
+		return Paths{}, Manifest{}, err
 	}
+	if err := verifyNativeImmutable(root); err != nil {
+		return Paths{}, Manifest{}, err
+	}
+	if err := verifyBoundPayload(root, m, nonOwnerExecute); err != nil {
+		return Paths{}, Manifest{}, err
+	}
+	if err := verifyNativeBinding(root, path, m); err != nil {
+		return Paths{}, Manifest{}, err
+	}
+	return boundPaths(path, m.Layout), m, nil
+}
+
+func readNativeRecord(root *os.Root, path string) (Manifest, error) {
+	if err := nativeProtectedFile(root, "native.json", false); err != nil {
+		return Manifest{}, err
+	}
+	var record NativePackage
 	if err := readJSON(root, "native.json", &record); err != nil {
-		return Paths{}, empty, err
+		return Manifest{}, err
 	}
 	m := record.Manifest
 	if record.Format != 1 || record.Path != path || m.Platform != "linux/"+goruntime.GOARCH {
-		return Paths{}, empty, errors.New("native package identity, platform or bound prefix differs")
+		return Manifest{}, errors.New("native package identity, platform or bound prefix differs")
 	}
 	if err := m.Validate(); err != nil {
-		return Paths{}, empty, err
+		return Manifest{}, err
 	}
-	// Package authentication authorizes the payload. Verify that its entire
-	// reachable tree remains root-controlled and contains no external links.
-	err = fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
+	return m, nil
+}
+
+// Package authentication authorizes the payload. Verify that its entire
+// reachable tree remains root-controlled and contains no external links.
+func verifyNativeImmutable(root *os.Root) error {
+	return fs.WalkDir(root.FS(), ".", func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -183,72 +206,49 @@ func readNativePayload(path string) (Paths, Manifest, error) {
 		}
 		return nil
 	})
-	if err != nil {
-		return Paths{}, empty, err
-	}
-	for _, name := range []string{m.Layout.EntryPoint, m.Layout.Node, m.Layout.Browser, m.Layout.Loader, "chrome", "fonts.conf"} {
-		if err := plainExistingParents(root, name); err != nil {
-			return Paths{}, empty, err
-		}
-		info, err := root.Lstat(name)
-		if err != nil || !info.Mode().IsRegular() {
-			return Paths{}, empty, fmt.Errorf("native payload is missing regular file %s", name)
-		}
-	}
-	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, "chrome"} {
-		info, err := root.Lstat(name)
-		if err != nil || info.Mode().Perm()&0111 == 0 {
-			return Paths{}, empty, fmt.Errorf("native executable is unavailable: %s", name)
-		}
-	}
-	for _, name := range []string{m.Layout.Dependencies, m.Layout.Fonts} {
-		if err := plainExistingParents(root, name); err != nil {
-			return Paths{}, empty, err
-		}
-		info, err := root.Lstat(name)
-		if err != nil || !info.IsDir() {
-			return Paths{}, empty, fmt.Errorf("native payload directory is unavailable: %s", name)
-		}
-	}
+}
+
+// The package was bound at build time; slots and generated configuration must
+// name the installed prefix, never a builder staging path.
+func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
 	interpreter := []byte(filepath.Join(path, m.Layout.Loader))
 	for _, binding := range m.Bindings {
 		if err := plainExistingParents(root, binding.Path); err != nil {
-			return Paths{}, empty, err
+			return err
 		}
 		if err := nativeProtectedFile(root, binding.Path, false); err != nil {
-			return Paths{}, empty, err
+			return err
 		}
 		if len(interpreter)+1 > len(binding.Expected) {
-			return Paths{}, empty, errors.New("native interpreter prefix exceeds binding capacity")
+			return errors.New("native interpreter prefix exceeds binding capacity")
 		}
 		f, err := root.Open(binding.Path)
 		if err != nil {
-			return Paths{}, empty, err
+			return err
 		}
 		actual := make([]byte, len(binding.Expected))
 		_, readErr := f.ReadAt(actual, binding.Offset)
-		err = errors.Join(readErr, f.Close())
-		if err != nil {
-			return Paths{}, empty, err
+		if err := errors.Join(readErr, f.Close()); err != nil {
+			return err
 		}
 		bound := make([]byte, len(binding.Expected))
 		copy(bound, interpreter)
 		if !bytes.Equal(actual, bound) {
-			return Paths{}, empty, errors.New("native interpreter is not bound to its package prefix")
+			return errors.New("native interpreter is not bound to its package prefix")
 		}
 	}
 	fonts, launcher, err := boundConfiguration(path, m.Layout)
 	if err != nil {
-		return Paths{}, empty, err
+		return err
 	}
 	for name, expected := range map[string][]byte{"fonts.conf": fonts, "chrome": launcher} {
 		actual, err := root.ReadFile(name)
 		if err != nil {
-			return Paths{}, empty, err
+			return err
 		}
 		if !bytes.Equal(actual, expected) {
-			return Paths{}, empty, fmt.Errorf("native configuration is not bound to its package prefix: %s", name)
+			return fmt.Errorf("native configuration is not bound to its package prefix: %s", name)
 		}
 	}
-	return Paths{EntryPoint: filepath.Join(path, m.Layout.EntryPoint), Node: filepath.Join(path, m.Layout.Node), Dependencies: filepath.Join(path, m.Layout.Dependencies), Browser: filepath.Join(path, "chrome")}, m, nil
+	return nil
 }

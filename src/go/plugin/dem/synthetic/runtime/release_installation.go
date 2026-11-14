@@ -172,17 +172,8 @@ func (s *Store) validateEnsureSelection(m Manifest) (result error) {
 		return selectedPayloadError(err)
 	}
 	defer func() { result = errors.Join(result, root.Close()) }()
-	if err := validatePayloadLayout(root, m); err != nil {
+	if err := verifyBoundPayload(root, m, ownerExecute); err != nil {
 		return selectedPayloadError(err)
-	}
-	for _, name := range []string{"chrome", "fonts.conf"} {
-		info, err := root.Lstat(name)
-		if err != nil {
-			return selectedPayloadError(err)
-		}
-		if !info.Mode().IsRegular() || (name == "chrome" && info.Mode()&0100 == 0) {
-			return fmt.Errorf("%w: selected runtime bound file is missing or invalid: %s", ErrDamaged, name)
-		}
 	}
 	return nil
 }

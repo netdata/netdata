@@ -262,13 +262,7 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 	if !sameManifest(g.Manifest, m) {
 		return Paths{}, damagedMetadata("selection.json", errors.New("prepared runtime manifest differs from installed requirement"))
 	}
-	base := filepath.Join(path, "generations", m.Archive.SHA256)
-	return Paths{
-		EntryPoint:   filepath.Join(base, m.Layout.EntryPoint),
-		Node:         filepath.Join(base, m.Layout.Node),
-		Dependencies: filepath.Join(base, m.Layout.Dependencies),
-		Browser:      filepath.Join(base, "chrome"),
-	}, nil
+	return boundPaths(filepath.Join(path, "generations", m.Archive.SHA256), m.Layout), nil
 }
 
 func checkContext(ctx context.Context) error {
