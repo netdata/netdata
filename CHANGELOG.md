@@ -498,6 +498,18 @@
 - Feat(go.d/postgres): collect TOP tables by recent activity and indexes by size ([#24234](https://github.com/netdata/netdata/issues/24234))
 - Regenerate integrations docs ([#24724](https://github.com/netdata/netdata/issues/24724))
 - Test(dem): pin runtime compatibility policy and baseline checks ([#24725](https://github.com/netdata/netdata/issues/24725))
+- Feat(otel): traces search bar, service map and derived service metrics ([#24659](https://github.com/netdata/netdata/issues/24659))
+- Feat(dem): add optional runtime extensions and journey failure evidence ([#24728](https://github.com/netdata/netdata/issues/24728))
+- Regenerate integrations docs ([#24727](https://github.com/netdata/netdata/issues/24727))
+- Pagefile monitoring on Windows (windows.plugin) ([#24647](https://github.com/netdata/netdata/issues/24647))
+- Refactor(otel): final names for the OTel plugin's charts ([#24731](https://github.com/netdata/netdata/issues/24731))
+- Feat(dem): add opt-in browser error summaries for journeys ([#24734](https://github.com/netdata/netdata/issues/24734))
+- Feat(dem): associate captures and report omissions ([#24735](https://github.com/netdata/netdata/issues/24735))
+- Drop SUID from otel-plugin in the Docker image ([#24730](https://github.com/netdata/netdata/issues/24730))
+- Regenerate integrations docs ([#24732](https://github.com/netdata/netdata/issues/24732))
+- Feat(dem): preserve valid captures when siblings exceed size limit ([#24736](https://github.com/netdata/netdata/issues/24736))
+- Feat(dem): add opt-in Playwright failure traces ([#24738](https://github.com/netdata/netdata/issues/24738))
+- Regenerate integrations docs ([#24739](https://github.com/netdata/netdata/issues/24739))
 
 ## [2.12.0] - 2026-09-30
 
