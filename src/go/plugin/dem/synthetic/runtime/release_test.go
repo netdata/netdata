@@ -78,7 +78,13 @@ func TestReleaseVerificationRequiresLocalTrustAndBoundedMetadata(t *testing.T) {
 		assert.Error(t, err)
 	}
 	public := key
-	for _, invalid := range [][]byte{append(bytes.Clone(data), []byte(" {}")...), []byte("{}"), bytes.Repeat([]byte(" "), ReleaseEnvelopeLimit+1)} {
+	for _, invalid := range [][]byte{
+		append(bytes.Clone(data), []byte(" {}")...),
+		[]byte("{}"),
+		bytes.Repeat([]byte(" "), ReleaseEnvelopeLimit+1),
+		// The unsigned envelope is as strict as the signed payload.
+		bytes.Replace(data, []byte(`"format":1`), []byte(`"format":1,"download_override":"https://untrusted.invalid"`), 1),
+	} {
 		_, err := VerifyRelease(invalid, testTrust(t, public))
 		assert.Error(t, err)
 	}

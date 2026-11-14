@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
@@ -51,7 +50,7 @@ func (r *Retention) Run(ctx context.Context) {
 			}
 			historyDue = time.Now().Add(delay)
 		}
-		if r.artifactStore != nil && (!now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy) {
+		if !now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy {
 			delay := time.Hour
 			_, err := r.artifactStore.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
 			if err != nil && ctx.Err() == nil {
@@ -61,7 +60,7 @@ func (r *Retention) Run(ctx context.Context) {
 			artifactsDue = time.Now().Add(delay)
 		}
 		next := historyDue
-		if r.artifactStore != nil && artifactsDue.Before(next) {
+		if artifactsDue.Before(next) {
 			next = artifactsDue
 		}
 		timer := time.NewTimer(time.Until(next))
@@ -74,19 +73,14 @@ func (r *Retention) Run(ctx context.Context) {
 	}
 }
 
-// reloadPolicy runs on the retention goroutine before each sweep. Invalid
-// edits leave the last validated policy in force; there is no config watcher.
+// reloadPolicy runs on the retention goroutine before each sweep. The provider
+// returns validated configuration (LoadConfig); a failed load leaves the last
+// policy in force. There is no config watcher.
 func (r *Retention) reloadPolicy() {
 	if r.loadConfig == nil {
 		return
 	}
 	cfg, err := r.loadConfig()
-	if err == nil {
-		err = cfg.History.validate(journal.MinHistoryBytes)
-		if err == nil {
-			err = cfg.Artifacts.validate(1)
-		}
-	}
 	r.policyErrorMu.Lock()
 	r.policyError = ""
 	if err != nil {

@@ -22,17 +22,21 @@ import (
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
+// Dependencies are the process-owned resources the components borrow. History
+// and Artifacts are required; the command keeps them open across Agent run
+// generations and closes them after the components stop.
 type Dependencies struct {
-	GeoIPPaths     geoip.Paths
-	History        *journal.Store
-	Artifacts      *artifacts.Store
-	Runtime        *runtimehost.Host
-	Executor       journey.Executor
-	ConfigProvider func() (Config, error)
+	GeoIPPaths geoip.Paths
+	History    *journal.Store
+	Artifacts  *artifacts.Store
+	Executor   journey.Executor
+	// BrowserActivation names the process browser runtime that synthetic jobs
+	// wait for; nil when the runtime mode has no readiness owner (preloads).
+	BrowserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
+	ConfigProvider    func() (Config, error)
 }
 
 // Components separates collector selection from process-owned investigation.
@@ -45,60 +49,42 @@ type Components struct {
 // New keeps the shared stores caller-owned across Agent run generations.
 // The registries contain admitted runtimes only; configuration stays in the framework.
 func New(deps Dependencies, cfg Config) Components {
+	return compose(deps, cfg, synthetichistory.NewStore(deps.History))
+}
+
+func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.Store) Components {
 	rumRegistry := rumregistry.New()
-	var rumHistory *rumhistory.Store
-	var syntheticHistory syntheticquery.History
-	if deps.History != nil {
-		rumHistory = rumhistory.NewStore(deps.History)
-		syntheticHistory = synthetichistory.NewStore(deps.History)
-	}
+	rumHistory := rumhistory.NewStore(deps.History)
 	rumQueries := rumquery.New(rumRegistry, rumHistory)
-	site := rum.Creator(rum.Dependencies{
+	syntheticRegistry := syntheticregistry.New()
+	collectors := collectorapi.Registry{}
+	collectors.Register("receiver", receiver.Creator(receiver.Dependencies{
+		Registry:   rumRegistry,
+		GeoIPPaths: deps.GeoIPPaths,
+	}))
+	collectors.Register("rum", rum.Creator(rum.Dependencies{
 		Registry: rumRegistry,
 		History:  rumHistory,
-	})
-	collectors := collectorapi.Registry{}
-	collectors.Register(
-		"receiver",
-		receiver.Creator(receiver.Dependencies{
-			Registry:   rumRegistry,
-			GeoIPPaths: deps.GeoIPPaths,
-		}),
-	)
-	collectors.Register("rum", site)
-	syntheticRegistry := syntheticregistry.New()
-	var captures syntheticquery.Artifacts
-	if deps.Artifacts != nil {
-		captures = deps.Artifacts
-	}
-	workflow := journey.Creator(journey.Dependencies{
-		Registry: syntheticRegistry,
-		Executor: deps.Executor,
-	})
-	audit := lighthouse.Creator(lighthouse.Dependencies{
-		Registry: syntheticRegistry,
-		Executor: deps.Executor,
-	})
-	if deps.Runtime != nil {
-		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
-	}
-	collectors.Register("journey", workflow)
-	collectors.Register("lighthouse", audit)
+	}))
+	collectors.Register("journey", journey.Creator(journey.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
+	collectors.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
 	retention := &Retention{
+		store:          deps.History,
 		policy:         cfg.History,
+		artifactStore:  deps.Artifacts,
 		artifactPolicy: cfg.Artifacts,
 		loadConfig:     deps.ConfigProvider,
 		log:            logger.New(),
 	}
-	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures, retention.PolicyError)
-	var historyStatus historyfunc.Deps
-	if deps.History != nil {
-		historyStatus = deps.History
-		retention.store = deps.History
-	}
-	if deps.Artifacts != nil {
-		retention.artifactStore = deps.Artifacts
-	}
+	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, deps.Artifacts, retention.PolicyError)
 	return Components{
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
@@ -128,7 +114,7 @@ func New(deps Dependencies, cfg Config) Components {
 			{
 				ID:         "dem-history",
 				Functions:  historyfunc.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(historyStatus, retention.PolicyError) },
+				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(deps.History, retention.PolicyError) },
 			},
 		},
 		Retention: retention,

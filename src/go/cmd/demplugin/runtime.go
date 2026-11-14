@@ -156,14 +156,14 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 		encoder.SetIndent("", "  ")
 		retErr = errors.Join(retErr, encoder.Encode(report))
 	}()
-	if (cfg.Mode == "preloaded" || cfg.Mode == "native") && command != "preload" {
+	if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
 		if command != "status" && command != "qualify" {
-			if cfg.Mode == "native" {
+			if cfg.Mode == runtimehost.ModeNative {
 				return true, errors.New("native runtime installation, update, repair and removal belong to the package manager; install the optional netdata-dem-runtime package")
 			}
 			return true, errors.New("install/update/repair/uninstall require runtime.mode: managed")
 		}
-		handle := dem.OpenRuntime(cfg, "")
+		handle := runtimehost.Open(cfg, "")
 		defer func() {
 			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
 				retErr = errors.Join(retErr, handle.Close())
@@ -172,13 +172,13 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 		if handle.SetupError != nil {
 			return true, handle.SetupError
 		}
-		if cfg.Mode == "native" {
+		if cfg.Mode == runtimehost.ModeNative {
 			status := handle.Host.Status()
 			report.Runtime = status.Running
 			report.Native = status.Native
 			report.Notice = "Native package files are owned by the package manager. Stop standalone consumers before package replacement or removal."
 		} else {
-			report.Runtime = releaseIdentity(*handle.Manifest)
+			report.Runtime = new(handle.Manifest.Identity())
 			report.PreloadPath = cfg.PreloadPath
 		}
 		report.Generation = report.Runtime.SHA256
@@ -287,7 +287,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			return true, err
 		}
 		if selected != nil {
-			report.Runtime = releaseIdentity(*selected)
+			report.Runtime = new(selected.Identity())
 			report.Generation = selected.Archive.SHA256
 			report.State = "installed"
 			report.Outcome = "already-selected"
@@ -299,7 +299,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			return true, nil
 		}
 		m := candidate.Manifest()
-		report.Candidate = releaseIdentity(m)
+		report.Candidate = new(m.Identity())
 		report.CandidateState = "requested"
 		defer func() {
 			if !errors.Is(retErr, ndexec.ErrTreeNotDrained) {
@@ -327,11 +327,11 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 				return true, err
 			}
 			sealed = true
-			report.Runtime = releaseIdentity(m)
+			report.Runtime = new(m.Identity())
 			report.Generation = m.Archive.SHA256
 			report.CachePath = ""
 			report.PreloadPath = storeConfig.Path
-			report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": "preloaded", "preload_path": storeConfig.Path}}
+			report.PreloadedConfig = map[string]any{"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": storeConfig.Path}}
 			report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
 		} else {
 			if err = candidate.Select(); err != nil {
@@ -340,7 +340,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			report.CandidateState = "selected"
 			if command == "ensure" {
 				report.Outcome = "newly-selected"
-				report.Runtime = releaseIdentity(m)
+				report.Runtime = new(m.Identity())
 				report.Generation = m.Archive.SHA256
 			}
 			report.Notice = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
@@ -378,7 +378,7 @@ func runRuntimeCommandWithInput(ctx context.Context, args []string, input *os.Fi
 			}
 		}()
 		m := consumer.Manifest()
-		report.Runtime = releaseIdentity(m)
+		report.Runtime = new(m.Identity())
 		report.Generation = m.Archive.SHA256
 		report.State = "installed"
 		report.Qualification, err = qualifyRuntime(ctx, runtimehost.Borrow(consumer))
@@ -394,7 +394,7 @@ type runtimeCommandReport struct {
 	Outcome         string                     `json:"outcome,omitempty"`
 	DownloadAllowed bool                       `json:"download_allowed"`
 	Command         string                     `json:"command"`
-	Mode            string                     `json:"mode"`
+	Mode            runtimehost.Mode           `json:"mode"`
 	State           string                     `json:"state"`
 	ReleasePath     string                     `json:"release_path,omitempty"`
 	CachePath       string                     `json:"cache_path,omitempty"`
@@ -419,7 +419,7 @@ func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
 	r.Generation = ""
 	r.State = "unavailable"
 	if status.Selected != nil {
-		r.Runtime = releaseIdentity(*status.Selected)
+		r.Runtime = new(status.Selected.Identity())
 		r.Generation = status.Selected.Archive.SHA256
 		r.State = "installed"
 	}
@@ -436,7 +436,4 @@ func errorString(err error) string {
 		return err.Error()
 	}
 	return ""
-}
-func releaseIdentity(m runtime.Manifest) *synthetic.RuntimeIdentity {
-	return &synthetic.RuntimeIdentity{Version: m.Version, SHA256: m.Archive.SHA256, Contract: m.Contract}
 }

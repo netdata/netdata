@@ -218,7 +218,7 @@ func (s *Store) Close() error {
 // HasObservedPublished is a prompt Function-discovery hint, not proof that a
 // capture is readable. Once true it stays true for this store's lifetime.
 func (s *Store) HasObservedPublished() bool {
-	return s != nil && s.observedPublished.Load()
+	return s.observedPublished.Load()
 }
 
 func (s *Store) publishedAtStartup() bool {

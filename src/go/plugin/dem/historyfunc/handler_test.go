@@ -110,7 +110,6 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	assert.Equal(t, 499, h.HandleRaw(ctx, request()).Status)
-	assert.Equal(t, 503, New(nil, nil).HandleRaw(context.Background(), request()).Status)
 	declarations := Declarations()
 	require.Len(t, declarations, 1)
 	assert.False(t, declarations[0].HasHistory)

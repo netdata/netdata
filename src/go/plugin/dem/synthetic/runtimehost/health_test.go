@@ -20,10 +20,10 @@ type healthLog struct {
 }
 
 func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
-	h := New(Config{Mode: "native", Unavailable: runtime.ErrUnavailable})
+	h := NewUnavailable(ModeNative, runtime.ErrUnavailable)
 	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
 	require.Equal(t, StateMissing, h.Status().State)
-	require.Equal(t, "native", h.Status().Mode)
+	require.Equal(t, ModeNative, h.Status().Mode)
 	require.Nil(t, h.Status().Storage)
 	require.NoError(t, h.Close())
 }
@@ -36,7 +36,7 @@ func (l *healthLog) Write(p []byte) (int, error) {
 func (l *healthLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.data.String() }
 
 func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
-	h := New(Config{Unavailable: errors.New("runtime unavailable")})
+	h := NewUnavailable(ModeManaged, errors.New("runtime unavailable"))
 	defer h.Close()
 	dependencies, err := h.Dependencies(nil)
 	require.NoError(t, err)
@@ -44,10 +44,11 @@ func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
 	require.ErrorContains(t, dependencies[0].Ready(), "runtime unavailable")
 	_, err = h.BeginUse()
 	require.Error(t, err)
+	require.Nil(t, h.NewUpdater(nil, nil), "only a managed store prepares updates")
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
-	h := New(Config{})
+	h := NewUnavailable(ModeManaged, runtime.ErrUnavailable)
 	var logs healthLog
 	h.log = logger.NewWithWriter(&logs)
 	h.setMaintenance("cleanup", errors.New("trash blocked"))

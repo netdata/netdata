@@ -19,7 +19,7 @@ if(ENABLE_PLUGIN_DEM)
 
     set(_DEM_GO_LDFLAGS "${GO_LDFLAGS}")
     if(NETDATA_PACKAGE_KIND STREQUAL "deb" OR NETDATA_PACKAGE_KIND STREQUAL "rpm")
-        string(APPEND GO_LDFLAGS " -X github.com/netdata/netdata/go/plugins/plugin/dem.DefaultRuntimeMode=native")
+        string(APPEND GO_LDFLAGS " -X github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost.DefaultMode=native")
     endif()
     add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
     set(GO_LDFLAGS "${_DEM_GO_LDFLAGS}")

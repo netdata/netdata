@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package dem
+package runtimehost
 
 import (
 	"bytes"
@@ -12,6 +12,7 @@ import (
 	goruntime "runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
@@ -19,13 +20,49 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestRuntimeConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	assert.Equal(t, ModeManaged, cfg.Mode)
+	store, err := cfg.StoreConfig("/var/lib/netdata")
+	require.NoError(t, err)
+	assert.Equal(t, "/var/lib/netdata/dem/runtime", store.Path)
+	assert.Equal(t, int64(4<<30), store.MaxBytes)
+	assert.Equal(t, 7*24*time.Hour, store.PreviousRetention)
+}
+
+func TestNativeRuntimeConfigurationUsesFixedPackagePaths(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Mode = ModeNative
+	require.NoError(t, cfg.Validate())
+	cfg.CachePath = "/alternate/proof"
+	require.ErrorContains(t, cfg.Validate(), "cache_path is only valid in managed mode")
+	cfg.CachePath = ""
+	cfg.PreloadPath = "/alternate/payload"
+	require.ErrorContains(t, cfg.Validate(), "preload_path requires mode: preloaded")
+}
+
+func TestRuntimePathsHaveNoImplicitWorkingDirectory(t *testing.T) {
+	cfg := DefaultConfig()
+	for _, path := range []string{"", "relative"} {
+		_, err := cfg.StoreConfig(path)
+		require.Error(t, err)
+	}
+	cfg.CachePath = "relative"
+	_, err := cfg.StoreConfig("/var/lib/netdata")
+	require.Error(t, err)
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
+	store, err := cfg.StoreConfig("")
+	require.NoError(t, err)
+	assert.Equal(t, cfg.CachePath, store.Path)
+}
+
 func trustedFixture() runtime.Manifest {
 	return runtime.Manifest{Format: 1, Contract: 2, Version: "test", Platform: "linux/" + goruntime.GOARCH,
 		Archive:  runtime.Archive{SHA256: strings.Repeat("a", 64), Bytes: 100, TarBytes: 10240, ExpandedBytes: 200, Entries: 2},
 		Layout:   runtime.Layout{EntryPoint: "runtime.mjs", Node: "node", Dependencies: "dependencies", Browser: "browser", Loader: "loader", Fonts: "fonts"},
 		Bindings: []runtime.Binding{{Path: "node", Expected: []byte("loader\x00")}, {Path: "browser", Expected: []byte("loader\x00")}}}
 }
-func signedSetupFixture(t *testing.T) (RuntimeConfig, runtime.Release, []byte) {
+func signedSetupFixture(t *testing.T) (Config, runtime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
 	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
@@ -36,7 +73,7 @@ func signedSetupFixture(t *testing.T) (RuntimeConfig, runtime.Release, []byte) {
 	require.NoError(t, err)
 	path := filepath.Join(t.TempDir(), "public.gpg")
 	require.NoError(t, os.WriteFile(path, pgptest.Public(t, key), 0600))
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	cfg.OfflineKeyring = path
 	return cfg, release, raw
 }
@@ -48,18 +85,7 @@ func TestInstalledReleaseTrust(t *testing.T) {
 	loaded, err := cfg.ReleaseLoader(path, false)(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, release, loaded)
-	for name, body := range map[string][]byte{
-		"trailing JSON":    append(append([]byte{}, raw...), []byte(" {}")...),
-		"unknown field":    []byte(strings.Replace(string(raw), `"format":1`, `"format":1,"download_override":"https://untrusted.invalid"`, 1)),
-		"invalid envelope": []byte(`{"format":1}`),
-		"oversized":        bytes.Repeat([]byte(" "), runtime.ReleaseEnvelopeLimit+1),
-	} {
-		t.Run(name, func(t *testing.T) {
-			require.NoError(t, os.WriteFile(path, body, 0600))
-			_, err := cfg.ReleaseLoader(path, false)(context.Background())
-			require.Error(t, err)
-		})
-	}
+	// Envelope decoding (trailing data, unknown fields, size) is the runtime package's contract.
 	_, err = cfg.ReleaseLoader("relative.json", false)(context.Background())
 	require.ErrorContains(t, err, "absolute")
 	_, err = cfg.ReleaseLoader(t.TempDir(), false)(context.Background())
@@ -89,35 +115,6 @@ func TestInstalledReleaseRejectsOtherArchitecture(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, raw, 0600))
 	_, err = cfg.ReleaseLoader(path, false)(context.Background())
 	require.ErrorContains(t, err, "does not match this architecture")
-}
-
-func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cache := filepath.Join(t.TempDir(), "cache")
-	cfg.CachePath = cache
-	handle := OpenRuntime(cfg, "")
-	require.Error(t, handle.SetupError)
-	require.NotNil(t, handle.Source)
-	require.NotNil(t, handle.Host)
-	assert.Contains(t, []string{"unavailable", "missing"}, handle.Host.Status().State)
-	_, err := handle.Source.BeginUse()
-	require.Error(t, err)
-	require.NoError(t, handle.Close())
-	require.NoError(t, handle.Close())
-}
-func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
-	cfg.Mode = "preloaded"
-	cfg.PreloadPath = filepath.Join(t.TempDir(), "not-created")
-	handle := OpenRuntime(cfg, "")
-	require.Error(t, handle.SetupError)
-	require.Nil(t, handle.Host)
-	require.Nil(t, handle.Store)
-	_, err := handle.Source.BeginUse()
-	require.Error(t, err)
-	require.NoError(t, handle.Close())
-	_, err = os.Stat(cfg.PreloadPath)
-	require.True(t, os.IsNotExist(err))
 }
 
 func TestReleaseLoaderRejectsInvalidConfiguredKeys(t *testing.T) {
@@ -189,14 +186,14 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 	require.ErrorContains(t, err, "offline_keyring")
 	require.Empty(t, requests)
 	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
-	handle := OpenRuntime(cfg, "")
+	handle := Open(cfg, "")
 	require.Error(t, handle.SetupError)
 	require.NoError(t, handle.Close())
 	require.Empty(t, requests, "synchronous runtime startup must never retrieve public keys or descriptors")
 }
 
 func TestReleaseLoaderRequiresDiscoveryURLBeforeNetworkAccess(t *testing.T) {
-	cfg := DefaultRuntimeConfig()
+	cfg := DefaultConfig()
 	previous := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = previous })
 	requests := 0

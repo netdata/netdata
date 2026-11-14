@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/stretchr/testify/require"
@@ -50,7 +51,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	var archiveRequests atomic.Int32
@@ -72,7 +73,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 		return runtime.VerifyRelease(envelope, public)
 	}
 	calls := 0
-	u := NewUpdater(host, qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(_ context.Context, source runner.Source) (*runner.Qualification, error) {
 		calls++
 		status, err := store.Inspect()
 		require.NoError(t, err)
@@ -97,7 +98,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	require.NoError(t, u.check(context.Background()))
 	require.Equal(t, 1, calls)
 	require.Equal(t, int32(1), archiveRequests.Load())
-	newHost := New(Config{Store: store})
+	newHost := NewManaged(store)
 	defer newHost.Close()
 	require.Equal(t, "second", newHost.Status().Running.Version)
 	require.False(t, newHost.Status().RestartRequired)
@@ -107,7 +108,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = w.Write(data) }))
@@ -117,27 +118,36 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	defer func() { http.DefaultTransport = previous }()
 	next.Manifest.Archive.URL = server.URL
 	failure := errors.New("sandbox qualification failed")
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
+	var logs healthLog
+	host.log = logger.NewWithWriter(&logs)
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) { return nil, failure }),
 		func(context.Context) (runtime.Release, error) { return next, nil })
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	status := host.Status()
 	require.Equal(t, first.Manifest, *status.Storage.Selected)
 	require.False(t, status.RestartRequired)
-	require.Contains(t, status.MaintenanceError, failure.Error())
+	require.Equal(t, "update: sandbox qualification failed", status.MaintenanceError)
 	require.Zero(t, status.Storage.CandidateClaims)
 	require.NoError(t, host.Ready())
+	require.ErrorIs(t, u.check(context.Background()), failure)
+	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update failed: sandbox qualification failed"))
 	host.sweep()
-	require.Contains(t, host.Status().MaintenanceError, failure.Error(), "storage cleanup cannot clear update health")
+	require.Equal(t, "update: sandbox qualification failed", host.Status().MaintenanceError, "storage cleanup cannot clear update health")
+	// A later check that finds no newer release clears update health.
+	u.load = func(context.Context) (runtime.Release, error) { return first, nil }
+	require.NoError(t, u.check(context.Background()))
+	require.Empty(t, host.Status().MaintenanceError)
+	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update recovered"))
 }
 
 func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
 	entered := make(chan struct{})
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}), func(ctx context.Context) (runtime.Release, error) {
@@ -158,11 +168,37 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	require.NoError(t, store.Uninstall(context.Background()), "cancelled updater must release installation exclusion")
 }
 
+func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
+	store := testStore(t)
+	first, data := publishedBundle(t, "first", 1)
+	selectPublished(t, store, first, data, runtime.AutomaticUpdates)
+	host := NewManaged(store)
+	entered := make(chan struct{})
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+		t.Error("unexpected qualification")
+		return nil, nil
+	}), func(ctx context.Context) (runtime.Release, error) {
+		close(entered)
+		<-ctx.Done()
+		return runtime.Release{}, ctx.Err()
+	})
+	u.delay = func(bool) time.Duration { return 0 }
+	go u.Run(context.Background())
+	<-entered
+	require.NoError(t, host.Close())
+	select {
+	case <-u.done:
+	default:
+		t.Fatal("host released protection before joining its updater")
+	}
+	require.NoError(t, store.Uninstall(context.Background()), "closed host and updater release the installation")
+}
+
 func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 	store := testStore(t)
-	host := New(Config{Store: store})
+	host := NewManaged(store)
 	defer host.Close()
-	u := NewUpdater(host, qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
+	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
 		return nil, nil
 	}),

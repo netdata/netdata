@@ -41,10 +41,11 @@ func Creator(deps Dependencies) collectorapi.Creator {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 10,
 		},
-		CreateV2:        func() collectorapi.CollectorV2 { return New(deps) },
-		Config:          func() any { return &Config{} },
-		JobConfigSchema: schema,
-		StoreFirst:      true,
+		CreateV2:               func() collectorapi.CollectorV2 { return New(deps) },
+		Config:                 func() any { return &Config{} },
+		JobConfigSchema:        schema,
+		StoreFirst:             true,
+		ActivationDependencies: deps.ActivationDependencies,
 	}
 }
 func New(deps Dependencies) *Collector {
