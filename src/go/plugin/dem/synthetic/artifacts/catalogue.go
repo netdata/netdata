@@ -2,10 +2,11 @@
 package artifacts
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 
@@ -100,7 +101,7 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	if err := ctx.Err(); err != nil {
 		return Page{}, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return newer(entries[i], entries[j]) })
+	slices.SortFunc(entries, newestFirst)
 	page := Page{
 		Sets:   []Set{},
 		Status: s.status(inv),
@@ -129,12 +130,11 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	return page, nil
 }
 
-func newer(a, b Set) bool {
-	if a.PublishedUS != b.PublishedUS {
-		return a.PublishedUS > b.PublishedUS
-	}
-	return a.RunID > b.RunID
+// newestFirst orders sets by publication time, then run ID, newest first.
+func newestFirst(a, b Set) int {
+	return cmp.Or(cmp.Compare(b.PublishedUS, a.PublishedUS), cmp.Compare(b.RunID, a.RunID))
 }
+
 func (s *Store) status(inv Inventory) Status {
 	var policy *Policy
 	if s.policy != nil {

@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"sort"
+	"slices"
 	"time"
 )
 
@@ -67,7 +67,7 @@ func (s *Store) Enforce(ctx context.Context, days int, maxBytes int64) (Status, 
 }
 
 func expiredSets(entries []Set, now time.Time, days int, maxBytes int64) []Set {
-	sort.Slice(entries, func(i, j int) bool { return newer(entries[j], entries[i]) })
+	slices.SortFunc(entries, func(a, b Set) int { return newestFirst(b, a) })
 	var victims, eligible []Set
 	newest := map[string]string{}
 	var total int64
