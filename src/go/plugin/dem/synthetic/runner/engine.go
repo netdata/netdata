@@ -46,23 +46,23 @@ type Engine struct {
 
 // New returns the monitoring engine. Every monitored attempt records history
 // and owns a run work directory, so both owners are required.
-func New(source Source, history historyWriter, artifacts artifactStore, concurrency int) (*Engine, error) {
+func New(source Source, history historyWriter, store artifactStore, concurrency int) (*Engine, error) {
 	if concurrency <= 0 {
 		return nil, errors.New("browser concurrency must be positive")
 	}
-	if history == nil || artifacts == nil {
+	if history == nil || store == nil {
 		return nil, errors.New("runner requires history and artifact owners")
 	}
-	return newEngine(source, history, artifacts, concurrency), nil
+	return newEngine(source, history, store, concurrency), nil
 }
 
-func newEngine(source Source, history historyWriter, artifacts artifactStore, concurrency int) *Engine {
+func newEngine(source Source, history historyWriter, store artifactStore, concurrency int) *Engine {
 	return &Engine{
 		executionOwner: newExecutionOwner(concurrency),
 		checks:         &checkOwner{},
 		source:         source,
 		history:        history,
-		artifacts:      artifacts,
+		artifacts:      store,
 		platform:       runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
@@ -72,14 +72,14 @@ func newEngine(source Source, history historyWriter, artifacts artifactStore, co
 
 // unrecordedView shares this engine's admission and fatal owner but records no
 // history and uses its own source, artifact store and check coalescing.
-func (e *Engine) unrecordedView(source Source, artifacts artifactStore) *Engine {
+func (e *Engine) unrecordedView(source Source, store artifactStore) *Engine {
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
 		unrecorded:     true,
 		checks:         &checkOwner{},
 		qualification:  e.qualification,
-		artifacts:      artifacts,
+		artifacts:      store,
 		start:          e.start,
 		platform:       e.platform,
 	}

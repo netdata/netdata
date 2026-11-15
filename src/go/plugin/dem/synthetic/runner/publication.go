@@ -72,7 +72,7 @@ func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture
 // records the result: published artifacts, omission reasons and the capture state.
 func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.Capture) {
 	run := &a.run
-	artifacts, err := e.artifacts.Finalize(ctx, run.ID, captures)
+	published, err := e.artifacts.Finalize(ctx, run.ID, captures)
 	if err != nil {
 		capturePublicationFailed(run, captures, err)
 		run.Error = joinText(run.Error, a.redact.text("artifact publication: "+err.Error()))
@@ -81,11 +81,11 @@ func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.C
 		}
 		return
 	}
-	run.Artifacts = artifacts
+	run.Artifacts = published
 	capturePublicationSucceeded(run, captures)
 	if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
 		run.CaptureState = synthetic.CaptureUnavailable
-		if len(artifacts) > 0 {
+		if len(published) > 0 {
 			run.CaptureState = synthetic.CaptureAvailable
 		}
 	}
