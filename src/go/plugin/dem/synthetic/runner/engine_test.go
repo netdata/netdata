@@ -701,6 +701,26 @@ func TestExecutionExits(t *testing.T) {
 			},
 			want: with(prelaunch, func(w *want) { w.err = failure.Error() }),
 		},
+		"cancelled after admission": {
+			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
+				ctx, cancel := context.WithCancel(t.Context())
+				paths := e.source.(fixtureRuntime).Paths
+				// A job stop lands while the runtime is being pinned.
+				e.source = sourceFunc(func() (Use, error) {
+					cancel()
+					return fixtureUse{
+						paths: paths,
+					}, nil
+				})
+				e.start = func(ctx context.Context, _ ndexec.TreeOptions, _ string, _ ...string) (treeProcess, error) {
+					return nil, ctx.Err()
+				}
+				return ctx
+			},
+			want: with(launched, func(w *want) {
+				w.outcome, w.reason, w.err = synthetic.Cancelled, synthetic.CallerCancelled, "context canceled"
+			}),
+		},
 		"untrusted release": {
 			setup: func(e *Engine, _ *observedArtifacts, _ *synthetic.Request) context.Context {
 				paths := e.source.(fixtureRuntime).Paths
@@ -859,6 +879,7 @@ func TestExecutionExits(t *testing.T) {
 			assert.Equal(t, tc.want.outcome, run.Outcome)
 			assert.Equal(t, tc.want.reason, run.TerminationReason)
 			assert.Equal(t, tc.want.err, run.Error)
+			assert.Empty(t, run.HistoryError)
 			assert.Equal(t, !tc.want.undrained, got.Drained)
 			assert.Equal(t, tc.want.admitted, run.StartedUS > 0, "admission timestamp")
 			assert.Equal(t, tc.want.completed, run.CompletedUS > 0, "completion timestamp")
