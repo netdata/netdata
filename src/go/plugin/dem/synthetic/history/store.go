@@ -30,6 +30,6 @@ type RunFilter struct {
 	Limit     int
 }
 type RunPage struct {
-	Runs      []synthetic.Run `json:"runs"`
-	Truncated bool            `json:"truncated"`
+	Runs      []synthetic.Run
+	Truncated bool
 }

@@ -23,24 +23,15 @@ func rowLimit(value string) (int, error) {
 	return limit, nil
 }
 
-func validKind(value string) error {
-	if value != "" && value != string(model.Journey) && value != string(model.Lighthouse) {
-		return errors.New("kind must be journey or lighthouse")
-	}
-	return nil
-}
-
-func runFilter(args map[string]string, now int64) (history.RunFilter, error) {
+// runFilter selects one kind's runs from the history method arguments.
+func runFilter(kind model.Kind, args map[string]string, now int64) (history.RunFilter, error) {
 	before := now
 	f := history.RunFilter{
 		JobID:     args["job_id"],
 		VnodeGUID: args["vnode_guid"],
-		Kind:      model.Kind(args["kind"]),
+		Kind:      kind,
 		Outcome:   model.Outcome(args["outcome"]),
 		Before:    &before,
-	}
-	if err := validKind(args["kind"]); err != nil {
-		return f, err
 	}
 	switch f.Outcome {
 	case "",

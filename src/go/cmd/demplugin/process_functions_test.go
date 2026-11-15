@@ -279,14 +279,14 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				)
 				assert.Equal(t, run.ID, response["run"].(map[string]any)["id"])
 				assert.Equal(t, string(synthetic.Failed), response["run"].(map[string]any)["outcome"])
-				info := output.call(t, writer, "info"+suffix, "synthetics-runs info")
+				info := output.call(t, writer, "info"+suffix, "synthetics-journey-runs info")
 				assert.NotContains(t, fmt.Sprint(info), "__job")
 				// The Cloud UI's Function table asks for info with its time window and posts data requests as a body.
-				for _, method := range []string{"rum-pages", "rum-sessions", "synthetics-checks", "synthetics-runs", "dem-history-status"} {
+				for _, method := range []string{"rum-pages", "rum-sessions", "synthetics-checks", "synthetics-journey-runs", "synthetics-lighthouse-runs", "dem-history-status"} {
 					output.call(t, writer, "ui-info-"+method+suffix, method+" info after:1700000000 before:1700000900")
 				}
 				const tableBody = `{"after":1700000000,"before":1700000900,"query":"","selections":{},"timeout":120000,"last":200}`
-				for _, method := range []string{"rum-sessions", "synthetics-runs"} {
+				for _, method := range []string{"rum-sessions", "synthetics-journey-runs", "synthetics-lighthouse-runs"} {
 					response := output.request(t, writer, "ui-data-"+method+suffix, method, tableBody, 200)
 					require.NoError(t, schema.Validate(response))
 				}
@@ -299,7 +299,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					200,
 				)
 				require.NoError(t, schema.Validate(status))
-				for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events", "synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
+				for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events", "synthetics-checks", "synthetics-journey-runs", "synthetics-lighthouse-runs", "synthetics-artifacts"} {
 					id := method + suffix
 					args := ""
 					if method == "rum-session-events" {
@@ -330,7 +330,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 						`{"hostname":"display-name","guid":"33333333-3333-4333-8333-333333333333"}`,
 						202,
 					)
-					selected := output.call(t, writer, "dynamic-before", "synthetics-runs vnode:selection")
+					selected := output.call(t, writer, "dynamic-before", "synthetics-journey-runs vnode:selection")
 					assert.Len(t, selected["data"], 1)
 					output.request(
 						t,
@@ -340,12 +340,24 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 						`{"hostname":"new-display-name","guid":"`+replacement+`"}`,
 						202,
 					)
-					updated := output.call(t, writer, "dynamic-updated", "synthetics-runs vnode:selection")
+					updated := output.call(t, writer, "dynamic-updated", "synthetics-journey-runs vnode:selection")
 					assert.Empty(t, updated["data"])
-					output.request(t, writer, "hostname-is-not-name", "synthetics-runs vnode:new-display-name", "", 400)
+					output.request(
+						t,
+						writer,
+						"hostname-is-not-name",
+						"synthetics-journey-runs vnode:new-display-name",
+						"",
+						400,
+					)
 					output.request(t, writer, "vnode-remove", "config dem:vnode:selection remove", "", 200)
-					output.request(t, writer, "removed-name", "synthetics-runs vnode:selection", "", 400)
-					fallback := output.call(t, writer, "retained-guid", "synthetics-runs vnode_guid:"+other.VnodeGUID)
+					output.request(t, writer, "removed-name", "synthetics-journey-runs vnode:selection", "", 400)
+					fallback := output.call(
+						t,
+						writer,
+						"retained-guid",
+						"synthetics-journey-runs vnode_guid:"+other.VnodeGUID,
+					)
 					assert.Len(t, fallback["data"], 1)
 					output.request(
 						t,
@@ -358,7 +370,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				}
 				if generation == 1 {
 					// The Agent owns DynCfg persistence and replays configuration after plugin restart.
-					output.request(t, writer, "before-replay", "synthetics-runs vnode:selection", "", 400)
+					output.request(t, writer, "before-replay", "synthetics-journey-runs vnode:selection", "", 400)
 					output.request(
 						t,
 						writer,
@@ -368,7 +380,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 						202,
 					)
 				}
-				selection := output.call(t, writer, "dynamic-current"+suffix, "synthetics-runs vnode:selection")
+				selection := output.call(t, writer, "dynamic-current"+suffix, "synthetics-journey-runs vnode:selection")
 				assert.Len(t, selection["data"], generation)
 				if generation == 0 {
 					restartCtx, stop := context.WithTimeout(ctx, 3*time.Second)

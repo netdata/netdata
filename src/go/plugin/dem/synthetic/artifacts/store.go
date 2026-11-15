@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 
 	"github.com/gofrs/flock"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 const FetchMaxBytes int64 = 5 << 20
@@ -44,6 +45,15 @@ var (
 	runIDPattern      = regexp.MustCompile(`^[0-9a-f]{32}$`)
 	artifactIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 )
+
+// Manifest is Go-authored capture membership, independent of run history.
+type Manifest struct {
+	VnodeGUID   string               `json:"vnode_guid,omitempty"`
+	JobID       string               `json:"job_id"`
+	RunID       string               `json:"run_id"`
+	PublishedUS int64                `json:"published_us"`
+	Artifacts   []synthetic.Artifact `json:"artifacts"`
+}
 
 type manifest struct {
 	Version int `json:"version"`

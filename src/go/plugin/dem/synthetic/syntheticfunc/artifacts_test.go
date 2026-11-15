@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -24,25 +25,11 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	store, err := artifacts.Open(t.TempDir())
 	require.NoError(t, err)
 	defer store.Close()
-	// Ascending suffixes keep run-ID order equal to publication order, which the page assertions rely on.
-	prefix := fixtureRunID()[:31]
-	for i, jobID := range []string{"journey:retired", "lighthouse:renamed", "journey:retired"} {
-		runID := fmt.Sprintf("%s%x", prefix, i+1)
-		work, err := store.Begin(
-			runID,
-			jobID,
-			[]string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", "11111111-1111-4111-8111-111111111111"}[i],
-		)
-		require.NoError(t, err)
-		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
-		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<html>report</html>"), 0600))
-		_, err = store.Finalize(
-			ctx,
-			runID,
-			[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
-		)
-		require.NoError(t, err)
-	}
+	prefix := publishReports(t, store, []captureOwner{
+		{"journey:retired", "11111111-1111-4111-8111-111111111111"},
+		{"lighthouse:renamed", "22222222-2222-4222-8222-222222222222"},
+		{"journey:retired", "11111111-1111-4111-8111-111111111111"},
+	})
 	_, err = store.Enforce(ctx, 7, 1<<20)
 	require.NoError(t, err)
 	policyError := func() string { return "policy reload rejected" }
@@ -73,7 +60,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	assert.Equal(t, float64(2), inventory["known_jobs"])
 	assert.NotNil(t, inventory["retained"].(map[string]any)["bytes"])
 	assert.Equal(t, float64(0), inventory["workspace"].(map[string]any)["bytes"])
-	page2 := call(h, "synthetics-artifacts", "limit:2", "before:"+next)
+	page2 := call(h, "synthetics-artifacts", "limit:2", "cursor:"+next)
 	rows = responseData(t, page2)
 	require.Len(t, rows, 1)
 	assert.Equal(t, prefix+"1", rowValues(t, page2, rows[0])["run_id"])
@@ -93,7 +80,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 		"synthetics-artifacts",
 		"vnode_guid:11111111-1111-4111-8111-111111111111",
 		"limit:1",
-		"before:"+sitePage.RawResponse["next"].(string),
+		"cursor:"+sitePage.RawResponse["next"].(string),
 	)
 	siteRows = responseData(t, siteNext)
 	require.Len(t, siteRows, 1)
@@ -120,7 +107,7 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 	assert.Equal(t, inventory["retained"], filteredInventory["retained"])
 	assert.Equal(t, inventory["known_sets"], filteredInventory["known_sets"])
 	assert.Equal(t, inventory["known_jobs"], filteredInventory["known_jobs"])
-	for _, args := range [][]string{{"limit:0"}, {"limit:2001"}, {"before:123"}, {"before:0.00000000000000000000000000000001"}, {"before:1.unsafe/path"}, {"before:+1.00000000000000000000000000000001"}, {"job_id:invalid"}} {
+	for _, args := range [][]string{{"limit:0"}, {"limit:2001"}, {"cursor:123"}, {"cursor:0.00000000000000000000000000000001"}, {"cursor:1.unsafe/path"}, {"cursor:+1.00000000000000000000000000000001"}, {"job_id:invalid"}} {
 		assert.Equal(t, 400, call(h, "synthetics-artifacts", args...).Status, args)
 	}
 	denied := h.HandleRaw(ctx, funcapi.RawMethodRequest{
@@ -128,4 +115,88 @@ func TestCataloguePaginationAndGlobalStatusWithoutHistoryOrJobs(t *testing.T) {
 		Permissions: "0x19",
 	})
 	assert.Equal(t, 403, denied.Status)
+}
+
+// captureOwner is the job and vnode GUID a published capture set belongs to.
+type captureOwner struct{ jobID, vnodeGUID string }
+
+// publishReports publishes one report set per owner, in order, and returns the shared run-ID prefix. Set i has run
+// ID prefix+hex(i+1): ascending suffixes keep run-ID order equal to publication order, which page assertions rely on.
+func publishReports(t *testing.T, store *artifacts.Store, owners []captureOwner) string {
+	t.Helper()
+	prefix := fixtureRunID()[:31]
+	for i, owner := range owners {
+		runID := fmt.Sprintf("%s%x", prefix, i+1)
+		work, err := store.Begin(runID, owner.jobID, owner.vnodeGUID)
+		require.NoError(t, err)
+		require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+		require.NoError(t, os.WriteFile(filepath.Join(work, "output/report.html"), []byte("<html>report</html>"), 0600))
+		_, err = store.Finalize(
+			t.Context(),
+			runID,
+			[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
+		)
+		require.NoError(t, err)
+	}
+	return prefix
+}
+
+func TestCatalogueCursorPagesThroughArgumentsAndTheCloudTableBody(t *testing.T) {
+	store, err := artifacts.Open(t.TempDir())
+	require.NoError(t, err)
+	defer store.Close()
+	prefix := publishReports(t, store, []captureOwner{{"journey:a", ""}, {"journey:a", ""}, {"journey:a", ""}})
+	h := syntheticfunc.New(query.New(syntheticregistry.New(), emptyHistory(t), store, noPolicyError), nil)
+	declarations := syntheticfunc.Declarations()
+	decl := declarations[slices.IndexFunc(declarations, func(d funcapi.FunctionConfig) bool {
+		return d.ID == "synthetics-artifacts"
+	})]
+	for name, request := range map[string]func(cursor string) funcapi.RawMethodRequest{
+		"arguments": func(cursor string) funcapi.RawMethodRequest {
+			args := []string{"limit:1"}
+			if cursor != "" {
+				args = append(args, "cursor:"+cursor)
+			}
+			return funcapi.RawMethodRequest{
+				Method:      decl.ID,
+				Args:        args,
+				Permissions: "0x1b",
+			}
+		},
+		// The table posts its time window only into accepted parameters, so it cannot reach the cursor.
+		"cloud table body": func(cursor string) funcapi.RawMethodRequest {
+			fields := map[string]any{"limit": 1}
+			if cursor != "" {
+				fields["cursor"] = cursor
+			}
+			return funcapi.RawMethodRequest{
+				Method:      decl.ID,
+				Payload:     cloudTableBody(t, decl, fields),
+				Permissions: "0x1b",
+			}
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var runs []any
+			cursor := ""
+			for range 3 {
+				got := h.HandleRaw(t.Context(), request(cursor))
+				rows := responseData(t, got)
+				require.Len(t, rows, 1)
+				runs = append(runs, rowValues(t, got, rows[0])["run_id"])
+				next, _ := got.RawResponse["next"].(string)
+				assert.Equal(t, next != "", got.RawResponse["truncated"])
+				cursor = next
+			}
+			assert.Equal(t, []any{prefix + "3", prefix + "2", prefix + "1"}, runs)
+			assert.Empty(t, cursor, "the last page returns no next cursor")
+		})
+	}
+	// The former parameter name is not a cursor alias.
+	first := call(h, decl.ID, "limit:1")
+	assert.Equal(
+		t,
+		funcapi.ErrorResponse(400, `unsupported argument "before"`),
+		call(h, decl.ID, "limit:1", "before:"+first.RawResponse["next"].(string)),
+	)
 }

@@ -9,7 +9,7 @@ import (
 
 type CataloguePage struct {
 	artifacts.Page
-	PolicyError string `json:"policy_error,omitempty"`
+	PolicyError string
 }
 
 // Catalogue exposes current manifest metadata and global storage observations.

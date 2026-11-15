@@ -166,8 +166,9 @@ Transport and history counters remain job-wide. Old evidence lacking a captured 
 current-config backfill or speculative migration is performed.
 
 DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
-All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
-`vnode_guid`. The detail Functions `synthetics-run` and `synthetics-artifact` retain their existing parameters.
+All six RUM Functions and `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs` and
+`synthetics-artifacts` accept either `vnode` or `vnode_guid`. The detail Functions `synthetics-run` and
+`synthetics-artifact` retain their existing parameters.
 Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
 all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
 even if either value is empty.
@@ -381,7 +382,7 @@ flowchart TD
 | Provider | Functions | Reads |
 |---|---|---|
 | `rum` | `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`, `rum-errors`, `rum-session-events` | Site snapshots from `rum/registry`, retained events from the journal |
-| `synthetics` | `synthetics-checks`, `synthetics-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact` | Active jobs from `synthetic/registry`, run records from the journal, captures from the store |
+| `synthetics` | `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact` | Active jobs from `synthetic/registry`, run records from the journal, captures from the store |
 | `dem-history` | `dem-history-status` | Journal status and the retention worker's policy reload error |
 
 What makes this layer predictable:
@@ -541,9 +542,11 @@ flowchart LR
 Dependency direction:
 
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
-  through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
-  `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
-  store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
+  through `rum/query`, while synthetic Functions use the domain values directly: `synthetic` runs and events,
+  `registry.Job`, `history.RunFilter`/`RunPage`, `artifacts.Filter`/`Set`/`Cursor`/`Status` and
+  `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status
+  through its narrow store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports
+  no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journalstore.Store`. They cannot close it or independently apply retention.
@@ -565,7 +568,7 @@ File layout within packages:
 | Function packages | Each method keeps its ordered column list, which defines both the column map and every row, beside its row reader |
 | History packages | Record codecs are separate from reducers |
 | `synthetic/runner` | Construction, unrecorded and temporary-store views, and execution phases (`engine`), admission and the fatal owner (`admission`), runtime source and checks, process ownership, the reporter stream and its limits (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`), capture eligibility and publication (`publication`), rehearsal and qualification (`rehearse`, `qualify`) and the monotonic clock (`clock_*`); tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
-| `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |
+| `synthetic/artifacts` | Store lifetime and manifests, work creation, publication, reads, the catalogue, inventory, retention with storage status, and filesystem checks |
 
 - Pure DEM helpers stay under their domain or `internal/`.
 - Moving code to the repository `pkg/` requires a real shared contract and consumers outside DEM.
