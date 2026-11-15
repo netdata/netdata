@@ -26,7 +26,7 @@ type sessionEvent struct {
 	metricID string
 	revision uint64
 	ts       time.Time
-	typ      string // an EventType* value other than EventTypeActivity
+	typ      string // an EventType* value; ring entries never hold EventTypeActivity
 	page     string
 	text     string
 	traceID  string // traced requests
