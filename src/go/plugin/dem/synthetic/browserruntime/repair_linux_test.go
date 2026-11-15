@@ -170,7 +170,7 @@ func TestRepairRestoresMetadataDamageClass(t *testing.T) {
 			require.NoError(t, candidate.Close())
 			status, err = s.Inspect()
 			require.NoError(t, err)
-			require.Equal(t, selected, *status.Selected)
+			require.Equal(t, selected, status.Release.Manifest)
 			require.Empty(t, status.SelectionError)
 			require.Empty(t, status.GenerationErrors)
 			consumer, err := s.AcquireSelected()
@@ -191,7 +191,7 @@ func TestRepairPreservesHealthyDifferentSelectionOnFailure(t *testing.T) {
 	require.NoError(t, candidate.Close())
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, selected, *status.Selected)
+	require.Equal(t, selected, status.Release.Manifest)
 }
 
 func TestRepairRefusesProtectedOrUnverifiableOwnership(t *testing.T) {
@@ -342,7 +342,7 @@ func TestRepairRetryAfterCallerExit(t *testing.T) {
 			require.NoError(t, candidate.Close())
 			status, err := s.Inspect()
 			require.NoError(t, err)
-			require.Equal(t, m, *status.Selected)
+			require.Equal(t, m, status.Release.Manifest)
 		})
 	}
 }

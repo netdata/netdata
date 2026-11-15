@@ -3,9 +3,6 @@
 package runtimehost
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
@@ -36,13 +33,6 @@ func (c healthChange) log(log *logger.Logger) {
 	}
 }
 
-func labelled(operation string, err error) error {
-	if err == nil {
-		return nil
-	}
-	return fmt.Errorf("%s: %w", operation, err)
-}
-
 func (h *Host) updateMaintenanceLocked(operation string, err error) healthChange {
 	change := trackHealth(operation, h.maintenance[operation], err)
 	if err == nil {
@@ -64,10 +54,4 @@ func (h *Host) recordFinishError(err error) {
 	change := h.updateMaintenanceLocked("execution completion", err)
 	h.mu.Unlock()
 	change.log(h.log)
-}
-func (h *Host) maintenanceErrorLocked() error {
-	return errors.Join(
-		labelled("cleanup", h.maintenance["cleanup"]),
-		labelled("execution completion", h.maintenance["execution completion"]),
-	)
 }

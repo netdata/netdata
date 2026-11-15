@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 )
@@ -20,11 +21,9 @@ type Handle struct {
 	Source runner.Source
 	// Host holds the managed or native selection; preloads have none.
 	Host *Host
-	// Manifest is the verified preload descriptor; nil in other modes or when
-	// the preload is unusable.
-	Manifest *browserruntime.Manifest
 	// SetupError reports why the runtime is unusable. RUM keeps working.
 	SetupError error
+	identity   synthetic.RuntimeIdentity
 	store      *browserruntime.Store
 	native     *browserruntime.Native
 	closeOnce  sync.Once
@@ -58,8 +57,8 @@ func (h *Handle) openPreload(path string) {
 	if h.SetupError == nil {
 		paths, manifest, err := browserruntime.ReadPreload(path)
 		if err == nil {
-			h.Manifest = &manifest
-			h.Source = preloadedSource{runnerPaths(paths, manifest.Identity())}
+			h.identity = manifest.Identity()
+			h.Source = preloadedSource{runnerPaths(paths, h.identity)}
 			return
 		}
 		h.SetupError = err
@@ -76,8 +75,7 @@ func (h *Handle) openNative() {
 	} else {
 		h.Host = NewNative(h.native)
 	}
-	h.SetupError = h.Host.Ready()
-	h.Source = h.Host
+	h.adoptHost()
 }
 
 func (h *Handle) openManaged(cfg Config, varLibPath string) {
@@ -93,8 +91,29 @@ func (h *Handle) openManaged(cfg Config, varLibPath string) {
 	} else {
 		h.Host = NewManaged(h.store)
 	}
+	h.adoptHost()
+}
+
+// adoptHost makes the host the process source and records its release.
+func (h *Handle) adoptHost() {
 	h.SetupError = h.Host.Ready()
 	h.Source = h.Host
+	if h.Host.identity != nil {
+		h.identity = *h.Host.identity
+	}
+}
+
+// Identity is the release the process runs; zero when SetupError is set.
+func (h *Handle) Identity() synthetic.RuntimeIdentity { return h.identity }
+
+// NativeStatus inspects the native package's ownership proof; nil unless native
+// mode opened its proof root. An inspection failure is reported in the status.
+func (h *Handle) NativeStatus() *browserruntime.NativeStatus {
+	if h.native == nil {
+		return nil
+	}
+	status, _ := h.native.Inspect()
+	return &status
 }
 
 // Close joins the host (and its updater) before closing the storage it opened.

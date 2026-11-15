@@ -153,7 +153,7 @@ func TestStoreBootstrapResumesIncompleteLayout(t *testing.T) {
 			defer s.Close()
 			status, err := s.Inspect()
 			require.NoError(t, err)
-			require.Equal(t, selected, *status.Selected, "reopening ready must not reset selection")
+			require.Equal(t, selected, status.Release.Manifest, "reopening ready must not reset selection")
 		})
 	}
 }

@@ -22,9 +22,7 @@ type healthLog struct {
 func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
 	h := NewUnavailable(ModeNative, browserruntime.ErrUnavailable)
 	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
-	require.Equal(t, StateMissing, h.Status().State)
-	require.Equal(t, ModeNative, h.Status().Mode)
-	require.Nil(t, h.Status().Storage)
+	require.ErrorIs(t, h.Ready(), browserruntime.ErrUnavailable)
 	require.NoError(t, h.Close())
 }
 
@@ -56,10 +54,8 @@ func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup failed"))
 	h.setMaintenance("execution completion", errors.New("execution metadata blocked"))
 	h.setMaintenance("cleanup", nil)
-	require.Contains(t, h.Status().MaintenanceError, "execution metadata blocked")
-	require.NotContains(t, h.Status().MaintenanceError, "trash blocked")
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup recovered"))
+	require.NotContains(t, logs.String(), "execution completion recovered", "cleanup cannot clear another operation")
 	h.setMaintenance("execution completion", nil)
-	require.Empty(t, h.Status().MaintenanceError)
 	require.Equal(t, 1, strings.Count(logs.String(), "execution completion recovered"))
 }

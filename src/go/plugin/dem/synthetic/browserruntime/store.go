@@ -175,8 +175,8 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 	}
 	if !sameExecutable(g.Manifest, m) {
 		return Paths{}, damagedMetadata(
-			"selection.json",
-			errors.New("prepared runtime manifest differs from installed requirement"),
+			filepath.Join("generations", m.Archive.SHA256, "prepared.json"),
+			errors.New("prepared runtime manifest differs from the required manifest"),
 		)
 	}
 	return boundPaths(filepath.Join(path, "generations", m.Archive.SHA256), m.Layout), nil

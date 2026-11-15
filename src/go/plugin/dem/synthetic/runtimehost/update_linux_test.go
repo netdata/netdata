@@ -56,12 +56,9 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 		return &runner.Qualification{}, nil
 	}), load)
 	require.NoError(t, u.check(context.Background()))
-	status := host.Status()
-	require.Equal(t, "first", status.Running.Version)
-	require.Equal(t, "second", status.Storage.Selected.Version)
-	require.True(t, status.RestartRequired)
-	require.Positive(t, status.Update.LastSuccessUS)
-	require.False(t, status.Update.Checking)
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, next.Manifest, status.Release.Manifest, "the next process runs the prepared release")
 	use, err := host.BeginUse()
 	require.NoError(t, err)
 	require.Equal(t, "first", use.Paths().Identity.Version)
@@ -71,8 +68,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	require.Equal(t, int32(1), archiveRequests.Load())
 	newHost := NewManaged(store)
 	defer newHost.Close()
-	require.Equal(t, "second", newHost.Status().Running.Version)
-	require.False(t, newHost.Status().RestartRequired)
+	require.Equal(t, next.Manifest.Identity(), *newHost.identity)
 }
 
 func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
@@ -99,25 +95,18 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 		func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedNext, nil },
 	)
 	require.ErrorIs(t, u.check(context.Background()), failure)
-	status := host.Status()
-	require.Equal(t, first.Manifest, *status.Storage.Selected)
-	require.False(t, status.RestartRequired)
-	require.Equal(t, "update: sandbox qualification failed", status.MaintenanceError)
-	require.Zero(t, status.Storage.CandidateClaims)
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, first.Manifest, status.Release.Manifest)
+	require.Zero(t, status.CandidateClaims)
 	require.NoError(t, host.Ready())
 	require.ErrorIs(t, u.check(context.Background()), failure)
 	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update failed: sandbox qualification failed"))
 	host.sweep()
-	require.Equal(
-		t,
-		"update: sandbox qualification failed",
-		host.Status().MaintenanceError,
-		"storage cleanup cannot clear update health",
-	)
+	require.NotContains(t, logs.String(), "update recovered", "storage cleanup cannot clear update health")
 	// A later check that finds no newer release clears update health.
 	u.load = func(context.Context) (browserruntime.VerifiedRelease, error) { return verifiedFirst, nil }
 	require.NoError(t, u.check(context.Background()))
-	require.Empty(t, host.Status().MaintenanceError)
 	require.Equal(t, 1, strings.Count(logs.String(), "DEM runtime update recovered"))
 }
 
@@ -137,14 +126,15 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 		return browserruntime.VerifiedRelease{}, ctx.Err()
 	})
 	u.delay = func(bool) time.Duration { return 0 }
+	var logs healthLog
+	u.log = logger.NewWithWriter(&logs)
 	go u.Run(context.Background())
 	<-entered
-	require.True(t, host.Status().Update.Checking)
 	require.NoError(t, u.Close())
-	status := host.Status()
-	require.False(t, status.Update.Checking)
-	require.Empty(t, status.MaintenanceError)
-	require.Equal(t, first.Manifest, *status.Storage.Selected)
+	require.Empty(t, logs.String(), "a cancelled check records no update outcome")
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, first.Manifest, status.Release.Manifest)
 	require.NoError(t, host.Close())
 	require.NoError(t, store.Uninstall(context.Background()), "cancelled updater must release installation exclusion")
 }
@@ -188,5 +178,4 @@ func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 			return browserruntime.VerifiedRelease{}, nil
 		})
 	require.NoError(t, u.check(context.Background()))
-	require.Zero(t, host.Status().Update.LastCheckUS)
 }

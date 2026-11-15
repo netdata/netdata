@@ -67,7 +67,7 @@ func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
 	require.NotNil(t, report.Qualification)
 	assert.False(t, report.Qualification.SandboxedLocalJourney)
 	require.NotNil(t, report.Storage)
-	assert.Nil(t, report.Storage.Selected)
+	assert.Nil(t, report.Storage.Release)
 	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
 	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
 	assert.Equal(t, "unavailable", report.State)
@@ -120,7 +120,7 @@ func TestRuntimeInstallDigestFailureNeverReportsPrepared(t *testing.T) {
 	assert.Equal(t, "unavailable", report.State)
 	assert.NotEmpty(t, report.SetupError)
 	require.NotNil(t, report.Storage)
-	assert.Nil(t, report.Storage.Selected)
+	assert.Nil(t, report.Storage.Release)
 }
 
 func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {

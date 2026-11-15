@@ -19,6 +19,15 @@ func damaged(err error) error {
 	return fmt.Errorf("%w: %v", ErrDamaged, err)
 }
 
+// publicDamage reports metadata damage met by a managed consumer or candidate
+// operation as ErrDamaged; operational failures keep their cause.
+func publicDamage(err error) error {
+	if isMetadataDamage(err) {
+		return damaged(err)
+	}
+	return err
+}
+
 type reservation struct {
 	Generation string `json:"generation"`
 	Bytes      int64  `json:"bytes"`
@@ -26,8 +35,7 @@ type reservation struct {
 
 type inventory struct {
 	ownershipInventory
-	selected         *Manifest
-	release          *Release
+	release          *Release // selected release; nil when nothing is selected
 	automaticUpdates bool
 	selectionError   error
 	generationErrors map[string]error
@@ -65,7 +73,6 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		}
 		inv.selectionError = err
 	} else {
-		inv.selected = record.manifest()
 		inv.release = record.Release
 		inv.automaticUpdates = record.AutomaticUpdates
 	}
@@ -85,15 +92,15 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 		// Keep every known directory in accounting, even if its record is bad.
 		inv.generations[id] = g
 	}
-	if inv.selected != nil {
-		id := inv.selected.Archive.SHA256
+	if selected := inv.selected(); selected != nil {
+		id := selected.Archive.SHA256
 		g, present := inv.generations[id]
 		switch {
 		case !present:
 			inv.selectionError = damagedMetadata("selection.json", ErrUnavailable)
 		case inv.generationErrors[id] != nil:
 			inv.selectionError = inv.generationErrors[id]
-		case !sameExecutable(g.Manifest, *inv.selected):
+		case !sameExecutable(g.Manifest, *selected):
 			inv.selectionError = damagedMetadata(
 				"selection.json",
 				errors.New("prepared runtime manifest differs from selected release"),
@@ -155,7 +162,7 @@ func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
 			continue
 		}
 		var r reservation
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
+		if err := readOwnerRecord(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
 			return inv, err
 		}
 		if !validID(r.Generation) || r.Bytes <= 0 {
@@ -184,11 +191,23 @@ func (inv inventory) damageError() error {
 	return damaged(errors.Join(errs...))
 }
 
+// selected is the manifest of the selected release, nil when nothing is selected.
+func (inv inventory) selected() *Manifest {
+	if inv.release == nil {
+		return nil
+	}
+	return &inv.release.Manifest
+}
+
 func (inv inventory) protected(id string) bool {
-	return (inv.selected != nil && inv.selected.Archive.SHA256 == id) || inv.processes[id] > 0 ||
+	return inv.isSelected(id) || inv.processes[id] > 0 ||
 		inv.candidates[id] > 0 ||
 		inv.preparing[id] > 0 ||
 		inv.uses[id] > 0
+}
+
+func (inv inventory) isSelected(id string) bool {
+	return inv.release != nil && inv.release.Manifest.Archive.SHA256 == id
 }
 
 // inUse reports consumers, candidates, executions or reservations that block

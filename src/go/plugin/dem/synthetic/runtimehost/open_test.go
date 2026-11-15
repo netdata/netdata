@@ -20,7 +20,8 @@ func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
 	require.Error(t, handle.SetupError)
 	require.NotNil(t, handle.Source)
 	require.NotNil(t, handle.Host)
-	assert.Contains(t, []string{"unavailable", "missing"}, handle.Host.Status().State)
+	assert.Equal(t, handle.Host.Ready(), handle.SetupError)
+	assert.Zero(t, handle.Identity())
 	_, err := handle.Source.BeginUse()
 	require.Error(t, err)
 	require.NoError(t, handle.Close())
@@ -69,7 +70,7 @@ func TestOpenKeepsTheConfiguredModeWhenUnusable(t *testing.T) {
 				require.Error(t, handle.SetupError)
 			} else {
 				require.NotNil(t, handle.Host)
-				assert.Equal(t, tc.reported, handle.Host.Status().Mode)
+				assert.Equal(t, tc.reported, handle.Host.mode)
 				assert.Equal(t, handle.Host.Ready(), handle.SetupError)
 			}
 			if tc.mode == "auto" {

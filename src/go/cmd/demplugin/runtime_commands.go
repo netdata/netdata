@@ -51,15 +51,12 @@ func inspectFixedRuntime(
 	if handle.SetupError != nil {
 		return handle.SetupError
 	}
-	// Without a setup error the handle is ready: native hosts know their running
-	// identity and preloaded handles their manifest.
+	// Without a setup error the handle knows the release it runs.
+	report.setRuntime(handle.Identity())
 	if cfg.Mode == runtimehost.ModeNative {
-		status := handle.Host.Status()
-		report.setRuntime(*status.Running)
-		report.Native = status.Native
+		report.Native = handle.NativeStatus()
 		report.Notice = "Native package files are owned by the package manager. Stop standalone consumers before package replacement or removal."
 	} else {
-		report.setRuntime(handle.Manifest.Identity())
 		report.PreloadPath = cfg.PreloadPath
 	}
 	report.State = "installed"
@@ -153,7 +150,7 @@ func reportStatus(store *browserruntime.Store, report *runtimeCommandReport) err
 	if err != nil {
 		return err
 	}
-	if status.Selected == nil {
+	if status.Release == nil {
 		return browserruntime.ErrUnavailable
 	}
 	return nil
@@ -269,11 +266,15 @@ func installCandidate(
 	report *runtimeCommandReport,
 	stderr io.Writer,
 ) error {
+	operation, err := releaseOperation(command)
+	if err != nil {
+		return err
+	}
 	options := browserruntime.ReleaseInstallOptions{
-		Operation: browserruntime.ReleaseOperation(command),
+		Operation: operation,
 	}
 	// install and repair set the update policy; update preserves the installed one.
-	if command != "update" {
+	if operation != browserruntime.UpdateRelease {
 		options.Updates = browserruntime.AutomaticUpdates
 		if manualUpdates {
 			options.Updates = browserruntime.ManualUpdates
@@ -290,6 +291,20 @@ func installCandidate(
 		return nil
 	}
 	return closeUnlessUndrained(selectCandidate(ctx, candidate, archive, report), candidate)
+}
+
+// releaseOperation names the store operation of the commands that install a
+// published release; ensure and preload have their own entry points.
+func releaseOperation(command string) (browserruntime.ReleaseOperation, error) {
+	switch command {
+	case "install":
+		return browserruntime.InstallRelease, nil
+	case "update":
+		return browserruntime.UpdateRelease, nil
+	case "repair":
+		return browserruntime.RepairRelease, nil
+	}
+	return "", fmt.Errorf("runtime command %q does not install a published release", command)
 }
 
 // preloadRuntime prepares a candidate in a fresh final root and seals it there.

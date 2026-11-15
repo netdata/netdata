@@ -142,10 +142,11 @@ func TestHostSelectionIsFixedAcrossInstallationUpdates(t *testing.T) {
 		require.NotNil(t, use.Completion())
 		require.NoError(t, use.Finish(true))
 	}
-	status := old.Status()
-	require.Equal(t, first.Archive.SHA256, status.Running.SHA256)
-	require.Equal(t, second.Archive.SHA256, status.Storage.Selected.Archive.SHA256)
-	require.Equal(t, 2, status.Storage.ProcessClaims)
+	require.Equal(t, first.Identity(), *old.identity)
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, second, status.Release.Manifest)
+	require.Equal(t, 2, status.ProcessClaims)
 	require.ErrorIs(t, store.Uninstall(t.Context()), browserruntime.ErrInUse)
 	require.NoError(t, old.Close())
 	require.Error(t, old.Ready())
@@ -159,16 +160,15 @@ func TestMissingStartupSelectionRequiresNewProcess(t *testing.T) {
 	empty := newTestHost(t, store)
 	require.ErrorIs(t, empty.Ready(), browserruntime.ErrUnavailable)
 	require.ErrorContains(t, empty.Ready(), "install a browser runtime and restart")
-	require.Equal(t, StateMissing, empty.Status().State)
 	manifest := installBundle(t, store, "installed-after-start")
 	empty.sweep()
 	require.ErrorIs(t, empty.Ready(), browserruntime.ErrUnavailable)
-	require.Nil(t, empty.Status().Running)
+	require.Nil(t, empty.identity)
 	_, err := empty.BeginUse()
 	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
 	next := newTestHost(t, store)
 	require.NoError(t, next.Ready())
-	require.Equal(t, manifest.Version, next.Status().Running.Version)
+	require.Equal(t, manifest.Identity(), *next.identity)
 }
 
 func TestSelectedInstallationSurvivesMaintenanceWithoutBrowserJobs(t *testing.T) {
@@ -207,8 +207,7 @@ func TestLostSelectedGenerationRequiresRepairRatherThanInstall(t *testing.T) {
 	host := newTestHost(t, store)
 	require.ErrorIs(t, host.Ready(), browserruntime.ErrDamaged)
 	require.NotErrorIs(t, host.Ready(), browserruntime.ErrUnavailable)
-	require.Equal(t, StateUnavailable, host.Status().State)
-	require.Contains(t, host.Status().SetupError, "runtime repair")
+	require.ErrorContains(t, host.Ready(), "runtime repair")
 }
 
 func TestUncertainExecutionOutlivesHost(t *testing.T) {
@@ -244,16 +243,14 @@ func TestExecutionFinishErrorIsMaintenanceNotReadiness(t *testing.T) {
 	require.NoError(t, os.Rename(trash, trash+".failed"))
 	require.NoError(t, os.Rename(trash+".saved", trash))
 	require.Error(t, finishErr)
-	require.NotEmpty(t, host.Status().MaintenanceError)
 	require.Contains(t, logs.String(), "execution completion failed")
 	require.NoError(t, host.Ready())
 	other, err := host.BeginUse()
 	require.NoError(t, err)
 	require.NoError(t, other.Finish(true))
-	require.NotEmpty(t, host.Status().MaintenanceError)
+	require.NotContains(t, logs.String(), "recovered", "a healthy invocation cannot clear an earlier failure")
 	host.sweep()
-	require.Empty(t, host.Status().MaintenanceError)
-	require.Contains(t, logs.String(), "execution completion recovered")
+	require.Equal(t, 1, strings.Count(logs.String(), "execution completion recovered"))
 	status, err := store.Inspect()
 	require.NoError(t, err)
 	require.Zero(t, status.ExecutionPins)
@@ -278,4 +275,44 @@ func TestExecutionAdmissionFailureCanRetrySameSelection(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, manifest.Archive.SHA256, use.Paths().Identity.SHA256)
 	require.NoError(t, use.Finish(true))
+}
+
+func TestHandleIdentityNamesTheRunningRelease(t *testing.T) {
+	for _, mode := range []Mode{ModeManaged, ModePreloaded} {
+		t.Run(string(mode), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "runtime")
+			store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+			require.NoError(t, err)
+			release, data := publishedBundle(t, "handle", installSequence.Add(1))
+			cfg := DefaultConfig()
+			cfg.Mode = mode
+			if mode == ModeManaged {
+				selectPublished(t, store, release, data, browserruntime.ManualUpdates)
+				cfg.CachePath = path
+			} else {
+				verified := verifiedRelease(t, release)
+				archive := filepath.Join(t.TempDir(), "archive.tar.zst")
+				require.NoError(t, os.WriteFile(archive, data, 0600))
+				candidate, err := store.BeginPublishedInstall(
+					context.Background(),
+					browserruntime.ReleaseInstallOptions{
+						Operation: browserruntime.InstallRelease,
+						Updates:   browserruntime.ManualUpdates,
+					},
+					func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil },
+				)
+				require.NoError(t, err)
+				require.NoError(t, candidate.Import(context.Background(), archive))
+				require.NoError(t, candidate.SealPreload())
+				require.NoError(t, candidate.Close())
+				cfg.PreloadPath = path
+			}
+			require.NoError(t, store.Close())
+			handle := Open(cfg, "")
+			t.Cleanup(func() { require.NoError(t, handle.Close()) })
+			require.NoError(t, handle.SetupError)
+			require.Equal(t, release.Manifest.Identity(), handle.Identity())
+			require.Nil(t, handle.NativeStatus(), "only native mode inspects package proof")
+		})
+	}
 }

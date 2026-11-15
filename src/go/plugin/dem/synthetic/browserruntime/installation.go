@@ -16,6 +16,8 @@ import (
 
 var ErrInUse = errors.New("runtime installation has consumers or unresolved executions")
 
+var errInvalidOperation = errors.New("invalid published runtime operation")
+
 // ReleaseOperation distinguishes an explicit installation/repair decision from
 // checks of an existing installation. Repair may deliberately select an older
 // authenticated release; normal checks may never regress publication order.
@@ -54,6 +56,10 @@ func (s *Store) BeginPublishedInstall(
 	options ReleaseInstallOptions,
 	load func(context.Context) (VerifiedRelease, error),
 ) (*Candidate, error) {
+	// Ensure reports an existing selection, which only BeginPublishedEnsure returns.
+	if options.Operation == ensureRelease {
+		return nil, errInvalidOperation
+	}
 	candidate, _, err := s.beginPublishedInstall(ctx, options, load)
 	return candidate, err
 }
@@ -92,7 +98,7 @@ func (s *Store) beginPublishedInstall(
 			return nil, nil, errors.New("runtime update preserves the installed update policy")
 		}
 	default:
-		return nil, nil, errors.New("invalid published runtime operation")
+		return nil, nil, errInvalidOperation
 	}
 	if load == nil {
 		return nil, nil, errors.New("runtime release loader is unavailable")
@@ -260,7 +266,7 @@ func (c *Candidate) Import(ctx context.Context, archive string) error {
 	if c.closed {
 		return errors.New("runtime candidate is closed")
 	}
-	return c.store.importArchive(ctx, c.manifest, archive)
+	return publicDamage(c.store.importArchive(ctx, c.manifest, archive))
 }
 
 func (c *Candidate) Download(ctx context.Context) error {
@@ -269,7 +275,7 @@ func (c *Candidate) Download(ctx context.Context) error {
 	if c.closed {
 		return errors.New("runtime candidate is closed")
 	}
-	return c.store.download(ctx, c.manifest)
+	return publicDamage(c.store.download(ctx, c.manifest))
 }
 
 // Select publishes a prepared candidate after the caller has qualified both
@@ -280,7 +286,7 @@ func (c *Candidate) Select() error {
 	if c.closed {
 		return errors.New("runtime candidate is closed")
 	}
-	return c.store.withLock(func() error {
+	return publicDamage(c.store.withLock(func() error {
 		if _, err := c.store.selectedLocked(true); err != nil {
 			return err
 		}
@@ -288,7 +294,7 @@ func (c *Candidate) Select() error {
 			return err
 		}
 		return c.store.selectLocked(c.publication)
-	})
+	}))
 }
 
 func (c *Candidate) Close() error {
@@ -352,7 +358,7 @@ func (s *Store) repairLocked(m Manifest) error {
 	}
 	// A same-release rebuild cannot leave its old selection admitting startup
 	// consumers while those paths are retired. Preserve healthy other selections.
-	if inv.selectionError != nil || (inv.selected != nil && inv.selected.Archive.SHA256 == m.Archive.SHA256) {
+	if inv.selectionError != nil || inv.isSelected(m.Archive.SHA256) {
 		if err := s.selectLocked(selection{}); err != nil {
 			return err
 		}

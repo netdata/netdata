@@ -15,12 +15,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-type UpdateStatus struct {
-	Checking      bool  `json:"checking"`
-	LastCheckUS   int64 `json:"last_check_us,omitempty"`
-	LastSuccessUS int64 `json:"last_success_us,omitempty"`
-}
-
 type Qualifier interface {
 	Qualify(context.Context, runner.Source) (*runner.Qualification, error)
 }
@@ -33,9 +27,8 @@ type Updater struct {
 	load      func(context.Context) (browserruntime.VerifiedRelease, error)
 	delay     func(bool) time.Duration
 	log       *logger.Logger
+	err       error // last completed check, owned by the checking goroutine
 	mu        sync.Mutex
-	status    UpdateStatus
-	err       error // last completed check; cleared only by a later successful check
 	started   bool
 	closed    bool
 	cancel    context.CancelFunc
@@ -43,7 +36,7 @@ type Updater struct {
 }
 
 // NewUpdater attaches automatic release preparation to a managed host, at most
-// once. Host.Status reports its progress and Host.Close joins it before
+// once. Check failures and recoveries are logged; Host.Close joins it before
 // releasing process protection. Hosts without a managed store return nil.
 func (h *Host) NewUpdater(
 	qualifier Qualifier,
@@ -97,44 +90,26 @@ func (u *Updater) Run(ctx context.Context) {
 	}
 }
 
+// check runs one update and logs a change of its outcome. A cancelled check
+// leaves the last completed outcome in place; only a later success clears it.
 func (u *Updater) check(ctx context.Context) error {
-	u.mu.Lock()
-	u.status.Checking = true
-	u.mu.Unlock()
-	discovered := false
-	err := u.prepare(ctx, func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
-		discovered = true
-		u.mu.Lock()
-		u.status.LastCheckUS = time.Now().UnixMicro()
-		u.mu.Unlock()
-		return u.load(ctx)
-	})
-	u.mu.Lock()
-	u.status.Checking = false
-	if discovered && err == nil {
-		u.status.LastSuccessUS = time.Now().UnixMicro()
-	}
-	var change healthChange
+	err := u.prepare(ctx)
 	if ctx.Err() == nil {
-		change = trackHealth("update", u.err, err)
+		change := trackHealth("update", u.err, err)
 		u.err = err
+		change.log(u.log)
 	}
-	u.mu.Unlock()
-	change.log(u.log)
 	return err
 }
 
 // prepare runs one complete managed transaction. Qualification uses the
 // process's existing execution owner. Without consent or a newer release no
 // candidate is begun.
-func (u *Updater) prepare(
-	ctx context.Context,
-	load func(context.Context) (browserruntime.VerifiedRelease, error),
-) (result error) {
+func (u *Updater) prepare(ctx context.Context) (result error) {
 	options := browserruntime.ReleaseInstallOptions{
 		Operation: browserruntime.AutomaticReleaseUpdate,
 	}
-	candidate, err := u.store.BeginPublishedInstall(ctx, options, load)
+	candidate, err := u.store.BeginPublishedInstall(ctx, options, u.load)
 	if err != nil || candidate == nil {
 		return err
 	}
@@ -150,13 +125,6 @@ func (u *Updater) prepare(
 		return err
 	}
 	return candidate.Select()
-}
-
-// state reports the progress and last failure that Host.Status publishes.
-func (u *Updater) state() (UpdateStatus, error) {
-	u.mu.Lock()
-	defer u.mu.Unlock()
-	return u.status, u.err
 }
 
 // Close cancels acquisition and joins qualification before its caller closes

@@ -95,7 +95,7 @@ func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
 	require.ErrorContains(t, err, "upgrade the Agent")
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, selected, *status.Selected)
+	require.Equal(t, selected, status.Release.Manifest)
 }
 
 func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
@@ -126,7 +126,7 @@ func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
 	status, err = s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, next, *status.Release)
-	require.Equal(t, next.Manifest, *status.Selected)
+	require.Equal(t, next.Manifest, status.Release.Manifest)
 	require.True(t, status.AutomaticUpdates)
 	require.Equal(t, current.Manifest, old.Manifest(), "running processes activate only on restart")
 	_, _, older := publishedFixture(t, 1)
@@ -381,7 +381,7 @@ func TestPublishedSelectionUncertaintyRetainsOneCompleteRecord(t *testing.T) {
 	// Inspect reads the visible atomic record without claiming crash durability.
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, next.Manifest, *status.Selected)
+	require.Equal(t, next.Manifest, status.Release.Manifest)
 	require.Equal(t, next, *status.Release)
 	require.True(t, status.AutomaticUpdates)
 	s.syncSelection = original
@@ -665,7 +665,7 @@ func TestPublishedEnsureCancellationDuringDiscoveryDoesNotEnroll(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Nil(t, status.Selected)
+	require.Nil(t, status.Release)
 	require.False(t, status.AutomaticUpdates)
 	// Cancellation released installer exclusion for an ordinary retry.
 	_, _, load := publishedFixture(t, 1)

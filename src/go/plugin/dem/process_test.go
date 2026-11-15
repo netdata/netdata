@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,8 +52,8 @@ func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 	assert.Same(t, process.Retention, process.Services[0])
 	assert.Same(t, process.runtime.Host, process.Services[1])
 	services := 2
-	if process.runtime.Host.Status().Storage != nil {
-		services++ // a managed store also runs automatic update preparation
+	if browserruntime.SupportedHost() {
+		services++ // the managed store opens and also runs automatic update preparation
 	}
 	assert.Len(t, process.Services, services)
 	require.NoError(t, process.Close())

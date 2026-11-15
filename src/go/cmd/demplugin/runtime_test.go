@@ -380,7 +380,7 @@ func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 			assert.NotEmpty(t, report.SetupError)
 			require.Nil(t, report.Qualification)
 			if report.Storage != nil {
-				assert.Nil(t, report.Storage.Selected)
+				assert.Nil(t, report.Storage.Release)
 				assert.Zero(t, report.Storage.CandidateClaims)
 			}
 		})
@@ -456,6 +456,32 @@ func TestRuntimeManualUpdatesOnlyChangesInstallAndRepairPolicy(t *testing.T) {
 			}
 			_, err := runtimeCommand(t, args...)
 			require.ErrorContains(t, err, "--manual-updates is only valid for install/repair")
+		})
+	}
+}
+
+func TestReleaseOperationMapsOnlyInstallCommands(t *testing.T) {
+	tests := map[string]struct {
+		operation browserruntime.ReleaseOperation
+		wantErr   bool
+	}{
+		"install":          {operation: browserruntime.InstallRelease},
+		"update":           {operation: browserruntime.UpdateRelease},
+		"repair":           {operation: browserruntime.RepairRelease},
+		"ensure":           {wantErr: true},
+		"preload":          {wantErr: true},
+		"status":           {wantErr: true},
+		"automatic-update": {wantErr: true},
+	}
+	for command, tc := range tests {
+		t.Run(command, func(t *testing.T) {
+			operation, err := releaseOperation(command)
+			if tc.wantErr {
+				require.ErrorContains(t, err, "does not install a published release")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.operation, operation)
 		})
 	}
 }
