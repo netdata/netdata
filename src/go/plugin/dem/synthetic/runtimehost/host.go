@@ -19,25 +19,9 @@ import (
 )
 
 const (
-	DependencyKind   = "dem-runtime"
-	DependencyName   = "browser"
-	StateMissing     = "missing"
-	StateReady       = "ready"
-	StateUnavailable = "unavailable"
+	DependencyKind = "dem-runtime"
+	DependencyName = "browser"
 )
-
-type Snapshot struct {
-	Mode             Mode                         `json:"mode"`
-	Running          *synthetic.RuntimeIdentity   `json:"running,omitempty"`
-	State            string                       `json:"state"`
-	SetupError       string                       `json:"setup_error,omitempty"`
-	MaintenanceError string                       `json:"maintenance_error,omitempty"`
-	Storage          *browserruntime.Status       `json:"storage,omitempty"`
-	Native           *browserruntime.NativeStatus `json:"native,omitempty"`
-	StorageError     string                       `json:"storage_error,omitempty"`
-	RestartRequired  bool                         `json:"restart_required"`
-	Update           UpdateStatus                 `json:"update"`
-}
 
 // Host holds one selected browser runtime for the plugin process. Missing
 // installation does not prevent RUM operation; browser jobs wait until an
@@ -49,8 +33,7 @@ type Host struct {
 	consumer        processConsumer
 	identity        *synthetic.RuntimeIdentity
 	mu              sync.Mutex
-	state           string
-	setupErr        error
+	setupErr        error // why the host is not ready; nil once admitted
 	maintenance     map[string]error
 	finishVersion   uint64
 	log             *logger.Logger
@@ -75,7 +58,6 @@ func newHost(mode Mode) *Host {
 		mode:          mode,
 		maintenance:   make(map[string]error),
 		log:           logger.New(),
-		state:         StateMissing,
 		done:          make(chan struct{}),
 		sweepInterval: time.Hour,
 	}
@@ -117,13 +99,11 @@ func NewUnavailable(mode Mode, err error) *Host {
 func (h *Host) admit(consumer processConsumer) {
 	h.consumer = consumer
 	h.identity = new(consumer.Manifest().Identity())
-	h.state = StateReady
 }
 
 func (h *Host) fail(err error) {
-	h.state, h.setupErr = StateUnavailable, err
+	h.setupErr = err
 	if errors.Is(err, browserruntime.ErrUnavailable) {
-		h.state = StateMissing
 		h.setupErr = fmt.Errorf("install a browser runtime and restart dem.plugin: %w", err)
 		if h.mode == ModeNative {
 			h.setupErr = fmt.Errorf("install the optional netdata-dem-runtime package and restart dem.plugin: %w", err)
@@ -137,13 +117,13 @@ func (h *Host) Ready() error {
 	if h.closed {
 		return errors.New("browser runtime owner is closed")
 	}
-	if h.state == StateReady {
-		return nil
-	}
 	if h.setupErr != nil {
 		return h.setupErr
 	}
-	return browserruntime.ErrUnavailable
+	if h.consumer == nil {
+		return browserruntime.ErrUnavailable
+	}
+	return nil
 }
 
 func (h *Host) Dependencies(map[string]any) ([]collectorapi.ActivationDependency, error) {
@@ -155,43 +135,6 @@ func errorText(err error) string {
 		return err.Error()
 	}
 	return ""
-}
-
-func (h *Host) Status() Snapshot {
-	h.mu.Lock()
-	result := Snapshot{
-		Mode:       h.mode,
-		State:      h.state,
-		SetupError: errorText(h.setupErr),
-	}
-	maintenance := h.maintenanceErrorLocked()
-	if h.identity != nil {
-		identity := *h.identity
-		result.Running = &identity
-	}
-	updater := h.updater
-	h.mu.Unlock()
-	if updater != nil {
-		var updateErr error
-		result.Update, updateErr = updater.state()
-		maintenance = errors.Join(maintenance, labelled("update", updateErr))
-	}
-	result.MaintenanceError = errorText(maintenance)
-	if h.store != nil {
-		status, err := h.store.Inspect()
-		result.Storage = &status
-		result.StorageError = errorText(err)
-		if result.Storage.Selected != nil && result.Storage.SelectionError == "" &&
-			result.Storage.InventoryError == "" {
-			result.RestartRequired = result.Running == nil || *result.Running != result.Storage.Selected.Identity()
-		}
-	}
-	if h.native != nil {
-		status, err := h.native.Inspect()
-		result.Native = &status
-		result.StorageError = errorText(err)
-	}
-	return result
 }
 
 func (h *Host) BeginUse() (runner.Use, error) {
@@ -223,7 +166,7 @@ func (h *Host) Run(ctx context.Context) {
 	defer close(h.done)
 	defer func() {
 		h.mu.Lock()
-		h.state, h.setupErr = StateUnavailable, errors.New("browser runtime owner stopped")
+		h.setupErr = errors.New("browser runtime owner stopped")
 		h.mu.Unlock()
 	}()
 	sweep := time.NewTicker(h.sweepInterval)

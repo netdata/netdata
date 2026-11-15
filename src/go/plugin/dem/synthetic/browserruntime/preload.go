@@ -4,8 +4,15 @@ package browserruntime
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+)
+
+// errPreloadDamaged reports damage in a sealed preload. Managed repair refuses
+// preloads, so the remedy is a replacement root, not ErrDamaged's advice.
+var errPreloadDamaged = errors.New(
+	"preloaded runtime metadata is damaged; prepare a replacement preload at a new final root and point runtime.preload_path to it",
 )
 
 type preloadRecord struct {
@@ -22,7 +29,7 @@ func (c *Candidate) SealPreload() error {
 	if c.closed {
 		return errors.New("runtime candidate is closed")
 	}
-	return c.store.withLock(func() error {
+	return publicDamage(c.store.withLock(func() error {
 		inv, err := c.store.inventoryLocked(true)
 		if err != nil {
 			return err
@@ -45,13 +52,25 @@ func (c *Candidate) SealPreload() error {
 			Manifest: c.manifest,
 			Path:     c.store.path,
 		})
-	})
+	}))
 }
 
 // ReadPreload reads administrator-controlled metadata from the immutable root.
 // It creates no state, so read-only mounts work. This service-account-owned
 // preload does not claim native package lifecycle or same-account isolation.
 func ReadPreload(path string) (Paths, Manifest, error) {
+	paths, m, err := readPreload(path)
+	if isMetadataDamage(err) {
+		// The cause is kept as text only, as for ErrDamaged.
+		return Paths{}, Manifest{}, fmt.Errorf("%w: %v", errPreloadDamaged, err)
+	}
+	if err != nil {
+		return Paths{}, Manifest{}, err
+	}
+	return paths, m, nil
+}
+
+func readPreload(path string) (Paths, Manifest, error) {
 	var empty Manifest
 	if !SupportedHost() {
 		return Paths{}, empty, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
@@ -79,7 +98,7 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, err
 	}
 	if err := record.Manifest.Validate(); err != nil {
-		return Paths{}, empty, err
+		return Paths{}, empty, damagedMetadata("preload.json", err)
 	}
 	if record.Path != path || !record.Manifest.MatchesHost() {
 		return Paths{}, empty, errors.New("preload identity, platform or final path differs from its preparation")

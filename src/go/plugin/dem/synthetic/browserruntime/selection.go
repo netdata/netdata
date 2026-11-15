@@ -140,7 +140,8 @@ func (c *Consumer) BeginUse() (*Use, error) {
 	if c.closed {
 		return nil, errors.New("runtime consumer is closed")
 	}
-	return c.store.beginUse(c.manifest)
+	use, err := c.store.beginUse(c.manifest)
+	return use, publicDamage(err)
 }
 
 func (c *Consumer) Close() error {

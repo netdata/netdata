@@ -270,8 +270,8 @@ func (r *runtimeCommandReport) selectedInstallation(status browserruntime.Status
 	r.Runtime = nil
 	r.Generation = ""
 	r.State = "unavailable"
-	if status.Selected != nil {
-		r.setRuntime(status.Selected.Identity())
+	if status.Release != nil {
+		r.setRuntime(status.Release.Manifest.Identity())
 		r.State = "installed"
 	}
 	if status.SelectionError != "" {

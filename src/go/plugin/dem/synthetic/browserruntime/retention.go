@@ -23,7 +23,6 @@ type Status struct {
 	SelectionError        string            `json:"selection_error,omitempty"`
 	GenerationErrors      map[string]string `json:"generation_errors,omitempty"`
 	InventoryError        string            `json:"inventory_error,omitempty"`
-	Selected              *Manifest         `json:"selected,omitempty"`
 	Release               *Release          `json:"release,omitempty"`
 	AutomaticUpdates      bool              `json:"automatic_updates"`
 	SelectedBytes         int64             `json:"selected_bytes"`
@@ -49,7 +48,6 @@ type Status struct {
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
 	status := Status{
-		Selected:              inv.selected,
 		Release:               inv.release,
 		AutomaticUpdates:      inv.automaticUpdates,
 		LimitBytes:            s.config.MaxBytes,
@@ -102,7 +100,7 @@ func (s *Store) statusLocked(inv inventory) (Status, error) {
 	}
 	for id := range inv.generations {
 		size := bytesByRecord[filepath.Join("generations", id)]
-		if inv.selected != nil && inv.selected.Archive.SHA256 == id {
+		if inv.isSelected(id) {
 			status.SelectedBytes += size
 		}
 		if inv.candidates[id] > 0 {

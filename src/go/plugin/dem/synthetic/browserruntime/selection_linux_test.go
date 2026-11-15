@@ -24,7 +24,7 @@ func TestLegacyEmptySelectionIsUninstalled(t *testing.T) {
 	require.NotErrorIs(t, err, ErrDamaged)
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Nil(t, status.Selected)
+	require.Nil(t, status.Release)
 	require.Empty(t, status.SelectionError)
 	// Reads never rewrite the record; the next selection replaces it.
 	data, err := os.ReadFile(path)
@@ -58,7 +58,7 @@ func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	require.NoError(t, candidate.Close())
 	status, err := other.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, selected, *status.Selected)
+	require.Equal(t, selected, status.Release.Manifest)
 	require.Positive(t, status.SelectedBytes)
 	consumer, err := other.AcquireSelected()
 	require.NoError(t, err)
@@ -90,7 +90,7 @@ func TestActivationKeepsOldProcessAndUninstallRefusesEveryGeneration(t *testing.
 	require.ErrorIs(t, s.Uninstall(context.Background()), ErrInUse, "execution outlives process claim")
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, second, *status.Selected)
+	require.Equal(t, second, status.Release.Manifest)
 	require.NoError(t, use.Finish(true))
 	require.NoError(t, s.Uninstall(context.Background()))
 	_, err = old.BeginUse()
@@ -119,7 +119,7 @@ func TestSelectionPublicationUncertaintyBlocksDeletionUntilReconciled(t *testing
 	// A real rename occurred; do not claim first is still selected.
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, next, *status.Selected)
+	require.Equal(t, next, status.Release.Manifest)
 	*now = now.Add(365 * 24 * time.Hour)
 	require.ErrorIs(t, s.Sweep(), failure)
 	require.FileExists(t, filepath.Join(s.path, "generations", first.Archive.SHA256, "prepared.json"))
@@ -152,7 +152,7 @@ func TestPrepublicationFailurePreservesSelection(t *testing.T) {
 	require.False(t, errors.As(err, &uncertain))
 	status, err := s.Inspect()
 	require.NoError(t, err)
-	require.Equal(t, first, *status.Selected)
+	require.Equal(t, first, status.Release.Manifest)
 	s.syncSelection = func() error { return syncDirectory(s.root, ".") }
 }
 

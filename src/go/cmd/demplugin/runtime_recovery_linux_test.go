@@ -106,7 +106,7 @@ func TestRuntimeFailedRepairReportsSelectedStateSeparately(t *testing.T) {
 				assert.Equal(t, "unavailable", report.State)
 				assert.Nil(t, report.Runtime)
 				assert.Empty(t, report.Generation)
-				assert.Nil(t, report.Storage.Selected)
+				assert.Nil(t, report.Storage.Release)
 				require.NotNil(t, report.Qualification)
 				assert.False(t, report.Qualification.SandboxedLocalJourney)
 				assert.False(t, report.Qualification.SandboxedLocalLighthouse)
