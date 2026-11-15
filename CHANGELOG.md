@@ -510,6 +510,23 @@
 - Feat(dem): preserve valid captures when siblings exceed size limit ([#24736](https://github.com/netdata/netdata/issues/24736))
 - Feat(dem): add opt-in Playwright failure traces ([#24738](https://github.com/netdata/netdata/issues/24738))
 - Regenerate integrations docs ([#24739](https://github.com/netdata/netdata/issues/24739))
+- Build(deps): bump go.opentelemetry.io/otel/trace from 1.46.0 to 1.47.0 in /src/go ([#24741](https://github.com/netdata/netdata/issues/24741))
+- Refactor(dem): share one synthetic job between journey and lighthouse ([#24743](https://github.com/netdata/netdata/issues/24743))
+- Refactor(dem): verify runtime payloads in one place and drop unreachable paths ([#24744](https://github.com/netdata/netdata/issues/24744))
+- Refactor(dem): one RUM history record and shared OTLP queue loop ([#24745](https://github.com/netdata/netdata/issues/24745))
+- Refactor(dem): share optional-output status and move wire rules into the runner ([#24746](https://github.com/netdata/netdata/issues/24746))
+- Chore(sow): fail the audit on mktemp templates that continue after their X's ([#24748](https://github.com/netdata/netdata/issues/24748))
+- Fix(skills): randomize mktemp names on macOS ([#24747](https://github.com/netdata/netdata/issues/24747))
+- Refactor(dem): give each RUM rule one owner ([#24750](https://github.com/netdata/netdata/issues/24750))
+- Refactor(dem): one composition root and a runtime host boundary ([#24751](https://github.com/netdata/netdata/issues/24751))
+- Refactor(dem): give each active synthetic job one state owner ([#24753](https://github.com/netdata/netdata/issues/24753))
+- Refactor(dem): split the synthetic runner engine and regroup its tests ([#24752](https://github.com/netdata/netdata/issues/24752))
+- Refactor(dem): simplify RUM aggregation and Faro decoding internals ([#24754](https://github.com/netdata/netdata/issues/24754))
+- Refactor(dem): runtime file layout, single-owner trust rules and verified releases ([#24755](https://github.com/netdata/netdata/issues/24755))
+- Refactor(dem): split the runtime admin CLI by command ([#24758](https://github.com/netdata/netdata/issues/24758))
+- Refactor(dem): share one plumbing layer across the DEM Functions ([#24759](https://github.com/netdata/netdata/issues/24759))
+- Refactor(dem): rename the journal package to journalstore and type its API ([#24760](https://github.com/netdata/netdata/issues/24760))
+- Fix(dem): redact RUM text after control characters are removed ([#24761](https://github.com/netdata/netdata/issues/24761))
 
 ## [2.12.0] - 2026-09-30
 
