@@ -471,8 +471,8 @@ modules:
             returns:
                 description: One session with retained observations originally received by the Agent in the selected range.
                     Counts and activity span cover selected observations, not lifetime totals. Sessions are ordered
-                    by last selected observation at microsecond precision. Late-saved context can change an earlier
-                    range. Results can include disabled sites until their history expires.
+                    by last selected observation at microsecond precision; at most 2000 are returned, with explicit
+                    truncated and limit fields. Late-saved context can change an earlier range. Results can include disabled sites until their history expires.
                 columns:
                   - name: site
                     type: string
