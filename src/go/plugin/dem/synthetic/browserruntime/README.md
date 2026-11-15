@@ -209,7 +209,10 @@ Native package and repository authentication is its trust boundary.
 Tests cover archive bounds/path handling, interpreter binding, selection/activation,
 idle and pressure protection, serialization, refused uninstall, publication failure,
 process death, uncertain uses, receipt recovery and boot provenance. Native admission
-tests need root and a `netdata` account and otherwise skip. Runtime, host, CLI and
+tests need root and a `netdata` account and otherwise skip. Their helper processes
+re-execute the test binary as that account, which cannot enter `go test`'s private
+build directory: build it with `go test -c` into a directory the account can traverse
+and run it from the package directory. Runtime, host, CLI and
 release-tool tests share one synthetic archive builder, `internal/browserruntimetest`.
 `DEM_RUNTIME_TEST_HELPER` enables real supervisor receipt tests; run under the same
 unprivileged identity as the helper. Real CLI qualification covers journeys and
