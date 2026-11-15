@@ -32,7 +32,7 @@ func TestSessionsReturnHistoryCancellation(t *testing.T) {
 // under an older pattern set, can still hold a credential.
 func TestRetiredSiteHistoryGetsCredentialPatterns(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journal.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := history.NewStore(journalStore)
