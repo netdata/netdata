@@ -1,14 +1,19 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Derives the Netdata version: git-describe when the checkout allows it,
-# packaging/version otherwise. Feeds project() in the root file,
-# CPACK_PACKAGE_VERSION in Packaging.cmake, and the NETDATA_VERSION defines
-# in config.h.
+# Derives the Netdata version: git-describe when the source directory is a
+# git checkout and the checkout allows it, packaging/version otherwise. Feeds
+# project() in the root file, CPACK_PACKAGE_VERSION in Packaging.cmake, and
+# the NETDATA_VERSION defines in config.h.
 
 include_guard()
 function(netdata_version)
   find_package(Git)
 
-  if(GIT_EXECUTABLE)
+  # Ask git only when the source directory is a checkout of its own. git
+  # searches the parent directories too, so a release tarball unpacked inside
+  # another repository, such as a distribution build tree, would otherwise be
+  # given the version of that repository. .git is a file in a worktree or a
+  # submodule, hence EXISTS and not IS_DIRECTORY.
+  if(GIT_EXECUTABLE AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
     execute_process(COMMAND ${GIT_EXECUTABLE} describe
                     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
                     RESULT_VARIABLE GIT_DESCRIBE_RESULT
