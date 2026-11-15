@@ -276,9 +276,8 @@ func (r *Resolver) Lookup(ipStr string) (loc beacon.Location) {
 	loc.City = trimCityAnnex(rec.City.Names.En)
 	if rec.Location.Latitude != nil && rec.Location.Longitude != nil {
 		a, b := *rec.Location.Latitude, *rec.Location.Longitude
-		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 && !math.IsNaN(b) && !math.IsInf(b, 0) &&
-			b >= -180 &&
-			b <= 180 {
+		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 &&
+			!math.IsNaN(b) && !math.IsInf(b, 0) && b >= -180 && b <= 180 {
 			loc.Lat, loc.Lon, loc.HasGeo = round1(a), round1(b), true
 		} else {
 			invalid = true

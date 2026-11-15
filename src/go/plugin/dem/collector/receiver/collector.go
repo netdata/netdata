@@ -28,6 +28,7 @@ type Config struct {
 	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
 	config.Receiver `    yaml:",inline"                json:""`
 }
+
 type Dependencies struct {
 	Registry   *rumregistry.Registry
 	GeoIPPaths geoip.Paths
@@ -59,6 +60,7 @@ func Creator(deps Dependencies) collectorapi.Creator {
 		StoreFirst:      true,
 	}
 }
+
 func New(deps Dependencies) *Collector {
 	c := &Collector{
 		Config: Config{
@@ -78,6 +80,7 @@ func New(deps Dependencies) *Collector {
 	c.metrics = newCollectorMetrics(c.store.Write().SnapshotMeter(""))
 	return c
 }
+
 func (c *Collector) Configuration() any                 { return c.Config }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }

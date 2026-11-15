@@ -9,7 +9,6 @@ import (
 	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 

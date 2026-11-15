@@ -77,6 +77,7 @@ func (metadataFunctionSource) Receiver() query.Receiver {
 		Serving: true,
 	}
 }
+
 func (metadataFunctionSource) Sites(context.Context, string, string) ([]query.Site, error) {
 	return []query.Site{
 		{Name: "shop", Label: "shop", Sampling: query.Sampling{
@@ -85,9 +86,11 @@ func (metadataFunctionSource) Sites(context.Context, string, string) ([]query.Si
 		}},
 	}, nil
 }
+
 func (metadataFunctionSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	return []query.Page{{Site: "shop", Page: "/"}}, nil
 }
+
 func (metadataFunctionSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
 	return nil, "", nil
 }
@@ -95,6 +98,7 @@ func (metadataFunctionSource) Live(context.Context, string, string, int, string)
 func (metadataFunctionSource) Sessions(context.Context, query.SessionFilter) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
+
 func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
 	return []query.SessionEvent{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
 }

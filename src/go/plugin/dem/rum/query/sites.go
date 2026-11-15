@@ -67,6 +67,7 @@ func (s *Service) Sites(ctx context.Context, filter, vnodeGUID string) ([]Site, 
 	}
 	return out, nil
 }
+
 func (s *Service) Pages(ctx context.Context, filter, vnodeGUID string) ([]Page, error) {
 	var out []Page
 	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {

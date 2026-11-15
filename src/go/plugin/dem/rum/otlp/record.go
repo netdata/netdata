@@ -167,6 +167,7 @@ func consoleSeverity(level string) logspb.SeverityNumber {
 		return sevInfo
 	}
 }
+
 func sevText(sev logspb.SeverityNumber) string {
 	return strings.TrimPrefix(sev.String(), "SEVERITY_NUMBER_")
 }

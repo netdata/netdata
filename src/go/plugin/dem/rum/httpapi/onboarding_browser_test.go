@@ -248,4 +248,5 @@ func (w *browserResponseWriter) WriteHeader(status int) {
 	w.status = status
 	w.ResponseWriter.WriteHeader(status)
 }
+
 func (w *browserResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

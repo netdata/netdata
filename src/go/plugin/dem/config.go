@@ -16,6 +16,7 @@ type RetentionConfig struct {
 	Days     int   `yaml:"days"`
 	MaxBytes int64 `yaml:"max_bytes"`
 }
+
 type BrowserConfig struct {
 	Concurrency int `yaml:"concurrency"`
 }

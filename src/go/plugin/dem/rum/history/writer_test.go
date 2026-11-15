@@ -101,9 +101,7 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	sessions, err := NewStore(
-		st,
-	).QuerySessions(ctx, SessionFilter{
+	sessions, err := NewStore(st).QuerySessions(ctx, SessionFilter{
 		Filter: Filter{
 			Site:   "site",
 			Before: time.Now().Unix() + 1,
@@ -115,9 +113,7 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	assert.Equal(t, []string{"[REDACTED]"}, sessions[0].UserIDs)
 	assert.EqualValues(t, 1, sessions[0].Pageviews)
 	assert.EqualValues(t, 1, sessions[0].Errors)
-	groups, err := NewStore(
-		st,
-	).QueryErrors(ctx, ErrorFilter{
+	groups, err := NewStore(st).QueryErrors(ctx, ErrorFilter{
 		Filter: Filter{
 			Site:   "site",
 			Before: time.Now().Unix() + 1,

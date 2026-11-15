@@ -44,7 +44,9 @@ const (
 )
 
 var frustrationCounters = map[string]string{
-	beacon.RageClickEvent: CounterRageClicks, beacon.DeadClickEvent: CounterDeadClicks, beacon.ErrorClickEvent: CounterErrorClicks,
+	beacon.RageClickEvent:  CounterRageClicks,
+	beacon.DeadClickEvent:  CounterDeadClicks,
+	beacon.ErrorClickEvent: CounterErrorClicks,
 }
 
 const (
@@ -134,6 +136,7 @@ type vitalIdentity struct {
 	revision uint64
 	attrs    *attributes
 }
+
 type activityObservation struct {
 	attrs                                  *attributes
 	documents, views, errors, frustrations uint64

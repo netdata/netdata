@@ -89,6 +89,7 @@ func (m attemptMetrics) write(s monitor.Snapshot) {
 	m.cancelled.ObserveTotal(float64(s.Outcomes.Cancelled))
 	m.unknown.ObserveTotal(float64(s.Outcomes.Unknown))
 }
+
 func boolean(v bool) float64 {
 	if v {
 		return 1

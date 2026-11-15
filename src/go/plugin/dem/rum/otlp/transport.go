@@ -93,6 +93,7 @@ func newTransport(
 	}
 	return t, nil
 }
+
 func (t *transport) Close() error { return t.conn.Close() }
 
 // Receiver error strings may echo credentials or payloads; log only the status
@@ -101,16 +102,14 @@ func (t *transport) Close() error { return t.conn.Close() }
 func (t *transport) failed(signal string, err error) {
 	code := status.Code(err)
 	key := t.siteName + "\x00" + signal + "\x00" + code.String()
-	exportLog.Limit(key, 1, time.Minute).Warningf(
-		"rum/otlp: site %q %s export failed: %s", t.siteName, signal, code,
-	)
+	exportLog.Limit(key, 1, time.Minute).Warningf("rum/otlp: site %q %s export failed: %s", t.siteName, signal, code)
 }
+
 func (t *transport) rejected(signal string, n uint64) {
 	key := t.siteName + "\x00" + signal + "\x00partial"
-	exportLog.Limit(key, 1, time.Minute).Warningf(
-		"rum/otlp: site %q %s partial rejection: %d", t.siteName, signal, n,
-	)
+	exportLog.Limit(key, 1, time.Minute).Warningf("rum/otlp: site %q %s partial rejection: %d", t.siteName, signal, n)
 }
+
 func rejectedCount(n int64, total uint64) uint64 {
 	if n <= 0 {
 		return 0

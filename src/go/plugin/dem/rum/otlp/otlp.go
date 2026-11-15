@@ -120,9 +120,7 @@ func (e *Logs) export(parent context.Context, batch []*logspb.LogRecord, timeout
 	req := &collogspb.ExportLogsServiceRequest{
 		ResourceLogs: []*logspb.ResourceLogs{{
 			Resource: &resourcepb.Resource{
-				Attributes: []*commonpb.KeyValue{
-					strAttr("service.name", serviceName), strAttr("rum.site", e.siteName),
-				},
+				Attributes: []*commonpb.KeyValue{strAttr("service.name", serviceName), strAttr("rum.site", e.siteName)},
 			},
 			ScopeLogs: []*logspb.ScopeLogs{
 				{Scope: &commonpb.InstrumentationScope{

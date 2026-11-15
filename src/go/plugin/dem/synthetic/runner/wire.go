@@ -221,7 +221,14 @@ func validateJourneyResult(result *reporterResult) error {
 			return errors.New("negative declared test count")
 		}
 		remaining := tests.Declared
-		for _, n := range []int{tests.Passed, tests.Failed, tests.TimedOut, tests.Skipped, tests.ExpectedFailure, tests.NotRun} {
+		for _, n := range []int{
+			tests.Passed,
+			tests.Failed,
+			tests.TimedOut,
+			tests.Skipped,
+			tests.ExpectedFailure,
+			tests.NotRun,
+		} {
 			if n < 0 || n > remaining {
 				return errors.New("invalid disjoint test counts")
 			}

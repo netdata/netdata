@@ -56,6 +56,7 @@ func (st *siteState) expireActivityIfDue(now time.Time) {
 		st.evictActivity(now)
 	}
 }
+
 func (st *siteState) evictActivity(now time.Time) {
 	st.lastActivityExpiry = now
 	cutoff := now.Add(-time.Minute)
@@ -63,6 +64,7 @@ func (st *siteState) evictActivity(now time.Time) {
 	st.rejected = evictTimes(st.rejected, cutoff)
 	st.bots = evictTimes(st.bots, cutoff)
 }
+
 func evictTimes(ts []time.Time, cutoff time.Time) []time.Time {
 	n := 0
 	for i, t := range ts {

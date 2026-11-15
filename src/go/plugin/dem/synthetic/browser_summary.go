@@ -18,23 +18,27 @@ type BrowserSummary struct {
 	Samples   []BrowserSample   `json:"samples,omitempty"`
 	Truncated []string          `json:"truncated,omitempty"`
 }
+
 type BrowserCounts struct {
 	Uncaught     int64 `json:"uncaught,omitempty"`
 	ConsoleError int64 `json:"console_error,omitempty"`
 	Transport    int64 `json:"transport,omitempty"`
 	HTTPError    int64 `json:"http_error,omitempty"`
 }
+
 type BrowserTestCounts struct {
 	Observed   int64 `json:"observed,omitempty"`
 	Incomplete int64 `json:"incomplete,omitempty"`
 	Invalid    int64 `json:"invalid,omitempty"`
 	NoSummary  int64 `json:"no_summary,omitempty"`
 }
+
 type BrowserAggregate struct {
 	Tests     BrowserTestCounts `json:"tests"`
 	Counts    BrowserCounts     `json:"counts"`
 	Omissions []string          `json:"omissions,omitempty"`
 }
+
 type BrowserTest struct {
 	ID        string         `json:"id"`
 	State     string         `json:"state"`
@@ -42,6 +46,7 @@ type BrowserTest struct {
 	SampleIDs []int          `json:"sample_ids,omitempty"`
 	Reason    string         `json:"reason,omitempty"`
 }
+
 type BrowserArgument struct {
 	Value   any    `json:"value,omitempty"`
 	Omitted string `json:"omitted,omitempty"`
@@ -134,7 +139,13 @@ func (b *BrowserSummary) Summary() string {
 	if t.Observed == 0 {
 		text += ": no observed fixture contexts"
 	} else {
-		text += fmt.Sprintf(": observed errors: uncaught=%d, console_error=%d, transport=%d, http_error=%d", c.Uncaught, c.ConsoleError, c.Transport, c.HTTPError)
+		text += fmt.Sprintf(
+			": observed errors: uncaught=%d, console_error=%d, transport=%d, http_error=%d",
+			c.Uncaught,
+			c.ConsoleError,
+			c.Transport,
+			c.HTTPError,
+		)
 	}
 	if len(b.Run.Omissions) > 0 {
 		text += " [omissions: " + strings.Join(b.Run.Omissions, ", ") + "]"

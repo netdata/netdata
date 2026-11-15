@@ -41,11 +41,8 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 		lines []string
 		want  optionalStatus
 	}{
-		"not negotiated": {
-			nil,
-			optionalStatus{pending, pending, "unavailable", "unavailable"},
-		},
-		"all selected": {[]string{all}, optionalStatus{supported, supported, "partial", "supported"}},
+		"not negotiated": {nil, optionalStatus{pending, pending, "unavailable", "unavailable"}},
+		"all selected":   {[]string{all}, optionalStatus{supported, supported, "partial", "supported"}},
 		"none selected": {
 			[]string{none},
 			optionalStatus{

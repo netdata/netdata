@@ -25,6 +25,7 @@ type Group struct {
 	Vitals                                map[string]VitalStats
 	Pageviews, JSErrors, ApplicationViews uint64
 }
+
 type Snapshot struct {
 	Name, DisplayName                                          string
 	Vitals                                                     map[string]VitalStats
@@ -57,6 +58,7 @@ type facetValue struct {
 	kind  int
 	value string
 }
+
 type population struct {
 	vitalValues                            *vitalDistributions
 	documents, views, errors, frustrations uint64
@@ -78,6 +80,7 @@ func (p *population) countVital(index int) {
 	}
 	p.vitalValues.counts[index]++
 }
+
 func (p *population) reserveVitals() {
 	if p.vitalValues == nil {
 		return
@@ -117,6 +120,7 @@ func (r *windowRead) group(kind int, value string) *population {
 	groups[value] = g
 	return g
 }
+
 func attributePairs(v *attributes, pageOnly bool) []facetValue {
 	if pageOnly {
 		return []facetValue{{kind: facetPage, value: v.page}}
@@ -260,6 +264,7 @@ func (a *Aggregator) Snapshot() Snapshot {
 	snap.ErrorGroups = r.rankErrorGroups()
 	return snap
 }
+
 func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	out := make(map[string]VitalStats, len(beacon.Vitals))
 	for index, name := range beacon.Vitals {
@@ -271,6 +276,7 @@ func (r *windowRead) vitals(p *population) map[string]VitalStats {
 	}
 	return out
 }
+
 func (cfg SiteCfg) topN(kind string) int {
 	switch kind {
 	case KindPage, KindView:
@@ -285,6 +291,7 @@ func (cfg SiteCfg) topN(kind string) int {
 		return 4
 	}
 }
+
 func (r *windowRead) rank(kind int, n int) []Group {
 	if len(r.groups[kind]) == 0 {
 		return nil
@@ -334,6 +341,7 @@ func (r *windowRead) rank(kind int, n int) []Group {
 	}
 	return out
 }
+
 func mergePopulation(dst, src *population) {
 	dst.documents += src.documents
 	dst.views += src.views
@@ -344,6 +352,7 @@ func mergePopulation(dst, src *population) {
 		}
 	}
 }
+
 func (r *windowRead) emitGroup(kind int, value string, other bool, p *population) Group {
 	out := Group{
 		Value:            value,

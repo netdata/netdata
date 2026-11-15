@@ -42,12 +42,14 @@ func (h *Host) updateMaintenanceLocked(operation string, err error) healthChange
 	}
 	return change
 }
+
 func (h *Host) setMaintenance(operation string, err error) {
 	h.mu.Lock()
 	change := h.updateMaintenanceLocked(operation, err)
 	h.mu.Unlock()
 	change.log(h.log)
 }
+
 func (h *Host) recordFinishError(err error) {
 	h.mu.Lock()
 	h.finishVersion++

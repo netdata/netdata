@@ -246,6 +246,7 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 		})
 	}
 }
+
 func TestRetentionMaintainsHourlySweep(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var historyCalls, artifactCalls atomic.Int32

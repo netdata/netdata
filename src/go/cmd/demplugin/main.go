@@ -37,6 +37,7 @@ func init() {
 		_ = os.Unsetenv("TZ")
 	}
 }
+
 func main() {
 	_, _ = maxprocs.Set(maxprocs.Logger(func(string, ...any) {}))
 	if len(os.Args) > 1 && os.Args[1] == "runtime" {

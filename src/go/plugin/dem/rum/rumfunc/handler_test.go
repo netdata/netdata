@@ -28,22 +28,27 @@ func (s recordingSource) Sites(context.Context, string, string) ([]query.Site, e
 	s.read("Sites")
 	return []query.Site{{Name: "shop"}}, nil
 }
+
 func (s recordingSource) Pages(context.Context, string, string) ([]query.Page, error) {
 	s.read("Pages")
 	return []query.Page{{Site: "shop"}}, nil
 }
+
 func (s recordingSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
 	s.read("Live")
 	return []query.LiveEvent{{}}, "", nil
 }
+
 func (s recordingSource) Sessions(context.Context, query.SessionFilter) ([]query.Session, error) {
 	s.read("Sessions")
 	return []query.Session{{Site: "shop"}}, nil
 }
+
 func (s recordingSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
 	s.read("SessionEvents")
 	return []query.SessionEvent{{Site: "shop"}}, nil
 }
+
 func (s recordingSource) Errors(context.Context, query.ErrorFilter) ([]query.ErrorGroup, error) {
 	s.read("Errors")
 	return []query.ErrorGroup{{Site: "shop"}}, nil

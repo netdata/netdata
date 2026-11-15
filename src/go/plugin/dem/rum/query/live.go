@@ -16,6 +16,7 @@ type livePosition struct {
 	Generation string `json:"g"`
 	Sequence   uint64 `json:"s"`
 }
+
 type liveCursor struct {
 	VnodeGUID string                  `json:"vnode_guid,omitempty"`
 	Version   int                     `json:"v"`
@@ -134,6 +135,7 @@ func (s liveStreams) Less(i, j int) bool {
 	}
 	return a.Seq < b.Seq
 }
+
 func (s liveStreams) Swap(i, j int)    { s[i], s[j] = s[j], s[i] }
 func (s *liveStreams) Push(stream any) { *s = append(*s, stream.([]LiveEvent)) }
 func (s *liveStreams) Pop() any {

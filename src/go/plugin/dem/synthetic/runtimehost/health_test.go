@@ -31,6 +31,7 @@ func (l *healthLog) Write(p []byte) (int, error) {
 	defer l.mu.Unlock()
 	return l.data.Write(p)
 }
+
 func (l *healthLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.data.String() }
 
 func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {

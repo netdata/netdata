@@ -36,6 +36,7 @@ func newRedactor(values map[string]string) *textRedactor {
 		patterns: redact.Patterns,
 	}
 }
+
 func (r *textRedactor) text(value string) string {
 	return clip(r.redacted(value))
 }

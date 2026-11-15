@@ -18,6 +18,7 @@ type receiptEntry[K comparable, V any] struct {
 	index    int
 	sequence uint64
 }
+
 type receiptHeap[K comparable, V any] struct {
 	entries  []*receiptEntry[K, V]
 	sequence uint64
@@ -31,16 +32,19 @@ func (h *receiptHeap[K, V]) Less(i, j int) bool {
 	}
 	return a.received.Before(b.received)
 }
+
 func (h *receiptHeap[K, V]) Swap(i, j int) {
 	h.entries[i], h.entries[j] = h.entries[j], h.entries[i]
 	h.entries[i].index = i
 	h.entries[j].index = j
 }
+
 func (h *receiptHeap[K, V]) Push(v any) {
 	e := v.(*receiptEntry[K, V])
 	e.index = len(h.entries)
 	h.entries = append(h.entries, e)
 }
+
 func (h *receiptHeap[K, V]) Pop() any {
 	n := len(h.entries) - 1
 	e := h.entries[n]
@@ -49,6 +53,7 @@ func (h *receiptHeap[K, V]) Pop() any {
 	e.index = -1
 	return e
 }
+
 func (h *receiptHeap[K, V]) add(received time.Time, key K, v V) *receiptEntry[K, V] {
 	h.sequence++
 	e := &receiptEntry[K, V]{
@@ -68,6 +73,7 @@ func (h *receiptHeap[K, V]) renew(e *receiptEntry[K, V], received time.Time) {
 		heap.Fix(h, e.index)
 	}
 }
+
 func (h *receiptHeap[K, V]) remove(e *receiptEntry[K, V]) { heap.Remove(h, e.index) }
 
 // popExpired removes and returns the oldest entry received before cutoff, or nil.
@@ -78,6 +84,7 @@ func (h *receiptHeap[K, V]) popExpired(cutoff time.Time) *receiptEntry[K, V] {
 	}
 	return heap.Pop(h).(*receiptEntry[K, V])
 }
+
 func (h *receiptHeap[K, V]) expire(cutoff time.Time) {
 	for h.popExpired(cutoff) != nil {
 	}
@@ -116,6 +123,7 @@ func newReceiptIndex[K comparable, V any]() receiptIndex[K, V] {
 		byKey: map[K]*receiptEntry[K, V]{},
 	}
 }
+
 func (x *receiptIndex[K, V]) len() int                      { return len(x.byKey) }
 func (x *receiptIndex[K, V]) get(key K) *receiptEntry[K, V] { return x.byKey[key] }
 
@@ -123,9 +131,11 @@ func (x *receiptIndex[K, V]) get(key K) *receiptEntry[K, V] { return x.byKey[key
 func (x *receiptIndex[K, V]) add(received time.Time, key K, v V) {
 	x.byKey[key] = x.order.add(received, key, v)
 }
+
 func (x *receiptIndex[K, V]) renew(e *receiptEntry[K, V], received time.Time) {
 	x.order.renew(e, received)
 }
+
 func (x *receiptIndex[K, V]) remove(e *receiptEntry[K, V]) {
 	x.order.remove(e)
 	delete(x.byKey, e.key)
@@ -151,6 +161,7 @@ func (x *receiptIndex[K, V]) current(key K, now time.Time, horizon time.Duration
 	}
 	return e
 }
+
 func (x *receiptIndex[K, V]) expire(cutoff time.Time) {
 	for e := x.order.popExpired(cutoff); e != nil; e = x.order.popExpired(cutoff) {
 		delete(x.byKey, e.key)

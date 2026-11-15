@@ -30,14 +30,17 @@ type Site struct {
 	Rejected          Rejection
 	ScriptURL         string
 }
+
 type Capture struct {
 	Geolocation        string
 	FrustrationSignals bool
 }
+
 type Sampling struct {
 	MeasureRate, InvestigateRate float64
 	KeepErrors, KeepPoorVitals   bool
 }
+
 type Rejection struct {
 	Origin string
 	At     time.Time

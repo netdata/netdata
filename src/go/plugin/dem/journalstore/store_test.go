@@ -24,12 +24,14 @@ func newTestStore(t *testing.T) *Store {
 	t.Cleanup(func() { require.NoError(t, s.Close()) })
 	return s
 }
+
 func appendEntry(t *testing.T, s *Store) {
 	t.Helper()
 	attempted, err := s.Append(context.Background(), testFields())
 	require.True(t, attempted)
 	require.NoError(t, err)
 }
+
 func testFields() []journal.Field {
 	return []journal.Field{
 		journal.StringField("DEM_KIND", "rum"),
@@ -37,6 +39,7 @@ func testFields() []journal.Field {
 		journal.StringField("MESSAGE", "entry"),
 	}
 }
+
 func countEntries(t *testing.T, s *Store) int {
 	t.Helper()
 	reader, release, err := s.OpenReader(context.Background())
@@ -75,6 +78,7 @@ func TestCancelledAdmissionDoesNotAppend(t *testing.T) {
 	appendEntry(t, s)
 	assert.Equal(t, 1, countEntries(t, s))
 }
+
 func TestScanCancellationAndSnapshotBoundaries(t *testing.T) {
 	s := newTestStore(t)
 	for range 4 {
@@ -118,6 +122,7 @@ func TestCloseWaitsForOwnedReaderAndRejectsNewWork(t *testing.T) {
 	assert.ErrorIs(t, err, os.ErrClosed)
 	require.NoError(t, s.Close())
 }
+
 func TestPrivateCleanup(t *testing.T) {
 	s := newTestStore(t)
 	root := s.root

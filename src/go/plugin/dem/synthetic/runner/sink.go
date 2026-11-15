@@ -32,6 +32,7 @@ type sink struct {
 	declared     int
 	tests        map[string]synthetic.Event
 }
+
 type sinkSnapshot struct {
 	captures *synthetic.CaptureReport
 	browser  *synthetic.BrowserSummary
@@ -57,6 +58,7 @@ func newSink(request synthetic.Request, redact *textRedactor) *sink {
 		tests:        make(map[string]synthetic.Event),
 	}
 }
+
 func (s *sink) consume(reader io.Reader) error {
 	defer func() {
 		s.mu.Lock()
@@ -173,6 +175,7 @@ func (s *sink) add(event synthetic.Event) {
 	}
 	s.retain(event)
 }
+
 func (s *sink) retain(event synthetic.Event) {
 	if event.Kind == "suite" && event.Phase == "discovery" {
 		s.declared = *event.DeclaredTests
@@ -189,6 +192,7 @@ func (s *sink) retain(event synthetic.Event) {
 		s.dropped++
 	}
 }
+
 func (s *sink) stderr(reader io.Reader) {
 	stream := newDiagnosticStream(s.redact, func(message string) {
 		s.mu.Lock()
@@ -212,6 +216,7 @@ func (s *sink) stderr(reader io.Reader) {
 		}
 	}
 }
+
 func (s *sink) snapshot() sinkSnapshot {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -237,7 +242,8 @@ func (s *sink) snapshot() sinkSnapshot {
 				counts.Passed++
 			}
 		}
-		counts.NotRun = counts.Declared - counts.Passed - counts.Failed - counts.TimedOut - counts.Skipped - counts.ExpectedFailure
+		counts.NotRun = counts.Declared - counts.Passed - counts.Failed - counts.TimedOut - counts.Skipped -
+			counts.ExpectedFailure
 		partial = &counts
 	}
 	return sinkSnapshot{

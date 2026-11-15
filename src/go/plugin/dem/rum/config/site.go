@@ -115,6 +115,7 @@ func (s Site) Secrets() []string {
 	}
 	return secrets
 }
+
 func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.IncludeConsoleLogs }
 
 // Effective returns defaults without changing the stored configuration.

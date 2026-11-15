@@ -887,8 +887,7 @@ func TestBrowserWireBounds(t *testing.T) {
 			"partial",
 		},
 		"pool past full": {func(s *browserStream) {
-			s.test("a", categorySamples(1, 3)...).
-				test("b", categorySamples(13, 1)...).
+			s.test("a", categorySamples(1, 3)...).test("b", categorySamples(13, 1)...).
 				test("c", uncaughtSample(17, "x"))
 		}, "invalid"},
 		"sample ID at limit":   {func(s *browserStream) { s.test("t", uncaughtSample(16, "x")) }, "partial"},

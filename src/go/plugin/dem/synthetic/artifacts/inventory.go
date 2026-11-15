@@ -115,9 +115,16 @@ func observation(bytes int64, err error) ByteObservation {
 		Bytes: &bytes,
 	}
 }
+
 func inventoryError(inv Inventory) error {
 	var result error
-	for _, e := range []string{inv.Error, inv.Retained.Error, inv.Workspace.Error, inv.Unclassified.Error, inv.Deleting.Error} {
+	for _, e := range []string{
+		inv.Error,
+		inv.Retained.Error,
+		inv.Workspace.Error,
+		inv.Unclassified.Error,
+		inv.Deleting.Error,
+	} {
 		if e != "" {
 			result = errors.Join(result, errors.New(e))
 		}

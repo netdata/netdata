@@ -14,6 +14,7 @@ type fixtureConfig struct {
 	config.Receiver
 	Sites []config.Site
 }
+
 type fixtureRoutes struct {
 	mu    sync.Mutex
 	sites map[string]*Route
@@ -42,6 +43,7 @@ func newFixture(cfg *fixtureConfig, sink Processor, geo Locator) *fixtureServer 
 	s.Update(cfg)
 	return s
 }
+
 func (s *fixtureServer) Update(cfg *fixtureConfig) {
 	s.fixture.mu.Lock()
 	defer s.fixture.mu.Unlock()
@@ -50,6 +52,7 @@ func (s *fixtureServer) Update(cfg *fixtureConfig) {
 		s.fixture.sites[sc.Name] = NewRoute(sc, s.sink, redact.NewRedactor(sc.Secrets()...))
 	}
 }
+
 func (s *fixtureServer) site(k string) *site {
 	r, _, _, _ := s.fixture.Acquire(k)
 	if r == nil {
@@ -57,4 +60,5 @@ func (s *fixtureServer) site(k string) *site {
 	}
 	return r.policy
 }
+
 func (s *fixtureServer) route(k string) *Route { r, _, _, _ := s.fixture.Acquire(k); return r }

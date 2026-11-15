@@ -20,6 +20,7 @@ func NewStore(store *journalstore.Store) *Store {
 		store: store,
 	}
 }
+
 func (s *Store) Sync(ctx context.Context) error { return s.store.Sync(ctx) }
 
 type RunFilter struct {
@@ -31,6 +32,7 @@ type RunFilter struct {
 	Before    *int64
 	Limit     int
 }
+
 type RunPage struct {
 	Runs      []synthetic.Run
 	Truncated bool

@@ -88,11 +88,8 @@ func parseSpans(rs []otlpResourceSpans, opt Options) ([]beacon.Span, string) {
 					Attrs:         spanAttrs(sp.Attributes, opt),
 					StatusCode:    sp.Status.Code,
 					StatusMessage: opt.text(sp.Status.Message, maxAttrLen),
-					Scope: opt.text(
-						ss.Scope.Name,
-						maxNameLen,
-					),
-					ScopeVersion: opt.text(ss.Scope.Version, maxNameLen),
+					Scope:         opt.text(ss.Scope.Name, maxNameLen),
+					ScopeVersion:  opt.text(ss.Scope.Version, maxNameLen),
 				})
 			}
 		}

@@ -63,8 +63,7 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 	// Identified observations renew session membership only when newly admitted.
 	// Errors, logs, spans and custom events do not carry this replay guarantee.
 	if len(obs.Vitals) > 0 || len(obs.Events) > 0 || len(obs.Errors) > 0 || len(obs.Logs) > 0 || len(obs.Spans) > 0 ||
-		obs.Navigation != nil ||
-		len(obs.Resources) > 0 {
+		obs.Navigation != nil || len(obs.Resources) > 0 {
 		st.observeSession(b.SessionID, b.PageGroup, now)
 	}
 	pageView := r.documents > 0
@@ -307,6 +306,7 @@ func (st *siteState) admitResources(r *report) {
 		}
 	}
 }
+
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
 	index := &st.identities
 	if key.kind == identityResource {
@@ -363,6 +363,7 @@ func (st *siteState) observeVital(r *report, v beacon.Vital) (*attributes, bool)
 	})
 	return attrs, true
 }
+
 func (st *siteState) appendActivity(received time.Time, v activityObservation) {
 	order := &st.activity
 	if v.resource != nil {
@@ -370,6 +371,7 @@ func (st *siteState) appendActivity(received time.Time, v activityObservation) {
 	}
 	order.add(received, struct{}{}, v)
 }
+
 func (st *siteState) observeSession(id, page string, now time.Time) {
 	if id == "" {
 		return

@@ -276,12 +276,7 @@ func TestOlderIncomingReceiptRetainsMeasurementsAndDetail(t *testing.T) {
 	old := mk(now.Add(-time.Second), "old", "/old", v(beacon.LCP, 200))
 	old.Events = nil
 	result := a.Ingest(old)
-	require.Len(
-		t,
-		result.Observation.Vitals,
-		1,
-		"an out-of-order receipt retains accepted investigation/export detail",
-	)
+	require.Len(t, result.Observation.Vitals, 1, "an out-of-order receipt retains accepted investigation/export detail")
 	assert.Equal(t, "/old", result.Observation.Vitals[0].Origin.PageGroup)
 	s := a.Snapshot()
 	assert.Equal(t, 10000, s.Vitals[beacon.FCP].N)

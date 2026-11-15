@@ -185,7 +185,14 @@ func (c *nativeChild) run(ctx context.Context, verb string, input []byte) ([]byt
 	command.Stdout, command.Stderr = &output, &diagnostic
 	// Arguments contain only the trusted executable and fixed internal verb.
 	// Manifest input and inherited environment are never included in command logs.
-	if _, err := fmt.Fprintf(c.diagnostic, "+ uid=%d gid=%d %s runtime %s\n", c.identity.uid, c.identity.gid, nativeDisplayArg(c.executable), verb); err != nil {
+	if _, err := fmt.Fprintf(
+		c.diagnostic,
+		"+ uid=%d gid=%d %s runtime %s\n",
+		c.identity.uid,
+		c.identity.gid,
+		nativeDisplayArg(c.executable),
+		verb,
+	); err != nil {
 		return nil, fmt.Errorf("log native service command: %w", err)
 	}
 	err := command.Run()

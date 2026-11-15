@@ -11,12 +11,10 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-
-	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
