@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +47,7 @@ func TestSiteInstallURLUsesOnlyExplicitConfiguration(t *testing.T) {
 			})
 			require.NoError(t, err)
 			defer retire()
-			rows, err := query.New(hub, nil).Sites(context.Background(), "")
+			rows, err := query.New(hub, nil).Sites(context.Background(), "", "")
 			require.NoError(t, err)
 			require.Len(t, rows, 1)
 			require.Equal(t, tc.want, rows[0].ScriptURL)
@@ -85,7 +86,7 @@ func TestSiteEvidencePersistsAfterAcceptanceAndResetsWithGeneration(t *testing.T
 	handler.ServeHTTP(response, request)
 	require.Equal(t, http.StatusAccepted, response.Code)
 	service := query.New(hub, nil)
-	rows, err := service.Sites(context.Background(), "")
+	rows, err := service.Sites(context.Background(), "", "")
 	require.NoError(t, err)
 	require.Equal(t, "https://wrong.example", rows[0].Rejected.Origin)
 	require.False(t, rows[0].Rejected.At.IsZero())
@@ -93,7 +94,7 @@ func TestSiteEvidencePersistsAfterAcceptanceAndResetsWithGeneration(t *testing.T
 	require.Equal(t, 1, rows[0].Activity.BeaconsPerMin)
 	retire()
 	addSite(t, hub, "shop", "second")
-	rows, err = service.Sites(context.Background(), "")
+	rows, err = service.Sites(context.Background(), "", "")
 	require.NoError(t, err)
 	require.Equal(t, "second", rows[0].Generation)
 	require.True(t, rows[0].Rejected.At.IsZero())
@@ -132,7 +133,29 @@ func TestPagesExposeRetainedGroupsBeyondChartTopNAndWindowedSessions(t *testing.
 		require.Equal(t, 1, page.Sessions)
 		require.Equal(t, 1, page.PageviewsWindow)
 	}
-	sites, err := service.Sites(context.Background(), "")
+	sites, err := service.Sites(context.Background(), "", "")
 	require.NoError(t, err)
 	require.Equal(t, 25, sites[0].Activity.ObservedSessions)
+}
+
+func TestSitesSelectsOneSiteKey(t *testing.T) {
+	hub := registry.New()
+	addSite(t, hub, "a", "first")
+	addSite(t, hub, "b", "first")
+	service := query.New(hub, nil)
+	for filter, want := range map[string][]string{
+		"":        {"a", "b"},
+		"b":       {"b"},
+		"missing": nil,
+	} {
+		t.Run(filter, func(t *testing.T) {
+			rows, err := service.Sites(context.Background(), filter, "")
+			require.NoError(t, err)
+			var names []string
+			for _, row := range rows {
+				names = append(names, row.Name)
+			}
+			assert.Equal(t, want, names)
+		})
+	}
 }

@@ -14,7 +14,9 @@ import (
 // History is redacted at ingestion with the site redactor of that time. Output
 // applies the current site redactor while the site is active, and the
 // credential patterns once it is retired, so records written by earlier builds
-// or pattern sets get the current patterns too.
+// or pattern sets get the current patterns too. A failed visit leaves the map
+// partial, so callers return no rows: an active site missing from it would get
+// only the credential patterns, not its configured values.
 func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, error) {
 	out := map[string]*redact.Redactor{}
 	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) { out[key] = siteRedactor(site) })
@@ -29,18 +31,15 @@ func outputRedactor(active map[string]*redact.Redactor, site string) *redact.Red
 	return credentialPatterns
 }
 
-func (s *Service) Sessions(
-	ctx context.Context,
-	site, userID string,
-	after, before int64,
-	limit int,
-	vnodeGUID string,
-) ([]Session, error) {
-	rows, err := s.history.QuerySessions(ctx, site, userID, after, before, limit, vnodeGUID)
+func (s *Service) Sessions(ctx context.Context, f SessionFilter) ([]Session, error) {
+	rows, err := s.history.QuerySessions(ctx, f)
 	if err != nil {
 		return nil, err
 	}
 	redactors, err := s.redactors(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for i := range rows {
 		r := &rows[i]
 		redact := outputRedactor(redactors, r.Site)
@@ -56,11 +55,7 @@ func (s *Service) Sessions(
 		r.EntryPage = redact.Apply(r.EntryPage)
 		r.LastPage = redact.Apply(r.LastPage)
 	}
-	out := make([]Session, len(rows))
-	for i, row := range rows {
-		out[i] = Session(row)
-	}
-	return out, err
+	return rows, nil
 }
 func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID string) ([]SessionEvent, error) {
 	// Copy the bounded active ring before journal I/O, releasing leases before any I/O.
@@ -103,11 +98,10 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 		rows = append(rows, row)
 	}
 	sort.SliceStable(rows, func(i, j int) bool { return rows[i].ObservedUS < rows[j].ObservedUS })
-	out := make([]SessionEvent, len(rows))
-	for i, row := range rows {
-		out[i] = SessionEvent(row)
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
-	return out, ctx.Err()
+	return rows, nil
 }
 func redactSessionEvent(row *history.SessionEventRecord, redact *redact.Redactor) {
 	row.UserID = redact.Apply(row.UserID)
@@ -117,17 +111,15 @@ func redactSessionEvent(row *history.SessionEventRecord, redact *redact.Redactor
 	row.Text = redact.Apply(row.Text)
 }
 
-func (s *Service) Errors(
-	ctx context.Context,
-	site, fingerprint string,
-	after, before int64,
-	vnodeGUID string,
-) ([]ErrorGroup, error) {
-	rows, err := s.history.QueryErrors(ctx, site, fingerprint, after, before, vnodeGUID)
+func (s *Service) Errors(ctx context.Context, f ErrorFilter) ([]ErrorGroup, error) {
+	rows, err := s.history.QueryErrors(ctx, f)
 	if err != nil {
 		return nil, err
 	}
 	redactors, err := s.redactors(ctx)
+	if err != nil {
+		return nil, err
+	}
 	for i := range rows {
 		r := &rows[i]
 		redact := outputRedactor(redactors, r.Site)
@@ -139,9 +131,5 @@ func (s *Service) Errors(
 			r.Browsers[j] = redact.Apply(r.Browsers[j])
 		}
 	}
-	out := make([]ErrorGroup, len(rows))
-	for i, row := range rows {
-		out[i] = ErrorGroup(row)
-	}
-	return out, err
+	return rows, nil
 }

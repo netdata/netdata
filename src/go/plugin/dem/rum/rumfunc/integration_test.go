@@ -247,7 +247,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	require.Equal(t, 1, pages[0].Sessions)
 	require.Equal(t, 1, pages[0].Vitals[beacon.CLS].N)
 	require.Equal(t, 0.5, pages[0].Vitals[beacon.CLS].P75)
-	sites, err := service.Sites(ctx, "")
+	sites, err := service.Sites(ctx, "", "")
 	require.NoError(t, err)
 	require.Equal(t, 1, sites[0].Activity.ObservedSessions)
 	require.EqualValues(t, 1, sites[0].Activity.ApplicationViewsWindow)
@@ -283,7 +283,16 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	afterRetirement, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, pending, afterRetirement)
-	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+5, 2000, "")
+	sessions, err := service.Sessions(
+		ctx,
+		query.SessionFilter{
+			Filter: query.HistoryFilter{
+				Site:   "shop",
+				Before: now.Unix() + 5,
+			},
+			Limit: 2000,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	require.EqualValues(t, 1, sessions[0].Pageviews)
@@ -320,7 +329,16 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 		},
 	}
 	require.False(t, owner.Ingest(prior).Investigated)
-	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0, "")
+	rows, err := store.QuerySessions(
+		ctx,
+		history.SessionFilter{
+			Filter: history.Filter{
+				Site:   "shop",
+				After:  observed.Unix(),
+				Before: observed.Unix(),
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Empty(t, rows)
 	trigger := &beacon.Beacon{
@@ -773,14 +791,40 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	current := old
 	ingest(current, "job-a", now.Add(time.Second))
 	flushHistory(ctx, current.w)
-	rows, err := service.Sessions(ctx, "", "", 0, now.Unix()+2, 2000, "")
+	rows, err := service.Sessions(
+		ctx,
+		query.SessionFilter{
+			Filter: query.HistoryFilter{
+				Before: now.Unix() + 2,
+			},
+			Limit: 2000,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 3, "same group must not merge jobs; reassignment must not merge groups")
-	selected, err := service.Sessions(ctx, "job-a", "", 0, now.Unix()+2, 2000, "11111111-1111-4111-8111-111111111111")
+	selected, err := service.Sessions(
+		ctx,
+		query.SessionFilter{
+			Filter: query.HistoryFilter{
+				Site:      "job-a",
+				VnodeGUID: "11111111-1111-4111-8111-111111111111",
+				Before:    now.Unix() + 2,
+			},
+			Limit: 2000,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
 	assert.Equal(t, int64(1), selected[0].Errors)
-	errors, err := service.Errors(ctx, "", "same", 0, now.Unix()+2, "")
+	errors, err := service.Errors(
+		ctx,
+		query.ErrorFilter{
+			Filter: query.HistoryFilter{
+				Before: now.Unix() + 2,
+			},
+			Fingerprint: "same",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, errors, 3)
 	retained, err := service.SessionEvents(ctx, "job-a", "shared", "11111111-1111-4111-8111-111111111111")
@@ -792,7 +836,7 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	after, _, err := service.Live(ctx, "", cursor, 2000, "22222222-2222-4222-8222-222222222222")
 	require.NoError(t, err)
 	require.Len(t, after, 2, "an association filter must not advance another job cursor")
-	sites, err := service.Sites(ctx, "11111111-1111-4111-8111-111111111111")
+	sites, err := service.Sites(ctx, "", "11111111-1111-4111-8111-111111111111")
 	require.NoError(t, err)
 	require.Len(t, sites, 1)
 	assert.Equal(t, "job-b", sites[0].Name)

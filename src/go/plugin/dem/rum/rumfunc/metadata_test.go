@@ -76,7 +76,7 @@ func (metadataFunctionSource) Receiver() query.Receiver {
 		Serving: true,
 	}
 }
-func (metadataFunctionSource) Sites(context.Context, string) ([]query.Site, error) {
+func (metadataFunctionSource) Sites(context.Context, string, string) ([]query.Site, error) {
 	return []query.Site{
 		{Name: "shop", Label: "shop", Sampling: query.Sampling{
 			MeasureRate:     1,
@@ -91,29 +91,14 @@ func (metadataFunctionSource) Live(context.Context, string, string, int, string)
 	return nil, "", nil
 }
 
-func (metadataFunctionSource) Sessions(
-	context.Context,
-	string,
-	string,
-	int64,
-	int64,
-	int,
-	string,
-) ([]query.Session, error) {
+func (metadataFunctionSource) Sessions(context.Context, query.SessionFilter) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
 func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
 	return []query.SessionEvent{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
 }
 
-func (metadataFunctionSource) Errors(
-	context.Context,
-	string,
-	string,
-	int64,
-	int64,
-	string,
-) ([]query.ErrorGroup, error) {
+func (metadataFunctionSource) Errors(context.Context, query.ErrorFilter) ([]query.ErrorGroup, error) {
 	return nil, nil
 }
 

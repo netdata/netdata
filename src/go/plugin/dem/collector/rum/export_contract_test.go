@@ -195,7 +195,16 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 				assert.Positive(t, site.TransportCounter(otlp.CounterLogsErrors))
 				assert.Zero(t, site.TransportCounter(otlp.CounterLogsSent))
 			}
-			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+			rows, err := store.QuerySessions(
+				context.Background(),
+				history.SessionFilter{
+					Filter: history.Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 10,
+					},
+					Limit: 10,
+				},
+			)
 			require.NoError(t, err)
 			require.Len(t, rows, 1)
 			assert.EqualValues(t, 1, rows[0].Pageviews)
@@ -238,7 +247,16 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	require.EqualValues(t, 4, site.TransportCounter(otlp.CounterLogsSent))
 	require.Zero(t, site.TransportCounter(otlp.CounterLogsErrors))
 	require.Zero(t, counters[aggregate.CounterJSErrors])
-	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+	rows, err := store.QuerySessions(
+		context.Background(),
+		history.SessionFilter{
+			Filter: history.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 }
@@ -293,7 +311,16 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsErrors))
 	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsSent))
 	assert.Zero(t, site.TransportCounter(otlp.CounterLogsDropped))
-	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+	rows, err := store.QuerySessions(
+		context.Background(),
+		history.SessionFilter{
+			Filter: history.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)

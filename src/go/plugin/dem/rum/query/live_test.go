@@ -100,7 +100,7 @@ func TestLiveVnodeSelectionUsesRecordedRowsBeforeLimits(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
 	assert.Equal(t, "/a-new", selected[0].Page)
-	sites, err := service.Sites(ctx, guidB)
+	sites, err := service.Sites(ctx, "", guidB)
 	require.NoError(t, err)
 	assert.Empty(t, sites, "inventory reports current identity rather than old buffered identity")
 	pages, err := service.Pages(ctx, "job", guidB)

@@ -24,7 +24,12 @@ func TestSessionsReturnHistoryCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	_, err = query.New(rumregistry.New(), history.NewStore(journalStore)).
-		Sessions(ctx, "", "", 0, time.Now().Unix(), 2000, "")
+		Sessions(ctx, query.SessionFilter{
+			Filter: query.HistoryFilter{
+				Before: time.Now().Unix(),
+			},
+			Limit: 2000,
+		})
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -64,13 +69,31 @@ func TestRetiredSiteHistoryGetsCredentialPatterns(t *testing.T) {
 	assert.Equal(t, "[REDACTED]", events[0].UserID)
 	assert.Equal(t, "token=[REDACTED]", events[0].View)
 
-	errors, err := service.Errors(ctx, "shop", "fingerprint", 0, now.Unix()+1, "")
+	errors, err := service.Errors(
+		ctx,
+		query.ErrorFilter{
+			Filter: query.HistoryFilter{
+				Site:   "shop",
+				Before: now.Unix() + 1,
+			},
+			Fingerprint: "fingerprint",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, errors, 1)
 	assert.Equal(t, "token=[REDACTED]", errors[0].Message)
 	assert.Equal(t, "[REDACTED] (app.js:1:2)\n", errors[0].SampleStack)
 
-	sessions, err := service.Sessions(ctx, "shop", "", 0, now.Unix()+1, 2000, "")
+	sessions, err := service.Sessions(
+		ctx,
+		query.SessionFilter{
+			Filter: query.HistoryFilter{
+				Site:   "shop",
+				Before: now.Unix() + 1,
+			},
+			Limit: 2000,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, []string{"[REDACTED]"}, sessions[0].UserIDs)

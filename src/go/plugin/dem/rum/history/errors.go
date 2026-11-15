@@ -9,12 +9,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
-func (s *Store) QueryErrors(
-	ctx context.Context,
-	site, fingerprint string,
-	after, before int64,
-	vnodeGUID string,
-) ([]ErrorGroup, error) {
+// ErrorFilter selects error groups.
+type ErrorFilter struct {
+	Filter
+	Fingerprint string // one group with affected-session, page and browser details; "" lists every group without them
+}
+
+func (s *Store) QueryErrors(ctx context.Context, f ErrorFilter) ([]ErrorGroup, error) {
 	type group struct {
 		record          ErrorGroup
 		first, last     int64
@@ -22,8 +23,8 @@ func (s *Store) QueryErrors(
 		pages, browsers map[string]int
 	}
 	groups := make(map[[3]string]*group)
-	err := s.scan(ctx, site, after, before, vnodeGUID, func(r EventRecord) {
-		if r.Type != aggregate.EventTypeError || (fingerprint != "" && r.Fingerprint != fingerprint) {
+	err := s.scan(ctx, f.Filter, func(r EventRecord) {
+		if r.Type != aggregate.EventTypeError || (f.Fingerprint != "" && r.Fingerprint != f.Fingerprint) {
 			return
 		}
 		key := [3]string{r.Site, r.VnodeGUID, r.Fingerprint}
@@ -37,7 +38,7 @@ func (s *Store) QueryErrors(
 					Type:        r.ErrorType,
 					Message:     r.Message,
 					SampleStack: r.SampleStack,
-					Details:     fingerprint != "",
+					Details:     f.Fingerprint != "",
 				},
 				first: r.ObservedUS,
 				last:  r.ObservedUS,

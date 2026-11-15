@@ -42,17 +42,25 @@ type Rejection struct {
 	At     time.Time
 }
 
-// These distinct result types preserve the underlying snapshot value vocabulary.
+// These aliases name the domain values Functions read through this package.
 // Service owns their copies and redaction; callers receive no runtime owner.
-type Activity aggregate.SiteActivity
-type Page aggregate.PageInfo
-type LiveObservation aggregate.LiveRow
+type (
+	Activity        = aggregate.SiteActivity
+	Page            = aggregate.PageInfo
+	LiveObservation = aggregate.LiveRow
+	Session         = history.SessionRecord
+	SessionEvent    = history.SessionEventRecord
+	ErrorGroup      = history.ErrorGroup
+)
+
 type LiveEvent struct {
 	LiveObservation
 	Generation string
 }
-type Session history.SessionRecord
-type SessionEvent history.SessionEventRecord
 
-// Details distinguishes unrequested statistics from observed zero values.
-type ErrorGroup history.ErrorGroup
+// History read filters.
+type (
+	HistoryFilter = history.Filter
+	SessionFilter = history.SessionFilter
+	ErrorFilter   = history.ErrorFilter
+)
