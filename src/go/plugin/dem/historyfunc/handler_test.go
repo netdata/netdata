@@ -40,28 +40,21 @@ func TestStatusPreservesIndependentFacts(t *testing.T) {
 			},
 		}, nil
 	}), func() string { return "invalid edited policy" })
-	response := h.HandleRaw(context.Background(), request())
-	require.Equal(t, 200, response.Status)
-	assert.Nil(t, response.RawResponse)
-	rows := response.Data.([][]any)
-	require.Len(t, rows, 1)
-	assert.Equal(
-		t,
-		[]any{
-			30,
-			int64(1 << 30),
-			nil,
-			nil,
-			now.UnixMicro(),
-			"header unavailable",
-			now.UnixMicro(),
-			now.Add(-time.Hour).UnixMicro(),
-			"unlink failed",
-			"writer failed",
-			"invalid edited policy",
-		},
-		rows[0],
-	)
+	want := method.Table()
+	want["data"] = [][]any{{
+		30,
+		int64(1 << 30),
+		nil,
+		nil,
+		now.UnixMicro(),
+		"header unavailable",
+		now.UnixMicro(),
+		now.Add(-time.Hour).UnixMicro(),
+		"unlink failed",
+		"writer failed",
+		"invalid edited policy",
+	}}
+	assert.Equal(t, funcapi.RawResponse(want), h.HandleRaw(context.Background(), request()))
 }
 func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 	for _, inventory := range []*journalstore.Inventory{nil, {Bytes: 0, Files: 0}} {
@@ -70,7 +63,7 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 				Inventory: inventory,
 			}, nil
 		}), func() string { return "" })
-		row := h.HandleRaw(context.Background(), request()).Data.([][]any)[0]
+		row := h.HandleRaw(context.Background(), request()).RawResponse["data"].([][]any)[0]
 		assert.Nil(t, row[0])
 		assert.Nil(t, row[1])
 		if inventory == nil {

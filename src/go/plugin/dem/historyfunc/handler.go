@@ -60,15 +60,12 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if _, err := rawfunc.ParseArgs(req, nil); err != nil {
 		return funcapi.ErrorResponse(400, "history status does not accept arguments")
 	}
-	response := &funcapi.FunctionResponse{
-		Status:            200,
-		Help:              method.Help,
-		Columns:           method.Columns,
-		DefaultSortColumn: method.Sort,
-	}
 	// Metadata remains available without accessing the store or reload state.
 	if req.Info {
-		return response
+		return &funcapi.FunctionResponse{
+			Status: 200,
+			Help:   method.Help,
+		}
 	}
 	if r := rawfunc.RequireMember(req); r != nil {
 		return r
@@ -83,11 +80,12 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		}
 		return funcapi.UnavailableResponse(err.Error())
 	}
-	response.Data = [][]any{statusColumns.Row(statusRow{
+	response := method.Table()
+	response["data"] = [][]any{statusColumns.Row(statusRow{
 		Status:      status,
 		policyError: h.policyError(),
 	})}
-	return response
+	return funcapi.RawResponse(response)
 }
 func timestamp(t time.Time) any {
 	if t.IsZero() {
