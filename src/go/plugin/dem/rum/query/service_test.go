@@ -69,7 +69,7 @@ func TestSourceRedactsCopiesAndRejectsCancelledReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	original, _ := a.Live(0, 10, "")
+	original := a.Live(0, 10, "")
 	assert.Equal(t, "/opaque-secret", original[0].Page)
 	sites, err := s.Sites(context.Background(), "")
 	require.NoError(t, err)

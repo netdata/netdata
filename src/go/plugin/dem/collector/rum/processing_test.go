@@ -161,7 +161,7 @@ func TestProcessingSamplingPromotionKeepsHistoryAndExportsCurrentObservation(t *
 	}
 	p.Ingest(first)
 	assert.Empty(t, history.events)
-	rows, _ := p.aggregator.Live(0, 10, "")
+	rows := p.aggregator.Live(0, 10, "")
 	require.Len(t, rows, 1) // Live measurements do not follow investigation sampling.
 	assert.True(t, rows[0].PageView)
 	assert.EqualValues(t, 1, p.aggregator.Snapshot().Counters[aggregate.CounterPageviews])

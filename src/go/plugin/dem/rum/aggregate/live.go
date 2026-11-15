@@ -7,6 +7,7 @@
 package aggregate
 
 import (
+	"sort"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -147,10 +148,11 @@ func (a *Aggregator) evictLive(now time.Time) {
 	}
 }
 
-// Live returns ring rows with Seq > after, oldest first, capped at maxRows. next is the max seq among returned rows,
-// or after unchanged when nothing matched. A cursor ahead of this runtime
-// sequence is treated as 0; the Function routing owner fences generations.
-func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) ([]LiveRow, uint64) {
+// Live returns at most maxRows ring rows with Seq > after, oldest first; a
+// non-positive maxRows returns none. A caller resumes from the Seq of the last
+// row it received. A cursor ahead of this runtime sequence is treated as 0; the
+// Function routing owner fences generations.
+func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
@@ -162,17 +164,23 @@ func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) ([]LiveRo
 	if after > a.liveSeq {
 		after = 0
 	}
-	next := after
-	out := make([]LiveRow, 0, maxRows)
-	for _, row := range a.live[a.liveStart:] {
-		if row.Seq <= after || row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
+	// Seq grows along the ring, so the rows after the cursor are its suffix,
+	// which bounds the result.
+	ring := a.live[a.liveStart:]
+	ring = ring[sort.Search(len(ring), func(i int) bool { return ring[i].Seq > after }):]
+	if maxRows <= 0 || len(ring) == 0 {
+		return nil
+	}
+	out := make([]LiveRow, 0, min(maxRows, len(ring)))
+	for i := range ring {
+		row := &ring[i]
+		if row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
 			continue
 		}
-		out = append(out, row)
-		next = row.Seq
-		if maxRows > 0 && len(out) >= maxRows {
+		out = append(out, *row)
+		if len(out) == maxRows {
 			break
 		}
 	}
-	return out, next
+	return out
 }

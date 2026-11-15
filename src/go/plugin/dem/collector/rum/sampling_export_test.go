@@ -132,7 +132,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			for _, counter := range []string{otlp.CounterLogsDropped, otlp.CounterLogsErrors, otlp.CounterSpansDropped, otlp.CounterSpansErrors, history.CounterDropped} {
 				assert.Zero(t, site.TransportCounter(counter), counter)
 			}
-			live, _ := a.Live(0, 10, "")
+			live := a.Live(0, 10, "")
 			assert.Len(
 				t,
 				live,
