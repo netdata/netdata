@@ -132,8 +132,9 @@ func attributePairs(v *attributes, pageOnly bool) []facetValue {
 
 // readWindow captures owned values and counts under the aggregator mutex.
 // Its distributions can be sorted after unlocking. Page reads derive only the page facet.
+// expire defines the window: it pops every heap root received before now minus
+// the window, so no retained entry is older afterwards.
 func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
-	cutoff := now.Add(-st.window)
 	st.expire(now)
 	r := &windowRead{
 		resourceGroups: map[hostKey]*resourcePopulation{},
@@ -143,9 +144,6 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	// trades slice growth/copying for exact buffers without persistent accounting.
 	for _, el := range st.observations.order.entries {
 		v, name := &el.Value, el.key.name
-		if el.received.Before(cutoff) {
-			continue
-		}
 		index, ok := vitalIndex(name)
 		if !ok {
 			continue
@@ -169,9 +167,6 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	}
 	for _, el := range st.observations.order.entries {
 		v, name := &el.Value, el.key.name
-		if el.received.Before(cutoff) {
-			continue
-		}
 		index, ok := vitalIndex(name)
 		if !ok {
 			if !pageOnly {
@@ -201,9 +196,6 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	}
 	for _, el := range st.activity.entries {
 		v := &el.Value
-		if el.received.Before(cutoff) {
-			continue
-		}
 		r.global.documents += v.documents
 		r.global.views += v.views
 		r.global.errors += v.errors
@@ -231,9 +223,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	}
 	r.sessions = st.sessions.len()
 	for _, el := range st.pageSessions.order.entries {
-		if !el.received.Before(cutoff) {
-			r.group(facetPage, el.Value).sessions++
-		}
+		r.group(facetPage, el.Value).sessions++
 	}
 	return r
 }
