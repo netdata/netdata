@@ -105,8 +105,8 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 
 // 10,000 retained rows span 200 sessions, seven error fingerprints, and 20
 // archives. Receipt time spans 10,000 seconds up to a fixed, minute-aligned
-// instant, so every run places rows and query windows on the same minute and
-// archive boundaries; the recent window selects 891 rows.
+// instant, so every run places rows and query windows on the same minute
+// boundaries; the recent window selects 891 rows.
 // Snapshot admission captures bounded index metadata per file. Reducers retain only
 // distinct summary keys or the requested timeline output, traversing outside the
 // writer gate. Selected fingerprint details retain its distinct session/page/

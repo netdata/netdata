@@ -102,6 +102,12 @@ func BenchmarkCollect(b *testing.B) {
 				collect()
 			}
 			b.StopTimer()
+			// The aggregator runs on the wall clock; a run long enough to expire
+			// the measured beacon would silently measure the quiet path.
+			if measured {
+				snapshot := c.aggregator.Snapshot()
+				require.Equal(b, 1, snapshot.Vitals[beacon.LCP].N)
+			}
 		})
 	}
 }

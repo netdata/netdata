@@ -64,8 +64,8 @@ func benchmarkCollectBody(b *testing.B, body string) {
 			b.Fatalf("unexpected response: %d", response.Code)
 		}
 	}
-	// The first request compiles the bot matcher and creates the client's
-	// rate-limit bucket; keep that one-time work out of the timer.
+	// The first request creates the client's rate-limit bucket and, in a fresh
+	// process, compiles the bot matcher; keep that one-time work out of the timer.
 	collect()
 	b.ReportAllocs()
 	b.ResetTimer()

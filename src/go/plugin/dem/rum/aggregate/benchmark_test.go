@@ -28,10 +28,15 @@ const (
 	// Ingest benchmarks run in rounds of benchRoundReports reports.
 	benchRoundReports = 1000
 	benchRoundStep    = time.Minute
+	// benchIdentityReports spans the 30-minute identity retention plus a round:
+	// under an advancing clock, every identity admitted this many reports earlier
+	// has expired, and the retained identity population has reached its size.
+	benchIdentityReports = (int(identityRetention/benchRoundStep) + 2) * benchRoundReports
 	// benchWarmupReports carries an ingest benchmark past one-time growth: the
-	// live ring repeats its compaction cycle within four capacities of rows, and
-	// an advancing clock fills the 30-minute identity retention after 31 rounds.
-	benchWarmupReports = max(4*liveRingCap, (int(identityRetention/benchRoundStep)+2)*benchRoundReports)
+	// identity population above, and the live ring's compaction cycle, which
+	// repeats from its first compaction at about two ring capacities of rows
+	// (every fixture that uses the ring adds at least one row per report).
+	benchWarmupReports = max(4*liveRingCap, benchIdentityReports)
 )
 
 // benchIngest runs ingest(i) for benchWarmupReports reports before the timer
@@ -114,13 +119,11 @@ func BenchmarkIngest(b *testing.B) {
 // One report touching every ingestion section and timeline kind: a paired
 // navigation revision, poor vitals, a new resource with its timing event,
 // session lifecycle, frustration, traced request and custom events, and an
-// error. "new-document" also admits a new activation each time. Receipts follow
-// an advancing clock, so admitted items expire and the retained populations
-// hold a steady size. In "new-document" the Go maps that hold per-document
-// identities still grow their tables now and then under that churn, so its B/op
-// varies by a few percent with the run length; compare it at a fixed
-// -benchtime count. Timings are local trends; allocation counts define the
-// per-report envelope.
+// error. "new-document" also admits a new activation each time; "same-document"
+// admits its activation again once per identity retention, because duplicates
+// do not renew it. Receipts follow an advancing clock, so admitted items expire
+// and the retained populations hold a steady size. Timings are local trends;
+// allocation counts define the per-report envelope.
 func BenchmarkIngestFullReport(b *testing.B) {
 	for _, newDocument := range []bool{false, true} {
 		name := "same-document"
@@ -138,9 +141,13 @@ func BenchmarkIngestFullReport(b *testing.B) {
 				Countries:  20,
 			})
 			a.SetHistorySink(discardHistory{})
-			reports := benchWarmupReports + b.N
-			resources, documents := make([]string, reports), make([]string, reports)
-			for i := range reports {
+			// IDs repeat every benchIdentityReports reports, when the identities
+			// admitted under them have expired, so each report still admits a new
+			// resource (and activation). Reused keys refill the slots their expired
+			// entries left; never-reused keys would make the identity maps grow
+			// new tables now and then, and B/op would depend on b.N.
+			resources, documents := make([]string, benchIdentityReports), make([]string, benchIdentityReports)
+			for i := range benchIdentityReports {
 				resources[i], documents[i] = "resource-"+strconv.Itoa(i), "document-"+strconv.Itoa(i)
 			}
 			input := &beacon.Beacon{
@@ -189,16 +196,25 @@ func BenchmarkIngestFullReport(b *testing.B) {
 				Errors: []beacon.Error{{Type: "TypeError", Message: "checkout failed", Fingerprint: "6c0f3e2a91d4"}},
 			}
 			benchIngest(b, a, now, advancingClock, func(i int) {
-				revision := uint64(i + 1)
+				revision, id := uint64(i+1), i%benchIdentityReports
 				if newDocument {
-					input.ExperienceID = documents[i]
+					input.ExperienceID = documents[id]
 				}
 				input.Received = *now
 				input.Navigation.Revision, input.Events[2].Revision = revision, revision
 				input.Vitals[0].Revision, input.Vitals[1].Revision = revision, revision
-				input.Resources[0].ID, input.Events[3].ID = resources[i], resources[i]
+				input.Resources[0].ID, input.Events[3].ID = resources[id], resources[id]
 				a.Ingest(input)
 			})
+			b.StopTimer()
+			reports := uint64(benchWarmupReports + b.N)
+			st := &a.site
+			if got := st.firstPartyResources + st.thirdPartyResources + st.unknownResources; got != reports {
+				b.Fatalf("admitted resources: got %d, want %d", got, reports)
+			}
+			if got := st.counters[CounterPageviews]; newDocument && got != reports {
+				b.Fatalf("admitted activations: got %d, want %d", got, reports)
+			}
 		})
 	}
 }
