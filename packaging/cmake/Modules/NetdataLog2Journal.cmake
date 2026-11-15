@@ -12,6 +12,7 @@
 #
 # Built only when libpcre2-8 was found. The lookup lives in NetdataDependencies.cmake, and
 # log2journal is optional, so this reads PCRE2_FOUND instead of requiring it.
+# ENABLE_LOG2JOURNAL=Off clears PCRE2_FOUND there.
 
 include_guard()
 
