@@ -16,21 +16,23 @@ const nativeGateName = "coordination.lock"
 
 const nativeStateName = "admission.json"
 
-// NativePackage is installed with the package payload, after build-time binding
-// to Path. Native package/repository authentication is its trust boundary.
-type NativePackage struct {
-	Format   int      `json:"format"`
-	Path     string   `json:"path"`
-	Manifest Manifest `json:"manifest"`
-}
+// nativePhase is the persisted admission phase of the native package gate.
+type nativePhase string
+
+const (
+	nativeInitializing nativePhase = "initializing"
+	nativeClosed       nativePhase = "closed"
+	nativeQualifying   nativePhase = "qualifying"
+	nativeReady        nativePhase = "ready"
+)
 
 type nativeControlRecord struct {
-	Format      int       `json:"format"`
-	Phase       string    `json:"phase"`
-	PayloadPath string    `json:"payload_path"`
-	UID         int       `json:"uid"`
-	GID         int       `json:"gid"`
-	Target      *Manifest `json:"target,omitempty"`
+	Format      int         `json:"format"`
+	Phase       nativePhase `json:"phase"`
+	PayloadPath string      `json:"payload_path"`
+	UID         int         `json:"uid"`
+	GID         int         `json:"gid"`
+	Target      *Manifest   `json:"target,omitempty"`
 }
 
 // NativeInspector invokes the installed proof inspector as the configured
@@ -114,11 +116,11 @@ func InitializeNativeControl(
 	if state.UID != uid || state.GID != gid {
 		return nil, errors.New("native service identity differs from established control state")
 	}
-	if state.Phase == "initializing" {
+	if state.Phase == nativeInitializing {
 		if err := initialize(ctx); err != nil {
 			return nil, err
 		}
-		state.Phase = "closed"
+		state.Phase = nativeClosed
 		if err := writeNativeControl(config, state); err != nil {
 			return nil, err
 		}
@@ -143,13 +145,13 @@ func (c *NativeControl) CloseAdmission(ctx context.Context, inspect NativeInspec
 	if err != nil {
 		return err
 	}
-	if state.Phase == "initializing" {
+	if state.Phase == nativeInitializing {
 		return errors.New("native bootstrap is incomplete")
 	}
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
 		return err
 	}
-	state.Phase, state.Target = "closed", nil
+	state.Phase, state.Target = nativeClosed, nil
 	return writeNativeControl(c.config, state)
 }
 
@@ -191,7 +193,7 @@ func (c *NativeControl) beginQualification(
 	if err != nil {
 		return Manifest{}, false, err
 	}
-	if state.Phase == "initializing" {
+	if state.Phase == nativeInitializing {
 		return Manifest{}, false, errors.New("native bootstrap is incomplete")
 	}
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
@@ -201,13 +203,13 @@ func (c *NativeControl) beginQualification(
 	if err != nil {
 		return Manifest{}, false, err
 	}
-	if state.Phase == "ready" {
+	if state.Phase == nativeReady {
 		if state.Target == nil || !sameManifest(*state.Target, target) {
 			return Manifest{}, false, errors.New("native package changed without closed admission")
 		}
 		return target, false, nil
 	}
-	state.Phase, state.Target = "qualifying", &target
+	state.Phase, state.Target = nativeQualifying, &target
 	return target, true, writeNativeControl(c.config, state)
 }
 
@@ -227,7 +229,7 @@ func (c *NativeControl) finishQualification(
 	if err != nil {
 		return err
 	}
-	if state.Phase != "qualifying" || state.Target == nil || !sameManifest(*state.Target, target) {
+	if state.Phase != nativeQualifying || state.Target == nil || !sameManifest(*state.Target, target) {
 		return errors.New("native qualification admission changed before completion")
 	}
 	_, actual, err := readNativePayload(c.config.PayloadPath)
@@ -240,7 +242,7 @@ func (c *NativeControl) finishQualification(
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
 		return err
 	}
-	state.Phase = "ready"
+	state.Phase = nativeReady
 	return writeNativeControl(c.config, state)
 }
 
@@ -310,11 +312,11 @@ func readNativeControl(config NativeConfig) (nativeControlRecord, error) {
 		return state, errors.New("invalid native control identity")
 	}
 	switch state.Phase {
-	case "initializing", "closed":
+	case nativeInitializing, nativeClosed:
 		if state.Target != nil {
 			return state, errors.New("closed native gate has an executable target")
 		}
-	case "qualifying", "ready":
+	case nativeQualifying, nativeReady:
 		if state.Target == nil {
 			return state, errors.New("native gate is missing its target")
 		}

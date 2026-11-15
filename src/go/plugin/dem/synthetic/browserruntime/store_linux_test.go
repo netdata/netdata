@@ -64,14 +64,14 @@ func TestStorePressureNeverEvictsProcessOrUncertainUse(t *testing.T) {
 	require.NoError(t, err)
 	second, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
 	file := archiveFile(t, archive)
-	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
+	require.ErrorIs(t, s.importUnselected(t, context.Background(), second, file), ErrAllowance)
 	use, err := s.beginUse(first)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false)) // no launch proof is supplied
 	require.NoError(t, s.closeClaim(claim))
 	*now = now.Add(365 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	require.ErrorIs(t, s.importUnselected(context.Background(), second, file), ErrAllowance)
+	require.ErrorIs(t, s.importUnselected(t, context.Background(), second, file), ErrAllowance)
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, 1, status.UncertainPins)
@@ -100,7 +100,7 @@ func TestFailedImportAndReadOnlyInspection(t *testing.T) {
 	m, archive := bundleFixture(t, "broken")
 	file := filepath.Join(t.TempDir(), "truncated")
 	require.NoError(t, os.WriteFile(file, archive[:len(archive)-1], 0600))
-	require.Error(t, s.importUnselected(context.Background(), m, file))
+	require.Error(t, s.importUnselected(t, context.Background(), m, file))
 	_, err = s.beginUse(m)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, s.Sweep())
@@ -225,12 +225,12 @@ func TestConcurrentPreparationAccountingAndReuse(t *testing.T) {
 	require.GreaterOrEqual(t, status.UsedBytes+status.ReservedBytes, needed)
 	require.Equal(t, status.UsedBytes-baseline.UsedBytes, status.ProtectedBytes)
 	require.Zero(t, status.ReclaimableBytes)
-	require.ErrorIs(t, other.importUnselected(context.Background(), m, "/must-not-open"), ErrPreparing)
+	require.ErrorIs(t, other.importUnselected(t, context.Background(), m, "/must-not-open"), ErrPreparing)
 	require.NoError(t, other.Sweep())
 	close(resume)
 	require.NoError(t, <-result)
 	// A successor reuses the published result without touching its input.
-	require.NoError(t, other.importUnselected(context.Background(), m, "/must-not-open"))
+	require.NoError(t, other.importUnselected(t, context.Background(), m, "/must-not-open"))
 	status, err = other.Inspect()
 	require.NoError(t, err)
 	require.Zero(t, status.ReservedBytes)
@@ -267,7 +267,7 @@ func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	next, _ := bundleFixture(t, strings.Repeat("b", 80<<10))
-	err = s.importUnselected(context.Background(), next, "/must-not-open")
+	err = s.importUnselected(t, context.Background(), next, "/must-not-open")
 	var allowance *AllowanceError
 	require.True(t, errors.As(err, &allowance))
 	require.Positive(t, allowance.NeededBytes)
@@ -294,7 +294,7 @@ func TestRealBundlePreparation(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &m))
 	s, _ := testStore(t)
 	start := time.Now()
-	require.NoError(t, s.importUnselected(context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
+	require.NoError(t, s.importUnselected(t, context.Background(), m, os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")))
 	t.Logf(
 		"prepared archive_bytes=%d expanded_bytes=%d entries=%d duration=%s",
 		m.Archive.Bytes,
@@ -313,7 +313,7 @@ func TestRealBundlePreparation(t *testing.T) {
 		require.NoError(t, err)
 		program, args := use.Paths.Node, []string{"--version"}
 		if command == "browser" {
-			program = use.Paths.Browser
+			program = filepath.Join(s.path, "generations", m.Archive.SHA256, launcherName)
 		}
 		if command == "reexec" {
 			args = []string{
@@ -473,7 +473,7 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	defer s.Close()
 	m, archive := bundleFixture(b, "benchmark")
 	file := archiveFile(b, archive)
-	require.NoError(b, s.importUnselected(context.Background(), m, file))
+	require.NoError(b, s.importUnselected(b, context.Background(), m, file))
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -510,7 +510,7 @@ func TestManagedClaimCloseStartsGraceImmediately(t *testing.T) {
 				installFixture(t, s, "replacement")
 			} else {
 				manifest = importFixture(t, s, "unselected-candidate")
-				candidate, err := s.beginFixture(context.Background(), manifest, InstallRelease)
+				candidate, err := s.beginFixture(t, context.Background(), manifest, InstallRelease)
 				require.NoError(t, err)
 				owner = candidate
 			}

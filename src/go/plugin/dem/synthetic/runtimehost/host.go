@@ -63,10 +63,10 @@ func newHost(mode Mode) *Host {
 	}
 }
 
-// NewManaged acquires the store's selected installation and its process
+// newManaged acquires the store's selected installation and its process
 // protection atomically, once. Neither monitor changes nor subsequent
 // installations change this selection.
-func NewManaged(store *browserruntime.Store) *Host {
+func newManaged(store *browserruntime.Store) *Host {
 	h := newHost(ModeManaged)
 	h.store = store
 	if consumer, err := store.AcquireSelected(); err != nil {
@@ -77,8 +77,8 @@ func NewManaged(store *browserruntime.Store) *Host {
 	return h
 }
 
-// NewNative acquires the package payload's selection like NewManaged.
-func NewNative(native *browserruntime.Native) *Host {
+// newNative acquires the package payload's selection like newManaged.
+func newNative(native *browserruntime.Native) *Host {
 	h := newHost(ModeNative)
 	h.native = native
 	if consumer, err := native.AcquireSelected(); err != nil {
@@ -89,8 +89,8 @@ func NewNative(native *browserruntime.Native) *Host {
 	return h
 }
 
-// NewUnavailable reports a setup failure that left the mode without runtime storage.
-func NewUnavailable(mode Mode, err error) *Host {
+// newUnavailable reports a setup failure that left the mode without runtime storage.
+func newUnavailable(mode Mode, err error) *Host {
 	h := newHost(mode)
 	h.fail(err)
 	return h
@@ -145,7 +145,7 @@ func (h *Host) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{
+	return runtimeUse{
 		use:      use,
 		host:     h,
 		identity: *h.identity,

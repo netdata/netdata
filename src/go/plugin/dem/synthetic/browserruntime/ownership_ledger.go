@@ -73,9 +73,18 @@ func (s *ownershipLedger) withLock(fn func() error) error {
 	return errors.Join(fn(), s.lock.Unlock())
 }
 
+// claimKind is persisted in claim records: a process consumer or an
+// installation candidate.
+type claimKind string
+
+const (
+	processClaim   claimKind = "process"
+	candidateClaim claimKind = "candidate"
+)
+
 type claimRecord struct {
-	Generation string `json:"generation"`
-	Kind       string `json:"kind"`
+	Generation string    `json:"generation"`
+	Kind       claimKind `json:"kind"`
 }
 
 // claim protects a process or candidate, never surviving-child lifetime.
@@ -87,7 +96,7 @@ type claim struct {
 	closed bool
 }
 
-func (s *ownershipLedger) claimLocked(id, kind string) (*claim, error) {
+func (s *ownershipLedger) claimLocked(id string, kind claimKind) (*claim, error) {
 	if !validID(id) {
 		return nil, errors.New("invalid runtime identity")
 	}

@@ -80,9 +80,9 @@ func (s *ownershipLedger) inventoryLocked(reconcile bool) (ownershipInventory, e
 			return inv, errors.New("invalid runtime processes binding")
 		}
 		switch claim.Kind {
-		case "candidate":
+		case candidateClaim:
 			inv.candidates[claim.Generation]++
-		case "process":
+		case processClaim:
 			inv.processes[claim.Generation]++
 		default:
 			return inv, errors.New("invalid runtime claim kind")

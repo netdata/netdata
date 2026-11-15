@@ -30,7 +30,7 @@ func (c *Candidate) SealPreload() error {
 		return errors.New("runtime candidate is closed")
 	}
 	return publicDamage(c.store.withLock(func() error {
-		inv, err := c.store.inventoryLocked(true)
+		inv, err := c.store.strictInventoryLocked(true)
 		if err != nil {
 			return err
 		}

@@ -184,7 +184,7 @@ func TestOpenOwnersDoNotRecreateLostCoordinationLocks(t *testing.T) {
 		path := filepath.Join(s.path, "installation.lock")
 		require.NoError(t, os.Rename(path, path+".lost"))
 		m, _ := bundleFixture(t, "lost-lock")
-		candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+		candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 		if candidate != nil {
 			require.NoError(t, candidate.Close())
 		}

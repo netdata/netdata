@@ -202,10 +202,6 @@ func TestReleasePublicKeyringBoundsAndMaterial(t *testing.T) {
 	}
 }
 
-type trustTransport func(*http.Request) (*http.Response, error)
-
-func (f trustTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
 func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	previous := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = previous })
@@ -213,7 +209,7 @@ func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	public := pgptest.Public(t, pgptest.Key(t, 1))
 	status := http.StatusOK
 	body := public
-	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) {
+	http.DefaultTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
 		require.Equal(t, ReleaseKeyringURL, r.URL.String())
 		return &http.Response{
@@ -232,7 +228,7 @@ func TestCanonicalKeyFetchBoundedCanceledAndNoCacheFallback(t *testing.T) {
 	body = bytes.Repeat([]byte(" "), releaseKeyringLimit+1)
 	_, err = FetchReleaseKeyring(context.Background())
 	require.ErrorContains(t, err, "size limit")
-	http.DefaultTransport = trustTransport(
+	http.DefaultTransport = roundTripFunc(
 		func(r *http.Request) (*http.Response, error) { <-r.Context().Done(); return nil, r.Context().Err() },
 	)
 	ctx, cancel := context.WithCancel(context.Background())

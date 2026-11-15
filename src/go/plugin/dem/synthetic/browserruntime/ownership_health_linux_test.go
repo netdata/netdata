@@ -51,7 +51,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	var version uint64
 	require.NoError(t, s.withLock(func() error {
 		version = s.ledger.cleanupErrorVersion
-		_, err := s.inventoryLocked(true)
+		_, err := s.strictInventoryLocked(true)
 		return err
 	}))
 	trash := filepath.Join(path, "trash")

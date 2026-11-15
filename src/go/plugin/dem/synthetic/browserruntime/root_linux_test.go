@@ -224,7 +224,7 @@ func TestPrecreatedMountedStoreRoot(t *testing.T) {
 	s, err = Open(DefaultConfig(path))
 	require.NoError(t, err)
 	defer s.Close()
-	candidate, err := s.beginFixture(context.Background(), m, RepairRelease)
+	candidate, err := s.beginFixture(t, context.Background(), m, RepairRelease)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Close())
 }

@@ -21,7 +21,7 @@ func TestImportRejectsFIFOWithoutBlocking(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "archive")
 	require.NoError(t, unix.Mkfifo(path, 0600))
 	result := make(chan error, 1)
-	go func() { result <- s.importUnselected(context.Background(), m, path) }()
+	go func() { result <- s.importUnselected(t, context.Background(), m, path) }()
 	select {
 	case err := <-result:
 		require.ErrorContains(t, err, "regular")
@@ -41,7 +41,7 @@ func TestImportFollowsRegularArchiveSymlink(t *testing.T) {
 	target, link := filepath.Join(dir, "archive"), filepath.Join(dir, "link")
 	require.NoError(t, os.WriteFile(target, archive, 0600))
 	require.NoError(t, os.Symlink(target, link))
-	require.NoError(t, s.importUnselected(context.Background(), m, link))
+	require.NoError(t, s.importUnselected(t, context.Background(), m, link))
 	requirePrepared(t, s, m)
 }
 

@@ -71,9 +71,9 @@ func (h *Handle) openNative() {
 		h.native, h.SetupError = browserruntime.OpenNative(browserruntime.DefaultNativeConfig())
 	}
 	if h.SetupError != nil {
-		h.Host = NewUnavailable(ModeNative, h.SetupError)
+		h.Host = newUnavailable(ModeNative, h.SetupError)
 	} else {
-		h.Host = NewNative(h.native)
+		h.Host = newNative(h.native)
 	}
 	h.adoptHost()
 }
@@ -87,9 +87,9 @@ func (h *Handle) openManaged(cfg Config, varLibPath string) {
 		}
 	}
 	if h.SetupError != nil {
-		h.Host = NewUnavailable(ModeManaged, h.SetupError)
+		h.Host = newUnavailable(ModeManaged, h.SetupError)
 	} else {
-		h.Host = NewManaged(h.store)
+		h.Host = newManaged(h.store)
 	}
 	h.adoptHost()
 }

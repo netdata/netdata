@@ -112,7 +112,7 @@ func selectPublished(
 
 func newTestHost(t *testing.T, store *browserruntime.Store) *Host {
 	t.Helper()
-	host := NewManaged(store)
+	host := newManaged(store)
 	t.Cleanup(func() { require.NoError(t, host.Close()) })
 	return host
 }
@@ -193,16 +193,12 @@ func TestSelectedInstallationSurvivesMaintenanceWithoutBrowserJobs(t *testing.T)
 }
 
 func TestLostSelectedGenerationRequiresRepairRatherThanInstall(t *testing.T) {
-	store := testStore(t)
-	installBundle(t, store, "installed")
-	consumer, err := store.AcquireSelected()
+	path := filepath.Join(t.TempDir(), "store")
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
 	require.NoError(t, err)
-	use, err := consumer.BeginUse()
-	require.NoError(t, err)
-	// The generated launcher sits at the generation root.
-	generation := filepath.Dir(use.Paths.Browser)
-	require.NoError(t, use.Finish(true))
-	require.NoError(t, consumer.Close())
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	manifest := installBundle(t, store, "installed")
+	generation := filepath.Join(path, "generations", manifest.Archive.SHA256)
 	require.NoError(t, os.Rename(generation, filepath.Join(t.TempDir(), "lost")))
 	host := newTestHost(t, store)
 	require.ErrorIs(t, host.Ready(), browserruntime.ErrDamaged)

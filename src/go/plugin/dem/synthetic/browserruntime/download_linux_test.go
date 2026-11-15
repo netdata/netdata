@@ -15,10 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type downloadTransport func(*http.Request) (*http.Response, error)
-
-func (f downloadTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
-
 func TestDownloadReportsCauseWithoutRequestCredentials(t *testing.T) {
 	for name, tc := range map[string]struct {
 		cause error
@@ -43,7 +39,7 @@ func TestDownloadReportsCauseWithoutRequestCredentials(t *testing.T) {
 			m, _ := bundleFixture(t, "download-diagnostic")
 			m.Archive.URL = "https://runtime.invalid/archive?token=private-query"
 			previous := http.DefaultTransport
-			http.DefaultTransport = downloadTransport(
+			http.DefaultTransport = roundTripFunc(
 				func(*http.Request) (*http.Response, error) { return nil, tc.cause },
 			)
 			defer func() { http.DefaultTransport = previous }()

@@ -162,24 +162,106 @@ type releaseSetupTransport func(*http.Request) (*http.Response, error)
 func (f releaseSetupTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
-	cfg, release, raw := signedSetupFixture(t)
+	const releaseURL = "https://releases.example.invalid/latest"
+	tests := map[string]struct {
+		localDescriptor bool
+		allowDownload   bool
+		keyring         string // offline keyring: "valid", "invalid" or "none"
+		unavailable     bool   // the network answers 503
+		wantRequests    []string
+		wantErr         string
+	}{
+		// Download consent uses fresh canonical online trust and ignores the
+		// offline keyring, even when that administrator file is malformed.
+		"local descriptor with download consent": {
+			localDescriptor: true,
+			allowDownload:   true,
+			keyring:         "invalid",
+			wantRequests:    []string{browserruntime.ReleaseKeyringURL},
+		},
+		"latest descriptor with download consent": {
+			allowDownload: true,
+			keyring:       "invalid",
+			wantRequests:  []string{browserruntime.ReleaseKeyringURL, releaseURL},
+		},
+		"failed canonical refresh does not fall back to the offline keyring": {
+			localDescriptor: true,
+			allowDownload:   true,
+			keyring:         "valid",
+			unavailable:     true,
+			wantRequests:    []string{browserruntime.ReleaseKeyringURL},
+			wantErr:         "503",
+		},
+		"offline import never acquires trust online": {
+			localDescriptor: true,
+			keyring:         "valid",
+		},
+		"latest descriptor without download consent": {
+			keyring: "valid",
+			wantErr: "network consent",
+		},
+		"offline import without a keyring": {
+			localDescriptor: true,
+			keyring:         "none",
+			wantErr:         "offline_keyring",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg, release, raw := signedSetupFixture(t)
+			cfg.ReleaseURL = releaseURL
+			switch tc.keyring {
+			case "invalid":
+				require.NoError(t, os.WriteFile(cfg.OfflineKeyring, []byte("invalid"), 0600))
+			case "none":
+				cfg.OfflineKeyring = ""
+			}
+			path := ""
+			if tc.localDescriptor {
+				path = filepath.Join(t.TempDir(), "release.json")
+				require.NoError(t, os.WriteFile(path, raw, 0600))
+			}
+			requests := serveReleaseSetup(t, cfg, raw, tc.unavailable)
+			got, err := cfg.ReleaseLoader(path, tc.allowDownload)(context.Background())
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, release, got.Release())
+			}
+			assert.Equal(t, tc.wantRequests, *requests)
+		})
+	}
+}
+
+func TestRuntimeStartupNeverRetrievesTrust(t *testing.T) {
+	cfg, _, raw := signedSetupFixture(t)
 	cfg.ReleaseURL = "https://releases.example.invalid/latest"
-	path := filepath.Join(t.TempDir(), "release.json")
-	require.NoError(t, os.WriteFile(path, raw, 0600))
+	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
+	requests := serveReleaseSetup(t, cfg, raw, false)
+	handle := Open(cfg, "")
+	require.Error(t, handle.SetupError)
+	require.NoError(t, handle.Close())
+	assert.Empty(t, *requests, "synchronous runtime startup must never retrieve public keys or descriptors")
+}
+
+// serveReleaseSetup answers the canonical keyring and cfg.ReleaseURL in place of
+// the network and records the requested URLs.
+func serveReleaseSetup(t *testing.T, cfg Config, descriptor []byte, unavailable bool) *[]string {
+	t.Helper()
 	previous := http.DefaultTransport
 	t.Cleanup(func() { http.DefaultTransport = previous })
 	var requests []string
-	fail := false
 	http.DefaultTransport = releaseSetupTransport(func(r *http.Request) (*http.Response, error) {
 		requests = append(requests, r.URL.String())
-		body := raw
+		body := descriptor
 		if r.URL.String() == browserruntime.ReleaseKeyringURL {
 			body = pgptest.Public(t, pgptest.Key(t, 19))
 		} else {
 			require.Equal(t, cfg.ReleaseURL, r.URL.String())
 		}
 		status := http.StatusOK
-		if fail {
+		if unavailable {
 			status = http.StatusServiceUnavailable
 		}
 		return &http.Response{
@@ -188,46 +270,7 @@ func TestReleaseLoaderUsesAcquisitionConsentForTrust(t *testing.T) {
 			Header:     make(http.Header),
 		}, nil
 	})
-	// Local descriptor plus download consent must use fresh canonical online trust,
-	// ignoring the offline keyring even when that administrator file is malformed.
-	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, []byte("invalid"), 0600))
-	got, err := cfg.ReleaseLoader(path, true)(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, release, got.Release())
-	require.Equal(t, []string{browserruntime.ReleaseKeyringURL}, requests)
-	requests = nil
-	got, err = cfg.ReleaseLoader("", true)(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, release, got.Release())
-	require.Equal(t, []string{browserruntime.ReleaseKeyringURL, cfg.ReleaseURL}, requests)
-	requests = nil
-	fail = true
-	_, err = cfg.ReleaseLoader(path, true)(context.Background())
-	require.ErrorContains(t, err, "503")
-	require.Equal(
-		t,
-		[]string{browserruntime.ReleaseKeyringURL},
-		requests,
-		"failed canonical refresh must not fall back to the offline ring",
-	)
-	requests = nil
-	require.NoError(t, os.WriteFile(cfg.OfflineKeyring, pgptest.Public(t, pgptest.Key(t, 19)), 0600))
-	got, err = cfg.ReleaseLoader(path, false)(context.Background())
-	require.NoError(t, err)
-	require.Equal(t, release, got.Release())
-	require.Empty(t, requests, "explicit offline import must never acquire trust online")
-	_, err = cfg.ReleaseLoader("", false)(context.Background())
-	require.ErrorContains(t, err, "network consent")
-	require.Empty(t, requests)
-	cfg.OfflineKeyring = ""
-	_, err = cfg.ReleaseLoader(path, false)(context.Background())
-	require.ErrorContains(t, err, "offline_keyring")
-	require.Empty(t, requests)
-	cfg.CachePath = filepath.Join(t.TempDir(), "cache")
-	handle := Open(cfg, "")
-	require.Error(t, handle.SetupError)
-	require.NoError(t, handle.Close())
-	require.Empty(t, requests, "synchronous runtime startup must never retrieve public keys or descriptors")
+	return &requests
 }
 
 func TestReleaseLoaderRequiresDiscoveryURLBeforeNetworkAccess(t *testing.T) {

@@ -47,15 +47,18 @@ type inventory struct {
 // The strict inventory remains the authority for automatic retirement and
 // ordinary installation. Diagnostics and explicit recovery use the same
 // ownership evidence without requiring usable executable metadata.
-func (s *Store) inventoryLocked(reconcile bool) (inventory, error) {
-	inv, err := s.inspectInventoryLocked(reconcile)
+func (s *Store) strictInventoryLocked(reconcile bool) (inventory, error) {
+	inv, err := s.lenientInventoryLocked(reconcile)
 	if err != nil {
 		return inv, err
 	}
 	return inv, inv.damageError()
 }
 
-func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
+// lenientInventoryLocked records metadata damage instead of failing. With
+// reconcile it also syncs the selection, removes dead staging owners and may
+// persist retirement deadlines, so it is not read-only.
+func (s *Store) lenientInventoryLocked(reconcile bool) (inventory, error) {
 	if reconcile {
 		if err := s.syncSelection(); err != nil {
 			return inventory{}, err
@@ -121,7 +124,7 @@ func (s *Store) inspectInventoryLocked(reconcile bool) (inventory, error) {
 				changed = true
 			}
 			if changed {
-				if err := saveJSON(s.root, filepath.Join("generations", id, "prepared.json"), g); err != nil {
+				if err := saveJSON(s.root, generationRecord(id), g); err != nil {
 					return inv, err
 				}
 			}
