@@ -31,8 +31,9 @@ const checkReplyLimit = 4096
 
 // A failing check writes one {"error": text} line to stderr, with text clipped
 // to textLimit characters (src/dem-runtime/runner/run.mjs main, protocol.cjs
-// write). checkDiagnosticLimit fits that line at its widest JSON escape (\u00XX,
-// six bytes per character) with its newline, so a long message still parses.
+// write). When that line is the only stderr output, checkDiagnosticLimit fits
+// it at its widest JSON escape (\u00XX, six bytes per character) with its
+// newline, so a long message still parses.
 const checkDiagnosticLimit = len(`{"error":""}`) + 6*textLimit + len("\n")
 
 func runtimeAllowed() error {

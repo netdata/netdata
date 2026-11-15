@@ -155,9 +155,9 @@ func TestCheckResponseBounds(t *testing.T) {
 			err:    failed + "a" + strings.Repeat("é", textLimit-1) + ")",
 		},
 		"diagnostic over read limit": {
-			stderr: strings.Repeat("é", checkDiagnosticLimit) + `{"error":"nd-run is missing"}`,
+			stderr: strings.Repeat("z", checkDiagnosticLimit) + "\n" + `{"error":"nd-run is missing"}` + "\n",
 			failed: true,
-			err:    failed + strings.Repeat("é", textLimit) + ")",
+			err:    failed + strings.Repeat("z", textLimit) + ")",
 		},
 	}
 	for name, tc := range tests {
