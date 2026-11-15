@@ -403,7 +403,12 @@ func (b *browserState) samples(
 	candidates := map[string]int{}
 	for i := range samples {
 		s := &samples[i]
-		if s.ID < 1 || s.ID > browserSampleLimit || seen[s.ID] || !refs[s.ID] || s.TestID != testID || !validEvidenceID(s.TestID, testIDBytes) ||
+		if s.ID < 1 ||
+			s.ID > browserSampleLimit ||
+			seen[s.ID] ||
+			!refs[s.ID] ||
+			s.TestID != testID ||
+			!validEvidenceID(s.TestID, testIDBytes) ||
 			!slices.Contains(browserCategories[:], s.Category) ||
 			pooled[s.Category] >= browserCategorySampleLimit ||
 			late && pooled[s.Category] > 0 {
@@ -424,10 +429,16 @@ func (b *browserState) samples(
 // fragment.
 func validBrowserSample(s *synthetic.BrowserSample, r *textRedactor) bool {
 	if s.TextOmitted != "" &&
-		(s.Category != "console_error" || s.State != "unavailable" || s.TextOmitted != "too_long" || s.Text != nil || s.Args != nil) {
+		(s.Category != "console_error" ||
+			s.State != "unavailable" ||
+			s.TextOmitted != "too_long" ||
+			s.Text != nil ||
+			s.Args != nil) {
 		return false
 	}
-	if s.ArgsOmitted < 0 || s.ArgsOmitted > maxSafeInteger || !boundedJSON(s.Message, browserTextBytes) ||
+	if s.ArgsOmitted < 0 ||
+		s.ArgsOmitted > maxSafeInteger ||
+		!boundedJSON(s.Message, browserTextBytes) ||
 		!boundedJSON(s.Error, browserErrorBytes) ||
 		s.Text != nil && !boundedJSON(*s.Text, browserTextBytes) ||
 		s.URL != nil && !boundedJSON(*s.URL, browserURLBytes) {

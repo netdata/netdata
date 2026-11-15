@@ -13,21 +13,9 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
-
-// frameMaxBytes is the runner protocol's 4 MiB ceiling on the request and on
-// every record, shared with the JS runner (run.mjs framing limit).
-const frameMaxBytes = 4 << 20
-
-// eventLimit is the per-run diagnostic event retention documented in the
-// plugin and runtime READMEs. Later events are counted as dropped; every
-// retained event is stored in the run's history record.
-const eventLimit = 500
-
-// textLimit is the character budget of each diagnostic text, shared with the
-// JS runner's clipping (protocol.cjs) and documented in its README.
-const textLimit = 2000
 
 const cleanupTimeout = 10 * time.Second
 
@@ -58,23 +46,23 @@ type Engine struct {
 
 // New returns the monitoring engine. Every monitored attempt records history
 // and owns a run work directory, so both owners are required.
-func New(source Source, history historyWriter, artifacts artifactStore, concurrency int) (*Engine, error) {
+func New(source Source, history historyWriter, store artifactStore, concurrency int) (*Engine, error) {
 	if concurrency <= 0 {
 		return nil, errors.New("browser concurrency must be positive")
 	}
-	if history == nil || artifacts == nil {
+	if history == nil || store == nil {
 		return nil, errors.New("runner requires history and artifact owners")
 	}
-	return newEngine(source, history, artifacts, concurrency), nil
+	return newEngine(source, history, store, concurrency), nil
 }
 
-func newEngine(source Source, history historyWriter, artifacts artifactStore, concurrency int) *Engine {
+func newEngine(source Source, history historyWriter, store artifactStore, concurrency int) *Engine {
 	return &Engine{
 		executionOwner: newExecutionOwner(concurrency),
 		checks:         &checkOwner{},
 		source:         source,
 		history:        history,
-		artifacts:      artifacts,
+		artifacts:      store,
 		platform:       runtimeAllowed,
 		start: func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 			return ndexec.StartUnprivilegedProcessTree(ctx, opts, bin, args...)
@@ -84,28 +72,35 @@ func newEngine(source Source, history historyWriter, artifacts artifactStore, co
 
 // unrecordedView shares this engine's admission and fatal owner but records no
 // history and uses its own source, artifact store and check coalescing.
-func (e *Engine) unrecordedView(source Source, artifacts artifactStore) *Engine {
+func (e *Engine) unrecordedView(source Source, store artifactStore) *Engine {
 	return &Engine{
 		executionOwner: e.executionOwner,
 		source:         source,
 		unrecorded:     true,
 		checks:         &checkOwner{},
 		qualification:  e.qualification,
-		artifacts:      artifacts,
+		artifacts:      store,
 		start:          e.start,
 		platform:       e.platform,
 	}
 }
 
-func (e *Engine) Fatal() <-chan error { return e.fatal }
-
-func (e *Engine) poison(err error) {
-	e.poisonOnce.Do(func() {
-		e.mu.Lock()
-		close(e.poisoned)
-		e.mu.Unlock()
-		e.fatal <- errors.Join(ndexec.ErrTreeNotDrained, err)
-	})
+// temporaryView returns an unrecorded view with a private artifact store and
+// finish, which closes that store and returns err joined with the close error.
+// finish keeps the store when err reports undrained work: a live process tree
+// may still write to its run work directory.
+func (e *Engine) temporaryView(source Source) (*Engine, func(err error) error, error) {
+	captures, err := artifacts.Open("")
+	if err != nil {
+		return nil, nil, err
+	}
+	finish := func(err error) error {
+		if errors.Is(err, ndexec.ErrTreeNotDrained) {
+			return err
+		}
+		return errors.Join(err, captures.Close())
+	}
+	return e.unrecordedView(source, captures), finish, nil
 }
 
 // attempt is one execution's mutable record: the redacted run and the run
@@ -133,8 +128,6 @@ func newAttempt(request synthetic.Request) *attempt {
 			Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
 			Outcome:      synthetic.Error,
 			CaptureState: synthetic.CaptureDisabled,
-			Events:       []synthetic.Event{},
-			Artifacts:    []synthetic.Artifact{},
 		},
 	}
 	if request.Capture {
@@ -430,19 +423,6 @@ func stopText(reason synthetic.TerminationReason) string {
 	}
 }
 
-// eligibleCaptures splits reported candidates into those to publish and those
-// to explain: interrupted captures publish only after a journey budget stop.
-func eligibleCaptures(run *synthetic.Run, s sinkSnapshot) (captures, ineligible []synthetic.Capture) {
-	if s.err != nil || s.result == nil {
-		return nil, nil
-	}
-	captures = append(captures, s.result.Artifacts...)
-	if run.TerminationReason == synthetic.ExecutionBudget {
-		return append(captures, s.result.InterruptedArtifacts...), nil
-	}
-	return captures, s.result.InterruptedArtifacts
-}
-
 // complete finalizes the run work directory, when one exists, and records
 // completion. It owns a fixed cleanup budget independent of cancelled workflow input.
 func (e *Engine) complete(a *attempt, captures []synthetic.Capture) {
@@ -453,27 +433,6 @@ func (e *Engine) complete(a *attempt, captures []synthetic.Capture) {
 	}
 	a.run.CompletedUS = time.Now().UnixMicro()
 	e.save(cleanup, synthetic.HistoryComplete, a)
-}
-
-func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.Capture) {
-	run := &a.run
-	artifacts, err := e.artifacts.Finalize(ctx, run.ID, captures)
-	if err != nil {
-		capturePublicationFailed(run, captures, err)
-		run.Error = joinText(run.Error, a.redact.text("artifact publication: "+err.Error()))
-		if run.CaptureState != synthetic.CaptureDisabled {
-			run.CaptureState = synthetic.CaptureUnavailable
-		}
-		return
-	}
-	run.Artifacts = artifacts
-	capturePublicationSucceeded(run, captures)
-	if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
-		run.CaptureState = synthetic.CaptureUnavailable
-		if len(artifacts) > 0 {
-			run.CaptureState = synthetic.CaptureAvailable
-		}
-	}
 }
 
 func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, a *attempt) {
