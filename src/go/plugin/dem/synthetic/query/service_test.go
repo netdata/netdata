@@ -4,9 +4,12 @@ package query_test
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -135,6 +138,141 @@ func TestEvidenceUsesManifestMembershipAndPreservesExpiredMetadata(t *testing.T)
 	assert.Equal(t, run.JobID, evidence.JobID)
 	assert.Equal(t, synthetic.CaptureExpired, evidence.CaptureState)
 	assert.Empty(t, evidence.Body)
+}
+
+// Publication leaves oversize candidates out of the manifest and writes no manifest when nothing is published or a
+// candidate is invalid. Evidence lists only manifest members, reports the run's own capture state when there is no
+// manifest, and never serves an omitted candidate.
+func TestEvidenceExcludesUnpublishedCaptures(t *testing.T) {
+	const jobID = "journey:checkout"
+	png := []byte("\x89PNG\r\n\x1a\nfixture")
+	digest := sha256.Sum256(png)
+	published := func(id, testID string) query.Artifact {
+		return query.Artifact{
+			Artifact: synthetic.Artifact{
+				ID:     id,
+				Kind:   synthetic.ScreenshotCapture,
+				MIME:   "image/png",
+				Bytes:  int64(len(png)),
+				SHA256: hex.EncodeToString(digest[:]),
+				Test: synthetic.ArtifactTest{
+					ID:    testID,
+					Title: "Checkout",
+				},
+			},
+			Availability: "available",
+		}
+	}
+	for name, tc := range map[string]struct {
+		oversize    []string // candidate IDs above the fetch limit
+		invalid     string   // candidate ID without a PNG signature
+		state       synthetic.CaptureState
+		unpublished []synthetic.CaptureOmission
+		want        []query.Artifact
+	}{
+		"second capture too large": {
+			oversize: []string{"s1"},
+			state:    synthetic.CaptureAvailable,
+			unpublished: []synthetic.CaptureOmission{{
+				ID:     "s1",
+				Reason: "too_large",
+			}},
+			want: []query.Artifact{published("s0", "t0")},
+		},
+		"first capture too large": {
+			oversize: []string{"s0"},
+			state:    synthetic.CaptureAvailable,
+			unpublished: []synthetic.CaptureOmission{{
+				ID:     "s0",
+				Reason: "too_large",
+			}},
+			want: []query.Artifact{published("s1", "t1")},
+		},
+		"every capture too large": {
+			oversize: []string{"s0", "s1"},
+			state:    synthetic.CaptureUnavailable,
+			unpublished: []synthetic.CaptureOmission{
+				{ID: "s0", Reason: "too_large"},
+				{ID: "s1", Reason: "too_large"},
+			},
+		},
+		"invalid capture after a too large one": {
+			oversize: []string{"s0"},
+			invalid:  "s1",
+			state:    synthetic.CaptureUnavailable,
+			unpublished: []synthetic.CaptureOmission{
+				{ID: "s0", Reason: "publication_failed"},
+				{ID: "s1", Reason: "publication_failed"},
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx := t.Context()
+			captures := emptyArtifacts(t)
+			runID := fixtureRunID()
+			work, err := captures.Begin(runID, jobID, "")
+			require.NoError(t, err)
+			require.NoError(t, os.Mkdir(filepath.Join(work, "output"), 0700))
+			var candidates []synthetic.Capture
+			for i, id := range []string{"s0", "s1"} {
+				file := filepath.Join(work, "output", id+".png")
+				body := png
+				if id == tc.invalid {
+					body = []byte("not a PNG")
+				}
+				require.NoError(t, os.WriteFile(file, body, 0600))
+				if slices.Contains(tc.oversize, id) {
+					require.NoError(t, os.Truncate(file, artifacts.FetchMaxBytes+1))
+				}
+				candidates = append(candidates, synthetic.Capture{
+					ID:   id,
+					Kind: synthetic.ScreenshotCapture,
+					MIME: "image/png",
+					Path: "output/" + id + ".png",
+					Test: synthetic.ArtifactTest{
+						ID:    fmt.Sprintf("t%d", i),
+						Title: "Checkout",
+					},
+				})
+			}
+			// The runner records what Finalize published; a failed publication records nothing.
+			recorded, err := captures.Finalize(ctx, runID, candidates)
+			if tc.invalid != "" {
+				require.ErrorIs(t, err, artifacts.ErrInvalidCapture)
+			} else {
+				require.NoError(t, err)
+			}
+			run := synthetic.Run{
+				ID:           runID,
+				JobID:        jobID,
+				Kind:         synthetic.Journey,
+				Outcome:      synthetic.Failed,
+				CaptureState: tc.state,
+				Artifacts:    recorded,
+				Captures: &synthetic.CaptureReport{
+					Unpublished: tc.unpublished,
+				},
+			}
+			service := query.New(activeRuns{
+				jobID: run,
+			}, unreadHistory{t}, captures, noPolicyError)
+			evidence, err := service.Evidence(ctx, jobID, runID, "")
+			require.NoError(t, err)
+			assert.Equal(t, query.Evidence{
+				JobID:        jobID,
+				RunID:        runID,
+				CaptureState: tc.state,
+				Artifacts:    tc.want,
+			}, evidence)
+			for _, omission := range tc.unpublished {
+				_, err = service.Evidence(ctx, jobID, runID, omission.ID)
+				assert.ErrorIs(t, err, query.ErrArtifactNotRecorded, omission.ID)
+			}
+			detail, err := service.Run(ctx, jobID, runID)
+			require.NoError(t, err)
+			assert.Equal(t, run, detail)
+		})
+	}
 }
 
 func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {

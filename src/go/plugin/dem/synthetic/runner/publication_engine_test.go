@@ -16,9 +16,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -213,21 +210,14 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 				}
 			}
 			if strings.Contains(mode, "oversize") {
-				service := query.New(activeRun(ex.Run), noRunHistory{}, store.Store, func() string { return "" })
-				evidence, err := service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, "")
-				require.NoError(t, err)
-				assert.Equal(t, ex.Run.CaptureState, evidence.CaptureState)
-				require.Len(t, evidence.Artifacts, len(ex.Run.Artifacts))
-				for i, a := range evidence.Artifacts {
-					assert.Equal(t, ex.Run.Artifacts[i], a.Artifact)
+				// Evidence reads membership from the manifest; nothing published leaves no manifest.
+				m, err := store.Manifest(t.Context(), ex.Run.JobID, ex.Run.ID)
+				if len(ex.Run.Artifacts) == 0 {
+					assert.ErrorIs(t, err, artifacts.ErrNotFound)
+				} else {
+					require.NoError(t, err)
+					assert.Equal(t, ex.Run.Artifacts, m.Artifacts)
 				}
-				for _, omission := range ex.Run.Captures.Unpublished {
-					_, err = service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, omission.ID)
-					assert.ErrorIs(t, err, query.ErrArtifactNotRecorded)
-				}
-				detail, err := service.Run(t.Context(), ex.Run.JobID, ex.Run.ID)
-				require.NoError(t, err)
-				assert.Equal(t, ex.Run.Captures, detail.Captures)
 			}
 		})
 	}
@@ -436,24 +426,4 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			}
 		})
 	}
-}
-
-// activeRun is an active job whose latest run is the wrapped run.
-type activeRun synthetic.Run
-
-func (r activeRun) Snapshot(time.Time) []registry.Job { return nil }
-
-func (r activeRun) Latest(jobID, runID string) (synthetic.Run, bool) {
-	return synthetic.Run(r), jobID == r.JobID && runID == r.ID
-}
-
-// noRunHistory retains no runs: evidence comes from the capture manifest and the active run.
-type noRunHistory struct{}
-
-func (noRunHistory) QueryRuns(context.Context, synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
-	return synthetichistory.RunPage{}, nil
-}
-
-func (noRunHistory) GetRun(context.Context, string, string) (synthetic.Run, error) {
-	return synthetic.Run{}, os.ErrNotExist
 }
