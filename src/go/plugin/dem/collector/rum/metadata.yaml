@@ -418,7 +418,7 @@ modules:
             function_name: rum-sessions
             name: RUM Sessions
             description: Investigate sampled sessions with retained observations received within a time range, including pages, errors and
-                optional interaction heuristics.
+                optional interaction heuristics. Results are capped at 2000 and disclose truncation.
             parameters:
               - id: vnode
                 name: vnode
