@@ -80,12 +80,11 @@ func main() {
 		os.Exit(1)
 	}
 	process, err := dem.Open(dem.Options{
-		Config:     cfg,
-		LoadConfig: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
-		VarLibDir:  pluginconfig.VarLibDir(),
-		Private:    debug,
-		GeoIPPaths: geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
-		Warnings:   os.Stderr,
+		Config:       cfg,
+		ReloadConfig: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
+		VarLibDir:    pluginconfig.VarLibDir(),
+		Private:      debug,
+		GeoIPPaths:   geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
