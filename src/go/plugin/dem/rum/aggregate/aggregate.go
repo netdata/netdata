@@ -120,6 +120,8 @@ const (
 	identityResource
 )
 
+type pageSessionKey struct{ session, page string }
+
 type identityKey struct {
 	kind             identityKind
 	experience, item string
@@ -153,10 +155,9 @@ type siteState struct {
 	identities, resourceIdentities receiptIndex[identityKey, uint64]
 	vitalIdentities                receiptIndex[observationKey, vitalIdentity]
 	activity, resources            receiptHeap[struct{}, activityObservation]
-	// sessions and pageSessions count observed sessions; a page session is keyed
-	// by session and page and holds the page.
+	// sessions and pageSessions count observed sessions, per site and per page.
 	sessions                                                   receiptIndex[string, struct{}]
-	pageSessions                                               receiptIndex[string, string]
+	pageSessions                                               receiptIndex[pageSessionKey, struct{}]
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -185,7 +186,7 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		resourceIdentities: newReceiptIndex[identityKey, uint64](),
 		vitalIdentities:    newReceiptIndex[observationKey, vitalIdentity](),
 		sessions:           newReceiptIndex[string, struct{}](),
-		pageSessions:       newReceiptIndex[string, string](),
+		pageSessions:       newReceiptIndex[pageSessionKey, struct{}](),
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},
 	}

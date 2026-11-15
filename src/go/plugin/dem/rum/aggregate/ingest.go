@@ -3,7 +3,6 @@
 package aggregate
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -376,5 +375,8 @@ func (st *siteState) observeSession(id, page string, now time.Time) {
 		return
 	}
 	st.sessions.put(now, id, struct{}{})
-	st.pageSessions.put(now, strconv.Itoa(len(id))+":"+id+page, page)
+	st.pageSessions.put(now, pageSessionKey{
+		session: id,
+		page:    page,
+	}, struct{}{})
 }

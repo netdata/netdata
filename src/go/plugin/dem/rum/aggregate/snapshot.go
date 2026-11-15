@@ -223,7 +223,7 @@ func (st *siteState) readWindow(now time.Time, pageOnly bool) *windowRead {
 	}
 	r.sessions = st.sessions.len()
 	for _, el := range st.pageSessions.order.entries {
-		r.group(facetPage, el.Value).sessions++
+		r.group(facetPage, el.key.page).sessions++
 	}
 	return r
 }
