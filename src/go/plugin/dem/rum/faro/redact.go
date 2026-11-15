@@ -21,10 +21,7 @@ type PathRule struct {
 // (id), and long token-like strings (token). A source path keeps a final
 // script file name.
 func redactPath(path string, rules []PathRule, source bool) string {
-	for _, r := range rules {
-		path = r.Re.ReplaceAllString(path, r.Replace)
-	}
-	segs := strings.Split(path, "/")
+	segs := strings.Split(applyPathRules(path, rules), "/")
 	for i, s := range segs {
 		if s == "" || s[0] == ':' {
 			continue
@@ -43,6 +40,14 @@ func redactPath(path string, rules []PathRule, source bool) string {
 		}
 	}
 	return strings.Join(segs, "/")
+}
+
+// applyPathRules applies the site's own path redaction rules in order.
+func applyPathRules(value string, rules []PathRule) string {
+	for _, r := range rules {
+		value = r.Re.ReplaceAllString(value, r.Replace)
+	}
+	return value
 }
 
 // redactURL strips credentials, query and fragment and applies the site's path

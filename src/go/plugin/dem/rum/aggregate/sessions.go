@@ -212,7 +212,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 			ev.Kind == beacon.EventSession:
 			// The page view entry stands for the activation; the rest have none.
 		case ev.Kind == beacon.EventView:
-			target := ev.Attrs["toView"]
+			target := ev.Attrs[beacon.AttrToView]
 			if target == "" {
 				target = page
 			}
@@ -229,7 +229,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 				typ:  EventTypeFrustration,
 				page: page,
 				text: truncateRunes(
-					strings.ReplaceAll(ev.Name, "_", " ")+" on "+ev.Attrs["target"],
+					strings.ReplaceAll(ev.Name, "_", " ")+" on "+ev.Attrs[beacon.AttrTarget],
 					sessionEventTextMax,
 				),
 			})
@@ -355,15 +355,15 @@ func poorVitalText(v beacon.Vital) string {
 // requestText summarizes a traced request, e.g. "GET api.example.com/orders
 // 200 · 7 ms", from the tracing add-on's event attributes.
 func requestText(attrs map[string]string) string {
-	target := attrs["url.full"]
+	target := attrs[beacon.AttrURLFull]
 	if i := strings.Index(target, "://"); i >= 0 {
 		target = target[i+3:]
 	}
-	text := strings.TrimSpace(attrs["http.request.method"] + " " + target)
-	if code := attrs["http.response.status_code"]; code != "" {
+	text := strings.TrimSpace(attrs[beacon.AttrHTTPMethod] + " " + target)
+	if code := attrs[beacon.AttrHTTPStatusCode]; code != "" {
 		text += " " + code
 	}
-	if ns, err := strconv.ParseFloat(attrs["duration_ns"], 64); err == nil && ns > 0 {
+	if ns, err := strconv.ParseFloat(attrs[beacon.AttrDurationNS], 64); err == nil && ns > 0 {
 		text += " · " + strconv.FormatFloat(ns/1e6, 'f', 0, 64) + " ms"
 	}
 	return text

@@ -61,10 +61,8 @@ func compileSite(sc config.Site) *site {
 		}
 	}
 	for _, pr := range sc.RedactPaths {
-		if pr.Pattern == "" {
-			continue // an empty pattern would match everywhere
-		}
-		if re, err := regexp.Compile(pr.Pattern); err == nil {
+		// Site validation rejects invalid patterns; an empty row yields no rule.
+		if re, err := pr.Regexp(); err == nil && re != nil {
 			st.pathRules = append(st.pathRules, faro.PathRule{
 				Re:      re,
 				Replace: pr.Replace,
