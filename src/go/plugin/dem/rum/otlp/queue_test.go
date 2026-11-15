@@ -106,8 +106,8 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 }
 
 // TestShutdownFlushIsBounded: with a black-holed endpoint and a queued
-// record, cancelling Run must return within the shutdown flush budget, not
-// the regular export timeout (the agent's SIGTERM grace is 3s).
+// record, cancelling Run must return within the owner's final budget, not
+// the regular export timeout.
 func TestShutdownFlushIsBounded(t *testing.T) {
 	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
 	e.Ingest(aggregate.Result{
@@ -130,7 +130,7 @@ func TestShutdownFlushIsBounded(t *testing.T) {
 		t.Fatal("Run did not return within 3s of cancellation")
 	}
 	if d := time.Since(start); d > 2*time.Second {
-		t.Fatalf("shutdown flush took %v, want about %v", d, ShutdownFlushTimeout)
+		t.Fatalf("shutdown flush took %v, want about %v", d, finalBudget)
 	}
 	_ = e.Close()
 }

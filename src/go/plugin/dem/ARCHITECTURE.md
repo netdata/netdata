@@ -911,7 +911,7 @@ flowchart LR
     R1("Remove future admission")
     R2("Join HTTP and<br/>Function readers")
     R3("Cancel history and<br/>export workers")
-    R4("Final drain<br/>within fixed budgets")
+    R4("Final drain<br/>within one shared budget")
     R1 --> R2 --> R3 --> R4
 
     classDef step fill:#dcfce7,stroke:#16a34a,color:#0b1021;
@@ -919,8 +919,8 @@ flowchart LR
 ```
 
 - A retiring site joins its HTTP and Function readers before cancelling the history/export worker context.
-- Export queues drain using one shared fixed shutdown budget.
-- Accepted history events flush under one detached five-second admission budget.
+- The history writer and export queues drain under one shared one-second budget, which fits inside the Agent's
+  two-second SIGTERM-to-SIGKILL grace. History entries the budget cannot admit count as dropped.
 - Every event is self-contained: there are no session/group parent records or cumulative deltas.
 - A cancelled admission leaves only unattempted entries pending for final drain. Attempted appends are never
   replayed, including when an error or cancellation races them.

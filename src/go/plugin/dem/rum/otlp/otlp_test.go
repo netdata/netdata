@@ -157,6 +157,10 @@ func destination(endpoint string) config.Destination {
 	}
 }
 
+// finalBudget stands in for the site owner's final-drain budget.
+const finalBudget = time.Second
+
+// finalContext stands in for the site owner's shared final context.
 func finalContext(t *testing.T) func() context.Context {
 	t.Helper()
 	var once sync.Once
@@ -164,7 +168,7 @@ func finalContext(t *testing.T) func() context.Context {
 	return func() context.Context {
 		once.Do(func() {
 			var cancel context.CancelFunc
-			ctx, cancel = context.WithTimeout(context.Background(), ShutdownFlushTimeout)
+			ctx, cancel = context.WithTimeout(context.Background(), finalBudget)
 			t.Cleanup(cancel)
 		})
 		return ctx
