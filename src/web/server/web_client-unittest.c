@@ -250,6 +250,10 @@ int web_client_header_parsing_unittest(void)
         "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\nHost: h\r\n\r\n",
         "GET /api/v1/info HTTP/1.1\r\nX-Forwarded-For: 127.0.0.1\rHost: h\r\n\r\n",
         "GET /api/v1/info HTTP/1.1\r\nX-Forward\ned-For: 127.0.0.1\r\n\r\n",
+        // a bare LF or CR inside the request line
+        "GET /api/v1/info\nSet-Cookie: a=b; Path=/ HTTP/1.1\r\nHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\nHost: h\r\n\r\n",
+        "GET /api/v1/info HTTP/1.1\rHost: h\r\n\r\n",
     };
 
     for (size_t i = 0; i < sizeof(malformed_cases) / sizeof(malformed_cases[0]); i++) {
