@@ -5,7 +5,6 @@ package historyfunc
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -55,37 +54,32 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Method != method.ID {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	if r := rawfunc.NoPayload(req); r != nil {
+	if _, r := rawfunc.Admit(req, nil, nil); r != nil {
 		return r
-	}
-	if _, err := rawfunc.ParseArgs(req, nil); err != nil {
-		return funcapi.ErrorResponse(400, "history status does not accept arguments")
-	}
-	response := &funcapi.FunctionResponse{
-		Status:            200,
-		Help:              method.Help,
-		Columns:           method.Columns,
-		DefaultSortColumn: method.Sort,
 	}
 	// Metadata remains available without accessing the store or reload state.
 	if req.Info {
-		return response
+		return &funcapi.FunctionResponse{
+			Status: 200,
+			Help:   method.Help,
+		}
 	}
-	if r := rawfunc.RequireMember(req); r != nil {
+	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r
-	}
-	if err := ctx.Err(); err != nil {
-		return statusError(err)
 	}
 	status, err := h.deps.Status(ctx)
 	if err != nil {
-		return statusError(err)
+		if r := rawfunc.Cancelled(err); r != nil {
+			return r
+		}
+		return funcapi.UnavailableResponse(err.Error())
 	}
-	response.Data = [][]any{statusColumns.Row(statusRow{
+	response := method.Table()
+	response["data"] = [][]any{statusColumns.Row(statusRow{
 		Status:      status,
 		policyError: h.policyError(),
 	})}
-	return response
+	return funcapi.RawResponse(response)
 }
 func timestamp(t time.Time) any {
 	if t.IsZero() {
@@ -98,16 +92,6 @@ func nullable(s string) any {
 		return nil
 	}
 	return s
-}
-func statusError(err error) *funcapi.FunctionResponse {
-	switch {
-	case errors.Is(err, context.Canceled):
-		return rawfunc.Cancelled(err)
-	case errors.Is(err, context.DeadlineExceeded):
-		return funcapi.ErrorResponse(504, "request timed out")
-	default:
-		return funcapi.UnavailableResponse(err.Error())
-	}
 }
 
 // statusRow is the store status with the retention worker's reload error.

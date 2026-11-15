@@ -73,6 +73,12 @@ func TestVnodeChangesFenceObservationsWithoutChangingQueuedIdentity(t *testing.T
 				assert.Equal(t, uint64(1), snapshot.Outcomes.Success)
 				h.session.SetVnodeGUID(next.request.VnodeGUID)
 				assert.Equal(t, snapshot, h.session.Snapshot(h.Now()), "same GUID preserves the observation")
+				h.session.SetVnodeGUID("33333333-3333-4333-8333-333333333333")
+				cleared := h.session.Snapshot(h.Now())
+				assert.False(t, cleared.HasObservation)
+				assert.Zero(t, cleared.Latest, "no latest run without an observation")
+				assert.Zero(t, cleared.ObservationAge)
+				assert.False(t, cleared.Fresh)
 				h.stop(t, nil)
 			})
 		}

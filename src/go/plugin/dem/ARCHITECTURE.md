@@ -390,8 +390,10 @@ What makes this layer predictable:
   (signed in, same Space, paid Space, sensitive data): viewing Real User Monitoring, browser tests and DEM history
   status requires a paid plan or an active trial. Collection, journeys, audits and history storage run on every plan.
   Every handler also requires member access (`0x1b`) for data, and `synthetics-artifact` bytes require administrator
-  access (`0x7b`); `info` stays available for discovery. The access masks, the permission test and the member check
-  are in `internal/rawfunc`; `synthetic/syntheticfunc` applies the administrator check to artifact bytes.
+  access (`0x7b`); `info` stays available for discovery. `internal/rawfunc.Admit` runs the checks every handler shares,
+  in one order: member access unless info, strict parameters from `key:value` arguments or a JSON body (the Cloud
+  Function table posts one), then the vnode selector. `synthetic/syntheticfunc` applies the administrator check to
+  artifact bytes.
 - **Independent of collector selection.** Disabling `rum` or `journey`, or every collector, keeps retained history
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
@@ -473,7 +475,7 @@ Shared and process-wide packages:
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, rehearsal, registration, monitor session, vnode association, and attempt and kind metrics |
 | `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
-| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
+| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: request admission (access masks, strict parameters from arguments or a JSON body, vnode selectors), the cancellation status, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
 | `config/` | Installed configuration files; not a Go package |
 

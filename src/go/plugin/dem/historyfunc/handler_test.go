@@ -40,28 +40,21 @@ func TestStatusPreservesIndependentFacts(t *testing.T) {
 			},
 		}, nil
 	}), func() string { return "invalid edited policy" })
-	response := h.HandleRaw(context.Background(), request())
-	require.Equal(t, 200, response.Status)
-	assert.Nil(t, response.RawResponse)
-	rows := response.Data.([][]any)
-	require.Len(t, rows, 1)
-	assert.Equal(
-		t,
-		[]any{
-			30,
-			int64(1 << 30),
-			nil,
-			nil,
-			now.UnixMicro(),
-			"header unavailable",
-			now.UnixMicro(),
-			now.Add(-time.Hour).UnixMicro(),
-			"unlink failed",
-			"writer failed",
-			"invalid edited policy",
-		},
-		rows[0],
-	)
+	want := method.Table()
+	want["data"] = [][]any{{
+		30,
+		int64(1 << 30),
+		nil,
+		nil,
+		now.UnixMicro(),
+		"header unavailable",
+		now.UnixMicro(),
+		now.Add(-time.Hour).UnixMicro(),
+		"unlink failed",
+		"writer failed",
+		"invalid edited policy",
+	}}
+	assert.Equal(t, funcapi.RawResponse(want), h.HandleRaw(context.Background(), request()))
 }
 func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 	for _, inventory := range []*journalstore.Inventory{nil, {Bytes: 0, Files: 0}} {
@@ -70,7 +63,7 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 				Inventory: inventory,
 			}, nil
 		}), func() string { return "" })
-		row := h.HandleRaw(context.Background(), request()).Data.([][]any)[0]
+		row := h.HandleRaw(context.Background(), request()).RawResponse["data"].([][]any)[0]
 		assert.Nil(t, row[0])
 		assert.Nil(t, row[1])
 		if inventory == nil {
@@ -107,10 +100,21 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 			Method:      method.ID,
 			Permissions: "0x1",
 		}, 403},
-		{"payload", funcapi.RawMethodRequest{
+		{"payload field", funcapi.RawMethodRequest{
 			Method:      method.ID,
 			Permissions: "0x1b",
-			Payload:     []byte("{}"),
+			Payload:     []byte(`{"after":1}`),
+		}, 400},
+		{"payload not an object", funcapi.RawMethodRequest{
+			Method:      method.ID,
+			Permissions: "0x1b",
+			Payload:     []byte(`[]`),
+		}, 400},
+		{"payload field on info", funcapi.RawMethodRequest{
+			Method:  method.ID,
+			Info:    true,
+			Args:    []string{"info"},
+			Payload: []byte(`{"site":"shop"}`),
 		}, 400},
 		{"time filter", funcapi.RawMethodRequest{
 			Method:      method.ID,
@@ -162,5 +166,48 @@ func TestStorageErrorStatuses(t *testing.T) {
 			}), func() string { return "" })
 			assert.Equal(t, tc.want, h.HandleRaw(context.Background(), request()))
 		})
+	}
+}
+
+func TestCloudTableRequests(t *testing.T) {
+	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
+		return journalstore.Status{}, nil
+	}), func() string { return "" })
+	// The table sends no query or selections to a Function without accepted parameters.
+	body := []byte(`{"timeout":120000,"last":200}`)
+	for name, req := range map[string]funcapi.RawMethodRequest{
+		"info call": {
+			Method: method.ID,
+			Info:   true,
+			Args:   []string{"info", "after:1700000000", "before:1700000900"},
+		},
+		"info with body": {
+			Method:  method.ID,
+			Info:    true,
+			Args:    []string{"info"},
+			Payload: body,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, &funcapi.FunctionResponse{
+				Status: 200,
+				Help:   method.Help,
+			}, h.HandleRaw(context.Background(), req))
+		})
+	}
+	data := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		Method:      method.ID,
+		Payload:     body,
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, data.RawResponse, data.Message)
+	assert.Equal(t, 200, data.RawResponse["status"])
+	assert.Len(t, data.RawResponse["data"], 1)
+}
+
+// The Cloud UI table posts a column filter as a selection named after the column; history status accepts none.
+func TestColumnsDeclareNoFilters(t *testing.T) {
+	for name, column := range method.Columns {
+		assert.Equal(t, "none", column.(map[string]any)["filter"], name)
 	}
 }

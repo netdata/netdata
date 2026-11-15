@@ -4,6 +4,7 @@ package rumfunc
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -13,9 +14,11 @@ import (
 
 var sessionsMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-sessions",
-		Title:       "RUM Sessions",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+		ID:    "rum-sessions",
+		Title: "RUM Sessions",
+		Help: "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Results are capped at " + strconv.Itoa(
+			rawfunc.MaxRows,
+		) + " and disclose truncation. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
 		Sort:        "last_observed_us",
 		UpdateEvery: 10,
 		History:     true,
@@ -32,29 +35,39 @@ type sessionRow struct {
 	now int64
 }
 
-func (h *Handler) sessionsRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
+func (h *Handler) sessionsRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {
 	now := time.Now().Unix()
 	after, before, err := historyRange(args, now)
 	if err != nil {
 		return nil, badRequest(err)
 	}
+	// One session past the cap reveals truncation.
 	sessions, err := h.deps.Sessions(
 		ctx,
 		args["site"],
 		args["user_id"],
 		after,
 		before,
-		rawfunc.MaxRows,
+		rawfunc.MaxRows+1,
 		args["vnode_guid"],
 	)
-	var rows [][]any
+	if err != nil {
+		return nil, err
+	}
+	truncated := len(sessions) > rawfunc.MaxRows
+	if truncated {
+		sessions = sessions[:rawfunc.MaxRows]
+	}
+	rows := make([][]any, 0, len(sessions))
 	for _, s := range sessions {
 		rows = append(rows, sessionsColumns.Row(sessionRow{
 			Session: s,
 			now:     now,
 		}))
 	}
-	return rows, err
+	response["truncated"] = truncated
+	response["limit"] = rawfunc.MaxRows
+	return rows, nil
 }
 
 var sessionsColumns = rawfunc.Columns[sessionRow]{
@@ -158,7 +171,6 @@ var sessionsColumns = rawfunc.Columns[sessionRow]{
 		Type:     funcapi.FieldTypeArray,
 		Visible:  true,
 		Sortable: true,
-		Filter:   funcapi.FieldFilterMultiselect,
 		Value:    func(r sessionRow) any { return r.UserIDs },
 	},
 	{

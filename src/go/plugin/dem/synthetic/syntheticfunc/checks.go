@@ -52,10 +52,6 @@ func (h *Handler) checks(
 			truncated = true
 			break
 		}
-		if !j.HasObservation {
-			// The latest-run columns stay empty until the first observation.
-			j.Latest = registry.Job{}.Latest
-		}
 		rows = append(rows, checksColumns.Row(j))
 	}
 	response["data"] = rows
