@@ -13,6 +13,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
+// frameMaxBytes is the runner protocol's 4 MiB ceiling on the request and on
+// every record, shared with the JS runner (run.mjs framing limit).
+const frameMaxBytes = 4 << 20
+
+// eventLimit is the per-run diagnostic event retention documented in the
+// plugin and runtime READMEs. Later events are counted as dropped; every
+// retained event is stored in the run's history record.
+const eventLimit = 500
+
+// textLimit is the character budget of each diagnostic text, shared with the
+// JS runner's clipping (protocol.cjs) and documented in its README.
+const textLimit = 2000
+
 // wireRequest is the one JSON request the runner reads on stdin.
 type wireRequest struct {
 	Extensions        []string          `json:"extensions,omitempty"`
