@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package history persists synthetic run start and completion records in the command-owned DEM journal and reduces
+// them back into runs for queries.
 package history
 
 import (

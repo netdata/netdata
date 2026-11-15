@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
+// dem.plugin runs the DEM collectors and Functions under the Netdata Agent. Its runtime subcommand installs,
+// updates, repairs, preloads, qualifies and reports the browser runtime.
 package main
 
 import (

@@ -1,6 +1,7 @@
 //go:build linux
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package dem_test
 
 import (

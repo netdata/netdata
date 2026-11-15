@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package rum implements the rum module, one job per monitored site. The job owns the site's aggregator, history
+// writer and optional OTLP exports, admits the site's route to the RUM registry while it runs, and publishes the
+// site's metrics.
 package rum
 
 import (

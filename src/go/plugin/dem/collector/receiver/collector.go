@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package receiver implements the single-instance receiver module. It owns the RUM HTTP listener and the GeoIP
+// sources, hands each browser request to the site route admitted in the RUM registry, and publishes request metrics.
 package receiver
 
 import (

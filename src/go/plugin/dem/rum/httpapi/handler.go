@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package httpapi serves the RUM receiver endpoints: bootstrap script, pinned assets, demo page and beacon
+// collection. It applies the receiver's origin, proxy, body and rate policy and hands each beacon to the exact site
+// route admitted for the request.
 package httpapi
 
 import (
