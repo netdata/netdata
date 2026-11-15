@@ -541,8 +541,9 @@ flowchart LR
 Dependency direction:
 
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
-  through `rum/query`, while synthetic Functions use `registry.Job`, `history.RunFilter`/`RunPage` and
-  `artifacts.Filter` directly. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
+  through `rum/query`, while synthetic Functions use the domain values directly: `synthetic` runs and events,
+  `registry.Job`, `history.RunFilter`/`RunPage`, `artifacts.Filter`/`Set`/`Cursor`/`Status` and
+  `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
   store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
@@ -565,7 +566,7 @@ File layout within packages:
 | Function packages | Each method keeps its ordered column list, which defines both the column map and every row, beside its row reader |
 | History packages | Record codecs are separate from reducers |
 | `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
-| `synthetic/artifacts` | Work creation, publication, reads, retention and filesystem checks |
+| `synthetic/artifacts` | Store lifetime and manifests, work creation, publication, reads, the catalogue, inventory, retention with storage status, and filesystem checks |
 
 - Pure DEM helpers stay under their domain or `internal/`.
 - Moving code to the repository `pkg/` requires a real shared contract and consumers outside DEM.

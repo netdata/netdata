@@ -9,6 +9,22 @@ import (
 	"time"
 )
 
+type ByteObservation struct {
+	Bytes *int64 `json:"bytes"`
+	Error string `json:"error,omitempty"`
+}
+
+type Inventory struct {
+	ObservedUS   int64           `json:"observed_us"`
+	Retained     ByteObservation `json:"retained"`
+	Workspace    ByteObservation `json:"workspace"`
+	Unclassified ByteObservation `json:"unclassified"`
+	Deleting     ByteObservation `json:"deleting"`
+	KnownSets    int             `json:"known_sets"`
+	KnownJobs    int             `json:"known_jobs"`
+	Error        string          `json:"error,omitempty"`
+}
+
 // Inventory categories are independent: a live browser changing its workspace
 // must not prevent retention of already published immutable capture sets.
 func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
@@ -86,4 +102,24 @@ func (s *Store) inventory(ctx context.Context) ([]Set, Inventory) {
 		inv.Error = classificationErr.Error()
 	}
 	return sets, inv
+}
+
+func observation(bytes int64, err error) ByteObservation {
+	if err != nil {
+		return ByteObservation{
+			Error: err.Error(),
+		}
+	}
+	return ByteObservation{
+		Bytes: &bytes,
+	}
+}
+func inventoryError(inv Inventory) error {
+	var result error
+	for _, e := range []string{inv.Error, inv.Retained.Error, inv.Workspace.Error, inv.Unclassified.Error, inv.Deleting.Error} {
+		if e != "" {
+			result = errors.Join(result, errors.New(e))
+		}
+	}
+	return result
 }
