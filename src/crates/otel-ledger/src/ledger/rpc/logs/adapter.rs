@@ -21,12 +21,16 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use sfsq::logs::{Anchor, Cursor, LogsData, LogsQuery, LogsQueryBuilder};
+use sfsq::logs::{
+    AggregateKind, AggregateResult, AggregateSpec, Anchor, Cursor, GroupAnswer, LogsData,
+    LogsQuery, LogsQueryBuilder, Parts,
+};
 
 use super::wire::{
-    ACCEPTED_PARAMS, AnchorParam, AvailableHistogram, Chart, ChartDimensions, ChartPoint,
-    ChartResult, ChartView, DataPoint, Facet, FacetOption, Histogram, Items, LogsResult,
-    MultiSelection, MultiSelectionOption, OtelLogsRequest, Pagination, RequiredParam,
+    ACCEPTED_PARAMS, AggregateGroupOut, AggregateOut, AggregateParam, AggregateValueOut,
+    AnchorParam, AvailableHistogram, Chart, ChartDimensions, ChartPoint, ChartResult, ChartView,
+    DataPoint, Facet, FacetOption, Histogram, Items, LogsResult, MultiSelection,
+    MultiSelectionOption, OtelLogsRequest, Pagination, PartParam, QuantileOut, RequiredParam,
     STREAM_SELECTION_PARAM, Version,
 };
 use file_lifecycle::registry::PartitionStat;
@@ -77,6 +81,110 @@ const NS_PER_S: i64 = 1_000_000_000;
 // grid — before handing a fully-specified [`LogsQuery`] to the engine.
 // The engine takes the grid as given; deciding it is this layer's job.
 
+/// The engine [`Parts`] for the requested part names.
+fn parts_from_params(params: &[PartParam]) -> Parts {
+    let mut parts = Parts::NONE;
+    for p in params {
+        match p {
+            PartParam::Rows => parts.rows = true,
+            PartParam::Matched => parts.matched = true,
+            PartParam::Histogram => parts.histogram = true,
+            PartParam::Facets => parts.facets = true,
+        }
+    }
+    parts
+}
+
+/// The part names of `parts`, in wire order.
+fn parts_to_names(parts: Parts) -> Vec<&'static str> {
+    [
+        (parts.rows, PartParam::Rows),
+        (parts.matched, PartParam::Matched),
+        (parts.histogram, PartParam::Histogram),
+        (parts.facets, PartParam::Facets),
+    ]
+    .into_iter()
+    .filter_map(|(on, p)| on.then_some(p.as_str()))
+    .collect()
+}
+
+/// Largest `top` accepted; a bigger answer belongs in a facet export.
+const MAX_AGGREGATE_TOP: usize = 10_000;
+
+/// Validate a wire aggregation into the engine's [`AggregateSpec`].
+fn aggregate_spec(p: AggregateParam) -> Result<AggregateSpec, String> {
+    if p.field.is_empty() {
+        return Err("aggregate: `field` is empty".into());
+    }
+    if p.by.as_deref() == Some("") {
+        return Err("aggregate: `by` is empty".into());
+    }
+    let kind = match (p.top, p.quantiles) {
+        (Some(n), None) if (1..=MAX_AGGREGATE_TOP).contains(&n) => AggregateKind::Top(n),
+        (Some(_), None) => {
+            return Err(format!("aggregate: `top` must be 1..={MAX_AGGREGATE_TOP}"));
+        }
+        (None, Some(q)) if !q.is_empty() && q.iter().all(|v| (0.0..=1.0).contains(v)) => {
+            AggregateKind::Quantiles(q)
+        }
+        (None, Some(_)) => {
+            return Err("aggregate: `quantiles` must be a non-empty list in [0, 1]".into());
+        }
+        _ => return Err("aggregate: set exactly one of `top` and `quantiles`".into()),
+    };
+    Ok(AggregateSpec {
+        field: p.field,
+        by: p.by,
+        kind,
+    })
+}
+
+/// Shape the engine's aggregation answer for the wire.
+fn aggregate_out(result: AggregateResult) -> AggregateOut {
+    let groups = result
+        .groups
+        .into_iter()
+        .map(|g| {
+            let (top, distinct, quantiles) = match g.answer {
+                GroupAnswer::Top { values, distinct } => (
+                    Some(
+                        values
+                            .into_iter()
+                            .map(|(value, count)| AggregateValueOut { value, count })
+                            .collect(),
+                    ),
+                    Some(distinct),
+                    None,
+                ),
+                GroupAnswer::Quantiles(q) => (
+                    None,
+                    None,
+                    Some(
+                        q.into_iter()
+                            .map(|(q, value)| QuantileOut { q, value })
+                            .collect(),
+                    ),
+                ),
+            };
+            AggregateGroupOut {
+                group: g.group,
+                count: g.count,
+                top,
+                distinct,
+                quantiles,
+            }
+        })
+        .collect();
+    AggregateOut {
+        field: result.field,
+        by: result.by,
+        groups,
+        ignored: result.ignored,
+        incomplete: result.incomplete,
+        approximate: result.approximate,
+    }
+}
+
 /// Default request window in seconds when the frontend doesn't specify
 /// `after`/`before`. Matches the consuming UI's default time range.
 const DEFAULT_WINDOW_SECS: u32 = 15 * 60;
@@ -89,10 +197,11 @@ impl OtelLogsRequest {
     /// becomes an [`Anchor::Timestamp`] in ns; a malformed cursor string
     /// is dropped (treated as "no anchor").
     ///
-    /// Fails with [`sfst::Error::InvalidPattern`] if the free-text `query`
-    /// is not a valid regex — validated once here, at the boundary, so a
-    /// bad search is a clean request error rather than a per-file degrade.
-    pub fn into_query(self) -> Result<LogsQuery, sfst::Error> {
+    /// Fails with a message if the free-text `query` is not a valid regex
+    /// or the `aggregate` is malformed — validated once here, at the
+    /// boundary, so a bad request is a clean error rather than a per-file
+    /// degrade.
+    pub fn into_query(self) -> Result<LogsQuery, String> {
         let (after, before) = effective_window(self.after, self.before);
         // Nice width + outward alignment + the exact grid — the shared
         // derivation (`rpc::grid::grid_for_window_s`) both otel Function
@@ -125,8 +234,14 @@ impl OtelLogsRequest {
         // malformed pattern is a clean error; the engine recompiles the source
         // per file, where a failure would silently zero that file's rows.
         if !self.query.is_empty() {
-            sfst::compile_query(&self.query)?;
+            sfst::compile_query(&self.query).map_err(|e| e.to_string())?;
             builder = builder.query(self.query);
+        }
+        if let Some(parts) = &self.parts {
+            builder = builder.parts(parts_from_params(parts));
+        }
+        if let Some(aggregate) = self.aggregate {
+            builder = builder.aggregate(aggregate_spec(aggregate)?);
         }
         Ok(builder.build())
     }
@@ -324,6 +439,8 @@ pub fn to_result(data: LogsData, max_to_return: usize) -> LogsResult {
         response_type: String::from("table"),
         help: String::from("Query and visualize OpenTelemetry logs."),
         pagination: Pagination::default(),
+        parts: (data.parts != Parts::ALL).then(|| parts_to_names(data.parts)),
+        aggregate: data.aggregate.map(aggregate_out),
     }
 }
 

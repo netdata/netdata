@@ -48,7 +48,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use tokio_util::sync::CancellationToken;
 
-use super::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
 use super::order::newest_first;
 use super::overview::top_k;
 use super::predicate::{PredicateError, TokenKind, TokenQuery};
@@ -56,6 +55,7 @@ use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{AttributeKey, KeyError, parse_key};
 use super::window::{TimeWindow, WindowError};
+use crate::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
 use crate::logs::merge::merge_timelines;
 use crate::source::{Mapped, map_source};
 

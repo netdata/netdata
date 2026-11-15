@@ -1,8 +1,10 @@
 //! A fixed-size log-linear histogram of durations: 16 linear sub-bins per
 //! power of two, so a bin's midpoint is within 1/32 of every value in it.
 //! Memory is per histogram, not per recorded duration. Used for the
-//! overview's per-bucket trace-duration percentiles, and for the
-//! explorer's span-duration percentiles and heatmap rows.
+//! traces overview's per-bucket trace-duration percentiles and the
+//! explorer's span-duration percentiles and heatmap rows, and by the logs
+//! quantile aggregation once its exact mode outgrows its entry cap
+//! (`logs::values`).
 
 /// One time bucket's duration percentiles, nanoseconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,10 +79,20 @@ impl DurationHistogram {
 
     /// Negative durations count as 0, in the bins and the range alike.
     pub(crate) fn record(&mut self, duration_ns: i64) {
+        self.record_n(duration_ns, 1);
+    }
+
+    /// Record `count` occurrences of one duration at once (a weighted
+    /// [`record`](Self::record)); a zero `count` records nothing. A bin
+    /// saturates at `u32::MAX`.
+    pub(crate) fn record_n(&mut self, duration_ns: i64, count: u64) {
+        if count == 0 {
+            return;
+        }
         let duration_ns = duration_ns.max(0);
         let bin = &mut self.counts[Self::bin(duration_ns)];
-        *bin = bin.saturating_add(1);
-        self.n += 1;
+        *bin = bin.saturating_add(u32::try_from(count).unwrap_or(u32::MAX));
+        self.n += count;
         self.range = Some(match self.range {
             None => (duration_ns, duration_ns),
             Some((min, max)) => (min.min(duration_ns), max.max(duration_ns)),
@@ -97,6 +109,11 @@ impl DurationHistogram {
             (None, range) | (range, None) => range,
             (Some((a, b)), Some((c, d))) => Some((a.min(c), b.max(d))),
         };
+    }
+
+    /// Durations recorded so far.
+    pub(crate) fn count(&self) -> u64 {
+        self.n
     }
 
     /// The recorded durations per heatmap row ([`HEATMAP_ROWS`]).
@@ -123,8 +140,14 @@ impl DurationHistogram {
     /// observed range is within 1/32 of it; equal durations answer that
     /// duration. `None` when nothing was recorded.
     pub(crate) fn percentile(&self, p: u64) -> Option<i64> {
+        self.at_rank((p * self.n).div_ceil(100).max(1))
+    }
+
+    /// The value at 1-based `rank` in recorded order (ranks past the count
+    /// answer the maximum), within 1/32 as for
+    /// [`percentile`](Self::percentile). `None` when nothing was recorded.
+    pub(crate) fn at_rank(&self, rank: u64) -> Option<i64> {
         let (min, max) = self.range?;
-        let rank = (p * self.n).div_ceil(100).max(1);
         let mut seen = 0u64;
         for (bin, &count) in self.counts.iter().enumerate() {
             seen += u64::from(count);

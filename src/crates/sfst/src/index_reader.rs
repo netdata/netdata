@@ -1157,6 +1157,124 @@ impl<'a> IndexReader<'a> {
         Ok(results)
     }
 
+    /// Value ids of each of `fields` over the logs matching `filter` in
+    /// `window_ns` (`[start, end)`), for value aggregations (top values,
+    /// quantiles, group-by) that facets can't serve: unlike
+    /// [`facets`](Self::facets), every tier works, high-card included.
+    ///
+    /// Returns one entry per input field (same order): `None` when the field
+    /// is absent from this file. The full filter applies to every field (no
+    /// facet-style self-exclusion). Low/mid fields intersect each value's
+    /// bitmap with the matching set; high-card fields share a single
+    /// stream-batch scan over the matching positions, as in
+    /// [`materialize_fields`](Self::materialize_fields). In every tier
+    /// `values` hold only the values present among the matching logs.
+    pub fn field_value_ids(
+        &self,
+        fields: &[&str],
+        filter: &BitmapFilter,
+        window_ns: std::ops::Range<i64>,
+    ) -> Result<Vec<Option<crate::query::FieldValueIds>>, crate::Error> {
+        let total = self.summary.record_count;
+        let (lo, hi) = self.range_positions(window_ns)?;
+        let mut scope = filter.full().clone();
+        scope.and_assign(&PosSet::range(lo, hi, total));
+
+        let mut out: Vec<Option<crate::query::FieldValueIds>> = Vec::with_capacity(fields.len());
+        // High-card fields resolved together in one stream-batch pass: the
+        // output slot, the field's KvId base and span, and its dictionary.
+        let mut highs: Vec<(usize, u32, u32, crate::schema::HighField)> = Vec::new();
+
+        for (fp, &field) in fields.iter().enumerate() {
+            let prefix = format!("{field}=");
+            let prefix_len = prefix.len();
+            let mut ids = crate::query::FieldValueIds::default();
+            let mut add_value = |kv_bytes: &[u8], bv: &crate::BitmapValue| {
+                let mut set = PosSet::from_value(bv);
+                set.and_assign(&scope);
+                if set.is_empty() {
+                    return;
+                }
+                let vi = ids.values.len() as u32;
+                ids.values
+                    .push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
+                ids.pairs.extend(set.iter().map(|p| (p, vi)));
+            };
+            match self.locate_field(field) {
+                None => {
+                    out.push(None);
+                    continue;
+                }
+                Some(FieldLocation::Low) => {
+                    for (kv_bytes, bv) in self.primary.prefix_pairs(prefix.as_bytes()) {
+                        add_value(&kv_bytes, bv);
+                    }
+                }
+                Some(FieldLocation::Mid(idx)) => {
+                    self.sfst
+                        .mid_field(idx)?
+                        .for_each(|kv_bytes, bv| add_value(kv_bytes, bv));
+                }
+                Some(FieldLocation::High(idx)) => {
+                    // Values are resolved after the scan, only for the ids
+                    // the scope contains: the dictionary can be far larger.
+                    let hf = self.sfst.high_field(idx)?;
+                    highs.push((fp, self.high_kv_id(idx, 0).0, hf.len() as u32, hf));
+                }
+            }
+            out.push(Some(ids));
+        }
+
+        if !highs.is_empty() && !scope.is_empty() {
+            let batch_size = crate::stream_batch_size(total);
+            let mut loaded: Option<(usize, crate::StreamBatch)> = None;
+            for p in scope.iter() {
+                if p >= total {
+                    break;
+                }
+                let b = (p / batch_size) as usize;
+                if loaded.as_ref().is_none_or(|(lb, _)| *lb != b) {
+                    loaded = Some((b, self.sfst.stream_batch(b as u8)?));
+                }
+                let batch = &loaded.as_ref().expect("loaded above").1;
+                for id in batch.row((p % batch_size) as usize) {
+                    // KvId ranges of different fields are disjoint; a field
+                    // listed twice fills both of its slots.
+                    for (fp, base, _, _) in highs
+                        .iter()
+                        .filter(|(_, base, span, _)| id.0 >= *base && id.0 < *base + *span)
+                    {
+                        if let Some(ids) = out[*fp].as_mut() {
+                            ids.pairs.push((p, id.0 - base));
+                        }
+                    }
+                }
+            }
+        }
+        for (fp, _, _, hf) in &highs {
+            let Some(ids) = out[*fp].as_mut() else {
+                continue;
+            };
+            // A row repeating a value counts it once, as a bitmap does.
+            ids.pairs.sort_unstable();
+            ids.pairs.dedup();
+            // Renumber the dictionary ids seen into dense value indices.
+            let mut seen: Vec<u32> = ids.pairs.iter().map(|&(_, id)| id).collect();
+            seen.sort_unstable();
+            seen.dedup();
+            let prefix_len = fields[*fp].len() + 1;
+            ids.values = seen
+                .iter()
+                .map(|&id| String::from_utf8_lossy(&hf.key(id as usize)[prefix_len..]).into_owned())
+                .collect();
+            for pair in &mut ids.pairs {
+                pair.1 = seen.binary_search(&pair.1).expect("collected above") as u32;
+            }
+        }
+
+        Ok(out)
+    }
+
     /// Compute a 2D time × value-of-`field` count grid for chart rendering.
     ///
     /// `grid` is caller-supplied. A grid that extends past the file's

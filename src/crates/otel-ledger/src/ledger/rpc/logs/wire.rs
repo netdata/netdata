@@ -129,6 +129,56 @@ pub struct OtelLogsRequest {
     /// (`resolve_query_tenant` in `super::handler`).
     #[serde(default)]
     pub tenant: Option<String>,
+    /// The response parts to compute. Omitted → all of them (the UI's
+    /// full response). A part left out is returned empty, and the work
+    /// behind it is skipped: without `matched`, `histogram` and `facets`
+    /// (and no `aggregate`) the statistics pass does not run; without
+    /// `rows` the page is not read. Not in [`ACCEPTED_PARAMS`]: API
+    /// callers send it, the UI does not.
+    #[serde(default)]
+    pub parts: Option<Vec<PartParam>>,
+    /// A value aggregation over the matching logs, returned in
+    /// [`LogsResult::aggregate`]. Not in [`ACCEPTED_PARAMS`].
+    #[serde(default)]
+    pub aggregate: Option<AggregateParam>,
+}
+
+/// One computable response part, as named in [`OtelLogsRequest::parts`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PartParam {
+    Rows,
+    Matched,
+    Histogram,
+    Facets,
+}
+
+impl PartParam {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PartParam::Rows => "rows",
+            PartParam::Matched => "matched",
+            PartParam::Histogram => "histogram",
+            PartParam::Facets => "facets",
+        }
+    }
+}
+
+/// A value aggregation request: exactly one of `top` and `quantiles`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AggregateParam {
+    /// The field whose values are aggregated.
+    pub field: String,
+    /// Group the answer by the values of this field.
+    #[serde(default)]
+    pub by: Option<String>,
+    /// The `top` most frequent values (at least 1).
+    #[serde(default)]
+    pub top: Option<usize>,
+    /// Quantiles in `[0, 1]` of the values parsed as numbers.
+    #[serde(default)]
+    pub quantiles: Option<Vec<f64>>,
 }
 
 /// Page size when the request omits `last`.
@@ -297,6 +347,63 @@ pub struct LogsResult {
     pub response_type: String,
     pub help: String,
     pub pagination: Pagination,
+    /// The computed parts, when the request limited them; absent for a
+    /// full response.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parts: Option<Vec<&'static str>>,
+    /// The value aggregation's answer, when the request asked for one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub aggregate: Option<AggregateOut>,
+}
+
+/// The answer to [`OtelLogsRequest::aggregate`].
+#[derive(Debug, Serialize)]
+pub struct AggregateOut {
+    pub field: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub by: Option<String>,
+    /// Groups by descending log count; one group (`group: null`) without `by`.
+    pub groups: Vec<AggregateGroupOut>,
+    /// Logs whose value is not a finite number (quantiles only).
+    pub ignored: u64,
+    /// Top values exceeded the exact-entry cap; counts may be undercounts.
+    pub incomplete: bool,
+    /// Quantiles came from a log-linear histogram (within 1/32 for
+    /// magnitudes from about 0.016 up).
+    pub approximate: bool,
+}
+
+/// One group of an [`AggregateOut`].
+#[derive(Debug, Serialize)]
+pub struct AggregateGroupOut {
+    /// The `by` value; `null` without `by` or for logs that lack it.
+    pub group: Option<String>,
+    /// Values counted in the group: one per log and distinct value
+    /// (quantiles: numeric values only).
+    pub count: u64,
+    /// Top values, most frequent first (top only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub top: Option<Vec<AggregateValueOut>>,
+    /// Distinct values in the group (top only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub distinct: Option<usize>,
+    /// Requested quantiles in request order (quantiles only).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub quantiles: Option<Vec<QuantileOut>>,
+}
+
+/// One top value and its log count.
+#[derive(Debug, Serialize)]
+pub struct AggregateValueOut {
+    pub value: String,
+    pub count: u64,
+}
+
+/// One quantile; `value` is `null` when the group has no numeric value.
+#[derive(Debug, Serialize)]
+pub struct QuantileOut {
+    pub q: f64,
+    pub value: Option<f64>,
 }
 
 /// Envelope schema version; always `3` via [`Default`].

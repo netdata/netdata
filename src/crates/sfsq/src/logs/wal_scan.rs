@@ -51,6 +51,7 @@ use super::aggregate::{LogsShard, eligible_facet_fields};
 use super::cursor::{Cursor, Part};
 use super::page::PageShard;
 use super::query::LogsQuery;
+use super::values::ValueAgg;
 
 /// A failure decoding a *flattened-frame* (ng-flatten) WAL during
 /// [`WalScan::scan_flattened`]. ng-flatten frames are bincode
@@ -313,6 +314,7 @@ impl WalScan {
                     facets: Vec::new(),
                     timeline: None,
                     fields,
+                    values: query.aggregate.as_ref().map(ValueAgg::new),
                 };
             }
         };
@@ -327,6 +329,14 @@ impl WalScan {
         let mut facets = FacetAcc::new(&facet_fields);
 
         let mut timeline = TimelineAcc::new(&query.histogram_field, grid, &fields, self);
+
+        let parts = query.parts;
+        // Value aggregation: counts per (group token, value token); `None`
+        // group for logs lacking the group field (or no group field asked).
+        let spec = query.aggregate.as_ref();
+        let mut value_counts: HashMap<(Option<u32>, u32), u64> = HashMap::new();
+        let mut row_values: Vec<u32> = Vec::new();
+        let mut row_groups: Vec<u32> = Vec::new();
 
         let mut matched: u64 = 0;
         let mut scratch: Vec<u32> = Vec::new();
@@ -351,17 +361,73 @@ impl WalScan {
                 }
             }
 
-            if in_window {
+            if in_window && parts.facets {
                 facets.accumulate(&compiled, &conjuncts, &scratch, self);
             }
-            timeline.accumulate(row.ts_ns, &conjuncts, &scratch);
+            if parts.histogram {
+                timeline.accumulate(row.ts_ns, &conjuncts, &scratch);
+            }
+
+            if let Some(spec) = spec
+                && in_window
+                && conjuncts.full
+            {
+                row_values.clear();
+                row_groups.clear();
+                for &t in &scratch {
+                    let field = self.pairs[t as usize].field();
+                    // Not exclusive: `by` may name the aggregated field.
+                    if field == spec.field {
+                        row_values.push(t);
+                    }
+                    if spec.by.as_deref() == Some(field) {
+                        row_groups.push(t);
+                    }
+                }
+                for &v in &row_values {
+                    if row_groups.is_empty() {
+                        *value_counts.entry((None, v)).or_insert(0) += 1;
+                    }
+                    for &g in &row_groups {
+                        *value_counts.entry((Some(g), v)).or_insert(0) += 1;
+                    }
+                }
+            }
         }
 
+        let values = spec.map(|spec| {
+            let mut agg = ValueAgg::new(spec);
+            let mut by_group: HashMap<Option<u32>, Vec<(u32, u64)>> = HashMap::new();
+            for ((g, v), c) in value_counts {
+                by_group.entry(g).or_default().push((v, c));
+            }
+            for (g, per_value) in by_group {
+                let group = g.map(|t| self.pairs[t as usize].value());
+                agg.add_group(
+                    group,
+                    per_value
+                        .into_iter()
+                        .map(|(v, c)| (self.pairs[v as usize].value(), c)),
+                );
+            }
+            agg.enforce_cap();
+            agg
+        });
+
         LogsShard {
-            matched,
-            facets: facets.finish(self),
-            timeline: timeline.finish(),
+            matched: if parts.matched { matched } else { 0 },
+            facets: if parts.facets {
+                facets.finish(self)
+            } else {
+                Vec::new()
+            },
+            timeline: if parts.histogram {
+                timeline.finish()
+            } else {
+                None
+            },
             fields,
+            values,
         }
     }
 

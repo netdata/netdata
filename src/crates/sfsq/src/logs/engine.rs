@@ -31,9 +31,10 @@ use tokio_util::sync::CancellationToken;
 use super::aggregate::LogsShard;
 use super::cursor::Part;
 use super::mmap::{self, Mapped};
-use super::page::paginate;
+use super::page::{Page, paginate};
 use super::query::LogsQuery;
 use super::result::LogsData;
+use super::values::ValueAgg;
 use super::wal_scan::WalScan;
 
 // The bytes-provenance type is signal-neutral and shared with the traces
@@ -242,39 +243,101 @@ pub fn run(
     // (sized to the available cores); a full-text query over hundreds of
     // files is CPU-bound and was limited to one core when folded serially.
     // A source reached after cancellation contributes the empty shard.
-    let shards: Vec<LogsShard> = sources
-        .par_iter()
-        .zip(mapped.par_iter())
-        .map(|(source, mapping)| {
-            if cancel.is_cancelled() {
-                return LogsShard::default();
+    //
+    // A query wanting no statistic and no value aggregation (rows only)
+    // skips step 1; every source then counts as done for progress.
+    let mut stats = if query.needs_stats() {
+        // Value aggregations can be large (one entry per distinct value, up
+        // to the cap per source), so each rayon job folds them as it goes
+        // and the per-job results merge as a tree: peak memory follows the
+        // number of jobs, not the number of sources. The other statistics
+        // keep the single all-shard merge in source order (the facet cap
+        // makes it order-sensitive).
+        let merge_values = |a: Option<ValueAgg>, b: Option<ValueAgg>| match (a, b) {
+            (Some(mut a), Some(b)) => {
+                a.merge(b);
+                Some(a)
             }
-            let shard = source.to_shard(&query, mapping.as_ref());
-            progress.fetch_add(1, Ordering::Relaxed);
-            shard
-        })
-        .collect();
-    let stats = LogsShard::merge(shards);
+            (a, b) => a.or(b),
+        };
+        let (mut indexed, values) = sources
+            .par_iter()
+            .zip(mapped.par_iter())
+            .enumerate()
+            .map(|(i, (source, mapping))| {
+                if cancel.is_cancelled() {
+                    return (i, LogsShard::default());
+                }
+                let shard = source.to_shard(&query, mapping.as_ref());
+                progress.fetch_add(1, Ordering::Relaxed);
+                (i, shard)
+            })
+            .fold(
+                || (Vec::new(), None),
+                |(mut shards, acc), (i, mut shard)| {
+                    let values = shard.values.take();
+                    shards.push((i, shard));
+                    (shards, merge_values(acc, values))
+                },
+            )
+            .reduce(
+                || (Vec::new(), None),
+                |(mut a, va), (b, vb)| {
+                    a.extend(b);
+                    (a, merge_values(va, vb))
+                },
+            );
+        indexed.sort_unstable_by_key(|(i, _)| *i);
+        let shards: Vec<LogsShard> = indexed.into_iter().map(|(_, shard)| shard).collect();
+        let mut stats = LogsShard::merge(shards);
+        stats.values = values;
+        stats
+    } else {
+        progress.fetch_add(sources.len(), Ordering::Relaxed);
+        LogsShard::default()
+    };
+    let aggregate = query.aggregate.as_ref().map(|spec| {
+        stats
+            .values
+            .take()
+            .unwrap_or_else(|| ValueAgg::new(spec))
+            .finish(spec)
+    });
+
+    // Step 2: paginate across every source under the unified cursor
+    // order — on-disk SFSTs and in-memory chunks (`Part::Indexed`), and
+    // the WAL tails (`Part::Tail`) — reading the same mappings as step 1.
+    let page = if query.parts.rows {
+        paginate(&sources, &mapped, &query, &cancel)
+    } else {
+        Page::default()
+    };
 
     // `available_fields` is the merged table with high-card fields
     // dropped — the offerable facet / histogram set — while `columns`
     // keeps the full name set, all tiers. The high-card drop happens
-    // here, once, at the root.
+    // here, once, at the root. Without step 1 there is no field table,
+    // so the columns are the fields the returned rows carry.
     let available_fields: sfst::FieldTable = stats
         .fields
         .iter()
         .filter(|field| !field.is_high_card())
         .cloned()
         .collect();
-    let columns: Vec<String> = stats.fields.names().map(str::to_owned).collect();
+    let columns: Vec<String> = if query.needs_stats() {
+        stats.fields.names().map(str::to_owned).collect()
+    } else {
+        page.rows
+            .iter()
+            .flat_map(|(_, row)| row.fields.iter().map(|(name, _)| name.as_str()))
+            .collect::<std::collections::BTreeSet<&str>>()
+            .into_iter()
+            .map(str::to_owned)
+            .collect()
+    };
     let histogram = stats
         .timeline
         .unwrap_or_else(|| sfst::Timeline::empty(grid));
-
-    // Step 2: paginate across every source under the unified cursor
-    // order — on-disk SFSTs and in-memory chunks (`Part::Indexed`), and
-    // the WAL tails (`Part::Tail`) — reading the same mappings as step 1.
-    let page = paginate(&sources, &mapped, &query, &cancel);
 
     LogsData {
         matched: stats.matched,
@@ -286,6 +349,8 @@ pub fn run(
         rows: page.rows,
         has_newer: page.has_newer,
         has_older: page.has_older,
+        parts: query.parts,
+        aggregate,
     }
 }
 

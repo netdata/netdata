@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use sfst::Filter;
 
 use super::cursor::Cursor;
+use super::values::AggregateSpec;
 
 /// Default histogram dimension when the query doesn't specify one:
 /// `severity_text`, the OTel canonical log-level field. Choosing a
@@ -50,6 +51,8 @@ pub struct LogsQuery {
     pub(super) anchor: Option<Anchor>,
     pub(super) direction: Direction,
     pub(super) limit: usize,
+    pub(super) parts: Parts,
+    pub(super) aggregate: Option<AggregateSpec>,
 }
 
 impl LogsQuery {
@@ -92,6 +95,66 @@ impl LogsQuery {
     pub fn limit(&self) -> usize {
         self.limit
     }
+
+    /// Which result parts to compute ([`Parts::ALL`] by default).
+    pub fn parts(&self) -> Parts {
+        self.parts
+    }
+
+    /// The value aggregation to compute, if any.
+    pub fn aggregate(&self) -> Option<&AggregateSpec> {
+        self.aggregate.as_ref()
+    }
+
+    /// Whether step 1 (per-source statistics) has anything to compute.
+    pub(super) fn needs_stats(&self) -> bool {
+        self.parts.needs_stats() || self.aggregate.is_some()
+    }
+}
+
+/// The result parts a query computes. A part left out is returned empty
+/// (zero `matched`, no facets, an empty histogram, no rows), and the work
+/// behind it is skipped: without `matched`, `histogram`, `facets` and an
+/// aggregation, step 1 doesn't run at all; without `rows`, step 2 doesn't.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Parts {
+    /// The page of rows (step 2).
+    pub rows: bool,
+    /// The matched count.
+    pub matched: bool,
+    /// The histogram.
+    pub histogram: bool,
+    /// The facets.
+    pub facets: bool,
+}
+
+impl Parts {
+    /// Every part — the default, and the UI's full response.
+    pub const ALL: Parts = Parts {
+        rows: true,
+        matched: true,
+        histogram: true,
+        facets: true,
+    };
+
+    /// No part; enable the wanted ones on top.
+    pub const NONE: Parts = Parts {
+        rows: false,
+        matched: false,
+        histogram: false,
+        facets: false,
+    };
+
+    /// Whether any step-1 statistic is wanted.
+    pub fn needs_stats(&self) -> bool {
+        self.matched || self.histogram || self.facets
+    }
+}
+
+impl Default for Parts {
+    fn default() -> Self {
+        Parts::ALL
+    }
 }
 
 /// Builder for [`LogsQuery`]. Start from the histogram [`grid`](LogsQuery::grid)
@@ -110,6 +173,8 @@ pub struct LogsQueryBuilder {
     anchor: Option<Anchor>,
     direction: Direction,
     limit: usize,
+    parts: Parts,
+    aggregate: Option<AggregateSpec>,
 }
 
 impl LogsQueryBuilder {
@@ -124,6 +189,8 @@ impl LogsQueryBuilder {
             anchor: None,
             direction: Direction::default(),
             limit: 0,
+            parts: Parts::ALL,
+            aggregate: None,
         }
     }
 
@@ -193,6 +260,18 @@ impl LogsQueryBuilder {
         self
     }
 
+    /// Select the result parts to compute; [`Parts::ALL`] by default.
+    pub fn parts(mut self, parts: Parts) -> Self {
+        self.parts = parts;
+        self
+    }
+
+    /// Request a value aggregation (top values or quantiles of a field).
+    pub fn aggregate(mut self, aggregate: AggregateSpec) -> Self {
+        self.aggregate = Some(aggregate);
+        self
+    }
+
     /// Resolve defaults and produce the query: an unset histogram field
     /// becomes `severity_text`, and an empty facet list becomes that same
     /// single default facet.
@@ -214,6 +293,8 @@ impl LogsQueryBuilder {
             anchor: self.anchor,
             direction: self.direction,
             limit: self.limit,
+            parts: self.parts,
+            aggregate: self.aggregate,
         }
     }
 }

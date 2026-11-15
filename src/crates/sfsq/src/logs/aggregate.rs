@@ -14,6 +14,7 @@ use super::engine::SfstCandidate;
 use super::merge::{merge_facet_results, merge_field_tables, merge_timelines};
 use super::mmap;
 use super::query::LogsQuery;
+use super::values::{AggregateSpec, ValueAgg};
 
 /// One file's (or one node's) contribution to a query's statistics:
 /// matched count, facets, histogram, and field table — everything in
@@ -39,6 +40,9 @@ pub struct LogsShard {
     /// marks a field `High` if high-card in *any* shard (see
     /// `merge_field_tables`); the offerable-set drop happens at the root.
     pub fields: sfst::FieldTable,
+    /// The query's value aggregation over this shard's logs, when the query
+    /// asks for one ([`LogsQuery::aggregate`]).
+    pub values: Option<ValueAgg>,
 }
 
 impl LogsShard {
@@ -58,9 +62,16 @@ impl LogsShard {
         let mut field_tables: Vec<sfst::FieldTable> = Vec::with_capacity(shards.len());
         let mut per_shard_facets: Vec<Vec<sfst::FacetResult>> = Vec::with_capacity(shards.len());
         let mut timelines: Vec<sfst::Timeline> = Vec::new();
+        let mut values: Option<ValueAgg> = None;
 
         for shard in shards {
             matched += shard.matched;
+            if let Some(v) = shard.values {
+                match values.as_mut() {
+                    Some(into) => into.merge(v),
+                    None => values = Some(v),
+                }
+            }
             field_tables.push(shard.fields);
             per_shard_facets.push(shard.facets);
             if let Some(timeline) = shard.timeline {
@@ -84,6 +95,7 @@ impl LogsShard {
             facets,
             timeline,
             fields,
+            values,
         }
     }
 
@@ -151,18 +163,24 @@ impl LogsShard {
                     facets: Vec::new(),
                     timeline: None,
                     fields,
+                    values: query.aggregate.as_ref().map(ValueAgg::new),
                 };
             }
         };
+        let parts = query.parts;
 
-        let matched = match reader.matched_count(&filter, window.clone()) {
-            Ok(count) => count,
-            Err(e) => {
-                tracing::warn!(
-                    "sfsq: matched count failed for {}: {e}",
-                    candidate.source.describe()
-                );
-                0
+        let matched = if !parts.matched {
+            0
+        } else {
+            match reader.matched_count(&filter, window.clone()) {
+                Ok(count) => count,
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq: matched count failed for {}: {e}",
+                        candidate.source.describe()
+                    );
+                    0
+                }
             }
         };
 
@@ -170,31 +188,49 @@ impl LogsShard {
         // *this* file — present and not high-card here (an unknown field
         // would make `facets()` error and cost the whole file; a high-card
         // one is dropped across files later, in `merge`).
-        let facet_fields = eligible_facet_fields(&query.facet_fields, &fields);
-        let facets = match reader.facets(&facet_fields, &filter, window) {
-            Ok(facets) => facets,
-            Err(e) => {
-                tracing::warn!(
-                    "sfsq: facets failed for {}: {e}",
-                    candidate.source.describe()
-                );
-                Vec::new()
+        let facets = if !parts.facets {
+            Vec::new()
+        } else {
+            let facet_fields = eligible_facet_fields(&query.facet_fields, &fields);
+            match reader.facets(&facet_fields, &filter, window.clone()) {
+                Ok(facets) => facets,
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq: facets failed for {}: {e}",
+                        candidate.source.describe()
+                    );
+                    Vec::new()
+                }
             }
         };
 
         // Histogram: a file lacking the field yields a dimensionless timeline
         // whose matching logs all land in `unset`; only a high-card field
         // errors, in which case the file contributes no timeline.
-        let timeline = match reader.timeline(&query.histogram_field, &filter, grid) {
-            Ok(timeline) => Some(timeline),
-            Err(e) => {
-                tracing::warn!(
-                    "sfsq: timeline failed for {}: {e}",
-                    candidate.source.describe()
-                );
-                None
+        let timeline = if !parts.histogram {
+            None
+        } else {
+            match reader.timeline(&query.histogram_field, &filter, grid) {
+                Ok(timeline) => Some(timeline),
+                Err(e) => {
+                    tracing::warn!(
+                        "sfsq: timeline failed for {}: {e}",
+                        candidate.source.describe()
+                    );
+                    None
+                }
             }
         };
+
+        let values = query.aggregate.as_ref().map(|spec| {
+            aggregate_indexed(&reader, &filter, window, spec).unwrap_or_else(|e| {
+                tracing::warn!(
+                    "sfsq: value aggregation failed for {}: {e}",
+                    candidate.source.describe()
+                );
+                ValueAgg::new(spec)
+            })
+        });
 
         // Release the file's cold suffix from the page cache (see
         // `sfst::IndexReader::cold_region`) so it doesn't evict the hot
@@ -213,8 +249,91 @@ impl LogsShard {
             facets,
             timeline,
             fields,
+            values,
         }
     }
+}
+
+/// One indexed source's value aggregation: the field's (and the group
+/// field's) value ids over the matching logs, counted per distinct
+/// `(group, value)` pair and folded into a fresh [`ValueAgg`]. A log lacking
+/// the field contributes nothing; one lacking the group field counts under
+/// the `None` group.
+fn aggregate_indexed(
+    reader: &sfst::IndexReader<'_>,
+    filter: &sfst::BitmapFilter,
+    window: std::ops::Range<i64>,
+    spec: &AggregateSpec,
+) -> Result<ValueAgg, sfst::Error> {
+    let mut agg = ValueAgg::new(spec);
+    let mut fields: Vec<&str> = vec![spec.field.as_str()];
+    if let Some(by) = &spec.by {
+        fields.push(by.as_str());
+    }
+    let mut ids = reader.field_value_ids(&fields, filter, window)?;
+    let groups = if spec.by.is_some() {
+        ids.pop().flatten()
+    } else {
+        None
+    };
+    let Some(Some(values)) = ids.pop() else {
+        return Ok(agg);
+    };
+
+    match groups {
+        None => {
+            let mut counts = vec![0u64; values.values.len()];
+            for &(_, vi) in &values.pairs {
+                counts[vi as usize] += 1;
+            }
+            agg.add_group(None, values.values.iter().map(String::as_str).zip(counts));
+        }
+        Some(groups) => {
+            // Join both fields' (position, id) pairs row by row. Slot
+            // `groups.values.len()` collects logs lacking the group field.
+            let mut vp = values.pairs;
+            let mut gp = groups.pairs;
+            vp.sort_unstable();
+            gp.sort_unstable();
+            let none = groups.values.len();
+            let mut counts: Vec<std::collections::HashMap<u32, u64>> = (0..=none)
+                .map(|_| std::collections::HashMap::new())
+                .collect();
+            let (mut i, mut g) = (0, 0);
+            while i < vp.len() {
+                let pos = vp[i].0;
+                let row_end = i + vp[i..].iter().take_while(|&&(p, _)| p == pos).count();
+                while g < gp.len() && gp[g].0 < pos {
+                    g += 1;
+                }
+                let g_end = g + gp[g..].iter().take_while(|&&(p, _)| p == pos).count();
+                let row_groups: &[(u32, u32)] = &gp[g..g_end];
+                for &(_, vi) in &vp[i..row_end] {
+                    if row_groups.is_empty() {
+                        *counts[none].entry(vi).or_insert(0) += 1;
+                    }
+                    for &(_, gi) in row_groups {
+                        *counts[gi as usize].entry(vi).or_insert(0) += 1;
+                    }
+                }
+                i = row_end;
+            }
+            for (gi, per_value) in counts.into_iter().enumerate() {
+                if per_value.is_empty() {
+                    continue;
+                }
+                let group = groups.values.get(gi).map(String::as_str);
+                agg.add_group(
+                    group,
+                    per_value
+                        .into_iter()
+                        .map(|(vi, c)| (values.values[vi as usize].as_str(), c)),
+                );
+            }
+        }
+    }
+    agg.enforce_cap();
+    Ok(agg)
 }
 
 /// The query's facet fields that are usable in *this* file: present in its
