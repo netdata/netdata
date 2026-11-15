@@ -3,7 +3,6 @@
 package aggregate
 
 import (
-	"math"
 	"strconv"
 	"time"
 
@@ -83,7 +82,6 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		Observation:  &obs,
 	}
 }
-func validMeasurement(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 func (st *siteState) countAccepted(now time.Time) {
 	st.counters[CounterAccepted]++
@@ -199,8 +197,7 @@ func (st *siteState) admitEvents(r *report) {
 func (st *siteState) admitVitals(r *report) {
 	b := r.in
 	for _, v := range b.Vitals {
-		if _, supported := thresholds[v.Name]; !supported || b.ExperienceID == "" || v.ID == "" || v.Revision == 0 ||
-			!validMeasurement(v.Value) {
+		if b.ExperienceID == "" || v.ID == "" || v.Revision == 0 {
 			st.counters[CounterInvalidMeasurements]++
 			continue
 		}
@@ -235,14 +232,6 @@ func (st *siteState) admitNavigation(r *report) {
 		return
 	}
 	n := *nav
-	if n.HasLoad && !validMeasurement(n.LoadMS) {
-		n.HasLoad = false
-		st.counters[CounterInvalidMeasurements]++
-	}
-	if n.HasDCL && !validMeasurement(n.DCLMS) {
-		n.HasDCL = false
-		st.counters[CounterInvalidMeasurements]++
-	}
 	// Revision replacement also removes a field absent from the newer report.
 	for _, metric := range []struct {
 		name    string
@@ -297,10 +286,6 @@ func (st *siteState) admitResources(r *report) {
 			item:       res.ID,
 		}, 1, r.now) {
 			continue
-		}
-		if res.HasDuration && !validMeasurement(res.DurationMS) {
-			res.HasDuration = false
-			st.counters[CounterInvalidMeasurements]++
 		}
 		st.resourcesSeen = true
 		firstParty := isFirstParty(b.PageHost, res.Host)
