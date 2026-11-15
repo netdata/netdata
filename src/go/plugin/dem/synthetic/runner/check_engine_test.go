@@ -6,6 +6,7 @@ package runner
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -96,12 +97,18 @@ func TestCheckRequiresTrustedReleaseAndPreservedIdentity(t *testing.T) {
 }
 
 // TestCheckResponseBounds pins the --check stdout cap and the stderr
-// diagnostic kept from a failing check.
+// diagnostic kept from a failing check: the parsed error of the runtime's
+// {"error": text} line, or the clipped raw stderr when it holds anything else.
 func TestCheckResponseBounds(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("requires unprivileged identity")
 	}
 	reply := fmt.Sprintf(`{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
+	// The widest producer line: textLimit characters, each escaped as \u00XX.
+	widest, err := json.Marshal(map[string]string{"error": strings.Repeat("\x1f", textLimit)})
+	require.NoError(t, err)
+	require.Len(t, widest, checkDiagnosticLimit-1)
+	const failed = "prepared runtime check: runtime check failed: exit status 1 ("
 	tests := map[string]struct {
 		stdout, stderr string
 		failed         bool
@@ -112,18 +119,45 @@ func TestCheckResponseBounds(t *testing.T) {
 			stdout: reply + strings.Repeat(" ", 4097-len(reply)),
 			err:    "prepared runtime check: runtime check response exceeds 4096 bytes",
 		},
+		"parsed diagnostic": {
+			stderr: `{"error":"nd-run is missing"}` + "\n",
+			failed: true,
+			err:    failed + "nd-run is missing)",
+		},
+		"parsed after other output": {
+			stderr: "(node:7) Warning: deprecated\n" + `{"error":"nd-run is missing"}` + "\n",
+			failed: true,
+			err:    failed + "nd-run is missing)",
+		},
+		"widest parsed diagnostic": {
+			stderr: string(widest) + "\n",
+			failed: true,
+			err:    failed + strings.Repeat("\x1f", textLimit) + ")",
+		},
+		"parsed diagnostic over text limit": {
+			stderr: `{"error":"` + strings.Repeat("z", 3*textLimit) + `"}` + "\n",
+			failed: true,
+			err:    failed + strings.Repeat("z", textLimit) + ")",
+		},
+		"unexpected JSON shape": {
+			stderr: `{"message":"nd-run is missing"}` + "\n",
+			failed: true,
+			err:    failed + `{"message":"nd-run is missing"}` + "\n)",
+		},
 		"clipped diagnostic": {
 			stderr: strings.Repeat("z", 3*textLimit),
 			failed: true,
-			err: "prepared runtime check: runtime check failed: exit status 1 (" + strings.Repeat(
-				"z",
-				textLimit,
-			) + ")",
+			err:    failed + strings.Repeat("z", textLimit) + ")",
 		},
 		"multibyte diagnostic": {
-			stderr: "a" + strings.Repeat("é", 1500),
+			stderr: "a" + strings.Repeat("é", 2*textLimit),
 			failed: true,
-			err:    "prepared runtime check: runtime check failed: exit status 1 (a" + strings.Repeat("é", 1000) + ")",
+			err:    failed + "a" + strings.Repeat("é", textLimit-1) + ")",
+		},
+		"diagnostic over read limit": {
+			stderr: strings.Repeat("é", checkDiagnosticLimit) + `{"error":"nd-run is missing"}`,
+			failed: true,
+			err:    failed + strings.Repeat("é", textLimit) + ")",
 		},
 	}
 	for name, tc := range tests {
