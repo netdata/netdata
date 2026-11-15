@@ -2,6 +2,7 @@
 package dem
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -59,18 +60,13 @@ func TestBrowserConcurrencyConfig(t *testing.T) {
 		want int
 		fail bool
 	}{
-		"default":           {want: 1},
-		"empty section":     {body: "browser: {}", want: 1},
-		"commented section": {body: "browser:\n  # concurrency: 1\n", want: 1},
-		"null section":      {body: "browser: null", want: 1},
-		"tilde section":     {body: "browser: ~", want: 1},
-		"null alias":        {body: "empty: &empty null\nbrowser: *empty", want: 1},
-		"explicit budget":   {body: "browser: {concurrency: 4}", want: 4},
-		"zero":              {body: "browser: {concurrency: 0}", fail: true},
-		"negative":          {body: "browser: {concurrency: -1}", fail: true},
-		"fractional":        {body: "browser: {concurrency: 1.5}", fail: true},
-		"text":              {body: "browser: {concurrency: four}", fail: true},
-		"null concurrency":  {body: "browser: {concurrency: null}", fail: true},
+		"default":          {want: 1},
+		"explicit budget":  {body: "browser: {concurrency: 4}", want: 4},
+		"zero":             {body: "browser: {concurrency: 0}", fail: true},
+		"negative":         {body: "browser: {concurrency: -1}", fail: true},
+		"fractional":       {body: "browser: {concurrency: 1.5}", fail: true},
+		"text":             {body: "browser: {concurrency: four}", fail: true},
+		"null concurrency": {body: "browser: {concurrency: null}", fail: true},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg, err := loadConfigText(t, tc.body)
@@ -81,6 +77,27 @@ func TestBrowserConcurrencyConfig(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, cfg.Browser.Concurrency)
 		})
+	}
+}
+
+// A section that is present but empty, including one whose settings are all
+// commented out, loads that section's defaults.
+func TestEmptySectionsLoadDefaults(t *testing.T) {
+	forms := map[string]string{
+		"commented settings": "%s:\n  # setting: value\n",
+		"null":               "%s: null\n",
+		"tilde":              "%s: ~\n",
+		"null alias":         "empty: &empty null\n%s: *empty\n",
+		"empty mapping":      "%s: {}\n",
+	}
+	for _, section := range []string{"history", "artifacts", "runtime", "browser"} {
+		for form, body := range forms {
+			t.Run(section+"/"+form, func(t *testing.T) {
+				cfg, err := loadConfigText(t, fmt.Sprintf(body, section))
+				require.NoError(t, err)
+				assert.Equal(t, DefaultConfig(), cfg)
+			})
+		}
 	}
 }
 
