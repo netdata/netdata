@@ -77,7 +77,9 @@ type Snapshot struct {
 	QueueAge time.Duration
 	// State is the executor-reported attempt phase or the latest outcome; it is stale when the
 	// observation is not fresh and no attempt waits or runs.
-	State          synthetic.JobState
+	State synthetic.JobState
+	// Latest, ObservationAge and Fresh describe the latest verified run of the current association; they are
+	// zero unless HasObservation.
 	Latest         Observation
 	HasObservation bool
 	ObservationAge time.Duration
