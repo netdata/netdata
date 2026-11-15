@@ -12,7 +12,9 @@ import (
 
 // Append includes the shared envelope and SDK publication, but not per-row
 // fsync. Distinct receipt clocks and repeated context exercise normal postings.
-// Cost follows fields per event; timing is a local trend, never a CI limit.
+// The first append also runs the journal's open-time retention check, so it is
+// made before the timer starts. Cost follows fields per event; timing is a local
+// trend, never a CI limit.
 func BenchmarkHistoryAppend(b *testing.B) {
 	ctx := context.Background()
 	store, err := Open(ctx, "")
@@ -30,6 +32,9 @@ func BenchmarkHistoryAppend(b *testing.B) {
 		journal.StringField("DEM_FINGERPRINT", "fingerprint"), journal.StringField("DEM_ERROR_TYPE", "TypeError"),
 		journal.StringField("DEM_MESSAGE", "request failed"), journal.StringField("DEM_SAMPLE_STACK", "app.js:10"),
 		journal.StringField("MESSAGE", "request failed"),
+	}
+	if _, err := store.Append(ctx, fields); err != nil {
+		b.Fatal(err)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()

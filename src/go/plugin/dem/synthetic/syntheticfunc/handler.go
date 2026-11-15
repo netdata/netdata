@@ -56,33 +56,22 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	spec := methods[i]
+	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID)
+	if r != nil {
+		return r
+	}
 	// Metadata discovery never queries active jobs, history or artifact storage.
 	if req.Info {
 		return &funcapi.FunctionResponse{
-			Status:            200,
-			Help:              spec.Help,
-			Columns:           spec.Columns,
-			DefaultSortColumn: spec.Sort,
+			Status: 200,
+			Help:   spec.Help,
 		}
-	}
-	if r := rawfunc.RequireMember(req); r != nil {
-		return r
-	}
-	if r := rawfunc.NoPayload(req); r != nil {
-		return r
-	}
-	args, err := rawfunc.ParseArgs(req, spec.Params)
-	if err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
 	}
 	if spec.ID == artifactMethod.ID && args["artifact_id"] != "" && !rawfunc.Permitted(req, rawfunc.AdminAccess) {
 		return funcapi.ErrorResponse(403, "administrator permissions are required for artifact bytes")
 	}
 	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r
-	}
-	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
 	}
 	return spec.serve(h, ctx, args, spec.Table())
 }

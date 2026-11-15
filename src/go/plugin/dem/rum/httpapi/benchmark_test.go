@@ -54,9 +54,7 @@ func benchmarkCollectBody(b *testing.B, body string) {
 	cfg.RateLimit.PerIPPerMin = math.MaxInt32
 	cfg.RateLimit.PerSitePerSec = math.MaxInt32
 	handler := newFixture(cfg, benchmarkSink{}, nil).Handler()
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
+	collect := func() {
 		req := httptest.NewRequest(http.MethodPost, "/rum/shop/collect", strings.NewReader(body))
 		req.Header.Set("Origin", "https://shop.example.com")
 		req.Header.Set("User-Agent", browserUA)
@@ -65,5 +63,13 @@ func benchmarkCollectBody(b *testing.B, body string) {
 		if response.Code != http.StatusAccepted {
 			b.Fatalf("unexpected response: %d", response.Code)
 		}
+	}
+	// The first request creates the client's rate-limit bucket and, in a fresh
+	// process, compiles the bot matcher; keep that one-time work out of the timer.
+	collect()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		collect()
 	}
 }

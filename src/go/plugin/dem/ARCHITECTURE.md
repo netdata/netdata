@@ -390,8 +390,10 @@ What makes this layer predictable:
   (signed in, same Space, paid Space, sensitive data): viewing Real User Monitoring, browser tests and DEM history
   status requires a paid plan or an active trial. Collection, journeys, audits and history storage run on every plan.
   Every handler also requires member access (`0x1b`) for data, and `synthetics-artifact` bytes require administrator
-  access (`0x7b`); `info` stays available for discovery. The access masks, the permission test and the member check
-  are in `internal/rawfunc`; `synthetic/syntheticfunc` applies the administrator check to artifact bytes.
+  access (`0x7b`); `info` stays available for discovery. `internal/rawfunc.Admit` runs the checks every handler shares,
+  in one order: member access unless info, strict parameters from `key:value` arguments or a JSON body (the Cloud
+  Function table posts one), then the vnode selector. `synthetic/syntheticfunc` applies the administrator check to
+  artifact bytes.
 - **Independent of collector selection.** Disabling `rum` or `journey`, or every collector, keeps retained history
   queryable while the plugin itself is enabled.
 - **Fresh handlers.** Each framework run generation gets new handler instances; the stores they read stay open.
@@ -468,11 +470,12 @@ Shared and process-wide packages:
 
 | Package | Responsibility |
 |---|---|
-| `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication; journey and lighthouse embed the shared synthetic job and keep request building and their own metrics |
-| `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
+| `collector/{receiver,rum}` | Native lifecycle, configuration, scheduling callbacks and metric publication |
+| `collector/synthetic` | The `journey` and `lighthouse` modules: each keeps its configuration, form and request building over the shared synthetic job; one chart template and one integration metadata file serve both |
+| `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, rehearsal, registration, monitor session, vnode association, and attempt and kind metrics |
 | `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
-| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
+| `internal/rawfunc` | Request and response plumbing shared by the three Function packages: request admission (access masks, strict parameters from arguments or a JSON body, vnode selectors), the cancellation status, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction |
 | `config/` | Installed configuration files; not a Go package |
 
@@ -594,8 +597,9 @@ Framework-owned behavior:
 
 Collectors:
 
-- Each package in `collector/` is a registered native collector. Its lifecycle methods show acquisition, readiness,
-  collection and retirement; its metric definitions show the measurements it publishes.
+- Each collector package under `collector/` registers native collectors: `receiver`, `rum`, and `synthetic`, which
+  registers both `journey` and `lighthouse`. Their lifecycle methods show acquisition, readiness, collection and
+  retirement. The synthetic modules' measurements are defined in `collector/internal/syntheticjob`.
 - Fixed instruments are prepared once.
 - Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 
@@ -911,7 +915,7 @@ flowchart LR
     R1("Remove future admission")
     R2("Join HTTP and<br/>Function readers")
     R3("Cancel history and<br/>export workers")
-    R4("Final drain<br/>within fixed budgets")
+    R4("Final drain<br/>within one shared budget")
     R1 --> R2 --> R3 --> R4
 
     classDef step fill:#dcfce7,stroke:#16a34a,color:#0b1021;
@@ -919,8 +923,8 @@ flowchart LR
 ```
 
 - A retiring site joins its HTTP and Function readers before cancelling the history/export worker context.
-- Export queues drain using one shared fixed shutdown budget.
-- Accepted history events flush under one detached five-second admission budget.
+- The history writer and export queues drain under one shared one-second budget, which fits inside the Agent's
+  two-second SIGTERM-to-SIGKILL grace. History entries the budget cannot admit count as dropped.
 - Every event is self-contained: there are no session/group parent records or cumulative deltas.
 - A cancelled admission leaves only unattempted entries pending for final drain. Attempted appends are never
   replayed, including when an error or cancellation races them.

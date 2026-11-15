@@ -391,8 +391,9 @@ func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 			Method:      "dem-history-status",
 			Permissions: "0x1b",
 		})
-		require.Equal(t, 200, response.Status)
-		return response.Data.([][]any)[0]
+		require.NotNil(t, response.RawResponse, response.Message)
+		require.Equal(t, 200, response.RawResponse["status"])
+		return response.RawResponse["data"].([][]any)[0]
 	}
 	components.Retention.reloadPolicy()
 	assert.Equal(t, 30, read()[0], "loading a policy alone does not make it effective")

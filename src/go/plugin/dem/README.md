@@ -171,6 +171,10 @@ Six process Functions use the regular Netdata Function transport: `rum-sites`, `
 `rum-errors`, and `rum-session-events`. Viewing them, and the `synthetics-*` Functions, requires a signed-in member of
 the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; collection and
 history storage are not restricted.
+Every DEM Function takes its parameters as `key:value` (or `key=value`) arguments or as fields of a JSON request body,
+at its top level or under `selections`, which is how the Netdata Cloud Function table sends them. Arguments win over
+`selections`, which win over top-level fields. Unknown parameters are rejected, except the table's request fields
+(`timeout`, `last`, `_auxiliary` and an empty `query`) and, for `info`, a time range the Function does not use.
 Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
 arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include
@@ -197,8 +201,9 @@ retained occurrences by fingerprint; affected-session, top-page and browser stat
 filter selects the group to investigate. `rum-session-events` returns the full retained and pending timeline for a
 session, ordered by Agent observation time in Unix microseconds, without range filtering. Activity-only presence records
 contribute to summaries but stay out of timelines. Session rows sort by `last_observed_us` at microsecond precision
-before limiting; first/last observations and their span describe only the selected activity. A gap between observations
-does not prove continuous presence.
+before limiting to 2000 rows with an explicit truncation flag; narrow the range or the site selection when truncated.
+First/last observations and their span describe only the selected activity. A gap between observations does not prove
+continuous presence.
 
 One process-owned retention worker applies one shared history budget across RUM, synthetic runs, disabled jobs and
 retained machine identities. Defaults are 30 days and 1 GiB; `history.max_bytes` must be at least 8 MiB. Accounting uses
@@ -218,7 +223,7 @@ retention policy, defaulting to 7 days and 2 GiB.
 last successful cleanup, and separate inventory, cleanup, writer and policy reload errors. It is a read-only member
 Function that, like every DEM Function, requires a signed-in member of the node's Space with permission to view
 sensitive data, on a paid plan or an active trial. It works even with all collectors
-disabled, with no arguments, payload or time filters. Unknown or unattempted values are `null`; an inventory failure
+disabled and takes no parameters or time filters. Unknown or unattempted values are `null`; an inventory failure
 does not erase cleanup or writer facts. These facts help diagnose storage pressure and maintenance failures, but cannot explain whether an absent event expired, was sampled out or was never collected.
 Unusable history at startup still stops the plugin before Functions register; inspect process logs in that case.
 

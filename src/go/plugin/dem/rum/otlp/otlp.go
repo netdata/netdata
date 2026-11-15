@@ -36,9 +36,6 @@ const (
 	batchPeriod   = time.Second
 	queueCap      = 10000
 	exportTimeout = 5 * time.Second
-	// ShutdownFlushTimeout bounds the final flush: the plugin has a 3s
-	// SIGTERM grace and a black-holed endpoint must not consume it.
-	ShutdownFlushTimeout = time.Second
 )
 
 // Counters receives export accounting; the owning site job publishes it.

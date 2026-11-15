@@ -12,8 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjob"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
+	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -31,8 +30,8 @@ type job interface {
 }
 
 var (
-	_ job = (*journey.Collector)(nil)
-	_ job = (*lighthouse.Collector)(nil)
+	_ job = (*syntheticcollector.Journey)(nil)
+	_ job = (*syntheticcollector.Lighthouse)(nil)
 )
 
 // settings override collector defaults; zero values keep them.
@@ -79,12 +78,12 @@ var kinds = map[string]kind{
 			BrowserErrorSummary: true,
 		},
 		new: func(e syntheticjob.Executor, hub *registry.Registry, s settings) job {
-			c := journey.New(journey.Dependencies{
+			c := syntheticcollector.NewJourney(syntheticcollector.Dependencies{
 				Executor: e,
 				Registry: hub,
 			})
 			c.Script = "export {};"
-			c.Secrets = []journey.Secret{{Name: "DEM_SECRET_LOGIN", Value: "synthetic-password"}}
+			c.Secrets = []syntheticcollector.Secret{{Name: "DEM_SECRET_LOGIN", Value: "synthetic-password"}}
 			c.ScreenshotOnFailure, c.TraceOnFailure, c.BrowserErrorSummary = true, true, true
 			s.apply(&c.Name, &c.CheckEvery, &c.UpdateEvery)
 			return c
@@ -122,7 +121,7 @@ var kinds = map[string]kind{
 			Capture: true,
 		},
 		new: func(e syntheticjob.Executor, hub *registry.Registry, s settings) job {
-			c := lighthouse.New(lighthouse.Dependencies{
+			c := syntheticcollector.NewLighthouse(syntheticcollector.Dependencies{
 				Executor: e,
 				Registry: hub,
 			})

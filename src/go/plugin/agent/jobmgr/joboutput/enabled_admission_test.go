@@ -11,8 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -24,8 +23,8 @@ func TestEnabledAdmissionRejectsMalformedDiscovery(t *testing.T) {
 		creator collectorapi.Creator
 		field   string
 	}{
-		"lighthouse": {lighthouse.Creator(lighthouse.Dependencies{}), "url"},
-		"journey":    {journey.Creator(journey.Dependencies{}), "script"},
+		"lighthouse": {synthetic.LighthouseCreator(synthetic.Dependencies{}), "url"},
+		"journey":    {synthetic.JourneyCreator(synthetic.Dependencies{}), "script"},
 	} {
 		for _, readiness := range []string{"available", "missing", "quarantined", "deadline"} {
 			t.Run(name+"/"+readiness, func(t *testing.T) {
@@ -64,7 +63,7 @@ func TestEnabledAdmissionRejectsMalformedPassiveEnable(t *testing.T) {
 	for _, missing := range []bool{false, true} {
 		t.Run(map[bool]string{false: "available", true: "missing"}[missing], func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			creator := lighthouse.Creator(lighthouse.Dependencies{})
+			creator := synthetic.LighthouseCreator(synthetic.Dependencies{})
 			creator.ActivationDependencies = enabledAdmissionDependencies(missing)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", map[string]any{"bad": "shape"})
@@ -87,7 +86,7 @@ func TestEnabledAdmissionRejectsMalformedPassiveEnable(t *testing.T) {
 
 func TestEnabledAdmissionInvalidDiscoveredReplacementPreservesBinding(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	creator := lighthouse.Creator(lighthouse.Dependencies{})
+	creator := synthetic.LighthouseCreator(synthetic.Dependencies{})
 	creator.ActivationDependencies = enabledAdmissionDependencies(true)
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
@@ -137,7 +136,7 @@ func TestEnabledAdmissionAdmissionWaitsForExactValidationAttempt(t *testing.T) {
 	for name, cut := range map[string]bool{"busy": false, "deadline": true} {
 		t.Run(name, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			creator := lighthouse.Creator(lighthouse.Dependencies{})
+			creator := synthetic.LighthouseCreator(synthetic.Dependencies{})
 			creator.ActivationDependencies = enabledAdmissionDependencies(true)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
@@ -226,7 +225,7 @@ func TestEnabledAdmissionAdmissionQuarantineRejectsWithoutAdoption(t *testing.T)
 	for _, route := range []string{"discovery", "enable"} {
 		t.Run(route, func(t *testing.T) {
 			controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-			creator := lighthouse.Creator(lighthouse.Dependencies{})
+			creator := synthetic.LighthouseCreator(synthetic.Dependencies{})
 			creator.ActivationDependencies = enabledAdmissionDependencies(true)
 			controller.modules["module"] = creator
 			config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://example.test")
@@ -263,7 +262,7 @@ func TestEnabledAdmissionAdmissionQuarantineRejectsWithoutAdoption(t *testing.T)
 
 func TestEnabledAdmissionAdmissionQuarantineAdvancesValidSibling(t *testing.T) {
 	controller, graph, _, _, _ := newDynCfgJobTestHarness(t)
-	creator := lighthouse.Creator(lighthouse.Dependencies{})
+	creator := synthetic.LighthouseCreator(synthetic.Dependencies{})
 	creator.ActivationDependencies = enabledAdmissionDependencies(true)
 	controller.modules["module"] = creator
 	config := acceptedActivationTestConfig(confgroup.TypeUser).Set("url", "https://quarantined.example.test")

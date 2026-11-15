@@ -77,9 +77,7 @@ func BenchmarkCollect(b *testing.B) {
 			managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
 			require.True(b, ok)
 			cycle := managed.CycleController()
-			b.ReportAllocs()
-			b.ResetTimer()
-			for range b.N {
+			collect := func() {
 				cycle.BeginCycle()
 				if err := c.Collect(ctx); err != nil {
 					b.Fatal(err)
@@ -88,7 +86,28 @@ func BenchmarkCollect(b *testing.B) {
 					b.Fatal(err)
 				}
 			}
+			// Early cycles create the site's series, and series and descriptors left
+			// idle expire within the store's retention window; warm past it so the
+			// timer covers only steady-state cycles.
+			retention, ok := c.MetricStore().(metrix.DescriptorRetention)
+			require.True(b, ok)
+			window := retention.DescriptorRetentionWindow()
+			require.NotEqual(b, metrix.DescriptorRetentionUnbounded, window)
+			for range window + 1 {
+				collect()
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				collect()
+			}
 			b.StopTimer()
+			// The aggregator runs on the wall clock; a run long enough to expire
+			// the measured beacon would silently measure the quiet path.
+			if measured {
+				snapshot := c.aggregator.Snapshot()
+				require.Equal(b, 1, snapshot.Vitals[beacon.LCP].N)
+			}
 		})
 	}
 }

@@ -15,11 +15,11 @@ import (
 )
 
 func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
-	for _, collector := range []string{"journey", "lighthouse"} {
-		t.Run(collector, func(t *testing.T) {
-			data, err := os.ReadFile("../../collector/" + collector + "/metadata.yaml")
-			require.NoError(t, err)
-			module, err := collecttest.DecodeMetadataModule(data, "")
+	data, err := os.ReadFile("../../collector/synthetic/metadata.yaml")
+	require.NoError(t, err)
+	for _, id := range []string{"collector-dem.plugin-journey", "collector-dem.plugin-lighthouse"} {
+		t.Run(id, func(t *testing.T) {
+			module, err := collecttest.DecodeMetadataModule(data, id)
 			require.NoError(t, err)
 			declarations := syntheticfunc.Declarations()
 			require.Len(t, module.Functions, len(declarations))
@@ -28,7 +28,7 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 				require.NotContains(t, docs, doc.ID)
 				docs[doc.ID] = doc
 			}
-			h := syntheticfunc.New(nil, nil)
+			h, _, _ := newRecordingHandler(nil)
 			for _, decl := range declarations {
 				t.Run(decl.ID, func(t *testing.T) {
 					// Registration must match the handler's own 0x1b permission check.
@@ -44,11 +44,17 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 					}
 					assert.ElementsMatch(t, decl.AcceptedParams, args)
 					assert.NotContains(t, args, "__job")
-					info := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-						Method: decl.ID,
-						Info:   true,
+					response := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+						Method:      decl.ID,
+						Args:        requiredArgs(decl.ID),
+						Permissions: "0x1b",
 					})
-					columns, err := collecttest.FunctionResponseColumns(info)
+					require.NotNil(t, response.RawResponse, response.Message)
+					table, ok := response.RawResponse["columns"].(map[string]any)
+					require.True(t, ok)
+					columns, err := collecttest.FunctionResponseColumns(&funcapi.FunctionResponse{
+						Columns: table,
+					})
 					require.NoError(t, err)
 					assert.Equal(t, columns, doc.Columns)
 				})

@@ -121,3 +121,37 @@ groups:
             name: expected_failure
           - selector: tests_not_run
             name: not_run
+  - family: Desktop lab performance
+    context_namespace: lighthouse
+    metrics: [performance, fcp, lcp, tbt, si, cls]
+    charts:
+      - context: performance
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse performance score
+        units: points
+        dimensions:
+          - selector: performance
+            name: performance
+      - context: timings
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse lab timings
+        units: milliseconds
+        dimensions:
+          - selector: fcp
+            name: fcp
+          - selector: lcp
+            name: lcp
+          - selector: tbt
+            name: tbt
+          - selector: si
+            name: speed_index
+      - context: cls
+        lifecycle:
+          expire_after_cycles: 0
+        title: Latest Lighthouse cumulative layout shift
+        units: ratio
+        dimensions:
+          - selector: cls
+            name: cls
