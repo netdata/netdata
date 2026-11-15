@@ -1,7 +1,7 @@
 //go:build linux
 
 // SPDX-License-Identifier: GPL-3.0-or-later
-package runner_test
+package dem_test
 
 import (
 	"context"
@@ -25,18 +25,18 @@ import (
 	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,7 +88,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 	observedHistory := &identityHistory{
 		Store: synthetichistory.NewStore(history),
 	}
-	engine, err := runner.New(selectedRuntime{consumer}, observedHistory, captures, 1)
+	engine, err := runner.New(runtimehost.Borrow(consumer), observedHistory, captures, 1)
 	require.NoError(t, err)
 	verifyIdentity := func(t *testing.T, run synthetic.Run) {
 		t.Helper()
@@ -651,36 +651,6 @@ func readProcIdentity(pid int) (procIdentity, error) {
 		state:     fields[0],
 	}, nil
 }
-
-// This adapter exposes only the public execution contract of the acquired
-// consumer. It cannot select a different generation or inject private paths.
-type selectedRuntime struct{ consumer *browserruntime.Consumer }
-
-func (s selectedRuntime) BeginUse() (runner.Use, error) {
-	use, err := s.consumer.BeginUse()
-	if err != nil {
-		return nil, err
-	}
-	return selectedUse{
-		use:      use,
-		identity: s.consumer.Manifest().Identity(),
-	}, nil
-}
-
-type selectedUse struct {
-	use      *browserruntime.Use
-	identity synthetic.RuntimeIdentity
-}
-
-func (u selectedUse) Paths() runner.Paths {
-	return runner.Paths{
-		Node:       u.use.Paths.Node,
-		EntryPoint: u.use.Paths.EntryPoint,
-		Identity:   u.identity,
-	}
-}
-func (u selectedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
-func (u selectedUse) Finish(drained bool) error          { return u.use.Finish(drained) }
 
 type identityHistory struct {
 	*synthetichistory.Store
