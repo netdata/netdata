@@ -15,6 +15,14 @@ import (
 // liveRingCap bounds rows retained by one aggregator runtime.
 const liveRingCap = 5000
 
+// LiveRow.Kind values: the observation a rum-live row reports.
+const (
+	LiveKindDocument = "document" // document activation
+	LiveKindView     = "view"     // application view occurrence
+	LiveKindVital    = "vital"    // vital report
+	LiveKindError    = "error"    // JavaScript errors of one report
+)
+
 // LiveRow is one rum-live ring entry. Has* distinguishes an absent vital
 // from a genuine zero, matching the FUNCTION's "null when absent" column
 // contract.
@@ -70,7 +78,7 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	}
 	if pageView {
 		row := base
-		row.Kind = "document"
+		row.Kind = LiveKindDocument
 		row.Revision = documentRevision(b)
 		row.PageView = true
 		appendRow(row)
@@ -78,14 +86,14 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	for _, ev := range b.Events {
 		if ev.Kind == beacon.EventView {
 			row := base
-			row.Kind = "view"
+			row.Kind = LiveKindView
 			row.Revision = ev.Revision
 			appendRow(row)
 		}
 	}
 	for _, v := range b.Vitals {
 		row := base
-		row.Kind = "vital"
+		row.Kind = LiveKindVital
 		row.Vital = v.Name
 		row.MetricID = v.ID
 		row.Revision = v.Revision
@@ -112,7 +120,7 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	}
 	if len(b.Errors) > 0 {
 		row := base
-		row.Kind = "error"
+		row.Kind = LiveKindError
 		row.Errors = len(b.Errors)
 		appendRow(row)
 	}

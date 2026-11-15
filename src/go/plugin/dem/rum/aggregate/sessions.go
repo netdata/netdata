@@ -26,7 +26,7 @@ type sessionEvent struct {
 	metricID string
 	revision uint64
 	ts       time.Time
-	typ      string // pageview, view, vital, error, frustration, request or event
+	typ      string // an EventType* value other than EventTypeActivity
 	page     string
 	text     string
 	traceID  string // traced requests
@@ -87,7 +87,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	if pageView {
 		t.record(sessionEvent{
 			ts:       now,
-			typ:      "pageview",
+			typ:      EventTypePageview,
 			revision: documentRevision(b),
 			page:     page,
 		})
@@ -104,7 +104,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		(len(b.Vitals) > 0 || len(b.Logs) > 0 || len(b.Spans) > 0 || b.Navigation != nil || len(b.Resources) > 0) {
 		event := sessionEvent{
 			ts:      now,
-			typ:     "activity",
+			typ:     EventTypeActivity,
 			page:    page,
 			context: t.context,
 		}
@@ -167,7 +167,7 @@ type timeline struct {
 // record gives an entry the report's context; a poor vital keeps the context of
 // its measurement.
 func (t *timeline) record(event sessionEvent) {
-	if event.typ != "vital" {
+	if event.typ != EventTypeVital {
 		event.context = t.context
 	}
 	t.session.pushEvent(event)
@@ -192,7 +192,7 @@ func (t *timeline) recordPoorVitals(vitals []beacon.Vital, page string, now time
 		}
 		t.record(sessionEvent{
 			ts:       now,
-			typ:      "vital",
+			typ:      EventTypeVital,
 			page:     originPage,
 			context:  origin,
 			metricID: v.ID,
@@ -218,7 +218,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 			}
 			t.record(sessionEvent{
 				ts:       now,
-				typ:      "view",
+				typ:      EventTypeView,
 				revision: ev.Revision,
 				page:     target,
 				text:     target,
@@ -226,7 +226,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 		case beacon.IsFrustration(ev.Name):
 			t.record(sessionEvent{
 				ts:   now,
-				typ:  "frustration",
+				typ:  EventTypeFrustration,
 				page: page,
 				text: truncateRunes(
 					strings.ReplaceAll(ev.Name, "_", " ")+" on "+ev.Attrs["target"],
@@ -236,7 +236,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 		case ev.TraceID != "" && ev.Kind == beacon.EventRequest:
 			t.record(sessionEvent{
 				ts:      now,
-				typ:     "request",
+				typ:     EventTypeRequest,
 				page:    page,
 				text:    truncateRunes(requestText(ev.Attrs), sessionEventTextMax),
 				traceID: ev.TraceID,
@@ -244,7 +244,7 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 		default:
 			t.record(sessionEvent{
 				ts:   now,
-				typ:  "event",
+				typ:  EventTypeCustom,
 				page: page,
 				text: truncateRunes(ev.Name, sessionEventTextMax),
 			})
@@ -283,7 +283,7 @@ func newEventContext(b *beacon.Beacon) eventContext {
 func newErrorEvent(err beacon.Error, ts time.Time, page string) (sessionEvent, sessionError) {
 	event := sessionEvent{
 		ts:   ts,
-		typ:  "error",
+		typ:  EventTypeError,
 		page: page,
 		text: truncateRunes(err.Type+": "+err.Message, sessionEventTextMax),
 	}

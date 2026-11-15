@@ -137,12 +137,12 @@ func (st *siteState) admitEvents(r *report) {
 			}
 			// Activations are occurrences, not revision-counted events.
 			key := identityKey{
-				kind:       "document",
+				kind:       identityDocument,
 				experience: b.ExperienceID,
 			}
 			if ev.Kind == beacon.EventView {
 				key = identityKey{
-					kind:       "view",
+					kind:       identityView,
 					experience: b.ExperienceID,
 					item:       b.ViewID,
 				}
@@ -161,7 +161,7 @@ func (st *siteState) admitEvents(r *report) {
 				continue
 			}
 			if !st.admitIdentity(identityKey{
-				kind:       "session",
+				kind:       identitySession,
 				experience: b.ExperienceID,
 				item:       ev.ID,
 			}, 1, r.now) {
@@ -229,7 +229,7 @@ func (st *siteState) admitNavigation(r *report) {
 		return
 	}
 	if !st.admitIdentity(identityKey{
-		kind:       "navigation",
+		kind:       identityNavigation,
 		experience: b.ExperienceID,
 	}, nav.Revision, r.now) {
 		return
@@ -292,7 +292,7 @@ func (st *siteState) admitResources(r *report) {
 			continue
 		}
 		if !st.admitIdentity(identityKey{
-			kind:       "resource",
+			kind:       identityResource,
 			experience: b.ExperienceID,
 			item:       res.ID,
 		}, 1, r.now) {
@@ -325,7 +325,7 @@ func (st *siteState) admitResources(r *report) {
 }
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
 	index := &st.identities
-	if key.kind == "resource" {
+	if key.kind == identityResource {
 		index = &st.resourceIdentities
 	}
 	if el := index.current(key, now, identityRetention); el != nil {

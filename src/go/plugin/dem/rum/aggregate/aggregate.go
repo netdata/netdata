@@ -108,7 +108,22 @@ type vitalObservation struct {
 	element  string
 	attrs    *attributes
 }
-type identityKey struct{ kind, experience, item string }
+
+// identityKind names the population a replay identity belongs to.
+type identityKind uint8
+
+const (
+	identityDocument identityKind = iota
+	identityView
+	identitySession
+	identityNavigation
+	identityResource
+)
+
+type identityKey struct {
+	kind             identityKind
+	experience, item string
+}
 
 // vitalIdentity is the replay evidence of one vital: its SDK metric identity
 // and the dimensions frozen when it was first admitted.
