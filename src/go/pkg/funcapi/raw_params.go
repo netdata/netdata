@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -70,7 +72,9 @@ func ParseRawParams(req RawMethodRequest) (RawParams, error) {
 			}
 		}
 	}
-	return RawParams{values: values}, nil
+	return RawParams{
+		values: values,
+	}, nil
 }
 
 // String returns the string value of key, or "" when key is absent.
@@ -89,6 +93,24 @@ func (p RawParams) String(key string) (string, error) {
 		return selected[0], nil
 	}
 	return "", fmt.Errorf("%s requires one string value", key)
+}
+
+// Names returns the names of the request's inputs in sorted order.
+func (p RawParams) Names() []string {
+	return slices.Sorted(maps.Keys(p.values))
+}
+
+// Text returns the value of key as text, or "" when key is absent: a string value as String reads it, or a JSON
+// number as written.
+func (p RawParams) Text(key string) (string, error) {
+	if text, err := p.String(key); err == nil {
+		return text, nil
+	}
+	var number json.Number
+	if raw := p.values[key]; string(raw) != "null" && json.Unmarshal(raw, &number) == nil {
+		return number.String(), nil
+	}
+	return "", fmt.Errorf("%s requires one string or number value", key)
 }
 
 // TimeRange returns the after and before inputs as Unix seconds, each nil when absent.
