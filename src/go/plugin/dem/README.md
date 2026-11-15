@@ -171,9 +171,10 @@ Six process Functions use the regular Netdata Function transport: `rum-sites`, `
 `rum-errors`, and `rum-session-events`. Viewing them, and the `synthetics-*` Functions, requires a signed-in member of
 the node's Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; collection and
 history storage are not restricted.
-Every DEM Function takes its parameters as `key:value` arguments or as fields of a JSON request body, which is how the
-Netdata Cloud Function table sends them; an argument wins over the same field in the body. Unknown parameters are
-rejected, except the table's own request fields and, for `info`, a time range the Function does not use.
+Every DEM Function takes its parameters as `key:value` (or `key=value`) arguments or as fields of a JSON request body,
+at its top level or under `selections`, which is how the Netdata Cloud Function table sends them. Arguments win over
+`selections`, which win over top-level fields. Unknown parameters are rejected, except the table's request fields
+(`timeout`, `last`, `_auxiliary` and an empty `query`) and, for `info`, a time range the Function does not use.
 Runtime observations include only admitted site jobs. Consumers join native
 DynCfg state to show disabled or failed configurations. Journal history remains queryable after a site stops. History range
 arguments select when the Agent originally received an observation, using inclusive Unix seconds: both endpoints include

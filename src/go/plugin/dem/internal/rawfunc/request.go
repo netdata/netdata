@@ -41,9 +41,10 @@ func Permitted(req funcapi.RawMethodRequest, required uint64) bool {
 
 // Admit runs the request checks every DEM Function shares, in this order:
 //  1. member access, unless the request is info (metadata needs none);
-//  2. parameters, strictly: names from the arguments, the payload selections
-//     and the top-level payload fields (funcapi.ParseRawParams precedence), each
-//     an accepted name with one string or number value;
+//  2. parameters, strictly: names from the key:value arguments, the payload
+//     selections and the top-level payload fields (funcapi.ParseRawParams
+//     precedence), each an accepted name with one string or number value; an
+//     argument without a separator is rejected, except the word info on info;
 //  3. the vnode or vnode_guid selector, resolved into args["vnode_guid"].
 //
 // Strict names allow what the Cloud UI's Function table sends with every
@@ -71,6 +72,11 @@ func Admit(
 var transportFields = []string{"selections", "timeout", "last", "_auxiliary"}
 
 func parameters(req funcapi.RawMethodRequest, accepted []string) (map[string]string, error) {
+	for _, arg := range req.Args {
+		if !strings.ContainsAny(arg, ":=") && !(req.Info && arg == "info") {
+			return nil, errors.New("expected key:value argument")
+		}
+	}
 	params, err := funcapi.ParseRawParams(req)
 	if err != nil {
 		return nil, fmt.Errorf("invalid payload: %w", err)

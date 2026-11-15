@@ -117,11 +117,24 @@ func TestAdmit(t *testing.T) {
 			}),
 			want: all(map[string]string{"site": "b"}),
 		},
-		"words without a separator are ignored": {
+		"word without a separator": {
 			req: member(funcapi.RawMethodRequest{
-				Args: []string{"info", "shop"},
+				Args: []string{"shop"},
 			}),
-			want: all(map[string]string{}),
+			deny: funcapi.ErrorResponse(400, "expected key:value argument"),
+		},
+		"word without a separator on info": {
+			req: funcapi.RawMethodRequest{
+				Info: true,
+				Args: []string{"info", "shop"},
+			},
+			deny: funcapi.ErrorResponse(400, "expected key:value argument"),
+		},
+		"info word on data": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"info"},
+			}),
+			deny: funcapi.ErrorResponse(400, "expected key:value argument"),
 		},
 		"unsupported argument": {
 			req: member(funcapi.RawMethodRequest{
