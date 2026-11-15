@@ -911,7 +911,7 @@ flowchart LR
     R1("Remove future admission")
     R2("Join HTTP and<br/>Function readers")
     R3("Cancel history and<br/>export workers")
-    R4("Final drain<br/>within fixed budgets")
+    R4("Final drain<br/>within one shared budget")
     R1 --> R2 --> R3 --> R4
 
     classDef step fill:#dcfce7,stroke:#16a34a,color:#0b1021;
