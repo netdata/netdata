@@ -84,6 +84,51 @@ func (r *Redactor) ApplyRemoving(s string, remove func(rune) bool) string {
 	return r.Apply(replaceSpans(s, spans, remove))
 }
 
+// Span is a byte range of a text that redaction replaces with one Marker; an
+// empty span inserts one (a credential key without a value).
+type Span struct{ Start, End int }
+
+// RemovingSpans returns the ranges of s that ApplyRemoving(s, remove) replaces,
+// merged and in order. Replacing each with one Marker and dropping the runes
+// remove selects elsewhere gives ApplyRemoving's result, apart from adjacent
+// markers Apply keeps separate. A caller rebuilding another form of s, such as
+// its escaped form, can so keep the provenance of every retained byte.
+func (r *Redactor) RemovingSpans(s string, remove func(rune) bool) []Span {
+	spans := r.spans(s)
+	if strings.IndexFunc(s, remove) >= 0 {
+		var kept strings.Builder
+		kept.Grow(len(s))
+		writeKept(&kept, s, remove)
+		spans = append(spans, keptToSource(r.spans(kept.String()), s, remove)...)
+		if len(spans) > 0 {
+			// ApplyRemoving's final Apply, mapped back onto s.
+			spans = merge(spans)
+			text, from := replaceMapped(s, spans, remove)
+			for _, sp := range r.spans(text) {
+				mapped := span{
+					start: len(s),
+				}
+				if sp.start < len(from) {
+					mapped.start = from[sp.start].start
+				}
+				mapped.end = mapped.start
+				if sp.end > sp.start {
+					mapped.end = from[sp.end-1].end
+				}
+				spans = append(spans, mapped)
+			}
+		}
+	}
+	out := make([]Span, 0, len(spans))
+	for _, sp := range merge(spans) {
+		out = append(out, Span{
+			Start: sp.start,
+			End:   sp.end,
+		})
+	}
+	return out
+}
+
 // span is a byte range Apply would replace with one marker; an empty span
 // inserts one (a credential key without a value).
 type span struct{ start, end int }
@@ -206,24 +251,68 @@ func keptToSource(spans []span, s string, remove func(rune) bool) []span {
 	return out
 }
 
+// merge sorts spans and joins overlapping or touching ones, each run becoming
+// one marker.
+func merge(spans []span) []span {
+	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(a.start-b.start, a.end-b.end) })
+	out := spans[:0]
+	for _, sp := range spans {
+		if n := len(out); n > 0 && sp.start <= out[n-1].end {
+			out[n-1].end = max(out[n-1].end, sp.end)
+			continue
+		}
+		out = append(out, sp)
+	}
+	return out
+}
+
 // replaceSpans writes s without the removed runes, each run of overlapping or
 // touching spans replaced by one marker.
 func replaceSpans(s string, spans []span, remove func(rune) bool) string {
-	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(a.start-b.start, a.end-b.end) })
 	var out strings.Builder
 	out.Grow(len(s) + len(Marker))
 	pos := 0
-	for i := 0; i < len(spans); {
-		merged := spans[i]
-		for i++; i < len(spans) && spans[i].start <= merged.end; i++ {
-			merged.end = max(merged.end, spans[i].end)
-		}
-		writeKept(&out, s[pos:merged.start], remove)
+	for _, sp := range merge(spans) {
+		writeKept(&out, s[pos:sp.start], remove)
 		out.WriteString(Marker)
-		pos = merged.end
+		pos = sp.end
 	}
 	writeKept(&out, s[pos:], remove)
 	return out.String()
+}
+
+// replaceMapped is replaceSpans for merged spans; it also returns, for each
+// byte of the result, the range of s that byte stands for.
+func replaceMapped(s string, spans []span, remove func(rune) bool) (string, []span) {
+	var out strings.Builder
+	out.Grow(len(s) + len(Marker))
+	from := make([]span, 0, len(s)+len(Marker))
+	keep := func(start, end int) {
+		for i := start; i < end; {
+			c, n := utf8.DecodeRuneInString(s[i:end])
+			if !remove(c) {
+				out.WriteString(s[i : i+n])
+				for j := i; j < i+n; j++ {
+					from = append(from, span{
+						start: j,
+						end:   j + 1,
+					})
+				}
+			}
+			i += n
+		}
+	}
+	pos := 0
+	for _, sp := range spans {
+		keep(pos, sp.start)
+		out.WriteString(Marker)
+		for range len(Marker) {
+			from = append(from, sp)
+		}
+		pos = sp.end
+	}
+	keep(pos, len(s))
+	return out.String(), from
 }
 
 func writeKept(out *strings.Builder, s string, remove func(rune) bool) {

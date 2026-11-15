@@ -82,10 +82,12 @@ func (o Options) redactLink(raw string, source bool) string {
 	}
 	u.User, u.RawQuery, u.Fragment, u.RawFragment = nil, "", "", ""
 	u.ForceQuery = false
-	path := redactPath(u.EscapedPath(), o.PathRules, source)
+	// A site path rule can insert a malformed escape; repair it as for the
+	// received URL, so the path still decodes.
+	path := escapeInvalidPercent(redactPath(u.EscapedPath(), o.PathRules, source))
 	plain, err := url.PathUnescape(path)
 	if err != nil {
-		plain = path
+		return "" // unreachable: every escape is valid
 	}
 	u.Path, u.RawPath = plain, path
 	escaped := path
@@ -109,16 +111,15 @@ func (o Options) redactLink(raw string, source bool) string {
 // redactDecodedPath reads an escaped path decoded, as the redactor reads text:
 // it removes control characters and replaces every credential found with or
 // without them by a literal marker, which net/url accepts in an escaped path.
-// Every other byte keeps its received escaping, so the final pass over the
+// Every retained byte keeps its received escape, so the final pass over the
 // escaped URL still reads the original escapes. plain is escaped decoded; it
 // returns the new decoded and escaped path.
 func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
-	redacted := o.redactor().ApplyRemoving(plain, unicode.IsControl)
-	if redacted == plain {
+	spans := o.redactor().RemovingSpans(plain, unicode.IsControl)
+	if len(spans) == 0 && strings.IndexFunc(plain, unicode.IsControl) < 0 {
 		return plain, escaped
 	}
-	// starts[i] is where decoded byte i begins in escaped; kept lists the
-	// decoded bytes that are not part of a control character.
+	// starts[i] is where decoded byte i begins in escaped.
 	starts := make([]int, 0, len(plain)+1)
 	for i := 0; i < len(escaped); {
 		starts = append(starts, i)
@@ -131,53 +132,48 @@ func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 	starts = append(starts, len(escaped))
 	if len(starts) != len(plain)+1 {
 		// Unreachable for a decoded escaped path; escaping the redacted text keeps it redacted.
-		return redacted, ""
+		return o.redactor().ApplyRemoving(plain, unicode.IsControl), ""
 	}
-	var keptText strings.Builder
-	kept := make([]int, 0, len(plain))
-	for i := 0; i < len(plain); {
-		c, n := utf8.DecodeRuneInString(plain[i:])
-		if !unicode.IsControl(c) {
-			keptText.WriteString(plain[i : i+n])
-			for j := i; j < i+n; j++ {
-				kept = append(kept, j)
+	var decoded, raw strings.Builder
+	keep := func(start, end int) {
+		for i := start; i < end; {
+			c, n := utf8.DecodeRuneInString(plain[i:end])
+			if !unicode.IsControl(c) {
+				decoded.WriteString(plain[i : i+n])
+				raw.WriteString(escaped[starts[i]:starts[i+n]])
 			}
+			i += n
 		}
-		i += n
 	}
-	// The redacted text is the kept text with ranges replaced by markers: place
-	// each run between markers in the kept text and write its received escapes.
-	text := keptText.String()
-	runs := strings.Split(redacted, redact.Marker)
-	var out strings.Builder
 	pos := 0
-	for i, run := range runs {
-		at := pos
-		switch {
-		case i == len(runs)-1:
-			at = len(text) - len(run)
-		case i > 0:
-			at = pos + strings.Index(text[pos:], run)
-		}
-		if at < pos || (i == 0 && at != 0) || !strings.HasPrefix(text[at:], run) {
-			// Unreachable while the redactor only replaces ranges.
-			return redacted, ""
-		}
-		if i > 0 {
-			out.WriteString(redact.Marker)
-		}
-		for _, j := range kept[at : at+len(run)] {
-			out.WriteString(escaped[starts[j]:starts[j+1]])
-		}
-		pos = at + len(run)
+	for _, sp := range spans {
+		keep(pos, sp.Start)
+		decoded.WriteString(redact.Marker)
+		raw.WriteString(redact.Marker)
+		pos = sp.End
 	}
-	return redacted, out.String()
+	keep(pos, len(plain))
+	return decoded.String(), raw.String()
 }
 
+// escapeInvalidPercent encodes each percent sign that does not start a valid
+// escape; a value without one is returned as is.
 func escapeInvalidPercent(value string) string {
+	invalid := func(i int) bool {
+		return value[i] == '%' && (i+2 >= len(value) || !isHexByte(value[i+1]) || !isHexByte(value[i+2]))
+	}
+	first := 0
+	for first < len(value) && !invalid(first) {
+		first++
+	}
+	if first == len(value) {
+		return value
+	}
 	var result strings.Builder
-	for i := 0; i < len(value); i++ {
-		if value[i] == '%' && (i+2 >= len(value) || !isHexByte(value[i+1]) || !isHexByte(value[i+2])) {
+	result.Grow(len(value) + 2)
+	result.WriteString(value[:first])
+	for i := first; i < len(value); i++ {
+		if invalid(i) {
 			result.WriteString("%25")
 		} else {
 			result.WriteByte(value[i])

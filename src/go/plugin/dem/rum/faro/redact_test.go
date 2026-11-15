@@ -61,6 +61,33 @@ func TestRedactURLReadsSitePathRuleOutputDecoded(t *testing.T) {
 	assert.Equal(t, "https://example.org/a/[REDACTED]", o.redactURL("https://example.org/a/Bearer_abcdef.ghi"))
 }
 
+// Received escapes stay attached to the bytes they encode: a credential
+// removed elsewhere in the path cannot lend its literal characters to retained
+// text, and retained marker text is not a marker. cleanURL adds the final pass
+// over the escaped URL.
+func TestRedactURLKeepsEscapesOfRetainedBytes(t *testing.T) {
+	var o Options
+	for raw, want := range map[string]string{
+		"https://example.org/k/-----BEGIN%20KEY-----/password=x&tail/z/-----END%20KEY-----/password=a%26tail/z/Bearer%20abcdef.ghi": "https://example.org/k/[REDACTED]/password=[REDACTED]",
+		"https://example.org/%5BREDACTED%5D/x%00": "https://example.org/%5BREDACTED%5D/x",
+	} {
+		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, o.cleanURL(raw)) })
+	}
+}
+
+// A site path rule that inserts a malformed escape cannot stop the decoded
+// reading of the rest of the path.
+func TestRedactURLRepairsEscapesSitePathRulesBreak(t *testing.T) {
+	o := Options{
+		PathRules: []PathRule{{Re: regexp.MustCompile(`/sale/`), Replace: "/sale%/"}},
+	}
+	assert.Equal(
+		t,
+		"https://example.org/sale%25/[REDACTED]",
+		o.cleanURL("https://example.org/sale/Bearer%20abcdef.ghi"),
+	)
+}
+
 func TestRedactSelector(t *testing.T) {
 	if got := redactSelector("div#row-jane@example.com > button.buy-1234567"); got != "div#:email > button.buy-:id" {
 		t.Fatalf("got %q", got)

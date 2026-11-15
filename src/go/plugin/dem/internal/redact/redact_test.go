@@ -106,6 +106,40 @@ func TestSpansMatchApply(t *testing.T) {
 	}
 }
 
+// RemovingSpans describes ApplyRemoving's result in the coordinates of its
+// input: replacing the spans gives the same text, apart from adjacent markers.
+func TestRemovingSpansMatchApplyRemoving(t *testing.T) {
+	r := siteRedactor()
+	collapse := func(s string) string {
+		for strings.Contains(s, Marker+Marker) {
+			s = strings.ReplaceAll(s, Marker+Marker, Marker)
+		}
+		return s
+	}
+	rng := rand.New(rand.NewPCG(7, 8))
+	for range 50000 {
+		input := randomText(rng)
+		var spans []span
+		previous := -1
+		for _, sp := range r.RemovingSpans(input, unicode.IsControl) {
+			require.Greater(t, sp.Start, previous, "input %q: spans are merged and ordered", input)
+			require.LessOrEqual(t, sp.Start, sp.End, "input %q", input)
+			previous = sp.End
+			spans = append(spans, span{
+				start: sp.Start,
+				end:   sp.End,
+			})
+		}
+		require.Equal(
+			t,
+			collapse(r.ApplyRemoving(input, unicode.IsControl)),
+			collapse(replaceSpans(input, spans, unicode.IsControl)),
+			"input %q",
+			input,
+		)
+	}
+}
+
 // randomText joins fragments that interact: separators, removable characters,
 // word boundaries, keys, values, markers and the configured value.
 func randomText(rng *rand.Rand) string {
