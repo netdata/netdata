@@ -954,3 +954,31 @@ func emptyArtifacts(t *testing.T) *artifacts.Store {
 }
 
 func noPolicyError() string { return "" }
+
+func TestCancellationStatuses(t *testing.T) {
+	expired, cancelExpired := context.WithDeadline(context.Background(), time.Unix(0, 0))
+	defer cancelExpired()
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		want *funcapi.FunctionResponse
+	}{
+		"deadline": {ctx: expired, want: funcapi.ErrorResponse(504, "request timed out")},
+		"cancel":   {ctx: cancelled, want: funcapi.ErrorResponse(499, "request cancelled")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			src := &source{}
+			h := newHandler(src)
+			for _, decl := range syntheticfunc.Declarations() {
+				response := h.HandleRaw(tc.ctx, funcapi.RawMethodRequest{
+					Method:      decl.ID,
+					Permissions: "0x7b",
+				})
+				assert.Equal(t, tc.want, response, decl.ID)
+			}
+			assert.Equal(t, synthetichistory.RunFilter{}, src.filter, "history is not queried")
+			assert.Zero(t, src.getCalls, "history is not read")
+		})
+	}
+}

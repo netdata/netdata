@@ -108,11 +108,17 @@ func ResolveVnode(args map[string]string, lookup func(string) (string, bool)) er
 	return nil
 }
 
-// Cancelled maps request cancellation or deadline expiry to status 499 and
-// returns nil for any other error.
+// Cancelled maps an expired deadline to status 504 and a cancellation to 499,
+// and returns nil for any other error. When the Agent cancels a request or its
+// deadline expires, the Function framework answers it with the same statuses
+// and discards the handler's response.
 func Cancelled(err error) *funcapi.FunctionResponse {
-	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		return funcapi.ErrorResponse(504, "request timed out")
+	case errors.Is(err, context.Canceled):
 		return funcapi.ErrorResponse(499, "request cancelled")
+	default:
+		return nil
 	}
-	return nil
 }

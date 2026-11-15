@@ -5,7 +5,6 @@ package historyfunc
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -74,12 +73,15 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if r := rawfunc.RequireMember(req); r != nil {
 		return r
 	}
-	if err := ctx.Err(); err != nil {
-		return statusError(err)
+	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
+		return r
 	}
 	status, err := h.deps.Status(ctx)
 	if err != nil {
-		return statusError(err)
+		if r := rawfunc.Cancelled(err); r != nil {
+			return r
+		}
+		return funcapi.UnavailableResponse(err.Error())
 	}
 	response.Data = [][]any{statusColumns.Row(statusRow{
 		Status:      status,
@@ -98,16 +100,6 @@ func nullable(s string) any {
 		return nil
 	}
 	return s
-}
-func statusError(err error) *funcapi.FunctionResponse {
-	switch {
-	case errors.Is(err, context.Canceled):
-		return rawfunc.Cancelled(err)
-	case errors.Is(err, context.DeadlineExceeded):
-		return funcapi.ErrorResponse(504, "request timed out")
-	default:
-		return funcapi.UnavailableResponse(err.Error())
-	}
 }
 
 // statusRow is the store status with the retention worker's reload error.

@@ -139,15 +139,17 @@ func TestResolveVnode(t *testing.T) {
 
 func TestCancelled(t *testing.T) {
 	cancelled := funcapi.ErrorResponse(499, "request cancelled")
+	timedOut := funcapi.ErrorResponse(504, "request timed out")
 	for name, tc := range map[string]struct {
 		err  error
 		want *funcapi.FunctionResponse
 	}{
-		"nil":      {},
-		"other":    {err: errors.New("disk")},
-		"canceled": {err: context.Canceled, want: cancelled},
-		"deadline": {err: context.DeadlineExceeded, want: cancelled},
-		"wrapped":  {err: fmt.Errorf("read: %w", context.Canceled), want: cancelled},
+		"nil":              {},
+		"other":            {err: errors.New("disk")},
+		"canceled":         {err: context.Canceled, want: cancelled},
+		"deadline":         {err: context.DeadlineExceeded, want: timedOut},
+		"wrapped canceled": {err: fmt.Errorf("read: %w", context.Canceled), want: cancelled},
+		"wrapped deadline": {err: fmt.Errorf("read: %w", context.DeadlineExceeded), want: timedOut},
 	} {
 		t.Run(name, func(t *testing.T) {
 			assert.Equal(t, tc.want, Cancelled(tc.err))

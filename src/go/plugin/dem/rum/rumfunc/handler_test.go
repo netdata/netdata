@@ -5,6 +5,7 @@ package rumfunc_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
@@ -104,4 +105,46 @@ func TestDataRequiresMemberPermissionsAndInfoDoesNot(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCancellationStatuses(t *testing.T) {
+	expired, cancelExpired := context.WithDeadline(context.Background(), time.Unix(0, 0))
+	defer cancelExpired()
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	for name, tc := range map[string]struct {
+		ctx  context.Context
+		want *funcapi.FunctionResponse
+	}{
+		"deadline": {ctx: expired, want: funcapi.ErrorResponse(504, "request timed out")},
+		"cancel":   {ctx: cancelled, want: funcapi.ErrorResponse(499, "request cancelled")},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, declaration := range rumfunc.Declarations() {
+				var args []string
+				if declaration.ID == "rum-session-events" {
+					args = []string{"session_id:visit"}
+				}
+				var reads []string
+				handler := rumfunc.New(recordingSource{&reads}, nil)
+				response := handler.HandleRaw(tc.ctx, funcapi.RawMethodRequest{
+					Method:      declaration.ID,
+					Args:        args,
+					Permissions: "0x1b",
+				})
+				assert.Equal(t, tc.want, response, declaration.ID)
+				assert.NotContains(t, reads, rowReads[declaration.ID], "%s rows are not read", declaration.ID)
+			}
+		})
+	}
+}
+
+// rowReads names the source read that serves each method's rows.
+var rowReads = map[string]string{
+	"rum-sites":          "Receiver",
+	"rum-pages":          "Pages",
+	"rum-live":           "Live",
+	"rum-sessions":       "Sessions",
+	"rum-errors":         "Errors",
+	"rum-session-events": "SessionEvents",
 }
