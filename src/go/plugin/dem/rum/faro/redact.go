@@ -104,11 +104,12 @@ func (o Options) redactLink(raw string, source bool) string {
 }
 
 // redactDecodedPath reads an escaped path decoded, as the redactor reads text:
-// it removes control characters and replaces every credential found with or
-// without them by a literal marker, which net/url accepts in an escaped path.
-// Every retained byte keeps its received escape, so the final pass over the
-// escaped URL still reads the original escapes. plain is escaped decoded; it
-// returns the new decoded and escaped path.
+// it removes control characters, and the bytes their removal would join into
+// another one, and replaces every credential found with or without them by a
+// literal marker, which net/url accepts in an escaped path. Every other byte
+// keeps its received escape, so the final pass over the escaped URL still
+// reads the original escapes. plain is escaped decoded; it returns the new
+// decoded and escaped path.
 func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 	// text is plain without the bytes removing its control characters would
 	// join into another one; source maps its bytes back to plain.
