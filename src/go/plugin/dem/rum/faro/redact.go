@@ -88,7 +88,12 @@ func (o Options) redactLink(raw string, source bool) string {
 		plain = path
 	}
 	u.Path, u.RawPath = plain, path
-	if escaped := u.EscapedPath(); strings.IndexByte(escaped, '%') >= 0 {
+	escaped := path
+	if plain == path {
+		// Nothing was decoded, but the URL escapes text a site path rule inserted.
+		escaped = u.EscapedPath()
+	}
+	if strings.IndexByte(escaped, '%') >= 0 {
 		// The final pass reads the escaped URL, where an escape can hide a
 		// credential (/a/Bearer%20token), so the redactor reads it decoded too.
 		u.Path, u.RawPath = o.redactDecodedPath(escaped, u.Path)
