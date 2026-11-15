@@ -6,27 +6,229 @@ package runner
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// Candidate bodies a capture-reporting runtime writes.
+const (
+	pngBody      = iota // a small valid screenshot
+	oversizeBody        // a valid screenshot above the fetch limit
+	invalidBody         // a file without the PNG signature
+)
+
+// screenshotFixture is the content of every published screenshot.
+var screenshotFixture = []byte("\x89PNG\r\n\x1a\nfixture")
+
+// captureTests returns the capture-details test records t0..t(n-1) of a capture-reporting runtime.
+func captureTests(n int) []synthetic.CaptureTest {
+	var tests []synthetic.CaptureTest
+	for i := range n {
+		tests = append(tests, synthetic.CaptureTest{
+			ArtifactTest: synthetic.ArtifactTest{
+				ID:    fmt.Sprintf("t%d", i),
+				Title: "Checkout",
+			},
+			Status:         "failed",
+			ExpectedStatus: "passed",
+			Accepted:       1,
+		})
+	}
+	return tests
+}
+
+// captureLinks returns the associations of screenshots s0..s(n-1) with tests t0..t(n-1).
+func captureLinks(n int) []synthetic.CaptureAssociation {
+	var links []synthetic.CaptureAssociation
+	for i := range n {
+		links = append(links, synthetic.CaptureAssociation{
+			ID:     fmt.Sprintf("s%d", i),
+			TestID: fmt.Sprintf("t%d", i),
+		})
+	}
+	return links
+}
+
+// screenshots returns published screenshots s<first>..s<last>; the first labeled ones carry their test.
+func screenshots(first, last, labeled int) []synthetic.Artifact {
+	digest := sha256.Sum256(screenshotFixture)
+	var published []synthetic.Artifact
+	for i := first; i <= last; i++ {
+		artifact := synthetic.Artifact{
+			ID:     fmt.Sprintf("s%d", i),
+			Kind:   synthetic.ScreenshotCapture,
+			MIME:   "image/png",
+			Bytes:  int64(len(screenshotFixture)),
+			SHA256: hex.EncodeToString(digest[:]),
+		}
+		if i < labeled {
+			artifact.Test = synthetic.ArtifactTest{
+				ID:    fmt.Sprintf("t%d", i),
+				Title: "Checkout",
+			}
+		}
+		published = append(published, artifact)
+	}
+	return published
+}
+
+// Each reported screenshot s<i> has a capture-details test t<i> and a link; the runtime then writes the extra frames
+// and, unless the case drops it, the completion record and a failed result offering every screenshot.
 func TestCaptureReportingThroughEnginePublication(t *testing.T) {
-	for _, mode := range []string{"published", "missing terminal", "oversize", "oversize first", "all oversize", "invalid after oversize", "invalid metadata", "unknown metadata ID", "unlabeled beyond cap"} {
-		t.Run(mode, func(t *testing.T) {
+	for name, tc := range map[string]struct {
+		bodies        []int
+		frames        []string
+		withoutResult bool
+		outcome       synthetic.Outcome
+		err           string
+		state         synthetic.CaptureState
+		artifacts     []synthetic.Artifact
+		captures      synthetic.CaptureReport
+	}{
+		"published": {
+			bodies:    []int{pngBody, pngBody},
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(0, 1, 2),
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+			},
+		},
+		"missing terminal": {
+			bodies:        []int{pngBody, pngBody},
+			withoutResult: true,
+			outcome:       synthetic.Error,
+			err:           "runner exited without a terminal result: no result",
+			state:         synthetic.CaptureUnavailable,
+			captures: synthetic.CaptureReport{
+				Reporting:    "partial",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+				Unpublished: []synthetic.CaptureOmission{
+					{ID: "s0", Reason: "not_in_final_report"},
+					{ID: "s1", Reason: "not_in_final_report"},
+				},
+			},
+		},
+		"oversize": {
+			bodies:    []int{pngBody, oversizeBody},
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(0, 0, 2),
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+				Unpublished:  []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}},
+			},
+		},
+		"oversize first": {
+			bodies:    []int{oversizeBody, pngBody},
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(1, 1, 2),
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+				Unpublished:  []synthetic.CaptureOmission{{ID: "s0", Reason: "too_large"}},
+			},
+		},
+		"all oversize": {
+			bodies:  []int{oversizeBody, oversizeBody},
+			outcome: synthetic.Failed,
+			err:     "assertion",
+			state:   synthetic.CaptureUnavailable,
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+				Unpublished: []synthetic.CaptureOmission{
+					{ID: "s0", Reason: "too_large"},
+					{ID: "s1", Reason: "too_large"},
+				},
+			},
+		},
+		"invalid after oversize": {
+			bodies:  []int{oversizeBody, invalidBody},
+			outcome: synthetic.Failed,
+			err:     "assertion; artifact publication: " + artifacts.ErrInvalidCapture.Error() + ": invalid screenshot signature",
+			state:   synthetic.CaptureUnavailable,
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+				Unpublished: []synthetic.CaptureOmission{
+					{ID: "s0", Reason: "publication_failed"},
+					{ID: "s1", Reason: "publication_failed"},
+				},
+			},
+		},
+		"invalid metadata": {
+			bodies:    []int{pngBody, pngBody},
+			frames:    []string{extensionLine(captureDetailsFeature, map[string]any{"record": "future"})},
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(0, 1, 2),
+			captures: synthetic.CaptureReport{
+				Reporting:    "invalid",
+				Tests:        captureTests(2),
+				Associations: captureLinks(2),
+			},
+		},
+		"unknown metadata ID": {
+			bodies:    []int{pngBody, pngBody},
+			frames:    []string{extensionLine(captureDetailsFeature, captureLink("unoffered", "t0"))},
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(0, 1, 2),
+			captures: synthetic.CaptureReport{
+				Reporting: "complete",
+				Tests:     captureTests(2),
+				Associations: append(captureLinks(2), synthetic.CaptureAssociation{
+					ID:     "unoffered",
+					TestID: "t0",
+				}),
+				Unpublished: []synthetic.CaptureOmission{{ID: "unoffered", Reason: "not_in_final_report"}},
+			},
+		},
+		// The detail budget holds 128 test and link pairs; later screenshots still publish, unlabeled.
+		"unlabeled beyond cap": {
+			bodies:    slices.Repeat([]int{pngBody}, 150),
+			outcome:   synthetic.Failed,
+			err:       "assertion",
+			state:     synthetic.CaptureAvailable,
+			artifacts: screenshots(0, 149, 128),
+			captures: synthetic.CaptureReport{
+				Reporting:    "complete",
+				Truncated:    true,
+				Tests:        captureTests(128),
+				Associations: captureLinks(128),
+			},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
 			e, h, store := testEngine(t)
 			e.start = starter(
 				t,
@@ -45,83 +247,48 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 							Err:     err,
 						}
 					}
-					count := 2
-					if mode == "unlabeled beyond cap" {
-						count = 150
-					}
-					_, err := fmt.Fprintln(
-						out,
-						`{"type":"extension_init","extension_init":{"selected":["capture_details.v1"]}}`,
-					)
-					assert.NoError(t, err)
+					emitLines(t, out, `{"type":"extension_init","extension_init":{"selected":["capture_details.v1"]}}`)
 					var candidates []synthetic.Capture
-					for i := 0; i < count; i++ {
-						id := fmt.Sprintf("s%d", i)
-						testID := fmt.Sprintf("t%d", i)
+					for i, body := range tc.bodies {
+						id, testID := fmt.Sprintf("s%d", i), fmt.Sprintf("t%d", i)
 						name := "output/" + id + ".png"
-						body := []byte("\x89PNG\r\n\x1a\nfixture")
-						if mode == "oversize" && i == 1 || mode == "all oversize" ||
-							(mode == "oversize first" || mode == "invalid after oversize") && i == 0 {
-							body = append(body, []byte(strings.Repeat("x", int(artifacts.FetchMaxBytes)))...)
-						}
-						if mode == "invalid after oversize" && i == 1 {
-							body = []byte("not a PNG")
-						}
-						if err := os.WriteFile(filepath.Join(req.WorkDir, name), body, 0600); !assert.NoError(t, err) {
+						if err := writeCaptureBody(filepath.Join(req.WorkDir, name), body); !assert.NoError(t, err) {
 							return ndexec.TreeResult{
 								Drained: true,
 								Err:     err,
 							}
 						}
-						candidates = append(
-							candidates,
-							synthetic.Capture{
-								ID:   id,
-								Kind: "screenshot",
-								Path: name,
-								MIME: "image/png",
-							},
-						)
-						_, err = fmt.Fprintln(
+						candidates = append(candidates, synthetic.Capture{
+							ID:   id,
+							Kind: synthetic.ScreenshotCapture,
+							Path: name,
+							MIME: "image/png",
+						})
+						emitLines(
+							t,
 							out,
 							extensionLine(captureDetailsFeature, captureTest(testID, 1, 0)),
-							"\n"+extensionLine(captureDetailsFeature, captureLink(id, testID)),
+							extensionLine(captureDetailsFeature, captureLink(id, testID)),
 						)
-						assert.NoError(t, err)
 					}
-					if mode == "invalid metadata" {
-						_, err = fmt.Fprintln(
-							out,
-							extensionLine(captureDetailsFeature, map[string]any{"record": "future"}),
-						)
-						assert.NoError(t, err)
-					}
-					if mode == "unknown metadata ID" {
-						_, err = fmt.Fprintln(out, extensionLine(captureDetailsFeature, captureLink("unoffered", "t0")))
-						assert.NoError(t, err)
-					}
-					if mode == "missing terminal" {
+					emitLines(t, out, tc.frames...)
+					if tc.withoutResult {
 						return ndexec.TreeResult{
 							Drained: true,
 						}
 					}
-					_, err = fmt.Fprintln(
-						out,
-						extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}),
-					)
-					assert.NoError(t, err)
-					r := reporterResult{
+					emitLines(t, out, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
+					assert.Zero(t, store.finalized.Load(), "publication follows the result")
+					return resultPayload(reporterResult{
 						Status:       synthetic.Failed,
 						Error:        "assertion",
 						CaptureState: "available",
 						Artifacts:    candidates,
 						Tests: &synthetic.TestCounts{
-							Declared: count,
-							Failed:   count,
+							Declared: len(tc.bodies),
+							Failed:   len(tc.bodies),
 						},
-					}
-					assert.Zero(t, store.finalized.Load())
-					return resultPayload(r)(ctx, args, raw, out, stderr)
+					})(ctx, args, raw, out, stderr)
 				},
 			)
 			req := journey()
@@ -130,107 +297,52 @@ func TestCaptureReportingThroughEnginePublication(t *testing.T) {
 			req.Timeout = 30 * time.Second
 			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
-			require.NotNil(t, ex.Run.Captures)
-			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
-			stored := h.runs[len(h.runs)-1].Artifacts
-			require.Len(t, stored, len(ex.Run.Artifacts))
-			for i, artifact := range ex.Run.Artifacts {
-				assert.Equal(t, artifact, stored[i])
-			}
-			switch mode {
-			case "missing terminal":
-				assert.Equal(t, synthetic.Error, ex.Run.Outcome)
-				assert.Empty(t, ex.Run.Artifacts)
-				assert.Equal(t, "partial", ex.Run.Captures.Reporting)
-				assert.Equal(
-					t,
-					[]synthetic.CaptureOmission{
-						{ID: "s0", Reason: "not_in_final_report"},
-						{ID: "s1", Reason: "not_in_final_report"},
-					},
-					ex.Run.Captures.Unpublished,
-				)
-			case "oversize", "oversize first":
-				publishedID, testID, skippedID := "s0", "t0", "s1"
-				if mode == "oversize first" {
-					publishedID, testID, skippedID = "s1", "t1", "s0"
-				}
-				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
-				assert.Equal(t, "assertion", ex.Run.Error)
-				assert.Equal(t, synthetic.CaptureAvailable, ex.Run.CaptureState)
-				require.Len(t, ex.Run.Artifacts, 1)
-				assert.Equal(t, publishedID, ex.Run.Artifacts[0].ID)
-				assert.Equal(t, testID, ex.Run.Artifacts[0].Test.ID)
-				assert.Equal(
-					t,
-					[]synthetic.CaptureOmission{{ID: skippedID, Reason: "too_large"}},
-					ex.Run.Captures.Unpublished,
-				)
-			case "all oversize":
-				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
-				assert.Equal(t, "assertion", ex.Run.Error)
-				assert.Empty(t, ex.Run.Artifacts)
-				assert.Equal(t, synthetic.CaptureUnavailable, ex.Run.CaptureState)
-				assert.Equal(
-					t,
-					[]synthetic.CaptureOmission{{ID: "s0", Reason: "too_large"}, {ID: "s1", Reason: "too_large"}},
-					ex.Run.Captures.Unpublished,
-				)
-			case "invalid after oversize":
-				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
-				assert.Contains(t, ex.Run.Error, "artifact publication:")
-				assert.Empty(t, ex.Run.Artifacts)
-				assert.Equal(t, synthetic.CaptureUnavailable, ex.Run.CaptureState)
-				assert.Equal(
-					t,
-					[]synthetic.CaptureOmission{
-						{ID: "s0", Reason: "publication_failed"},
-						{ID: "s1", Reason: "publication_failed"},
-					},
-					ex.Run.Captures.Unpublished,
-				)
-			default:
-				assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
-				require.NotEmpty(t, ex.Run.Artifacts)
-				assert.Equal(t, "t0", ex.Run.Artifacts[0].Test.ID)
-				m, err := store.Manifest(t.Context(), ex.Run.JobID, ex.Run.ID)
-				require.NoError(t, err)
-				assert.Equal(t, ex.Run.Artifacts, m.Artifacts)
-				if mode == "invalid metadata" {
-					assert.Equal(t, "invalid", ex.Run.Captures.Reporting)
-				}
-				if mode == "unknown metadata ID" {
-					assert.Equal(
-						t,
-						[]synthetic.CaptureOmission{{ID: "unoffered", Reason: "not_in_final_report"}},
-						ex.Run.Captures.Unpublished,
-					)
-				}
-				if mode == "unlabeled beyond cap" {
-					require.Len(t, ex.Run.Artifacts, 150)
-					assert.True(t, ex.Run.Captures.Truncated)
-					assert.Empty(t, ex.Run.Artifacts[149].Test.ID)
-				}
-			}
-			if strings.Contains(mode, "oversize") {
-				service := query.New(activeRun(ex.Run), noRunHistory{}, store.Store, func() string { return "" })
-				evidence, err := service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, "")
-				require.NoError(t, err)
-				assert.Equal(t, ex.Run.CaptureState, evidence.CaptureState)
-				require.Len(t, evidence.Artifacts, len(ex.Run.Artifacts))
-				for i, a := range evidence.Artifacts {
-					assert.Equal(t, ex.Run.Artifacts[i], a.Artifact)
-				}
-				for _, omission := range ex.Run.Captures.Unpublished {
-					_, err = service.Evidence(t.Context(), ex.Run.JobID, ex.Run.ID, omission.ID)
-					assert.ErrorIs(t, err, query.ErrArtifactNotRecorded)
-				}
-				detail, err := service.Run(t.Context(), ex.Run.JobID, ex.Run.ID)
-				require.NoError(t, err)
-				assert.Equal(t, ex.Run.Captures, detail.Captures)
-			}
+			assert.Equal(t, tc.outcome, ex.Run.Outcome)
+			assert.Equal(t, tc.err, ex.Run.Error)
+			assert.Equal(t, tc.state, ex.Run.CaptureState)
+			assert.Equal(t, tc.artifacts, ex.Run.Artifacts)
+			assert.Equal(t, &tc.captures, ex.Run.Captures)
+			completed := h.runs[len(h.runs)-1]
+			assert.Equal(t, tc.artifacts, completed.Artifacts)
+			assert.Equal(t, &tc.captures, completed.Captures)
+			assertManifest(t, store, ex.Run, tc.artifacts)
 		})
 	}
+}
+
+// emitLines writes one reporter line per value.
+func emitLines(t *testing.T, out *os.File, lines ...string) {
+	t.Helper()
+	for _, line := range lines {
+		_, err := fmt.Fprintln(out, line)
+		assert.NoError(t, err)
+	}
+}
+
+func writeCaptureBody(path string, body int) error {
+	switch body {
+	case invalidBody:
+		return os.WriteFile(path, []byte("not a PNG"), 0600)
+	case oversizeBody:
+		if err := os.WriteFile(path, screenshotFixture, 0600); err != nil {
+			return err
+		}
+		return os.Truncate(path, artifacts.FetchMaxBytes+1)
+	default:
+		return os.WriteFile(path, screenshotFixture, 0600)
+	}
+}
+
+// assertManifest checks the capture manifest evidence reads membership from; nothing published leaves none.
+func assertManifest(t *testing.T, store *observedArtifacts, run synthetic.Run, published []synthetic.Artifact) {
+	t.Helper()
+	m, err := store.Manifest(t.Context(), run.JobID, run.ID)
+	if len(published) == 0 {
+		assert.ErrorIs(t, err, artifacts.ErrNotFound)
+		return
+	}
+	require.NoError(t, err)
+	assert.Equal(t, published, m.Artifacts)
 }
 
 func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
@@ -299,9 +411,112 @@ func TestLighthouseCaptureOmissionNeedsNoRuntimeFeature(t *testing.T) {
 	)
 }
 
+// Every case requests captures and traces. The runtime reports a failed test t1 with a screenshot and, unless it
+// predates capture details, a trace; the selection line and the capture-details records vary.
 func TestTraceReportingThroughEnginePublication(t *testing.T) {
-	for _, mode := range []string{"selected", "old runtime", "declined", "malformed init", "invalid capture details", "oversize"} {
-		t.Run(mode, func(t *testing.T) {
+	const bothFeatures = `{"type":"extension_init","extension_init":{"selected":["capture_details.v1","failure_trace.v1"]}}`
+	fixtures := map[string][]byte{
+		"screen": screenshotFixture,
+		"trace1": []byte("PK\x03\x04fixture"),
+	}
+	published := func(id string, kind synthetic.CaptureKind, mime string, labeled bool) synthetic.Artifact {
+		digest := sha256.Sum256(fixtures[id])
+		artifact := synthetic.Artifact{
+			ID:     id,
+			Kind:   kind,
+			MIME:   mime,
+			Bytes:  int64(len(fixtures[id])),
+			SHA256: hex.EncodeToString(digest[:]),
+		}
+		if labeled {
+			artifact.Test = synthetic.ArtifactTest{
+				ID:    "t1",
+				Title: "Checkout",
+			}
+		}
+		return artifact
+	}
+	screen := func(labeled bool) synthetic.Artifact {
+		return published("screen", synthetic.ScreenshotCapture, "image/png", labeled)
+	}
+	trace := func(labeled bool) synthetic.Artifact {
+		return published("trace1", synthetic.TraceCapture, "application/zip", labeled)
+	}
+	recorded := synthetic.CaptureReport{
+		Tests: []synthetic.CaptureTest{{
+			ArtifactTest: synthetic.ArtifactTest{
+				ID:    "t1",
+				Title: "Checkout",
+			},
+			Status:         "failed",
+			ExpectedStatus: "passed",
+			Accepted:       1,
+		}},
+		Associations: []synthetic.CaptureAssociation{
+			{ID: "screen", TestID: "t1"},
+			{ID: "trace1", TestID: "t1"},
+		},
+	}
+	report := func(trace, reporting string, unpublished ...synthetic.CaptureOmission) *synthetic.CaptureReport {
+		out := synthetic.CloneCaptureReport(&recorded)
+		out.Trace, out.Reporting, out.Unpublished = trace, reporting, unpublished
+		return out
+	}
+	for name, tc := range map[string]struct {
+		selection     string   // extension_init line; empty for a runtime without extensions
+		records       bool     // the runtime writes capture-details records
+		frames        []string // extra capture-details records before completion
+		oversizeTrace bool
+		artifacts     []synthetic.Artifact
+		captures      *synthetic.CaptureReport
+	}{
+		"selected": {
+			selection: bothFeatures,
+			records:   true,
+			artifacts: []synthetic.Artifact{screen(true), trace(true)},
+			captures:  report("supported", "complete"),
+		},
+		"old runtime": {
+			artifacts: []synthetic.Artifact{screen(false)},
+			captures: &synthetic.CaptureReport{
+				Trace:     "unavailable",
+				Reporting: "unavailable",
+			},
+		},
+		"declined": {
+			selection: `{"type":"extension_init","extension_init":{"selected":["capture_details.v1"]}}`,
+			records:   true,
+			artifacts: []synthetic.Artifact{screen(true), trace(true)},
+			captures:  report("unsupported", "complete"),
+		},
+		"malformed init": {
+			selection: `{"type":"extension_init","extension_init":{"selected":null}}`,
+			records:   true,
+			artifacts: []synthetic.Artifact{screen(false), trace(false)},
+			captures: &synthetic.CaptureReport{
+				Trace:     "invalid",
+				Reporting: "invalid",
+			},
+		},
+		"invalid capture details": {
+			selection: bothFeatures,
+			records:   true,
+			frames:    []string{extensionLine(captureDetailsFeature, map[string]any{"record": "future"})},
+			artifacts: []synthetic.Artifact{screen(true), trace(true)},
+			captures:  report("supported", "invalid"),
+		},
+		"oversize": {
+			selection:     bothFeatures,
+			records:       true,
+			oversizeTrace: true,
+			artifacts:     []synthetic.Artifact{screen(true)},
+			captures: report("supported", "complete", synthetic.CaptureOmission{
+				ID:     "trace1",
+				Reason: "too_large",
+			}),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
 			e, h, store := testEngine(t)
 			e.start = starter(
 				t,
@@ -321,42 +536,21 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 							Err:     err,
 						}
 					}
-					selection := `{"type":"extension_init","extension_init":{"selected":["capture_details.v1","failure_trace.v1"]}}`
-					if mode == "old runtime" {
-						selection = ""
+					if tc.selection != "" {
+						emitLines(t, out, tc.selection)
 					}
-					if mode == "declined" {
-						selection = `{"type":"extension_init","extension_init":{"selected":["capture_details.v1"]}}`
-					}
-					if mode == "malformed init" {
-						selection = `{"type":"extension_init","extension_init":{"selected":null}}`
-					}
-					if selection != "" {
-						_, err := fmt.Fprintln(out, selection)
-						assert.NoError(t, err)
-					}
-					if mode != "old runtime" {
-						_, err := fmt.Fprintln(
+					if tc.records {
+						emitLines(
+							t,
 							out,
 							extensionLine(captureDetailsFeature, captureTest("t1", 1, 0)),
-							"\n"+extensionLine(captureDetailsFeature, captureLink("screen", "t1")),
-							"\n"+extensionLine(captureDetailsFeature, captureLink("trace1", "t1")),
+							extensionLine(captureDetailsFeature, captureLink("screen", "t1")),
+							extensionLine(captureDetailsFeature, captureLink("trace1", "t1")),
 						)
-						assert.NoError(t, err)
-						if mode == "invalid capture details" {
-							_, err = fmt.Fprintln(
-								out,
-								extensionLine(captureDetailsFeature, map[string]any{"record": "future"}),
-							)
-							assert.NoError(t, err)
-						}
-						_, err = fmt.Fprintln(
-							out,
-							extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}),
-						)
-						assert.NoError(t, err)
+						emitLines(t, out, tc.frames...)
+						emitLines(t, out, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"}))
 					}
-					for path, body := range map[string][]byte{"output/screen.png": []byte("\x89PNG\r\n\x1a\nfixture"), "output/trace.zip": []byte("PK\x03\x04fixture")} {
+					for path, body := range map[string][]byte{"output/screen.png": fixtures["screen"], "output/trace.zip": fixtures["trace1"]} {
 						if err := os.WriteFile(filepath.Join(req.WorkDir, path), body, 0600); !assert.NoError(t, err) {
 							return ndexec.TreeResult{
 								Drained: true,
@@ -364,26 +558,30 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 							}
 						}
 					}
-					if mode == "oversize" {
+					if tc.oversizeTrace {
 						err := os.Truncate(filepath.Join(req.WorkDir, "output/trace.zip"), artifacts.FetchMaxBytes+1)
 						assert.NoError(t, err)
 					}
-					r := reporterResult{
+					offered := []synthetic.Capture{
+						{ID: "screen", Kind: synthetic.ScreenshotCapture, MIME: "image/png", Path: "output/screen.png"},
+					}
+					if tc.records {
+						offered = append(offered, synthetic.Capture{
+							ID:   "trace1",
+							Kind: synthetic.TraceCapture,
+							MIME: "application/zip",
+							Path: "output/trace.zip",
+						})
+					}
+					return resultPayload(reporterResult{
 						Status: synthetic.Failed,
 						Tests: &synthetic.TestCounts{
 							Declared: 1,
 							Failed:   1,
 						},
 						CaptureState: "available",
-						Artifacts: []synthetic.Capture{
-							{ID: "screen", Kind: "screenshot", MIME: "image/png", Path: "output/screen.png"},
-							{ID: "trace1", Kind: "trace", MIME: "application/zip", Path: "output/trace.zip"},
-						},
-					}
-					if mode == "old runtime" {
-						r.Artifacts = r.Artifacts[:1]
-					}
-					return resultPayload(r)(ctx, args, raw, out, stderr)
+						Artifacts:    offered,
+					})(ctx, args, raw, out, stderr)
 				},
 			)
 			req := journey()
@@ -392,68 +590,19 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			ex := e.execute(t.Context(), req)
 			require.True(t, ex.Drained)
 			assert.Equal(t, synthetic.Failed, ex.Run.Outcome)
-			require.NotNil(t, ex.Run.Captures)
-			want := "supported"
-			if mode == "old runtime" {
-				want = "unavailable"
-			}
-			if mode == "declined" {
-				want = "unsupported"
-			}
-			if mode == "malformed init" {
-				want = "invalid"
-			}
-			assert.Equal(t, want, ex.Run.Captures.Trace)
-			assert.Equal(t, ex.Run.Captures, h.runs[len(h.runs)-1].Captures)
-			count := 2
-			if mode == "old runtime" {
-				count = 1
-				assert.Equal(t, "unavailable", ex.Run.Captures.Reporting)
-				assert.Empty(t, ex.Run.Captures.Tests)
-			}
-			if mode == "oversize" {
-				count = 1
-				assert.Equal(
-					t,
-					[]synthetic.CaptureOmission{{ID: "trace1", Reason: "too_large"}},
-					ex.Run.Captures.Unpublished,
-				)
-			}
-			require.Len(t, ex.Run.Artifacts, count)
-			if mode == "old runtime" {
-				assert.Equal(t, synthetic.ScreenshotCapture, ex.Run.Artifacts[0].Kind)
-				assert.Empty(t, ex.Run.Artifacts[0].Test)
-			}
-			if mode != "old runtime" && mode != "malformed init" {
-				assert.Equal(t, int64(1), ex.Run.Captures.Tests[0].Accepted)
-				assert.Equal(t, "t1", ex.Run.Artifacts[0].Test.ID)
-			}
-			if count == 2 {
-				meta, body, err := store.Fetch(t.Context(), ex.Run.JobID, ex.Run.ID, "trace1")
+			assert.Empty(t, ex.Run.Error)
+			assert.Equal(t, synthetic.CaptureAvailable, ex.Run.CaptureState)
+			assert.Equal(t, tc.artifacts, ex.Run.Artifacts)
+			assert.Equal(t, tc.captures, ex.Run.Captures)
+			completed := h.runs[len(h.runs)-1]
+			assert.Equal(t, tc.artifacts, completed.Artifacts)
+			assert.Equal(t, tc.captures, completed.Captures)
+			assertManifest(t, store, ex.Run, tc.artifacts)
+			for _, artifact := range tc.artifacts {
+				_, body, err := store.Fetch(t.Context(), ex.Run.JobID, ex.Run.ID, artifact.ID)
 				require.NoError(t, err)
-				assert.Equal(t, synthetic.TraceCapture, meta.Kind)
-				assert.Equal(t, []byte("PK\x03\x04fixture"), body)
+				assert.Equal(t, fixtures[artifact.ID], body)
 			}
 		})
 	}
-}
-
-// activeRun is an active job whose latest run is the wrapped run.
-type activeRun synthetic.Run
-
-func (r activeRun) Snapshot(time.Time) []registry.Job { return nil }
-
-func (r activeRun) Latest(jobID, runID string) (synthetic.Run, bool) {
-	return synthetic.Run(r), jobID == r.JobID && runID == r.ID
-}
-
-// noRunHistory retains no runs: evidence comes from the capture manifest and the active run.
-type noRunHistory struct{}
-
-func (noRunHistory) QueryRuns(context.Context, synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
-	return synthetichistory.RunPage{}, nil
-}
-
-func (noRunHistory) GetRun(context.Context, string, string) (synthetic.Run, error) {
-	return synthetic.Run{}, os.ErrNotExist
 }

@@ -144,32 +144,6 @@ func TestPrivateCleanupPreservesUnsafeFiles(t *testing.T) {
 	assert.Equal(t, "preserve evidence", string(data))
 }
 
-func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		ctx := context.Background()
-		s := newTestStore(t)
-		require.NoError(t, s.EnforceHistoryRetention(ctx, 1, 1<<30))
-		appendEntry(t, s)
-		time.Sleep(2 * 24 * time.Hour)
-		require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
-		assert.Equal(t, 1, countEntries(t, s), "a relaxed policy must not enforce the retired shorter age")
-	})
-}
-
-func TestOrdinaryRetentionPreservesActiveFile(t *testing.T) {
-	s := newTestStore(t)
-	ctx := context.Background()
-	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
-	appendEntry(t, s)
-	active := s.log.ActivePath()
-	require.NotEmpty(t, active)
-	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
-	assert.Equal(t, active, s.log.ActivePath())
-	files, err := filepath.Glob(filepath.Join(s.root, "*", "*.journal"))
-	require.NoError(t, err)
-	assert.Equal(t, []string{active}, files)
-}
-
 func TestAppendEnvelopeRejectsIncompatibleFieldsBeforeAttempt(t *testing.T) {
 	for name, fields := range map[string][]journal.Field{
 		"missing kind":    {journal.StringField("MESSAGE", "unknown")},
@@ -317,4 +291,37 @@ func TestFailedJournalRejectsQueriesAndRetention(t *testing.T) {
 	after, err := os.ReadFile(active)
 	require.NoError(t, err, "failed private history is preserved")
 	assert.Equal(t, before, after, "close must not rewrite uncertain metadata")
+}
+
+func TestObservedKindIgnoresRejectedAppend(t *testing.T) {
+	s := newTestStore(t)
+	_, err := s.Append(t.Context(), []journal.Field{journal.StringField("DEM_KIND", "rum")})
+	require.Error(t, err)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = s.Append(ctx, testFields())
+	require.ErrorIs(t, err, context.Canceled)
+	assert.False(t, s.HasObservedKind(KindRUM))
+	assert.False(t, s.HasObservedKind(KindSynthetic))
+	assert.False(t, s.HasObservedKind("unknown"))
+}
+
+func TestObservedKindAfterRetentionAndRestart(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		root := t.TempDir()
+		s, err := Open(t.Context(), root)
+		require.NoError(t, err)
+		t.Cleanup(func() { require.NoError(t, s.Close()) })
+		appendEntry(t, s)
+		require.True(t, s.HasObservedKind(KindRUM))
+		time.Sleep(48 * time.Hour)
+		require.NoError(t, s.EnforceHistoryRetention(t.Context(), 1, 1<<30))
+		require.Zero(t, countEntries(t, s))
+		assert.True(t, s.HasObservedKind(KindRUM))
+		require.NoError(t, s.Close())
+		s, err = Open(t.Context(), root)
+		require.NoError(t, err)
+		assert.False(t, s.HasObservedKind(KindRUM))
+		assert.False(t, s.HasObservedKind(KindSynthetic))
+	})
 }

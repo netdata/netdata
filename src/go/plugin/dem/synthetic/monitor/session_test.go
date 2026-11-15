@@ -6,6 +6,7 @@ import (
 	"context"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
@@ -81,6 +82,8 @@ func request() synthetic.Request {
 	}
 }
 
+// newHarness starts a session on a test clock. Call it in a synctest bubble: there the timeouts of advance and
+// receive fire only once every goroutine of the bubble is blocked, so a missing transition fails at once.
 func newHarness(t *testing.T, req synthetic.Request) *monitorHarness {
 	t.Helper()
 	h := &monitorHarness{
@@ -143,20 +146,11 @@ func receive[T any](t *testing.T, ch <-chan T) T {
 	}
 }
 
-// wait polls the session until the monitor goroutine has applied a transition.
-func (h *monitorHarness) wait(t *testing.T, predicate func(Snapshot) bool) Snapshot {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		snapshot := h.session.Snapshot(h.Now())
-		if predicate(snapshot) {
-			return snapshot
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("monitor did not reach expected state: %+v", snapshot)
-		}
-		time.Sleep(time.Millisecond)
-	}
+// settle returns the snapshot once every goroutine of the test bubble is blocked, that is, once the monitor has
+// applied every transition its inputs allow.
+func (h *monitorHarness) settle() Snapshot {
+	synctest.Wait()
+	return h.session.Snapshot(h.Now())
 }
 
 func (h *monitorHarness) stop(t *testing.T, call *controlledCall) {
@@ -176,175 +170,184 @@ func (h *monitorHarness) stop(t *testing.T, call *controlledCall) {
 }
 
 func TestQueuedLatestOccurrencePreservesAdmissionTurn(t *testing.T) {
-	h := newHarness(t, request())
-	bootstrap := h.Now()
-	call := receive(t, h.executor.calls)
-	firstDelay := receive(t, h.reset)
-	require.GreaterOrEqual(t, firstDelay, 10*time.Second)
-	require.Less(t, firstDelay, 20*time.Second)
-	firstDue := bootstrap.Add(firstDelay)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, request())
+		bootstrap := h.Now()
+		call := receive(t, h.executor.calls)
+		firstDelay := receive(t, h.reset)
+		require.GreaterOrEqual(t, firstDelay, 10*time.Second)
+		require.Less(t, firstDelay, 20*time.Second)
+		firstDue := bootstrap.Add(firstDelay)
 
-	// One timer delivery represents a million elapsed periods while the first
-	// executor is still queued. No missed-period goroutines or requeue occur.
-	latestDue := firstDue.Add(999999 * 10 * time.Second)
-	h.advance(t, latestDue)
-	snapshot := h.wait(t, func(s Snapshot) bool { return s.Scheduled == 1000001 })
-	assert.Equal(t, uint64(1000000), snapshot.Coalesced)
-	assert.Equal(t, bootstrap.UnixMicro(), snapshot.QueuedUS)
-	assert.Equal(t, latestDue.Sub(bootstrap), snapshot.QueueAge)
-	assert.False(t, snapshot.HasObservation)
-	assert.False(t, snapshot.Fresh)
-	assert.Empty(t, h.executor.calls)
+		// One timer delivery represents a million elapsed periods while the first
+		// executor is still queued. No missed-period goroutines or requeue occur.
+		latestDue := firstDue.Add(999999 * 10 * time.Second)
+		h.advance(t, latestDue)
+		snapshot := h.settle()
+		require.Equal(t, uint64(1000001), snapshot.Scheduled)
+		assert.Equal(t, uint64(1000000), snapshot.Coalesced)
+		assert.Equal(t, bootstrap.UnixMicro(), snapshot.QueuedUS)
+		assert.Equal(t, latestDue.Sub(bootstrap), snapshot.QueueAge)
+		assert.False(t, snapshot.HasObservation)
+		assert.False(t, snapshot.Fresh)
+		assert.Empty(t, h.executor.calls)
 
-	// Admission itself must account for a grid point whose timer notification
-	// has not arrived yet, and consume only the latest pending occurrence.
-	admitted := latestDue.Add(10 * time.Second)
-	h.setNow(admitted)
-	call.admission <- admitted
-	assert.Equal(
-		t,
-		synthetic.Schedule{
-			DueUS:    admitted.UnixMicro(),
-			QueuedUS: bootstrap.UnixMicro(),
-		},
-		receive(t, call.schedule),
-	)
-	snapshot = h.session.Snapshot(admitted)
-	assert.Equal(t, uint64(1000002), snapshot.Scheduled)
-	assert.Equal(t, uint64(1000001), snapshot.Coalesced)
-	assert.Equal(t, uint64(1), snapshot.Admitted)
-	assert.False(t, snapshot.Pending)
-	assert.True(t, snapshot.Active)
-	assert.Zero(t, snapshot.SchedulingDelay)
-	h.stop(t, call)
+		// Admission itself must account for a grid point whose timer notification
+		// has not arrived yet, and consume only the latest pending occurrence.
+		admitted := latestDue.Add(10 * time.Second)
+		h.setNow(admitted)
+		call.admission <- admitted
+		assert.Equal(
+			t,
+			synthetic.Schedule{
+				DueUS:    admitted.UnixMicro(),
+				QueuedUS: bootstrap.UnixMicro(),
+			},
+			receive(t, call.schedule),
+		)
+		snapshot = h.session.Snapshot(admitted)
+		assert.Equal(t, uint64(1000002), snapshot.Scheduled)
+		assert.Equal(t, uint64(1000001), snapshot.Coalesced)
+		assert.Equal(t, uint64(1), snapshot.Admitted)
+		assert.False(t, snapshot.Pending)
+		assert.True(t, snapshot.Active)
+		assert.Zero(t, snapshot.SchedulingDelay)
+		h.stop(t, call)
+	})
 }
 
 func TestActiveCoalescingAndEveryCompletion(t *testing.T) {
-	h := newHarness(t, request())
-	activation := h.Now()
-	first := receive(t, h.executor.calls)
-	firstDue := activation.Add(receive(t, h.reset))
-	first.admission <- activation
-	receive(t, first.schedule)
-	h.advance(t, firstDue.Add(2*10*time.Second))
-	snapshot := h.wait(t, func(s Snapshot) bool { return s.Scheduled == 4 })
-	assert.Equal(t, uint64(2), snapshot.Coalesced)
-	assert.True(t, snapshot.Active)
-	assert.True(t, snapshot.Pending)
-	assert.Zero(t, snapshot.QueuedUS)
-	assert.Empty(t, h.executor.calls)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, request())
+		activation := h.Now()
+		first := receive(t, h.executor.calls)
+		firstDue := activation.Add(receive(t, h.reset))
+		first.admission <- activation
+		receive(t, first.schedule)
+		h.advance(t, firstDue.Add(2*10*time.Second))
+		snapshot := h.settle()
+		require.Equal(t, uint64(4), snapshot.Scheduled)
+		assert.Equal(t, uint64(2), snapshot.Coalesced)
+		assert.True(t, snapshot.Active)
+		assert.True(t, snapshot.Pending)
+		assert.Zero(t, snapshot.QueuedUS)
+		assert.Empty(t, h.executor.calls)
 
-	first.finish <- synthetic.Execution{
-		Run: synthetic.Run{
-			ID:          "first",
-			Outcome:     synthetic.Failed,
+		first.finish <- synthetic.Execution{
+			Run: synthetic.Run{
+				ID:          "first",
+				Outcome:     synthetic.Failed,
+				CompletedUS: h.Now().UnixMicro(),
+			},
+			Drained: true,
+		}
+		second := receive(t, h.executor.calls)
+		snapshot = h.session.Snapshot(h.Now())
+		assert.Equal(t, Outcomes{
+			Failed: 1,
+		}, snapshot.Outcomes)
+		assert.Equal(t, "first", snapshot.Latest.ID)
+		assert.True(t, snapshot.Fresh)
+		assert.Equal(t, h.Now().UnixMicro(), snapshot.QueuedUS)
+		second.admission <- h.Now().Add(time.Second)
+		schedule := receive(t, second.schedule)
+		assert.Equal(t, firstDue.Add(2*10*time.Second).UnixMicro(), schedule.DueUS)
+		assert.Equal(t, time.Second, h.session.Snapshot(h.Now()).SchedulingDelay)
+
+		duration, performance := 12.5, 0.0
+		run := synthetic.Run{
+			ID:          "second",
+			Outcome:     synthetic.Success,
 			CompletedUS: h.Now().UnixMicro(),
-		},
-		Drained: true,
-	}
-	second := receive(t, h.executor.calls)
-	snapshot = h.session.Snapshot(h.Now())
-	assert.Equal(t, Outcomes{
-		Failed: 1,
-	}, snapshot.Outcomes)
-	assert.Equal(t, "first", snapshot.Latest.ID)
-	assert.True(t, snapshot.Fresh)
-	assert.Equal(t, h.Now().UnixMicro(), snapshot.QueuedUS)
-	second.admission <- h.Now().Add(time.Second)
-	schedule := receive(t, second.schedule)
-	assert.Equal(t, firstDue.Add(2*10*time.Second).UnixMicro(), schedule.DueUS)
-	assert.Equal(t, time.Second, h.session.Snapshot(h.Now()).SchedulingDelay)
-
-	duration, performance := 12.5, 0.0
-	run := synthetic.Run{
-		ID:          "second",
-		Outcome:     synthetic.Success,
-		CompletedUS: h.Now().UnixMicro(),
-		DurationMS:  &duration,
-		Tests: &synthetic.TestCounts{
-			Declared: 1,
-			Passed:   1,
-		},
-		Metrics: &synthetic.LabMetrics{
-			Performance: &performance,
-		},
-		Events: []synthetic.Event{{Kind: "test"}},
-	}
-	second.finish <- synthetic.Execution{
-		Run:     run,
-		Drained: true,
-	}
-	snapshot = h.wait(t, func(s Snapshot) bool { return s.Outcomes.Success == 1 })
-	assert.Equal(t, Outcomes{
-		Success: 1,
-		Failed:  1,
-	}, snapshot.Outcomes)
-	assert.Equal(t, Observation{
-		ID:          "second",
-		Outcome:     synthetic.Success,
-		CompletedUS: run.CompletedUS,
-		DurationMS: Scalar{
-			Value:   12.5,
-			Present: true,
-		},
-		Tests: synthetic.TestCounts{
-			Declared: 1,
-			Passed:   1,
-		},
-		HasTests: true,
-		Metrics: LabMetrics{
-			Performance: Scalar{
-				Value:   0,
+			DurationMS:  &duration,
+			Tests: &synthetic.TestCounts{
+				Declared: 1,
+				Passed:   1,
+			},
+			Metrics: &synthetic.LabMetrics{
+				Performance: &performance,
+			},
+			Events: []synthetic.Event{{Kind: "test"}},
+		}
+		second.finish <- synthetic.Execution{
+			Run:     run,
+			Drained: true,
+		}
+		snapshot = h.settle()
+		assert.Equal(t, Outcomes{
+			Success: 1,
+			Failed:  1,
+		}, snapshot.Outcomes)
+		assert.Equal(t, Observation{
+			ID:          "second",
+			Outcome:     synthetic.Success,
+			CompletedUS: run.CompletedUS,
+			DurationMS: Scalar{
+				Value:   12.5,
 				Present: true,
 			},
-		},
-		HasMetrics: true,
-	}, snapshot.Latest)
-	assert.False(t, snapshot.Latest.Metrics.LCPMS.Present)
-	latest, ok := h.session.Latest("second")
-	require.True(t, ok)
-	assert.Equal(t, run, latest)
-	_, ok = h.session.Latest("first")
-	assert.False(t, ok, "only the latest run is retained")
-	h.stop(t, nil)
+			Tests: synthetic.TestCounts{
+				Declared: 1,
+				Passed:   1,
+			},
+			HasTests: true,
+			Metrics: LabMetrics{
+				Performance: Scalar{
+					Value:   0,
+					Present: true,
+				},
+			},
+			HasMetrics: true,
+		}, snapshot.Latest)
+		assert.False(t, snapshot.Latest.Metrics.LCPMS.Present)
+		latest, ok := h.session.Latest("second")
+		require.True(t, ok)
+		assert.Equal(t, run, latest)
+		_, ok = h.session.Latest("first")
+		assert.False(t, ok, "only the latest run is retained")
+		h.stop(t, nil)
+	})
 }
 
 func TestStopJoinsQueuedAndRunningExecution(t *testing.T) {
 	for name, admitted := range map[string]bool{"queued": false, "running": true} {
 		t.Run(name, func(t *testing.T) {
-			h := newHarness(t, request())
-			call := receive(t, h.executor.calls)
-			if admitted {
-				call.admission <- h.Now()
-				receive(t, call.schedule)
-			}
-			h.cancel()
-			receive(t, call.cancelled)
-			select {
-			case <-h.done:
-				t.Fatal("Run returned before executor joined")
-			default:
-			}
-			call.finish <- synthetic.Execution{
-				Run: synthetic.Run{
-					Outcome:     synthetic.Cancelled,
-					CompletedUS: h.Now().UnixMicro(),
-				},
-				Drained: true,
-			}
-			require.NoError(t, receive(t, h.done))
-			snapshot := h.session.Snapshot(h.Now())
-			assert.False(t, snapshot.Pending)
-			assert.False(t, snapshot.Active)
-			assert.Zero(t, snapshot.QueuedUS)
-			assert.Equal(t, admitted, snapshot.HasObservation)
-			if admitted {
-				assert.Equal(t, Outcomes{
-					Cancelled: 1,
-				}, snapshot.Outcomes)
-			} else {
-				assert.Equal(t, Outcomes{}, snapshot.Outcomes)
-			}
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, request())
+				call := receive(t, h.executor.calls)
+				if admitted {
+					call.admission <- h.Now()
+					receive(t, call.schedule)
+				}
+				h.cancel()
+				receive(t, call.cancelled)
+				synctest.Wait()
+				select {
+				case <-h.done:
+					t.Fatal("Run returned before executor joined")
+				default:
+				}
+				call.finish <- synthetic.Execution{
+					Run: synthetic.Run{
+						Outcome:     synthetic.Cancelled,
+						CompletedUS: h.Now().UnixMicro(),
+					},
+					Drained: true,
+				}
+				require.NoError(t, receive(t, h.done))
+				snapshot := h.session.Snapshot(h.Now())
+				assert.False(t, snapshot.Pending)
+				assert.False(t, snapshot.Active)
+				assert.Zero(t, snapshot.QueuedUS)
+				assert.Equal(t, admitted, snapshot.HasObservation)
+				if admitted {
+					assert.Equal(t, Outcomes{
+						Cancelled: 1,
+					}, snapshot.Outcomes)
+				} else {
+					assert.Equal(t, Outcomes{}, snapshot.Outcomes)
+				}
+			})
 		})
 	}
 }
@@ -360,137 +363,164 @@ func TestUnverifiedResultsDoNotPublishObservation(t *testing.T) {
 		}, Drained: true},
 	} {
 		t.Run(name, func(t *testing.T) {
-			h := newHarness(t, request())
-			call := receive(t, h.executor.calls)
-			call.admission <- h.Now()
-			receive(t, call.schedule)
-			call.finish <- execution
-			require.Error(t, receive(t, h.done))
-			snapshot := h.session.Snapshot(h.Now())
-			assert.False(t, snapshot.HasObservation)
-			assert.Equal(t, synthetic.JobRunning, snapshot.State)
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, request())
+				call := receive(t, h.executor.calls)
+				call.admission <- h.Now()
+				receive(t, call.schedule)
+				call.finish <- execution
+				require.Error(t, receive(t, h.done))
+				snapshot := h.session.Snapshot(h.Now())
+				assert.False(t, snapshot.HasObservation)
+				assert.Equal(t, synthetic.JobRunning, snapshot.State)
+			})
 		})
 	}
 }
 
 func TestObservationFreshnessUsesActualCompletion(t *testing.T) {
-	h := newHarness(t, request())
-	call := receive(t, h.executor.calls)
-	call.admission <- h.Now()
-	receive(t, call.schedule)
-	completed := h.Now()
-	call.finish <- synthetic.Execution{
-		Run: synthetic.Run{
-			Outcome:     synthetic.Error,
-			CompletedUS: completed.UnixMicro(),
-		},
-		Drained: true,
-	}
-	h.wait(t, func(s Snapshot) bool { return s.HasObservation })
 	for name, tc := range map[string]struct {
 		age   time.Duration
 		fresh bool
+		state synthetic.JobState
 	}{
-		"completed":    {age: 0, fresh: true},
-		"held":         {age: 15 * time.Second, fresh: true},
-		"boundary":     {age: 20 * time.Second, fresh: true},
-		"stale":        {age: 20*time.Second + time.Microsecond, fresh: false},
-		"future clock": {age: -time.Microsecond, fresh: false},
+		"completed": {
+			age:   0,
+			fresh: true,
+			state: synthetic.JobState(synthetic.Error),
+		},
+		"held": {
+			age:   15 * time.Second,
+			fresh: true,
+			state: synthetic.JobState(synthetic.Error),
+		},
+		"boundary": {
+			age:   20 * time.Second,
+			fresh: true,
+			state: synthetic.JobState(synthetic.Error),
+		},
+		"stale": {
+			age:   20*time.Second + time.Microsecond,
+			fresh: false,
+			state: synthetic.JobStale,
+		},
+		"future clock": {
+			age:   -time.Microsecond,
+			fresh: false,
+			state: synthetic.JobStale,
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			snapshot := h.session.Snapshot(completed.Add(tc.age))
-			assert.Equal(t, tc.age, snapshot.ObservationAge)
-			assert.Equal(t, tc.fresh, snapshot.Fresh)
-			state := synthetic.JobStale
-			if tc.fresh {
-				state = synthetic.JobState(synthetic.Error)
-			}
-			assert.Equal(t, state, snapshot.State)
-			assert.Equal(t, synthetic.Error, snapshot.Latest.Outcome)
-			assert.Equal(t, Outcomes{
-				Error: 1,
-			}, snapshot.Outcomes)
-			assert.False(t, snapshot.Latest.DurationMS.Present)
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, request())
+				call := receive(t, h.executor.calls)
+				call.admission <- h.Now()
+				receive(t, call.schedule)
+				completed := h.Now()
+				call.finish <- synthetic.Execution{
+					Run: synthetic.Run{
+						Outcome:     synthetic.Error,
+						CompletedUS: completed.UnixMicro(),
+					},
+					Drained: true,
+				}
+				require.True(t, h.settle().HasObservation)
+				snapshot := h.session.Snapshot(completed.Add(tc.age))
+				assert.Equal(t, tc.age, snapshot.ObservationAge)
+				assert.Equal(t, tc.fresh, snapshot.Fresh)
+				assert.Equal(t, tc.state, snapshot.State)
+				assert.Equal(t, synthetic.Error, snapshot.Latest.Outcome)
+				assert.Equal(t, Outcomes{
+					Error: 1,
+				}, snapshot.Outcomes)
+				assert.False(t, snapshot.Latest.DurationMS.Present)
+				h.stop(t, nil)
+			})
 		})
 	}
-	h.stop(t, nil)
 }
 
 func TestStateAndLatestOutcomesFollowTheCurrentAssociation(t *testing.T) {
-	h := newHarness(t, request())
-	call := receive(t, h.executor.calls)
-	assert.Equal(t, synthetic.JobWaiting, h.session.Snapshot(h.Now()).State)
-	call.admission <- h.Now()
-	receive(t, call.schedule)
-	assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
-	failed := h.Now()
-	call.finish <- synthetic.Execution{
-		Run: synthetic.Run{
-			ID:          "failed",
-			Outcome:     synthetic.Failed,
-			CompletedUS: failed.UnixMicro(),
-		},
-		Drained: true,
-	}
-	snapshot := h.wait(t, func(s Snapshot) bool { return s.HasObservation })
-	assert.Equal(t, synthetic.JobState(synthetic.Failed), snapshot.State)
-	assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
-	assert.Zero(t, snapshot.LastSuccessUS)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, request())
+		call := receive(t, h.executor.calls)
+		assert.Equal(t, synthetic.JobWaiting, h.session.Snapshot(h.Now()).State)
+		call.admission <- h.Now()
+		receive(t, call.schedule)
+		assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
+		failed := h.Now()
+		call.finish <- synthetic.Execution{
+			Run: synthetic.Run{
+				ID:          "failed",
+				Outcome:     synthetic.Failed,
+				CompletedUS: failed.UnixMicro(),
+			},
+			Drained: true,
+		}
+		snapshot := h.settle()
+		require.True(t, snapshot.HasObservation)
+		assert.Equal(t, synthetic.JobState(synthetic.Failed), snapshot.State)
+		assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
+		assert.Zero(t, snapshot.LastSuccessUS)
 
-	// A waiting or running attempt shows its phase instead of a stale observation.
-	h.advance(t, failed.Add(time.Minute))
-	next := receive(t, h.executor.calls)
-	snapshot = h.session.Snapshot(h.Now())
-	assert.False(t, snapshot.Fresh)
-	assert.Equal(t, synthetic.JobWaiting, snapshot.State)
-	next.admission <- h.Now()
-	receive(t, next.schedule)
-	assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
-	succeeded := h.Now()
-	next.finish <- synthetic.Execution{
-		Run: synthetic.Run{
-			ID:          "succeeded",
-			Outcome:     synthetic.Success,
-			CompletedUS: succeeded.UnixMicro(),
-		},
-		Drained: true,
-	}
-	snapshot = h.wait(t, func(s Snapshot) bool { return s.Outcomes.Success == 1 })
-	assert.Equal(t, synthetic.JobState(synthetic.Success), snapshot.State)
-	assert.Equal(t, succeeded.UnixMicro(), snapshot.LastSuccessUS)
-	assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
-	latest, ok := h.session.Latest("succeeded")
-	require.True(t, ok)
-	assert.Equal(t, "succeeded", latest.ID)
+		// A waiting or running attempt shows its phase instead of a stale observation.
+		h.advance(t, failed.Add(time.Minute))
+		next := receive(t, h.executor.calls)
+		snapshot = h.session.Snapshot(h.Now())
+		assert.False(t, snapshot.Fresh)
+		assert.Equal(t, synthetic.JobWaiting, snapshot.State)
+		next.admission <- h.Now()
+		receive(t, next.schedule)
+		assert.Equal(t, synthetic.JobRunning, h.session.Snapshot(h.Now()).State)
+		succeeded := h.Now()
+		next.finish <- synthetic.Execution{
+			Run: synthetic.Run{
+				ID:          "succeeded",
+				Outcome:     synthetic.Success,
+				CompletedUS: succeeded.UnixMicro(),
+			},
+			Drained: true,
+		}
+		snapshot = h.settle()
+		require.Equal(t, uint64(1), snapshot.Outcomes.Success)
+		assert.Equal(t, synthetic.JobState(synthetic.Success), snapshot.State)
+		assert.Equal(t, succeeded.UnixMicro(), snapshot.LastSuccessUS)
+		assert.Equal(t, failed.UnixMicro(), snapshot.LastFailureUS)
+		latest, ok := h.session.Latest("succeeded")
+		require.True(t, ok)
+		assert.Equal(t, "succeeded", latest.ID)
 
-	// A vnode change clears the observation and state; the activation counters continue.
-	const guid = "11111111-1111-4111-8111-111111111111"
-	h.session.SetVnodeGUID(guid)
-	assert.Equal(t, Snapshot{
-		JobID:     "journey:test",
-		Kind:      synthetic.Journey,
-		Name:      "test",
-		VnodeGUID: guid,
-		Interval:  10 * time.Second,
-		Status:    snapshot.Status,
-		State:     synthetic.JobUnknown,
-	}, h.session.Snapshot(h.Now()))
-	_, ok = h.session.Latest("succeeded")
-	assert.False(t, ok)
-	h.stop(t, nil)
+		// A vnode change clears the observation and state; the activation counters continue.
+		const guid = "11111111-1111-4111-8111-111111111111"
+		h.session.SetVnodeGUID(guid)
+		assert.Equal(t, Snapshot{
+			JobID:     "journey:test",
+			Kind:      synthetic.Journey,
+			Name:      "test",
+			VnodeGUID: guid,
+			Interval:  10 * time.Second,
+			Status:    snapshot.Status,
+			State:     synthetic.JobUnknown,
+		}, h.session.Snapshot(h.Now()))
+		_, ok = h.session.Latest("succeeded")
+		assert.False(t, ok)
+		h.stop(t, nil)
+	})
 }
 
 func TestSiteAssociationDoesNotChooseScheduleOrExecutionKey(t *testing.T) {
-	a, b := request(), request()
-	a.VnodeGUID, b.VnodeGUID = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
-	assert.Equal(t, phase(a.JobID(), time.Minute), phase(b.JobID(), time.Minute))
-	b.Name = "other"
-	assert.NotEqual(t, phase(a.JobID(), time.Minute), phase(b.JobID(), time.Minute))
-	h := newHarness(t, a)
-	call := receive(t, h.executor.calls)
-	assert.Equal(t, a.JobID(), call.request.JobID())
-	assert.Equal(t, a.VnodeGUID, call.request.VnodeGUID)
-	h.stop(t, call)
+	synctest.Test(t, func(t *testing.T) {
+		a, b := request(), request()
+		a.VnodeGUID, b.VnodeGUID = "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"
+		assert.Equal(t, phase(a.JobID(), time.Minute), phase(b.JobID(), time.Minute))
+		b.Name = "other"
+		assert.NotEqual(t, phase(a.JobID(), time.Minute), phase(b.JobID(), time.Minute))
+		h := newHarness(t, a)
+		call := receive(t, h.executor.calls)
+		assert.Equal(t, a.JobID(), call.request.JobID())
+		assert.Equal(t, a.VnodeGUID, call.request.VnodeGUID)
+		h.stop(t, call)
+	})
 }
 
 func TestNewRejectsInvalidInputsAndCopiesSecrets(t *testing.T) {
@@ -511,23 +541,28 @@ func TestNewRejectsInvalidInputsAndCopiesSecrets(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
-	req := request()
-	req.Secrets = map[string]string{"DEM_SECRET_TEST": "test-value"}
-	s, err := New(req, time.Second, e)
-	require.NoError(t, err)
-	req.Secrets["DEM_SECRET_TEST"] = "changed"
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- s.Run(ctx) }()
-	call := receive(t, e.calls)
-	assert.Equal(t, "test-value", call.request.Secrets["DEM_SECRET_TEST"])
-	cancel()
-	receive(t, call.cancelled)
-	call.finish <- synthetic.Execution{
-		Drained: true,
-	}
-	require.NoError(t, receive(t, done))
+	synctest.Test(t, func(t *testing.T) {
+		e := &controlledExecutor{
+			calls: make(chan *controlledCall),
+		}
+		req := request()
+		req.Secrets = map[string]string{"DEM_SECRET_TEST": "test-value"}
+		s, err := New(req, time.Second, e)
+		require.NoError(t, err)
+		req.Secrets["DEM_SECRET_TEST"] = "changed"
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- s.Run(ctx) }()
+		call := receive(t, e.calls)
+		assert.Equal(t, "test-value", call.request.Secrets["DEM_SECRET_TEST"])
+		cancel()
+		receive(t, call.cancelled)
+		call.finish <- synthetic.Execution{
+			Drained: true,
+		}
+		require.NoError(t, receive(t, done))
+	})
 }
 
 func TestCancelledBeforeStartAndSecondRun(t *testing.T) {
@@ -558,49 +593,52 @@ func (f executorFunc) ExecuteScheduled(
 }
 
 func TestAdmissionRacingStopRetainsOccurrenceUntilJoin(t *testing.T) {
-	entered, release := make(chan struct{}), make(chan struct{})
-	schedules := make(chan synthetic.Schedule, 1)
-	executor := executorFunc(
-		func(ctx context.Context, _ synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
-			close(entered)
-			<-ctx.Done()
-			// The owner checked cancellation immediately before invoking admission.
-			// Shutdown must retain its selected occurrence until this call joins.
-			<-release
-			schedules <- admitted(time.Now())
-			state(synthetic.JobRunning)
-			return synthetic.Execution{
-				Run: synthetic.Run{
-					Outcome:     synthetic.Cancelled,
-					CompletedUS: time.Now().UnixMicro(),
-				},
-				Drained: true,
-			}
-		},
-	)
-	s, err := New(request(), time.Hour, executor)
-	require.NoError(t, err)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	done := make(chan error, 1)
-	go func() { done <- s.Run(ctx) }()
-	receive(t, entered)
-	queued := s.Snapshot(time.Now())
-	cancel()
-	select {
-	case <-done:
-		t.Fatal("monitor returned before admission callback finished")
-	default:
-	}
-	close(release)
-	schedule := receive(t, schedules)
-	assert.Equal(t, queued.QueuedUS, schedule.QueuedUS)
-	assert.Positive(t, schedule.DueUS, "the bootstrap occurrence stays selected")
-	assert.LessOrEqual(t, schedule.DueUS, schedule.QueuedUS)
-	require.NoError(t, receive(t, done))
-	assert.Equal(t, Outcomes{
-		Cancelled: 1,
-	}, s.Snapshot(time.Now()).Outcomes)
+	synctest.Test(t, func(t *testing.T) {
+		entered, release := make(chan struct{}), make(chan struct{})
+		schedules := make(chan synthetic.Schedule, 1)
+		executor := executorFunc(
+			func(ctx context.Context, _ synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+				close(entered)
+				<-ctx.Done()
+				// The owner checked cancellation immediately before invoking admission.
+				// Shutdown must retain its selected occurrence until this call joins.
+				<-release
+				schedules <- admitted(time.Now())
+				state(synthetic.JobRunning)
+				return synthetic.Execution{
+					Run: synthetic.Run{
+						Outcome:     synthetic.Cancelled,
+						CompletedUS: time.Now().UnixMicro(),
+					},
+					Drained: true,
+				}
+			},
+		)
+		s, err := New(request(), time.Hour, executor)
+		require.NoError(t, err)
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		done := make(chan error, 1)
+		go func() { done <- s.Run(ctx) }()
+		receive(t, entered)
+		queued := s.Snapshot(time.Now())
+		cancel()
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatal("monitor returned before admission callback finished")
+		default:
+		}
+		close(release)
+		schedule := receive(t, schedules)
+		assert.Equal(t, queued.QueuedUS, schedule.QueuedUS)
+		assert.Positive(t, schedule.DueUS, "the bootstrap occurrence stays selected")
+		assert.LessOrEqual(t, schedule.DueUS, schedule.QueuedUS)
+		require.NoError(t, receive(t, done))
+		assert.Equal(t, Outcomes{
+			Cancelled: 1,
+		}, s.Snapshot(time.Now()).Outcomes)
+	})
 }
 
 func TestEveryAdmittedOutcomeIsCounted(t *testing.T) {
@@ -631,53 +669,59 @@ func TestEveryAdmittedOutcomeIsCounted(t *testing.T) {
 		}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			h := newHarness(t, request())
-			call := receive(t, h.executor.calls)
-			call.admission <- h.Now()
-			receive(t, call.schedule)
-			call.finish <- synthetic.Execution{
-				Run: synthetic.Run{
-					Outcome:     tc.outcome,
-					CompletedUS: h.Now().UnixMicro(),
-				},
-				Drained: true,
-			}
-			snapshot := h.wait(t, func(s Snapshot) bool { return s.HasObservation })
-			assert.Equal(t, tc.counts, snapshot.Outcomes)
-			assert.Equal(t, tc.outcome, snapshot.Latest.Outcome)
-			h.stop(t, nil)
+			synctest.Test(t, func(t *testing.T) {
+				h := newHarness(t, request())
+				call := receive(t, h.executor.calls)
+				call.admission <- h.Now()
+				receive(t, call.schedule)
+				call.finish <- synthetic.Execution{
+					Run: synthetic.Run{
+						Outcome:     tc.outcome,
+						CompletedUS: h.Now().UnixMicro(),
+					},
+					Drained: true,
+				}
+				snapshot := h.settle()
+				require.True(t, snapshot.HasObservation)
+				assert.Equal(t, tc.counts, snapshot.Outcomes)
+				assert.Equal(t, tc.outcome, snapshot.Latest.Outcome)
+				h.stop(t, nil)
+			})
 		})
 	}
 }
 
 func TestSnapshotCopiesScalarsAndDoesNotAllocate(t *testing.T) {
-	h := newHarness(t, request())
-	call := receive(t, h.executor.calls)
-	call.admission <- h.Now()
-	receive(t, call.schedule)
-	duration, performance := 10.0, 0.5
-	tests := &synthetic.TestCounts{
-		Declared: 1,
-		Failed:   1,
-	}
-	run := synthetic.Run{
-		Outcome:     synthetic.Failed,
-		CompletedUS: h.Now().UnixMicro(),
-		DurationMS:  &duration,
-		Tests:       tests,
-		Metrics: &synthetic.LabMetrics{
-			Performance: &performance,
-		},
-		Events:    make([]synthetic.Event, 500),
-		Artifacts: make([]synthetic.Artifact, 100),
-	}
-	call.finish <- synthetic.Execution{
-		Run:     run,
-		Drained: true,
-	}
-	before := h.wait(t, func(s Snapshot) bool { return s.HasObservation })
-	duration, performance, tests.Failed = 0, 1, 0
-	assert.Equal(t, before, h.session.Snapshot(h.Now()))
-	assert.Zero(t, testing.AllocsPerRun(100, func() { h.session.Snapshot(h.Now()) }))
-	h.stop(t, nil)
+	synctest.Test(t, func(t *testing.T) {
+		h := newHarness(t, request())
+		call := receive(t, h.executor.calls)
+		call.admission <- h.Now()
+		receive(t, call.schedule)
+		duration, performance := 10.0, 0.5
+		tests := &synthetic.TestCounts{
+			Declared: 1,
+			Failed:   1,
+		}
+		run := synthetic.Run{
+			Outcome:     synthetic.Failed,
+			CompletedUS: h.Now().UnixMicro(),
+			DurationMS:  &duration,
+			Tests:       tests,
+			Metrics: &synthetic.LabMetrics{
+				Performance: &performance,
+			},
+			Events:    make([]synthetic.Event, 500),
+			Artifacts: make([]synthetic.Artifact, 100),
+		}
+		call.finish <- synthetic.Execution{
+			Run:     run,
+			Drained: true,
+		}
+		before := h.settle()
+		require.True(t, before.HasObservation)
+		duration, performance, tests.Failed = 0, 1, 0
+		assert.Equal(t, before, h.session.Snapshot(h.Now()))
+		assert.Zero(t, testing.AllocsPerRun(100, func() { h.session.Snapshot(h.Now()) }))
+		h.stop(t, nil)
+	})
 }

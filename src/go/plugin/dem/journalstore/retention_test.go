@@ -206,6 +206,32 @@ func TestInvalidRetentionLeavesEffectivePolicyUnchanged(t *testing.T) {
 	}
 }
 
+func TestRelaxedRetentionDoesNotApplyPreviousAge(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		ctx := context.Background()
+		s := newTestStore(t)
+		require.NoError(t, s.EnforceHistoryRetention(ctx, 1, 1<<30))
+		appendEntry(t, s)
+		time.Sleep(2 * 24 * time.Hour)
+		require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+		assert.Equal(t, 1, countEntries(t, s), "a relaxed policy must not enforce the retired shorter age")
+	})
+}
+
+func TestOrdinaryRetentionPreservesActiveFile(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+	appendEntry(t, s)
+	active := s.log.ActivePath()
+	require.NotEmpty(t, active)
+	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
+	assert.Equal(t, active, s.log.ActivePath())
+	files, err := filepath.Glob(filepath.Join(s.root, "*", "*.journal"))
+	require.NoError(t, err)
+	assert.Equal(t, []string{active}, files)
+}
+
 func appendNamed(t *testing.T, s *Store, kind, name string) {
 	t.Helper()
 	clock := "DEM_OBSERVED_US"
