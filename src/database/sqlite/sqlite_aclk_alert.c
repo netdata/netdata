@@ -2179,6 +2179,57 @@ int alert_queue_unittest(void)
         freez(h);
     }
 
+    // --- an entry saved while its notification ran is loaded without EXEC_IN_PROGRESS, so the retention cleanup can
+    // free it once it is superseded and old: no notification survives a restart. The load first appends a REMOVED
+    // transition that copies the flags of the one it follows, and that is the entry it loads.
+    {
+        RRDHOST *h = callocz(1, sizeof(*h));
+        uuid_generate(h->host_id.uuid);
+        h->aclk_host_config = callocz(1, sizeof(*h->aclk_host_config));
+        health_alarm_entry_aral_init();
+
+        ALARM_ENTRY *ae = aq_test_ae(8, 8001, RRDCALC_STATUS_CLEAR, RRDCALC_STATUS_WARNING, "reload");
+        ae->name = string_strdupz("reload_alert");
+        ae->chart = string_strdupz("reload.chart");
+        ae->flags = HEALTH_ENTRY_FLAG_PROCESSED | HEALTH_ENTRY_FLAG_EXEC_RUN | HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
+        sql_health_alarm_log_save(h, ae);
+        AQ_SQL(
+            db_execute(db_meta, "INSERT OR IGNORE INTO alert_hash (hash_id) VALUES (zeroblob(16))", NULL),
+            "seed the alert config row the health log load joins");
+
+        sql_health_alarm_log_load(h);
+        ALARM_ENTRY *loaded = h->health_log.alarms;
+        while (loaded && loaded->alarm_id != 8)
+            loaded = loaded->next;
+        uint32_t loaded_flags = loaded ? atomic_flags_get(&loaded->flags) : 0;
+        AQ_CHECK(
+            loaded && !(loaded_flags & HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS) &&
+                (loaded_flags & HEALTH_ENTRY_FLAG_EXEC_RUN),
+            "reload: an entry saved while its notification ran loads without EXEC_IN_PROGRESS "
+            "(loaded=%d status=%d flags=0x%x)", loaded ? 1 : 0, loaded ? (int)loaded->new_status : 0, loaded_flags);
+
+        if (loaded) {
+            atomic_flags_set(&loaded->flags, HEALTH_ENTRY_FLAG_UPDATED);
+            loaded->when = now_realtime_sec() - 7200;
+        }
+        h->health_log.health_log_retention_s = 3600;
+        health_alarm_log_cleanup(h);
+        bool was_loaded = loaded != NULL;
+        loaded = h->health_log.alarms;
+        while (loaded && loaded->alarm_id != 8)
+            loaded = loaded->next;
+        AQ_CHECK(
+            was_loaded && !loaded, "reload: the retention cleanup frees the loaded entry once it is superseded and old");
+
+        health_alarm_log_free(h);
+        string_freez(ae->name);
+        string_freez(ae->chart);
+        aq_test_ae_free(ae);
+        (void)db_execute(db_meta, "DELETE FROM alert_queue", NULL);
+        freez(h->aclk_host_config);
+        freez(h);
+    }
+
     SQLITE_FINALIZE(res_delete);
     sql_close_database(db_meta, "METADATA");
     db_meta = saved_db_meta;

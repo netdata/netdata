@@ -374,13 +374,6 @@ static void do_eval_expression(
         *result = expression_result(expression);
 }
 
-// returns the number of runnable alerts
-//
-// The caller owns `owa` and provides it so a single arena can be reused
-// across all hosts of one iteration (and, in the multi-threaded variant,
-// across all hosts a single worker processes). The arena is reset between
-// alerts inside this function, so peak memory stays bounded by one alert's
-// scratch no matter how many hosts flow through it.
 // Transitions created while a loop walks the alert dictionary are linked into the health log there, but saved to SQLite
 // only after the walk: a save can take seconds on slow storage, and chart cleanup waits for this dictionary's write lock
 // while it holds the chart dictionary's, so ML, collectors and the web API would stall behind every save. The saves
@@ -414,6 +407,13 @@ static void health_pending_saves_drain(RRDHOST *host) {
     health_pending_saves.used = 0;
 }
 
+// returns the number of runnable alerts
+//
+// The caller owns `owa` and provides it so a single arena can be reused
+// across all hosts of one iteration (and, in the multi-threaded variant,
+// across all hosts a single worker processes). The arena is reset between
+// alerts inside this function, so peak memory stays bounded by one alert's
+// scratch no matter how many hosts flow through it.
 static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_delay, time_t now, time_t *next_run, ONEWAYALLOC *owa) {
     size_t runnable = 0;
     struct health_alert_status_counts status_counts = { 0 };

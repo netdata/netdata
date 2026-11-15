@@ -898,6 +898,9 @@ void sql_health_alarm_log_load(RRDHOST *host)
         ae->non_clear_duration = (time_t) sqlite3_column_int64(res, 8);
 
         ae->flags = (uint32_t) sqlite3_column_int64(res, 9);
+        // no notification survives a restart, and only health_alarm_wait_for_execution() clears this flag: a
+        // loaded entry keeping it would never be freed by the retention cleanup
+        ae->flags &= ~HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS;
         ae->flags |= HEALTH_ENTRY_FLAG_SAVED;
 
         ae->exec_run_timestamp = (time_t) sqlite3_column_int64(res, 10);
