@@ -615,7 +615,18 @@ func TestCaptureRedactsCredentialsHiddenByURLEscapes(t *testing.T) {
 	}{
 		"bearer behind an escaped space": {path: "/a/Bearer%20abcdef.ghi", secret: "abcdef.ghi", want: "/a/[REDACTED]"},
 		"bearer behind an escaped tab":   {path: "/a/Bearer%09abcdef.ghi", secret: "abcdef.ghi", want: "/a/[REDACTED]"},
-		"escaped credential key":         {path: "/a/tok%65n=hunter2", secret: "hunter2", want: "/a/token=[REDACTED]"},
+		"escaped credential key":         {path: "/a/tok%65n=hunter2", secret: "hunter2", want: "/a/tok%65n=[REDACTED]"},
+		// The escaped reading still ends the value at the escaped ampersand.
+		"escaped ampersand in a key value": {
+			path:   "/a/password=Tr0ub%26dor99",
+			secret: "dor99",
+			want:   "/a/password=[REDACTED]",
+		},
+		"configured value written with an escape": {
+			path:   "/x/pa%41ss/Bearer%20abcdef.ghi",
+			secret: "abcdef.ghi",
+			want:   "/x/[REDACTED]/[REDACTED]",
+		},
 		"configured value with an escape": {
 			path:   "/files/open%20sesame/x",
 			secret: "sesame",
@@ -634,18 +645,23 @@ func TestCaptureRedactsCredentialsHiddenByURLEscapes(t *testing.T) {
 			secret: "abcdef.ghi",
 			want:   "/users/:email/[REDACTED]",
 		},
-		// A redacted path is escaped again as a whole: an escaped slash in it
-		// becomes a separator.
+		// Text the redactor keeps keeps its received escaping.
 		"escaped slash beside a credential": {
 			path:   "/a%2Fb/Bearer%20abcdef.ghi",
 			secret: "abcdef.ghi",
-			want:   "/a/b/[REDACTED]",
+			want:   "/a%2Fb/[REDACTED]",
+		},
+		"escaped slash before a host-like segment": {
+			path:   "/%2Fevil.com/Bearer%20abcdef.ghi",
+			secret: "abcdef.ghi",
+			want:   "/%2Fevil.com/[REDACTED]",
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			b := urlEscapeBeacon(t, tc.path, redact.NewRedactor("open sesame"))
+			b := urlEscapeBeacon(t, tc.path, redact.NewRedactor("open sesame", "pa%41ss"))
 			assert.Equal(t, tc.want, b.Path)
 			assert.Equal(t, tc.want, b.View)
+			assert.Equal(t, tc.want, b.Events[0].Attrs["url"], "a relative URL")
 			for _, value := range beaconStrings(reflect.ValueOf(b)) {
 				assert.NotContains(t, value, tc.secret)
 			}
@@ -653,21 +669,24 @@ func TestCaptureRedactsCredentialsHiddenByURLEscapes(t *testing.T) {
 	}
 }
 
-// A path the decoded redaction leaves unchanged keeps its received escaping.
-func TestCaptureKeepsURLEscapesWithoutCredentials(t *testing.T) {
-	for _, path := range []string{
-		"/caf%C3%A9/50%25-off",
-		"/a%2Fb/c",
-		"/a/Bearer",
-		"/x%5By%5D",
-		"/a%00b%FF/c%0A", // control characters and invalid UTF-8 without a credential
-		"/%5BREDACTED%5D/x",
+// A path without a credential keeps its received escaping. Control characters
+// are removed from it, as from text, so a credential cannot be joined by
+// removing only some of them.
+func TestCaptureURLPathEscapes(t *testing.T) {
+	for path, want := range map[string]string{
+		"/caf%C3%A9/50%25-off":      "/caf%C3%A9/50%25-off",
+		"/a%2Fb/c":                  "/a%2Fb/c",
+		"/a/Bearer":                 "/a/Bearer",
+		"/x%5By%5D":                 "/x%5By%5D",
+		"/%5BREDACTED%5D/x":         "/%5BREDACTED%5D/x",
+		"/a%00b%FF/c%0A":            "/ab%FF/c",
+		"/a/Bearer%09%00abcdef.ghi": "/a/Bearerabcdef.ghi",
 	} {
 		t.Run(path, func(t *testing.T) {
 			b := urlEscapeBeacon(t, path, nil)
-			assert.Equal(t, path, b.Path)
-			assert.Equal(t, path, b.View)
-			assert.Equal(t, "https://api.example.org"+path, b.Events[0].Attrs["url.full"])
+			assert.Equal(t, want, b.Path)
+			assert.Equal(t, want, b.View)
+			assert.Equal(t, "https://api.example.org"+want, b.Events[0].Attrs["url.full"])
 		})
 	}
 }

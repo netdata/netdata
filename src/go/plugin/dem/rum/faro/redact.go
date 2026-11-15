@@ -87,53 +87,86 @@ func (o Options) redactLink(raw string, source bool) string {
 	if err != nil {
 		plain = path
 	}
-	if plain != path {
-		// The site redactor reads the URL in its escaped form, where an escape
-		// can hide a credential (/a/Bearer%20token), so it reads the decoded
-		// path too. A redacted path is escaped again with the markers literal.
-		if redacted, ok := o.redactDecoded(plain); ok {
-			plain, path = redacted, escapePath(redacted)
+	u.Path, u.RawPath = plain, path
+	if escaped := u.EscapedPath(); strings.IndexByte(escaped, '%') >= 0 {
+		// The final pass reads the escaped URL, where an escape can hide a
+		// credential (/a/Bearer%20token), so the redactor reads it decoded too.
+		u.Path, u.RawPath = o.redactDecodedPath(escaped, u.Path)
+		if u.Host == "" && strings.HasPrefix(u.RawPath, "//") {
+			// Removed control characters can join two slashes; a relative path
+			// must not become a network-path reference with a host.
+			u.RawPath = "/%2F" + u.RawPath[2:]
 		}
 	}
-	u.Path, u.RawPath = plain, path
 	return u.String()
 }
 
-// redactDecoded redacts a decoded path like text: every credential found in it
-// or in it without control characters. ok is false, and the path keeps its
-// received escaping, when it holds none.
-func (o Options) redactDecoded(plain string) (string, bool) {
+// redactDecodedPath reads an escaped path decoded, as the redactor reads text:
+// it removes control characters and replaces every credential found with or
+// without them by a literal marker, which net/url accepts in an escaped path.
+// Every other byte keeps its received escaping, so the final pass over the
+// escaped URL still reads the original escapes. plain is escaped decoded; it
+// returns the new decoded and escaped path.
+func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 	redacted := o.redactor().ApplyRemoving(plain, unicode.IsControl)
-	if redacted == plain || redacted == withoutControls(plain) {
-		return "", false
+	if redacted == plain {
+		return plain, escaped
 	}
-	return redacted, true
-}
-
-// withoutControls removes control characters, keeping every other byte as
-// ApplyRemoving does.
-func withoutControls(s string) string {
-	var out strings.Builder
-	for i := 0; i < len(s); {
-		c, n := utf8.DecodeRuneInString(s[i:])
+	// starts[i] is where decoded byte i begins in escaped; kept lists the
+	// decoded bytes that are not part of a control character.
+	starts := make([]int, 0, len(plain)+1)
+	for i := 0; i < len(escaped); {
+		starts = append(starts, i)
+		if escaped[i] == '%' && i+2 < len(escaped) && isHexByte(escaped[i+1]) && isHexByte(escaped[i+2]) {
+			i += 3
+		} else {
+			i++
+		}
+	}
+	starts = append(starts, len(escaped))
+	if len(starts) != len(plain)+1 {
+		// Unreachable for a decoded escaped path; escaping the redacted text keeps it redacted.
+		return redacted, ""
+	}
+	var keptText strings.Builder
+	kept := make([]int, 0, len(plain))
+	for i := 0; i < len(plain); {
+		c, n := utf8.DecodeRuneInString(plain[i:])
 		if !unicode.IsControl(c) {
-			out.WriteString(s[i : i+n])
+			keptText.WriteString(plain[i : i+n])
+			for j := i; j < i+n; j++ {
+				kept = append(kept, j)
+			}
 		}
 		i += n
 	}
-	return out.String()
-}
-
-// escapePath escapes a decoded path, keeping each redaction marker literal;
-// net/url accepts brackets in an escaped path.
-func escapePath(plain string) string {
-	parts := strings.Split(plain, redact.Marker)
-	for i, part := range parts {
-		parts[i] = (&url.URL{
-			Path: part,
-		}).EscapedPath()
+	// The redacted text is the kept text with ranges replaced by markers: place
+	// each run between markers in the kept text and write its received escapes.
+	text := keptText.String()
+	runs := strings.Split(redacted, redact.Marker)
+	var out strings.Builder
+	pos := 0
+	for i, run := range runs {
+		at := pos
+		switch {
+		case i == len(runs)-1:
+			at = len(text) - len(run)
+		case i > 0:
+			at = pos + strings.Index(text[pos:], run)
+		}
+		if at < pos || (i == 0 && at != 0) || !strings.HasPrefix(text[at:], run) {
+			// Unreachable while the redactor only replaces ranges.
+			return redacted, ""
+		}
+		if i > 0 {
+			out.WriteString(redact.Marker)
+		}
+		for _, j := range kept[at : at+len(run)] {
+			out.WriteString(escaped[starts[j]:starts[j+1]])
+		}
+		pos = at + len(run)
 	}
-	return strings.Join(parts, redact.Marker)
+	return redacted, out.String()
 }
 
 func escapeInvalidPercent(value string) string {

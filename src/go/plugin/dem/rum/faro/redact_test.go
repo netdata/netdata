@@ -38,6 +38,29 @@ func TestRedactURL(t *testing.T) {
 	assert.Equal(t, "https://api.example.com", o.redactURL("https://api.example.com"), "host only")
 }
 
+// Removing control characters from a relative path must not turn it into a
+// network-path reference, and escapes the redactor keeps stay escaped.
+func TestRedactURLKeepsRelativeURLsHostless(t *testing.T) {
+	var o Options
+	for raw, want := range map[string]string{
+		"/%2Fevil.com/Bearer%20abcdef.ghi":    "/%2Fevil.com/[REDACTED]",
+		"/%09/tok%65n%3Dx":                    "/%2Ftok%65n%3D[REDACTED]",
+		"https://example.org/%09/tok%65n%3Dx": "https://example.org//tok%65n%3D[REDACTED]",
+		"a%3Ab/Bearer%20abcdef.ghi":           "a%3Ab/[REDACTED]",
+	} {
+		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, o.redactURL(raw)) })
+	}
+}
+
+// Site path rules run on the escaped path; text they insert is escaped before
+// the decoded reading, so a rule cannot bypass it.
+func TestRedactURLReadsSitePathRuleOutputDecoded(t *testing.T) {
+	o := Options{
+		PathRules: []PathRule{{Re: regexp.MustCompile(`_`), Replace: " "}},
+	}
+	assert.Equal(t, "https://example.org/a/[REDACTED]", o.redactURL("https://example.org/a/Bearer_abcdef.ghi"))
+}
+
 func TestRedactSelector(t *testing.T) {
 	if got := redactSelector("div#row-jane@example.com > button.buy-1234567"); got != "div#:email > button.buy-:id" {
 		t.Fatalf("got %q", got)

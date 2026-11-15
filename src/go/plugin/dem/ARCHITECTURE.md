@@ -666,10 +666,12 @@ Sites:
   unrecognized prefix. Composed texts (stacks, session timeline entries) are built from redacted values. Opaque IDs
   (session, page, view, observation, trace) are validated, not redacted.
 - URL values (page URLs, URL-shaped view names, URL attributes and stack frame file names) are reduced first:
-  credentials, query and fragment are dropped and path segments generalized. The site redactor then reads the decoded
-  path like text, so an escape cannot hide a credential (`/a/Bearer%20token`, an escaped control character), and the
-  reduced, escaped URL. A path holding a credential is escaped again with literal `[REDACTED]` markers; any other path
-  keeps its received escaping. A site path rule that rewrites part of a credential can still hide a pattern.
+  credentials, query and fragment are dropped and path segments generalized. The site redactor then reads an escaped
+  path decoded, like text: escaped control characters are removed and every credential found with or without them
+  becomes a literal `[REDACTED]` marker, while every other byte keeps its received escaping. The final pass reads the
+  reduced URL with those escapes: an escape cannot hide a credential from the decoded read (`/a/Bearer%20token`), and
+  a decoded character cannot end one early for the escaped read (`password=a%26b`). A site path rule that rewrites
+  part of a credential can still hide a pattern.
 - Site path rules on a non-URL view name read the cleaned name when it holds no credential in either form, and the
   redacted name otherwise, so a rule cannot split a credential; a name they leave unchanged is redacted as text.
 - Query output applies the current site redactor to every text value of active sites, because configured credentials
