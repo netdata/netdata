@@ -179,13 +179,14 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	assert.Empty(t, service.PolicyError())
 }
 
-// A failed sweep is retried promptly without sweeping the other store again;
-// each store gets its own policy.
+// A failed sweep is logged and retried promptly without sweeping the other
+// store again; each store gets its own policy.
 func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 	for _, failedStore := range []string{"history", "artifacts"} {
 		t.Run(failedStore, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				var historyCalls, artifactCalls atomic.Int32
+				var logs bytes.Buffer
 				service := &Retention{
 					history: historyRetentionFunc(func(_ context.Context, days int, maxBytes int64) error {
 						historyCalls.Add(1)
@@ -213,7 +214,7 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 					),
 					historyPolicy:  DefaultConfig().History,
 					artifactPolicy: DefaultConfig().Artifacts,
-					log:            logger.NewWithWriter(&bytes.Buffer{}),
+					log:            logger.NewWithWriter(&logs),
 				}
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -229,6 +230,16 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 				} else {
 					assert.Equal(t, int32(1), historyCalls.Load())
 					assert.Equal(t, int32(3), artifactCalls.Load())
+				}
+				for store, warning := range map[string]string{
+					"history":   "DEM history retention failed",
+					"artifacts": "DEM artifact retention failed",
+				} {
+					if store == failedStore {
+						assert.Contains(t, logs.String(), warning)
+					} else {
+						assert.NotContains(t, logs.String(), warning)
+					}
 				}
 			})
 		})

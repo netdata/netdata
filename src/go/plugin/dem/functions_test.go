@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -135,6 +136,26 @@ func assertAvailability(t *testing.T, components dem.Components, rum, synthetics
 	assert.ElementsMatch(t, slices.Collect(maps.Keys(declared)), providers)
 }
 
+// listed returns one column of a composed RUM or synthetic Function's rows.
+func listed(t *testing.T, components dem.Components, method, column string) []any {
+	t.Helper()
+	handle := syntheticHandler(t, components).HandleRaw
+	if strings.HasPrefix(method, "rum-") {
+		handle = rumHandler(t, components).HandleRaw
+	}
+	response := handle(t.Context(), funcapi.RawMethodRequest{
+		Method:      method,
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, response.RawResponse, response.Message)
+	index := response.RawResponse["columns"].(map[string]any)[column].(map[string]any)["index"].(int)
+	var values []any
+	for _, row := range response.RawResponse["data"].([][]any) {
+		values = append(values, row[index])
+	}
+	return values
+}
+
 func TestOnlySyntheticCollectorsWaitForTheBrowserRuntime(t *testing.T) {
 	browser := []collectorapi.ActivationDependency{{Kind: "dem-runtime", Name: "browser"}}
 	for name, activation := range map[string]func(map[string]any) ([]collectorapi.ActivationDependency, error){
@@ -214,6 +235,14 @@ func TestFunctionAvailabilityWithActiveCollectors(t *testing.T) {
 				t.Fatal("collector did not become ready")
 			}
 			assertAvailability(t, components, module == "rum", module == "journey" || module == "lighthouse")
+			// The module's listing Function reads the registry its collector registers into.
+			if listing, ok := map[string]struct{ method, column, want string }{
+				"rum":        {method: "rum-sites", column: "site", want: "shop"},
+				"journey":    {method: "synthetics-checks", column: "job_id", want: "journey:login"},
+				"lighthouse": {method: "synthetics-checks", column: "job_id", want: "lighthouse:home"},
+			}[module]; ok {
+				assert.Equal(t, []any{listing.want}, listed(t, components, listing.method, listing.column))
+			}
 			cancel()
 			select {
 			case err := <-done:
