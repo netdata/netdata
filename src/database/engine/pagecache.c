@@ -1297,11 +1297,11 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
             mrg_metric_clear_retention(main_mrg, metric);
 
             // a collector may have added pages after the scan, and the clear above may have erased the retention
-            // they recorded: restore it from them
+            // they recorded: restore it from them (the metric keeps its update every: the clear does not touch it)
             time_t newest_end_s = 0;
             oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &newest_end_s);
             if (oldest_s)
-                mrg_metric_expand_retention(main_mrg, metric, oldest_s, newest_end_s, entry.update_every_s);
+                mrg_metric_expand_retention(main_mrg, metric, oldest_s, newest_end_s, 0);
             else
                 __atomic_store_n(&ram_cache_metrics_lost_retention, true, __ATOMIC_RELAXED);
         }
