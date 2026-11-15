@@ -6,7 +6,7 @@
     "properties": {
       "name": {
         "title": "Name",
-        "description": "Native job name used to identify this monitor and its history. Renaming creates a separate monitor.",
+        "description": "Job name. It identifies the audit in charts and run history, so renaming starts a separate history.",
         "type": "string",
         "minLength": 1
       },
@@ -17,34 +17,34 @@
       },
       "url": {
         "title": "URL",
-        "description": "Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.",
+        "description": "Page to audit, as an absolute http:// or https:// URL without a username or password.",
         "type": "string",
         "minLength": 1,
         "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s/:@?#][^\\s/@?#]*(?:[/?#][^\\r\\n]*)?$"
       },
       "save_report": {
         "title": "Save HTML report",
-        "description": "Save the full Lighthouse HTML report. Reports can contain sensitive URLs and page content.",
+        "description": "Save the full Lighthouse HTML report of each audit. Reports can contain sensitive URLs and page content.",
         "type": "boolean",
         "default": false
       },
       "update_every": {
         "title": "Update every",
-        "description": "Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.",
+        "description": "How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.",
         "type": "integer",
         "minimum": 1,
         "default": 10
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.",
+        "description": "Time limit for one audit, in seconds. Time spent waiting for a free browser does not count.",
         "type": "number",
         "default": 180,
         "minimum": 0.001
       },
       "check_every": {
         "title": "Check every",
-        "description": "Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.",
+        "description": "How often to audit the page, in seconds.",
         "type": "integer",
         "minimum": 1,
         "maximum": 9223372036,
