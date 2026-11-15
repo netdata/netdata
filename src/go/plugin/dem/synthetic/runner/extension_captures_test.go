@@ -52,7 +52,7 @@ func TestCaptureReportingNegotiationAndIsolation(t *testing.T) {
 		lines  []string
 		status string
 	}{
-		"old runtime":    {nil, "negotiation_not_reported"},
+		"old runtime":    {nil, "unavailable"},
 		"declined":       {[]string{`{"type":"extension_init","extension_init":{"selected":[]}}`}, "unsupported"},
 		"selected":       {[]string{captureInit}, "partial"},
 		"complete":       {[]string{captureInit, extensionLine(captureDetailsFeature, map[string]any{"record": "complete"})}, "complete"},
@@ -191,7 +191,7 @@ func TestTraceSupportReporting(t *testing.T) {
 		want  string
 	}{
 		"disabled":                {},
-		"old runtime":             {trace: true, want: "negotiation_not_reported"},
+		"old runtime":             {trace: true, want: "unavailable"},
 		"old selection":           {trace: true, lines: []string{captureInit}, want: "unsupported"},
 		"selected":                {trace: true, lines: []string{selected}, want: "supported"},
 		"invalid init":            {trace: true, lines: []string{`{"type":"extension_init","extension_init":{"selected":null}}`}, want: "invalid"},

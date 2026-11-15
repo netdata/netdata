@@ -395,7 +395,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			require.NotNil(t, ex.Run.Captures)
 			want := "supported"
 			if mode == "old runtime" {
-				want = "negotiation_not_reported"
+				want = "unavailable"
 			}
 			if mode == "declined" {
 				want = "unsupported"
@@ -408,7 +408,7 @@ func TestTraceReportingThroughEnginePublication(t *testing.T) {
 			count := 2
 			if mode == "old runtime" {
 				count = 1
-				assert.Equal(t, "negotiation_not_reported", ex.Run.Captures.Reporting)
+				assert.Equal(t, "unavailable", ex.Run.Captures.Reporting)
 				assert.Empty(t, ex.Run.Captures.Tests)
 			}
 			if mode == "oversize" {

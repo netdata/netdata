@@ -369,7 +369,9 @@ Playwright steps can contain those operations. User steps/API calls remain visib
 This is a supported-script boundary, not isolation against direct private imports.
 
 Secrets are redacted before bounding text. Structured URLs lose credentials, query
-and fragment; an oversized URL is omitted whole and an unusable URL is empty.
+and fragment; an oversized URL is omitted whole and an unusable URL is empty. Go stores
+an oversized request URL as `url_omitted: too_long`, and an empty one or one its URL
+parser rejects as `url_omitted: unavailable`.
 Recognized embedded HTTP(S) URLs receive best-effort stripping. Arbitrary
 application text is not guaranteed anonymous. The renderer guards strings at 512
 UTF-16 units; worker/Go retention requires <=512 Go-encoded JSON bytes, including
@@ -460,8 +462,9 @@ body limit apply; exact-secret redaction precedes title clipping. There is no pe
 
 Invalid bodies or unknown variants invalidate this feature alone and retain earlier valid observations; conflicting
 identities lose their disputed association. Shared envelopes and core records remain strict. Reporting states are
-`negotiation_not_reported`, `unsupported`, `partial`, `complete`, `invalid`; truncation is independent. An absent stored
-report means not recorded. Lighthouse has Go publication dispositions but no journey feature reporting state.
+`unavailable` (never acknowledged), `unsupported`, `partial`, `complete`, `invalid`; truncation is independent. An
+absent stored report means not recorded. Lighthouse has Go publication dispositions but no journey feature reporting
+state.
 
 Go joins labels only onto eligible terminal candidates. Metadata IDs never authorize files. A delivered association
 without an accepted final candidate is `not_in_final_report`; interrupted candidates visible to Go but rejected by
@@ -504,10 +507,10 @@ the existing normal or interrupted list. IDs share the existing per-attempt inde
 both kinds, while `accepted` and `unaccepted` remain PNG-only. No trace rejection counter or inferred absence reason
 is introduced. Existing Go omissions describe candidates rejected by terminal eligibility or publication.
 
-When requested, `run.captures.trace` describes negotiation: `supported`, `unsupported`, `negotiation_not_reported` or
-`invalid`; absent when disabled. It describes capability, not whether a trace was produced or retained. Bad
-capture-detail payloads do not change this independent capability state. Invalid shared negotiation affects optional
-reporting only, never outcomes or request-authorized core candidates.
+When requested, `run.captures.trace` describes negotiation: `supported`, `unsupported`, `unavailable` (never
+acknowledged) or `invalid`; absent when disabled. It describes capability, not whether a trace was produced or
+retained. Bad capture-detail payloads do not change this independent capability state. Invalid shared negotiation
+affects optional reporting only, never outcomes or request-authorized core candidates.
 
 Trace ZIPs retain raw data, including resolved DEM credentials, cookies, form values, headers, bodies, object details
 and source fragments. Text/step redaction does not rewrite ZIPs. Source and attachment exclusion is not redaction.
