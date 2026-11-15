@@ -75,6 +75,10 @@ func writeNewFile(root *os.Root, name string, contents []byte, mode os.FileMode)
 	return errors.Join(err, f.Close())
 }
 
+// metadataError marks a declared but unusable selection, generation, preload or
+// root layout record: damage that managed repair or a replacement preload fixes.
+// Ownership records are read with readOwnerRecord, because neither can replace
+// them.
 type metadataError struct {
 	name string
 	err  error
@@ -132,6 +136,17 @@ func readJSON(root *os.Root, name string, value any) error {
 		return damagedMetadata(name, errors.New("trailing runtime metadata"))
 	}
 	return nil
+}
+
+// readOwnerRecord reads an ownership record. A malformed one keeps its text but
+// is not metadata damage: repair and uninstall need a readable ownership
+// inventory, so it must never carry ErrDamaged's advice.
+func readOwnerRecord(root *os.Root, name string, value any) error {
+	err := readJSON(root, name, value)
+	if isMetadataDamage(err) {
+		return errors.New(err.Error())
+	}
+	return err
 }
 
 // saveJSON durably publishes a service-private record: it survives a crash once

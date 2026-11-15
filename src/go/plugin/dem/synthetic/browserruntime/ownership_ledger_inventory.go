@@ -73,7 +73,7 @@ func (s *ownershipLedger) inventoryLocked(reconcile bool) (ownershipInventory, e
 			continue
 		}
 		var claim claimRecord
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &claim); err != nil {
+		if err := readOwnerRecord(s.root, filepath.Join(name, "owner.json"), &claim); err != nil {
 			return inv, err
 		}
 		if !validID(claim.Generation) {
@@ -95,7 +95,7 @@ func (s *ownershipLedger) inventoryLocked(reconcile bool) (ownershipInventory, e
 	}
 	for _, name := range uses {
 		var use useRecord
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &use); err != nil {
+		if err := readOwnerRecord(s.root, filepath.Join(name, "owner.json"), &use); err != nil {
 			return inv, err
 		}
 		if !validID(use.Generation) || !validID(use.Invocation) || (use.Boot.Verified && !validBootID(use.Boot.ID)) {

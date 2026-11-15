@@ -104,5 +104,9 @@ func readPreload(path string) (Paths, Manifest, error) {
 		return Paths{}, empty, errors.New("preload identity, platform or final path differs from its preparation")
 	}
 	paths, err := preparedPaths(root, path, record.Manifest)
+	if errors.Is(err, ErrUnavailable) {
+		// A sealed preload names a generation it no longer contains.
+		err = damagedMetadata("preload.json", err)
+	}
 	return paths, record.Manifest, err
 }

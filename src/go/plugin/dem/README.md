@@ -705,10 +705,11 @@ release version, archive digest and execution contract for investigation.
 
 Explicit installation enables automatic preparation by default and prints this policy before proceeding. Use
 `--manual-updates` on install or repair to disable it. The running plugin checks roughly daily with jitter, downloads
-and qualifies a newer signed release beside the working release, and reports that restart is required. It never
-restarts the Agent. Security fixes remain inactive until the administrator or deployment system restarts DEM.
-Qualification shares the browser execution allowance, so monitors can wait while these local checks run. Failures preserve
-the selected release and appear as update maintenance errors, separately from website measurements.
+and qualifies a newer signed release beside the working release, and selects it for the next DEM start; `runtime
+status` shows the selected release. It never restarts the Agent. Security fixes remain inactive until the
+administrator or deployment system restarts DEM. Qualification shares the browser execution allowance, so monitors can
+wait while these local checks run. Failures preserve the selected release and are logged as `DEM runtime update
+failed` warnings, with a notice when a later check recovers, separately from website measurements.
 
 Signatures authenticate publication order and complete preparation instructions. They cannot detect withheld updates
 or guarantee freshness on a new installation. Online trust follows the canonical HTTPS key endpoint and system TLS

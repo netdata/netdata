@@ -272,3 +272,43 @@ func TestExecutionAdmissionFailureCanRetrySameSelection(t *testing.T) {
 	require.Equal(t, manifest.Archive.SHA256, use.Paths().Identity.SHA256)
 	require.NoError(t, use.Finish(true))
 }
+
+func TestHandleIdentityNamesTheRunningRelease(t *testing.T) {
+	for _, mode := range []Mode{ModeManaged, ModePreloaded} {
+		t.Run(string(mode), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "runtime")
+			store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+			require.NoError(t, err)
+			release, data := publishedBundle(t, "handle", installSequence.Add(1))
+			cfg := DefaultConfig()
+			cfg.Mode = mode
+			if mode == ModeManaged {
+				selectPublished(t, store, release, data, browserruntime.ManualUpdates)
+				cfg.CachePath = path
+			} else {
+				verified := verifiedRelease(t, release)
+				archive := filepath.Join(t.TempDir(), "archive.tar.zst")
+				require.NoError(t, os.WriteFile(archive, data, 0600))
+				candidate, err := store.BeginPublishedInstall(
+					context.Background(),
+					browserruntime.ReleaseInstallOptions{
+						Operation: browserruntime.InstallRelease,
+						Updates:   browserruntime.ManualUpdates,
+					},
+					func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil },
+				)
+				require.NoError(t, err)
+				require.NoError(t, candidate.Import(context.Background(), archive))
+				require.NoError(t, candidate.SealPreload())
+				require.NoError(t, candidate.Close())
+				cfg.PreloadPath = path
+			}
+			require.NoError(t, store.Close())
+			handle := Open(cfg, "")
+			t.Cleanup(func() { require.NoError(t, handle.Close()) })
+			require.NoError(t, handle.SetupError)
+			require.Equal(t, release.Manifest.Identity(), handle.Identity())
+			require.Nil(t, handle.NativeStatus(), "only native mode inspects package proof")
+		})
+	}
+}

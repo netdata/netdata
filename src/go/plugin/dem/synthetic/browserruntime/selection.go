@@ -5,6 +5,7 @@ package browserruntime
 import (
 	"errors"
 	"os"
+	"path/filepath"
 	"sync"
 )
 
@@ -128,6 +129,10 @@ type Consumer struct {
 	store    *Store
 	manifest Manifest
 	claim    *claim
+	// selected consumers acquired a prepared generation that their claim
+	// protects, so its later absence is damage. A candidate's generation does not
+	// exist until it is prepared.
+	selected bool
 	mu       sync.Mutex
 	closed   bool
 }
@@ -141,6 +146,9 @@ func (c *Consumer) BeginUse() (*Use, error) {
 		return nil, errors.New("runtime consumer is closed")
 	}
 	use, err := c.store.beginUse(c.manifest)
+	if c.selected && errors.Is(err, ErrUnavailable) {
+		err = damagedMetadata(filepath.Join("generations", c.manifest.Archive.SHA256), err)
+	}
 	return use, publicDamage(err)
 }
 
@@ -167,6 +175,7 @@ func (s *Store) AcquireSelected() (*Consumer, error) {
 				store:    s,
 				manifest: *m,
 				claim:    owner,
+				selected: true,
 			}
 		}
 		return err

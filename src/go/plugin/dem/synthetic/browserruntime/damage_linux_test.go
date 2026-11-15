@@ -26,6 +26,9 @@ func damageGeneration(t *testing.T, s *Store, id, damage string) {
 		require.NoError(t, err)
 		g.Manifest.Version += ".other"
 		require.NoError(t, saveJSON(s.root, name, g))
+	case "missing generation":
+		// Keep the payload as evidence outside the store.
+		require.NoError(t, os.Rename(filepath.Join(s.path, "generations", id), filepath.Join(t.TempDir(), "lost")))
 	default:
 		t.Fatalf("unknown damage %q", damage)
 	}
@@ -96,6 +99,63 @@ func TestManagedOperationsReportMetadataDamageAsErrDamaged(t *testing.T) {
 	}
 }
 
+func TestSelectedConsumerReportsLostGenerationAsDamage(t *testing.T) {
+	s, _ := testStore(t)
+	m := installFixture(t, s, "lost")
+	consumer, err := s.AcquireSelected()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = consumer.Close() })
+	// The claim protects the generation, so only damage can remove it.
+	damageGeneration(t, s, m.Archive.SHA256, "missing generation")
+	_, err = consumer.BeginUse()
+	require.ErrorIs(t, err, ErrDamaged)
+	require.ErrorContains(t, err, "runtime repair")
+	require.NotErrorIs(t, err, ErrUnavailable, "damage hides ordinary sentinels")
+}
+
+func TestDamagedOwnershipRecordIsNotRepairableDamage(t *testing.T) {
+	// Repair and uninstall need a readable ownership inventory, so a damaged
+	// ownership record must not carry ErrDamaged's advice.
+	operations := map[string]func(t *testing.T, c *Candidate, archive string) error{
+		"candidate import": func(t *testing.T, c *Candidate, archive string) error {
+			return c.Import(context.Background(), archive)
+		},
+		"candidate download": func(t *testing.T, c *Candidate, _ string) error {
+			return c.Download(context.Background())
+		},
+		"candidate seal preload": func(t *testing.T, c *Candidate, archive string) error {
+			return c.SealPreload()
+		},
+	}
+	for name, operation := range operations {
+		t.Run(name, func(t *testing.T) {
+			s, _ := testStore(t)
+			installFixture(t, s, "installed")
+			consumer, err := s.AcquireSelected()
+			require.NoError(t, err)
+			use, err := consumer.BeginUse()
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = use.Finish(true); _ = consumer.Close() })
+			m, data := bundleFixture(t, "candidate")
+			archive := archiveFile(t, data)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = candidate.Close() })
+			if name == "candidate seal preload" {
+				require.NoError(t, candidate.Import(context.Background(), archive))
+			}
+			records, err := filepath.Glob(filepath.Join(s.path, "uses", "*", "owner.json"))
+			require.NoError(t, err)
+			require.Len(t, records, 1)
+			require.NoError(t, os.WriteFile(records[0], []byte("broken"), 0600))
+			err = operation(t, candidate, archive)
+			require.ErrorContains(t, err, "owner.json")
+			require.NotErrorIs(t, err, ErrDamaged)
+			require.NotContains(t, err.Error(), "runtime repair")
+		})
+	}
+}
+
 func TestManagedUseKeepsOperationalFailures(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("permission failure requires the unprivileged service identity")
@@ -118,6 +178,7 @@ func TestReadPreloadReportsDamageWithPreloadAdvice(t *testing.T) {
 		"broken record",
 		"missing record",
 		"different executable",
+		"missing generation",
 		"broken preload record",
 		"invalid preload manifest",
 	} {
@@ -143,6 +204,7 @@ func TestReadPreloadReportsDamageWithPreloadAdvice(t *testing.T) {
 			require.ErrorIs(t, err, errPreloadDamaged)
 			require.NotErrorIs(t, err, ErrDamaged, "managed repair refuses sealed preloads")
 			require.NotErrorIs(t, err, os.ErrNotExist, "damage hides ordinary sentinels")
+			require.NotErrorIs(t, err, ErrUnavailable, "damage hides ordinary sentinels")
 			require.NotContains(t, err.Error(), "selection.json")
 		})
 	}
