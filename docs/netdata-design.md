@@ -80,7 +80,7 @@ For large infrastructures, we recommend deploying Parents for about every 500 no
 
 For example, a fleet of 2,000 nodes needs 4 Parents for the recommended capacity, and a fleet of 20,000 nodes needs about 40, with each Parent placed in the data center, region or cloud zone of its Agents. The [Parent sizing guidelines](/docs/scalability.md#parent-sizing-guidelines) list the layouts and resources.
 
-In a benchmark, a single Parent ingested 4.6 million metrics per second from 1,000 nodes using about 9 of its 52 CPU cores and 47 GiB of its 200 GiB of RAM: 37% less CPU, 88% less RAM and 97% less disk I/O than Prometheus on the same data. This was a test load, not a maximum. The planning figure of about 500 nodes per Parent includes machine learning, alerts, queries, the operating system and headroom; the benchmark measured ingestion with ML and alerts disabled.
+In a benchmark, a single Parent ingested 4.6 million metrics per second from 1,000 nodes using about 9 of its 52 CPU cores and 47 GiB of its 200 GiB of RAM: 37% less CPU, 88% less RAM and 97% less disk I/O than Prometheus on the same data. This was a test load, not a maximum. The planning figure of about 500 nodes per Parent includes machine learning, alerts, queries, the operating system and headroom.
 
 Large queries were up to 22x faster: Netdata answers each query from the storage tier that matches the chart's resolution, and every point in a higher tier keeps its min, max, average and anomaly rate, so the chart is the same, only faster.
 
