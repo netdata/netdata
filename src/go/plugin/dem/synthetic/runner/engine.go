@@ -430,19 +430,6 @@ func stopText(reason synthetic.TerminationReason) string {
 	}
 }
 
-// eligibleCaptures splits reported candidates into those to publish and those
-// to explain: interrupted captures publish only after a journey budget stop.
-func eligibleCaptures(run *synthetic.Run, s sinkSnapshot) (captures, ineligible []synthetic.Capture) {
-	if s.err != nil || s.result == nil {
-		return nil, nil
-	}
-	captures = append(captures, s.result.Artifacts...)
-	if run.TerminationReason == synthetic.ExecutionBudget {
-		return append(captures, s.result.InterruptedArtifacts...), nil
-	}
-	return captures, s.result.InterruptedArtifacts
-}
-
 // complete finalizes the run work directory, when one exists, and records
 // completion. It owns a fixed cleanup budget independent of cancelled workflow input.
 func (e *Engine) complete(a *attempt, captures []synthetic.Capture) {
@@ -453,27 +440,6 @@ func (e *Engine) complete(a *attempt, captures []synthetic.Capture) {
 	}
 	a.run.CompletedUS = time.Now().UnixMicro()
 	e.save(cleanup, synthetic.HistoryComplete, a)
-}
-
-func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.Capture) {
-	run := &a.run
-	artifacts, err := e.artifacts.Finalize(ctx, run.ID, captures)
-	if err != nil {
-		capturePublicationFailed(run, captures, err)
-		run.Error = joinText(run.Error, a.redact.text("artifact publication: "+err.Error()))
-		if run.CaptureState != synthetic.CaptureDisabled {
-			run.CaptureState = synthetic.CaptureUnavailable
-		}
-		return
-	}
-	run.Artifacts = artifacts
-	capturePublicationSucceeded(run, captures)
-	if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
-		run.CaptureState = synthetic.CaptureUnavailable
-		if len(artifacts) > 0 {
-			run.CaptureState = synthetic.CaptureAvailable
-		}
-	}
 }
 
 func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, a *attempt) {
