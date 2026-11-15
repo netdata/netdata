@@ -36,7 +36,12 @@ type fakeHistory struct {
 	syncCalls int
 }
 
-func (h *fakeHistory) AppendRun(_ context.Context, phase synthetic.HistoryPhase, run synthetic.Run) (bool, error) {
+// AppendRun and Sync refuse a cancelled context before recording anything, as
+// the journal store does at admission.
+func (h *fakeHistory) AppendRun(ctx context.Context, phase synthetic.HistoryPhase, run synthetic.Run) (bool, error) {
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.phases = append(h.phases, string(phase))
@@ -44,7 +49,10 @@ func (h *fakeHistory) AppendRun(_ context.Context, phase synthetic.HistoryPhase,
 	return true, h.err
 }
 
-func (h *fakeHistory) Sync(context.Context) error {
+func (h *fakeHistory) Sync(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.syncCalls++

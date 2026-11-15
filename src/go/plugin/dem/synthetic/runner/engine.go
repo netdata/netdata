@@ -243,7 +243,7 @@ func (e *Engine) runAdmitted(
 	}
 	identity := paths.Identity
 	a.run.Runtime = &identity
-	e.save(attemptCtx, synthetic.HistoryStart, a)
+	e.recordStart(a)
 
 	raw, err := e.prepareWork(attemptCtx, a, admittedAt)
 	if err != nil {
@@ -265,10 +265,16 @@ func (e *Engine) runAdmitted(
 // record as an observed error. No work directory exists yet.
 func (e *Engine) failBeforeStart(a *attempt, err error) {
 	a.run.Error = a.redact.text(err.Error())
+	e.recordStart(a)
+	e.complete(a, nil)
+}
+
+// recordStart saves the admitted attempt's start record under a fixed cleanup
+// budget, so a caller cancelled after admission still leaves it.
+func (e *Engine) recordStart(a *attempt) {
 	cleanup, cancel := context.WithTimeout(context.Background(), cleanupTimeout)
 	defer cancel()
 	e.save(cleanup, synthetic.HistoryStart, a)
-	e.complete(a, nil)
 }
 
 // prepareWork creates the run work directory and encodes the wire request.
