@@ -140,6 +140,14 @@ option(ENABLE_BUNDLED_PROTOBUF "Use a vendored copy of protobuf" False)
 option(ENABLE_WEBRTC "Enable WebRTC dashboard communications (experimental)" False)
 mark_as_advanced(ENABLE_WEBRTC)
 
+# buildinfo shows the compiler and linker flags of the build, and the CMake
+# cache is installed next to the agent for the same purpose. Both name the
+# build tree and the sysroot (-I, -L, -ffile-prefix-map), so the installed
+# files differ between two builds of the same source in different locations.
+# Turn this off for a build that has to be reproducible.
+option(RECORD_BUILD_ENVIRONMENT "Record the compiler flags and the CMake cache of the build in the installed agent" True)
+mark_as_advanced(RECORD_BUILD_ENVIRONMENT)
+
 # The user account the installed agent runs as; reaches the service templates,
 # edit-config and config.h. The last -D-only knob of the settable-but-declared-
 # nowhere class this module was created to eliminate.
