@@ -8,12 +8,18 @@ import (
 	"encoding/hex"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
+
+// finalDrainTimeout bounds the history and export drains of one site shutdown
+// together. The Agent sends SIGKILL 2 s after SIGTERM, and a stalled journal or
+// a black-holed export endpoint must not consume that grace.
+const finalDrainTimeout = time.Second
 
 // Run admits an independent site without waiting for receiver startup. Worker
 // cancellation occurs only after exact route/read leases have drained.
@@ -62,15 +68,14 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		return err
 	}
 	workersCtx, stopWorkers := context.WithCancel(context.Background())
-	var workers sync.WaitGroup
-	workers.Go(func() { writer.Run(workersCtx) })
-	// Enabled exports share one absolute final-flush budget after route leases drain.
+	// The history writer and enabled exports share one absolute final-drain
+	// budget, started by the first drain after route leases drain.
 	var finalOnce sync.Once
 	var finalCtx context.Context
 	var finalCancel context.CancelFunc
 	final := func() context.Context {
 		finalOnce.Do(func() {
-			finalCtx, finalCancel = context.WithTimeout(context.Background(), otlp.ShutdownFlushTimeout)
+			finalCtx, finalCancel = context.WithTimeout(context.Background(), finalDrainTimeout)
 		})
 		return finalCtx
 	}
@@ -79,6 +84,8 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			finalCancel()
 		}
 	}()
+	var workers sync.WaitGroup
+	workers.Go(func() { writer.Run(workersCtx, final) })
 	if p.logs != nil {
 		workers.Go(func() { p.logs.Run(workersCtx, final) })
 	}

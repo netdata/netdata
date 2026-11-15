@@ -179,9 +179,7 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 	for i, id := range ids {
 		assert.Equal(t, id, pending[i+1][5])
 	}
-	flushCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	writer.Run(flushCtx)
+	flushHistory(ctx, writer)
 	assert.Equal(t, pending, timeline(), "journal/live overlap includes event attribution")
 	retire()
 	assert.Equal(t, pending, timeline(), "history remains attributable without a running site")
@@ -277,9 +275,7 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	require.Equal(t, []uint64{1, 2}, updates)
 	pending, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
-	flush, cancel := context.WithCancel(ctx)
-	cancel()
-	writer.Run(flush)
+	flushHistory(ctx, writer)
 	persisted, err := service.SessionEvents(ctx, "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, pending, persisted, "journal overlap must include all identity fields")
@@ -333,12 +329,12 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 		ExperienceID: "document",
 		Received:     observed.Add(time.Minute),
 		PageGroup:    "/error",
-		Errors:       []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "boom", Time: observed.Add(-24 * time.Hour)}},
+		Errors: []beacon.Error{
+			{Fingerprint: "failure", Type: "Error", Message: "boom", Time: observed.Add(-24 * time.Hour)},
+		},
 	}
 	require.True(t, owner.Ingest(trigger).Investigated)
-	flush, cancel := context.WithCancel(ctx)
-	cancel()
-	writer.Run(flush)
+	flushHistory(ctx, writer)
 	// Another session's later receipt is in the same whole second, saved after promotion.
 	_, err = store.AppendEvent(
 		ctx,
@@ -352,8 +348,12 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	require.NoError(t, err)
 	handler := rumfunc.New(query.New(rumregistry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method:      "rum-sessions",
-		Args:        []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
+		Method: "rum-sessions",
+		Args: []string{
+			"site:shop",
+			fmt.Sprintf("after:%d", observed.Unix()),
+			fmt.Sprintf("before:%d", observed.Unix()),
+		},
 		Permissions: "0x1b",
 	}).RawResponse
 	require.NotNil(t, response)
@@ -501,9 +501,7 @@ func TestFunctionPayloadsValidateAgainstNativeSchema(t *testing.T) {
 		},
 	)
 	a.Snapshot()
-	flushCtx, cancel := context.WithCancel(ctx)
-	cancel()
-	writer.Run(flushCtx)
+	flushHistory(ctx, writer)
 	handler := rumfunc.New(query.New(hub, st), nil)
 	data, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_UI_SCHEMA.json"))
 	require.NoError(t, err)
@@ -730,7 +728,6 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 		t.Cleanup(retire)
 		return runtime{a, w}
 	}
-	flush := func(w *history.Writer) { c, cancel := context.WithCancel(ctx); cancel(); w.Run(c) }
 	ingest := func(r runtime, job string, at time.Time) {
 		b := &beacon.Beacon{
 			Site:         job,
@@ -767,15 +764,15 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	for _, row := range pending {
 		assert.Equal(t, "11111111-1111-4111-8111-111111111111", row.VnodeGUID)
 	}
-	flush(old.w)
-	flush(other.w)
+	flushHistory(ctx, old.w)
+	flushHistory(ctx, other.w)
 	persisted, err := service.SessionEvents(ctx, "job-a", "shared", "11111111-1111-4111-8111-111111111111")
 	require.NoError(t, err)
 	assert.Equal(t, pending, persisted, "active and journal copies must deduplicate")
 	old.a.SetVnodeGUID("22222222-2222-4222-8222-222222222222")
 	current := old
 	ingest(current, "job-a", now.Add(time.Second))
-	flush(current.w)
+	flushHistory(ctx, current.w)
 	rows, err := service.Sessions(ctx, "", "", 0, now.Unix()+2, 2000, "")
 	require.NoError(t, err)
 	require.Len(t, rows, 3, "same group must not merge jobs; reassignment must not merge groups")
@@ -849,11 +846,6 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 		require.NotNil(t, response.RawResponse, "status=%d message=%s", response.Status, response.Message)
 		return response.RawResponse["data"].([][]any)
 	}
-	flush := func(w *history.Writer) {
-		runCtx, cancel := context.WithCancel(ctx)
-		cancel()
-		w.Run(runCtx)
-	}
 	first := history.NewWriter(st, discardCounters{})
 	a.SetHistorySink(first)
 	a.Ingest(
@@ -873,7 +865,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	require.Len(t, pending, 3)
 	assert.Equal(t, "[REDACTED]", pending[1][3])
 	assert.Equal(t, pending[1], pending[2], "identical repeated events are real occurrences")
-	flush(first)
+	flushHistory(ctx, first)
 	assert.Equal(t, pending, request(), "flushing must not duplicate the live ring")
 	second := history.NewWriter(st, discardCounters{})
 	a.SetHistorySink(second)
@@ -889,7 +881,7 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	require.Len(t, merged, 4)
 	assert.Equal(t, pending, merged[:3])
 	assert.Equal(t, []any{"event", "/second", "purchase", "", "", "", "", "", "", uint64(0), ""}, merged[3][1:])
-	flush(second)
+	flushHistory(ctx, second)
 	assert.Equal(t, merged, request())
 	retire()
 	assert.Equal(t, merged, request(), "retired site history remains available")
@@ -907,4 +899,12 @@ func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	require.Len(t, reloaded, 6)
 	assert.Equal(t, merged, reloaded[:4], "new site generation must retain the persisted timeline")
 	assert.Equal(t, "reloaded", reloaded[5][3])
+}
+
+// flushHistory drains every record queued on w: a writer whose run context is
+// already done goes straight to its final drain, here bounded only by ctx.
+func flushHistory(ctx context.Context, w *history.Writer) {
+	run, cancel := context.WithCancel(ctx)
+	cancel()
+	w.Run(run, func() context.Context { return ctx })
 }

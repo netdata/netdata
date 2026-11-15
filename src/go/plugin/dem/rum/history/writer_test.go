@@ -47,7 +47,20 @@ func (f eventWriterFunc) AppendEvent(ctx context.Context, r EventRecord) (bool, 
 
 func (eventWriterFunc) Sync(context.Context) error { return nil }
 
-func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background()); cancel(); w.Run(ctx) }
+// ownerFinal stands in for the site owner's shared final context.
+func ownerFinal(t *testing.T, budget time.Duration) func() context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	t.Cleanup(cancel)
+	return func() context.Context { return ctx }
+}
+
+// drain runs w with its run context already done, so it goes straight to the
+// final drain under final.
+func drain(w *Writer, final func() context.Context) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w.Run(ctx, final)
+}
 
 func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	ctx := context.Background()
@@ -83,7 +96,7 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 			Browser:     "Chrome",
 		},
 	)
-	drain(w)
+	drain(w, ownerFinal(t, time.Minute))
 	rows, err := NewStore(st).QuerySessionEvents(ctx, "site", "session", "")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
@@ -146,7 +159,7 @@ func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
 	for _, record := range records {
 		writer.Event(record)
 	}
-	drain(writer)
+	drain(writer, ownerFinal(t, time.Minute))
 	events, err := store.QuerySessionEvents(context.Background(), "shop", "session", "")
 	require.NoError(t, err)
 	require.Equal(t, []SessionEventRecord{
@@ -203,7 +216,7 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 			Type: "event",
 		})
 	}
-	drain(w)
+	drain(w, ownerFinal(t, time.Minute))
 	assert.Equal(t, queueCap, calls)
 	assert.EqualValues(t, queueCap, counters.get(CounterWritten))
 	assert.EqualValues(t, 7, counters.get(CounterDropped))
@@ -244,7 +257,7 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 			Text: fmt.Sprint(i),
 		})
 	}
-	w.Run(ctx)
+	w.Run(ctx, ownerFinal(t, time.Minute))
 	require.Len(t, attempts, maxBatch+7)
 	for text, n := range attempts {
 		assert.Equal(t, 1, n, "event %s replayed", text)
@@ -275,7 +288,7 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 					Type: "event",
 				})
 			}
-			w.Run(ctx)
+			w.Run(ctx, ownerFinal(t, time.Minute))
 			assert.Equal(t, maxBatch, calls)
 			wantWritten, wantDropped := maxBatch, 0
 			if writeErr != nil {
@@ -288,9 +301,16 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	}
 }
 
-func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
+// The final drain admits what remains under the owner's shared final context,
+// obtained once.
+func TestFinalDrainAdmitsUnderOwnerContext(t *testing.T) {
 	counters := newFakeCounters()
 	w := NewWriter(nil, counters)
+	owner, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	want, _ := owner.Deadline()
+	finals := 0
+	final := func() context.Context { finals++; return owner }
 	deadlines := []time.Time{}
 	w.st = eventWriterFunc(func(ctx context.Context, r EventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
@@ -304,11 +324,35 @@ func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 			Type: "event",
 		})
 	}
-	drain(w)
+	drain(w, final)
+	assert.Equal(t, 1, finals)
 	require.Len(t, deadlines, maxBatch+7)
 	for _, d := range deadlines {
-		assert.Equal(t, deadlines[0], d)
+		assert.Equal(t, want, d)
 	}
+	assert.EqualValues(t, maxBatch+7, counters.get(CounterWritten))
+}
+
+// A stalled journal holds the site's shutdown only for the owner's final
+// budget; entries the final drain cannot admit count as dropped.
+func TestFinalDrainEndsWithOwnerBudget(t *testing.T) {
+	counters := newFakeCounters()
+	w := NewWriter(nil, counters)
+	w.st = eventWriterFunc(func(ctx context.Context, _ EventRecord) (bool, error) {
+		<-ctx.Done() // journal admission never opens
+		return false, ctx.Err()
+	})
+	for range 3 {
+		w.Event(aggregate.HistoryEvent{
+			Site: "site",
+			Type: "event",
+		})
+	}
+	start := time.Now()
+	drain(w, ownerFinal(t, 50*time.Millisecond))
+	assert.Less(t, time.Since(start), time.Second)
+	assert.EqualValues(t, 3, counters.get(CounterDropped))
+	assert.Zero(t, counters.get(CounterWritten))
 }
 
 // Empty timer ticks must not dirty and fsync the shared journal per idle site.
@@ -375,7 +419,7 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 			Type: "event",
 		})
 	}
-	w.Run(ctx)
+	w.Run(ctx, ownerFinal(t, time.Minute))
 	assert.Equal(t, maxBatch, disk.appends)
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }

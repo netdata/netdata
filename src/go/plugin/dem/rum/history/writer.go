@@ -68,7 +68,9 @@ func (w *Writer) Event(rec EventRecord) {
 // append is counted once, even if retirement races success or a disk error.
 // The SDK cannot interrupt a filesystem write; contexts bound admission and
 // subsequent work, and the host's fail-stop path owns a non-quiescent process.
-func (w *Writer) Run(ctx context.Context) {
+// Once ctx is done, Run drains what remains with the owner's shared, bounded
+// final context; entries it cannot admit there count as dropped.
+func (w *Writer) Run(ctx context.Context, final func() context.Context) {
 	ticker := time.NewTicker(batchPeriod)
 	defer ticker.Stop()
 	batch := make([]EventRecord, 0, maxBatch)
@@ -99,8 +101,7 @@ steady:
 			}
 		}
 	}
-	finalCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	finalCtx := final()
 	for {
 		select {
 		case rec := <-w.ch:
