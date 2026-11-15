@@ -144,7 +144,8 @@ mark_as_advanced(ENABLE_WEBRTC)
 # cache is installed next to the agent for the same purpose. Both name the
 # build tree and the sysroot (-I, -L, -ffile-prefix-map), so the installed
 # files differ between two builds of the same source in different locations.
-# Turn this off for a build that has to be reproducible.
+# Turn this off to keep them out of the installed files. That removes this
+# source of differences, it does not make a build reproducible on its own.
 option(RECORD_BUILD_ENVIRONMENT "Record the compiler flags and the CMake cache of the build in the installed agent" True)
 mark_as_advanced(RECORD_BUILD_ENVIRONMENT)
 
