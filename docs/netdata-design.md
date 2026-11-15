@@ -143,8 +143,6 @@ See [clustering and high availability of Parents](/docs/observability-centraliza
 
 The streaming topology between Children and Parents forms a private network, and Functions and dynamic configuration are routed through it. Netdata Cloud asks a Parent to provision configuration to a Child; the Parent passes the message down the path, Parent to Parent, until it reaches the Child, which hands it to the relevant plugin. Live Functions take the same path: a PostgreSQL deadlock Function, for example, can be reached through a grandparent and is routed in real time to the Child's PostgreSQL module. Every level holds routing information, including real-time detection that a plugin died or a Child disconnected.
 
-Dynamic configuration from the UI requires a paid plan; see [feature availability by plan](/docs/netdata-oss-limitations.md).
-
 ## History: tiers and what they cost
 
 **Every Agent and Parent keeps tiered history, and you choose how long each tier lasts.**
@@ -182,7 +180,7 @@ Centralized systems need database administration, capacity planning for central 
 
 **Every deployment, from one node to very large fleets, runs the same complete open-source engine.**
 
-Everything that collects, stores, analyzes, alerts on, streams and queries your data is open source (GPLv3 or later): collection, the database, machine learning, alerting, streaming and Parents, the APIs and the MCP server. Netdata Cloud is a thin orchestration layer over the Agents; by itself it holds and does nothing, because the data and its processing are in the Agents and Parents. The dashboard is the same for free and paid users.
+Everything that collects, stores, analyzes, alerts on, streams and queries your data is open source (GPLv3 or later): collection, the database, machine learning, alerting, streaming and Parents, the APIs and the MCP server. Netdata Cloud is a thin orchestration layer over the Agents; by itself it holds and does nothing, because the data and its processing are in the Agents and Parents.
 
 - **Embedding means calling the APIs.** Netdata's APIs are GPL, and anyone can embed API calls anywhere.
 - **Open in, open out.** Netdata ingests Prometheus and OpenTelemetry (metrics, logs and traces), Nagios plugins and StatsD, and can export metrics to Prometheus, Graphite, OpenTSDB and other systems when you want them elsewhere. Export is openness: your data is never locked in.
@@ -234,7 +232,7 @@ Your metrics stay on your Agents and Parents. Netdata Cloud routes queries and m
 
 ### Is Netdata open source?
 
-The whole engine is open source (GPLv3 or later): collection, storage, machine learning, alerting, streaming, the APIs and the MCP server. The dashboard ships free with every Agent and is the same for free and paid users. See [Open by design](#open-by-design).
+The whole engine is open source (GPLv3 or later): collection, storage, machine learning, alerting, streaming, the APIs and the MCP server. The dashboard ships free with every Agent. See [Open by design](#open-by-design).
 
 ### Why does Netdata collect everything instead of what I select?
 
