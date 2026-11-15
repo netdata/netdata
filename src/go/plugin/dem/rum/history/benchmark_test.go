@@ -104,7 +104,9 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 }
 
 // 10,000 retained rows span 200 sessions, seven error fingerprints, and 20
-// archives. Receipt time spans 10,000 seconds; the recent window selects 891 rows.
+// archives. Receipt time spans 10,000 seconds up to a fixed, minute-aligned
+// instant, so every run places rows and query windows on the same minute and
+// archive boundaries; the recent window selects 891 rows.
 // Snapshot admission captures bounded index metadata per file. Reducers retain only
 // distinct summary keys or the requested timeline output, traversing outside the
 // writer gate. Selected fingerprint details retain its distinct session/page/
@@ -133,7 +135,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	now := time.Now().Truncate(time.Second)
+	now := time.Unix(1_700_000_040, 0)
 	for i := 0; i < 10000; i++ {
 		saved := now.Add(time.Duration(i-9999) * time.Second)
 		r := EventRecord{
@@ -206,8 +208,10 @@ func BenchmarkHistoryQueries(b *testing.B) {
 }
 
 // Measures synchronous AppendEvent validation, encoding and SDK append. It excludes
-// queueing, periodic Sync, rotation and retention. The journal grows throughout each
-// run; use a fixed count (e.g. -benchtime=50000x) when comparing implementations.
+// queueing, periodic Sync, rotation and retention; the first append, which also runs
+// the journal's open-time retention check, is made before the timer starts. The
+// journal grows throughout each run, which slows appends; use a fixed count (e.g.
+// -benchtime=50000x) when comparing timings.
 func BenchmarkHistoryEventAppend(b *testing.B) {
 	ctx := context.Background()
 	owner, err := journalstore.Open(ctx, "")
@@ -232,6 +236,10 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 		ErrorType:   "TypeError",
 		Message:     "request failed",
 		SampleStack: "app.js:10",
+		ObservedUS:  1_700_000_000_000_000 - 1_000_000,
+	}
+	if _, err := store.AppendEvent(ctx, event); err != nil {
+		b.Fatal(err)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -242,32 +250,6 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 		}
 	}
 	b.StopTimer()
-}
-
-func BenchmarkAppendRumEvent(b *testing.B) {
-	owner, err := journalstore.Open(context.Background(), b.TempDir())
-	s := NewStore(owner)
-	if err != nil {
-		b.Fatal(err)
-	}
-	defer s.store.Close()
-	r := EventRecord{
-		Site:       "shop",
-		SessionID:  "session",
-		ObservedUS: time.Now().UnixMicro(),
-		Type:       "pageview",
-		Page:       "/cart",
-		Browser:    "Firefox",
-		Device:     "desktop",
-		Country:    "DE",
-	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for b.Loop() {
-		if _, err := s.AppendEvent(context.Background(), r); err != nil {
-			b.Fatal(err)
-		}
-	}
 }
 
 type discardEventWriter struct{}

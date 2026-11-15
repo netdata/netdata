@@ -15,8 +15,57 @@ type discardHistory struct{}
 
 func (discardHistory) Event(HistoryEvent) {}
 
+// benchClock says whether benchIngest advances the site clock between rounds.
+type benchClock bool
+
+const (
+	// fixedClock is never moved by benchIngest: retained populations stay as built.
+	fixedClock benchClock = false
+	// advancingClock moves benchRoundStep per round; reports that take their
+	// receipt from it expire with the retention windows, as on a live site.
+	advancingClock benchClock = true
+
+	// Ingest benchmarks run in rounds of benchRoundReports reports.
+	benchRoundReports = 1000
+	benchRoundStep    = time.Minute
+	// benchWarmupReports carries an ingest benchmark past one-time growth: the
+	// live ring repeats its compaction cycle within four capacities of rows, and
+	// an advancing clock fills the 30-minute identity retention after 31 rounds.
+	benchWarmupReports = max(4*liveRingCap, (int(identityRetention/benchRoundStep)+2)*benchRoundReports)
+)
+
+// benchIngest runs ingest(i) for benchWarmupReports reports before the timer
+// and then for b.N timed reports; i counts across both. Allocations therefore
+// show the steady-state cost of one report, not growth amortized over b.N: ring
+// and slice capacities are reached and retained populations stop growing before
+// the timer starts.
+//
+// The receiver activity log is compacted at most once per minute of site time.
+// An advancing clock reaches that compaction every round. A fixed clock never
+// does, so the log is emptied in place every round instead, standing in for it.
+func benchIngest(b *testing.B, a *Aggregator, now *time.Time, clock benchClock, ingest func(i int)) {
+	report := func(i int) {
+		if i%benchRoundReports == 0 {
+			if clock == advancingClock {
+				*now = now.Add(benchRoundStep)
+			} else {
+				a.site.accepted = a.site.accepted[:0]
+			}
+		}
+		ingest(i)
+	}
+	for i := range benchWarmupReports {
+		report(i)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := range b.N {
+		report(benchWarmupReports + i)
+	}
+}
+
 // Fixed experiences with monotonically newer reports measure real update work.
-// These fixed receipt times exercise replacement without heap reordering.
+// The fixed clock and receipt time exercise replacement without heap reordering.
 // Advancing receipts cost O(log retained) per item; timings are local trends,
 // while allocation counts define the cost envelope.
 func BenchmarkIngest(b *testing.B) {
@@ -26,7 +75,7 @@ func BenchmarkIngest(b *testing.B) {
 			name = "investigate"
 		}
 		b.Run(name, func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				VnodeGUID: "11111111-1111-4111-8111-111111111111",
 				Investigate: InvestigateCfg{
 					Rate: 1,
@@ -47,19 +96,17 @@ func BenchmarkIngest(b *testing.B) {
 				Browser:      "Chrome",
 				Country:      "GR",
 				Device:       "desktop",
-				Received:     time.Now(),
+				Received:     *now,
 				Vitals: []beacon.Vital{
 					{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 1200},
 					{ID: "cls", Revision: 1, Name: beacon.CLS, Value: .1},
 				},
 			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := range b.N {
+			benchIngest(b, a, now, fixedClock, func(i int) {
 				input.Vitals[0].Revision = uint64(i + 1)
 				input.Vitals[1].Revision = uint64(i + 1)
 				a.Ingest(input)
-			}
+			})
 		})
 	}
 }
@@ -67,8 +114,13 @@ func BenchmarkIngest(b *testing.B) {
 // One report touching every ingestion section and timeline kind: a paired
 // navigation revision, poor vitals, a new resource with its timing event,
 // session lifecycle, frustration, traced request and custom events, and an
-// error. "new-document" also admits a new activation each time. Timings are
-// local trends; allocation counts define the per-report envelope.
+// error. "new-document" also admits a new activation each time. Receipts follow
+// an advancing clock, so admitted items expire and the retained populations
+// hold a steady size. In "new-document" the Go maps that hold per-document
+// identities still grow their tables now and then under that churn, so its B/op
+// varies by a few percent with the run length; compare it at a fixed
+// -benchtime count. Timings are local trends; allocation counts define the
+// per-report envelope.
 func BenchmarkIngestFullReport(b *testing.B) {
 	for _, newDocument := range []bool{false, true} {
 		name := "same-document"
@@ -76,7 +128,7 @@ func BenchmarkIngestFullReport(b *testing.B) {
 			name = "new-document"
 		}
 		b.Run(name, func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				VnodeGUID: "11111111-1111-4111-8111-111111111111",
 				Investigate: InvestigateCfg{
 					Rate: 1,
@@ -86,8 +138,9 @@ func BenchmarkIngestFullReport(b *testing.B) {
 				Countries:  20,
 			})
 			a.SetHistorySink(discardHistory{})
-			resources, documents := make([]string, b.N), make([]string, b.N)
-			for i := range b.N {
+			reports := benchWarmupReports + b.N
+			resources, documents := make([]string, reports), make([]string, reports)
+			for i := range reports {
 				resources[i], documents[i] = "resource-"+strconv.Itoa(i), "document-"+strconv.Itoa(i)
 			}
 			input := &beacon.Beacon{
@@ -99,7 +152,6 @@ func BenchmarkIngestFullReport(b *testing.B) {
 				Browser:      "Chrome",
 				Country:      "GR",
 				Device:       "desktop",
-				Received:     time.Now(),
 				Vitals: []beacon.Vital{
 					{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 5000, Element: "img.hero"},
 					{ID: "cls", Revision: 1, Name: beacon.CLS, Value: .5},
@@ -136,27 +188,28 @@ func BenchmarkIngestFullReport(b *testing.B) {
 				},
 				Errors: []beacon.Error{{Type: "TypeError", Message: "checkout failed", Fingerprint: "6c0f3e2a91d4"}},
 			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := range b.N {
+			benchIngest(b, a, now, advancingClock, func(i int) {
 				revision := uint64(i + 1)
 				if newDocument {
 					input.ExperienceID = documents[i]
 				}
+				input.Received = *now
 				input.Navigation.Revision, input.Events[2].Revision = revision, revision
 				input.Vitals[0].Revision, input.Vitals[1].Revision = revision, revision
 				input.Resources[0].ID, input.Events[3].ID = resources[i], resources[i]
 				a.Ingest(input)
-			}
+			})
 		})
 	}
 }
 
 // Error ingestion adds one immutable metadata object per error to retain detail
 // for later session promotion. Work stays bounded by the beacon and live ring;
-// it does not traverse persisted history. Timings are local trends, not CI gates.
+// it does not traverse persisted history. Receipts follow an advancing clock, so
+// error activity expires with the window. Timings are
+// local trends, not CI gates.
 func BenchmarkIngestErrors(b *testing.B) {
-	a := New(5*time.Minute, SiteCfg{
+	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",
 		Investigate: InvestigateCfg{
 			Rate: 1,
@@ -171,7 +224,6 @@ func BenchmarkIngestErrors(b *testing.B) {
 		SessionID: "browser",
 		PageGroup: "/checkout",
 		Browser:   "Chrome",
-		Received:  time.Now(),
 		Errors: []beacon.Error{
 			{
 				Type:        "TypeError",
@@ -181,17 +233,17 @@ func BenchmarkIngestErrors(b *testing.B) {
 			},
 		},
 	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
+	benchIngest(b, a, now, advancingClock, func(int) {
+		input.Received = *now
 		a.Ingest(input)
-	}
+	})
 }
 
 // A report without a session has no timeline: an investigated error goes
-// straight to history without retaining session detail.
+// straight to history without retaining session detail. Receipts advance as in
+// BenchmarkIngestErrors.
 func BenchmarkIngestSessionlessErrors(b *testing.B) {
-	a := New(5*time.Minute, SiteCfg{
+	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",
 		Investigate: InvestigateCfg{
 			Rate: 1,
@@ -205,7 +257,6 @@ func BenchmarkIngestSessionlessErrors(b *testing.B) {
 		Site:      "shop",
 		PageGroup: "/checkout",
 		Browser:   "Chrome",
-		Received:  time.Now(),
 		Errors: []beacon.Error{
 			{
 				Type:        "TypeError",
@@ -215,16 +266,15 @@ func BenchmarkIngestSessionlessErrors(b *testing.B) {
 			},
 		},
 	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
+	benchIngest(b, a, now, advancingClock, func(int) {
+		input.Received = *now
 		a.Ingest(input)
-	}
+	})
 }
 
 // Replayed SDK batches must not allocate work proportional to retained state.
 func BenchmarkIngestDuplicate(b *testing.B) {
-	a := New(5*time.Minute, SiteCfg{
+	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 		Name:       "shop",
 		PageGroups: 20,
@@ -234,22 +284,18 @@ func BenchmarkIngestDuplicate(b *testing.B) {
 		Site:         "shop",
 		ExperienceID: "document",
 		SessionID:    "browser",
-		Received:     time.Now(),
+		Received:     *now,
 		Vitals:       []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 100}},
 	}
 	a.Ingest(input)
-	b.ReportAllocs()
-	b.ResetTimer()
-	for range b.N {
-		a.Ingest(input)
-	}
+	benchIngest(b, a, now, fixedClock, func(int) { a.Ingest(input) })
 }
 
 // A retained population changes memory use, not the per-report traversal cost.
 func BenchmarkIngestDuplicateRetained(b *testing.B) {
 	for _, size := range []int{1, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -257,26 +303,24 @@ func BenchmarkIngestDuplicateRetained(b *testing.B) {
 			})
 			input := &beacon.Beacon{
 				Site:     "shop",
-				Received: time.Now(),
+				Received: *now,
 				Vitals:   []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 100}},
 			}
 			for i := range size {
 				input.ExperienceID = strconv.Itoa(i)
 				a.Ingest(input)
 			}
-			b.ReportAllocs()
-			b.ResetTimer()
-			for range b.N {
-				a.Ingest(input)
-			}
+			benchIngest(b, a, now, fixedClock, func(int) { a.Ingest(input) })
 		})
 	}
 }
 
 // Cyclic updates exercise receipt-order maintenance at a full retained population.
 // Receipt updates require O(log retained) heap work; duplicate checks remain O(1).
+// The clock and receipts advance a microsecond per report, so every retained
+// item is renewed long before the window could expire it.
 func BenchmarkRetainedUpdate(b *testing.B) {
-	a := New(5*time.Minute, SiteCfg{
+	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 		Name:       "shop",
 		PageGroups: 20,
@@ -287,19 +331,18 @@ func BenchmarkRetainedUpdate(b *testing.B) {
 		inputs[i] = beacon.Beacon{
 			Site:         "shop",
 			ExperienceID: strconv.Itoa(i),
-			Received:     time.Now(),
+			Received:     *now,
 			Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
 		}
 		a.Ingest(&inputs[i])
 	}
-	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	benchIngest(b, a, now, fixedClock, func(i int) {
+		*now = now.Add(time.Microsecond)
 		v := &inputs[i%len(inputs)]
-		v.Received = time.Now()
+		v.Received = *now
 		v.Vitals[0].Revision++
 		a.Ingest(v)
-	}
+	})
 }
 
 // Site-list reads need counts, not facet materialization. Allocation growth
@@ -307,7 +350,7 @@ func BenchmarkRetainedUpdate(b *testing.B) {
 func BenchmarkActivity(b *testing.B) {
 	for _, size := range []int{100, 10000} {
 		b.Run(strconv.Itoa(size), func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -320,7 +363,7 @@ func BenchmarkActivity(b *testing.B) {
 						ExperienceID: strconv.Itoa(i),
 						SessionID:    strconv.Itoa(i),
 						PageGroup:    "/" + strconv.Itoa(i),
-						Received:     time.Now(),
+						Received:     *now,
 						Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
 						Events: []beacon.Event{
 							{Kind: beacon.EventDocument, ID: "activation", Revision: 1},
@@ -341,7 +384,7 @@ func BenchmarkActivity(b *testing.B) {
 }
 
 func BenchmarkSnapshot(b *testing.B) {
-	a := New(5*time.Minute, SiteCfg{
+	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",
 		Investigate: InvestigateCfg{
 			Rate: 1,
@@ -361,7 +404,7 @@ func BenchmarkSnapshot(b *testing.B) {
 				Browser:      "Chrome",
 				Device:       "desktop",
 				Country:      "GR",
-				Received:     time.Now(),
+				Received:     *now,
 				Vitals:       []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64(i + 1)}},
 			},
 		)
@@ -430,7 +473,7 @@ func BenchmarkSnapshotPopulations(b *testing.B) {
 func BenchmarkHighCardinalityReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				VnodeGUID:  "11111111-1111-4111-8111-111111111111",
 				Name:       "shop",
 				PageGroups: 20,
@@ -445,7 +488,7 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 						SessionID:    id,
 						PageGroup:    "/" + id,
 						AppVersion:   id,
-						Received:     time.Now(),
+						Received:     *now,
 						Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
 					},
 				)
@@ -469,12 +512,11 @@ func BenchmarkHighCardinalityReads(b *testing.B) {
 func BenchmarkDenseWindowReads(b *testing.B) {
 	for _, kind := range []string{"snapshot", "pages"} {
 		b.Run(kind, func(b *testing.B) {
-			a := New(5*time.Minute, SiteCfg{
+			a, now := newAgg(5*time.Minute, SiteCfg{
 				Name:       "shop",
 				PageGroups: 20,
 				Countries:  20,
 			})
-			now := time.Now()
 			for i := range 150000 {
 				a.Ingest(&beacon.Beacon{
 					Site:         "shop",
@@ -486,7 +528,7 @@ func BenchmarkDenseWindowReads(b *testing.B) {
 					Browser:      "Chrome",
 					Device:       "desktop",
 					Country:      "GR",
-					Received:     now,
+					Received:     *now,
 					Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
 					Vitals: []beacon.Vital{
 						{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: float64((i * 37) % 10000)},
