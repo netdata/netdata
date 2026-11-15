@@ -2672,45 +2672,69 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 		vendorsByFile[entry.File] = append(vendorsByFile[entry.File], vendor)
 	}
 
+	type fileResult struct {
+		name      string
+		routes    profileTrapRoutes
+		trapCount int
+	}
+	results := make([]fileResult, len(entries))
+	// Joining this group keeps aggregate assertions after every independent file
+	// check. Each child owns its parser/bundle and a distinct result slot.
+	t.Run("profiles", func(t *testing.T) {
+		// Parse each physical file once; keep the line scanner and byte digest
+		// independent of the production parser.
+		for i, file := range entries {
+			name := file.Name()
+			if file.IsDir() || !isProfileFileName(name) || strings.HasPrefix(name, "_") {
+				continue
+			}
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				require.False(t, strings.HasSuffix(name, ".zst"), "stock profiles must stay uncompressed in the repository")
+				require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
+				path := filepath.Join(stockDir, name)
+				routes := profileTrapRoutesFromFile(t, path)
+
+				bundle, err := loadProfileBundle(path)
+				require.NoError(t, err, "stock profile %s", name)
+				require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", name)
+				profileData, err := os.ReadFile(path)
+				require.NoError(t, err)
+				for _, vendor := range vendorsByFile[name] {
+					entry := catalogue[vendor]
+					assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(profileData)), entry.SHA256,
+						"catalogue sha256 mismatch for %s", name)
+					assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", name)
+					assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", name)
+					expected := stockProfileRoutes{
+						trapOIDs:        append([]string(nil), entry.TrapOIDs...),
+						mibs:            append([]string(nil), entry.MIBs...),
+						metricRuleNames: append([]string(nil), entry.MetricRuleNames...),
+					}
+					slices.Sort(expected.trapOIDs)
+					slices.Sort(expected.mibs)
+					slices.Sort(expected.metricRuleNames)
+					require.NoError(t, validateStockProfileRoutes(vendor, expected, bundle), "stock profile %s", name)
+				}
+				results[i] = fileResult{
+					name:      name,
+					routes:    routes,
+					trapCount: len(bundle.traps),
+				}
+			})
+		}
+	})
 	routesByFile := make(map[string]profileTrapRoutes, len(entries))
 	totalFiles, totalTraps := 0, 0
-	// Parse every physical file once, including files missing from the catalogue.
-	// Keep the line scanner and byte digest independent of the production parser.
-	for _, file := range entries {
-		name := file.Name()
-		if file.IsDir() || !isProfileFileName(name) || strings.HasPrefix(name, "_") {
+	for _, result := range results {
+		if result.name == "" {
 			continue
 		}
-		require.False(t, strings.HasSuffix(name, ".zst"), "stock profiles must stay uncompressed in the repository")
-		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
-		path := filepath.Join(stockDir, name)
-		routes := profileTrapRoutesFromFile(t, path)
-		routesByFile[name] = routes
-		totalFiles += len(routes.oids)
-
-		bundle, err := loadProfileBundle(path)
-		require.NoError(t, err, "stock profile %s", name)
-		require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", name)
-		totalTraps += len(bundle.traps)
-		profileData, err := os.ReadFile(path)
-		require.NoError(t, err)
-		for _, vendor := range vendorsByFile[name] {
-			entry := catalogue[vendor]
-			assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(profileData)), entry.SHA256,
-				"catalogue sha256 mismatch for %s", name)
-			assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", name)
-			assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", name)
-			expected := stockProfileRoutes{
-				trapOIDs:        append([]string(nil), entry.TrapOIDs...),
-				mibs:            append([]string(nil), entry.MIBs...),
-				metricRuleNames: append([]string(nil), entry.MetricRuleNames...),
-			}
-			slices.Sort(expected.trapOIDs)
-			slices.Sort(expected.mibs)
-			slices.Sort(expected.metricRuleNames)
-			require.NoError(t, validateStockProfileRoutes(vendor, expected, bundle), "stock profile %s", name)
-		}
+		routesByFile[result.name] = result.routes
+		totalFiles += len(result.routes.oids)
+		totalTraps += result.trapCount
 	}
+
 	require.Positive(t, totalTraps)
 	require.Len(t, routesByFile, len(catalogue), "catalogue and default profile file count must match")
 

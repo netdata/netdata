@@ -26,7 +26,7 @@ func Test_loadDDSnmpProfiles(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = f.Close() }()
 
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 
 	require.NotEmpty(t, profiles)

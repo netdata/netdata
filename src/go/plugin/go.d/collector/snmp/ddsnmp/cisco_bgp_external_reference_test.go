@@ -3,7 +3,6 @@
 package ddsnmp
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -11,15 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
 func Test_CiscoBgpPeer3Profile_AlignedWithOfficialMIBAndCheckmk(t *testing.T) {
-	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-	require.NoError(t, err)
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 

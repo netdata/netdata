@@ -196,6 +196,7 @@ This skill holds only what the documents below lack. Point at them; do not resta
    (`TestStockProfileCatalogueMatchesDefaultFiles`, `TestStockCatalogueReconcilesPhysicalInventory`): regenerating
    profiles without the catalogue fails tests. The catalogue test parses each physical file once and shares that
    bundle across the parse and manifest checks; it MUST retain the independent line scanner and byte-digest checks.
+   Per-file checks MAY run as parallel subtests; aggregate inventory assertions MUST follow the subtest-group join.
 
 8. **PEN registry.** The default is the bundled snapshot (`defaultPENFilePath`; installed at
    `usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt`). With `--refresh-pen`, or when
