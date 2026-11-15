@@ -295,8 +295,8 @@ modules:
                 required: false
                 default: ''
                 options: []
-              - id: after
-                name: after
+              - id: cursor
+                name: cursor
                 description: Opaque next cursor from the previous rum-live response. Pass it unchanged; leave empty for
                     recent events.
                 type: string

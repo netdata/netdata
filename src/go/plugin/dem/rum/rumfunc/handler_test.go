@@ -219,20 +219,21 @@ func requiredArgs(id string) []string {
 	return args
 }
 
-// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: the accepted parameters with
-// values, an empty search, no facet selections and its transport fields. The table also fills rum-live's after with
-// its time window, which rum-live rejects as an invalid cursor; this body leaves it out.
-func cloudTableBody(t *testing.T, declaration funcapi.FunctionConfig) []byte {
+// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: an empty search, no facet
+// selections, its transport fields and the accepted parameters that hold table state. The table state includes its time
+// window, which reaches only methods that accept after or before. fields adds parameters such as a cursor.
+func cloudTableBody(t *testing.T, declaration funcapi.FunctionConfig, fields map[string]any) []byte {
 	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
+	window := map[string]any{"after": 1700000000, "before": 1700000900}
 	for _, param := range declaration.AcceptedParams {
-		switch {
-		case param == "after" && declaration.ID != "rum-live":
-			body["after"] = 1700000000
-		case param == "before":
-			body["before"] = 1700000900
+		if value, ok := window[param]; ok {
+			body[param] = value
 		}
 	}
 	for key, value := range required[declaration.ID] {
+		body[key] = value
+	}
+	for key, value := range fields {
 		body[key] = value
 	}
 	data, err := json.Marshal(body)
@@ -256,7 +257,7 @@ func TestCloudTableRequests(t *testing.T) {
 			assert.NotEmpty(t, info.Help)
 			assert.NotContains(t, reads, rowReads[declaration.ID], "info reads no rows")
 
-			body := cloudTableBody(t, declaration)
+			body := cloudTableBody(t, declaration, nil)
 			info = handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method:  declaration.ID,
 				Info:    true,

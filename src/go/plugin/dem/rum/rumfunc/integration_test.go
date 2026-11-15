@@ -418,7 +418,7 @@ func TestFunctionStatusesAndMissingVitalsFromRealSource(t *testing.T) {
 		args   []string
 		status int
 	}{
-		"malformed cursor": {"rum-live", []string{"after:invalid"}, 400},
+		"malformed cursor": {"rum-live", []string{"cursor:invalid"}, 400},
 		"invalid range":    {"rum-sessions", []string{"after:garbage"}, 400},
 		"inverted range":   {"rum-errors", []string{"after:20", "before:10"}, 400},
 		"missing session":  {"rum-session-events", nil, 400},

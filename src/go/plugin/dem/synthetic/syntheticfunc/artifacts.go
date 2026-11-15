@@ -16,12 +16,12 @@ var artifactsMethod = method{
 	Method: rawfunc.Method{
 		ID:    "synthetics-artifacts",
 		Title: "Retained synthetic captures",
-		Help: "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–" + strconv.Itoa(
+		Help: "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. cursor accepts the previous response's next unchanged; limit is 1–" + strconv.Itoa(
 			rawfunc.MaxRows,
 		) + ". Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 		Sort:        "published_us",
 		UpdateEvery: 10,
-		Params:      []string{"job_id", "before", "limit", "vnode", "vnode_guid"},
+		Params:      []string{"job_id", "cursor", "limit", "vnode", "vnode_guid"},
 		Columns:     artifactsColumns.Build(),
 	},
 	serve: (*Handler).artifacts,
@@ -57,7 +57,7 @@ func (h *Handler) artifacts(
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
-	cursor, err := parseArtifactCursor(args["before"])
+	cursor, err := parseArtifactCursor(args["cursor"])
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
@@ -100,7 +100,7 @@ func parseArtifactCursor(value string) (*artifacts.Cursor, error) {
 		valid = valid && (char >= '0' && char <= '9' || char >= 'a' && char <= 'f')
 	}
 	if !valid {
-		return nil, errors.New("before must be a returned artifact catalogue cursor")
+		return nil, errors.New("cursor must be a returned artifact catalogue cursor")
 	}
 	return &artifacts.Cursor{
 		PublishedUS: published,

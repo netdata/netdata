@@ -185,7 +185,7 @@ Delayed session promotion preserves that original receipt time, so late-saved co
 past range shows currently retained evidence, not what was known at the time. Browser clocks do not define the native
 history axis.
 
-`rum-live` returns an opaque string `next` cursor, passed unchanged as `after` on the next request. Each event has a
+`rum-live` returns an opaque string `next` cursor, passed unchanged as `cursor` on the next request. Each event has a
 string identity combining site, runtime generation and sequence. Cursors track independent streams so a busy site cannot
 advance a quiet site's position. A replaced site's runtime starts a fresh stream. Missing Web Vitals are `null` in
 Functions and gaps in charts; an available but quiet receiver measures zero traffic. Receiver outages leave site jobs
@@ -949,7 +949,7 @@ Active or unverified workspace, unclassified files and pending deletions are rep
 retained-capture allowance. Total disk use can exceed the allowance, including growth between sweeps; sizes are logical
 file lengths, not allocated disk space. `synthetics-artifacts` reports global storage observations, effective policy,
 cleanup status and policy reload errors even when `job_id` filters its rows. Its newest-first list accepts an optional
-`limit` from 1 to 2000 and a returned `next` cursor as `before`; captures can expire between pages.
+`limit` from 1 to 2000 and a returned `next` cursor as `cursor`; captures can expire between pages.
 
 Capture discovery and downloads remain available after run history expires and after a monitor is disabled or deleted.
 Capture states distinguish disabled, not needed, unavailable and published evidence. Retained history may also outlive

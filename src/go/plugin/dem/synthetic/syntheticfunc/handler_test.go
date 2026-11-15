@@ -1028,21 +1028,22 @@ func requiredArgs(id string) []string {
 	return nil
 }
 
-// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: the accepted parameters with
-// values, an empty search, no facet selections and its transport fields. The table also fills synthetics-artifacts'
-// before with its time window, which synthetics-artifacts rejects as an invalid cursor; this body leaves it out.
-func cloudTableBody(t *testing.T, decl funcapi.FunctionConfig) []byte {
+// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: an empty search, no facet
+// selections, its transport fields and the accepted parameters that hold table state. The table state includes its time
+// window, which reaches only methods that accept after or before. fields adds parameters such as a cursor.
+func cloudTableBody(t *testing.T, decl funcapi.FunctionConfig, fields map[string]any) []byte {
 	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
+	window := map[string]any{"after": 1700000000, "before": 1700000900}
 	for _, param := range decl.AcceptedParams {
-		switch {
-		case param == "after":
-			body["after"] = 1700000000
-		case param == "before" && decl.ID != "synthetics-artifacts":
-			body["before"] = 1700000900
+		if value, ok := window[param]; ok {
+			body[param] = value
 		}
 	}
 	if requiredRun[decl.ID] {
 		body["job_id"], body["run_id"] = "journey:checkout", "r"
+	}
+	for key, value := range fields {
+		body[key] = value
 	}
 	data, err := json.Marshal(body)
 	require.NoError(t, err)
@@ -1061,7 +1062,7 @@ func TestCloudTableRequests(t *testing.T) {
 			assert.Equal(t, 200, info.Status, info.Message)
 			assert.NotEmpty(t, info.Help)
 
-			body := cloudTableBody(t, decl)
+			body := cloudTableBody(t, decl, nil)
 			info = h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
 				Method:  decl.ID,
 				Info:    true,

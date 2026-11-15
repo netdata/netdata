@@ -786,16 +786,17 @@ modules:
               required: false
               default: ''
               options: []
-            - id: before
-              name: Previous page cursor (`before`)
-              description: The next cursor returned by the previous page. Leave empty for the newest captures.
+            - id: cursor
+              name: Page cursor (`cursor`)
+              description: The next cursor returned by the previous page, passed unchanged. Leave empty for the newest
+                captures.
               type: string
               required: false
               default: ''
               options: []
             - id: limit
               name: Maximum rows (`limit`)
-              description: Maximum returned sets, from 1 to 2000. Use next as before to continue when truncated
+              description: Maximum returned sets, from 1 to 2000. Use next as cursor to continue when truncated
                 is true. Captures may expire between pages.
               type: string
               required: false

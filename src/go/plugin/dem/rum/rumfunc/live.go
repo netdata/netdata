@@ -15,17 +15,17 @@ var liveMethod = method{
 	Method: rawfunc.Method{
 		ID:          "rum-live",
 		Title:       "RUM Live",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
+		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor: pass the previous response's next unchanged as cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
 		Sort:        "seq",
 		UpdateEvery: 2,
-		Params:      []string{"site", "vnode", "vnode_guid", "after"},
+		Params:      []string{"site", "vnode", "vnode_guid", "cursor"},
 		Columns:     liveColumns.Build(),
 	},
 	rows: (*Handler).liveRows,
 }
 
 func (h *Handler) liveRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {
-	live, next, err := h.deps.Live(ctx, args["site"], args["after"], rawfunc.MaxRows, args["vnode_guid"])
+	live, next, err := h.deps.Live(ctx, args["site"], args["cursor"], rawfunc.MaxRows, args["vnode_guid"])
 	response["next"] = next
 	var rows [][]any
 	for _, r := range live {
