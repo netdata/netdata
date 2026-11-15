@@ -171,7 +171,6 @@ var sessionsColumns = rawfunc.Columns[sessionRow]{
 		Type:     funcapi.FieldTypeArray,
 		Visible:  true,
 		Sortable: true,
-		Filter:   funcapi.FieldFilterMultiselect,
 		Value:    func(r sessionRow) any { return r.UserIDs },
 	},
 	{

@@ -207,6 +207,11 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 			Permissions: "0x1b",
 			Args:        []string{"password:secret"},
 		}, 400},
+		"malformed argument": {funcapi.RawMethodRequest{
+			Method:      "synthetics-checks",
+			Permissions: "0x1b",
+			Args:        []string{"kind"},
+		}, 400},
 		"unknown method": {funcapi.RawMethodRequest{
 			Method:      "not-a-function",
 			Permissions: "0x7b",
@@ -1025,9 +1030,9 @@ func requiredArgs(id string) []string {
 	return nil
 }
 
-// cloudTableBody is the body the Cloud UI's Function table posts for a data request: the accepted parameters with
-// values, an empty search, no facet selections and its transport fields. synthetics-artifacts is left without its
-// time window: its before is a cursor.
+// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: the accepted parameters with
+// values, an empty search, no facet selections and its transport fields. The table also fills synthetics-artifacts'
+// before with its time window, which synthetics-artifacts rejects as an invalid cursor; this body leaves it out.
 func cloudTableBody(t *testing.T, decl funcapi.FunctionConfig) []byte {
 	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
 	for _, param := range decl.AcceptedParams {
@@ -1178,6 +1183,25 @@ func TestRejectedRequestsReadNothing(t *testing.T) {
 			got := h.HandleRaw(context.Background(), req)
 			assert.Equal(t, funcapi.ErrorResponse(400, `unknown configured vnode "removed"`), got, decl.ID+" "+name)
 			assert.Empty(t, *reads)
+		}
+	}
+}
+
+// The Cloud UI table posts a column filter as a selection named after the column, so a filter must name an
+// accepted parameter.
+func TestColumnFiltersNameAcceptedParameters(t *testing.T) {
+	h, _, _ := newRecordingHandler(nil)
+	for _, decl := range syntheticfunc.Declarations() {
+		response := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+			Method:      decl.ID,
+			Args:        requiredArgs(decl.ID),
+			Permissions: "0x1b",
+		})
+		require.NotNil(t, response.RawResponse, response.Message)
+		for name, column := range response.RawResponse["columns"].(map[string]any) {
+			if filter := column.(map[string]any)["filter"]; filter != "none" {
+				assert.Contains(t, decl.AcceptedParams, name, "%s column %s has filter %v", decl.ID, name, filter)
+			}
 		}
 	}
 }

@@ -204,3 +204,10 @@ func TestCloudTableRequests(t *testing.T) {
 	assert.Equal(t, 200, data.RawResponse["status"])
 	assert.Len(t, data.RawResponse["data"], 1)
 }
+
+// The Cloud UI table posts a column filter as a selection named after the column; history status accepts none.
+func TestColumnsDeclareNoFilters(t *testing.T) {
+	for name, column := range method.Columns {
+		assert.Equal(t, "none", column.(map[string]any)["filter"], name)
+	}
+}

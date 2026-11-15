@@ -219,9 +219,9 @@ func requiredArgs(id string) []string {
 	return args
 }
 
-// cloudTableBody is the body the Cloud UI's Function table posts for a data request: the accepted parameters with
-// values, an empty search, no facet selections and its transport fields. rum-live is left without its time window:
-// its after is a cursor.
+// cloudTableBody builds the body the Cloud UI's Function table posts for a data request: the accepted parameters with
+// values, an empty search, no facet selections and its transport fields. The table also fills rum-live's after with
+// its time window, which rum-live rejects as an invalid cursor; this body leaves it out.
 func cloudTableBody(t *testing.T, declaration funcapi.FunctionConfig) []byte {
 	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
 	for _, param := range declaration.AcceptedParams {
@@ -388,5 +388,32 @@ func TestRejectedRequestsReadNothing(t *testing.T) {
 				assert.Empty(t, reads, "%s reads nothing", declaration.ID)
 			}
 		})
+	}
+}
+
+// The Cloud UI table posts a column filter as a selection named after the column, so a filter must name an
+// accepted parameter.
+func TestColumnFiltersNameAcceptedParameters(t *testing.T) {
+	for _, declaration := range rumfunc.Declarations() {
+		var reads []string
+		response := rumfunc.New(recordingSource{&reads}, nil).HandleRaw(context.Background(), funcapi.RawMethodRequest{
+			Method:      declaration.ID,
+			Args:        requiredArgs(declaration.ID),
+			Permissions: "0x1b",
+		})
+		require.NotNil(t, response.RawResponse, response.Message)
+		for name, column := range response.RawResponse["columns"].(map[string]any) {
+			if filter := column.(map[string]any)["filter"]; filter != "none" {
+				assert.Contains(
+					t,
+					declaration.AcceptedParams,
+					name,
+					"%s column %s has filter %v",
+					declaration.ID,
+					name,
+					filter,
+				)
+			}
+		}
 	}
 }
