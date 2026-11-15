@@ -1248,24 +1248,35 @@ bool rrdeng_in_memory_take_lost_retention(void) {
 // retention then starts at its oldest page that remains (this one is already out of the index), so a page lost to
 // the out of memory protection in the middle leaves a gap without hiding the older data. With no page left, the
 // metric has no retention, whatever order its pages were freed in: its release deletes it when nothing collects it.
-static time_t ram_cache_metric_oldest_page_s(PGC *cache, Word_t section, Word_t metric_id) {
-    time_t start_s = 0;
+// the start of the metric's oldest page that holds data, or 0; with newest_end_s, the end of its newest one too
+static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_t metric_id, time_t *newest_end_s) {
+    time_t start_s = 0, oldest_s = 0;
     PGC_SEARCH method = PGC_SEARCH_FIRST;
     PGC_PAGE *page;
 
     while ((page = pgc_page_get_and_acquire(cache, section, metric_id, start_s, method))) {
         method = PGC_SEARCH_NEXT;
         start_s = pgc_page_start_time_s(page);
+        time_t end_s = pgc_page_end_time_s(page);
         // a gap marker (pgc_inject_gap()) holds no data
         bool has_data = pgc_page_data(page) != PGD_EMPTY;
         // no inline eviction on release in this cache (PGC_OPTIONS_EVICT_PAGES_NO_INLINE)
         pgc_page_release(cache, page);
 
-        if (has_data)
-            return start_s;
+        if (!has_data)
+            continue;
+
+        if (!oldest_s)
+            oldest_s = start_s;
+
+        if (!newest_end_s)
+            break;
+
+        if (end_s > *newest_end_s)
+            *newest_end_s = end_s;
     }
 
-    return 0;
+    return oldest_s;
 }
 
 static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
@@ -1277,7 +1288,7 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
         mrg_metric_get_and_acquire_by_id(main_mrg, (UUIDMAP_ID)entry.metric_id, entry.section);
 
     if (metric) {
-        time_t oldest_s = ram_cache_metric_oldest_page_s(cache, entry.section, entry.metric_id);
+        time_t oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, NULL);
         if (oldest_s)
             mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s);
         else {
@@ -1285,11 +1296,12 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
             // when a newer page was freed before it
             mrg_metric_clear_retention(main_mrg, metric);
 
-            // a collector may have started a page after the scan: its first point stamped the first time, which the
-            // clear above may have erased (its next point sets the latest time again)
-            oldest_s = ram_cache_metric_oldest_page_s(cache, entry.section, entry.metric_id);
+            // a collector may have added pages after the scan, and the clear above may have erased the retention
+            // they recorded: restore it from them
+            time_t newest_end_s = 0;
+            oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, &newest_end_s);
             if (oldest_s)
-                mrg_metric_expand_retention(main_mrg, metric, oldest_s, 0, 0);
+                mrg_metric_expand_retention(main_mrg, metric, oldest_s, newest_end_s, entry.update_every_s);
             else
                 __atomic_store_n(&ram_cache_metrics_lost_retention, true, __ATOMIC_RELAXED);
         }

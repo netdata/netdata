@@ -2475,9 +2475,10 @@ static void rrdeng_in_memory_retention(void) {
     last_run_s = run_s;
     rrdeng_in_memory_enforce_retention(now_realtime_sec());
 
-    // metrics left without pages (by this pass or the out of memory protection) leave their contexts, like a rotation
+    // metrics left without pages (by this pass or the out of memory protection) leave their contexts; the request
+    // does not postpone a scan already scheduled, so a steady churn still gets scanned
     if(rrdeng_in_memory_take_lost_retention())
-        rrdcontext_db_rotation();
+        rrdcontext_request_full_gc();
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {
