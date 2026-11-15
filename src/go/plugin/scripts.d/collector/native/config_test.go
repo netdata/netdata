@@ -20,32 +20,67 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+func TestNativeByteLimitsDefault(t *testing.T) {
+	assert.Equal(t, 64<<20, maxDescriptionBytes, "documented startup byte limit")
+	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
+	for name, create := range map[string]func() *Collector{
+		"generic": New,
+		"generic registration": func() *Collector {
+			return collectorapi.DefaultRegistry["native"].CreateV2().(*Collector)
+		},
+		"registered package": func() *Collector {
+			return registry["native-fixture"].CreateV2().(*Collector)
+		},
+	} {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, 64<<20, create().messageLimit) })
+	}
+}
+
 // The limit covers the JSON envelope, effective defaults and terminating LF.
+// Runtime boundary tests also use injected budgets; constructors retain the production default.
 func TestConfigEnvelope_SizeLimit(t *testing.T) {
+	const limit = 1024
 	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
 	definition := registry["native-fixture"].CreateV2().(*Collector).definition
 	settings := Settings{
 		"text": "x",
 	}
-	frame, err := definition.configEnvelope(settings)
+	frame, err := definition.configEnvelope(settings, limit)
 	require.NoError(t, err)
-	settings["text"] = strings.Repeat("x", maxMessageBytes-len(frame)+1)
-	frame, err = definition.configEnvelope(settings)
+	settings["text"] = strings.Repeat("x", limit-len(frame)+1)
+	frame, err = definition.configEnvelope(settings, limit)
 	require.NoError(t, err)
-	assert.Len(t, frame, maxMessageBytes)
+	assert.Len(t, frame, limit)
 	settings["text"] = settings["text"].(string) + "x"
-	_, err = definition.configEnvelope(settings)
+	_, err = definition.configEnvelope(settings, limit)
 	require.ErrorContains(t, err, "config envelope exceeds 64 MiB")
+}
+
+func TestConfigEnvelope_EncodedLimit(t *testing.T) {
+	const limit = 1024
+	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
+	definition := registry["native-fixture"].CreateV2().(*Collector).definition
+	for name, text := range map[string]string{
+		"escaped bytes": strings.Repeat("\n", limit/2),
+		"utf8 bytes":    strings.Repeat("λ", limit/2),
+	} {
+		t.Run(name, func(t *testing.T) {
+			// The value fits by itself, but its encoded envelope exceeds the budget.
+			require.LessOrEqual(t, len(text), limit)
+			_, err := definition.configEnvelope(Settings{"text": text}, limit)
+			require.ErrorContains(t, err, "config envelope exceeds 64 MiB")
+		})
+	}
 }
 
 func TestConfigEnvelope_PackageWithoutForm(t *testing.T) {
 	c, _ := fixtureCollector(t, "exit 0\n")
-	envelope, err := c.definition.configEnvelope(nil)
+	envelope, err := c.definition.configEnvelope(nil, maxMessageBytes)
 	require.NoError(t, err)
 	assert.Nil(t, envelope, "schema-free packages receive EOF on stdin")
 	_, err = c.definition.configEnvelope(Settings{
 		"text": "x",
-	})
+	}, maxMessageBytes)
 	require.ErrorContains(t, err, "does not declare config_schema")
 }
 

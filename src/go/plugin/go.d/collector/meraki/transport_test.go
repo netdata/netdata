@@ -67,3 +67,18 @@ func TestPacingCoversRedirectsPagesAndCancellation(t *testing.T) {
 	hc.CloseIdleConnections()
 	assert.Equal(t, 1, base.closed)
 }
+
+func TestInitPacesRequests(t *testing.T) {
+	f, server := newFixtureAPI(t)
+	c := configuredCollector(server)
+	require.NoError(t, c.Init(t.Context()))
+	t.Cleanup(func() { c.Cleanup(context.Background()) })
+
+	start := time.Now()
+	require.NoError(t, c.Check(t.Context()))
+	require.NoError(t, c.Check(t.Context()))
+	elapsed := time.Since(start)
+	require.Len(t, f.calls(), 2)
+	// Server arrival times include TLS/network jitter; pacing bounds request starts.
+	assert.GreaterOrEqual(t, elapsed, requestSpacing)
+}

@@ -53,7 +53,7 @@ func (c *Collector) executeFunction(
 	}
 	// Reserve the largest session ID before queue admission. Rejection must not
 	// touch an existing process, even when ingress allowed a larger payload.
-	if _, err := encodeFunctionRequest(ctx, maxRequestID, request); err != nil {
+	if _, err := encodeFunctionRequest(ctx, maxRequestID, request, c.messageLimit); err != nil {
 		return nil, err
 	}
 	if c.definition.Mode == modePersistent {
@@ -68,11 +68,11 @@ func (c *Collector) executeOneshotFunction(
 	request funcapi.RawMethodRequest,
 ) (*funcapi.FunctionResponse, error) {
 	const id = "1"
-	frame, err := encodeFunctionRequest(ctx, id, request)
+	frame, err := encodeFunctionRequest(ctx, id, request, c.messageLimit)
 	if err != nil {
 		return nil, err
 	}
-	data, err := runOneshot(ctx, c.definition.command, opFunction, slices.Concat(c.configEnvelope, frame))
+	data, err := runOneshot(ctx, c.definition.command, opFunction, slices.Concat(c.configEnvelope, frame), c.messageLimit)
 	if err != nil {
 		c.Errorf("one-shot Function command failed: %s", commandFailureReason(err))
 		return nil, err

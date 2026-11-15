@@ -457,6 +457,7 @@ func TestTrafficDeadlineAbortsCycle(t *testing.T) {
 	_, c, _ := newTrafficFixture(t)
 	// The four paced core reads take about 300ms; the deadline expires during the
 	// traffic reads, so the core metrics must not commit either.
+	useProductionPacing(t, c)
 	c.Timeout = confopt.Duration(450 * time.Millisecond)
 	require.ErrorIs(t, collectCycle(t.Context(), c), context.DeadlineExceeded)
 	assert.Empty(t, readOrganization(c))

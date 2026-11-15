@@ -470,9 +470,9 @@ func TestCollector_Collect(t *testing.T) {
 
 			var mx map[string]int64
 
+			// InState advances by UpdateEvery per collection, independent of elapsed time.
 			for range 2 {
 				mx = collr.Collect(context.Background())
-				time.Sleep(time.Duration(collr.UpdateEvery) * time.Second)
 			}
 
 			copyResponseTime(test.wantMetrics, mx)
