@@ -28,7 +28,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
-	host := NewManaged(store)
+	host := newManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	var archiveRequests atomic.Int32
@@ -66,7 +66,7 @@ func TestUpdaterPreparesOnceAndRequiresRestart(t *testing.T) {
 	require.NoError(t, u.check(context.Background()))
 	require.Equal(t, 1, calls)
 	require.Equal(t, int32(1), archiveRequests.Load())
-	newHost := NewManaged(store)
+	newHost := newManaged(store)
 	defer newHost.Close()
 	require.Equal(t, next.Manifest.Identity(), *newHost.identity)
 }
@@ -75,7 +75,7 @@ func TestUpdaterPreservesInstallationAfterQualificationFailure(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
-	host := NewManaged(store)
+	host := newManaged(store)
 	defer host.Close()
 	next, data := publishedBundle(t, "second", 2)
 	server := httptest.NewTLSServer(
@@ -114,7 +114,7 @@ func TestUpdaterJoinsCancelledAcquisition(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
-	host := NewManaged(store)
+	host := newManaged(store)
 	defer host.Close()
 	entered := make(chan struct{})
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
@@ -143,7 +143,7 @@ func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
 	store := testStore(t)
 	first, data := publishedBundle(t, "first", 1)
 	selectPublished(t, store, first, data, browserruntime.AutomaticUpdates)
-	host := NewManaged(store)
+	host := newManaged(store)
 	entered := make(chan struct{})
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")
@@ -167,7 +167,7 @@ func TestHostCloseJoinsAttachedUpdater(t *testing.T) {
 
 func TestUpdaterWithoutInstallationDoesNotLoadOrQualify(t *testing.T) {
 	store := testStore(t)
-	host := NewManaged(store)
+	host := newManaged(store)
 	defer host.Close()
 	u := host.NewUpdater(qualifyFunc(func(context.Context, runner.Source) (*runner.Qualification, error) {
 		t.Error("unexpected qualification")

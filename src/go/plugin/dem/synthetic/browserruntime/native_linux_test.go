@@ -306,12 +306,12 @@ func TestNativeAdmissionLifecycle(t *testing.T) {
 	require.ErrorIs(t, f.control.CloseAdmission(ctx, f.inspect(t)), ErrInUse)
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, "ready", state.Phase)
+	require.Equal(t, nativeReady, state.Phase)
 	stop()
 	require.NoError(t, f.control.CloseAdmission(ctx, f.inspect(t)))
 	state, err = readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, "closed", state.Phase)
+	require.Equal(t, nativeClosed, state.Phase)
 	require.Nil(t, state.Target)
 	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
 }
@@ -327,7 +327,7 @@ func TestNativeFailedQualificationCannotOpenAdmission(t *testing.T) {
 	require.NoError(t, status.empty())
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, "qualifying", state.Phase, "empty proof does not establish qualification success")
+	require.Equal(t, nativeQualifying, state.Phase, "empty proof does not establish qualification success")
 	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
 }
 
@@ -446,7 +446,7 @@ func TestNativeQualificationRequiresReleasedCandidate(t *testing.T) {
 	require.NoError(t, status.empty())
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, "qualifying", state.Phase)
+	require.Equal(t, nativeQualifying, state.Phase)
 	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
 }
 
@@ -483,7 +483,7 @@ func TestNativeBootstrapInterruptionAndGateIdentity(t *testing.T) {
 	require.Error(t, err)
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, "initializing", state.Phase)
+	require.Equal(t, nativeInitializing, state.Phase)
 	gate := filepath.Join(f.config.ControlPath, nativeGateName)
 	before, err := os.Stat(gate)
 	require.NoError(t, err)

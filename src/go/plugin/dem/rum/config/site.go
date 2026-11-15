@@ -2,6 +2,8 @@
 
 package config
 
+import "regexp"
+
 // Site is one monitored web property. Validate requires a name, top-N bounds
 // and at least one allowed origin; native job admission decides whether its
 // endpoints exist.
@@ -39,6 +41,15 @@ type Site struct {
 type PathRule struct {
 	Pattern string `yaml:"pattern" json:"pattern"`
 	Replace string `yaml:"replace" json:"replace"`
+}
+
+// Regexp compiles Pattern. An empty pattern is an empty row from the form: it
+// is kept in the configuration but never matched, so Regexp returns nil.
+func (r PathRule) Regexp() (*regexp.Regexp, error) {
+	if r.Pattern == "" {
+		return nil, nil
+	}
+	return regexp.Compile(r.Pattern)
 }
 
 // Bot handling.

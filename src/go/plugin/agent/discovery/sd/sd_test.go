@@ -5,6 +5,7 @@ package sd
 import (
 	"bytes"
 	"testing"
+	"testing/synctest"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/sd/pipeline"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -97,7 +98,7 @@ func TestServiceDiscovery_Run(t *testing.T) {
 
 	for name, sim := range tests {
 		t.Run(name, func(t *testing.T) {
-			sim.run(t)
+			synctest.Test(t, sim.run)
 		})
 	}
 }
@@ -110,7 +111,7 @@ func TestServiceDiscovery_UnsupportedDiscovererConfigIsIgnored(t *testing.T) {
 		wantPipelines: nil,
 		wantExposed:   []wantExposedCfg{},
 	}
-	sim.run(t)
+	synctest.Test(t, sim.run)
 }
 
 func TestServiceDiscovery_WindowsSourcePathIsPublished(t *testing.T) {
@@ -131,7 +132,7 @@ func TestServiceDiscovery_WindowsSourcePathIsPublished(t *testing.T) {
 		}},
 		wantOutputContains: `'C:\Program Files\Netdata\etc\netdata\sd\windows.conf'`,
 	}
-	sim.run(t)
+	synctest.Test(t, sim.run)
 }
 
 func TestServiceDiscovery_UnpublishableConfigDoesNotEnterStateOrWaitGate(t *testing.T) {
@@ -333,7 +334,7 @@ func TestServiceDiscovery_Priority(t *testing.T) {
 
 	for name, sim := range tests {
 		t.Run(name, func(t *testing.T) {
-			sim.run(t)
+			synctest.Test(t, sim.run)
 		})
 	}
 }

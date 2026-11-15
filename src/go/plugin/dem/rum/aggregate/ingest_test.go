@@ -5,7 +5,6 @@ package aggregate
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"testing"
 	"time"
 
@@ -267,9 +266,9 @@ func TestNavigationRevisionAndBFCacheAbsence(t *testing.T) {
 	assert.Equal(t, 1, a.Snapshot().Load.N)
 }
 
-// Navigation needs an experience and a revision. A non-finite or negative
-// timing field is dropped from an otherwise admitted revision.
-func TestInvalidNavigationTimingIsCounted(t *testing.T) {
+// Navigation needs an experience and a revision. Timing values are the
+// decoder's input policy and are tested there.
+func TestInvalidNavigationIdentityIsCounted(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	invalid := func() uint64 { return a.Snapshot().Counters[CounterInvalidMeasurements] }
 	b := mk(*now, "s", "/")
@@ -287,24 +286,8 @@ func TestInvalidNavigationTimingIsCounted(t *testing.T) {
 		LoadMS:   10,
 	}
 	assert.Nil(t, a.Ingest(b).Observation.Navigation)
-	require.EqualValues(t, 2, invalid())
-
-	b.ExperienceID = "document"
-	b.Navigation = &beacon.Navigation{
-		Revision: 1,
-		HasLoad:  true,
-		LoadMS:   math.NaN(),
-		HasDCL:   true,
-		DCLMS:    -1,
-	}
-	got := a.Ingest(b).Observation.Navigation
-	require.NotNil(t, got)
-	assert.False(t, got.HasLoad)
-	assert.False(t, got.HasDCL)
-	assert.EqualValues(t, 4, invalid())
-	s := a.Snapshot()
-	assert.Zero(t, s.Load.N)
-	assert.Zero(t, s.DCL.N)
+	assert.EqualValues(t, 2, invalid())
+	assert.Zero(t, a.Snapshot().Load.N)
 }
 
 // Decoded navigation reports without valid timings do not replace a revision.

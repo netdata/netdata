@@ -155,10 +155,8 @@ func TestNoSyntheticSessionStart(t *testing.T) {
 
 func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 	e := &Logs{
-		transport: &transport{
-			redactor: newRedactor(t, "secret-value"),
-		},
-		now: func() time.Time { return t0 },
+		transport: &transport{},
+		now:       func() time.Time { return t0 },
 	}
 	for level, want := range map[string]string{"info": "INFO", "warn": "WARN", "error": "ERROR", "debug": "DEBUG", "trace": "TRACE"} {
 		frame, err := json.Marshal(
@@ -187,7 +185,7 @@ func TestConsoleSeverityAndErrorDetails(t *testing.T) {
 }
 
 func TestConsoleErrorAttributesOnlyWhenPresent(t *testing.T) {
-	e := newExporter(t, "127.0.0.1:1", newRecCounters(), nil)
+	e := newExporter(t, "127.0.0.1:1", newRecCounters())
 	b := mkBeacon()
 	b.Logs = []beacon.Log{{Level: "info", Message: "plain console line"}}
 	records := e.build(b, false)
@@ -238,7 +236,7 @@ func TestDecodedConsoleUnicodeRemainsExportable(t *testing.T) {
 			assert.LessOrEqual(t, len(l.ErrorType), 64)
 			assert.LessOrEqual(t, len(l.Message), 1024)
 			assert.LessOrEqual(t, len(l.Stack), 4096)
-			e := newExporter(t, "127.0.0.1:1", newRecCounters(), nil)
+			e := newExporter(t, "127.0.0.1:1", newRecCounters())
 			records := e.build(b, false)
 			require.Len(t, records, 1)
 			_, err = proto.Marshal(records[0])
@@ -307,8 +305,8 @@ func TestDecodedObservationsPreservedAcrossOTLPLogsAndTraces(t *testing.T) {
 	)
 
 	remoteLogs := &fakeLogsService{}
-	// The transport guard is for diagnostics, never a second beacon normalization pass.
-	logs := newExporter(t, startServer(t, remoteLogs), newRecCounters(), newRedactor(t, "render"))
+	// Export carries the normalized beacon values; it does not normalize them again.
+	logs := newExporter(t, startServer(t, remoteLogs), newRecCounters())
 	records := logs.build(b, true)
 	require.Len(t, records, 4, "page, error, view transition, and milestone; no session lifecycle logs")
 	attrs := simplify(records[1]).attrs
@@ -325,7 +323,7 @@ func TestDecodedObservationsPreservedAcrossOTLPLogsAndTraces(t *testing.T) {
 	require.Len(t, requests, 1)
 
 	remoteTraces := &fakeTraceService{}
-	traces := newTraceExporter(t, startTraceServer(t, remoteTraces), "s1", newRecCounters(), newRedactor(t, "failed"))
+	traces := newTraceExporter(t, startTraceServer(t, remoteTraces), "s1", newRecCounters())
 	resource := traces.resourceSpans(b)
 	require.NotNil(t, resource)
 	require.Len(t, resource.ScopeSpans, 1)

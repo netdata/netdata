@@ -9,7 +9,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -20,33 +19,37 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	captures, err := artifacts.Open("")
+	view, finish, err := e.temporaryView(e.source)
 	if err != nil {
 		return fmt.Errorf("prepare rehearsal workspace: %w", err)
 	}
 	request.Capture = false
 	request.Trace = false
-	execution := e.unrecordedView(e.source, captures).execute(ctx, request)
+	return finish(rehearsalResult(ctx, view.execute(ctx, request)))
+}
+
+// rehearsalResult reports an undrained, cancelled or unsuccessful rehearsal.
+func rehearsalResult(ctx context.Context, execution synthetic.Execution) error {
 	if !execution.Drained {
 		// The shared fatal owner stops the process; uncertain live work must remain.
 		return ndexec.ErrTreeNotDrained
 	}
-	cleanupErr := captures.Close()
 	if err := ctx.Err(); err != nil {
-		return errors.Join(err, cleanupErr)
+		return err
 	}
-	if execution.Run.Outcome != synthetic.Success || execution.Run.Error != "" {
-		outcome := string(execution.Run.Outcome)
-		if execution.Run.TerminationReason != "" {
-			outcome += " (" + string(execution.Run.TerminationReason) + ")"
-		}
-		err := fmt.Errorf("rehearsal %s: %s", outcome, rehearsalFailureText(execution.Run))
-		if execution.Run.Outcome == synthetic.Timeout {
-			err = errors.Join(err, context.DeadlineExceeded)
-		}
-		return errors.Join(err, cleanupErr)
+	run := execution.Run
+	if run.Outcome == synthetic.Success && run.Error == "" {
+		return nil
 	}
-	return cleanupErr
+	outcome := string(run.Outcome)
+	if run.TerminationReason != "" {
+		outcome += " (" + string(run.TerminationReason) + ")"
+	}
+	err := fmt.Errorf("rehearsal %s: %s", outcome, rehearsalFailureText(run))
+	if run.Outcome == synthetic.Timeout {
+		err = errors.Join(err, context.DeadlineExceeded)
+	}
+	return err
 }
 
 // rehearsalFailureText preserves the core error and adds the same diagnostic

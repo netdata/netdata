@@ -34,7 +34,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		aggregator: c.aggregator,
 	}
 	if c.EventLogsOn() {
-		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.transport, c.redactor)
+		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.transport)
 		if err != nil {
 			return err
 		}
@@ -42,7 +42,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		defer logs.Close()
 	}
 	if c.TracingOn() {
-		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.transport, c.redactor)
+		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.transport)
 		if err != nil {
 			return err
 		}

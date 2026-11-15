@@ -230,70 +230,78 @@ func TestBrowserRedactionSamplesAndSnapshots(t *testing.T) {
 	assert.NotContains(t, string(encoded), "secret")
 }
 
+// TestBrowserUnusableURLPreservesEvidenceAndCompletion stores an unusable
+// request URL as omitted: one net/url rejects (WHATWG keeps escapes such as
+// %zz), or the empty URL the runtime sends for one its URL parser rejects.
 func TestBrowserUnusableURLPreservesEvidenceAndCompletion(t *testing.T) {
+	urls := map[string]string{
+		"rejected by Go":     "https://user:secret@example.com/%zz?private=secret#fragment",
+		"empty from runtime": "",
+	}
 	for _, category := range []string{"http_error", "transport"} {
-		t.Run(category, func(t *testing.T) {
-			counts := synthetic.BrowserCounts{
-				HTTPError: 1,
-			}
-			if category == "transport" {
-				counts = synthetic.BrowserCounts{
-					Transport: 1,
+		for urlCase, requestURL := range urls {
+			t.Run(category+"/"+urlCase, func(t *testing.T) {
+				counts := synthetic.BrowserCounts{
+					HTTPError: 1,
 				}
-			}
-			run := synthetic.BrowserAggregate{
-				Tests: synthetic.BrowserTestCounts{
-					Observed: 1,
-				},
-				Counts: counts,
-			}
-			sample := map[string]any{
-				"id":       1,
-				"test_id":  "t",
-				"category": category,
-				"method":   "GET",
-				"url":      "https://user:secret@example.com/%zz?private=secret#fragment",
-			}
-			if category == "http_error" {
-				sample["status"] = 500
-			} else {
-				sample["error"] = "connection refused"
-			}
-			s := consumeBrowser(
-				t,
-				browserInit,
-				extensionLine(
-					browserSummaryFeature,
-					map[string]any{
-						"record": "test",
-						"run":    run,
-						"test": synthetic.BrowserTest{
-							ID:        "t",
-							State:     "observed",
-							Counts:    &counts,
-							SampleIDs: []int{1},
-						},
-						"samples": []any{sample},
+				if category == "transport" {
+					counts = synthetic.BrowserCounts{
+						Transport: 1,
+					}
+				}
+				run := synthetic.BrowserAggregate{
+					Tests: synthetic.BrowserTestCounts{
+						Observed: 1,
 					},
-				),
-				extensionLine(
-					browserSummaryFeature,
-					map[string]any{"record": "complete", "run": run},
-				),
-				evidenceRecord("complete", "", nil),
-			)
-			require.Equal(t, "complete", s.browser.ReportingStatus())
-			assert.Equal(t, "complete", s.evidence.ReportingStatus())
-			assert.Equal(t, run, *s.browser.Run)
-			require.Len(t, s.browser.Samples, 1)
-			require.NotNil(t, s.browser.Samples[0].URL)
-			assert.Empty(t, *s.browser.Samples[0].URL)
-			assert.Empty(t, s.browser.Samples[0].URLOmitted)
-			raw, err := json.Marshal(s.browser)
-			require.NoError(t, err)
-			assert.NotContains(t, string(raw), "secret")
-			assert.NotContains(t, string(raw), "private=")
-		})
+					Counts: counts,
+				}
+				sample := map[string]any{
+					"id":       1,
+					"test_id":  "t",
+					"category": category,
+					"method":   "GET",
+					"url":      requestURL,
+				}
+				if category == "http_error" {
+					sample["status"] = 500
+				} else {
+					sample["error"] = "connection refused"
+				}
+				s := consumeBrowser(
+					t,
+					browserInit,
+					extensionLine(
+						browserSummaryFeature,
+						map[string]any{
+							"record": "test",
+							"run":    run,
+							"test": synthetic.BrowserTest{
+								ID:        "t",
+								State:     "observed",
+								Counts:    &counts,
+								SampleIDs: []int{1},
+							},
+							"samples": []any{sample},
+						},
+					),
+					extensionLine(
+						browserSummaryFeature,
+						map[string]any{"record": "complete", "run": run},
+					),
+					evidenceRecord("complete", "", nil),
+				)
+				require.Equal(t, "complete", s.browser.ReportingStatus())
+				assert.Equal(t, "complete", s.evidence.ReportingStatus())
+				assert.Equal(t, run, *s.browser.Run)
+				require.Len(t, s.browser.Samples, 1)
+				assert.Nil(t, s.browser.Samples[0].URL)
+				assert.Equal(t, "unavailable", s.browser.Samples[0].URLOmitted)
+				raw, err := json.Marshal(s.browser)
+				require.NoError(t, err)
+				assert.NotContains(t, string(raw), "secret")
+				assert.NotContains(t, string(raw), "private=")
+			})
+		}
 	}
 }
 

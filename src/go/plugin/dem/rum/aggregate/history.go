@@ -27,6 +27,20 @@ type HistoryEvent struct {
 	Fingerprint, ErrorType, Message, SampleStack string
 }
 
+// HistoryEvent.Type values: the persisted investigation vocabulary. History
+// reducers match them, so renaming one changes the meaning of stored events.
+const (
+	EventTypePageview    = "pageview"    // document activation
+	EventTypeView        = "view"        // application view change
+	EventTypeVital       = "vital"       // poor Web Vital
+	EventTypeError       = "error"       // JavaScript error
+	EventTypeFrustration = "frustration" // rage, dead or error click
+	EventTypeRequest     = "request"     // traced request
+	EventTypeCustom      = "event"       // custom event
+	// EventTypeActivity records session activity without a timeline entry.
+	EventTypeActivity = "activity"
+)
+
 func (a *Aggregator) SetHistorySink(h HistorySink) {
 	a.mu.Lock()
 	defer a.mu.Unlock()

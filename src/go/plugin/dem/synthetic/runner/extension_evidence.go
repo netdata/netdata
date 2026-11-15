@@ -283,26 +283,34 @@ func validDuration(d *float64) bool {
 func validEvidenceTest(t synthetic.EvidenceTest) bool {
 	// The producer's 1024-byte limit per serialized test never binds here: the
 	// field budgets keep a test well below it.
-	return validEvidenceID(t.ID, testIDBytes) && boundedJSON(t.Title, titleBytes) && validLocation(t.Location) &&
+	return validEvidenceID(t.ID, testIDBytes) &&
+		boundedJSON(t.Title, titleBytes) &&
+		validLocation(t.Location) &&
 		slices.Contains([]string{"running", "passed", "failed", "timedOut", "skipped", "interrupted"}, t.Status) &&
 		slices.Contains([]string{"passed", "failed", "skipped"}, t.ExpectedStatus) &&
-		(t.Status != "running") == t.ReportingComplete && validDuration(t.DurationMS)
+		(t.Status != "running") == t.ReportingComplete &&
+		validDuration(t.DurationMS)
 }
 
 func validEvidenceStep(s synthetic.EvidenceStep) bool {
-	return validEvidenceID(s.ID, stepIDBytes) && validEvidenceID(s.TestID, testIDBytes) &&
+	return validEvidenceID(s.ID, stepIDBytes) &&
+		validEvidenceID(s.TestID, testIDBytes) &&
 		(s.ParentID == "" || validEvidenceID(s.ParentID, stepIDBytes) && s.ParentID != s.ID) &&
-		boundedJSON(
-			s.Title,
-			titleBytes,
-		) && s.Category != "" && boundedJSON(s.Category, categoryBytes) && validLocation(s.Location) &&
-		slices.Contains([]string{"running", "passed", "failed"}, s.State) && validDuration(s.DurationMS) &&
-		boundedJSON(s.Message, stepMessageBytes) && boundedJSON(s, stepBytes)
+		boundedJSON(s.Title, titleBytes) &&
+		s.Category != "" &&
+		boundedJSON(s.Category, categoryBytes) &&
+		validLocation(s.Location) &&
+		slices.Contains([]string{"running", "passed", "failed"}, s.State) &&
+		validDuration(s.DurationMS) &&
+		boundedJSON(s.Message, stepMessageBytes) &&
+		boundedJSON(s, stepBytes)
 }
 
 func validFailure(f synthetic.FailureDetail) bool {
 	return slices.Contains([]string{"failed", "timedOut", "passed"}, f.Test.Status) &&
-		f.Test.Status != f.Test.ExpectedStatus && (f.Test.Status != "passed" || f.Test.ExpectedStatus == "failed") && validDetail(f)
+		f.Test.Status != f.Test.ExpectedStatus &&
+		(f.Test.Status != "passed" || f.Test.ExpectedStatus == "failed") &&
+		validDetail(f)
 }
 
 func validStop(f synthetic.FailureDetail) bool {
@@ -311,11 +319,14 @@ func validStop(f synthetic.FailureDetail) bool {
 }
 
 func validDetail(f synthetic.FailureDetail) bool {
-	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
-		len(
-			f.Path,
-		) > failurePathLimit || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
-		utf8.RuneCountInString(f.Message) > textLimit || !boundedJSON(f, extensionBodyLimit) {
+	if !validEvidenceTest(f.Test) ||
+		!f.Test.ReportingComplete ||
+		len(f.Path) > failurePathLimit ||
+		f.OmittedAncestors < 0 ||
+		int64(f.OmittedAncestors) > maxSafeInteger ||
+		!validLocation(f.Location) ||
+		utf8.RuneCountInString(f.Message) > textLimit ||
+		!boundedJSON(f, extensionBodyLimit) {
 		return false
 	}
 	seen := make(map[string]bool, len(f.Path))

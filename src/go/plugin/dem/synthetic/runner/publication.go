@@ -3,11 +3,25 @@
 package runner
 
 import (
+	"context"
 	"errors"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
+
+// eligibleCaptures splits reported candidates into those to publish and those
+// to explain: interrupted captures publish only after a journey budget stop.
+func eligibleCaptures(run *synthetic.Run, s sinkSnapshot) (captures, ineligible []synthetic.Capture) {
+	if s.err != nil || s.result == nil {
+		return nil, nil
+	}
+	captures = append(captures, s.result.Artifacts...)
+	if run.TerminationReason == synthetic.ExecutionBudget {
+		return append(captures, s.result.InterruptedArtifacts...), nil
+	}
+	return captures, s.result.InterruptedArtifacts
+}
 
 // joinCaptures adds labels only to already admitted terminal candidates. Metadata
 // IDs absent from that authority remain explanations, never offered files.
@@ -50,6 +64,29 @@ func joinCaptures(run *synthetic.Run, candidates, ineligible []synthetic.Capture
 					Reason: "not_in_final_report",
 				},
 			)
+		}
+	}
+}
+
+// publish finalizes the run work directory with the eligible captures and
+// records the result: published artifacts, omission reasons and the capture state.
+func (e *Engine) publish(ctx context.Context, a *attempt, captures []synthetic.Capture) {
+	run := &a.run
+	published, err := e.artifacts.Finalize(ctx, run.ID, captures)
+	if err != nil {
+		capturePublicationFailed(run, captures, err)
+		run.Error = joinText(run.Error, a.redact.text("artifact publication: "+err.Error()))
+		if run.CaptureState != synthetic.CaptureDisabled {
+			run.CaptureState = synthetic.CaptureUnavailable
+		}
+		return
+	}
+	run.Artifacts = published
+	capturePublicationSucceeded(run, captures)
+	if run.CaptureState != synthetic.CaptureDisabled && len(captures) > 0 {
+		run.CaptureState = synthetic.CaptureUnavailable
+		if len(published) > 0 {
+			run.CaptureState = synthetic.CaptureAvailable
 		}
 	}
 }

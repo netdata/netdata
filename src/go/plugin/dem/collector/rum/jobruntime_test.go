@@ -162,7 +162,13 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	stopNext()
 	stopSite()
 	rows, err := rumhistory.NewStore(db).
-		QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+		QuerySessions(context.Background(), rumhistory.SessionFilter{
+			Filter: rumhistory.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)
@@ -256,7 +262,14 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	stopBeta()
 	stopNext()
 	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
-		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, "", 0, time.Now().Unix()+10, 10, "")
+		rows, err := rumhistory.NewStore(db).
+			QuerySessions(ctx, rumhistory.SessionFilter{
+				Filter: rumhistory.Filter{
+					Site:   name,
+					Before: time.Now().Unix() + 10,
+				},
+				Limit: 10,
+			})
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)
@@ -424,7 +437,7 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	require.True(t, ok)
 	require.Equal(t, generation, site.Generation, "vnode refresh does not restart ingestion")
 	require.Empty(t, site.Aggregator.Pages(""))
-	oldRows, _ := site.Aggregator.Live(0, 10, guidA)
+	oldRows := site.Aggregator.Live(0, 10, guidA)
 	require.Len(t, oldRows, 2)
 	release()
 	send("shop", "/new", 100)

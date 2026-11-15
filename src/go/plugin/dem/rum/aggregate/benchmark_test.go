@@ -399,6 +399,39 @@ func BenchmarkActivity(b *testing.B) {
 	}
 }
 
+// A rum-live poll reads the rows after its cursor from a full ring, capped at
+// the Function's row limit: "first-poll" returns a full batch, "tail" the few
+// rows a steady poll sees, "caught-up" none. Timings are local trends;
+// allocations and bytes define the per-read envelope.
+func BenchmarkLive(b *testing.B) {
+	const functionRows = 2000 // the rum-live Function's row cap
+	a, now := newAgg(5 * time.Minute)
+	for i := range 2 * liveRingCap {
+		a.Ingest(&beacon.Beacon{
+			ExperienceID: strconv.Itoa(i),
+			Site:         "s",
+			PageGroup:    "/products",
+			Received:     *now,
+			Vitals:       []beacon.Vital{{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 100}},
+		})
+	}
+	if got := len(a.live) - a.liveStart; got != liveRingCap {
+		b.Fatalf("live ring holds %d rows, want %d", got, liveRingCap)
+	}
+	head := a.liveSeq
+	for _, poll := range []struct {
+		name  string
+		after uint64
+	}{{"first-poll", 0}, {"tail", head - 10}, {"caught-up", head}} {
+		b.Run(poll.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for range b.N {
+				a.Live(poll.after, functionRows, "")
+			}
+		})
+	}
+}
+
 func BenchmarkSnapshot(b *testing.B) {
 	a, now := newAgg(5*time.Minute, SiteCfg{
 		VnodeGUID: "11111111-1111-4111-8111-111111111111",

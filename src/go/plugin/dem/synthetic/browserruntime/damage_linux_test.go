@@ -48,7 +48,7 @@ func TestManagedOperationsReportMetadataDamageAsErrDamaged(t *testing.T) {
 		},
 		"candidate select": func(t *testing.T, s *Store, damage string) (string, error) {
 			m, archive := bundleFixture(t, "select")
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = candidate.Close() })
 			require.NoError(t, candidate.Import(context.Background(), archiveFile(t, archive)))
@@ -57,7 +57,7 @@ func TestManagedOperationsReportMetadataDamageAsErrDamaged(t *testing.T) {
 		},
 		"candidate seal preload": func(t *testing.T, s *Store, damage string) (string, error) {
 			m, archive := bundleFixture(t, "seal")
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = candidate.Close() })
 			require.NoError(t, candidate.Import(context.Background(), archiveFile(t, archive)))
@@ -67,9 +67,9 @@ func TestManagedOperationsReportMetadataDamageAsErrDamaged(t *testing.T) {
 		"candidate import": func(t *testing.T, s *Store, damage string) (string, error) {
 			m, archive := bundleFixture(t, "import")
 			path := archiveFile(t, archive)
-			require.NoError(t, s.importUnselected(context.Background(), m, path))
+			require.NoError(t, s.importUnselected(t, context.Background(), m, path))
 			damageGeneration(t, s, m.Archive.SHA256, damage)
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = candidate.Close() })
 			return m.Archive.SHA256, candidate.Import(context.Background(), path)
@@ -77,7 +77,7 @@ func TestManagedOperationsReportMetadataDamageAsErrDamaged(t *testing.T) {
 		"candidate download": func(t *testing.T, s *Store, damage string) (string, error) {
 			m := importFixture(t, s, "download")
 			damageGeneration(t, s, m.Archive.SHA256, damage)
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = candidate.Close() })
 			// The prepared generation is checked before any network access.
@@ -138,7 +138,7 @@ func TestDamagedOwnershipRecordIsNotRepairableDamage(t *testing.T) {
 			t.Cleanup(func() { _ = use.Finish(true); _ = consumer.Close() })
 			m, data := bundleFixture(t, "candidate")
 			archive := archiveFile(t, data)
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = candidate.Close() })
 			if name == "candidate seal preload" {
@@ -185,7 +185,7 @@ func TestReadPreloadReportsDamageWithPreloadAdvice(t *testing.T) {
 		t.Run(damage, func(t *testing.T) {
 			s, _ := testStore(t)
 			m := importFixture(t, s, "preloaded")
-			candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 			require.NoError(t, err)
 			require.NoError(t, candidate.SealPreload())
 			require.NoError(t, candidate.Close())

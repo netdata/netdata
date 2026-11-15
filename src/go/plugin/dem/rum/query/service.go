@@ -12,6 +12,8 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
+// Service reads redacted copies of RUM observations. A failed read returns no
+// rows.
 type Service struct {
 	registry *rumregistry.Registry
 	history  *history.Store

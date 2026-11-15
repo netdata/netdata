@@ -283,7 +283,7 @@ Each site job builds its own objects; nothing is shared between sites:
 | Object | Package | Built in | Notes |
 |---|---|---|---|
 | Aggregator | `rum/aggregate` | `Init` | One site's rolling measurements and investigation state, behind one lock |
-| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text; handed to the route and exporters |
+| Redactor | `internal/redact` | `Init` | Masks configured credentials in stored and exported text; handed to the route |
 | Route | `rum/httpapi` | `Run` | The site's policy, processor, redactor and last rejected origin, admitted through the registry |
 | History writer | `rum/history` | `Run` | Queued, batched journal appends |
 | Event-log exporter | `rum/otlp` | `Run` | Only when `event_logs` is enabled |
@@ -567,7 +567,7 @@ File layout within packages:
 | `rum/aggregate` | State/construction, ingestion/results, activity, snapshots/ranking, vital statistics and cohesive topic operations, without creating extra state owners |
 | Function packages | Each method keeps its ordered column list, which defines both the column map and every row, beside its row reader |
 | History packages | Record codecs are separate from reducers |
-| `synthetic/runner` | Execution phases (`engine`), admission, runtime source and checks, process ownership, the reporter stream (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`) and capture publication; tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
+| `synthetic/runner` | Construction, unrecorded and temporary-store views, and execution phases (`engine`), admission and the fatal owner (`admission`), runtime source and checks, process ownership, the reporter stream and its limits (`wire`, `sink`, `redact`, `stream`), optional-output decoders (`extension*`), capture eligibility and publication (`publication`), rehearsal and qualification (`rehearse`, `qualify`) and the monotonic clock (`clock_*`); tests are named after the file they cover; tests that need the unix process harness use an `_engine_test` suffix, except `engine.go`'s own tests in `engine_test.go` |
 | `synthetic/artifacts` | Store lifetime and manifests, work creation, publication, reads, the catalogue, inventory, retention with storage status, and filesystem checks |
 
 - Pure DEM helpers stay under their domain or `internal/`.
@@ -662,7 +662,8 @@ Sites:
 - Config materializes country-only geolocation and disabled frustration heuristics without mutating the stored input.
 - The browser bootstrap limits instrumentation and outgoing metadata. The receiver independently enforces the same
   policy and normalizes supported URLs, paths and text before aggregation, retained history or enabled exports.
-- Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.
+- Site redaction covers stored and exported payloads. OTLP export failures log only the gRPC status code and the
+  site key, never remote error text.
 - Ingestion removes control characters from each received text value and redacts every credential the site redactor
   finds in the received or in the cleaned text. A credential can depend on a removed character (`Bearer<TAB>token`, a
   word boundary) or be joined by its removal. The size bound comes last, so it cannot cut a credential into an

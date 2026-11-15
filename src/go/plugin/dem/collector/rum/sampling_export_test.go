@@ -132,7 +132,7 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			for _, counter := range []string{otlp.CounterLogsDropped, otlp.CounterLogsErrors, otlp.CounterSpansDropped, otlp.CounterSpansErrors, history.CounterDropped} {
 				assert.Zero(t, site.TransportCounter(counter), counter)
 			}
-			live, _ := a.Live(0, 10, "")
+			live := a.Live(0, 10, "")
 			assert.Len(
 				t,
 				live,
@@ -150,11 +150,28 @@ func TestSamplingDetailThroughNativeJobs(t *testing.T) {
 			}
 			assert.Equal(t, observations, documents)
 			assert.Equal(t, 1, errorsLive)
-			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+			rows, err := store.QuerySessions(
+				context.Background(),
+				history.SessionFilter{
+					Filter: history.Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 10,
+					},
+					Limit: 10,
+				},
+			)
 			require.NoError(t, err)
 			timeline, err := store.QuerySessionEvents(context.Background(), "shop", session, "")
 			require.NoError(t, err)
-			errors, err := store.QueryErrors(context.Background(), "shop", "", 0, time.Now().Unix()+10, "")
+			errors, err := store.QueryErrors(
+				context.Background(),
+				history.ErrorFilter{
+					Filter: history.Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 10,
+					},
+				},
+			)
 			require.NoError(t, err)
 			if !tc.promote {
 				assert.Empty(t, rows)

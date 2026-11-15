@@ -124,7 +124,7 @@ func createNativeControl(config NativeConfig, uid, gid int) error {
 	}
 	initial := nativeControlRecord{
 		Format:      1,
-		Phase:       "initializing",
+		Phase:       nativeInitializing,
 		PayloadPath: config.PayloadPath,
 		UID:         uid,
 		GID:         gid,
@@ -177,11 +177,11 @@ func readNativePayload(path string) (Paths, Manifest, error) {
 }
 
 func readNativeRecord(root *os.Root, path string) (Manifest, error) {
-	if err := nativeProtectedFile(root, "native.json", false); err != nil {
+	if err := nativeProtectedFile(root, nativeRecordName, false); err != nil {
 		return Manifest{}, err
 	}
 	var record NativePackage
-	if err := readJSON(root, "native.json", &record); err != nil {
+	if err := readJSON(root, nativeRecordName, &record); err != nil {
 		return Manifest{}, err
 	}
 	m := record.Manifest
@@ -223,7 +223,7 @@ func verifyNativeImmutable(root *os.Root) error {
 // The package was bound at build time; slots and generated configuration must
 // name the installed prefix, never a builder staging path.
 func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
-	interpreter := []byte(filepath.Join(path, m.Layout.Loader))
+	interpreter := boundInterpreter(path, m.Layout)
 	for _, binding := range m.Bindings {
 		if err := plainExistingParents(root, binding.Path); err != nil {
 			return err
@@ -231,7 +231,8 @@ func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
 		if err := nativeProtectedFile(root, binding.Path, false); err != nil {
 			return err
 		}
-		if len(interpreter)+1 > len(binding.Expected) {
+		bound, ok := boundSlot(binding, interpreter)
+		if !ok {
 			return errors.New("native interpreter prefix exceeds binding capacity")
 		}
 		f, err := root.Open(binding.Path)
@@ -243,8 +244,6 @@ func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
 		if err := errors.Join(readErr, f.Close()); err != nil {
 			return err
 		}
-		bound := make([]byte, len(binding.Expected))
-		copy(bound, interpreter)
 		if !bytes.Equal(actual, bound) {
 			return errors.New("native interpreter is not bound to its package prefix")
 		}
@@ -253,7 +252,7 @@ func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
 	if err != nil {
 		return err
 	}
-	for name, expected := range map[string][]byte{"fonts.conf": fonts, "chrome": launcher} {
+	for name, expected := range map[string][]byte{fontConfigName: fonts, launcherName: launcher} {
 		actual, err := root.ReadFile(name)
 		if err != nil {
 			return err

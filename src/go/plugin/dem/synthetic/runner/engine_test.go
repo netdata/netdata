@@ -25,6 +25,35 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestEmptyListsStayNil keeps the events and artifacts of an attempt that has
+// none nil, from the live run to its history records, which store null lists.
+// synthetics-run shows them as empty.
+func TestEmptyListsStayNil(t *testing.T) {
+	tests := map[string]func(t *testing.T, e *Engine){
+		"reported success": func(t *testing.T, e *Engine) { e.start = starter(t, resultPayload(success())) },
+		"failed before start": func(_ *testing.T, e *Engine) {
+			e.platform = func() error { return errors.New("unsupported host") }
+		},
+	}
+	for name, setup := range tests {
+		t.Run(name, func(t *testing.T) {
+			e, h, _ := testEngine(t)
+			setup(t, e)
+			execution := e.execute(t.Context(), journey())
+			require.True(t, execution.Drained)
+			assert.Nil(t, execution.Run.Events)
+			assert.Nil(t, execution.Run.Artifacts)
+			require.Equal(t, []string{"start", "complete"}, h.phases)
+			for _, run := range h.runs {
+				encoded, err := json.Marshal(run)
+				require.NoError(t, err)
+				assert.Contains(t, string(encoded), `"events":null`)
+				assert.Contains(t, string(encoded), `"artifacts":null`)
+			}
+		})
+	}
+}
+
 func TestSuccessfulExecutionJoinsAndFinalizes(t *testing.T) {
 	e, h, a := testEngine(t)
 	e.start = starter(t, resultPayload(success()))

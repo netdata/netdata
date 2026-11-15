@@ -105,7 +105,7 @@ func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	assert.Zero(t, empty.Counters[CounterAccepted])
 	assert.False(t, empty.ResourcesSeen)
 	assert.Zero(t, empty.FirstPartyResources)
-	retained, _ := a.Live(0, 10, "")
+	retained := a.Live(0, 10, "")
 	require.Len(t, retained, 2)
 	assert.Equal(t, vnodeA, retained[0].VnodeGUID)
 	// Promotion after reassignment retains preceding A context and adds B context.
@@ -130,7 +130,7 @@ func TestVnodeChangeResetsMeasurementsAndPreservesEvidence(t *testing.T) {
 	fresh := a.Snapshot()
 	assert.Equal(t, 1, fresh.Vitals[beacon.LCP].N)
 	assert.EqualValues(t, 1, fresh.Counters[CounterPageviews])
-	rows, _ := a.Live(retained[1].Seq, 10, vnodeB)
+	rows := a.Live(retained[1].Seq, 10, vnodeB)
 	require.Len(t, rows, 3)
 	for _, row := range rows {
 		assert.Equal(t, vnodeB, row.VnodeGUID)

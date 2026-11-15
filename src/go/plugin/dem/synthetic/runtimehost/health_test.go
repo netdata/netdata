@@ -20,7 +20,7 @@ type healthLog struct {
 }
 
 func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
-	h := NewUnavailable(ModeNative, browserruntime.ErrUnavailable)
+	h := newUnavailable(ModeNative, browserruntime.ErrUnavailable)
 	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
 	require.ErrorIs(t, h.Ready(), browserruntime.ErrUnavailable)
 	require.NoError(t, h.Close())
@@ -34,7 +34,7 @@ func (l *healthLog) Write(p []byte) (int, error) {
 func (l *healthLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.data.String() }
 
 func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
-	h := NewUnavailable(ModeManaged, errors.New("runtime unavailable"))
+	h := newUnavailable(ModeManaged, errors.New("runtime unavailable"))
 	defer h.Close()
 	dependencies, err := h.Dependencies(nil)
 	require.NoError(t, err)
@@ -46,7 +46,7 @@ func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
-	h := NewUnavailable(ModeManaged, browserruntime.ErrUnavailable)
+	h := newUnavailable(ModeManaged, browserruntime.ErrUnavailable)
 	var logs healthLog
 	h.log = logger.NewWithWriter(&logs)
 	h.setMaintenance("cleanup", errors.New("trash blocked"))

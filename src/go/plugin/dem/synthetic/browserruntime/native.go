@@ -71,7 +71,7 @@ func OpenNative(config NativeConfig) (*Native, error) {
 	if err := nativeServiceIdentity(state); err != nil {
 		return nil, err
 	}
-	if state.Phase == "initializing" {
+	if state.Phase == nativeInitializing {
 		return nil, ErrNativeClosed
 	}
 	path := filepath.Join(config.ControlPath, "owners")
@@ -101,7 +101,7 @@ func InitializeNativeProof(config NativeConfig) error {
 	if err := nativeServiceIdentity(state); err != nil {
 		return err
 	}
-	if state.Phase != "initializing" {
+	if state.Phase != nativeInitializing {
 		return errors.New("native proof bootstrap is not authorized by the root gate")
 	}
 	ledger, err := openOwnershipLedger(filepath.Join(config.ControlPath, "owners"))
@@ -174,23 +174,23 @@ type NativeConsumer struct {
 	manifest Manifest
 	paths    Paths
 	claim    *claim
-	phase    string
+	phase    nativePhase
 	mu       sync.Mutex
 	closed   bool
 }
 
 func (n *Native) AcquireSelected() (*NativeConsumer, error) {
-	return n.acquire("ready", nil)
+	return n.acquire(nativeReady, nil)
 }
 
 func (n *Native) AcquireCandidate(target Manifest) (*NativeConsumer, error) {
 	if err := target.Validate(); err != nil {
 		return nil, err
 	}
-	return n.acquire("qualifying", &target)
+	return n.acquire(nativeQualifying, &target)
 }
 
-func (n *Native) acquire(phase string, expected *Manifest) (consumer *NativeConsumer, result error) {
+func (n *Native) acquire(phase nativePhase, expected *Manifest) (consumer *NativeConsumer, result error) {
 	gate, err := lockNativeGate(context.Background(), n.config, false)
 	if err != nil {
 		return nil, err
@@ -224,9 +224,9 @@ func (n *Native) acquire(phase string, expected *Manifest) (consumer *NativeCons
 	var owner *claim
 	err = n.ledger.withLock(func() error {
 		var err error
-		kind := "process"
-		if phase == "qualifying" {
-			kind = "candidate"
+		kind := processClaim
+		if phase == nativeQualifying {
+			kind = candidateClaim
 		}
 		owner, err = n.ledger.claimLocked(m.Archive.SHA256, kind)
 		return err

@@ -106,7 +106,7 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		Manifest: m,
 		LastUsed: s.now().UTC(),
 	}
-	if err := saveJSON(payload, "prepared.json", g); err != nil {
+	if err := saveJSON(payload, preparedRecordName, g); err != nil {
 		return err
 	}
 	if err := syncTree(payload); err != nil {
@@ -167,16 +167,11 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 			// Publication and reservation share one decision. A concurrent
 			// preparer may have finished since this candidate established protection.
 			if _, err := s.prepared(m); err == nil {
-				g, err := s.loadGeneration(m.Archive.SHA256)
-				if err != nil {
-					return err
-				}
-				g.LastUsed = s.now().UTC()
-				return saveJSON(s.root, filepath.Join("generations", m.Archive.SHA256, "prepared.json"), g)
+				return s.touchGenerationLocked(m.Archive.SHA256)
 			} else if !errors.Is(err, ErrUnavailable) {
 				return err
 			}
-			inv, err := s.inventoryLocked(true)
+			inv, err := s.strictInventoryLocked(true)
 			if err != nil {
 				return err
 			}
@@ -200,7 +195,7 @@ func (s *Store) reserve(m Manifest) (string, *flock.Flock, error) {
 				)
 				return err
 			}
-			ids := s.candidates(inv, true)
+			ids := s.retirable(inv, true)
 			if len(ids) == 0 {
 				return errors.Join(&AllowanceError{
 					NeededBytes: needed,

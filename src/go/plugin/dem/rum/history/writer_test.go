@@ -101,13 +101,29 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	sessions, err := NewStore(st).QuerySessions(ctx, "site", "", 0, time.Now().Unix()+1, 2000, "")
+	sessions, err := NewStore(
+		st,
+	).QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "site",
+			Before: time.Now().Unix() + 1,
+		},
+		Limit: 2000,
+	})
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, []string{"[REDACTED]"}, sessions[0].UserIDs)
 	assert.EqualValues(t, 1, sessions[0].Pageviews)
 	assert.EqualValues(t, 1, sessions[0].Errors)
-	groups, err := NewStore(st).QueryErrors(ctx, "site", "fp", 0, time.Now().Unix()+1, "")
+	groups, err := NewStore(
+		st,
+	).QueryErrors(ctx, ErrorFilter{
+		Filter: Filter{
+			Site:   "site",
+			Before: time.Now().Unix() + 1,
+		},
+		Fingerprint: "fp",
+	})
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
@@ -198,7 +214,16 @@ func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
 			Revision:     3,
 		},
 	}, events)
-	sessions, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+1, 10, "")
+	sessions, err := store.QuerySessions(
+		context.Background(),
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 1,
+			},
+			Limit: 10,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	require.EqualValues(t, 1, sessions[0].Pageviews)

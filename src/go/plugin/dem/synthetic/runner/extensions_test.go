@@ -43,7 +43,7 @@ func TestOptionalOutputStatusMatrix(t *testing.T) {
 	}{
 		"not negotiated": {
 			nil,
-			optionalStatus{pending, pending, "negotiation_not_reported", "negotiation_not_reported"},
+			optionalStatus{pending, pending, "unavailable", "unavailable"},
 		},
 		"all selected": {[]string{all}, optionalStatus{supported, supported, "partial", "supported"}},
 		"none selected": {

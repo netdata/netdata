@@ -102,10 +102,7 @@ func (s Site) optionalErrors() []string {
 		}
 	}
 	for _, r := range s.RedactPaths {
-		if r.Pattern == "" {
-			continue // an empty row from the form: ignored, never matched
-		}
-		if _, err := regexp.Compile(r.Pattern); err != nil {
+		if _, err := r.Regexp(); err != nil {
 			errs = append(errs, "redact_paths pattern "+strconv.Quote(r.Pattern)+" is not a valid regular expression")
 		}
 	}

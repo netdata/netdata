@@ -34,6 +34,8 @@ jobs:
             .github/workflows/go-tests.yml
             .github/scripts/get-go-version.py
             .github/scripts/normalize-go-test-json.py
+            .github/scripts/summarize-go-test-json.py
+            .github/scripts/test-go-test-timings.py
             .github/scripts/test-go-build-matrix.py
             packaging/cmake/
             src/go/**
@@ -74,6 +76,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test Go build matrix
         run: python3 .github/scripts/test-go-build-matrix.py
+      - name: Test Go test timing reports
+        run: python3 .github/scripts/test-go-test-timings.py
       - name: Get Go version and modules
         id: get-version
         run: .github/scripts/get-go-version.py
@@ -93,15 +97,37 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+      - name: Install Go
+        id: go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.version }}
+          cache: false
+      # Share module downloads; isolate native/race, tagged and cross-target compiled outputs.
+      - name: Cache Go modules
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-${{ hashFiles(format('{0}/go.mod', matrix.module), format('{0}/go.sum', matrix.module)) }}
+          restore-keys: |
+            go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-
+      - name: Cache Go build outputs
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-native-race-${{ hashFiles(format('{0}/go.mod', matrix.module), format('{0}/go.sum', matrix.module)) }}
+          restore-keys: |
+            go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-native-race-
       - name: Go mod download
         if: needs.file-check.outputs.run == 'true'
         run: go mod download
@@ -145,6 +171,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
       - name: Go test
+        id: go-test
         if: needs.file-check.outputs.run == 'true'
         run: |
           set -euo pipefail
@@ -153,9 +180,28 @@ jobs:
           # Some toolchain output still lacks package metadata, so normalize the stream
           # before passing it to gotestfmt.
           CGO_ENABLED=1 go test -json ./... -race -count=1 2>&1 \
+            | tee "${RUNNER_TEMP}/go-test.jsonl" \
             | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
             | gotestfmt -hide all
         working-directory: ${{ matrix.module }}
+      - name: Summarize Go test timings
+        if: ${{ !cancelled() && (steps.go-test.outcome == 'success' || steps.go-test.outcome == 'failure') }}
+        env:
+          SUITE: ${{ matrix.module }}
+        run: |
+          python3 .github/scripts/summarize-go-test-json.py "${RUNNER_TEMP}/go-test.jsonl" --label "$SUITE" \
+            > "${RUNNER_TEMP}/go-test-timings.md"
+          cat "${RUNNER_TEMP}/go-test-timings.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go test timings
+        if: ${{ !cancelled() && (steps.go-test.outcome == 'success' || steps.go-test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-test-timings-${{ strategy.job-index }}
+          path: |
+            ${{ runner.temp }}/go-test.jsonl
+            ${{ runner.temp }}/go-test-timings.md
+          if-no-files-found: error
+          retention-days: 7
 
   ebpf-libbpf-tests:
     name: Go ebpf libbpf-tagged tests
@@ -173,10 +219,30 @@ jobs:
         with:
           submodules: recursive
       - name: Install Go
+        id: go
         if: needs.file-check.outputs.run == 'true'
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod
+          cache: false
+      - name: Cache Go modules
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-${{ hashFiles('src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod', 'src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum') }}
+          restore-keys: |
+            go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-
+      - name: Cache Go build outputs
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-libbpf-race-${{ hashFiles('src/collectors/ebpf.plugin/ebpfgo.plugin/go.mod', 'src/collectors/ebpf.plugin/ebpfgo.plugin/go.sum') }}
+          restore-keys: |
+            go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-src/collectors/ebpf.plugin/ebpfgo.plugin-libbpf-race-
       - name: Install libbpf
         if: needs.file-check.outputs.run == 'true'
         run: |
@@ -202,6 +268,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: v2.2.0
       - name: Go test (libbpf tag)
+        id: go-test
         if: needs.file-check.outputs.run == 'true'
         env:
           # The libbpfloader package declares no `#cgo LDFLAGS`; the production build
@@ -212,9 +279,28 @@ jobs:
         run: |
           set -euo pipefail
           CGO_ENABLED=1 go test -tags 'netdata_ebpf_libbpf netdata_ebpf_test' -json ./... -race -count=1 2>&1 \
+            | tee "${RUNNER_TEMP}/go-test.jsonl" \
             | "$GITHUB_WORKSPACE/.github/scripts/normalize-go-test-json.py" \
             | gotestfmt -hide all
         working-directory: src/collectors/ebpf.plugin/ebpfgo.plugin
+      - name: Summarize Go test timings
+        if: ${{ !cancelled() && (steps.go-test.outcome == 'success' || steps.go-test.outcome == 'failure') }}
+        env:
+          SUITE: ebpf libbpf-tagged tests
+        run: |
+          python3 .github/scripts/summarize-go-test-json.py "${RUNNER_TEMP}/go-test.jsonl" --label "$SUITE" \
+            > "${RUNNER_TEMP}/go-test-timings.md"
+          cat "${RUNNER_TEMP}/go-test-timings.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload Go test timings
+        if: ${{ !cancelled() && (steps.go-test.outcome == 'success' || steps.go-test.outcome == 'failure') }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-test-timings-ebpf-libbpf
+          path: |
+            ${{ runner.temp }}/go-test.jsonl
+            ${{ runner.temp }}/go-test-timings.md
+          if-no-files-found: error
+          retention-days: 7
 
   build-tests:
     name: Go build tests (${{ matrix.module }}, ${{ matrix.platform }})
@@ -231,15 +317,36 @@ jobs:
         id: skip
         if: needs.file-check.outputs.run != 'true'
         run: echo "SKIPPED"
-      - name: Install Go
-        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ matrix.version }}
       - name: Checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
+      - name: Install Go
+        id: go
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ matrix.version }}
+          cache: false
+      - name: Cache Go modules
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+          key: go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-${{ hashFiles(format('{0}/go.mod', matrix.module), format('{0}/go.sum', matrix.module)) }}
+          restore-keys: |
+            go-mod-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-
+      - name: Cache Go build outputs
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/go-build
+          key: go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-build-${{ matrix.platform }}-${{ hashFiles(format('{0}/go.mod', matrix.module), format('{0}/go.sum', matrix.module)) }}
+          restore-keys: |
+            go-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.go.outputs.go-version }}-${{ matrix.module }}-build-${{ matrix.platform }}-
       - name: Go mod download
         if: needs.file-check.outputs.run == 'true'
         run: go mod download

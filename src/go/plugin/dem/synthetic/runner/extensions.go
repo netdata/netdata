@@ -121,21 +121,14 @@ func (s *featureState) status() synthetic.FeatureStatus {
 }
 
 // word projects the lifecycle onto the one-word statuses stored in a capture
-// report. selected names a selected, incomplete output: "partial" capture
-// details, or "supported" traces, which have no records to complete.
+// report: the reporting status of the stored evidence fields, except that
+// selected names a selected, incomplete output: "partial" capture details, or
+// "supported" traces, which have no records to complete.
 func (s *featureState) word(selected string) string {
-	switch s.phase {
-	case featureRequested:
-		return "negotiation_not_reported"
-	case featureDeclined:
-		return "unsupported"
-	case featureSelected:
+	if s.phase == featureSelected {
 		return selected
-	case featureComplete:
-		return "complete"
-	default:
-		return string(synthetic.FeatureInvalid)
 	}
+	return s.status().ReportingStatus()
 }
 
 // extensions owns negotiation and the shared envelope boundary. Each feature

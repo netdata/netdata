@@ -3,6 +3,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -28,11 +29,12 @@ const checkTimeout = 10 * time.Second
 // misbehaving runtime from growing Agent memory.
 const checkReplyLimit = 4096
 
-// A failing check writes {"error": text} to stderr with text clipped to
-// textLimit characters (src/dem-runtime/runner/protocol.cjs). The Agent reads
-// one byte past textLimit and clips the result to textLimit characters for the
-// check error's diagnostic.
-const checkDiagnosticLimit = textLimit + 1
+// A failing check writes one {"error": text} line to stderr, with text clipped
+// to textLimit characters (src/dem-runtime/runner/run.mjs main, protocol.cjs
+// write). When that line is the only stderr output, checkDiagnosticLimit fits
+// it at its widest JSON escape (\u00XX, six bytes per character) with its
+// newline, so a long message still parses.
+const checkDiagnosticLimit = len(`{"error":""}`) + 6*textLimit + len("\n")
 
 func runtimeAllowed() error {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
@@ -265,8 +267,8 @@ func (e *Engine) probe(ctx context.Context, arguments func(Paths) []string) ([]b
 		}
 		return parseErr
 	}, func(reader io.Reader) {
-		raw, _ := io.ReadAll(io.LimitReader(reader, checkDiagnosticLimit))
-		diagnostic = clip(string(raw))
+		raw, _ := io.ReadAll(io.LimitReader(reader, int64(checkDiagnosticLimit)))
+		diagnostic = checkDiagnostic(raw)
 		_, _ = io.Copy(io.Discard, reader)
 	})
 	if err != nil {
@@ -286,4 +288,19 @@ func (e *Engine) probe(ctx context.Context, arguments func(Paths) []string) ([]b
 		return nil, fmt.Errorf("runtime check failed: %w (%s)", result.Err, diagnostic)
 	}
 	return output, nil
+}
+
+// checkDiagnostic returns the error text of a failing check's stderr: the
+// error of its last line when that line is the runtime's {"error": text}, or
+// else the raw stderr (Node can print a stack trace before the runner starts).
+func checkDiagnostic(raw []byte) string {
+	line := bytes.TrimRight(raw, "\n")
+	line = line[bytes.LastIndexByte(line, '\n')+1:]
+	var reply struct {
+		Error *string `json:"error"`
+	}
+	if decodeCore(line, &reply) == nil && reply.Error != nil {
+		return clip(*reply.Error)
+	}
+	return clip(string(raw))
 }

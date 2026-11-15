@@ -6,24 +6,27 @@ import (
 	"context"
 	"slices"
 	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
+
+// SessionFilter selects session summaries.
+type SessionFilter struct {
+	Filter
+	UserID string // an exact stored, normalized ID observed in the range; "" selects every session
+	Limit  int    // the newest sessions kept; zero keeps all
+}
 
 // QuerySessions matches an optional exact user ID in the selected receipt-time range
 // before limiting results, while summarizing every selected event in a matching session.
-func (s *Store) QuerySessions(
-	ctx context.Context,
-	site, userID string,
-	after, before int64,
-	limit int,
-	vnodeGUID string,
-) ([]SessionRecord, error) {
+func (s *Store) QuerySessions(ctx context.Context, f SessionFilter) ([]SessionRecord, error) {
 	type summary struct {
 		record      SessionRecord
 		first, last int64
 		userIDs     map[string]struct{}
 	}
 	groups := make(map[[3]string]*summary)
-	err := s.scan(ctx, site, after, before, vnodeGUID, func(r EventRecord) {
+	err := s.scan(ctx, f.Filter, func(r EventRecord) {
 		if r.SessionID == "" {
 			return
 		}
@@ -60,13 +63,13 @@ func (s *Store) QuerySessions(
 			g.userIDs[r.UserID] = struct{}{}
 		}
 		switch r.Type {
-		case "pageview":
+		case aggregate.EventTypePageview:
 			g.record.Pageviews++
-		case "view":
+		case aggregate.EventTypeView:
 			g.record.ApplicationViews++
-		case "error":
+		case aggregate.EventTypeError:
 			g.record.Errors++
-		case "frustration":
+		case aggregate.EventTypeFrustration:
 			g.record.Frustrations++
 		}
 	})
@@ -75,8 +78,8 @@ func (s *Store) QuerySessions(
 	}
 	out := make([]SessionRecord, 0, len(groups))
 	for _, g := range groups {
-		if userID != "" {
-			if _, ok := g.userIDs[userID]; !ok {
+		if f.UserID != "" {
+			if _, ok := g.userIDs[f.UserID]; !ok {
 				continue
 			}
 		}
@@ -101,8 +104,8 @@ func (s *Store) QuerySessions(
 		}
 		return out[i].SessionID < out[j].SessionID
 	})
-	if limit > 0 && len(out) > limit {
-		out = out[:limit]
+	if f.Limit > 0 && len(out) > f.Limit {
+		out = out[:f.Limit]
 	}
 	return out, ctx.Err()
 }
@@ -115,7 +118,7 @@ func (s *Store) QuerySessionEvents(
 ) ([]SessionEventRecord, error) {
 	var out []SessionEventRecord
 	err := s.matchSession(ctx, site, sessionID, vnodeGUID, func(r EventRecord) {
-		if r.Type == "activity" {
+		if r.Type == aggregate.EventTypeActivity {
 			return
 		}
 		out = append(out, SessionEventOf(r))

@@ -3,20 +3,16 @@
 package browserruntime
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/ProtonMail/go-crypto/openpgp/packet"
-	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
 	"github.com/stretchr/testify/require"
 )
@@ -53,49 +49,24 @@ func publishedRelease(m Manifest, sequence uint64) Release {
 	}
 }
 
-// fixturePublisher signs fixture releases. Installation accepts only releases
-// that VerifyRelease authenticated, so fixtures take the same path as published
-// ones. Helper processes create their own publisher.
-var fixturePublisher = sync.OnceValues(func() (fixtureKeys, error) {
-	key, err := openpgp.NewEntity(
-		"Runtime fixture",
-		"",
-		"fixture@example.invalid",
-		&packet.Config{
-			Algorithm: packet.PubKeyAlgoEdDSA,
-		},
-	)
-	if err != nil {
-		return fixtureKeys{}, err
-	}
-	var public bytes.Buffer
-	if err := key.Serialize(&public); err != nil {
-		return fixtureKeys{}, err
-	}
-	trust, err := ParseReleaseKeyring(public.Bytes())
-	return fixtureKeys{
-		key:   key,
-		trust: trust,
-	}, err
-})
+// fixtureKeyID selects the fixture publisher's pgptest key. Installation accepts
+// only releases that VerifyRelease authenticated, so fixtures take the same path
+// as published ones.
+const fixtureKeyID = 100
 
-type fixtureKeys struct {
-	key   *openpgp.Entity
-	trust *ReleaseTrust
-}
-
-// verifyFixture signs release as its publisher and authenticates it as a
+// verifyFixture signs release as the fixture publisher and authenticates it as a
 // production loader does; validation errors come from VerifyRelease.
-func verifyFixture(release Release) (VerifiedRelease, error) {
-	keys, err := fixturePublisher()
+func verifyFixture(t testing.TB, release Release) (VerifiedRelease, error) {
+	key := pgptest.Key(t, fixtureKeyID)
+	trust, err := ParseReleaseKeyring(pgptest.Public(t, key))
 	if err != nil {
 		return VerifiedRelease{}, err
 	}
-	envelope, err := pgptest.Release(release, keys.key)
+	envelope, err := pgptest.Release(release, key)
 	if err != nil {
 		return VerifiedRelease{}, err
 	}
-	return VerifyRelease(envelope, keys.trust)
+	return VerifyRelease(envelope, trust)
 }
 
 var fixtureSequence atomic.Uint64
@@ -108,11 +79,21 @@ func fixtureRelease(m Manifest) Release {
 
 // beginFixture starts an installation or repair candidate for m through the
 // published-installation path with manual updates.
-func (s *Store) beginFixture(ctx context.Context, m Manifest, operation ReleaseOperation) (*Candidate, error) {
-	return s.beginRelease(ctx, fixtureRelease(m), operation)
+func (s *Store) beginFixture(
+	t testing.TB,
+	ctx context.Context,
+	m Manifest,
+	operation ReleaseOperation,
+) (*Candidate, error) {
+	return s.beginRelease(t, ctx, fixtureRelease(m), operation)
 }
 
-func (s *Store) beginRelease(ctx context.Context, release Release, operation ReleaseOperation) (*Candidate, error) {
+func (s *Store) beginRelease(
+	t testing.TB,
+	ctx context.Context,
+	release Release,
+	operation ReleaseOperation,
+) (*Candidate, error) {
 	options := ReleaseInstallOptions{
 		Operation: operation,
 		Updates:   ManualUpdates,
@@ -120,7 +101,7 @@ func (s *Store) beginRelease(ctx context.Context, release Release, operation Rel
 	candidate, err := s.BeginPublishedInstall(
 		ctx,
 		options,
-		func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) },
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, release) },
 	)
 	if err == nil && candidate == nil {
 		err = errors.New("fixture installation was an unexpected no-op")
@@ -139,7 +120,7 @@ func installRelease(t *testing.T, s *Store, release Release, archive string, pol
 	candidate, err := s.BeginPublishedInstall(
 		context.Background(),
 		options,
-		func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) },
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, release) },
 	)
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
@@ -164,7 +145,7 @@ func publishedFixture(t *testing.T, sequence uint64) (Release, string, func(cont
 	return release, archiveFile(
 		t,
 		archive,
-	), func(context.Context) (VerifiedRelease, error) { return verifyFixture(release) }
+	), func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, release) }
 }
 
 func installPublishedFixture(t *testing.T, s *Store, sequence uint64, policy UpdatePolicy) Release {
@@ -179,12 +160,12 @@ func installPublishedFixture(t *testing.T, s *Store, sequence uint64, policy Upd
 func importFixture(t *testing.T, s *Store, label string) Manifest {
 	t.Helper()
 	m, archive := bundleFixture(t, label)
-	require.NoError(t, s.importUnselected(context.Background(), m, archiveFile(t, archive)))
+	require.NoError(t, s.importUnselected(t, context.Background(), m, archiveFile(t, archive)))
 	return m
 }
 
-func (s *Store) importUnselected(ctx context.Context, m Manifest, path string) error {
-	candidate, err := s.beginFixture(ctx, m, InstallRelease)
+func (s *Store) importUnselected(t testing.TB, ctx context.Context, m Manifest, path string) error {
+	candidate, err := s.beginFixture(t, ctx, m, InstallRelease)
 	if err != nil {
 		return err
 	}

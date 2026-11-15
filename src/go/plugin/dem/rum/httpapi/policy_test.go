@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestClientIPTrustedProxies(t *testing.T) {
@@ -58,4 +61,29 @@ func TestClientIPTrustedProxies(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A route compiles every redact_paths row except the empty ones, in order.
+func TestCompileSiteSkipsEmptyRedactPathRows(t *testing.T) {
+	type rule struct{ pattern, replace string }
+	st := compileSite(config.Site{
+		RedactPaths: []config.PathRule{
+			{
+				Pattern: `/u/\d+`,
+				Replace: "/u/:user",
+			},
+			{
+				Replace: ":ignored",
+			},
+			{
+				Pattern: `/t/\w+`,
+				Replace: "/t/:team",
+			},
+		},
+	})
+	var got []rule
+	for _, r := range st.pathRules {
+		got = append(got, rule{r.Re.String(), r.Replace})
+	}
+	assert.Equal(t, []rule{{`/u/\d+`, "/u/:user"}, {`/t/\w+`, "/t/:team"}}, got)
 }

@@ -68,18 +68,11 @@ func (o Options) view(value string) string {
 	if named != cleaned {
 		source = named
 	}
-	ruled := o.pathRules(source)
+	ruled := applyPathRules(source, o.PathRules)
 	if ruled == source {
 		return truncate(named, maxNameLen)
 	}
 	return o.text(ruled, maxNameLen)
-}
-
-func (o Options) pathRules(value string) string {
-	for _, rule := range o.PathRules {
-		value = rule.Re.ReplaceAllString(value, rule.Replace)
-	}
-	return value
 }
 
 func (o Options) selector(value string) string {
@@ -162,19 +155,19 @@ func eventAttrRule(kind beacon.EventKind, name, key string) attrRule {
 		}
 	case beacon.EventRequest:
 		switch key {
-		case "http.response.status_code", "duration_ns":
+		case beacon.AttrHTTPStatusCode, beacon.AttrDurationNS:
 			return nativeAttr(attrNumber)
-		case "url.full", "http.request.method":
+		case beacon.AttrURLFull, beacon.AttrHTTPMethod:
 			return nativeAttr(attrByKey)
 		}
 	case beacon.EventView:
 		switch key {
-		case "fromView", "toView":
+		case beacon.AttrFromView, beacon.AttrToView:
 			return nativeAttr(attrByKey)
 		}
 	case beacon.EventCustom:
 		// Frustration signals are custom events; their target is the element.
-		if key == "target" && beacon.IsFrustration(name) {
+		if key == beacon.AttrTarget && beacon.IsFrustration(name) {
 			return nativeAttr(attrByKey)
 		}
 	}
@@ -204,16 +197,16 @@ func (o Options) eventAttr(rule attrRule, key, value string) (string, bool) {
 }
 
 // urlAttrKeys hold URLs; they lose query and fragment like page URLs.
-var urlAttrKeys = map[string]bool{"url.full": true, "http.url": true, "url": true, "name": true}
+var urlAttrKeys = map[string]bool{beacon.AttrURLFull: true, "http.url": true, "url": true, "name": true}
 
 // cleanAttr applies field semantics before text bounds and shared ingestion.
 func (o Options) cleanAttr(key, value string) string {
 	switch {
 	case urlAttrKeys[key] && (key != "name" || strings.Contains(value, "://") || strings.HasPrefix(value, "/")):
 		return o.url(value, maxAttrLen)
-	case key == "target":
+	case key == beacon.AttrTarget:
 		return o.selector(value)
-	case key == "fromView" || key == "toView":
+	case key == beacon.AttrFromView || key == beacon.AttrToView:
 		return o.view(value)
 	default:
 		return o.text(value, maxAttrLen)

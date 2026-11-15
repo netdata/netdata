@@ -4,6 +4,7 @@ package runner
 
 import (
 	"context"
+	"errors"
 	"slices"
 	"sync"
 
@@ -140,6 +141,20 @@ func (o *executionOwner) releaseLocked(job *admissionJob) {
 		o.ready = append(o.ready, job)
 	}
 	o.dispatch()
+}
+
+// Fatal delivers the first process tree whose completion is unverified. The
+// owner admits nothing after it, and the command owner must fail-stop.
+func (o *executionOwner) Fatal() <-chan error { return o.fatal }
+
+// poison closes admission and reports err on Fatal, once.
+func (o *executionOwner) poison(err error) {
+	o.poisonOnce.Do(func() {
+		o.mu.Lock()
+		close(o.poisoned)
+		o.mu.Unlock()
+		o.fatal <- errors.Join(ndexec.ErrTreeNotDrained, err)
+	})
 }
 
 func (o *executionOwner) isPoisoned() bool { return closed(o.poisoned) }

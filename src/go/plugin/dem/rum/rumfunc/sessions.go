@@ -42,15 +42,16 @@ func (h *Handler) sessionsRows(ctx context.Context, args map[string]string, resp
 		return nil, badRequest(err)
 	}
 	// One session past the cap reveals truncation.
-	sessions, err := h.deps.Sessions(
-		ctx,
-		args["site"],
-		args["user_id"],
-		after,
-		before,
-		rawfunc.MaxRows+1,
-		args["vnode_guid"],
-	)
+	sessions, err := h.deps.Sessions(ctx, query.SessionFilter{
+		Filter: query.HistoryFilter{
+			Site:      args["site"],
+			VnodeGUID: args["vnode_guid"],
+			After:     after,
+			Before:    before,
+		},
+		UserID: args["user_id"],
+		Limit:  rawfunc.MaxRows + 1,
+	})
 	if err != nil {
 		return nil, err
 	}

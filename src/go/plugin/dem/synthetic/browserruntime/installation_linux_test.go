@@ -22,7 +22,7 @@ import (
 func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 	s, now := testStore(t)
 	m := importFixture(t, s, "candidate")
-	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	*now = now.Add(365 * 24 * time.Hour)
 	other, err := Open(s.config)
@@ -34,7 +34,7 @@ func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, other.Uninstall(ctx), context.Canceled)
-	_, err = other.beginFixture(ctx, m, InstallRelease)
+	_, err = other.beginFixture(t, ctx, m, InstallRelease)
 	require.ErrorIs(t, err, context.Canceled)
 	require.NoError(t, candidate.Close())
 	require.NoError(t, other.Uninstall(context.Background()))
@@ -45,7 +45,7 @@ func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 func TestPreparationReportsOneCandidateClaim(t *testing.T) {
 	s, _ := testStore(t)
 	m, archive := bundleFixture(t, "status")
-	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, candidate.Close()) })
 	ready, resume := make(chan struct{}), make(chan struct{})
@@ -89,7 +89,7 @@ func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
 	selected := installFixture(t, s, "selected")
 	unsupported := selected
 	unsupported.Contract = 1
-	candidate, err := s.beginFixture(context.Background(), unsupported, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), unsupported, InstallRelease)
 	require.Nil(t, candidate)
 	require.ErrorContains(t, err, "unsupported runtime execution contract 1")
 	require.ErrorContains(t, err, "upgrade the Agent")
@@ -291,7 +291,7 @@ func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 	moved.Manifest.Archive.URL = "https://mirror.example.invalid/runtime.tar.zst"
 	var requests atomic.Int32
 	previous := http.DefaultTransport
-	http.DefaultTransport = downloadTransport(func(*http.Request) (*http.Response, error) {
+	http.DefaultTransport = roundTripFunc(func(*http.Request) (*http.Response, error) {
 		requests.Add(1)
 		return nil, errors.New("unexpected archive acquisition")
 	})
@@ -299,7 +299,7 @@ func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{
 		Operation: UpdateRelease,
 	},
-		func(context.Context) (VerifiedRelease, error) { return verifyFixture(moved) })
+		func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, moved) })
 	require.NoError(t, err)
 	require.NotNil(t, candidate)
 	require.NoError(t, candidate.Download(context.Background()))
@@ -427,7 +427,7 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	t.Cleanup(func() { http.DefaultTransport = previous })
 	status := http.StatusServiceUnavailable
 	calls := 0
-	http.DefaultTransport = trustTransport(func(r *http.Request) (*http.Response, error) {
+	http.DefaultTransport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		calls++
 		require.Equal(t, ReleaseKeyringURL, r.URL.String())
 		return &http.Response{

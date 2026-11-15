@@ -350,6 +350,7 @@ func TestHealthMalformedProbeAndContextAbort(t *testing.T) {
 			defer cancel()
 			want := error(context.Canceled)
 			if mode == "deadline" {
+				useProductionPacing(t, c)
 				c.Timeout = confopt.Duration(450 * time.Millisecond)
 				want = context.DeadlineExceeded
 			} else {

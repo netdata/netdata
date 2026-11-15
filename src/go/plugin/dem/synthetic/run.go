@@ -2,6 +2,8 @@
 
 package synthetic
 
+import "slices"
+
 type Outcome string
 
 const (
@@ -134,14 +136,12 @@ func CloneRun(in Run) Run {
 	r.BrowserSummary = CloneBrowserSummary(in.BrowserSummary)
 	r.FailureEvidence = CloneFailureEvidence(in.FailureEvidence)
 	r.Runtime = clonePtr(in.Runtime)
-	// Appending to nil turns an empty list into nil, so history stores null
-	// for an attempt without events or artifacts. Keep that stored shape.
-	r.Events = append([]Event(nil), in.Events...)
+	r.Events = slices.Clone(in.Events)
 	for i := range r.Events {
 		r.Events[i].DeclaredTests = clonePtr(r.Events[i].DeclaredTests)
 		r.Events[i].DurationMS = clonePtr(r.Events[i].DurationMS)
 	}
-	r.Artifacts = append([]Artifact(nil), in.Artifacts...)
+	r.Artifacts = slices.Clone(in.Artifacts)
 	r.Tests = clonePtr(in.Tests)
 	if in.Metrics != nil {
 		m := *in.Metrics

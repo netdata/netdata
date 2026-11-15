@@ -29,7 +29,7 @@ func (s measurementSiteSource) Receiver() query.Receiver {
 	}
 }
 
-func (s measurementSiteSource) Sites(context.Context, string) ([]query.Site, error) {
+func (s measurementSiteSource) Sites(context.Context, string, string) ([]query.Site, error) {
 	return []query.Site{{Name: "shop", Sampling: query.Sampling{
 		MeasureRate: s.rate,
 	}, Activity: query.Activity{
@@ -149,7 +149,7 @@ type onboardingSource struct {
 	site query.Site
 }
 
-func (s onboardingSource) Sites(context.Context, string) ([]query.Site, error) {
+func (s onboardingSource) Sites(context.Context, string, string) ([]query.Site, error) {
 	return []query.Site{s.site}, nil
 }
 

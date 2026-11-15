@@ -169,10 +169,10 @@ func TestBothSignalsTLSAndBearer(t *testing.T) {
 				d.TLSCert, d.TLSKey = certPath, keyPath
 			}
 			c := newRecCounters()
-			l, err := NewLogs(context.Background(), d, "s1", c, nil)
+			l, err := NewLogs(context.Background(), d, "s1", c)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = l.Close() })
-			tr, err := NewTraces(context.Background(), d, "s1", c, nil)
+			tr, err := NewTraces(context.Background(), d, "s1", c)
 			require.NoError(t, err)
 			t.Cleanup(func() { _ = tr.Close() })
 			l.export(context.Background(), l.build(mkBeacon(), true), time.Second)
@@ -272,8 +272,8 @@ func TestPartialCountsAndSafeDiagnostics(t *testing.T) {
 					},
 				},
 			}
-			l := newExporter(t, startServer(t, ls), c, nil)
-			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
+			l := newExporter(t, startServer(t, ls), c)
+			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c)
 			for range 5 {
 				l.Ingest(accepted(tracedBeacon()))
 				tr.Ingest(accepted(tracedBeacon()))
@@ -333,10 +333,10 @@ func TestRepeatedReceiverFailuresHaveBoundedDiagnostics(t *testing.T) {
 			const attempts = 8
 			for _, site := range []string{"shop", "checkout"} {
 				c := newRecCounters()
-				l, err := NewLogs(context.Background(), destination(lis.Addr().String()), site, c, nil)
+				l, err := NewLogs(context.Background(), destination(lis.Addr().String()), site, c)
 				require.NoError(t, err)
 				t.Cleanup(func() { require.NoError(t, l.Close()) })
-				tr := newTraceExporter(t, lis.Addr().String(), site, c, nil)
+				tr := newTraceExporter(t, lis.Addr().String(), site, c)
 				b := tracedBeacon()
 				for range attempts {
 					l.Ingest(accepted(b))

@@ -74,7 +74,7 @@ func TestResourceClassificationSurvivesInputMutation(t *testing.T) {
 	b.Resources = []beacon.Resource{
 		{ID: "api", Host: "api.example.org", Initiator: "fetch", HasDuration: true, DurationMS: 0},
 		{ID: "image", Host: "example.org", Initiator: "img", HasDuration: true, DurationMS: 40},
-		{ID: "invalid", Host: "example.org", Initiator: "fetch", HasDuration: true, DurationMS: -1},
+		{ID: "no-duration", Host: "example.org", Initiator: "fetch"},
 		{ID: "third", Host: "example.net", Initiator: "fetch", HasDuration: true, DurationMS: 80},
 	}
 	a.Ingest(b)
@@ -87,7 +87,6 @@ func TestResourceClassificationSurvivesInputMutation(t *testing.T) {
 	}, first.API, "zero duration is an observed API value")
 	require.EqualValues(t, 3, first.FirstPartyResources)
 	require.EqualValues(t, 1, first.ThirdPartyResources)
-	require.EqualValues(t, 1, first.Counters[CounterInvalidMeasurements])
 	require.Equal(t, first, a.Snapshot(), "sorting owned distributions must not change the next read")
 }
 

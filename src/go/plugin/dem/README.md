@@ -135,7 +135,9 @@ outcomes, trigger retries or extend deadlines. Summary finalization does not wai
 Console samples contain only whole primitive values or explicit omissions; objects are not rendered. Unavailable,
 pending, unsupported and oversized values remain explicit. No headers, response bodies or cookies are captured.
 Structured URLs have credentials, query strings and fragments removed, and recognized embedded HTTP(S) URLs in
-text receive best-effort stripping. Known configured secret values are redacted before clipping or byte checks.
+text receive best-effort stripping. A request URL that is too long or cannot be parsed is omitted, with
+`url_omitted` set to `too_long` or `unavailable`. Known configured secret values are redacted before clipping or
+byte checks.
 Arbitrary page-derived text is not anonymized and can contain sensitive content.
 
 Owned detail is bounded to 64 interesting test rows and four representative samples per category, with sixteen
@@ -974,7 +976,7 @@ remains `too_large`; earlier size skips are not separately preserved. It reports
 candidate rejected by stop policy, and `not_in_final_report` for metadata
 without an accepted final candidate. Without a final candidate report, earlier captures are not recovered.
 These are historical decisions, separate from current artifact availability. An absent `run.captures` means reporting
-was not recorded, not zero captures. Metadata may be partial, unsupported,
+was not recorded, not zero captures. Metadata may be unavailable, partial, unsupported,
 invalid or truncated; none means zero captures. Labels use exact-secret redaction before clipping; this does not
 sanitize screenshot, trace or report content.
 
@@ -1007,8 +1009,8 @@ or publish captures; the script can still direct its own recording.
 `synthetics-artifact` labels retained ZIPs `Trace` and includes their test title. Fetch and base64-decode the artifact
 bytes, save a `.zip` file, and open it with the standard local Playwright Trace Viewer. Byte access requires existing
 administrator-equivalent permissions. `synthetics-run` exposes `run.captures.trace` as `supported`, `unsupported`,
-`negotiation_not_reported` or `invalid` when requested. This reports runtime capability, not guaranteed trace retention;
-PNG accepted/unaccepted counts keep their screenshot-only meaning.
+`unavailable` (never acknowledged) or `invalid` when requested. This reports runtime capability, not guaranteed trace
+retention; PNG accepted/unaccepted counts keep their screenshot-only meaning.
 
 Downgrading to an Agent without trace support makes mixed capture sets unreadable, including their screenshots.
 These sets become unclassified and are excluded from retention cleanup until re-upgrade. Preserved files become

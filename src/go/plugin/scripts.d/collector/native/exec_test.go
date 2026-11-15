@@ -16,11 +16,12 @@ import (
 
 func TestRunOneshot(t *testing.T) {
 	setupRunner(t)
-	large := bytes.Repeat([]byte("x"), 8<<20)
+	large := bytes.Repeat([]byte("x"), testPipeBytes)
 	tests := map[string]struct {
 		body        string
 		input       []byte
 		timeout     time.Duration
+		limit       int
 		wantOutput  []byte
 		wantErrText string
 	}{
@@ -37,20 +38,23 @@ func TestRunOneshot(t *testing.T) {
 			wantOutput: []byte("done"),
 		},
 		"exact limit": {
-			body:       fmt.Sprintf("head -c %d /dev/zero", maxMessageBytes),
+			body:       fmt.Sprintf("head -c %d /dev/zero", testMessageLimit),
 			timeout:    10 * time.Second,
-			wantOutput: make([]byte, maxMessageBytes),
+			wantOutput: make([]byte, testMessageLimit),
+			limit:      testMessageLimit,
 		},
 		"over limit": {
-			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1),
+			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", testMessageLimit+1),
 			timeout:     5 * time.Second,
 			wantErrText: "exceeds 64 MiB",
+			limit:       testMessageLimit,
 		},
 		"over limit with unread input": {
-			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", maxMessageBytes+1),
+			body:        fmt.Sprintf("head -c %d /dev/zero; sleep 30", testMessageLimit+1),
 			input:       large,
 			timeout:     5 * time.Second,
 			wantErrText: "exceeds 64 MiB",
+			limit:       testMessageLimit,
 		},
 		"timeout with unread input": {
 			body:        "sleep 30",
@@ -75,7 +79,11 @@ func TestRunOneshot(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), tc.timeout)
 			defer cancel()
 			start := time.Now()
-			data, err := runOneshot(ctx, c.definition.command, opCollect, tc.input)
+			limit := tc.limit
+			if limit == 0 {
+				limit = maxMessageBytes
+			}
+			data, err := runOneshot(ctx, c.definition.command, opCollect, tc.input, limit)
 			assert.Less(t, time.Since(start), tc.timeout+time.Second)
 			if tc.wantErrText != "" {
 				require.ErrorContains(t, err, tc.wantErrText)
@@ -102,7 +110,7 @@ func TestRunDescribe(t *testing.T) {
 			wantText: "status 7",
 		},
 		"oversized": {
-			body:     fmt.Sprintf("printf '%%*s' %d x\nsleep 30\n", maxDescriptionBytes+1),
+			body:     fmt.Sprintf("printf '%%*s' %d x\nsleep 30\n", testDescriptionLimit+1),
 			wantText: "exceeds 64 MiB",
 		},
 		"caller deadline": {
@@ -124,7 +132,7 @@ func TestRunDescribe(t *testing.T) {
 				ctx, cancel = context.WithTimeout(ctx, tc.timeout)
 				defer cancel()
 			}
-			data, err := runDescribe(ctx, c.definition.command)
+			data, err := runDescribe(ctx, c.definition.command, testDescriptionLimit)
 			require.ErrorContains(t, err, tc.wantText)
 			assert.Nil(t, data)
 			assert.NotContains(t, err.Error(), "private-output", "stderr is discarded")
@@ -135,14 +143,25 @@ func TestRunDescribe(t *testing.T) {
 func TestRunDescribe_LargeDescription(t *testing.T) {
 	setupRunner(t)
 	const header = "version: v1\n"
-	for _, size := range []int{(4 << 20) + 1, maxDescriptionBytes} {
-		t.Run(fmt.Sprint(size), func(t *testing.T) {
+	tests := map[string]struct{ size, limit int }{
+		"default budget across reads": {
+			size:  testTransferBytes,
+			limit: maxDescriptionBytes,
+		},
+		"exact configured budget": {
+			size:  testDescriptionLimit,
+			limit: testDescriptionLimit,
+		},
+	}
+	for name, tc := range tests {
+		size := tc.size
+		t.Run(name, func(t *testing.T) {
 			body := fmt.Sprintf(
 				"printf '%%s\\n' 'version: v1'\nprintf '%%*s' %d ''\n",
 				size-len(header),
 			)
 			c, _ := fixtureCollector(t, body)
-			data, err := runDescribe(context.Background(), c.definition.command)
+			data, err := runDescribe(context.Background(), c.definition.command, tc.limit)
 			require.NoError(t, err)
 			assert.Len(t, data, size)
 			_, err = parseDescription(data, c.definition.command)
@@ -156,7 +175,7 @@ func TestRunDescribe_CanceledBeforeStart(t *testing.T) {
 	c, dir := fixtureCollector(t, "touch \"$(dirname \"$0\")/started\"\n")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := runDescribe(ctx, c.definition.command)
+	_, err := runDescribe(ctx, c.definition.command, maxDescriptionBytes)
 	require.ErrorIs(t, err, context.Canceled)
 	requireNoFile(t, filepath.Join(dir, "started"))
 }

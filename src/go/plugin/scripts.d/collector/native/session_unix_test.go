@@ -54,7 +54,7 @@ func TestStartSession_FailedStartupClosesPipes(t *testing.T) {
 		require.NoError(t, file.Close())
 	}
 	files = files[:len(files)-2]
-	_, err = startSession(context.Background(), []string{"/never-started"})
+	_, err = startSession(context.Background(), []string{"/never-started"}, maxMessageBytes)
 	require.ErrorIs(t, err, syscall.EMFILE)
 	for range 2 {
 		file, err := os.Open(os.DevNull)

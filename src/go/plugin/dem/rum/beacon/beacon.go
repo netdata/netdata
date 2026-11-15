@@ -43,8 +43,8 @@ const (
 	EventDocument
 )
 
-// Frustration signals the snippet detects; each event carries a
-// "target" CSS selector.
+// Frustration signals the snippet detects; each event carries an
+// AttrTarget CSS selector.
 const (
 	RageClickEvent  = "rage_click"
 	DeadClickEvent  = "dead_click"
@@ -60,10 +60,10 @@ func IsFrustration(name string) bool {
 // are rounded to one decimal degree and valid only when HasGeo.
 type Location struct {
 	Country string // ISO 3166-1 alpha-2, "" when unknown
-	City    string // "" when unknown
+	City    string // city name from the GeoIP database, "" when unknown
 	Lat     float64
 	Lon     float64
-	HasGeo  bool
+	HasGeo  bool // false when the database has no location for the address
 }
 
 // Beacon is one accepted Faro payload after origin/limit checks, URL
@@ -83,14 +83,11 @@ type Beacon struct {
 	Browser        string
 	BrowserVersion string
 	OS             string
-	Device         string  // mobile|tablet|desktop
-	Country        string  // ISO 3166-1 alpha-2, "" when unknown
-	City           string  // city name from the mmdb, "" when unknown
-	Lat, Lon       float64 // rounded to 1 decimal degree; approximate, valid only when HasGeo
-	HasGeo         bool    // false when the mmdb had no location for this IP
-	AppVersion     string  // bootstrap data-version → Faro app.version
-	UserID         string  // application-supplied identifier; callers choose its contents
-	Environment    string  // bootstrap data-env → Faro app.environment
+	Device         string // mobile|tablet|desktop
+	Location              // receiver GeoIP result, filtered by the site's geolocation mode
+	AppVersion     string // bootstrap data-version → Faro app.version
+	UserID         string // application-supplied identifier; callers choose its contents
+	Environment    string // bootstrap data-env → Faro app.environment
 
 	Vitals     []Vital
 	Errors     []Error
@@ -107,7 +104,8 @@ type Beacon struct {
 
 // Navigation is page-load timing extracted from a faro.performance.navigation
 // event. Has* distinguishes an absent attribute (SDK sent
-// no value) from a genuine zero.
+// no value) from a genuine zero. A present timing is finite and non-negative;
+// the producer drops any other value.
 type Navigation struct {
 	Revision uint64
 	LoadMS   float64
@@ -117,6 +115,8 @@ type Navigation struct {
 }
 
 // Resource is one entry from a faro.performance.resource event: a single sub-resource fetch (script, image, XHR,...).
+// A present duration and the transfer size are finite and non-negative; the
+// producer drops any other value.
 type Resource struct {
 	ID          string
 	HasDuration bool
@@ -139,6 +139,8 @@ type VitalOrigin struct {
 	AppVersion string
 }
 
+// Vital is one Web Vital measurement. Name is one of Vitals and Value is
+// finite and non-negative; the producer drops any other measurement.
 type Vital struct {
 	ID       string       // SDK metric identity, preserved across updates
 	Revision uint64       // Creation sequence, assigned before batching; zero means unavailable
@@ -167,10 +169,23 @@ type Event struct {
 	Kind     EventKind
 	Name     string
 	Domain   string
-	Attrs    map[string]string
-	Time     time.Time
-	TraceID  string // hex, set on traced fetch/XHR events
+	// Attrs holds normalized attribute values; consumers read the Attr* keys
+	// below by their protocol meaning.
+	Attrs   map[string]string
+	Time    time.Time
+	TraceID string // hex, set on traced fetch/XHR events
 }
+
+// Event attribute keys with a protocol meaning consumers read.
+const (
+	AttrFromView       = "fromView"                  // EventView: the previous view name
+	AttrToView         = "toView"                    // EventView: the new view name
+	AttrTarget         = "target"                    // frustration signal: the element's CSS selector
+	AttrURLFull        = "url.full"                  // EventRequest: URL without query or fragment
+	AttrHTTPMethod     = "http.request.method"       // EventRequest
+	AttrHTTPStatusCode = "http.response.status_code" // EventRequest: non-negative number
+	AttrDurationNS     = "duration_ns"               // EventRequest: non-negative number of nanoseconds
+)
 
 // Span is one browser span, with URL attributes already stripped of
 // query and fragment. IDs are hex as Faro sends them.

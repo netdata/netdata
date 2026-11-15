@@ -18,7 +18,7 @@ func TestPreloadedIdentityReadOnlyAndManagedExclusion(t *testing.T) {
 	defer other.Close()
 	_, _, err = ReadPreload(s.path)
 	require.Error(t, err)
-	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	require.NoError(t, candidate.SealPreload())
 	require.NoError(t, candidate.Close())
@@ -43,7 +43,7 @@ func TestPreloadedIdentityReadOnlyAndManagedExclusion(t *testing.T) {
 func TestPreloadCannotMoveOrSealWithUnresolvedExecution(t *testing.T) {
 	s, _ := testStore(t)
 	m := importFixture(t, s, "preloaded")
-	candidate, err := s.beginFixture(context.Background(), m, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
 	require.NoError(t, err)
 	use, err := candidate.BeginUse()
 	require.NoError(t, err)
