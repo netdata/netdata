@@ -104,9 +104,9 @@ func newRedactor(t *testing.T, secretValue string) *redact.Redactor {
 	return redact.NewRedactor(secretValue)
 }
 
-func newExporter(t *testing.T, endpoint string, counters Counters, redact *redact.Redactor) *Logs {
+func newExporter(t *testing.T, endpoint string, counters Counters) *Logs {
 	t.Helper()
-	e, err := NewLogs(context.Background(), destination(endpoint), "s1", counters, redact)
+	e, err := NewLogs(context.Background(), destination(endpoint), "s1", counters)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestExport(t *testing.T) {
 			}
 			addr := startServer(t, svc)
 			counters := newRecCounters()
-			e := newExporter(t, addr, counters, nil)
+			e := newExporter(t, addr, counters)
 
 			// One admitted pageview produces one record.
 			recs := e.build(mkBeacon(), true)
@@ -252,7 +252,7 @@ func TestExport(t *testing.T) {
 // still measured, but produces no events.
 func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 	counters := newRecCounters()
-	e := newExporter(t, "127.0.0.1:1", counters, nil)
+	e := newExporter(t, "127.0.0.1:1", counters)
 	b := mkBeacon()
 	e.Ingest(aggregate.Result{
 		Observation: b,
@@ -267,7 +267,7 @@ func TestIngestSkipsSampledOutBeacons(t *testing.T) {
 
 func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 	counters := newRecCounters()
-	exporter := newExporter(t, "127.0.0.1:1", counters, nil)
+	exporter := newExporter(t, "127.0.0.1:1", counters)
 	owner := aggregate.New(5*time.Minute, aggregate.SiteCfg{
 		Name:       "s1",
 		PageGroups: 20,
@@ -327,8 +327,8 @@ func TestExportUsesAcceptedMeasurementUpdatesAndIdentity(t *testing.T) {
 // browser beacon the aggregator received.
 func TestExportDoesNotResurrectFilteredObservation(t *testing.T) {
 	counters := newRecCounters()
-	logs := newExporter(t, "127.0.0.1:1", counters, nil)
-	traces := newTraceExporter(t, "127.0.0.1:1", "s1", counters, nil)
+	logs := newExporter(t, "127.0.0.1:1", counters)
+	traces := newTraceExporter(t, "127.0.0.1:1", "s1", counters)
 	result := aggregate.Result{
 		Investigated: true,
 		Observation: &beacon.Beacon{

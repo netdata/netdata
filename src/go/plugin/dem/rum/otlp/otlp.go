@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
@@ -67,9 +66,8 @@ func NewLogs(
 	cfg config.Destination,
 	siteName string,
 	counters Counters,
-	redactor *redact.Redactor,
 ) (*Logs, error) {
-	t, err := newTransport(ctx, cfg, siteName, counters, redactor)
+	t, err := newTransport(ctx, cfg, siteName, counters)
 	if err != nil {
 		return nil, err
 	}

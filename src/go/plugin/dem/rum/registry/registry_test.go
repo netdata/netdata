@@ -141,6 +141,12 @@ func TestRetirementIsIndependentAndGenerationFenced(t *testing.T) {
 }
 func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 	hub := rumregistry.New()
+	assert.Equal(t, rumregistry.Availability{
+		GeoIP: geoip.Status{
+			State:  "unavailable",
+			Reason: "receiver_stopped",
+		},
+	}, hub.Availability())
 	old := hub.PublishReceiver(rumregistry.Availability{
 		Serving:   true,
 		PublicURL: "https://old.example",
@@ -149,31 +155,34 @@ func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 		Serving:   true,
 		PublicURL: "https://next.example",
 	})
-	next.SetGeoIP(
-		geoip.Status{
-			Selection:    "explicit",
-			State:        "loaded",
-			Source:       "explicit",
-			DatabaseType: "GeoLite2-Country",
-			LookupErrors: 3,
-		},
-	)
+	loaded := geoip.Status{
+		Selection:    "explicit",
+		State:        "loaded",
+		Source:       "explicit",
+		DatabaseType: "GeoLite2-Country",
+		LookupErrors: 3,
+	}
+	next.SetGeoIP(loaded)
 	old.SetGeoIP(geoip.Status{
 		State:  "using_previous",
 		Source: "cache",
 	})
 	old.Close()
-	assert.Equal(t, "explicit", hub.Availability().GeoIP.Source)
-	assert.Equal(t, uint64(3), hub.Availability().GeoIP.LookupErrors)
-	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
-	assert.True(t, hub.Availability().Serving)
+	assert.Equal(t, rumregistry.Availability{
+		Serving:   true,
+		PublicURL: "https://next.example",
+		GeoIP:     loaded,
+	}, hub.Availability())
 	next.Close()
 	next.SetGeoIP(geoip.Status{
 		State: "loaded",
 	})
-	assert.Equal(t, "unavailable", hub.Availability().GeoIP.State)
-	assert.Equal(t, "receiver_stopped", hub.Availability().GeoIP.Reason)
-	assert.Empty(t, hub.Availability().GeoIP.DatabaseType)
-	assert.False(t, hub.Availability().Serving)
-	assert.Equal(t, "https://next.example", hub.Availability().PublicURL)
+	assert.Equal(t, rumregistry.Availability{
+		PublicURL: "https://next.example",
+		GeoIP: geoip.Status{
+			Selection: "explicit",
+			State:     "unavailable",
+			Reason:    "receiver_stopped",
+		},
+	}, hub.Availability())
 }

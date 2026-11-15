@@ -18,8 +18,8 @@ import (
 
 func TestIngestDispositionAndOverflow(t *testing.T) {
 	c := newRecCounters()
-	l := newExporter(t, "127.0.0.1:1", c, nil)
-	tr := newTraceExporter(t, "127.0.0.1:1", "s1", c, nil)
+	l := newExporter(t, "127.0.0.1:1", c)
+	tr := newTraceExporter(t, "127.0.0.1:1", "s1", c)
 	// Measured but not investigated: nothing is exported.
 	measured := aggregate.Result{
 		Observation: tracedBeacon(),
@@ -45,7 +45,7 @@ func TestIngestDispositionAndOverflow(t *testing.T) {
 
 func TestIngestDropsOnFullQueue(t *testing.T) {
 	counters := newRecCounters()
-	e := newExporter(t, "127.0.0.1:1", counters, nil) // unreachable; nothing drains e.ch
+	e := newExporter(t, "127.0.0.1:1", counters) // unreachable; nothing drains e.ch
 	e.ch = make(chan *logspb.LogRecord, 1)
 
 	b1 := mkBeacon() // One pageview fills the queue.
@@ -73,8 +73,8 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 		t.Run(map[bool]string{false: "drain", true: "expired"}[expired], func(t *testing.T) {
 			c := newRecCounters()
 			ls, ts := &fakeLogsService{}, &fakeTraceService{}
-			l := newExporter(t, startServer(t, ls), c, nil)
-			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c, nil)
+			l := newExporter(t, startServer(t, ls), c)
+			tr := newTraceExporter(t, startTraceServer(t, ts), "s1", c)
 			for range 300 {
 				l.Ingest(accepted(tracedBeacon()))
 				tr.Ingest(accepted(tracedBeacon()))
@@ -109,7 +109,7 @@ func TestSharedShutdownDrainsOrDropsUnattempted(t *testing.T) {
 // record, cancelling Run must return within the owner's final budget, not
 // the regular export timeout.
 func TestShutdownFlushIsBounded(t *testing.T) {
-	e := newExporter(t, "192.0.2.1:4317", newRecCounters(), nil)
+	e := newExporter(t, "192.0.2.1:4317", newRecCounters())
 	e.Ingest(aggregate.Result{
 		Observation:  mkBeacon(),
 		Investigated: true,
@@ -177,7 +177,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 				}
 				if signal == "logs" {
 					remote := &fakeLogsService{}
-					e := newExporter(t, startServer(t, remote), counters, nil)
+					e := newExporter(t, startServer(t, remote), counters)
 					for i := 0; i < maxBatch+3; i++ {
 						e.Ingest(result)
 					}
@@ -197,7 +197,7 @@ func TestCancellationBeforeExportPreservesFinalBatch(t *testing.T) {
 					sent, dropped, errors = CounterLogsSent, CounterLogsDropped, CounterLogsErrors
 				} else {
 					remote := &fakeTraceService{}
-					e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters, nil)
+					e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters)
 					b := tracedBeacon()
 					b.Spans = append(b.Spans, b.Spans[0])
 					result.Observation = b
@@ -323,7 +323,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 					started:   started,
 					cancelled: cancelled,
 				}
-				e := newExporter(t, startServer(t, remote), counters, nil)
+				e := newExporter(t, startServer(t, remote), counters)
 				e.Ingest(result)
 				run = e.Run
 				requests = func() int { return len(remote.requests()) }
@@ -333,7 +333,7 @@ func TestInFlightPeriodicExportAbortsOnCancel(t *testing.T) {
 					started:   started,
 					cancelled: cancelled,
 				}
-				e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters, nil)
+				e := newTraceExporter(t, startTraceServer(t, remote), "s1", counters)
 				e.Ingest(result)
 				run = e.Run
 				requests = remote.count

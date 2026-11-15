@@ -660,7 +660,8 @@ Sites:
 - Config materializes country-only geolocation and disabled frustration heuristics without mutating the stored input.
 - The browser bootstrap limits instrumentation and outgoing metadata. The receiver independently enforces the same
   policy and normalizes supported URLs, paths and text before aggregation, retained history or enabled exports.
-- Site redaction covers stored/exported payloads and remote OTLP diagnostic messages.
+- Site redaction covers stored and exported payloads. OTLP export failures log only the gRPC status code and the
+  site key, never remote error text.
 - Ingestion removes control characters from each received text value and redacts every credential the site redactor
   finds in the received or in the cleaned text. A credential can depend on a removed character (`Bearer<TAB>token`, a
   word boundary) or be joined by its removal. The size bound comes last, so it cannot cut a credential into an

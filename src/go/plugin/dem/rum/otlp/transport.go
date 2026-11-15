@@ -24,7 +24,6 @@ type transport struct {
 	siteName string
 	conn     *grpc.ClientConn
 	counters Counters
-	redactor *redact.Redactor
 	authMD   metadata.MD
 }
 
@@ -66,7 +65,6 @@ func newTransport(
 	d config.Destination,
 	site string,
 	counters Counters,
-	r *redact.Redactor,
 ) (*transport, error) {
 	target, creds, err := destinationCredentials(ctx, d)
 	if err != nil {
@@ -88,7 +86,6 @@ func newTransport(
 		siteName: site,
 		conn:     conn,
 		counters: counters,
-		redactor: r,
 	}
 	if d.AuthToken != "" {
 		t.authMD = metadata.Pairs("authorization", "Bearer "+d.AuthToken)
@@ -96,26 +93,21 @@ func newTransport(
 	return t, nil
 }
 func (t *transport) Close() error { return t.conn.Close() }
-func (t *transport) redact(s string) string {
-	if t.redactor == nil || s == "" {
-		return s
-	}
-	return t.redactor.Apply(s)
-}
 
-// Receiver error strings may echo credentials or payloads; log only the status code.
+// Receiver error strings may echo credentials or payloads; log only the status
+// code and the validated site key.
 // Limit repeated failures per site/signal/class; counters still account for every record.
 func (t *transport) failed(signal string, err error) {
 	code := status.Code(err)
 	key := t.siteName + "\x00" + signal + "\x00" + code.String()
 	exportLog.Limit(key, 1, time.Minute).Warningf(
-		"rum/otlp: site %q %s export failed: %s", t.redact(t.siteName), signal, code,
+		"rum/otlp: site %q %s export failed: %s", t.siteName, signal, code,
 	)
 }
 func (t *transport) rejected(signal string, n uint64) {
 	key := t.siteName + "\x00" + signal + "\x00partial"
 	exportLog.Limit(key, 1, time.Minute).Warningf(
-		"rum/otlp: site %q %s partial rejection: %d", t.redact(t.siteName), signal, n,
+		"rum/otlp: site %q %s partial rejection: %d", t.siteName, signal, n,
 	)
 }
 func rejectedCount(n int64, total uint64) uint64 {
