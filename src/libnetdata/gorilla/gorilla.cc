@@ -484,6 +484,7 @@ void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
  * appends to a buffer right before it links the next one.
  */
 
+#include <cstdlib>
 #include <vector>
 
 namespace {
@@ -491,14 +492,22 @@ namespace {
 struct gorilla_unittest_hot_page {
     static constexpr size_t slots = 8; // tiny buffers, so the writer links new ones often
 
-    std::vector<std::vector<uint64_t>> storage; // uint64_t keeps the header's next pointer aligned
+    std::vector<void *> storage; // zeroed malloc'd buffers, as the dbengine allocates them
     std::vector<uint32_t> written;
     gorilla_writer_t gw{};
     uint32_t next_value = 1000;
 
+    ~gorilla_unittest_hot_page() {
+        for (void *p : storage)
+            std::free(p);
+    }
+
     gorilla_buffer_t *new_buffer() {
-        storage.emplace_back(slots * sizeof(uint32_t) / sizeof(uint64_t), 0);
-        return reinterpret_cast<gorilla_buffer_t *>(storage.back().data());
+        void *p = std::calloc(slots, sizeof(uint32_t));
+        if (!p)
+            std::abort();
+        storage.push_back(p);
+        return static_cast<gorilla_buffer_t *>(p);
     }
 
     // as pgd_append_point() does: a full buffer makes the write fail, then link a new one
@@ -535,7 +544,6 @@ extern "C" int gorilla_unittest(void)
 {
     gorilla_unittest_hot_page page;
     gorilla_unittest_page = &page;
-    page.storage.reserve(1000);
     page.gw = gorilla_writer_init(page.new_buffer(), gorilla_unittest_hot_page::slots);
     page.write_one();
 
