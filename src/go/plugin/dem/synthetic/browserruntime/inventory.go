@@ -162,7 +162,7 @@ func (s *Store) ownershipInventoryLocked(reconcile bool) (inventory, error) {
 			continue
 		}
 		var r reservation
-		if err := readJSON(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
+		if err := readOwnerRecord(s.root, filepath.Join(name, "owner.json"), &r); err != nil {
 			return inv, err
 		}
 		if !validID(r.Generation) || r.Bytes <= 0 {
