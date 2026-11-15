@@ -66,6 +66,10 @@ func (*opaqueConfigValue) UnmarshalYAML(func(any) error) error { return nil }
 
 // LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
 // fields are decoded by the Agent; this owner decodes browser, runtime and retention policy.
+//
+// Each section decodes through a pointer to its default. yaml.v2 zeroes the
+// target of a null node, such as a section whose settings are all commented
+// out; through a pointer it clears only the pointer, so the default stays.
 func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	cfg := DefaultConfig()
 	path, err := paths.Find("dem.conf")
@@ -82,16 +86,21 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	// Decode the original document strictly for runtime settings, including merges
 	// and aliases, while leaving other sections opaque to this schema.
 	runtimeInput := struct {
-		Runtime runtimehost.Config           `yaml:"runtime"`
+		Runtime *runtimehost.Config          `yaml:"runtime"`
 		Other   map[string]opaqueConfigValue `yaml:",inline"`
-	}{Runtime: cfg.Runtime}
+	}{Runtime: &cfg.Runtime}
 	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
 		return cfg, fmt.Errorf("read dem.conf runtime settings: %w", err)
 	}
-	if err = yaml.Unmarshal(data, &cfg); err != nil {
+	// The other sections are decoded leniently: unknown keys are ignored.
+	sections := struct {
+		History   *RetentionConfig `yaml:"history"`
+		Artifacts *RetentionConfig `yaml:"artifacts"`
+		Browser   *BrowserConfig   `yaml:"browser"`
+	}{History: &cfg.History, Artifacts: &cfg.Artifacts, Browser: &cfg.Browser}
+	if err = yaml.Unmarshal(data, &sections); err != nil {
 		return cfg, fmt.Errorf("read dem.conf: %w", err)
 	}
-	cfg.Runtime = runtimeInput.Runtime
 	if err = cfg.History.validate(journalstore.MinHistoryBytes); err != nil {
 		return cfg, fmt.Errorf("history.%w", err)
 	}
@@ -100,11 +109,6 @@ func LoadConfig(paths multipath.MultiPath) (Config, error) {
 	}
 	if err = cfg.Runtime.Validate(); err != nil {
 		return cfg, fmt.Errorf("runtime.%w", err)
-	}
-	// yaml.v2 zeroes a null section without calling BrowserConfig.UnmarshalYAML.
-	// Non-null sections already reject explicit invalid concurrency values there.
-	if cfg.Browser.Concurrency == 0 {
-		cfg.Browser = DefaultConfig().Browser
 	}
 	return cfg, nil
 }
