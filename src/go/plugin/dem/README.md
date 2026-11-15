@@ -61,17 +61,18 @@ partial success must show which operations need attention. A vnode does not own 
 retention budgets, and referencing it does not deploy jobs to other Agents.
 
 DEM Functions remain global on the collecting Agent. Invoke their existing names through that Agent or Cloud and
-select a site by its configured vnode name, for example `synthetics-runs vnode:storefront` or
+select a site by its configured vnode name, for example `synthetics-journey-runs vnode:storefront` or
 `rum-pages vnode:storefront`. The name is the exact resource name used by the job's `vnode` option, not its display
 hostname. Name lookup uses current vnode configuration, including when all jobs are disabled or no jobs reference it.
 Renamed or removed names stop resolving; reusing a name selects its current GUID, without aliases to earlier identities.
 
 Use `vnode_guid` with the recorded canonical GUID to query an earlier identity or retained history after its vnode is
-removed, for example `synthetics-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
+removed, for example `synthetics-journey-runs vnode_guid:12345678-1234-4234-8234-123456789abc`. Supply only one selector;
 empty or unknown vnode names and requests containing both selectors are rejected, even if either value is empty.
 Omitting both selectors, or supplying only an empty `vnode_guid`, includes all vnodes and unassigned data.
-These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts`;
-`synthetics-run` and `synthetics-artifact` keep their existing detail parameters.
+These selectors apply to all six RUM Functions and `synthetics-checks`, `synthetics-journey-runs`,
+`synthetics-lighthouse-runs` and `synthetics-artifacts`; `synthetics-run` and `synthetics-artifact` keep their existing
+detail parameters.
 
 The selectors filter data under the existing Agent-level access model; they are not a per-site authorization boundary.
 Functions are not registered on each vnode. Frontend consumers retain the collecting Agent relationship when selecting
@@ -89,7 +90,7 @@ receiver service and retention remain shared by the collecting Agent.
 
 ## Investigate journey failures
 
-`synthetics-runs` includes the first unexpected test failure, the last observed running step and pending-before-cleanup context when the runtime
+`synthetics-journey-runs` includes the first unexpected test failure, the last observed running step and pending-before-cleanup context when the runtime
 supports structured journey evidence. `synthetics-run` also returns `run.failure_evidence`: test observations,
 step identities and parent relationships, source locations, bounded error excerpts, and the first failure's step path.
 The overall outcome and termination reason remain separate. An earlier assertion can be retained even when a later
@@ -119,7 +120,7 @@ current browser activity. Captures keep their existing access rules and publicat
 ## Optional journey browser error summaries
 
 Set `browser_error_summary: true` in a journey job to collect browser error counts and bounded primitive samples,
-including on passing tests. It defaults to `false`. The `synthetics-runs` columns `browser_summary_status` and
+including on passing tests. It defaults to `false`. The `synthetics-journey-runs` columns `browser_summary_status` and
 `browser_errors` show reporting status and observed counts; `synthetics-run` returns typed `run.browser_summary`
 with coverage, aggregate counts, interesting test rows, samples and explicit omissions. Failed configuration
 rehearsals include a text summary; successful rehearsals retain their existing success response and do not save runs.
@@ -156,7 +157,7 @@ reverse-proxy path prefix. The receiver serves the pinned Faro 2.11.0 SDK and op
 SDK CDN connection. Client IP addresses are used for rate limiting/geolocation and are not stored.
 
 `dem-history-status` is always announced. The six RUM Functions appear once a RUM site is active or RUM history is
-retained; the five synthetics Functions appear once a journey or Lighthouse job is active, or synthetic history or
+retained; the six synthetics Functions appear once a journey or Lighthouse job is active, or synthetic history or
 published captures are retained. Retained data makes the corresponding group available after restart even without
 jobs. A receiver alone does not enable RUM Functions. Once announced, a group stays available for that framework run,
 even after the last job stops or its data expires. A process restart reconstructs availability from data present when
@@ -897,16 +898,17 @@ qualification failures.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
-and CLS is dimensionless. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
+and CLS is dimensionless. `synthetics-lighthouse-runs` lists them for each retained audit. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
 page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving
 completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is
 enabled.
 
 ## Synthetic diagnosis and captures
 
-Process Functions use the regular Netdata transport: `synthetics-checks` for active observations, `synthetics-runs`
-for retained history, `synthetics-run` for one run's full diagnosis, `synthetics-artifacts` for retained capture sets and
-storage status, and `synthetics-artifact` for one set's metadata or bytes.
+Process Functions use the regular Netdata transport: `synthetics-checks` for active observations,
+`synthetics-journey-runs` and `synthetics-lighthouse-runs` for retained history of each kind (journey test counts and
+failure evidence; Lighthouse lab measurements), `synthetics-run` for one run's full diagnosis, `synthetics-artifacts`
+for retained capture sets and storage status, and `synthetics-artifact` for one set's metadata or bytes.
 Use the advertised `job_id`, `run_id` and other parameters. Disabled/failed-startup jobs remain in native configuration
 status. Last success/failure and freshness describe the current activation and vnode association; reassignment resets
 these observations. They do not reconstruct a historical incident. A running or

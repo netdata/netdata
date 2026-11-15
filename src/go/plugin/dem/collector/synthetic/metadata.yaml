@@ -311,17 +311,19 @@ modules:
                 - name: skipped
                 - name: expected_failure
                 - name: not_run
-    functions: &functions
-      description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
-        jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name
-        with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
+    functions:
+      description: &functions_description Use these process-wide Functions through the Agent or Cloud. Run history
+        has one Function per kind (synthetics-journey-runs, synthetics-lighthouse-runs); the monitor overview, run detail
+        and capture Functions serve journeys and Lighthouse audits alike. Invoke their public synthetics-* names on the
+        collecting Agent and select the exact configured vnode name with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
         renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
         history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
         Agent-level access and do not provide per-site authorization; no active browser is required.
         Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive
         data, on a paid plan or an active trial; journeys and audits run and their history is stored on every plan.
       list:
-        - id: synthetics-checks
+        - &function_checks
+          id: synthetics-checks
           function_name: synthetics-checks
           name: Synthetic monitors
           description: Invoke `synthetics-checks`. Active native monitors and their latest observation. Disabled
@@ -473,11 +475,11 @@ modules:
           require_cloud: true
           prerequisites:
             list: []
-        - id: synthetics-runs
-          function_name: synthetics-runs
-          name: Synthetic runs
-          description: Invoke `synthetics-runs`. Retained attempts selected by start time, with their latest retained
-            outcome even when completion is outside the range. after and before include their entire Unix
+        - id: synthetics-journey-runs
+          function_name: synthetics-journey-runs
+          name: Journey runs
+          description: Invoke `synthetics-journey-runs`. Retained journey attempts with test counts and failure evidence. Attempts are selected by start time, with their latest
+            retained outcome even when completion is outside the range. after and before include their entire Unix
             second or accept negative offsets from now; omitted bounds cover retained history through now.
             Results are capped at 2000 and disclose truncation.
           parameters:
@@ -501,14 +503,7 @@ modules:
             - id: job_id
               name: Monitor (`job_id`)
               description: Native module and job name, such as journey:checkout. Leave empty to include all
-                monitors when listing.
-              type: string
-              required: false
-              default: ''
-              options: []
-            - id: kind
-              name: Kind (`kind`)
-              description: Filter by journey or lighthouse. Leave empty to include both kinds.
+                journey monitors.
               type: string
               required: false
               default: ''
@@ -546,9 +541,9 @@ modules:
               default: '2000'
               options: []
           returns:
-            description: At most limit retained attempts selected by start time, with explicit truncated and
-              effective time bounds. Zero or missing execution timestamps and missing durations are null rather
-              than fabricated measurements.
+            description: At most limit retained journey attempts selected by start time, with explicit truncated
+              and effective time bounds. Zero or missing execution timestamps, missing durations and test counts the run did not report are
+              null rather than fabricated measurements.
             columns:
               - name: run_id
                 type: string
@@ -558,10 +553,6 @@ modules:
                 type: string
                 unit: ''
                 description: Monitor.
-              - name: kind
-                type: string
-                unit: ''
-                description: Kind.
               - name: name
                 type: string
                 unit: ''
@@ -614,6 +605,34 @@ modules:
                 type: string
                 unit: ''
                 description: Reason execution stopped, separate from the first reported error.
+              - name: tests_declared
+                type: integer
+                unit: ''
+                description: Tests the journey declared. Null when the run reported no test counts.
+              - name: tests_passed
+                type: integer
+                unit: ''
+                description: Passed tests.
+              - name: tests_failed
+                type: integer
+                unit: ''
+                description: Failed tests.
+              - name: tests_timed_out
+                type: integer
+                unit: ''
+                description: Timed-out tests.
+              - name: tests_skipped
+                type: integer
+                unit: ''
+                description: Skipped tests.
+              - name: tests_expected_failure
+                type: integer
+                unit: ''
+                description: Tests that failed as expected.
+              - name: tests_not_run
+                type: integer
+                unit: ''
+                description: Declared tests that did not run.
               - name: failure_evidence_status
                 type: string
                 unit: ''
@@ -649,7 +668,8 @@ modules:
           require_cloud: true
           prerequisites:
             list: []
-        - id: synthetics-run
+        - &function_run
+          id: synthetics-run
           function_name: synthetics-run
           name: Synthetic run detail
           description: Invoke `synthetics-run`. One retained or latest active attempt, independent of picker bounds,
@@ -729,7 +749,8 @@ modules:
           require_cloud: true
           prerequisites:
             list: []
-        - id: synthetics-artifacts
+        - &function_artifacts
+          id: synthetics-artifacts
           function_name: synthetics-artifacts
           name: Retained synthetic captures
           description: Invoke `synthetics-artifacts` to find retained screenshot, trace and report sets, newest publication
@@ -818,7 +839,8 @@ modules:
           require_cloud: true
           prerequisites:
             list: []
-        - id: synthetics-artifact
+        - &function_artifact
+          id: synthetics-artifact
           function_name: synthetics-artifact
           name: Synthetic capture detail
           description: Invoke `synthetics-artifact`. Retained capture metadata for one run, independently of run
@@ -1027,4 +1049,174 @@ modules:
               chart_type: line
               dimensions:
                 - name: cls
-    functions: *functions
+    functions:
+      description: *functions_description
+      list:
+        - *function_checks
+        - id: synthetics-lighthouse-runs
+          function_name: synthetics-lighthouse-runs
+          name: Lighthouse runs
+          description: Invoke `synthetics-lighthouse-runs`. Retained Lighthouse audits with their lab measurements. Attempts are selected by start time, with their latest
+            retained outcome even when completion is outside the range. after and before include their entire Unix
+            second or accept negative offsets from now; omitted bounds cover retained history through now.
+            Results are capped at 2000 and disclose truncation.
+          parameters:
+            - id: vnode
+              name: Virtual node name (`vnode`)
+              description: Filter by exact configured vnode name, as used by the job's vnode option. Empty or unknown
+                names are rejected. Omit this parameter when not selecting by name.
+                Supply either vnode or vnode_guid, never both, even with empty values.
+              type: string
+              required: false
+              default: Not supplied
+              options: []
+            - id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Filter by canonical vnode GUID. No configured name is required. Do not also supply
+                vnode. Leave empty or omit both selectors to include every vnode and unassigned jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: job_id
+              name: Monitor (`job_id`)
+              description: Native module and job name, such as lighthouse:home. Leave empty to include all
+                Lighthouse monitors.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: outcome
+              name: Outcome (`outcome`)
+              description: Filter by unknown, success, failed, timeout, inconclusive, error or cancelled. Leave
+                empty for all outcomes.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: after
+              name: Started after (`after`)
+              description: Inclusive run start-time lower bound in Unix seconds or a negative offset from
+                now. Leave empty for all retained history.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: before
+              name: Started before (`before`)
+              description: Inclusive run start-time upper bound in Unix seconds or a negative offset from
+                now. Leave empty for the current time.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: limit
+              name: Maximum rows (`limit`)
+              description: Maximum returned rows, from 1 to 2000. Defaults to 2000; truncated indicates additional
+                matching rows.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: At most limit retained Lighthouse attempts selected by start time, with explicit truncated
+              and effective time bounds. Zero or missing execution timestamps, missing durations and measurements the audit did not report are
+              null rather than fabricated measurements.
+            columns:
+              - name: run_id
+                type: string
+                unit: ''
+                description: Run.
+              - name: job_id
+                type: string
+                unit: ''
+                description: Monitor.
+              - name: name
+                type: string
+                unit: ''
+                description: Name.
+              - name: target
+                type: string
+                unit: ''
+                description: Target.
+              - name: started_us
+                type: timestamp
+                unit: ''
+                description: Started. Unix microseconds; null when unavailable.
+              - name: completed_us
+                type: timestamp
+                unit: ''
+                description: Completed. Unix microseconds; null when unavailable.
+              - name: outcome
+                type: string
+                unit: ''
+                description: Outcome.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: Attempt duration.
+              - name: capture_state
+                type: string
+                unit: ''
+                description: Capture state.
+              - name: error
+                type: string
+                unit: ''
+                description: Error.
+              - name: history_error
+                type: string
+                unit: ''
+                description: History error.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: Recorded canonical vnode GUID. Empty means unassigned.
+              - name: scheduled_us
+                type: timestamp
+                unit: ''
+                description: Selected due time.
+              - name: queued_us
+                type: timestamp
+                unit: ''
+                description: Original admission queue time.
+              - name: termination_reason
+                type: string
+                unit: ''
+                description: Reason execution stopped, separate from the first reported error.
+              - name: performance
+                type: float
+                unit: points
+                description: Lighthouse performance score, 0 to 100.
+              - name: fcp_ms
+                type: float
+                unit: ms
+                description: First Contentful Paint.
+              - name: lcp_ms
+                type: float
+                unit: ms
+                description: Largest Contentful Paint.
+              - name: tbt_ms
+                type: float
+                unit: ms
+                description: Total Blocking Time.
+              - name: si_ms
+                type: float
+                unit: ms
+                description: Speed Index.
+              - name: cls
+                type: float
+                unit: ''
+                description: Cumulative Layout Shift; dimensionless.
+          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
+            browser admission. Artifact fetch reads at most 5 MiB.
+          security: Requires member-equivalent access for observations and retained text; artifact bytes require
+            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
+            and user input; they are not universally redacted.
+          availability: Available while dem.plugin is running, independently of active journey or Lighthouse
+            jobs. Individual retained evidence may be absent or expired.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - *function_run
+        - *function_artifacts
+        - *function_artifact

@@ -4,6 +4,7 @@ package syntheticfunc
 
 import (
 	"context"
+	"slices"
 	"strconv"
 	"time"
 
@@ -12,24 +13,60 @@ import (
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-var runsMethod = method{
-	Method: rawfunc.Method{
-		ID:    "synthetics-runs",
-		Title: "Synthetic runs",
-		Help: "Retained attempts selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(
-			rawfunc.MaxRows,
-		) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
-		Sort:        "started_us",
-		UpdateEvery: 10,
-		History:     true,
-		Params:      []string{"job_id", "kind", "outcome", "after", "before", "limit", "vnode", "vnode_guid"},
-		Columns:     runsColumns.Build(),
-	},
-	serve: (*Handler).runs,
+// Run history has one method per kind, so each table shows only the columns its
+// kind reports.
+var (
+	journeyRunsMethod = runsMethod(
+		model.Journey,
+		"synthetics-journey-runs",
+		"Journey runs",
+		"Retained journey attempts with test counts and failure evidence.",
+		journeyRunsColumns,
+	)
+	lighthouseRunsMethod = runsMethod(
+		model.Lighthouse,
+		"synthetics-lighthouse-runs",
+		"Lighthouse runs",
+		"Retained Lighthouse audits with their lab measurements. Missing measurements are null.",
+		lighthouseRunsColumns,
+	)
+)
+
+var runsHelp = " Attempts are selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(
+	rawfunc.MaxRows,
+) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned."
+
+func runsMethod(kind model.Kind, id, title, summary string, columns rawfunc.Columns[model.Run]) method {
+	return method{
+		Method: rawfunc.Method{
+			ID:          id,
+			Title:       title,
+			Help:        summary + runsHelp,
+			Sort:        "started_us",
+			UpdateEvery: 10,
+			History:     true,
+			Params:      []string{"job_id", "outcome", "after", "before", "limit", "vnode", "vnode_guid"},
+			Columns:     columns.Build(),
+		},
+		serve: func(
+			h *Handler,
+			ctx context.Context,
+			args map[string]string,
+			response map[string]any,
+		) *funcapi.FunctionResponse {
+			return h.runs(ctx, kind, columns, args, response)
+		},
+	}
 }
 
-func (h *Handler) runs(ctx context.Context, args map[string]string, response map[string]any) *funcapi.FunctionResponse {
-	filter, err := runFilter(args, time.Now().Unix())
+func (h *Handler) runs(
+	ctx context.Context,
+	kind model.Kind,
+	columns rawfunc.Columns[model.Run],
+	args map[string]string,
+	response map[string]any,
+) *funcapi.FunctionResponse {
+	filter, err := runFilter(kind, args, time.Now().Unix())
 	if err != nil {
 		return funcapi.ErrorResponse(400, "%v", err)
 	}
@@ -39,7 +76,7 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 	}
 	rows := make([][]any, 0, len(page.Runs))
 	for _, run := range page.Runs {
-		rows = append(rows, runsColumns.Row(run))
+		rows = append(rows, columns.Row(run))
 	}
 	response["data"] = rows
 	response["truncated"] = page.Truncated
@@ -49,10 +86,10 @@ func (h *Handler) runs(ctx context.Context, args map[string]string, response map
 	return funcapi.RawResponse(response)
 }
 
+// runsColumns are the run history columns every kind reports.
 var runsColumns = rawfunc.Columns[model.Run]{
 	column("run_id", "Run", funcapi.FieldTypeString, "", func(r model.Run) any { return r.ID }),
 	column("job_id", "Monitor", funcapi.FieldTypeString, "", func(r model.Run) any { return r.JobID }),
-	column("kind", "Kind", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Kind }),
 	column("name", "Name", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Name }),
 	column("target", "Target", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Target }),
 	column(
@@ -98,6 +135,20 @@ var runsColumns = rawfunc.Columns[model.Run]{
 	column("termination_reason", "Termination reason", funcapi.FieldTypeString, "", func(r model.Run) any {
 		return r.TerminationReason
 	}),
+}
+
+var journeyRunsColumns = slices.Concat(runsColumns, rawfunc.Columns[model.Run]{
+	testCount("tests_declared", "Declared tests", func(c model.TestCounts) int { return c.Declared }),
+	testCount("tests_passed", "Passed tests", func(c model.TestCounts) int { return c.Passed }),
+	testCount("tests_failed", "Failed tests", func(c model.TestCounts) int { return c.Failed }),
+	testCount("tests_timed_out", "Timed-out tests", func(c model.TestCounts) int { return c.TimedOut }),
+	testCount("tests_skipped", "Skipped tests", func(c model.TestCounts) int { return c.Skipped }),
+	testCount(
+		"tests_expected_failure",
+		"Expected-failure tests",
+		func(c model.TestCounts) int { return c.ExpectedFailure },
+	),
+	testCount("tests_not_run", "Tests not run", func(c model.TestCounts) int { return c.NotRun }),
 	column("failure_evidence_status", "Evidence reporting", funcapi.FieldTypeString, "", func(r model.Run) any {
 		return r.FailureEvidence.ReportingStatus()
 	}),
@@ -116,4 +167,33 @@ var runsColumns = rawfunc.Columns[model.Run]{
 	column("browser_errors", model.BrowserErrorsLabel, funcapi.FieldTypeString, "", func(r model.Run) any {
 		return r.BrowserSummary.Summary()
 	}),
+})
+
+// testCount reports one journey test count, or null when the run reported none.
+func testCount(name, tooltip string, count func(model.TestCounts) int) rawfunc.Column[model.Run] {
+	return column(name, tooltip, funcapi.FieldTypeInteger, "", func(r model.Run) any {
+		if r.Tests == nil {
+			return nil
+		}
+		return count(*r.Tests)
+	})
+}
+
+var lighthouseRunsColumns = slices.Concat(runsColumns, rawfunc.Columns[model.Run]{
+	labMetric("performance", "Performance score", "points", func(m model.LabMetrics) *float64 { return m.Performance }),
+	labMetric("fcp_ms", "First Contentful Paint", "ms", func(m model.LabMetrics) *float64 { return m.FCPMS }),
+	labMetric("lcp_ms", "Largest Contentful Paint", "ms", func(m model.LabMetrics) *float64 { return m.LCPMS }),
+	labMetric("tbt_ms", "Total Blocking Time", "ms", func(m model.LabMetrics) *float64 { return m.TBTMS }),
+	labMetric("si_ms", "Speed Index", "ms", func(m model.LabMetrics) *float64 { return m.SIMS }),
+	labMetric("cls", "Cumulative Layout Shift", "", func(m model.LabMetrics) *float64 { return m.CLS }),
+})
+
+// labMetric reports one Lighthouse lab measurement, or null when it is missing.
+func labMetric(name, tooltip, units string, value func(model.LabMetrics) *float64) rawfunc.Column[model.Run] {
+	return column(name, tooltip, funcapi.FieldTypeFloat, units, func(r model.Run) any {
+		if r.Metrics == nil {
+			return nil
+		}
+		return number(value(*r.Metrics))
+	})
 }

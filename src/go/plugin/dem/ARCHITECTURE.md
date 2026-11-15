@@ -166,8 +166,9 @@ Transport and history counters remain job-wide. Old evidence lacking a captured 
 current-config backfill or speculative migration is performed.
 
 DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
-All six RUM Functions and `synthetics-checks`, `synthetics-runs`, and `synthetics-artifacts` accept either `vnode` or
-`vnode_guid`. The detail Functions `synthetics-run` and `synthetics-artifact` retain their existing parameters.
+All six RUM Functions and `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs` and
+`synthetics-artifacts` accept either `vnode` or `vnode_guid`. The detail Functions `synthetics-run` and
+`synthetics-artifact` retain their existing parameters.
 Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
 all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
 even if either value is empty.
@@ -381,7 +382,7 @@ flowchart TD
 | Provider | Functions | Reads |
 |---|---|---|
 | `rum` | `rum-sites`, `rum-pages`, `rum-live`, `rum-sessions`, `rum-errors`, `rum-session-events` | Site snapshots from `rum/registry`, retained events from the journal |
-| `synthetics` | `synthetics-checks`, `synthetics-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact` | Active jobs from `synthetic/registry`, run records from the journal, captures from the store |
+| `synthetics` | `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact` | Active jobs from `synthetic/registry`, run records from the journal, captures from the store |
 | `dem-history` | `dem-history-status` | Journal status and the retention worker's policy reload error |
 
 What makes this layer predictable:

@@ -95,7 +95,7 @@ func (e inventoryExecutor) ExecuteScheduled(
 
 func assertAvailability(t *testing.T, components dem.Components, rum, synthetics bool) {
 	t.Helper()
-	counts := map[string]int{"rum": 6, "synthetics": 5, "dem-history": 1}
+	counts := map[string]int{"rum": 6, "synthetics": 6, "dem-history": 1}
 	for _, provider := range components.Functions {
 		methods := provider.Functions()
 		require.Len(t, methods, counts[provider.ID])
@@ -385,7 +385,7 @@ func TestSiteAssociationHistoryFunctionsWithoutActiveJobs(t *testing.T) {
 		handle func(context.Context, funcapi.RawMethodRequest) *funcapi.FunctionResponse
 	}{
 		"RUM":       {"rum-sessions", rumHandler(t, components).HandleRaw},
-		"synthetic": {"synthetics-runs", syntheticHandler(t, components).HandleRaw},
+		"synthetic": {"synthetics-journey-runs", syntheticHandler(t, components).HandleRaw},
 	} {
 		t.Run(name, func(t *testing.T) {
 			for _, association := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
@@ -447,7 +447,7 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	}, dem.DefaultConfig())
 	require.Contains(t, components.Collectors, "journey")
 	require.Contains(t, components.Collectors, "lighthouse")
-	require.Len(t, provider(t, components, "synthetics").Functions(), 5)
+	require.Len(t, provider(t, components, "synthetics").Functions(), 6)
 	handler := syntheticHandler(t, components)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",

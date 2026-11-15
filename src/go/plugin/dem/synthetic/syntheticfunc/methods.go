@@ -14,7 +14,14 @@ type method struct {
 	serve func(h *Handler, ctx context.Context, args map[string]string, response map[string]any) *funcapi.FunctionResponse
 }
 
-var methods = []method{checksMethod, runsMethod, runMethod, artifactsMethod, artifactMethod}
+var methods = []method{
+	checksMethod,
+	journeyRunsMethod,
+	lighthouseRunsMethod,
+	runMethod,
+	artifactsMethod,
+	artifactMethod,
+}
 
 func Declarations() []funcapi.FunctionConfig {
 	out := make([]funcapi.FunctionConfig, 0, len(methods))

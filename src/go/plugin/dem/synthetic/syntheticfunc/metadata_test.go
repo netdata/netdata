@@ -14,29 +14,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
+// Each integration documents the shared Functions and its own kind's run history; every
+// declared Function is documented.
+func TestIntegrationsDocumentTheirProcessFunctions(t *testing.T) {
 	data, err := os.ReadFile("../../collector/synthetic/metadata.yaml")
 	require.NoError(t, err)
-	for _, id := range []string{"collector-dem.plugin-journey", "collector-dem.plugin-lighthouse"} {
+	declarations := make(map[string]funcapi.FunctionConfig)
+	for _, decl := range syntheticfunc.Declarations() {
+		declarations[decl.ID] = decl
+	}
+	documented := make(map[string]bool)
+	for id, history := range map[string]string{
+		"collector-dem.plugin-journey":    "synthetics-journey-runs",
+		"collector-dem.plugin-lighthouse": "synthetics-lighthouse-runs",
+	} {
 		t.Run(id, func(t *testing.T) {
 			module, err := collecttest.DecodeMetadataModule(data, id)
 			require.NoError(t, err)
-			declarations := syntheticfunc.Declarations()
-			require.Len(t, module.Functions, len(declarations))
-			docs := make(map[string]collecttest.MetadataFunction)
+			var ids []string
 			for _, doc := range module.Functions {
-				require.NotContains(t, docs, doc.ID)
-				docs[doc.ID] = doc
+				ids = append(ids, doc.ID)
 			}
+			assert.Equal(
+				t,
+				[]string{"synthetics-checks", history, "synthetics-run", "synthetics-artifacts", "synthetics-artifact"},
+				ids,
+			)
 			h, _, _ := newRecordingHandler(nil)
-			for _, decl := range declarations {
-				t.Run(decl.ID, func(t *testing.T) {
+			for _, doc := range module.Functions {
+				t.Run(doc.ID, func(t *testing.T) {
+					decl, exists := declarations[doc.ID]
+					require.True(t, exists)
+					documented[doc.ID] = true
 					// Registration must match the handler's own 0x1b permission check.
 					require.True(t, decl.RequireCloud)
 					// Viewing browser tests (journeys, Lighthouse) requires a paid plan (access 0x0017).
 					require.True(t, decl.RequireCommercial)
-					doc, exists := docs[decl.ID]
-					require.True(t, exists)
 					assert.Equal(t, decl.FunctionName, doc.FunctionName)
 					var args []string
 					for _, param := range doc.Parameters {
@@ -60,5 +73,8 @@ func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
 				})
 			}
 		})
+	}
+	for id := range declarations {
+		assert.True(t, documented[id], "%s is not documented", id)
 	}
 }

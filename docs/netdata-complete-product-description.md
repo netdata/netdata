@@ -710,7 +710,7 @@ Netdata monitors applications from the user's side as well as the infrastructure
 - Screenshots and Lighthouse reports share a default seven-day, 2 GiB retained-capture allowance, preferring each monitor’s newest eligible capture; age and space pressure can still remove it
 - Retained captures remain discoverable after run history expires or a monitor is disabled; storage status separates retained captures from workspace and pending cleanup. The allowance is not a hard disk cap or a guarantee of complete incident history
 - Netdata Agents act as probe locations
-- Functions: `synthetics-checks`, `synthetics-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact`; stock alert on journey failure
+- Functions: `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs`, `synthetics-run`, `synthetics-artifacts`, `synthetics-artifact`; stock alert on journey failure
 - Netdata Cloud views: Journeys, Overview, Runs, Tests, Alerts
 
 **Lighthouse performance audits**

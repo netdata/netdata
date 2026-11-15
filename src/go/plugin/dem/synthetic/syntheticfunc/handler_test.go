@@ -185,11 +185,11 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 			Method: "synthetics-checks",
 		}, 403},
 		"partial member": {funcapi.RawMethodRequest{
-			Method:      "synthetics-runs",
+			Method:      "synthetics-journey-runs",
 			Permissions: "0x19",
 		}, 403},
 		"malformed permissions": {funcapi.RawMethodRequest{
-			Method:      "synthetics-runs",
+			Method:      "synthetics-lighthouse-runs",
 			Permissions: "member",
 		}, 403},
 		"member cannot fetch": {funcapi.RawMethodRequest{
@@ -223,16 +223,19 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 		})
 	}
 	h := newHandler(&source{})
-	for _, args := range [][]string{{"limit:0"}, {"limit:2001"}, {"limit:NaN"}, {"kind:other"}, {"after:NaN"}, {"after:200", "before:100"}, {"outcome:other"}} {
-		got := call(h, "synthetics-runs", args...)
-		assert.Equal(t, 400, got.Status)
+	for _, method := range []string{"synthetics-journey-runs", "synthetics-lighthouse-runs"} {
+		// The method fixes the kind, so kind is not a run history argument.
+		for _, args := range [][]string{{"limit:0"}, {"limit:2001"}, {"limit:NaN"}, {"kind:journey"}, {"after:NaN"}, {"after:200", "before:100"}, {"outcome:other"}} {
+			got := call(h, method, args...)
+			assert.Equal(t, 400, got.Status, "%s %v", method, args)
+		}
 	}
 	// With both bounds invalid, the after bound is reported on every call.
 	for range 64 {
 		require.Equal(
 			t,
 			funcapi.ErrorResponse(400, "after must be Unix seconds or a relative negative offset"),
-			call(h, "synthetics-runs", "after:NaN", "before:NaN"),
+			call(h, "synthetics-journey-runs", "after:NaN", "before:NaN"),
 		)
 	}
 	assert.Equal(t, 400, call(h, "synthetics-run", "run_id:r").Status)
@@ -360,9 +363,8 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 	}
 	got := call(
 		newHandler(src),
-		"synthetics-runs",
+		"synthetics-lighthouse-runs",
 		"job_id:lighthouse:home",
-		"kind:lighthouse",
 		"outcome:unknown",
 		"after:100",
 		"before:200",
@@ -387,13 +389,14 @@ func TestHistoryFiltersAndUnavailableValues(t *testing.T) {
 	assert.Equal(t, true, got.RawResponse["truncated"])
 	validate(t, got)
 	before := time.Now().Unix()
-	responseData(t, call(newHandler(src), "synthetics-runs", "after:-60"))
+	responseData(t, call(newHandler(src), "synthetics-journey-runs", "after:-60"))
+	assert.Equal(t, model.Journey, src.filter.Kind)
 	assert.GreaterOrEqual(t, src.filter.After, before-60)
 	require.NotNil(t, src.filter.Before)
 	assert.LessOrEqual(t, *src.filter.Before, time.Now().Unix())
 	assert.Equal(t, 2000, src.filter.Limit)
 	src.queryErr = errors.New("private path and credential")
-	got = call(newHandler(src), "synthetics-runs")
+	got = call(newHandler(src), "synthetics-lighthouse-runs")
 	assert.Equal(t, 500, got.Status)
 	assert.NotContains(t, got.Message, "credential")
 }
@@ -650,8 +653,8 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 		query.New(syntheticregistry.New(), synthetichistory.NewStore(journalStore), emptyArtifacts(t), noPolicyError),
 		nil,
 	)
-	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
-	got := call(h, "synthetics-runs", "before:0")
+	require.Len(t, responseData(t, call(h, "synthetics-journey-runs")), 1)
+	got := call(h, "synthetics-journey-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
 	assert.Equal(t, int64(0), got.RawResponse["before"])
 	// Internal detail lookup still has no picker bound.
@@ -676,7 +679,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	_, err = retained.AppendRun(ctx, "start", run)
 	require.NoError(t, err)
 	h := syntheticfunc.New(query.New(syntheticregistry.New(), retained, emptyArtifacts(t), noPolicyError), nil)
-	beforeCompletion := call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")
+	beforeCompletion := call(h, "synthetics-journey-runs", "after:100", "before:100", "outcome:unknown")
 	require.Len(t, responseData(t, beforeCompletion), 1)
 	validate(t, beforeCompletion)
 	run.CompletedUS = 300000000
@@ -684,7 +687,7 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	run.Events = []model.Event{{Kind: "error", Message: "later completion"}}
 	_, err = retained.AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	got := call(h, "synthetics-runs", "after:100", "before:100", "outcome:failed")
+	got := call(h, "synthetics-journey-runs", "after:100", "before:100", "outcome:failed")
 	rows := responseData(t, got)
 	require.Len(t, rows, 1)
 	values := rowValues(t, got, rows[0])
@@ -693,8 +696,8 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 	assert.Equal(t, run.CompletedUS, values["completed_us"])
 	assert.Equal(t, run.Outcome, values["outcome"])
 	validate(t, got)
-	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "after:100", "before:100", "outcome:unknown")))
-	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "after:101", "before:300")))
+	assert.Empty(t, responseData(t, call(h, "synthetics-journey-runs", "after:100", "before:100", "outcome:unknown")))
+	assert.Empty(t, responseData(t, call(h, "synthetics-journey-runs", "after:101", "before:300")))
 	detail := call(h, "synthetics-run", "job_id:journey:past", "run_id:past-attempt")
 	require.NotNil(t, detail.RawResponse)
 	assert.Equal(t, run.CompletedUS, detail.RawResponse["run"].(map[string]any)["completed_us"])
@@ -809,7 +812,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 				"browser_summary": run.BrowserSummary, "browser_summary_status": status,
 			}, detail)
 			validate(t, detailResponse)
-			listResponse := call(h, "synthetics-runs")
+			listResponse := call(h, "synthetics-journey-runs")
 			listRows := responseData(t, listResponse)
 			require.Len(t, listRows, 1)
 			values := rowValues(t, listResponse, listRows[0])
@@ -828,14 +831,6 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			} else {
 				assert.Equal(t, "", values["browser_errors"])
 			}
-			columns := listResponse.RawResponse["columns"].(map[string]any)
-			assert.Equal(t, 15, columns["termination_reason"].(map[string]any)["index"])
-			assert.Equal(t, 16, columns["failure_evidence_status"].(map[string]any)["index"])
-			assert.Equal(t, 17, columns["first_failure"].(map[string]any)["index"])
-			assert.Equal(t, 18, columns["last_observed_step"].(map[string]any)["index"])
-			assert.Equal(t, 19, columns["stop_context"].(map[string]any)["index"])
-			assert.Equal(t, 20, columns["browser_summary_status"].(map[string]any)["index"])
-			assert.Equal(t, 21, columns["browser_errors"].(map[string]any)["index"])
 			validate(t, listResponse)
 		})
 	}
@@ -902,21 +897,24 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	)
 	runs := call(
 		h,
-		"synthetics-runs",
+		"synthetics-journey-runs",
 		"vnode_guid:33333333-3333-4333-8333-333333333333",
-		"kind:journey",
 		"job_id:journey:checkout",
 	)
 	rows = responseData(t, runs)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "33333333-3333-4333-8333-333333333333", rowValues(t, runs, rows[0])["vnode_guid"])
 	validate(t, runs)
-	assert.Empty(t, responseData(t, call(h, "synthetics-runs", "vnode_guid:11111111-1111-4111-8111-111111111111")))
-	assert.Len(t, responseData(t, call(h, "synthetics-runs", "vnode_guid:")), 3)
+	assert.Empty(
+		t,
+		responseData(t, call(h, "synthetics-journey-runs", "vnode_guid:11111111-1111-4111-8111-111111111111")),
+	)
+	assert.Len(t, responseData(t, call(h, "synthetics-journey-runs", "vnode_guid:")), 3)
+	assert.Empty(t, responseData(t, call(h, "synthetics-lighthouse-runs", "vnode_guid:")))
 	detail := call(h, "synthetics-run", "job_id:journey:checkout", "run_id:checkout")
 	require.NotNil(t, detail.RawResponse)
 	assert.Equal(t, "33333333-3333-4333-8333-333333333333", detail.RawResponse["run"].(map[string]any)["vnode_guid"])
-	for _, method := range []string{"synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
+	for _, method := range []string{"synthetics-checks", "synthetics-journey-runs", "synthetics-lighthouse-runs", "synthetics-artifacts"} {
 		assert.Equal(t, 400, call(h, method, "vnode_guid:INVALID").Status)
 		denied := h.HandleRaw(
 			ctx,
@@ -1086,21 +1084,32 @@ func TestCloudTableRequests(t *testing.T) {
 }
 
 func TestCloudTableTimeWindowSelectsTheRuns(t *testing.T) {
-	h, _, filter := newRecordingHandler(nil)
-	response := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
-		Method: "synthetics-runs",
-		Payload: []byte(
-			`{"after":1700000000,"before":1700000900,"query":"","selections":{},"timeout":120000,"last":200}`,
-		),
-		Permissions: "0x1b",
-	})
-	require.NotNil(t, response.RawResponse, response.Message)
-	before := int64(1700000900)
-	assert.Equal(t, synthetichistory.RunFilter{
-		After:  1700000000,
-		Before: &before,
-		Limit:  2000,
-	}, *filter)
+	for method, kind := range map[string]model.Kind{
+		"synthetics-journey-runs":    model.Journey,
+		"synthetics-lighthouse-runs": model.Lighthouse,
+	} {
+		t.Run(method, func(t *testing.T) {
+			h, _, filter := newRecordingHandler(nil)
+			response := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method: method,
+				Payload: []byte(
+					`{"after":1700000000,"before":1700000900,"outcome":"failed","query":"","selections":{},"timeout":120000,"last":200}`,
+				),
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, response.RawResponse, response.Message)
+			before := int64(1700000900)
+			assert.Equal(t, synthetichistory.RunFilter{
+				Kind:    kind,
+				Outcome: model.Failed,
+				After:   1700000000,
+				Before:  &before,
+				Limit:   2000,
+			}, *filter)
+			assert.Equal(t, int64(1700000000), response.RawResponse["after"])
+			assert.Equal(t, int64(1700000900), response.RawResponse["before"])
+		})
+	}
 }
 
 func TestRejectedRequestsReadNothing(t *testing.T) {
