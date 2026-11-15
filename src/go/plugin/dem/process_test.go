@@ -3,8 +3,6 @@
 package dem
 
 import (
-	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -26,12 +24,10 @@ func processConfig(t *testing.T) Config {
 
 func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 	varLib := t.TempDir()
-	var warnings bytes.Buffer
 	process, err := Open(Options{
 		Config:    processConfig(t),
 		VarLibDir: varLib,
 		Private:   true,
-		Warnings:  &warnings,
 	})
 	require.NoError(t, err)
 	for _, module := range []string{"receiver", "rum"} {
@@ -60,7 +56,6 @@ func TestPrivateProcessLeavesLiveDirectoriesUntouched(t *testing.T) {
 	entries, err := os.ReadDir(varLib)
 	require.NoError(t, err)
 	assert.Empty(t, entries)
-	assert.Empty(t, warnings.String())
 }
 
 func TestProcessKeepsLiveStoresUnderStateDirectory(t *testing.T) {
@@ -68,7 +63,6 @@ func TestProcessKeepsLiveStoresUnderStateDirectory(t *testing.T) {
 	process, err := Open(Options{
 		Config:    processConfig(t),
 		VarLibDir: varLib,
-		Warnings:  io.Discard,
 	})
 	require.NoError(t, err)
 	require.NoError(t, process.Close())
@@ -79,8 +73,7 @@ func TestProcessKeepsLiveStoresUnderStateDirectory(t *testing.T) {
 
 func TestProcessRequiresStateDirectoryOutsidePrivateRuns(t *testing.T) {
 	_, err := Open(Options{
-		Config:   processConfig(t),
-		Warnings: io.Discard,
+		Config: processConfig(t),
 	})
 	require.ErrorContains(t, err, "initializing DEM history: NETDATA_LIB_DIR is required outside terminal/debug mode")
 }

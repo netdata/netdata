@@ -5,14 +5,14 @@ package dem
 import (
 	"context"
 	"fmt"
-	"io"
 	"path/filepath"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	syntheticartifacts "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
@@ -22,27 +22,25 @@ import (
 // Options are the resolved inputs of one plugin process.
 type Options struct {
 	Config Config
-	// LoadConfig rereads dem.conf for the retention worker.
-	LoadConfig func() (Config, error)
+	// ReloadConfig rereads dem.conf for the retention worker.
+	ReloadConfig func() (Config, error)
 	// VarLibDir holds the live journal, the capture store and the default runtime cache.
 	VarLibDir string
 	// Private (terminal and debug) runs use temporary history and capture stores
 	// and leave the live ones untouched. The browser runtime store is shared.
 	Private    bool
 	GeoIPPaths geoip.Paths
-	// Warnings receives non-fatal startup diagnostics; required (the command passes stderr).
-	Warnings io.Writer
 }
 
 // Process is one composed plugin process: its stores, browser runtime, runner,
 // components and process services.
 type Process struct {
 	Components
-	Services []composition.ProcessService
-	executor *runner.Engine
-	runtime  *runtimehost.Handle
-	captures *artifacts.Store
-	history  *journalstore.Store
+	Services  []composition.ProcessService
+	executor  *runner.Engine
+	runtime   *runtimehost.Handle
+	artifacts *syntheticartifacts.Store
+	history   *journalstore.Store
 }
 
 // Open opens the journal first and applies the configured history budget
@@ -67,22 +65,26 @@ func Open(opts Options) (*Process, error) {
 	if !opts.Private {
 		artifactPath = filepath.Join(opts.VarLibDir, "dem", "artifacts")
 	}
-	captures, err := artifacts.Open(artifactPath)
+	artifacts, err := syntheticartifacts.Open(artifactPath)
 	if err != nil {
 		_ = history.Close()
 		return nil, fmt.Errorf("opening DEM artifacts: %w", err)
 	}
-	if _, err := captures.Enforce(context.Background(), cfg.Artifacts.Days, cfg.Artifacts.MaxBytes); err != nil {
+	if _, err := artifacts.Enforce(context.Background(), cfg.Artifacts.Days, cfg.Artifacts.MaxBytes); err != nil {
 		// Inventory/cleanup failure does not invalidate the owned store or stop runs.
 		// Process maintenance retries it, and the catalogue exposes its status.
-		_, _ = fmt.Fprintf(opts.Warnings, "initial DEM artifact cleanup failed: %v\n", err)
+		logger.New().Warningf("initial DEM artifact cleanup failed: %v", err)
 	}
 	browserRuntime := runtimehost.Open(cfg.Runtime, opts.VarLibDir)
-	syntheticHistory := synthetichistory.NewStore(history)
-	executor, err := runner.New(browserRuntime.Source, syntheticHistory, captures, cfg.Browser.Concurrency)
+	executor, err := runner.New(
+		browserRuntime.Source,
+		synthetichistory.NewStore(history),
+		artifacts,
+		cfg.Browser.Concurrency,
+	)
 	if err != nil {
 		_ = browserRuntime.Close()
-		_ = captures.Close()
+		_ = artifacts.Close()
 		_ = history.Close()
 		return nil, fmt.Errorf("initializing DEM browser execution: %w", err)
 	}
@@ -92,14 +94,14 @@ func Open(opts Options) (*Process, error) {
 		browserActivation = browserRuntime.Host.Dependencies
 		updater = browserRuntime.Host.NewUpdater(executor, cfg.Runtime.ReleaseLoader("", true))
 	}
-	components := compose(Dependencies{
+	components := New(Dependencies{
 		GeoIPPaths:        opts.GeoIPPaths,
 		History:           history,
-		Artifacts:         captures,
+		Artifacts:         artifacts,
 		Executor:          executor,
 		BrowserActivation: browserActivation,
-		ConfigProvider:    opts.LoadConfig,
-	}, cfg, syntheticHistory)
+		ReloadConfig:      opts.ReloadConfig,
+	}, cfg)
 	services := []composition.ProcessService{components.Retention}
 	if browserRuntime.Host != nil {
 		services = append(services, browserRuntime.Host)
@@ -112,7 +114,7 @@ func Open(opts Options) (*Process, error) {
 		Services:   services,
 		executor:   executor,
 		runtime:    browserRuntime,
-		captures:   captures,
+		artifacts:  artifacts,
 		history:    history,
 	}, nil
 }
@@ -129,7 +131,7 @@ func (p *Process) Close() error {
 	if err := p.runtime.Close(); err != nil {
 		return fmt.Errorf("closing DEM runtime: %w", err)
 	}
-	if err := p.captures.Close(); err != nil {
+	if err := p.artifacts.Close(); err != nil {
 		return fmt.Errorf("closing DEM artifacts: %w", err)
 	}
 	if err := p.history.Close(); err != nil {

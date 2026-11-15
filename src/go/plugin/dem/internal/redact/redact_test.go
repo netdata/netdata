@@ -14,7 +14,7 @@ import (
 
 func TestURLCredentialParameters(t *testing.T) {
 	raw := "https://example.org/?client_secret=first&client%5Fsecret=second&CLIENT_SECRET=third&view=home&token=fourth"
-	redacted := NewRedactor().ApplyURL(raw)
+	redacted := Patterns.ApplyURL(raw)
 	for _, secret := range []string{"first", "second", "third", "fourth"} {
 		require.NotContains(t, redacted, secret)
 	}
@@ -37,6 +37,55 @@ func TestTextCredentialPatterns(t *testing.T) {
 	} {
 		require.Equal(t, tc.want, r.Apply(tc.input))
 	}
+}
+
+// Both exact-value policies run before the credential patterns; they differ in
+// which values they replace and how.
+func TestValuePolicies(t *testing.T) {
+	tests := map[string]struct {
+		apply func(string) string
+		input string
+		want  string
+	}{
+		"site values shorter than four bytes are ignored": {
+			apply: NewRedactor("abc", "", "abcd").Apply,
+			input: "abc abcd",
+			want:  "abc [REDACTED]",
+		},
+		"secrets of any length": {
+			apply: NewSecrets("x", "").Apply,
+			input: "x-ray",
+			want:  "[REDACTED]-ray",
+		},
+		"a secret containing another is replaced whole": {
+			apply: NewSecrets("pass", "password1").Apply,
+			input: "password1 pass",
+			want:  "[REDACTED] [REDACTED]",
+		},
+		"one pass never rescans a marker": {
+			apply: NewSecrets("x", "RED").Apply,
+			input: "x RED",
+			want:  "[REDACTED] [REDACTED]",
+		},
+		"secrets then patterns": {
+			apply: NewSecrets("abc").Apply,
+			input: "token=abc Bearer xyz",
+			want:  "token=[REDACTED] [REDACTED]",
+		},
+		"patterns alone": {
+			apply: Patterns.Apply,
+			input: "abcd password=abcd",
+			want:  "abcd password=[REDACTED]",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) { assert.Equal(t, tc.want, tc.apply(tc.input)) })
+	}
+}
+
+// Streamed matching relies on the secrets being listed longest first.
+func TestSecretsValuesLongestFirst(t *testing.T) {
+	assert.Equal(t, []string{"password1", "pass", "x"}, NewSecrets("x", "", "pass", "password1").Values())
 }
 
 // siteRedactor holds configured values that overlap each other and the
@@ -168,17 +217,16 @@ func randomText(rng *rand.Rand) string {
 // unchanged, so a later pattern pass over redacted output is a no-op.
 func TestApplyOutputIsStable(t *testing.T) {
 	site := siteRedactor()
-	patterns := NewRedactor()
 	rng := rand.New(rand.NewPCG(1, 2))
 	for range 20000 {
 		input := randomText(rng)
 		out := site.Apply(input)
 		require.Equal(t, out, site.Apply(out), "input %q", input)
-		require.Equal(t, out, patterns.Apply(out), "input %q", input)
+		require.Equal(t, out, Patterns.Apply(out), "input %q", input)
 		removed := site.ApplyRemoving(input, unicode.IsControl)
 		require.Equal(t, -1, strings.IndexFunc(removed, unicode.IsControl), "input %q", input)
 		require.Equal(t, removed, site.Apply(removed), "input %q", input)
-		require.Equal(t, removed, patterns.Apply(removed), "input %q", input)
+		require.Equal(t, removed, Patterns.Apply(removed), "input %q", input)
 	}
 }
 

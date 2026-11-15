@@ -4,9 +4,11 @@ package dem_test
 
 import (
 	"context"
-	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
@@ -93,12 +96,29 @@ func (e inventoryExecutor) ExecuteScheduled(
 	}
 }
 
+// declared lists, per process Function provider, the methods its Function
+// package declares; each provider must expose exactly those.
+var declared = map[string][]funcapi.FunctionConfig{
+	"rum":         rumfunc.Declarations(),
+	"synthetics":  syntheticfunc.Declarations(),
+	"dem-history": historyfunc.Declarations(),
+}
+
+func methodIDs(methods []funcapi.FunctionConfig) []string {
+	var ids []string
+	for _, method := range methods {
+		ids = append(ids, method.ID)
+	}
+	return ids
+}
+
 func assertAvailability(t *testing.T, components dem.Components, rum, synthetics bool) {
 	t.Helper()
-	counts := map[string]int{"rum": 6, "synthetics": 6, "dem-history": 1}
+	var providers []string
 	for _, provider := range components.Functions {
+		providers = append(providers, provider.ID)
 		methods := provider.Functions()
-		require.Len(t, methods, counts[provider.ID])
+		require.Equal(t, methodIDs(declared[provider.ID]), methodIDs(methods), provider.ID)
 		for _, method := range methods {
 			assert.NotContains(t, method.Tags, "hidden", method.ID)
 			if provider.ID == "dem-history" {
@@ -113,6 +133,27 @@ func assertAvailability(t *testing.T, components dem.Components, rum, synthetics
 			assert.Equal(t, want, method.Available(), method.ID)
 		}
 	}
+	assert.ElementsMatch(t, slices.Collect(maps.Keys(declared)), providers)
+}
+
+// listed returns one column of a composed RUM or synthetic Function's rows.
+func listed(t *testing.T, components dem.Components, method, column string) []any {
+	t.Helper()
+	handle := syntheticHandler(t, components).HandleRaw
+	if strings.HasPrefix(method, "rum-") {
+		handle = rumHandler(t, components).HandleRaw
+	}
+	response := handle(t.Context(), funcapi.RawMethodRequest{
+		Method:      method,
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, response.RawResponse, response.Message)
+	index := response.RawResponse["columns"].(map[string]any)[column].(map[string]any)["index"].(int)
+	var values []any
+	for _, row := range response.RawResponse["data"].([][]any) {
+		values = append(values, row[index])
+	}
+	return values
 }
 
 func TestOnlySyntheticCollectorsWaitForTheBrowserRuntime(t *testing.T) {
@@ -194,6 +235,14 @@ func TestFunctionAvailabilityWithActiveCollectors(t *testing.T) {
 				t.Fatal("collector did not become ready")
 			}
 			assertAvailability(t, components, module == "rum", module == "journey" || module == "lighthouse")
+			// The module's listing Function reads the registry its collector registers into.
+			if listing, ok := map[string]struct{ method, column, want string }{
+				"rum":        {method: "rum-sites", column: "site", want: "shop"},
+				"journey":    {method: "synthetics-checks", column: "job_id", want: "journey:login"},
+				"lighthouse": {method: "synthetics-checks", column: "job_id", want: "lighthouse:home"},
+			}[module]; ok {
+				assert.Equal(t, []any{listing.want}, listed(t, components, listing.method, listing.column))
+			}
 			cancel()
 			select {
 			case err := <-done:
@@ -447,7 +496,6 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	}, dem.DefaultConfig())
 	require.Contains(t, components.Collectors, "journey")
 	require.Contains(t, components.Collectors, "lighthouse")
-	require.Len(t, provider(t, components, "synthetics").Functions(), 6)
 	handler := syntheticHandler(t, components)
 	checks := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 		Method:      "synthetics-checks",
@@ -469,46 +517,4 @@ func TestRegistryPublishesSyntheticHistoryWithoutActiveJobs(t *testing.T) {
 	assert.Equal(t, run.Outcome, retained["outcome"])
 	assert.Nil(t, retained["metrics"])
 	assert.Len(t, detail.RawResponse["data"], 1)
-}
-
-func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
-	waiting := make(chan struct{})
-	components := dem.New(dem.Dependencies{
-		History:   privateHistory(t),
-		Artifacts: privateCaptures(t),
-		Executor: inventoryExecutor{
-			waiting: waiting,
-		},
-	}, dem.DefaultConfig())
-	collector := components.Collectors["lighthouse"].CreateV2().(*syntheticcollector.Lighthouse)
-	collector.Name = "home"
-	collector.URL = "https://example.org/?token=fixture-token&password=fixture-password&page=home"
-	require.NoError(t, collector.Init(context.Background()))
-	require.NoError(t, collector.Check(context.Background()))
-	ctx, cancel := context.WithCancel(context.Background())
-	ready, done := make(chan struct{}), make(chan error, 1)
-	go func() { done <- collector.Run(ctx, func() { close(ready) }) }()
-	defer func() { cancel(); require.NoError(t, <-done) }()
-	select {
-	case <-ready:
-	case <-time.After(2 * time.Second):
-		t.Fatal("collector did not become ready")
-	}
-	select {
-	case <-waiting:
-	case <-time.After(2 * time.Second):
-		t.Fatal("scheduled attempt did not queue")
-	}
-	checks := syntheticHandler(t, components).HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method:      "synthetics-checks",
-		Permissions: "0x1b",
-	})
-	require.NotNil(t, checks.RawResponse)
-	require.Len(t, checks.RawResponse["data"], 1)
-	encoded, err := json.Marshal(checks.RawResponse["data"])
-	require.NoError(t, err)
-	assert.NotContains(t, string(encoded), "fixture-token")
-	assert.NotContains(t, string(encoded), "fixture-password")
-	assert.Contains(t, string(encoded), "[REDACTED]")
-	assert.Equal(t, "https://example.org/?token=fixture-token&password=fixture-password&page=home", collector.URL)
 }

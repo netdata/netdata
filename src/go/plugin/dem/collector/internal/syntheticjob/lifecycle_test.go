@@ -14,6 +14,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
+	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
@@ -75,6 +76,32 @@ func TestActiveRegistrationAndReplacement(t *testing.T) {
 		stopNext()
 		assert.Empty(t, hub.Snapshot(time.Now()))
 	})
+}
+
+// Functions list a URL target without its credentials; the executor still
+// receives the configured URL.
+func TestRegisteredTargetOmitsCredentials(t *testing.T) {
+	const target = "https://example.org/?token=fixture-token&password=fixture-password&page=home"
+	hub := registry.New()
+	requests := make(chan synthetic.Request, 1)
+	c := kinds["lighthouse"].new(syntheticjobtest.Executor{
+		ExecuteFunc: func(ctx context.Context, r synthetic.Request, _ func(synthetic.JobState)) synthetic.Execution {
+			requests <- r
+			<-ctx.Done()
+			return synthetic.Execution{
+				Drained: true,
+				Run: synthetic.Run{
+					Outcome: synthetic.Cancelled,
+				},
+			}
+		},
+	}, hub, settings{}).(*syntheticcollector.Lighthouse)
+	c.URL = target
+	start(t, c)
+	assert.Equal(t, target, receive(t, requests).URL)
+	jobs := hub.Snapshot(time.Now())
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "https://example.org/?token=[REDACTED]&password=[REDACTED]&page=home", jobs[0].Target)
 }
 
 func TestOutcomesAndMissingObservations(t *testing.T) {

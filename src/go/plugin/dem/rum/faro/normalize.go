@@ -14,15 +14,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-var defaultRedactor = redact.NewRedactor()
-
 var viewURLScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
 // Text is normalized before it becomes an aggregation key or retained evidence.
 // Opaque protocol IDs use their own validation and are not generalized as paths.
 func (o Options) redactor() *redact.Redactor {
 	if o.Redactor == nil {
-		return defaultRedactor
+		return redact.Patterns
 	}
 	return o.Redactor
 }

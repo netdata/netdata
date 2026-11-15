@@ -30,21 +30,23 @@ func privateCaptures(t *testing.T) *artifacts.Store {
 	return captures
 }
 
+// The retention store adapters let tests observe and fail sweeps.
+type historyRetentionFunc func(context.Context, int, int64) error
+
+func (f historyRetentionFunc) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
+	return f(ctx, days, maxBytes)
+}
+
+type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Status, error)
+
+func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Status, error) {
+	return f(ctx, days, maxBytes)
+}
+
 // keptArtifacts is an artifact store with nothing to expire.
 var keptArtifacts = artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
 	return artifacts.Status{}, nil
 })
-
-type observedRetention struct {
-	*journalstore.Store
-	swept chan error
-}
-
-func (r *observedRetention) EnforceHistoryRetention(ctx context.Context, days int, bytes int64) error {
-	err := r.Store.EnforceHistoryRetention(ctx, days, bytes)
-	r.swept <- err
-	return err
-}
 
 func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	ctx := context.Background()
@@ -70,17 +72,18 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 		Artifacts: DefaultConfig().Artifacts,
 	})
 	service := components.Retention
-	observed := &observedRetention{
-		Store: st,
-		swept: make(chan error, 1),
-	}
-	service.store = observed
+	swept := make(chan error, 1)
+	service.history = historyRetentionFunc(func(ctx context.Context, days int, maxBytes int64) error {
+		err := st.EnforceHistoryRetention(ctx, days, maxBytes)
+		swept <- err
+		return err
+	})
 	runCtx, cancel := context.WithCancel(ctx)
 	done := make(chan struct{})
 	go func() { defer close(done); service.Run(runCtx) }()
 	t.Cleanup(func() { cancel(); <-done })
 	select {
-	case err := <-observed.swept:
+	case err := <-swept:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
 		t.Fatal("retention did not sweep with no site jobs")
@@ -104,21 +107,16 @@ func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	assert.Equal(t, "recent", rows[0].SessionID)
 }
 
-type blockingRetention struct{ entered chan struct{} }
-
-func (r *blockingRetention) EnforceHistoryRetention(ctx context.Context, _ int, _ int64) error {
-	close(r.entered)
-	<-ctx.Done()
-	return ctx.Err()
-}
 func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
-	backend := &blockingRetention{
-		entered: make(chan struct{}),
-	}
+	entered := make(chan struct{})
 	service := &Retention{
-		store:          backend,
-		policy:         DefaultConfig().History,
-		artifactStore:  keptArtifacts,
+		history: historyRetentionFunc(func(ctx context.Context, _ int, _ int64) error {
+			close(entered)
+			<-ctx.Done()
+			return ctx.Err()
+		}),
+		historyPolicy:  DefaultConfig().History,
+		artifacts:      keptArtifacts,
 		artifactPolicy: DefaultConfig().Artifacts,
 		log:            logger.New(),
 	}
@@ -126,7 +124,7 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 	defer cancel()
 	done := make(chan struct{})
 	go func() { defer close(done); service.Run(ctx) }()
-	<-backend.entered
+	<-entered
 	cancel()
 	select {
 	case <-done:
@@ -143,9 +141,9 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	components := New(
 		Dependencies{
-			History:        history,
-			Artifacts:      privateCaptures(t),
-			ConfigProvider: func() (Config, error) { return LoadConfig(multipath.New(dir)) },
+			History:      history,
+			Artifacts:    privateCaptures(t),
+			ReloadConfig: func() (Config, error) { return LoadConfig(multipath.New(dir)) },
 		},
 		DefaultConfig(),
 	)
@@ -155,13 +153,13 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	assert.Equal(t, RetentionConfig{
 		Days:     7,
 		MaxBytes: 8388608,
-	}, service.policy)
+	}, service.historyPolicy)
 	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
 	service.reloadPolicy()
 	assert.Equal(t, RetentionConfig{
 		Days:     14,
 		MaxBytes: 16777216,
-	}, service.policy)
+	}, service.historyPolicy)
 	for name, body := range map[string]string{
 		"invalid value":  "history: {days: 0, max_bytes: 1}",
 		"invalid syntax": "history: [",
@@ -173,7 +171,7 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 			assert.Equal(t, RetentionConfig{
 				Days:     14,
 				MaxBytes: 16777216,
-			}, service.policy)
+			}, service.historyPolicy)
 		})
 	}
 	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
@@ -181,107 +179,42 @@ func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	assert.Empty(t, service.PolicyError())
 }
 
-type transientRetention struct{ calls chan int }
-
-func (r *transientRetention) EnforceHistoryRetention(context.Context, int, int64) error {
-	r.calls <- 1
-	return errors.New("temporary filesystem failure")
-}
-func TestRetentionRetriesTransientFailureBeforeHourlySweep(t *testing.T) {
-	backend := &transientRetention{
-		calls: make(chan int, 2),
-	}
-	service := &Retention{
-		store:          backend,
-		policy:         DefaultConfig().History,
-		artifactStore:  keptArtifacts,
-		artifactPolicy: DefaultConfig().Artifacts,
-		log:            logger.New(),
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { defer close(done); service.Run(ctx) }()
-	t.Cleanup(func() { cancel(); <-done })
-	select {
-	case <-backend.calls:
-	case <-time.After(time.Second):
-		t.Fatal("initial sweep did not run")
-	}
-	select {
-	case <-backend.calls:
-	case <-time.After(6 * time.Second):
-		t.Fatal("transient failure stalled retention until the hourly sweep")
-	}
-}
-
-type observedArtifactRetention struct{ sweeps chan RetentionConfig }
-
-func (r *observedArtifactRetention) Enforce(_ context.Context, days int, bytes int64) (artifacts.Status, error) {
-	r.sweeps <- RetentionConfig{
-		Days:     days,
-		MaxBytes: bytes,
-	}
-	return artifacts.Status{}, nil
-}
-func TestArtifactSweepStillRunsWhenJournalSweepFails(t *testing.T) {
-	artifact := &observedArtifactRetention{
-		sweeps: make(chan RetentionConfig, 1),
-	}
-	service := &Retention{
-		store: &transientRetention{
-			calls: make(chan int, 1),
-		},
-		policy:         DefaultConfig().History,
-		artifactStore:  artifact,
-		artifactPolicy: DefaultConfig().Artifacts,
-		log:            logger.New(),
-	}
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	go func() { defer close(done); service.Run(ctx) }()
-	defer func() { cancel(); <-done }()
-	select {
-	case policy := <-artifact.sweeps:
-		assert.Equal(t, DefaultConfig().Artifacts, policy)
-	case <-time.After(time.Second):
-		t.Fatal("journal failure prevented independent artifact expiry")
-	}
-}
-
-type historyRetentionFunc func(context.Context, int, int64) error
-
-func (f historyRetentionFunc) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
-	return f(ctx, days, maxBytes)
-}
-
-type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Status, error)
-
-func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Status, error) {
-	return f(ctx, days, maxBytes)
-}
+// A failed sweep is logged and retried promptly without sweeping the other
+// store again; each store gets its own policy.
 func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 	for _, failedStore := range []string{"history", "artifacts"} {
 		t.Run(failedStore, func(t *testing.T) {
 			synctest.Test(t, func(t *testing.T) {
 				var historyCalls, artifactCalls atomic.Int32
+				var logs bytes.Buffer
 				service := &Retention{
-					store: historyRetentionFunc(func(context.Context, int, int64) error {
+					history: historyRetentionFunc(func(_ context.Context, days int, maxBytes int64) error {
 						historyCalls.Add(1)
+						assert.Equal(t, DefaultConfig().History, RetentionConfig{
+							Days:     days,
+							MaxBytes: maxBytes,
+						})
 						if failedStore == "history" {
 							return errors.New("history unavailable")
 						}
 						return nil
 					}),
-					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
-						artifactCalls.Add(1)
-						if failedStore == "artifacts" {
-							return artifacts.Status{}, errors.New("artifacts unavailable")
-						}
-						return artifacts.Status{}, nil
-					}),
-					policy:         DefaultConfig().History,
+					artifacts: artifactRetentionFunc(
+						func(_ context.Context, days int, maxBytes int64) (artifacts.Status, error) {
+							artifactCalls.Add(1)
+							assert.Equal(t, DefaultConfig().Artifacts, RetentionConfig{
+								Days:     days,
+								MaxBytes: maxBytes,
+							})
+							if failedStore == "artifacts" {
+								return artifacts.Status{}, errors.New("artifacts unavailable")
+							}
+							return artifacts.Status{}, nil
+						},
+					),
+					historyPolicy:  DefaultConfig().History,
 					artifactPolicy: DefaultConfig().Artifacts,
-					log:            logger.NewWithWriter(&bytes.Buffer{}),
+					log:            logger.NewWithWriter(&logs),
 				}
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
@@ -298,60 +231,30 @@ func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
 					assert.Equal(t, int32(1), historyCalls.Load())
 					assert.Equal(t, int32(3), artifactCalls.Load())
 				}
-			})
-		})
-	}
-}
-func TestRetentionDoesNotTreatWorkspaceAsCaptureBudget(t *testing.T) {
-	for _, failed := range []bool{false, true} {
-		t.Run(map[bool]string{false: "fresh", true: "stale"}[failed], func(t *testing.T) {
-			synctest.Test(t, func(t *testing.T) {
-				var logs bytes.Buffer
-				service := &Retention{
-					store: historyRetentionFunc(func(context.Context, int, int64) error { return nil }),
-					artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
-						workspace := DefaultConfig().Artifacts.MaxBytes + 1
-						stats := artifacts.Status{
-							Inventory: artifacts.Inventory{
-								Workspace: artifacts.ByteObservation{
-									Bytes: &workspace,
-								},
-							},
-						}
-						if failed {
-							return stats, errors.New("artifact sweep failed")
-						}
-						return stats, nil
-					}),
-					policy:         DefaultConfig().History,
-					artifactPolicy: DefaultConfig().Artifacts,
-					log:            logger.NewWithWriter(&logs),
-				}
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				go service.Run(ctx)
-				synctest.Wait()
-				if failed {
-					assert.Contains(t, logs.String(), "DEM artifact retention failed")
-					assert.NotContains(t, logs.String(), "protected run files exceed artifact budget")
-				} else {
-					assert.NotContains(t, logs.String(), "protected run files exceed artifact budget")
+				for store, warning := range map[string]string{
+					"history":   "DEM history retention failed",
+					"artifacts": "DEM artifact retention failed",
+				} {
+					if store == failedStore {
+						assert.Contains(t, logs.String(), warning)
+					} else {
+						assert.NotContains(t, logs.String(), warning)
+					}
 				}
 			})
 		})
 	}
 }
-
 func TestRetentionMaintainsHourlySweep(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		var historyCalls, artifactCalls atomic.Int32
 		service := &Retention{
-			store: historyRetentionFunc(func(context.Context, int, int64) error { historyCalls.Add(1); return nil }),
-			artifactStore: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
+			history: historyRetentionFunc(func(context.Context, int, int64) error { historyCalls.Add(1); return nil }),
+			artifacts: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
 				artifactCalls.Add(1)
 				return artifacts.Status{}, nil
 			}),
-			policy:         DefaultConfig().History,
+			historyPolicy:  DefaultConfig().History,
 			artifactPolicy: DefaultConfig().Artifacts,
 			log:            logger.NewWithWriter(&bytes.Buffer{}),
 		}
@@ -381,9 +284,9 @@ func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 	edited := initial
 	edited.History.Days = 7
 	components := New(Dependencies{
-		History:        store,
-		Artifacts:      privateCaptures(t),
-		ConfigProvider: func() (Config, error) { return edited, reloadErr },
+		History:      store,
+		Artifacts:    privateCaptures(t),
+		ReloadConfig: func() (Config, error) { return edited, reloadErr },
 	}, initial)
 	var handler funcapi.RawMethodHandler
 	for _, provider := range components.Functions {

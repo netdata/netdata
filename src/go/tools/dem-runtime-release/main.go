@@ -32,83 +32,80 @@ func run(args []string, diagnostics io.Writer) error {
 	if len(args) == 0 {
 		return errors.New("usage: dem-runtime-release sign|verify|stage-native [flags]")
 	}
-	if args[0] == "stage-native" {
-		return stageNative(args[1:], diagnostics)
-	}
-	fs := flag.NewFlagSet(args[0], flag.ContinueOnError)
-	fs.SetOutput(diagnostics)
-	var key, publicKey, descriptor, archive, sources string
-	fs.StringVar(&key, "key", "", "GPG signing fingerprint (sign) or local public OpenPGP keyring path (verify)")
-	fs.StringVar(&archive, "archive", "", "local runtime archive (required for sign; optional for verify)")
-	fs.StringVar(&sources, "sources", "", "local source archive (required for sign; optional for verify)")
-	var manifest, archiveURL, sourcesURL string
-	var sequence uint64
 	switch args[0] {
 	case "sign":
-		fs.StringVar(&publicKey, "public-key", "", "local public OpenPGP keyring to verify the generated signature")
-		fs.StringVar(&descriptor, "output", "", "new immutable signed descriptor path")
-		fs.StringVar(&manifest, "manifest", "", "builder manifest JSON")
-		fs.StringVar(&archiveURL, "archive-url", "", "immutable HTTPS runtime archive publication URL")
-		fs.StringVar(&sourcesURL, "sources-url", "", "immutable HTTPS source archive publication URL")
-		fs.Uint64Var(&sequence, "sequence", 0, "positive publication sequence in the shared release channel")
+		return sign(args[1:], diagnostics)
 	case "verify":
-		fs.StringVar(&descriptor, "release", "", "signed descriptor path")
+		return verify(args[1:], diagnostics)
+	case "stage-native":
+		return stageNative(args[1:], diagnostics)
 	default:
 		return fmt.Errorf("unknown command %q", args[0])
 	}
-	if err := fs.Parse(args[1:]); err != nil {
+}
+
+func sign(args []string, diagnostics io.Writer) error {
+	fs := flag.NewFlagSet("sign", flag.ContinueOnError)
+	fs.SetOutput(diagnostics)
+	key := fs.String("key", "", "GPG signing fingerprint")
+	publicKey := fs.String("public-key", "", "local public OpenPGP keyring to verify the generated signature")
+	descriptor := fs.String("output", "", "new immutable signed descriptor path")
+	manifest := fs.String("manifest", "", "builder manifest JSON")
+	archive := fs.String("archive", "", "local runtime archive")
+	sources := fs.String("sources", "", "local source archive")
+	archiveURL := fs.String("archive-url", "", "immutable HTTPS runtime archive publication URL")
+	sourcesURL := fs.String("sources-url", "", "immutable HTTPS source archive publication URL")
+	sequence := fs.Uint64("sequence", 0, "positive publication sequence in the shared release channel")
+	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
 		return errors.New("unexpected positional arguments")
 	}
-	if key == "" || descriptor == "" {
+	if *key == "" || *descriptor == "" {
 		return errors.New("key and descriptor paths are required")
 	}
-	if args[0] == "verify" {
-		return verify(key, descriptor, archive, sources)
-	}
-	if publicKey == "" || manifest == "" || archive == "" || sources == "" || archiveURL == "" || sourcesURL == "" ||
-		sequence == 0 {
+	if *publicKey == "" || *manifest == "" || *archive == "" || *sources == "" || *archiveURL == "" ||
+		*sourcesURL == "" || *sequence == 0 {
 		return errors.New(
 			"sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence",
 		)
 	}
-	m, err := readBuilderManifest(manifest)
+	m, err := readBuilderManifest(*manifest)
 	if err != nil {
 		return err
 	}
-	if m.Archive.URL != "" && m.Archive.URL != archiveURL {
+	if m.Archive.URL != "" && m.Archive.URL != *archiveURL {
 		return errors.New("archive-url differs from builder manifest")
 	}
-	m.Archive.URL = archiveURL
+	m.Archive.URL = *archiveURL
 	if err := m.Validate(); err != nil {
 		return err
 	}
-	if err := checkFile(archive, m.Archive.SHA256, m.Archive.Bytes); err != nil {
+	if err := checkFile(*archive, m.Archive.SHA256, m.Archive.Bytes); err != nil {
 		return fmt.Errorf("runtime archive: %w", err)
 	}
-	hash, size, err := hashFile(sources)
+	hash, size, err := hashFile(*sources)
 	if err != nil {
 		return fmt.Errorf("source archive: %w", err)
 	}
 	release := browserruntime.Release{
 		Format:   1,
-		Sequence: sequence,
+		Sequence: *sequence,
 		Manifest: m,
 		Sources: browserruntime.ReleaseSource{
-			URL:    sourcesURL,
+			URL:    *sourcesURL,
 			SHA256: hash,
 			Bytes:  size,
 		},
 	}
-	trusted, err := browserruntime.ReadReleaseKeyring(publicKey)
+	trusted, err := browserruntime.ReadReleaseKeyring(*publicKey)
 	if err != nil {
 		return err
 	}
 	// Accept a full fingerprint only; argument parsing must never select another
 	// GPG operation or a loosely matching user ID from the publisher keyring.
-	if (len(key) != 40 && len(key) != 64) || strings.Trim(key, "0123456789abcdefABCDEF") != "" {
+	if (len(*key) != 40 && len(*key) != 64) || strings.Trim(*key, "0123456789abcdefABCDEF") != "" {
 		return errors.New("sign requires a full GPG signing fingerprint")
 	}
 	payload, err := browserruntime.ReleaseSigningPayload(release)
@@ -124,7 +121,7 @@ func run(args []string, diagnostics io.Writer) error {
 		"--digest-algo",
 		"SHA256",
 		"--local-user",
-		key,
+		*key,
 		"--detach-sign",
 		"--output",
 		"-",
@@ -143,15 +140,30 @@ func run(args []string, diagnostics io.Writer) error {
 	if _, err := browserruntime.VerifyRelease(signed, trusted); err != nil {
 		return fmt.Errorf("verify generated signature: %w", err)
 	}
-	return writeNew(descriptor, signed)
+	return writeNew(*descriptor, signed)
 }
 
-func verify(key, descriptor, archive, sources string) error {
-	public, err := browserruntime.ReadReleaseKeyring(key)
+func verify(args []string, diagnostics io.Writer) error {
+	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
+	fs.SetOutput(diagnostics)
+	key := fs.String("key", "", "local public OpenPGP keyring path")
+	descriptor := fs.String("release", "", "signed descriptor path")
+	archive := fs.String("archive", "", "optional local runtime archive to check")
+	sources := fs.String("sources", "", "optional local source archive to check")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 0 {
+		return errors.New("unexpected positional arguments")
+	}
+	if *key == "" || *descriptor == "" {
+		return errors.New("key and descriptor paths are required")
+	}
+	public, err := browserruntime.ReadReleaseKeyring(*key)
 	if err != nil {
 		return err
 	}
-	data, err := readBounded(descriptor)
+	data, err := readBounded(*descriptor)
 	if err != nil {
 		return err
 	}
@@ -160,13 +172,13 @@ func verify(key, descriptor, archive, sources string) error {
 		return err
 	}
 	release := verified.Release()
-	if archive != "" {
-		if err := checkFile(archive, release.Manifest.Archive.SHA256, release.Manifest.Archive.Bytes); err != nil {
+	if *archive != "" {
+		if err := checkFile(*archive, release.Manifest.Archive.SHA256, release.Manifest.Archive.Bytes); err != nil {
 			return fmt.Errorf("runtime archive: %w", err)
 		}
 	}
-	if sources != "" {
-		if err := checkFile(sources, release.Sources.SHA256, release.Sources.Bytes); err != nil {
+	if *sources != "" {
+		if err := checkFile(*sources, release.Sources.SHA256, release.Sources.Bytes); err != nil {
 			return fmt.Errorf("source archive: %w", err)
 		}
 	}
