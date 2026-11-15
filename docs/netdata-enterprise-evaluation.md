@@ -97,7 +97,7 @@ For high availability configurations, see [Clustering and High Availability of N
 
 ### Netdata Cloud On-Prem
 
-For organizations that need the control plane inside their own network, including air-gapped environments, Netdata Cloud On-Prem runs the full Netdata Cloud on your Kubernetes cluster, installed and upgraded with Helm. A single-host installer gets a proof of concept running without Kubernetes. See [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) for sizing and installation.
+For organizations that need the control plane inside their own network, including air-gapped environments, Netdata Cloud On-Prem runs the full Netdata Cloud on your Kubernetes cluster, installed and upgraded with Helm. A single-host k3s installer gets smaller teams started without an existing Kubernetes cluster. See [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) for sizing and installation.
 
 ## Rollout / Lifecycle Management
 
