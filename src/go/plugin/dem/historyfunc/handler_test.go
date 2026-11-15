@@ -100,10 +100,21 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 			Method:      method.ID,
 			Permissions: "0x1",
 		}, 403},
-		{"payload", funcapi.RawMethodRequest{
+		{"payload field", funcapi.RawMethodRequest{
 			Method:      method.ID,
 			Permissions: "0x1b",
-			Payload:     []byte("{}"),
+			Payload:     []byte(`{"after":1}`),
+		}, 400},
+		{"payload not an object", funcapi.RawMethodRequest{
+			Method:      method.ID,
+			Permissions: "0x1b",
+			Payload:     []byte(`[]`),
+		}, 400},
+		{"payload field on info", funcapi.RawMethodRequest{
+			Method:  method.ID,
+			Info:    true,
+			Args:    []string{"info"},
+			Payload: []byte(`{"site":"shop"}`),
 		}, 400},
 		{"time filter", funcapi.RawMethodRequest{
 			Method:      method.ID,
@@ -156,4 +167,40 @@ func TestStorageErrorStatuses(t *testing.T) {
 			assert.Equal(t, tc.want, h.HandleRaw(context.Background(), request()))
 		})
 	}
+}
+
+func TestCloudTableRequests(t *testing.T) {
+	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
+		return journalstore.Status{}, nil
+	}), func() string { return "" })
+	// The table sends no query or selections to a Function without accepted parameters.
+	body := []byte(`{"timeout":120000,"last":200}`)
+	for name, req := range map[string]funcapi.RawMethodRequest{
+		"info call": {
+			Method: method.ID,
+			Info:   true,
+			Args:   []string{"info", "after:1700000000", "before:1700000900"},
+		},
+		"info with body": {
+			Method:  method.ID,
+			Info:    true,
+			Args:    []string{"info"},
+			Payload: body,
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, &funcapi.FunctionResponse{
+				Status: 200,
+				Help:   method.Help,
+			}, h.HandleRaw(context.Background(), req))
+		})
+	}
+	data := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		Method:      method.ID,
+		Payload:     body,
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, data.RawResponse, data.Message)
+	assert.Equal(t, 200, data.RawResponse["status"])
+	assert.Len(t, data.RawResponse["data"], 1)
 }

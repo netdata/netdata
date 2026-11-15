@@ -281,6 +281,24 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 				assert.Equal(t, string(synthetic.Failed), response["run"].(map[string]any)["outcome"])
 				info := output.call(t, writer, "info"+suffix, "synthetics-runs info")
 				assert.NotContains(t, fmt.Sprint(info), "__job")
+				// The Cloud UI's Function table asks for info with its time window and posts data requests as a body.
+				for _, method := range []string{"rum-pages", "rum-sessions", "synthetics-checks", "synthetics-runs", "dem-history-status"} {
+					output.call(t, writer, "ui-info-"+method+suffix, method+" info after:1700000000 before:1700000900")
+				}
+				const tableBody = `{"after":1700000000,"before":1700000900,"query":"","selections":{},"timeout":120000,"last":200}`
+				for _, method := range []string{"rum-sessions", "synthetics-runs"} {
+					response := output.request(t, writer, "ui-data-"+method+suffix, method, tableBody, 200)
+					require.NoError(t, schema.Validate(response))
+				}
+				status = output.request(
+					t,
+					writer,
+					"ui-data-history"+suffix,
+					"dem-history-status",
+					`{"timeout":120000,"last":200}`,
+					200,
+				)
+				require.NoError(t, schema.Validate(status))
 				for _, method := range []string{"rum-sites", "rum-pages", "rum-live", "rum-sessions", "rum-errors", "rum-session-events", "synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
 					id := method + suffix
 					args := ""
@@ -291,7 +309,7 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					byGUID := output.call(t, writer, "guid-"+id, method+args+" vnode_guid:"+siteGUID)
 					assert.Equal(t, selectionData(byGUID), selectionData(byName))
 					assert.Contains(t, byName["accepted_params"], "vnode")
-					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode:storefront vnode:storefront"} {
+					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode_guid:not-a-guid"} {
 						output.request(
 							t,
 							writer,

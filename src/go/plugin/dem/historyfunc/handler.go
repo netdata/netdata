@@ -54,11 +54,8 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Method != method.ID {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	if r := rawfunc.NoPayload(req); r != nil {
+	if _, r := rawfunc.Admit(req, nil, nil); r != nil {
 		return r
-	}
-	if _, err := rawfunc.ParseArgs(req, nil); err != nil {
-		return funcapi.ErrorResponse(400, "history status does not accept arguments")
 	}
 	// Metadata remains available without accessing the store or reload state.
 	if req.Info {
@@ -66,9 +63,6 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 			Status: 200,
 			Help:   method.Help,
 		}
-	}
-	if r := rawfunc.RequireMember(req); r != nil {
-		return r
 	}
 	if r := rawfunc.Cancelled(ctx.Err()); r != nil {
 		return r

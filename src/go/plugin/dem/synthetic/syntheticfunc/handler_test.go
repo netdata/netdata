@@ -11,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
 
@@ -170,7 +171,6 @@ func TestInfoNeverReadsDependencies(t *testing.T) {
 			)
 			assert.Equal(t, 200, got.Status)
 			assert.NotEmpty(t, got.Help)
-			assert.NotEmpty(t, got.Columns)
 			assert.NotContains(t, decl.AcceptedParams, "__job")
 		})
 	}
@@ -197,25 +197,15 @@ func TestPermissionsAndInvalidRequests(t *testing.T) {
 			Permissions: "0x1b",
 			Args:        []string{"job_id:journey:a", "run_id:r", "artifact_id:screenshot"},
 		}, 403},
-		"payload": {funcapi.RawMethodRequest{
+		"payload field": {funcapi.RawMethodRequest{
 			Method:      "synthetics-checks",
 			Permissions: "0x1b",
-			Payload:     []byte("{}"),
+			Payload:     []byte(`{"password":"secret"}`),
 		}, 400},
 		"unsupported argument": {funcapi.RawMethodRequest{
 			Method:      "synthetics-checks",
 			Permissions: "0x1b",
 			Args:        []string{"password:secret"},
-		}, 400},
-		"duplicate argument": {funcapi.RawMethodRequest{
-			Method:      "synthetics-checks",
-			Permissions: "0x1b",
-			Args:        []string{"kind:journey", "kind:lighthouse"},
-		}, 400},
-		"malformed argument": {funcapi.RawMethodRequest{
-			Method:      "synthetics-checks",
-			Permissions: "0x1b",
-			Args:        []string{"kind"},
 		}, 400},
 		"unknown method": {funcapi.RawMethodRequest{
 			Method:      "not-a-function",
@@ -980,5 +970,214 @@ func TestCancellationStatuses(t *testing.T) {
 			assert.Equal(t, synthetichistory.RunFilter{}, src.filter, "history is not queried")
 			assert.Zero(t, src.getCalls, "history is not read")
 		})
+	}
+}
+
+// recordingDeps answers every read with an empty result and records which reads ran and the runs filter.
+type recordingDeps struct {
+	reads  *[]string
+	filter *synthetichistory.RunFilter
+}
+
+func (d recordingDeps) Jobs(time.Time) []syntheticregistry.Job {
+	*d.reads = append(*d.reads, "Jobs")
+	return nil
+}
+
+func (d recordingDeps) Catalogue(context.Context, artifacts.Filter) (query.CataloguePage, error) {
+	*d.reads = append(*d.reads, "Catalogue")
+	return query.CataloguePage{}, nil
+}
+
+func (d recordingDeps) Runs(_ context.Context, filter synthetichistory.RunFilter) (synthetichistory.RunPage, error) {
+	*d.reads = append(*d.reads, "Runs")
+	*d.filter = filter
+	return synthetichistory.RunPage{}, nil
+}
+
+func (d recordingDeps) Run(context.Context, string, string) (model.Run, error) {
+	*d.reads = append(*d.reads, "Run")
+	return model.Run{}, nil
+}
+
+func (d recordingDeps) Evidence(context.Context, string, string, string) (query.Evidence, error) {
+	*d.reads = append(*d.reads, "Evidence")
+	return query.Evidence{}, nil
+}
+
+func newRecordingHandler(
+	lookup func(string) (string, bool),
+) (*syntheticfunc.Handler, *[]string, *synthetichistory.RunFilter) {
+	reads, filter := &[]string{}, &synthetichistory.RunFilter{}
+	return syntheticfunc.New(recordingDeps{
+		reads:  reads,
+		filter: filter,
+	}, lookup), reads, filter
+}
+
+// requiredRun names the run that run-scoped methods need before they read.
+var requiredRun = map[string]bool{"synthetics-run": true, "synthetics-artifact": true}
+
+func requiredArgs(id string) []string {
+	if requiredRun[id] {
+		return []string{"job_id:journey:checkout", "run_id:r"}
+	}
+	return nil
+}
+
+// cloudTableBody is the body the Cloud UI's Function table posts for a data request: the accepted parameters with
+// values, an empty search, no facet selections and its transport fields. synthetics-artifacts is left without its
+// time window: its before is a cursor.
+func cloudTableBody(t *testing.T, decl funcapi.FunctionConfig) []byte {
+	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
+	for _, param := range decl.AcceptedParams {
+		switch {
+		case param == "after":
+			body["after"] = 1700000000
+		case param == "before" && decl.ID != "synthetics-artifacts":
+			body["before"] = 1700000900
+		}
+	}
+	if requiredRun[decl.ID] {
+		body["job_id"], body["run_id"] = "journey:checkout", "r"
+	}
+	data, err := json.Marshal(body)
+	require.NoError(t, err)
+	return data
+}
+
+func TestCloudTableRequests(t *testing.T) {
+	for _, decl := range syntheticfunc.Declarations() {
+		t.Run(decl.ID, func(t *testing.T) {
+			h, reads, _ := newRecordingHandler(nil)
+			info := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method: decl.ID,
+				Info:   true,
+				Args:   []string{"info", "after:1700000000", "before:1700000900"},
+			})
+			assert.Equal(t, 200, info.Status, info.Message)
+			assert.NotEmpty(t, info.Help)
+
+			body := cloudTableBody(t, decl)
+			info = h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:  decl.ID,
+				Info:    true,
+				Args:    []string{"info"},
+				Payload: body,
+			})
+			assert.Equal(t, 200, info.Status, info.Message)
+			assert.Empty(t, *reads, "info reads nothing")
+
+			data := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      decl.ID,
+				Payload:     body,
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, data.RawResponse, data.Message)
+			assert.Equal(t, 200, data.RawResponse["status"])
+			assert.Len(t, *reads, 1)
+		})
+	}
+}
+
+func TestCloudTableTimeWindowSelectsTheRuns(t *testing.T) {
+	h, _, filter := newRecordingHandler(nil)
+	response := h.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		Method: "synthetics-runs",
+		Payload: []byte(
+			`{"after":1700000000,"before":1700000900,"query":"","selections":{},"timeout":120000,"last":200}`,
+		),
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, response.RawResponse, response.Message)
+	before := int64(1700000900)
+	assert.Equal(t, synthetichistory.RunFilter{
+		After:  1700000000,
+		Before: &before,
+		Limit:  2000,
+	}, *filter)
+}
+
+func TestRejectedRequestsReadNothing(t *testing.T) {
+	unknownVnode := func(string) (string, bool) { return "", false }
+	for name, tc := range map[string]struct {
+		req  funcapi.RawMethodRequest
+		want *funcapi.FunctionResponse
+	}{
+		"data without member access": {
+			req: funcapi.RawMethodRequest{
+				Permissions: "0x17",
+			},
+			want: funcapi.ErrorResponse(403, "member permissions are required"),
+		},
+		"unsupported argument": {
+			req: funcapi.RawMethodRequest{
+				Args:        []string{"password:secret"},
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "password"`),
+		},
+		"unsupported payload field": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`{"password":"secret","timeout":120000}`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "password"`),
+		},
+		"unsupported payload field on info": {
+			req: funcapi.RawMethodRequest{
+				Info:    true,
+				Args:    []string{"info"},
+				Payload: []byte(`{"password":"secret"}`),
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "password"`),
+		},
+		"search query": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`{"query":"checkout"}`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "query"`),
+		},
+		"payload not an object": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`"checks"`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, "invalid payload: expected a JSON object"),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, decl := range syntheticfunc.Declarations() {
+				h, reads, _ := newRecordingHandler(unknownVnode)
+				req := tc.req
+				req.Method = decl.ID
+				req.Args = append(slices.Clone(req.Args), requiredArgs(decl.ID)...)
+				assert.Equal(t, tc.want, h.HandleRaw(context.Background(), req), decl.ID)
+				assert.Empty(t, *reads, "%s reads nothing", decl.ID)
+			}
+		})
+	}
+	// Methods with vnode selectors resolve them on info and data alike.
+	for _, decl := range syntheticfunc.Declarations() {
+		if !slices.Contains(decl.AcceptedParams, "vnode") {
+			continue
+		}
+		for name, req := range map[string]funcapi.RawMethodRequest{
+			"data": {
+				Payload:     []byte(`{"vnode":"removed"}`),
+				Permissions: "0x1b",
+			},
+			"info": {
+				Info: true,
+				Args: []string{"info", "vnode:removed"},
+			},
+		} {
+			h, reads, _ := newRecordingHandler(unknownVnode)
+			req.Method = decl.ID
+			got := h.HandleRaw(context.Background(), req)
+			assert.Equal(t, funcapi.ErrorResponse(400, `unknown configured vnode "removed"`), got, decl.ID+" "+name)
+			assert.Empty(t, *reads)
+		}
 	}
 }

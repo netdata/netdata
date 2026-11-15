@@ -4,6 +4,8 @@ package rumfunc_test
 
 import (
 	"context"
+	"encoding/json"
+	"slices"
 	"strconv"
 	"testing"
 	"time"
@@ -201,6 +203,190 @@ func TestSessionsDiscloseTruncationAtTheRowCap(t *testing.T) {
 			assert.Equal(t, tc.truncated, response["truncated"])
 			assert.Equal(t, rawfunc.MaxRows, response["limit"])
 			assert.Contains(t, response["help"], "capped at "+strconv.Itoa(rawfunc.MaxRows)+" and disclose truncation")
+		})
+	}
+}
+
+// required holds the parameters a method needs before it reads rows.
+var required = map[string]map[string]string{"rum-session-events": {"session_id": "visit"}}
+
+// requiredArgs returns a method's required parameters as key:value arguments.
+func requiredArgs(id string) []string {
+	var args []string
+	for key, value := range required[id] {
+		args = append(args, key+":"+value)
+	}
+	return args
+}
+
+// cloudTableBody is the body the Cloud UI's Function table posts for a data request: the accepted parameters with
+// values, an empty search, no facet selections and its transport fields. rum-live is left without its time window:
+// its after is a cursor.
+func cloudTableBody(t *testing.T, declaration funcapi.FunctionConfig) []byte {
+	body := map[string]any{"query": "", "selections": map[string]any{}, "timeout": 120000, "last": 200}
+	for _, param := range declaration.AcceptedParams {
+		switch {
+		case param == "after" && declaration.ID != "rum-live":
+			body["after"] = 1700000000
+		case param == "before":
+			body["before"] = 1700000900
+		}
+	}
+	for key, value := range required[declaration.ID] {
+		body[key] = value
+	}
+	data, err := json.Marshal(body)
+	require.NoError(t, err)
+	return data
+}
+
+func TestCloudTableRequests(t *testing.T) {
+	for _, declaration := range rumfunc.Declarations() {
+		t.Run(declaration.ID, func(t *testing.T) {
+			var reads []string
+			handler := rumfunc.New(recordingSource{&reads}, nil)
+			info := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method: declaration.ID,
+				Info:   true,
+				Args: append(
+					[]string{"info", "after:1700000000", "before:1700000900"},
+					requiredArgs(declaration.ID)...),
+			})
+			assert.Equal(t, 200, info.Status, info.Message)
+			assert.NotEmpty(t, info.Help)
+			assert.NotContains(t, reads, rowReads[declaration.ID], "info reads no rows")
+
+			body := cloudTableBody(t, declaration)
+			info = handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:  declaration.ID,
+				Info:    true,
+				Args:    []string{"info"},
+				Payload: body,
+			})
+			assert.Equal(t, 200, info.Status, info.Message)
+
+			data := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      declaration.ID,
+				Payload:     body,
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, data.RawResponse, data.Message)
+			assert.Equal(t, 200, data.RawResponse["status"])
+			assert.Len(t, data.RawResponse["data"], 1)
+			assert.Contains(t, reads, rowReads[declaration.ID])
+		})
+	}
+}
+
+// rangeSource records the time range of a sessions read.
+type rangeSource struct {
+	recordingSource
+	after, before *int64
+}
+
+func (s rangeSource) Sessions(
+	_ context.Context,
+	_, _ string,
+	after, before int64,
+	_ int,
+	_ string,
+) ([]query.Session, error) {
+	*s.after, *s.before = after, before
+	return nil, nil
+}
+
+func TestCloudTableTimeWindowSelectsTheRange(t *testing.T) {
+	var reads []string
+	var after, before int64
+	handler := rumfunc.New(rangeSource{
+		recordingSource: recordingSource{&reads},
+		after:           &after,
+		before:          &before,
+	}, nil)
+	response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		Method: "rum-sessions",
+		Payload: []byte(
+			`{"after":1700000000,"before":1700000900,"query":"","selections":{},"timeout":120000,"last":200}`,
+		),
+		Permissions: "0x1b",
+	})
+	require.NotNil(t, response.RawResponse, response.Message)
+	assert.Equal(t, [2]int64{1700000000, 1700000900}, [2]int64{after, before})
+}
+
+func TestRejectedRequestsReadNothing(t *testing.T) {
+	unknownVnode := func(string) (string, bool) { return "", false }
+	for name, tc := range map[string]struct {
+		req  funcapi.RawMethodRequest
+		want *funcapi.FunctionResponse
+	}{
+		"data without member access": {
+			req: funcapi.RawMethodRequest{
+				Permissions: "0x17",
+			},
+			want: funcapi.ErrorResponse(403, "member permissions are required"),
+		},
+		"unsupported argument": {
+			req: funcapi.RawMethodRequest{
+				Args:        []string{"limit:1"},
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "limit"`),
+		},
+		"unsupported payload field": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`{"limit":1,"timeout":120000}`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "limit"`),
+		},
+		"unsupported payload field on info": {
+			req: funcapi.RawMethodRequest{
+				Info:    true,
+				Args:    []string{"info"},
+				Payload: []byte(`{"limit":1}`),
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "limit"`),
+		},
+		"search query": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`{"query":"checkout"}`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unsupported argument "query"`),
+		},
+		"payload not an object": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`[]`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, "invalid payload: expected a JSON object"),
+		},
+		"unknown vnode": {
+			req: funcapi.RawMethodRequest{
+				Payload:     []byte(`{"vnode":"removed"}`),
+				Permissions: "0x1b",
+			},
+			want: funcapi.ErrorResponse(400, `unknown configured vnode "removed"`),
+		},
+		"unknown vnode on info": {
+			req: funcapi.RawMethodRequest{
+				Info: true,
+				Args: []string{"info", "vnode:removed"},
+			},
+			want: funcapi.ErrorResponse(400, `unknown configured vnode "removed"`),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			for _, declaration := range rumfunc.Declarations() {
+				var reads []string
+				handler := rumfunc.New(recordingSource{&reads}, unknownVnode)
+				req := tc.req
+				req.Method = declaration.ID
+				req.Args = append(slices.Clone(req.Args), requiredArgs(declaration.ID)...)
+				assert.Equal(t, tc.want, handler.HandleRaw(context.Background(), req), declaration.ID)
+				assert.Empty(t, reads, "%s reads nothing", declaration.ID)
+			}
 		})
 	}
 }

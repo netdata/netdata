@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 // Package rawfunc is the request and response plumbing shared by the DEM
-// raw-request Functions: access checks, strict arguments, vnode selectors,
-// cancellation, the table response and its ordered column definition. Each
-// handler keeps its own check order; the orders differ observably.
+// raw-request Functions: request admission (access, strict parameters, vnode
+// selectors), cancellation, the table response and its ordered column
+// definition.
 package rawfunc
 
 import (
@@ -39,50 +39,65 @@ func Permitted(req funcapi.RawMethodRequest, required uint64) bool {
 	return err == nil && mask&required == required
 }
 
-// RequireMember returns a 403 response unless the request has member access.
-// Every DEM Function requires it for data; info is metadata and needs none.
-func RequireMember(req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	if Permitted(req, MemberAccess) {
-		return nil
+// Admit runs the request checks every DEM Function shares, in this order:
+//  1. member access, unless the request is info (metadata needs none);
+//  2. parameters, strictly: names from the arguments, the payload selections
+//     and the top-level payload fields (funcapi.ParseRawParams precedence), each
+//     an accepted name with one string or number value;
+//  3. the vnode or vnode_guid selector, resolved into args["vnode_guid"].
+//
+// Strict names allow what the Cloud UI's Function table sends with every
+// request: its transport fields, an empty query, and on info an after or before
+// the method does not accept (the table's time window).
+func Admit(
+	req funcapi.RawMethodRequest,
+	accepted []string,
+	lookup func(string) (string, bool),
+) (map[string]string, *funcapi.FunctionResponse) {
+	if !req.Info && !Permitted(req, MemberAccess) {
+		return nil, funcapi.ErrorResponse(403, "member permissions are required")
 	}
-	return funcapi.ErrorResponse(403, "member permissions are required")
-}
-
-// NoPayload rejects a request body sent to a read-only Function.
-func NoPayload(req funcapi.RawMethodRequest) *funcapi.FunctionResponse {
-	if len(req.Payload) == 0 {
-		return nil
+	args, err := parameters(req, accepted)
+	if err != nil {
+		return nil, funcapi.ErrorResponse(400, "%v", err)
 	}
-	return funcapi.ErrorResponse(400, "this read-only Function does not accept a payload")
-}
-
-// ParseArgs reads key:value arguments strictly: every key must be accepted and
-// appear once. An info request may also carry the bare word info.
-func ParseArgs(req funcapi.RawMethodRequest, accepted []string) (map[string]string, error) {
-	args := make(map[string]string, len(req.Args))
-	for _, word := range req.Args {
-		if req.Info && word == "info" {
-			continue
-		}
-		key, value, ok := strings.Cut(word, ":")
-		if !ok {
-			return nil, errors.New("expected key:value argument")
-		}
-		if !slices.Contains(accepted, key) {
-			return nil, fmt.Errorf("unsupported argument %q", key)
-		}
-		if _, exists := args[key]; exists {
-			return nil, fmt.Errorf("duplicate argument %q", key)
-		}
-		args[key] = value
+	if err := resolveVnode(args, lookup); err != nil {
+		return nil, funcapi.ErrorResponse(400, "%v", err)
 	}
 	return args, nil
 }
 
-// ResolveVnode sets args["vnode_guid"] from the vnode or vnode_guid selector: a
+// transportFields are the Cloud UI table's request fields that carry no input.
+var transportFields = []string{"selections", "timeout", "last", "_auxiliary"}
+
+func parameters(req funcapi.RawMethodRequest, accepted []string) (map[string]string, error) {
+	params, err := funcapi.ParseRawParams(req)
+	if err != nil {
+		return nil, fmt.Errorf("invalid payload: %w", err)
+	}
+	args := make(map[string]string)
+	for _, name := range params.Names() {
+		value, err := params.Text(name)
+		switch {
+		case slices.Contains(accepted, name):
+			if err != nil {
+				return nil, err
+			}
+			args[name] = value
+		case slices.Contains(transportFields, name),
+			name == funcapi.ParamQuery && err == nil && strings.TrimSpace(value) == "",
+			req.Info && (name == funcapi.ParamAfter || name == funcapi.ParamBefore):
+		default:
+			return nil, fmt.Errorf("unsupported argument %q", name)
+		}
+	}
+	return args, nil
+}
+
+// resolveVnode sets args["vnode_guid"] from the vnode or vnode_guid selector: a
 // configured name resolved by lookup, a recorded GUID, or empty for all. Name
 // lookup is request-local; retained evidence is never renamed or reassigned.
-func ResolveVnode(args map[string]string, lookup func(string) (string, bool)) error {
+func resolveVnode(args map[string]string, lookup func(string) (string, bool)) error {
 	name, named := args["vnode"]
 	guid, identified := args["vnode_guid"]
 	if named && identified {

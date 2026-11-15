@@ -34,67 +34,162 @@ func TestPermitted(t *testing.T) {
 			}
 			assert.Equal(t, tc.member, Permitted(req, MemberAccess))
 			assert.Equal(t, tc.admin, Permitted(req, AdminAccess))
-			if tc.member {
-				assert.Nil(t, RequireMember(req))
-			} else {
-				assert.Equal(t, funcapi.ErrorResponse(403, "member permissions are required"), RequireMember(req))
-			}
 		})
 	}
 }
 
-func TestNoPayload(t *testing.T) {
-	assert.Nil(t, NoPayload(funcapi.RawMethodRequest{}))
-	assert.Equal(
-		t,
-		funcapi.ErrorResponse(400, "this read-only Function does not accept a payload"),
-		NoPayload(funcapi.RawMethodRequest{
-			Payload: []byte(`{}`),
-		}),
-	)
-}
-
-func TestParseArgs(t *testing.T) {
-	accepted := []string{"site", "after"}
+func TestAdmit(t *testing.T) {
+	const guid = "11111111-1111-4111-8111-111111111111"
+	accepted := []string{"site", "after", "vnode", "vnode_guid"}
+	lookup := func(name string) (string, bool) { return guid, name == "storefront" }
+	member := func(req funcapi.RawMethodRequest) funcapi.RawMethodRequest {
+		req.Permissions = "0x1b"
+		return req
+	}
+	all := func(args map[string]string) map[string]string {
+		args["vnode_guid"] = ""
+		return args
+	}
 	for name, tc := range map[string]struct {
 		req  funcapi.RawMethodRequest
 		want map[string]string
-		err  string
+		deny *funcapi.FunctionResponse
 	}{
-		"none": {want: map[string]string{}},
-		"accepted": {req: funcapi.RawMethodRequest{
-			Args: []string{"site:shop", "after:-60"},
-		}, want: map[string]string{"site": "shop", "after": "-60"}},
-		"empty value": {req: funcapi.RawMethodRequest{
-			Args: []string{"site:"},
-		}, want: map[string]string{"site": ""}},
-		"value with colon": {req: funcapi.RawMethodRequest{
-			Args: []string{"site:a:b"},
-		}, want: map[string]string{"site": "a:b"}},
-		"info word on info": {req: funcapi.RawMethodRequest{
-			Info: true,
-			Args: []string{"info", "site:shop"},
-		}, want: map[string]string{"site": "shop"}},
-		"info word on data": {req: funcapi.RawMethodRequest{
-			Args: []string{"info"},
-		}, err: "expected key:value argument"},
-		"bare word": {req: funcapi.RawMethodRequest{
-			Args: []string{"shop"},
-		}, err: "expected key:value argument"},
-		"unsupported": {req: funcapi.RawMethodRequest{
-			Args: []string{"limit:1"},
-		}, err: `unsupported argument "limit"`},
-		"duplicate": {req: funcapi.RawMethodRequest{
-			Args: []string{"site:a", "site:b"},
-		}, err: `duplicate argument "site"`},
+		"no input": {
+			req:  member(funcapi.RawMethodRequest{}),
+			want: all(map[string]string{}),
+		},
+		"arguments": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"site:a:b", "after:-60"},
+			}),
+			want: all(map[string]string{"site": "a:b", "after": "-60"}),
+		},
+		"data without member access": {
+			req: funcapi.RawMethodRequest{
+				Args:        []string{"unsupported:1"},
+				Permissions: "0x17",
+			},
+			deny: funcapi.ErrorResponse(403, "member permissions are required"),
+		},
+		"info without permissions": {
+			req: funcapi.RawMethodRequest{
+				Info: true,
+				Args: []string{"info", "site:shop"},
+			},
+			want: all(map[string]string{"site": "shop"}),
+		},
+		"Cloud UI table body": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"site":"shop","after":1700000000,"query":"","selections":{},"timeout":120000,"last":200,"_auxiliary":{"page":1}}`),
+			}),
+			want: all(map[string]string{"site": "shop", "after": "1700000000"}),
+		},
+		"Cloud UI info window on info": {
+			req: funcapi.RawMethodRequest{
+				Info: true,
+				Args: []string{"info", "after:1700000000", "before:1700000900"},
+			},
+			want: all(map[string]string{"after": "1700000000"}),
+		},
+		"unaccepted before on data": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"before:1700000900"},
+			}),
+			deny: funcapi.ErrorResponse(400, `unsupported argument "before"`),
+		},
+		"selection": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"selections":{"site":["shop"]}}`),
+			}),
+			want: all(map[string]string{"site": "shop"}),
+		},
+		"arguments, then selections, then payload": {
+			req: member(funcapi.RawMethodRequest{
+				Args:    []string{"site:argument"},
+				Payload: []byte(`{"site":"payload","after":-60,"selections":{"site":["selection"],"after":["-30"]}}`),
+			}),
+			want: all(map[string]string{"site": "argument", "after": "-30"}),
+		},
+		"last duplicate argument wins": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"site:a", "site=b"},
+			}),
+			want: all(map[string]string{"site": "b"}),
+		},
+		"words without a separator are ignored": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"info", "shop"},
+			}),
+			want: all(map[string]string{}),
+		},
+		"unsupported argument": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"limit:1"},
+			}),
+			deny: funcapi.ErrorResponse(400, `unsupported argument "limit"`),
+		},
+		"unsupported payload field": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"limit":1}`),
+			}),
+			deny: funcapi.ErrorResponse(400, `unsupported argument "limit"`),
+		},
+		"unsupported selection": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"selections":{"kind":["journey"]}}`),
+			}),
+			deny: funcapi.ErrorResponse(400, `unsupported argument "kind"`),
+		},
+		"search query": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"query":"checkout"}`),
+			}),
+			deny: funcapi.ErrorResponse(400, `unsupported argument "query"`),
+		},
+		"several values": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"site":["a","b"]}`),
+			}),
+			deny: funcapi.ErrorResponse(400, "site requires one string or number value"),
+		},
+		"payload not an object": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`[]`),
+			}),
+			deny: funcapi.ErrorResponse(400, "invalid payload: expected a JSON object"),
+		},
+		"payload on info": {
+			req: funcapi.RawMethodRequest{
+				Info:    true,
+				Args:    []string{"info"},
+				Payload: []byte(`{"site":"shop","timeout":120000}`),
+			},
+			want: all(map[string]string{"site": "shop"}),
+		},
+		"vnode name": {
+			req: member(funcapi.RawMethodRequest{
+				Args: []string{"vnode:storefront"},
+			}),
+			want: map[string]string{"vnode": "storefront", "vnode_guid": guid},
+		},
+		"unknown vnode": {
+			req: member(funcapi.RawMethodRequest{
+				Payload: []byte(`{"vnode":"removed"}`),
+			}),
+			deny: funcapi.ErrorResponse(400, `unknown configured vnode "removed"`),
+		},
+		"unknown vnode on info": {
+			req: funcapi.RawMethodRequest{
+				Info: true,
+				Args: []string{"info", "vnode:removed"},
+			},
+			deny: funcapi.ErrorResponse(400, `unknown configured vnode "removed"`),
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, err := ParseArgs(tc.req, accepted)
-			if tc.err != "" {
-				require.EqualError(t, err, tc.err)
-				return
-			}
-			require.NoError(t, err)
+			got, deny := Admit(tc.req, accepted, lookup)
+			assert.Equal(t, tc.deny, deny)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -120,7 +215,7 @@ func TestResolveVnode(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			calls := 0
-			err := ResolveVnode(tc.args, func(name string) (string, bool) {
+			err := resolveVnode(tc.args, func(name string) (string, bool) {
 				calls++
 				return guid, name == "storefront"
 			})
@@ -133,7 +228,7 @@ func TestResolveVnode(t *testing.T) {
 			assert.Equal(t, tc.want, tc.args["vnode_guid"])
 		})
 	}
-	err := ResolveVnode(map[string]string{"vnode": "storefront"}, nil)
+	err := resolveVnode(map[string]string{"vnode": "storefront"}, nil)
 	require.EqualError(t, err, "configured vnode lookup is unavailable")
 }
 

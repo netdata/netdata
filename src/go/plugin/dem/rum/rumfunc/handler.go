@@ -71,19 +71,11 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	spec := methods[i]
-	// Info is metadata; data needs member access before any argument or source is read.
-	if !req.Info {
-		if r := rawfunc.RequireMember(req); r != nil {
-			return r
-		}
+	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID)
+	if r != nil {
+		return r
 	}
-	args, err := rawfunc.ParseArgs(req, spec.Params)
-	if err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
-	}
-	if err := rawfunc.ResolveVnode(args, h.lookupVnodeGUID); err != nil {
-		return funcapi.ErrorResponse(400, "%v", err)
-	}
+	// Info help includes the selected sites' sampling policy, so it follows argument checks.
 	response := spec.Table()
 	if spec.samplingHelp {
 		help, err := h.samplingHelp(ctx, spec.Help, args)
