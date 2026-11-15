@@ -198,12 +198,10 @@ func TestStoredRunEncodingRoundTrip(t *testing.T) {
 	assert.Equal(t, storedRunJSON, string(cloned))
 }
 
-func TestCloneRunStoresEmptyListsAsNull(t *testing.T) {
-	// History records an attempt without events or artifacts as null lists.
-	encoded, err := json.Marshal(CloneRun(Run{
-		Events:    []Event{},
-		Artifacts: []Artifact{},
-	}))
+func TestCloneRunStoresNilListsAsNull(t *testing.T) {
+	// The runner leaves an attempt without events or artifacts with nil lists;
+	// the copy keeps them nil, so history stores null lists.
+	encoded, err := json.Marshal(CloneRun(Run{}))
 	require.NoError(t, err)
 	assert.Contains(t, string(encoded), `"events":null`)
 	assert.Contains(t, string(encoded), `"artifacts":null`)

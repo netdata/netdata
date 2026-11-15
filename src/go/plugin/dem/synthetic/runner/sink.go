@@ -54,7 +54,6 @@ func newSink(request synthetic.Request, redact *textRedactor) *sink {
 		capture:      request.Capture,
 		trace:        request.Trace,
 		redact:       redact,
-		events:       []synthetic.Event{},
 		tests:        make(map[string]synthetic.Event),
 	}
 }
@@ -245,7 +244,7 @@ func (s *sink) snapshot() sinkSnapshot {
 		captures: s.extensions.captures.snapshot(),
 		evidence: s.extensions.evidence.snapshot(),
 		browser:  s.extensions.browser.snapshot(),
-		events:   append([]synthetic.Event{}, s.events...),
+		events:   slices.Clone(s.events),
 		dropped:  s.dropped,
 		result:   s.result,
 		err:      s.err,

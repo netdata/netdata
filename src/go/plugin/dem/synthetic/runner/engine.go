@@ -128,8 +128,6 @@ func newAttempt(request synthetic.Request) *attempt {
 			Target:       redact.text(redact.patterns.ApplyURL(request.URL)),
 			Outcome:      synthetic.Error,
 			CaptureState: synthetic.CaptureDisabled,
-			Events:       []synthetic.Event{},
-			Artifacts:    []synthetic.Artifact{},
 		},
 	}
 	if request.Capture {
