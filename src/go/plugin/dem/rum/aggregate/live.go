@@ -164,18 +164,21 @@ func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow
 	if after > a.liveSeq {
 		after = 0
 	}
-	// Seq grows along the ring, so the rows after the cursor are its suffix,
-	// which bounds the result.
-	ring := a.live[a.liveStart:]
-	ring = ring[sort.Search(len(ring), func(i int) bool { return ring[i].Seq > after }):]
-	if maxRows <= 0 || len(ring) == 0 {
+	if maxRows <= 0 {
 		return nil
 	}
-	out := make([]LiveRow, 0, min(maxRows, len(ring)))
+	// Seq grows along the ring, so the rows after the cursor are its suffix.
+	ring := a.live[a.liveStart:]
+	ring = ring[sort.Search(len(ring), func(i int) bool { return ring[i].Seq > after }):]
+	var out []LiveRow
 	for i := range ring {
 		row := &ring[i]
 		if row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
 			continue
+		}
+		if out == nil {
+			// The rows from the first match on bound the result.
+			out = make([]LiveRow, 0, min(maxRows, len(ring)-i))
 		}
 		out = append(out, *row)
 		if len(out) == maxRows {

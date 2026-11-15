@@ -127,6 +127,11 @@ func TestLiveRingAndCursorAcrossWraps(t *testing.T) {
 	require.Len(t, rows, 5)
 	assert.EqualValues(t, 2*liveRingCap+1, rows[0].Seq, "a cursor ahead of the ring restarts it")
 	assert.Empty(t, a.Live(0, 0, ""), "a non-positive cap returns no rows")
+	assert.Zero(
+		t,
+		testing.AllocsPerRun(5, func() { a.Live(0, 100, "other-vnode") }),
+		"a read without matches allocates nothing",
+	)
 	*now = now.Add(time.Minute + time.Second)
 	assert.Empty(t, a.Live(0, 100, ""))
 }
