@@ -4,10 +4,12 @@ package rumfunc_test
 
 import (
 	"context"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/assert"
@@ -147,4 +149,58 @@ var rowReads = map[string]string{
 	"rum-sessions":       "Sessions",
 	"rum-errors":         "Errors",
 	"rum-session-events": "SessionEvents",
+}
+
+// sessionsSource holds n sessions and returns at most the requested limit, newest first.
+type sessionsSource struct {
+	recordingSource
+	n int
+}
+
+func (s sessionsSource) Sessions(
+	_ context.Context,
+	_, _ string,
+	_, _ int64,
+	limit int,
+	_ string,
+) ([]query.Session, error) {
+	out := make([]query.Session, 0, min(s.n, limit))
+	for i := range cap(out) {
+		out = append(out, query.Session{
+			Site:      "shop",
+			SessionID: strconv.Itoa(i),
+		})
+	}
+	return out, nil
+}
+
+func TestSessionsDiscloseTruncationAtTheRowCap(t *testing.T) {
+	for name, tc := range map[string]struct {
+		stored    int
+		rows      int
+		truncated bool
+	}{
+		"below the cap": {stored: rawfunc.MaxRows - 1, rows: rawfunc.MaxRows - 1},
+		"at the cap":    {stored: rawfunc.MaxRows, rows: rawfunc.MaxRows},
+		"over the cap":  {stored: rawfunc.MaxRows + 1, rows: rawfunc.MaxRows, truncated: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var reads []string
+			handler := rumfunc.New(sessionsSource{
+				recordingSource: recordingSource{&reads},
+				n:               tc.stored,
+			}, nil)
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      "rum-sessions",
+				Permissions: "0x1b",
+			}).RawResponse
+			require.NotNil(t, response)
+			rows := response["data"].([][]any)
+			require.Len(t, rows, tc.rows)
+			assert.Equal(t, "0", rows[0][1], "the newest session stays first")
+			assert.Equal(t, tc.truncated, response["truncated"])
+			assert.Equal(t, rawfunc.MaxRows, response["limit"])
+			assert.Contains(t, response["help"], "capped at "+strconv.Itoa(rawfunc.MaxRows)+" and disclose truncation")
+		})
+	}
 }

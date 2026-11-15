@@ -197,8 +197,9 @@ retained occurrences by fingerprint; affected-session, top-page and browser stat
 filter selects the group to investigate. `rum-session-events` returns the full retained and pending timeline for a
 session, ordered by Agent observation time in Unix microseconds, without range filtering. Activity-only presence records
 contribute to summaries but stay out of timelines. Session rows sort by `last_observed_us` at microsecond precision
-before limiting; first/last observations and their span describe only the selected activity. A gap between observations
-does not prove continuous presence.
+before limiting to 2000 rows with an explicit truncation flag; narrow the range or the site selection when truncated.
+First/last observations and their span describe only the selected activity. A gap between observations does not prove
+continuous presence.
 
 One process-owned retention worker applies one shared history budget across RUM, synthetic runs, disabled jobs and
 retained machine identities. Defaults are 30 days and 1 GiB; `history.max_bytes` must be at least 8 MiB. Accounting uses
