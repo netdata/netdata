@@ -34,9 +34,9 @@ Choose the storage mode that matches the device's recovery needs:
 | `ram` | Backfills network outages while the Agent stays running, with metric history kept off the SD card |
 | `alloc` | The same as `ram` |
 | `dbengine` | Backfills from persistent history that survives Agent restarts and device power loss |
-| `none` | Resumes current monitoring on reconnection, with the smallest local history footprint |
+| `none` | Resumes current monitoring on reconnection; keeps no local history, so data collected while disconnected is lost |
 
-Use local retention to cover outages. The streaming send buffer handles short sending delays. See [CPU and memory settings](./minimize-cpu-and-memory.md#choose-local-history) for retention choices and the [streaming reference](../../src/streaming/README.md) for replication settings.
+Use local retention to cover outages, even short ones: reconnecting takes several seconds, and the streaming send buffer only absorbs slow sending while connected. For a device that only needs to ride out brief network glitches, `ram` with a short `retention` (a few minutes of samples) is enough. See [CPU and memory settings](./minimize-cpu-and-memory.md#choose-local-history) for retention choices and the [streaming reference](../../src/streaming/README.md) for replication settings.
 
 ## Connect automatically to another Parent
 

@@ -12,4 +12,4 @@ stops.
   in this directory, four bytes per sample, allocated when a dimension is created. `ram` rounds each buffer up to
   whole memory pages and lets the kernel deduplicate them (KSM); `alloc` allocates the exact number of samples.
 
-The round-robin buffers in this directory also serve `[db].db = none`, which keeps five samples per dimension.
+`[db].db = none` keeps no samples (`src/database/storage-none.c`).

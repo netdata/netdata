@@ -82,7 +82,7 @@ Local history lets the Child fill coverage gaps after reconnecting:
 |:--|:--|
 | `ram` | History in memory for recovery through network outages, with metric samples kept off the SD card |
 | `alloc` | The same as `ram` |
-| `none` | Current streaming with the smallest local history footprint |
+| `none` | Current streaming without local history; data collected while disconnected is lost |
 | `dbengine` | Persistent history that survives Agent restarts and device power loss |
 
 In RAM mode, `retention` sets the number of samples each dimension keeps, with a minimum of five. `retention = 1024` provides about 85 minutes at five-second collection, 3.6 days at five-minute collection or 7.1 days at ten-minute collection. Each chart's interval determines its window. Samples are compressed in memory and the memory grows with the samples stored, so a lower retention uses less memory. `alloc` is the same as `ram`. Both keep metric history off the SD card and lose it when the Agent stops.

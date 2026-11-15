@@ -438,8 +438,7 @@ set(RRD_PLUGIN_FILES
         src/database/rrdset.c
         src/database/storage-engine.c
         src/database/storage-engine.h
-        src/database/ram/rrddim_mem.c
-        src/database/ram/rrddim_mem.h
+        src/database/storage-none.c
         src/database/sqlite/sqlite_metadata.c
         src/database/sqlite/sqlite_metadata.h
         src/database/sqlite/sqlite_functions.c
@@ -979,6 +978,12 @@ set(ML_MEMORY_FILES
 set(ML_DISABLED_FILES
         src/ml/ml_public.h
         src/ml/ml-dummy.c
+)
+
+# rrd: the ring storage backend of ram/alloc, in builds without dbengine
+set(RRD_RING_FILES
+        src/database/ram/rrddim_mem.c
+        src/database/ram/rrddim_mem.h
 )
 
 # rrd: the dbengine storage backend

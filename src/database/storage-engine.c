@@ -1,25 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "storage-engine.h"
-#include "ram/rrddim_mem.h"
 #ifdef ENABLE_DBENGINE
 #include "engine/rrdengineapi.h"
+#else
+#include "ram/rrddim_mem.h"
 #endif
 
 static STORAGE_ENGINE engines[] = {
     {
         .id = RRD_DB_MODE_NONE,
         .name = RRD_DB_MODE_NONE_NAME,
-        .seb = STORAGE_ENGINE_BACKEND_RRDDIM,
+        .seb = STORAGE_ENGINE_BACKEND_NONE,
         .api = {
-            .metric_get_by_id = rrddim_metric_get_by_id,
-            .metric_get_by_uuid = rrddim_metric_get_by_uuid,
-            .metric_get_or_create = rrddim_metric_get_or_create,
-            .metric_dup = rrddim_metric_dup,
-            .metric_release = rrddim_metric_release,
-            .metric_retention_by_id = rrddim_metric_retention_by_id,
-            .metric_retention_by_uuid = rrddim_metric_retention_by_uuid,
-            .metric_retention_delete_by_id = rrddim_retention_delete_by_id,
+            .metric_get_by_id = storage_none_metric_get_by_id,
+            .metric_get_by_uuid = storage_none_metric_get_by_uuid,
+            .metric_get_or_create = storage_none_metric_get_or_create,
+            .metric_dup = storage_none_metric_dup,
+            .metric_release = storage_none_metric_release,
+            .metric_retention_by_id = storage_none_metric_retention_by_id,
+            .metric_retention_by_uuid = storage_none_metric_retention_by_uuid,
+            .metric_retention_delete_by_id = storage_none_metric_retention_delete_by_id,
         }
     },
 #ifdef ENABLE_DBENGINE
