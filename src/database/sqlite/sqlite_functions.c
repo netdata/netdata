@@ -1030,6 +1030,15 @@ uint64_t get_total_database_space(void)
 
 int sqlite_library_init(void)
 {
+#ifndef ENABLE_BUNDLED_SQLITE
+    // The bundled SQLite is serialized, and closing the databases at shutdown relies on that.
+    // A system library can be built in another threading mode.
+    if (sqlite3_threadsafe() != 1) {
+        nd_log_daemon(NDLP_ERR, "SQLITE: the system library is not built with SQLITE_THREADSAFE=1");
+        return 1;
+    }
+#endif
+
     netdata_mutex_lock(&sqlite_lifetime_mutex);
     int rc = sqlite3_initialize();
     netdata_mutex_unlock(&sqlite_lifetime_mutex);

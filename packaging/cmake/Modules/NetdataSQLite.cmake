@@ -7,6 +7,9 @@
 # source directory), generates the amalgamation at build time (with
 # --enable-update-limit so the parser supports UPDATE/DELETE ... LIMIT), then
 # compiles it as a separate static library that links into libnetdata.
+#
+# With ENABLE_BUNDLED_SQLITE turned off none of that happens and the SQLite
+# library of the system is used instead, see netdata_detect_sqlite3().
 
 include_guard()
 
@@ -18,6 +21,10 @@ set(SQLITE_VERSION_YEAR "2026")
 
 set(SQLITE_TARBALL_SHA256 "d18fa15aec74d8c17e1463f861095adc01b5ad190256acb4f91d22f0368d232b")
 set(SQLITE_GIT_SHA "b09c88c14082339b66c7b7158d609a771e64ca69") # tag is: version-${SQLITE_VERSION}
+
+# Oldest system SQLite that is accepted. The queries use UNIXEPOCH(), which
+# needs 3.38.0, so anything older cannot work.
+set(SQLITE_SYSTEM_MIN_VERSION "3.38.0")
 
 function(netdata_bundle_sqlite3)
         message(STATUS "Preparing SQLite ${SQLITE_VERSION}")
@@ -103,8 +110,42 @@ function(netdata_bundle_sqlite3)
         message(STATUS "Finished preparing SQLite ${SQLITE_VERSION}")
 endfunction()
 
+# Handle setup of SQLite for the build.
+#
+# By default this builds the bundled copy. With ENABLE_BUNDLED_SQLITE turned
+# off it finds the system copy with pkg-config instead, fetches nothing, and
+# fails if there is none. Unlike the other ENABLE_BUNDLED_* options there is
+# no fallback to the bundled copy, so the result does not depend on the host.
+#
+# A system library has no recover extension, so recovery of the metadata
+# database is not available with it. It is usually built without
+# UPDATE/DELETE ... LIMIT too, which only the unit test relies on.
+macro(netdata_detect_sqlite3)
+        if(ENABLE_BUNDLED_SQLITE)
+                netdata_bundle_sqlite3()
+        else()
+                pkg_check_modules(SQLITE3 sqlite3>=${SQLITE_SYSTEM_MIN_VERSION})
+
+                if(NOT SQLITE3_FOUND)
+                        message(FATAL_ERROR "ENABLE_BUNDLED_SQLITE is off, but SQLite >= ${SQLITE_SYSTEM_MIN_VERSION} could not be found.")
+                endif()
+
+                message(STATUS "Using system SQLite ${SQLITE3_VERSION}")
+
+                set(NETDATA_SQLITE_INCLUDE_DIRS ${SQLITE3_INCLUDE_DIRS})
+                set(NETDATA_SQLITE_CFLAGS_OTHER ${SQLITE3_CFLAGS_OTHER})
+                set(NETDATA_SQLITE_LIBRARIES ${SQLITE3_LDFLAGS})
+        endif()
+endmacro()
+
 function(netdata_add_sqlite3_to_target _target)
-        target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_SQLITE_INCLUDE_DIRS}")
-        target_link_libraries(${_target} PUBLIC ${NETDATA_SQLITE_LIBRARIES})
-        add_dependencies(${_target} sqlite3)
+        if(ENABLE_BUNDLED_SQLITE)
+                target_include_directories(${_target} BEFORE PUBLIC "${NETDATA_SQLITE_INCLUDE_DIRS}")
+                target_link_libraries(${_target} PUBLIC ${NETDATA_SQLITE_LIBRARIES})
+                add_dependencies(${_target} sqlite3)
+        else()
+                target_include_directories(${_target} PUBLIC ${NETDATA_SQLITE_INCLUDE_DIRS})
+                target_compile_options(${_target} PUBLIC ${NETDATA_SQLITE_CFLAGS_OTHER})
+                target_link_libraries(${_target} PUBLIC ${NETDATA_SQLITE_LIBRARIES})
+        endif()
 endfunction()

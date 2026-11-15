@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "sqlite_metadata.h"
+#ifdef ENABLE_BUNDLED_SQLITE
 #include "sqlite3recover.h"
+#endif
 #include "health/health-alert-entry.h"
 
 #include "sqlite_db_migration.h"
@@ -653,6 +655,7 @@ done:
 
 static void recover_database(const char *sqlite_database, const char *new_sqlite_database)
 {
+#ifdef ENABLE_BUNDLED_SQLITE
     sqlite3 *database;
     int rc = sqlite3_open(sqlite_database, &database);
     if (rc != SQLITE_OK)
@@ -690,6 +693,12 @@ static void recover_database(const char *sqlite_database, const char *new_sqlite
     }
     else
         (void) sqlite3_close_v2(database);
+#else
+    // The recover extension is not part of a system SQLite library
+    (void) new_sqlite_database;
+    netdata_log_error("Cannot recover %s, this agent uses the system SQLite library, which has no recover extension",
+                      sqlite_database);
+#endif
 }
 
 
