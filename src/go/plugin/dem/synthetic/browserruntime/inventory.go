@@ -56,8 +56,8 @@ func (s *Store) strictInventoryLocked(reconcile bool) (inventory, error) {
 }
 
 // lenientInventoryLocked records metadata damage instead of failing. With
-// reconcile it also syncs the selection, removes dead staging owners and may
-// persist retirement deadlines, so it is not read-only.
+// reconcile it also syncs the selection, removes dead or completed owner records
+// and may persist retirement deadlines, so it is not read-only.
 func (s *Store) lenientInventoryLocked(reconcile bool) (inventory, error) {
 	if reconcile {
 		if err := s.syncSelection(); err != nil {
