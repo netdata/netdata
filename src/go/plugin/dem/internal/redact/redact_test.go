@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"unicode"
-	"unicode/utf8"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -117,16 +116,12 @@ func TestRemovingSpansMatchApplyRemoving(t *testing.T) {
 		}
 		return s
 	}
-	// Removing whole invalid UTF-8 units too leaves only whole runes: the result
-	// is valid UTF-8 without control characters, so nothing can join.
-	controlOrInvalid := func(c rune) bool { return c == utf8.RuneError || unicode.IsControl(c) }
+	// Lone invalid UTF-8 bytes check the mapping around runes removal can cut or join.
 	lone := []string{"\xc2", "\x85", "\xff", "\xe2\x82", "\u0085"}
 	rng := rand.New(rand.NewPCG(7, 8))
 	for i := range 50000 {
 		input := randomText(rng)
-		remove := unicode.IsControl
 		if i%2 == 1 {
-			remove = controlOrInvalid
 			for range 1 + rng.IntN(3) {
 				pos := rng.IntN(len(input) + 1)
 				input = input[:pos] + lone[rng.IntN(len(lone))] + input[pos:]
@@ -134,7 +129,7 @@ func TestRemovingSpansMatchApplyRemoving(t *testing.T) {
 		}
 		var spans []span
 		previous := -1
-		for _, sp := range r.RemovingSpans(input, remove) {
+		for _, sp := range r.RemovingSpans(input, unicode.IsControl) {
 			require.Greater(t, sp.Start, previous, "input %q: spans are merged and ordered", input)
 			require.LessOrEqual(t, sp.Start, sp.End, "input %q", input)
 			previous = sp.End
@@ -143,12 +138,13 @@ func TestRemovingSpansMatchApplyRemoving(t *testing.T) {
 				end:   sp.End,
 			})
 		}
-		got := replaceSpans(input, spans, remove)
-		require.Equal(t, collapse(r.ApplyRemoving(input, remove)), collapse(got), "input %q", input)
-		if i%2 == 1 {
-			require.True(t, utf8.ValidString(got), "input %q", input)
-			require.Equal(t, -1, strings.IndexFunc(got, unicode.IsControl), "input %q", input)
-		}
+		require.Equal(
+			t,
+			collapse(r.ApplyRemoving(input, unicode.IsControl)),
+			collapse(replaceSpans(input, spans, unicode.IsControl)),
+			"input %q",
+			input,
+		)
 	}
 }
 

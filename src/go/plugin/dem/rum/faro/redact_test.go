@@ -3,11 +3,16 @@
 package faro
 
 import (
+	"math/rand/v2"
+	"net/url"
 	"regexp"
 	"strings"
 	"testing"
+	"unicode"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRedactPath(t *testing.T) {
@@ -48,6 +53,7 @@ func TestRedactURLKeepsRelativeURLsHostless(t *testing.T) {
 		"/%09/tok%65n%3Dx":                    "/%2Ftok%65n%3D[REDACTED]",
 		"https://example.org/%09/tok%65n%3Dx": "https://example.org//tok%65n%3D[REDACTED]",
 		"a%3Ab/Bearer%20abcdef.ghi":           "a%3Ab/[REDACTED]",
+		"/%2Fevil.com/\u00e9a@b.c":            "/%2Fevil.com/:email",
 	} {
 		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, o.redactURL(raw)) })
 	}
@@ -126,10 +132,19 @@ func TestRedactURLEscapesSitePathRuleBytesAlone(t *testing.T) {
 }
 
 // Removing a control character can join invalid UTF-8 bytes into another
-// control character; the decoded reading repeats until none is left.
+// control character; the joined bytes go too. Other invalid bytes stay and can
+// give a credential key its word boundary.
 func TestRedactURLRemovesControlsJoinedByRemoval(t *testing.T) {
 	var o Options
-	assert.Equal(t, "https://example.org/token=[REDACTED]", o.cleanURL("https://example.org/tok%C2%00%85en=hunter2"))
+	for raw, want := range map[string]string{
+		"https://example.org/tok%C2%00%85en=hunter2":         "https://example.org/token=[REDACTED]",
+		"https://example.org/caf%E9tok%00en=hunter2":         "https://example.org/caf%E9token=[REDACTED]",
+		"https://example.org/caf%E9tok%C2%00%85en=hunter2":   "https://example.org/caf%E9token=[REDACTED]",
+		"https://example.org/x%EF%BF%BDtok%00en=hunter2":     "https://example.org/x%EF%BF%BDtoken=[REDACTED]",
+		"https://example.org/%C2%C2%00%85%85tok%00en=secret": "https://example.org/token=[REDACTED]",
+	} {
+		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, o.cleanURL(raw)) })
+	}
 }
 
 // Work stays linear in the path: joins that removing control characters could
@@ -142,6 +157,33 @@ func TestRedactURLJoinedControlsCostOnePass(t *testing.T) {
 	allocs := testing.AllocsPerRun(1, func() { got = o.cleanURL(raw) })
 	assert.Equal(t, "https://example.org//token=[REDACTED]", got)
 	assert.Less(t, allocs, 100.0, "allocations must not grow with the number of joins")
+}
+
+// Whatever escapes, control characters and joins a path holds, the stored URL
+// parses, its decoded path holds no control character and no credential the
+// site redactor recognizes, and the reading stays linear.
+func TestCleanURLDecodedPathInvariants(t *testing.T) {
+	fragments := []string{
+		"%C2", "%85", "%9F", "%00", "%09", "%0A", "%E9", "%EF%BF%BD", "%20", "%26", "%2F", "%3D", "%65",
+		"/", "a", "tok", "en=", "token=", "hunter2", "Bearer", "password", "=", "open%20sesame", "[REDACTED]",
+	}
+	o := Options{
+		Redactor: redact.NewRedactor("open sesame"),
+	}
+	rng := rand.New(rand.NewPCG(9, 10))
+	for range 50000 {
+		var path strings.Builder
+		for range 1 + rng.IntN(16) {
+			path.WriteString(fragments[rng.IntN(len(fragments))])
+		}
+		raw := "https://example.org/" + path.String()
+		stored := o.cleanURL(raw)
+		u, err := url.Parse(stored)
+		require.NoError(t, err, "input %q stored %q", raw, stored)
+		require.Equal(t, -1, strings.IndexFunc(u.Path, unicode.IsControl), "input %q stored %q", raw, stored)
+		require.Equal(t, u.Path, o.redactor().Apply(u.Path), "input %q stored %q", raw, stored)
+		require.NotContains(t, u.Path, "sesame", "input %q stored %q", raw, stored)
+	}
 }
 
 func TestRedactSelector(t *testing.T) {

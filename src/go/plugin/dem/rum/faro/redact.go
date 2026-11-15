@@ -94,11 +94,11 @@ func (o Options) redactLink(raw string, source bool) string {
 		// The final pass reads the escaped URL, where an escape can hide a
 		// credential (/a/Bearer%20token), so the redactor reads it decoded too.
 		u.Path, u.RawPath = o.redactDecodedPath(path, plain)
-		if u.Host == "" && strings.HasPrefix(u.RawPath, "//") {
-			// Removed control characters can join two slashes; a relative path
-			// must not become a network-path reference with a host.
-			u.RawPath = "/%2F" + u.RawPath[2:]
-		}
+	}
+	if u.Host == "" && strings.HasPrefix(u.RawPath, "//") {
+		// Removed control characters or a generalized segment can leave two
+		// leading slashes; a relative path must not gain a host.
+		u.RawPath = "/%2F" + u.RawPath[2:]
 	}
 	return u.String()
 }
@@ -110,16 +110,11 @@ func (o Options) redactLink(raw string, source bool) string {
 // escaped URL still reads the original escapes. plain is escaped decoded; it
 // returns the new decoded and escaped path.
 func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
-	remove := unicode.IsControl
-	controls := strings.IndexFunc(plain, unicode.IsControl) >= 0
-	if controls {
-		// Removing a control character between invalid UTF-8 bytes could join
-		// them into another one (%C2%00%85). Dropping invalid bytes with it
-		// leaves only whole runes, which cannot join, so one pass is enough.
-		remove = isControlOrInvalid
-	}
-	spans := o.redactor().RemovingSpans(plain, remove)
-	if len(spans) == 0 && !controls {
+	// text is plain without the bytes removing its control characters would
+	// join into another one; source maps its bytes back to plain.
+	text, source := withoutJoins(plain)
+	spans := o.redactor().RemovingSpans(text, unicode.IsControl)
+	if len(spans) == 0 && strings.IndexFunc(text, unicode.IsControl) < 0 {
 		return plain, escaped
 	}
 	// starts[i] is where decoded byte i begins in escaped.
@@ -135,15 +130,21 @@ func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 	starts = append(starts, len(escaped))
 	if len(starts) != len(plain)+1 {
 		// Unreachable for a decoded escaped path; escaping the redacted text keeps it redacted.
-		return o.redactor().ApplyRemoving(plain, remove), ""
+		return o.redactor().ApplyRemoving(text, unicode.IsControl), ""
 	}
 	var decoded, raw strings.Builder
 	keep := func(start, end int) {
 		for i := start; i < end; {
-			c, n := utf8.DecodeRuneInString(plain[i:end])
-			if !remove(c) {
-				decoded.WriteString(plain[i : i+n])
-				raw.WriteString(escaped[starts[i]:starts[i+n]])
+			c, n := utf8.DecodeRuneInString(text[i:end])
+			if !unicode.IsControl(c) {
+				decoded.WriteString(text[i : i+n])
+				for j := i; j < i+n; j++ {
+					at := j
+					if source != nil {
+						at = source[j]
+					}
+					raw.WriteString(escaped[starts[at]:starts[at+1]])
+				}
 			}
 			i += n
 		}
@@ -155,13 +156,53 @@ func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 		raw.WriteString(redact.Marker)
 		pos = sp.End
 	}
-	keep(pos, len(plain))
+	keep(pos, len(text))
 	return decoded.String(), raw.String()
 }
 
-// isControlOrInvalid selects control characters and what does not decode as a
-// whole rune: invalid UTF-8 bytes and the replacement character.
-func isControlOrInvalid(c rune) bool { return c == utf8.RuneError || unicode.IsControl(c) }
+// withoutJoins drops the bytes of plain that removing its control characters
+// would join into another control character: a lone 0xC2 and a lone 0x80-0x9F
+// byte that meet once the characters between them are gone (%C2%00%85). No
+// other pair forms one. It works in one pass, like a stack, so joins that
+// cascade cost no more. source lists the plain index of each byte of text; it
+// is nil, and text is plain, when nothing joins.
+func withoutJoins(plain string) (text string, source []int) {
+	if strings.IndexFunc(plain, unicode.IsControl) < 0 {
+		return plain, nil
+	}
+	var stack []int // plain indexes of the bytes kept so far, control characters excluded
+	var joined []bool
+	for i := 0; i < len(plain); {
+		c, n := utf8.DecodeRuneInString(plain[i:])
+		switch {
+		case unicode.IsControl(c):
+		case n == 1 && 0x80 <= plain[i] && plain[i] <= 0x9F && len(stack) > 0 && plain[stack[len(stack)-1]] == 0xC2:
+			if joined == nil {
+				joined = make([]bool, len(plain))
+			}
+			joined[stack[len(stack)-1]], joined[i] = true, true
+			stack = stack[:len(stack)-1]
+		default:
+			for j := i; j < i+n; j++ {
+				stack = append(stack, j)
+			}
+		}
+		i += n
+	}
+	if joined == nil {
+		return plain, nil
+	}
+	var out strings.Builder
+	out.Grow(len(plain))
+	source = make([]int, 0, len(plain))
+	for i := range len(plain) {
+		if !joined[i] {
+			out.WriteByte(plain[i])
+			source = append(source, i)
+		}
+	}
+	return out.String(), source
+}
 
 // validEscapedPath escapes what net/url does not keep in an escaped path: a
 // percent sign that does not start a valid escape, and every byte other than
