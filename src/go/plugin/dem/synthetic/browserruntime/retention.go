@@ -136,7 +136,7 @@ func (s *Store) Inspect() (Status, error) {
 		BootRecoveryAvailable: s.ledger.boot.Verified,
 	}
 	err := s.withLock(func() error {
-		inv, err := s.inspectInventoryLocked(false)
+		inv, err := s.lenientInventoryLocked(false)
 		if err != nil {
 			status.InventoryError = err.Error()
 			return err
@@ -162,11 +162,11 @@ func (s *Store) Sweep() error {
 		if err := s.ledger.retryOwnerReleasesLocked(); err != nil {
 			return err
 		}
-		inv, err := s.inventoryLocked(true)
+		inv, err := s.strictInventoryLocked(true)
 		if err != nil {
 			return err
 		}
-		for _, id := range s.candidates(inv, false) {
+		for _, id := range s.retirable(inv, false) {
 			if err := s.removeOwned(filepath.Join("generations", id)); err != nil {
 				return err
 			}
@@ -178,7 +178,9 @@ func (s *Store) Sweep() error {
 	return result
 }
 
-func (s *Store) candidates(inv inventory, pressure bool) []string {
+// retirable lists the unprotected generations, least recently used first.
+// Without pressure, the most recently used one keeps its rollback grace.
+func (s *Store) retirable(inv inventory, pressure bool) []string {
 	var ids []string
 	for id := range inv.generations {
 		if !inv.protected(id) {

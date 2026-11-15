@@ -237,7 +237,7 @@ func (s *Store) candidateWithOperation(operation *flock.Flock, publication selec
 		} else if _, err := s.selectedLocked(true); err != nil {
 			return err
 		}
-		owner, err := s.ledger.claimLocked(m.Archive.SHA256, "candidate")
+		owner, err := s.ledger.claimLocked(m.Archive.SHA256, candidateClaim)
 		if err == nil {
 			consumer = &Consumer{
 				store:    s,
@@ -325,7 +325,7 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 	}
 	defer func() { result = errors.Join(result, s.ledger.releaseOwner(operation)) }()
 	err = s.withLock(func() error {
-		inv, err := s.inspectInventoryLocked(true)
+		inv, err := s.lenientInventoryLocked(true)
 		if err != nil {
 			return err
 		}
@@ -349,7 +349,7 @@ func (s *Store) Uninstall(ctx context.Context) (result error) {
 }
 
 func (s *Store) repairLocked(m Manifest) error {
-	inv, err := s.inspectInventoryLocked(true)
+	inv, err := s.lenientInventoryLocked(true)
 	if err != nil {
 		return err
 	}

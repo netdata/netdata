@@ -52,7 +52,7 @@ func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	require.NoError(t, other.Sweep())
 	next, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
 	input := archiveFile(t, archive)
-	candidate, err := other.beginFixture(context.Background(), next, InstallRelease)
+	candidate, err := other.beginFixture(t, context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	require.ErrorIs(t, candidate.Import(context.Background(), input), ErrAllowance)
 	require.NoError(t, candidate.Close())
@@ -101,7 +101,7 @@ func TestSelectionPublicationUncertaintyBlocksDeletionUntilReconciled(t *testing
 	s, now := testStore(t)
 	first := installFixture(t, s, "first")
 	next := importFixture(t, s, "second")
-	candidate, err := s.beginFixture(context.Background(), next, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	original := s.syncSelection
 	calls := 0
@@ -142,7 +142,7 @@ func TestPrepublicationFailurePreservesSelection(t *testing.T) {
 	s, _ := testStore(t)
 	first := installFixture(t, s, "first")
 	next := importFixture(t, s, "second")
-	candidate, err := s.beginFixture(context.Background(), next, InstallRelease)
+	candidate, err := s.beginFixture(t, context.Background(), next, InstallRelease)
 	require.NoError(t, err)
 	defer candidate.Close()
 	s.syncSelection = func() error { return errors.New("failed before publication") }
@@ -172,7 +172,7 @@ func TestSelectionWriterExitProcess(t *testing.T) {
 		require.NoError(t, err)
 		var release Release
 		require.NoError(t, json.Unmarshal(data, &release))
-		candidate, err = s.beginRelease(context.Background(), release, InstallRelease)
+		candidate, err = s.beginRelease(t, context.Background(), release, InstallRelease)
 		require.NoError(t, err)
 	}
 	count := 0

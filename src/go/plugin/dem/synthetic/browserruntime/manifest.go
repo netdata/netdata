@@ -122,8 +122,18 @@ func (m Manifest) Validate() error {
 	return nil
 }
 
+// Names a bound payload adds next to the archive entries. The bundle builder
+// (packaging/dem-runtime/bundle.py) reserves the same names, and its runtime.json
+// points the runner at the generated launcher.
+const (
+	launcherName       = "chrome"
+	fontConfigName     = "fonts.conf"
+	preparedRecordName = "prepared.json"
+	nativeRecordName   = "native.json"
+)
+
 func reservedName(name string) bool {
-	for _, reserved := range []string{"prepared.json", "native.json", "chrome", "fonts.conf"} {
+	for _, reserved := range []string{preparedRecordName, nativeRecordName, launcherName, fontConfigName} {
 		if name == reserved || strings.HasPrefix(name, reserved+"/") {
 			return true
 		}

@@ -131,6 +131,11 @@ func requireManaged(root *os.Root) error {
 	return nil
 }
 
+// generationRecord names the prepared record of generation id in a store root.
+func generationRecord(id string) string {
+	return filepath.Join("generations", id, preparedRecordName)
+}
+
 func (s *Store) loadGeneration(id string) (generation, error) {
 	return loadGeneration(s.root, id)
 }
@@ -151,7 +156,7 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 	if !info.IsDir() {
 		return g, errors.New("invalid generation directory")
 	}
-	metadata := filepath.Join(name, "prepared.json")
+	metadata := generationRecord(id)
 	if err := readJSON(root, metadata, &g); err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			err = damagedMetadata(metadata, err)
@@ -175,7 +180,7 @@ func preparedPaths(root *os.Root, path string, m Manifest) (Paths, error) {
 	}
 	if !sameExecutable(g.Manifest, m) {
 		return Paths{}, damagedMetadata(
-			filepath.Join("generations", m.Archive.SHA256, "prepared.json"),
+			generationRecord(m.Archive.SHA256),
 			errors.New("prepared runtime manifest differs from the required manifest"),
 		)
 	}
@@ -210,12 +215,7 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 				result = errors.Join(result, lease.abortLocked())
 			}
 		}()
-		g, err := s.loadGeneration(m.Archive.SHA256)
-		if err == nil {
-			g.LastUsed = s.now().UTC()
-			err = saveJSON(s.root, filepath.Join("generations", m.Archive.SHA256, "prepared.json"), g)
-		}
-		if err != nil {
+		if err := s.touchGenerationLocked(m.Archive.SHA256); err != nil {
 			return err
 		}
 		if err := lease.publishLocked(); err != nil {
@@ -234,11 +234,22 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 	return use, err
 }
 
+// touchGenerationLocked records a use of generation id. Retirement takes the
+// least recently used unprotected generations first.
+func (s *Store) touchGenerationLocked(id string) error {
+	g, err := s.loadGeneration(id)
+	if err != nil {
+		return err
+	}
+	g.LastUsed = s.now().UTC()
+	return saveJSON(s.root, generationRecord(id), g)
+}
+
 // closeClaim preserves managed reconciliation after releasing common proof.
 func (s *Store) closeClaim(c *claim) error {
 	retired, err := c.close()
 	if retired && err == nil {
-		err = s.withLock(func() error { _, err := s.inventoryLocked(true); return err })
+		err = s.withLock(func() error { _, err := s.strictInventoryLocked(true); return err })
 		s.ledger.recordCleanupError(err)
 	}
 	return err

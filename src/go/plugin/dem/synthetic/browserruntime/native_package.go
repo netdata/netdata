@@ -16,6 +16,14 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
+// NativePackage is installed with the package payload, after build-time binding
+// to Path. Native package/repository authentication is its trust boundary.
+type NativePackage struct {
+	Format   int      `json:"format"`
+	Path     string   `json:"path"`
+	Manifest Manifest `json:"manifest"`
+}
+
 // PrepareNativePackage assembles a package payload without executing it or
 // touching installed runtime state. The builder owns the trusted manifest and
 // exclusive access to output, which must be a new or empty staging directory.
@@ -173,7 +181,7 @@ func publishNativeMetadata(root *os.Root, parent, output string, record NativePa
 	if err := syncTree(root); err != nil {
 		return err
 	}
-	if err := os.Rename(metadata.Name(), filepath.Join(output, "native.json")); err != nil {
+	if err := os.Rename(metadata.Name(), filepath.Join(output, nativeRecordName)); err != nil {
 		return fmt.Errorf("complete native package metadata: %w", err)
 	}
 	return syncDirectory(root, ".")

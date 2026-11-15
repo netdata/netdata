@@ -35,17 +35,18 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 	}); err != nil {
 		return err
 	}
-	for _, name := range []string{"chrome", "fonts.conf"} {
+	for _, name := range []string{launcherName, fontConfigName} {
 		if len(filepath.Join(final, name)) >= 4096 {
 			return errors.New("runtime payload exceeds Linux absolute path limit")
 		}
 	}
-	interpreter := []byte(filepath.Join(final, filepath.FromSlash(m.Layout.Loader)))
+	interpreter := boundInterpreter(final, m.Layout)
 	for _, binding := range m.Bindings {
-		if len(interpreter)+1 > len(binding.Expected) {
+		slot, ok := boundSlot(binding, interpreter)
+		if !ok {
 			return errors.New("runtime prefix exceeds authenticated interpreter capacity")
 		}
-		if err := bindInterpreter(root, binding, interpreter); err != nil {
+		if err := bindInterpreter(root, binding, slot); err != nil {
 			return err
 		}
 	}
@@ -53,10 +54,10 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 	if err != nil {
 		return err
 	}
-	if err := writeNewFile(root, "fonts.conf", fonts, 0400); err != nil {
+	if err := writeNewFile(root, fontConfigName, fonts, 0400); err != nil {
 		return err
 	}
-	if err := writeNewFile(root, "chrome", launcher, 0500); err != nil {
+	if err := writeNewFile(root, launcherName, launcher, 0500); err != nil {
 		return err
 	}
 	// Staging is owned and, for managed generations, later executed by this account.
@@ -85,7 +86,7 @@ const (
 // of the class that runs them, the entrypoint and generated font configuration
 // are regular files, and the data paths are directories.
 func verifyBoundPayload(root *os.Root, m Manifest, execute os.FileMode) error {
-	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, "chrome"} {
+	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, launcherName} {
 		info, err := lstatPlain(root, name)
 		if err != nil {
 			return err
@@ -94,7 +95,7 @@ func verifyBoundPayload(root *os.Root, m Manifest, execute os.FileMode) error {
 			return payloadLayoutError(fmt.Sprintf("runtime executable is missing or not a plain executable: %s", name))
 		}
 	}
-	for _, name := range []string{m.Layout.EntryPoint, "fonts.conf"} {
+	for _, name := range []string{m.Layout.EntryPoint, fontConfigName} {
 		info, err := lstatPlain(root, name)
 		if err != nil {
 			return err
@@ -122,20 +123,18 @@ func lstatPlain(root *os.Root, name string) (os.FileInfo, error) {
 	return root.Lstat(name)
 }
 
+// Paths are the runner's entry points into a bound payload. The runner finds the
+// browser launcher and dependencies through the bundle's own runtime.json.
 type Paths struct {
-	EntryPoint   string
-	Node         string
-	Dependencies string
-	Browser      string
+	EntryPoint string
+	Node       string
 }
 
 // boundPaths names the executable entry points of a payload bound to prefix.
 func boundPaths(prefix string, layout Layout) Paths {
 	return Paths{
-		EntryPoint:   filepath.Join(prefix, layout.EntryPoint),
-		Node:         filepath.Join(prefix, layout.Node),
-		Dependencies: filepath.Join(prefix, layout.Dependencies),
-		Browser:      filepath.Join(prefix, "chrome"),
+		EntryPoint: filepath.Join(prefix, layout.EntryPoint),
+		Node:       filepath.Join(prefix, layout.Node),
 	}
 }
 
@@ -151,12 +150,30 @@ func boundConfiguration(final string, layout Layout) ([]byte, []byte, error) {
 		"</dir><cachedir prefix=\"xdg\">fontconfig</cachedir><config><rescan><int>0</int></rescan></config></fontconfig>\n",
 	)
 	// /bin/sh is an installation prerequisite, not a host Node/libc dependency.
-	launcher := "#!/bin/sh\nexport FONTCONFIG_FILE=" + shellQuote(filepath.Join(final, "fonts.conf")) +
+	launcher := "#!/bin/sh\nexport FONTCONFIG_FILE=" + shellQuote(filepath.Join(final, fontConfigName)) +
 		"\nexec " + shellQuote(filepath.Join(final, layout.Browser)) + " \"$@\"\n"
 	return fonts.Bytes(), []byte(launcher), nil
 }
 
-func bindInterpreter(root *os.Root, binding Binding, interpreter []byte) error {
+// boundInterpreter is the loader path that binds a payload to prefix.
+func boundInterpreter(prefix string, layout Layout) []byte {
+	return []byte(filepath.Join(prefix, filepath.FromSlash(layout.Loader)))
+}
+
+// boundSlot is binding's interpreter slot naming interpreter, zero-padded to the
+// authenticated slot length. It reports false when the interpreter and its
+// terminator do not fit.
+func boundSlot(binding Binding, interpreter []byte) ([]byte, bool) {
+	if len(interpreter)+1 > len(binding.Expected) {
+		return nil, false
+	}
+	slot := make([]byte, len(binding.Expected))
+	copy(slot, interpreter)
+	return slot, true
+}
+
+// bindInterpreter replaces the authenticated bytes of binding with slot.
+func bindInterpreter(root *os.Root, binding Binding, slot []byte) error {
 	if err := plainExistingParents(root, binding.Path); err != nil {
 		return err
 	}
@@ -181,9 +198,7 @@ func bindInterpreter(root *os.Root, binding Binding, interpreter []byte) error {
 		f.Close()
 		return errors.New("interpreter slot does not match authenticated bytes")
 	}
-	bound := make([]byte, len(actual))
-	copy(bound, interpreter)
-	_, err = f.WriteAt(bound, binding.Offset)
+	_, err = f.WriteAt(slot, binding.Offset)
 	err = errors.Join(err, f.Chmod(info.Mode().Perm()), f.Sync())
 	return errors.Join(err, f.Close())
 }

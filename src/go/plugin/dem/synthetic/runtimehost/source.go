@@ -25,23 +25,23 @@ func (s borrowedSource) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{
+	return runtimeUse{
 		use:      use,
 		identity: s.consumer.Manifest().Identity(),
 	}, nil
 }
 
-// managedUse is one execution pin on a held claim. The process source records
+// runtimeUse is one execution pin on a held claim. The process source records
 // failed retirement as host maintenance; borrowed sources leave it to their owner.
-type managedUse struct {
+type runtimeUse struct {
 	use      *browserruntime.Use
 	host     *Host
 	identity synthetic.RuntimeIdentity
 }
 
-func (u managedUse) Paths() runner.Paths                { return runnerPaths(u.use.Paths, u.identity) }
-func (u managedUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
-func (u managedUse) Finish(drained bool) error {
+func (u runtimeUse) Paths() runner.Paths                { return runnerPaths(u.use.Paths, u.identity) }
+func (u runtimeUse) Completion() *ndexec.TreeCompletion { return u.use.Completion }
+func (u runtimeUse) Finish(drained bool) error {
 	err := u.use.Finish(drained)
 	if err != nil && u.host != nil {
 		u.host.recordFinishError(err)
