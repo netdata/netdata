@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -82,6 +83,24 @@ func (e *Engine) unrecordedView(source Source, artifacts artifactStore) *Engine 
 		start:          e.start,
 		platform:       e.platform,
 	}
+}
+
+// temporaryView returns an unrecorded view with a private artifact store and
+// finish, which closes that store and returns err joined with the close error.
+// finish keeps the store when err reports undrained work: a live process tree
+// may still write to its run work directory.
+func (e *Engine) temporaryView(source Source) (*Engine, func(err error) error, error) {
+	captures, err := artifacts.Open("")
+	if err != nil {
+		return nil, nil, err
+	}
+	finish := func(err error) error {
+		if errors.Is(err, ndexec.ErrTreeNotDrained) {
+			return err
+		}
+		return errors.Join(err, captures.Close())
+	}
+	return e.unrecordedView(source, captures), finish, nil
 }
 
 // attempt is one execution's mutable record: the redacted run and the run

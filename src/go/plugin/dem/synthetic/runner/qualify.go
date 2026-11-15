@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -35,17 +34,13 @@ func Qualify(ctx context.Context, source Source) (*Qualification, error) {
 // Qualify checks a candidate through this engine's admission and fatal owner.
 // It never replaces the monitoring source or appends monitor history.
 func (e *Engine) Qualify(ctx context.Context, source Source) (*Qualification, error) {
-	captures, err := artifacts.Open("")
+	candidate, finish, err := e.temporaryView(source)
 	if err != nil {
 		return nil, err
 	}
-	candidate := e.unrecordedView(source, captures)
 	candidate.qualification = true
 	result, err := qualify(ctx, candidate)
-	if !errors.Is(err, ndexec.ErrTreeNotDrained) {
-		err = errors.Join(err, captures.Close())
-	}
-	return result, err
+	return result, finish(err)
 }
 
 // Qualification exercises the normal adapter and sandbox in the caller's
