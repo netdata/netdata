@@ -1,23 +1,23 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "RUM rum collector configuration.",
+    "title": "Real User Monitoring collector configuration.",
     "type": "object",
     "properties": {
       "name": {
         "title": "Site key",
-        "description": "Stable site identifier used in beacon URLs and history. Renaming creates a new history identity.",
+        "description": "Site key, made of letters, digits, underscores and hyphens. It is part of the script URL and identifies the site in charts and history, so renaming starts a separate history.",
         "type": "string",
         "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
       },
       "display_name": {
         "title": "Display name",
-        "description": "Human-readable site name. Leave empty to use the site key.",
+        "description": "Human-readable site name for charts and Functions. Leave empty to use the site key.",
         "type": "string"
       },
       "allowed_origins": {
         "title": "Allowed origins",
-        "description": "Web origins allowed to send telemetry, such as https://example.org. A leading *. allows subdomains only.",
+        "description": "Origins the website is served from, such as `https://shop.example.org`. Reports from other origins are refused. A leading `*.` matches any subdomain.",
         "type": "array",
         "items": {
           "type": "string"
@@ -26,7 +26,7 @@
       },
       "public_url": {
         "title": "Public URL",
-        "description": "Public receiver base URL used for this site's installation snippet. Leave empty to use the receiver public URL.",
+        "description": "Public base URL of the receiver for this site's script tag, such as `https://rum.example.org`. Leave empty to use the receiver's public URL.",
         "type": "string"
       },
       "update_every": {
@@ -38,13 +38,13 @@
       },
       "window": {
         "title": "Measurement window",
-        "description": "Receiver-arrival window for recent browser measurements and distinct observed sessions. Accepts durations between 1m and 30m.",
+        "description": "Time span of recent reports that the charts, alerts and Pages view summarize, from 1m to 30m.",
         "type": "string",
         "default": "5m"
       },
       "page_groups": {
         "title": "Page groups",
-        "description": "Maximum individual page groups shown in breakdown charts. Remaining groups are combined as other.",
+        "description": "How many of the busiest pages and application views get their own breakdown charts, from 1 to 100. The rest are combined as `other`.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100,
@@ -52,7 +52,7 @@
       },
       "countries": {
         "title": "Countries",
-        "description": "Maximum individual countries shown in breakdown charts. Remaining countries are combined as other.",
+        "description": "How many of the busiest countries get their own breakdown charts, from 1 to 100. The rest are combined as `other`.",
         "type": "integer",
         "minimum": 1,
         "maximum": 100,
@@ -60,7 +60,7 @@
       },
       "measure_sample_rate": {
         "title": "Browser collection rate",
-        "description": "Share of browser sessions collected, from 0 to 1. Omitted or null means all; zero disables collection. Browser measurement charts are absent while collection is disabled; receiver diagnostics remain available.",
+        "description": "Share of browser sessions that send reports, from 0 to 1. 1 measures every session; 0 stops collection for the site.",
         "type": [
           "number",
           "null"
@@ -71,7 +71,7 @@
       },
       "investigate": {
         "title": "Detail sampling",
-        "description": "Select native investigation history and enabled event-log and trace exports from received sessions. Leave empty to select all received sessions.",
+        "description": "Which measured sessions are saved to history with their details, and exported when event logs or tracing are on. Leave empty to save every session.",
         "type": [
           "object",
           "null"
@@ -79,7 +79,7 @@
         "properties": {
           "sample_rate": {
             "title": "Baseline detail sample rate",
-            "description": "Baseline share of received sessions selected for detail, from 0 to 1. Omitted or null means all; zero selects only the problem overrides below.",
+            "description": "Share of measured sessions saved with their details, from 0 to 1. 0 saves only the sessions that `always_keep` selects.",
             "type": [
               "number",
               "null"
@@ -90,7 +90,7 @@
           },
           "always_keep": {
             "title": "Problem overrides",
-            "description": "Conditions that select detail beyond the baseline sample. Omitted or null keeps errors and poor vitals; an empty list disables overrides.",
+            "description": "Sessions to save whatever the sample rate - `errors` (a JavaScript error) and `poor_vitals` (a poor Web Vital). An empty list adds none.",
             "type": [
               "array",
               "null"
@@ -111,7 +111,7 @@
       },
       "bots": {
         "title": "Bot handling",
-        "description": "Exclude crawlers and browser automation by default, or include them as bot traffic.",
+        "description": "Whether to drop reports from crawlers, headless browsers and other automation (`exclude`) or keep them as device `bot` (`include`).",
         "type": "string",
         "enum": [
           "exclude",
@@ -121,7 +121,7 @@
       },
       "tracing": {
         "title": "Browser tracing",
-        "description": "Capture browser request spans and propagate trace context. Backend spans require separately instrumented services.",
+        "description": "Record spans for the browser's requests and pass trace context to your APIs, exported as OpenTelemetry traces.",
         "type": [
           "object",
           "null"
@@ -129,7 +129,7 @@
         "properties": {
           "enabled": {
             "title": "Enable browser tracing",
-            "description": "Capture and export browser spans independently of event logs. Disabled by default.",
+            "description": "Send browser spans to their destination. Independent of event logs.",
             "type": [
               "boolean",
               "null"
@@ -138,7 +138,7 @@
           },
           "propagate_to": {
             "title": "Trace propagation origins",
-            "description": "Additional literal API origins receiving trace headers. Same-origin requests receive them automatically; cross-origin APIs must allow the trace headers in CORS.",
+            "description": "Origins of other APIs, such as `https://api.example.org`, whose requests also get the `traceparent` header. Requests to the page's own origin always get it.",
             "type": [
               "array",
               "null"
@@ -186,7 +186,7 @@
       },
       "redact_paths": {
         "title": "Path redaction",
-        "description": "Apply site-specific URL-path replacements before built-in normalization. These rules do not anonymize user IDs or provide general data-loss prevention.",
+        "description": "Your own replacements for private identifiers in URL paths, applied before the built-in ones.",
         "type": [
           "array",
           "null"
@@ -198,12 +198,12 @@
           "properties": {
             "pattern": {
               "title": "Pattern",
-              "description": "Go regular expression matching private path identifiers. Empty patterns are ignored.",
+              "description": "Regular expression, in Go syntax, matching the part of a URL path to replace. Empty patterns are ignored.",
               "type": "string"
             },
             "replace": {
               "title": "Replacement",
-              "description": "Replacement text for matching path segments. Leave empty to remove them.",
+              "description": "Replacement text, such as `:account`. Leave empty to remove the match.",
               "type": "string"
             }
           }
@@ -211,7 +211,7 @@
       },
       "event_logs": {
         "title": "Event logs",
-        "description": "Export sampled browser events for search, including custom-event attributes. Native RUM history works independently.",
+        "description": "Export browser events, including custom event attributes, as OpenTelemetry logs. Session history in Netdata works without it.",
         "type": [
           "object",
           "null"
@@ -219,7 +219,7 @@
         "properties": {
           "enabled": {
             "title": "Enable event logs",
-            "description": "Send event logs to the configured destination. Disabled by default; native charts, sessions and errors remain available.",
+            "description": "Send event logs to their destination.",
             "type": [
               "boolean",
               "null"
@@ -228,7 +228,7 @@
           },
           "include_console_logs": {
             "title": "Include console logs",
-            "description": "Capture console info, warn and error messages for investigated sessions. Effective only when event logs are enabled.",
+            "description": "Also export the console info, warning and error messages of saved sessions. Requires event logs.",
             "type": [
               "boolean",
               "null"
@@ -247,7 +247,7 @@
       },
       "capture": {
         "title": "Capture",
-        "description": "Choose optional location and interaction evidence independently of sampling. Defaults retain country comparisons and disable frustration heuristics.",
+        "description": "Optional location and interaction data to collect. By default only the visitor's country is looked up and click signals are off.",
         "type": [
           "object",
           "null"
@@ -255,7 +255,7 @@
         "properties": {
           "geolocation": {
             "title": "Geolocation",
-            "description": "IP-derived location detail: off disables lookup, country retains country comparisons, and city adds approximate live map markers. Omitted or null means country; coordinates are never retained in history or exported.",
+            "description": "Location looked up from the visitor's IP address - `off`, `country`, or `city`, which adds approximate city markers to the live feed. Coordinates are never stored or exported.",
             "type": [
               "string",
               "null"
@@ -270,7 +270,7 @@
           },
           "frustration_signals": {
             "title": "Frustration signals",
-            "description": "Enable rage, dead and error click heuristics and their browser instrumentation. Disabled by default; these signals do not establish user intent or causality.",
+            "description": "Detect rage clicks, dead clicks and clicks followed by an error. These are heuristics, not proof of user frustration.",
             "type": [
               "boolean",
               "null"
@@ -292,7 +292,7 @@
     "definitions": {
       "destination": {
         "title": "Destination",
-        "description": "Receiver for this signal only. Leave unset to use the local OTLP/gRPC receiver.",
+        "description": "OTLP/gRPC receiver for this signal. Leave empty to use `http://127.0.0.1:4317`, where the Netdata OpenTelemetry plugin listens by default.",
         "type": [
           "object",
           "null"
@@ -300,7 +300,7 @@
         "properties": {
           "endpoint": {
             "title": "Endpoint",
-            "description": "OTLP/gRPC receiver URL with an explicit port. Use http for plaintext or https for TLS; paths, credentials, query strings and fragments are not allowed.",
+            "description": "Receiver address with a port, `http://host:port` for plaintext or `https://host:port` for TLS, without a path or credentials.",
             "type": [
               "string",
               "null"
@@ -309,7 +309,7 @@
           },
           "auth_token": {
             "title": "Authentication token",
-            "description": "Bearer token accepted by the receiver. Use a native secret reference; leave empty for no authentication.",
+            "description": "Bearer token for the receiver. Use a secret reference such as `${env:OTLP_TOKEN}`. Leave empty for no authentication.",
             "type": [
               "string",
               "null"
@@ -317,7 +317,7 @@
           },
           "tls_ca": {
             "title": "TLS CA certificate",
-            "description": "CA certificate file for verifying an HTTPS receiver. Leave empty to use system roots.",
+            "description": "CA certificate file to verify an HTTPS receiver. Leave empty to use the system's trusted CAs.",
             "type": [
               "string",
               "null"
@@ -325,7 +325,7 @@
           },
           "tls_cert": {
             "title": "TLS client certificate",
-            "description": "Client certificate file for an HTTPS receiver. Set together with TLS key; leave both empty to omit client authentication.",
+            "description": "Client certificate file for an HTTPS receiver that requires one. Set together with the client key.",
             "type": [
               "string",
               "null"
@@ -333,7 +333,7 @@
           },
           "tls_key": {
             "title": "TLS client key",
-            "description": "Client private key file for an HTTPS receiver. Set together with TLS client certificate.",
+            "description": "Client private key file. Set together with the client certificate.",
             "type": [
               "string",
               "null"
@@ -570,9 +570,6 @@
     "redact_paths": {
       "ui:listFlavour": "list"
     },
-    "window": {
-      "ui:placeholder": "5m"
-    },
     "event_logs": {
       "destination": {
         "auth_token": {
@@ -580,9 +577,9 @@
           "ui:placeholder": "${env:EVENT_LOGS_TOKEN}"
         }
       },
-      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "ui:help": "Destination settings are kept while the export is disabled, and a secret reference in them must still resolve for the job to start.",
       "include_console_logs": {
-        "ui:help": "Console errors remain optional logs, with bounded and redacted error detail when available. Uncaught exceptions and unhandled rejections remain core RUM errors."
+        "ui:help": "Console errors are exported as logs. Uncaught exceptions and unhandled promise rejections are always collected as JavaScript errors, with or without this option."
       }
     },
     "tracing": {
@@ -592,16 +589,16 @@
           "ui:placeholder": "${env:TRACE_EXPORT_TOKEN}"
         }
       },
-      "ui:help": "Saved destination settings are retained while disabled. Secret references must still resolve for the whole job to start.",
+      "ui:help": "Destination settings are kept while the export is disabled, and a secret reference in them must still resolve for the job to start.",
       "propagate_to": {
-        "ui:help": "To join browser and backend spans, instrument the backend, accept propagated context, coordinate sampling, and send both sides to the same tracing system. Sending browser spans alone does not produce a complete backend trace."
+        "ui:help": "To follow requests into the backend, instrument the backend services, allow the `traceparent` header in their CORS settings, and send their spans to the same tracing system. Browser spans alone do not show the backend side."
       }
     },
     "measure_sample_rate": {
-      "ui:help": "Lower positive rates reduce browser traffic. Existing browser sessions may keep their earlier sampling decision; zero also discards their traffic at the receiver. Excluded sessions cannot be recovered by detail sampling."
+      "ui:help": "The decision is made once per browser session: a session that is not sampled sends nothing and cannot be saved later. Pages that are already open keep their earlier decision until they reload; at 0 the receiver also discards their reports."
     },
     "investigate": {
-      "ui:help": "For problems-only detail, set the baseline rate to 0 and keep the default overrides. For measurements and live views without retained or exported detail, also set always_keep to an empty list. Problem overrides preserve available recent native context plus current and future detail while the session remains tracked. Earlier event logs and spans are not exported retrospectively; complete sessions and traces are not guaranteed."
+      "ui:help": "To save details only for problem sessions, set the sample rate to 0 and keep the default conditions. To save no sessions at all, also empty the conditions list.\n\nEvent logs and spans sent before a session matched a condition are not exported afterwards."
     },
     "capture": {
       "geolocation": {
