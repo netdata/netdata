@@ -308,6 +308,7 @@ func TestRetryAfterPreventsEarlyRequests(t *testing.T) {
 func TestOperationDeadlineAndCancellation(t *testing.T) {
 	_, server := newFixtureAPI(t)
 	c := newTestCollector(t, server)
+	useProductionPacing(t, c)
 	c.Timeout = confopt.Duration(20 * time.Millisecond)
 	err := collectCycle(t.Context(), c) // Request pacing spans the complete operation budget.
 	require.ErrorIs(t, err, context.DeadlineExceeded)

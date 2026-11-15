@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	batchv1 "k8s.io/api/batch/v1"
@@ -131,6 +133,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
+	stubClusterMetadata(t)
 	tests := map[string]struct {
 		prepare   func() *Collector
 		doInit    bool
@@ -167,26 +170,29 @@ func TestCollector_Cleanup(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			collr := test.prepare()
+			synctest.Test(t, func(t *testing.T) {
+				collr := test.prepare()
 
-			if test.doInit {
-				_ = collr.Init(context.Background())
-			}
-			if test.doCollect {
-				_ = collr.Collect(context.Background())
-				time.Sleep(collr.initDelay)
-			}
+				if test.doInit {
+					_ = collr.Init(context.Background())
+				}
+				if test.doCollect {
+					_ = collr.Collect(context.Background())
+					time.Sleep(collr.initDelay)
+				}
 
-			assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
-			time.Sleep(time.Second)
-			if test.doCollect {
-				assert.True(t, collr.discoverer.stopped())
-			}
+				assert.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+				time.Sleep(time.Second)
+				if test.doCollect {
+					assert.True(t, collr.discoverer.stopped())
+				}
+			})
 		})
 	}
 }
 
 func TestCollector_Collect(t *testing.T) {
+	stubClusterMetadata(t)
 	type (
 		testCaseStep func(t *testing.T, ks *Collector)
 		testCase     struct {
@@ -932,29 +938,32 @@ func TestCollector_Collect(t *testing.T) {
 
 	for name, creator := range tests {
 		t.Run(name, func(t *testing.T) {
-			test := creator.create(t)
+			synctest.Test(t, func(t *testing.T) {
+				test := creator.create(t)
 
-			collr := New()
-			collr.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
+				collr := New()
+				collr.newKubeClient = func() (kubernetes.Interface, error) { return test.client, nil }
 
-			require.NoError(t, collr.Init(context.Background()))
-			require.NoError(t, collr.Check(context.Background()))
-			defer collr.Cleanup(context.Background())
+				require.NoError(t, collr.Init(context.Background()))
+				require.NoError(t, collr.Check(context.Background()))
+				defer collr.Cleanup(context.Background())
 
-			for i, executeStep := range test.steps {
-				if i == 0 {
-					_ = collr.Collect(context.Background())
-					time.Sleep(collr.initDelay)
-				} else {
-					time.Sleep(time.Second)
+				for i, executeStep := range test.steps {
+					if i == 0 {
+						_ = collr.Collect(context.Background())
+						time.Sleep(collr.initDelay)
+					} else {
+						time.Sleep(time.Second)
+					}
+					executeStep(t, collr)
 				}
-				executeStep(t, collr)
-			}
+			})
 		})
 	}
 }
 
 func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
+	stubClusterMetadata(t)
 	// Deleting "x-1" must obsolete only the charts of "x-1", not those of the live "x-10".
 	// The expected chart sets come from collectors that only ever saw one of the two objects.
 	const deleted, live = "x-1", "x-10"
@@ -1017,85 +1026,126 @@ func TestCollector_Collect_DeleteObjectKeepsLongerNamedSibling(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
+			synctest.Test(t, func(t *testing.T) {
 
-			client := fake.NewClientset(test.objects(deleted, live)...)
-			collrs := startCollectors(t, client,
-				fake.NewClientset(test.objects(deleted)...),
-				fake.NewClientset(test.objects(live)...),
-			)
-			collr, deletedOnly, liveOnly := collrs[0], collrs[1], collrs[2]
+				client := fake.NewClientset(test.objects(deleted, live)...)
+				collrs := startCollectors(t, client,
+					fake.NewClientset(test.objects(deleted)...),
+					fake.NewClientset(test.objects(live)...),
+				)
+				collr, deletedOnly, liveOnly := collrs[0], collrs[1], collrs[2]
 
-			expected := make(map[string]bool) // chart ID -> obsolete
-			for _, c := range *deletedOnly.Charts() {
-				expected[c.ID] = true
-			}
-			// Runs second: charts both collectors have (discovery, node01) must stay active.
-			for _, c := range *liveOnly.Charts() {
-				expected[c.ID] = false
-			}
-			var own int
-			for _, obsolete := range expected {
-				if obsolete {
-					own++
+				expected := make(map[string]bool) // chart ID -> obsolete
+				for _, c := range *deletedOnly.Charts() {
+					expected[c.ID] = true
 				}
-			}
-			require.NotZero(t, own, "the deleted object must have charts")
-
-			require.NoError(t, test.delete(client, deleted))
-			require.Eventually(t, func() bool {
-				_ = collr.Collect(ctx)
-				for id, obsolete := range expected {
-					if c := collr.Charts().Get(id); obsolete && (c == nil || !c.Obsolete) {
-						return false
+				// Runs second: charts both collectors have (discovery, node01) must stay active.
+				for _, c := range *liveOnly.Charts() {
+					expected[c.ID] = false
+				}
+				var own int
+				for _, obsolete := range expected {
+					if obsolete {
+						own++
 					}
 				}
-				return true
-			}, 5*time.Second, 50*time.Millisecond, "the deleted object's charts were not removed")
+				require.NotZero(t, own, "the deleted object must have charts")
 
-			actual := make(map[string]bool)
-			for _, c := range *collr.Charts() {
-				actual[c.ID] = c.Obsolete
-			}
+				require.NoError(t, test.delete(client, deleted))
+				require.Eventually(t, func() bool {
+					_ = collr.Collect(ctx)
+					for id, obsolete := range expected {
+						if c := collr.Charts().Get(id); obsolete && (c == nil || !c.Obsolete) {
+							return false
+						}
+					}
+					return true
+				}, 5*time.Second, 50*time.Millisecond, "the deleted object's charts were not removed")
 
-			assert.Equal(t, expected, actual)
+				actual := make(map[string]bool)
+				for _, c := range *collr.Charts() {
+					actual[c.ID] = c.Obsolete
+				}
+
+				assert.Equal(t, expected, actual)
+			})
 		})
 	}
 }
 
 func TestCollector_Collect_ScheduledPodUpdatesOnlyItsNodeLabel(t *testing.T) {
-	// Scheduling the pending "x-1" must not rewrite the node label of the live "x-10".
-	ctx := context.Background()
-	pending := newPod("node01", "x-1")
-	pending.Spec.NodeName = ""
-	client := fake.NewClientset(newNode("node01"), newNode("node02"), pending, newPod("node02", "x-10"))
-	collr := startCollectors(t, client)[0]
+	stubClusterMetadata(t)
+	synctest.Test(t, func(t *testing.T) {
+		// Scheduling the pending "x-1" must not rewrite the node label of the live "x-10".
+		ctx := context.Background()
+		pending := newPod("node01", "x-1")
+		pending.Spec.NodeName = ""
+		client := fake.NewClientset(newNode("node01"), newNode("node02"), pending, newPod("node02", "x-10"))
+		collr := startCollectors(t, client)[0]
 
-	_, err := client.CoreV1().Pods(pending.Namespace).Update(ctx, newPod("node01", "x-1"), metav1.UpdateOptions{})
-	require.NoError(t, err)
-	require.Eventually(t, func() bool {
-		_ = collr.Collect(ctx)
+		_, err := client.CoreV1().Pods(pending.Namespace).Update(ctx, newPod("node01", "x-1"), metav1.UpdateOptions{})
+		require.NoError(t, err)
+		require.Eventually(t, func() bool {
+			_ = collr.Collect(ctx)
+			for _, c := range *collr.Charts() {
+				if chartLabelValue(c, labelKeyPodName) == "x-1" && chartLabelValue(c, labelKeyNodeName) != "node01" {
+					return false
+				}
+			}
+			return true
+		}, 5*time.Second, 50*time.Millisecond, "the scheduled pod's charts did not get its node label")
+
+		podNode := map[string]string{"x-1": "node01", "x-10": "node02"}
+		seen := make(map[string]bool)
+		expected := make(map[string]string) // chart ID -> node label
+		actual := make(map[string]string)
 		for _, c := range *collr.Charts() {
-			if chartLabelValue(c, labelKeyPodName) == "x-1" && chartLabelValue(c, labelKeyNodeName) != "node01" {
-				return false
+			if pod := chartLabelValue(c, labelKeyPodName); pod != "" {
+				seen[pod] = true
+				expected[c.ID] = podNode[pod]
+				actual[c.ID] = chartLabelValue(c, labelKeyNodeName)
 			}
 		}
-		return true
-	}, 5*time.Second, 50*time.Millisecond, "the scheduled pod's charts did not get its node label")
 
-	podNode := map[string]string{"x-1": "node01", "x-10": "node02"}
-	seen := make(map[string]bool)
-	expected := make(map[string]string) // chart ID -> node label
-	actual := make(map[string]string)
-	for _, c := range *collr.Charts() {
-		if pod := chartLabelValue(c, labelKeyPodName); pod != "" {
-			seen[pod] = true
-			expected[c.ID] = podNode[pod]
-			actual[c.ID] = chartLabelValue(c, labelKeyNodeName)
+		require.Equal(t, map[string]bool{"x-1": true, "x-10": true}, seen, "both pods must have charts")
+		assert.Equal(t, expected, actual)
+	})
+}
+
+func TestCollector_Collect_InitialDelay(t *testing.T) {
+	stubClusterMetadata(t)
+	synctest.Test(t, func(t *testing.T) {
+		client := fake.NewClientset(newNode("node01"))
+		collr := New()
+		collr.newKubeClient = func() (kubernetes.Interface, error) { return client, nil }
+		require.NoError(t, collr.Init(context.Background()))
+		t.Cleanup(func() { collr.Cleanup(context.Background()) })
+		require.Positive(t, collr.initDelay)
+		discoveryOnly := map[string]int64{
+			"discovery_node_discoverer_state": 1,
+			"discovery_pod_discoverer_state":  1,
 		}
-	}
+		assert.Equal(t, discoveryOnly, collr.Collect(context.Background()))
+		time.Sleep(collr.initDelay - time.Nanosecond)
+		assert.Equal(t, discoveryOnly, collr.Collect(context.Background()))
+		time.Sleep(time.Nanosecond)
+		assert.Contains(t, collr.Collect(context.Background()), "node_node01_age")
+	})
+}
 
-	require.Equal(t, map[string]bool{"x-1": true, "x-10": true}, seen, "both pods must have charts")
-	assert.Equal(t, expected, actual)
+type metadataTransport func(*http.Request) (*http.Response, error)
+
+func (f metadataTransport) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+func stubClusterMetadata(t *testing.T) {
+	t.Helper()
+	// These fake-client tests exercise discovery, including its production delay,
+	// using virtual time. Keep the optional GKE lookup off the real network too.
+	previous := http.DefaultTransport
+	http.DefaultTransport = metadataTransport(func(*http.Request) (*http.Response, error) {
+		return nil, errors.New("GKE metadata unavailable in fake-client tests")
+	})
+	t.Cleanup(func() { http.DefaultTransport = previous })
 }
 
 // startCollectors starts one collector per client and waits once for all of them to pass the initial delay.

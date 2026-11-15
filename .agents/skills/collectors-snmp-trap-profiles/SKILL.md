@@ -193,8 +193,9 @@ This skill holds only what the documents below lack. Point at them; do not resta
    written, comments and final newline included (format pinned by `TestStockProfileCatalogueRequiresValidSHA256`);
    lazy hydration verifies it (`TestStockProfileEpochBindsLazyHydrationToManifestContent`). Catalog tests load all
    shipped profiles and require the manifest and the files to agree in both directions
-   (`TestStockProfileCatalogueMatchesDefaultFiles`, `TestStockCatalogueReconcilesPhysicalInventory`,
-   `TestStockProfileDefaultFilesParse`): regenerating profiles without the catalogue fails tests.
+   (`TestStockProfileCatalogueMatchesDefaultFiles`, `TestStockCatalogueReconcilesPhysicalInventory`): regenerating
+   profiles without the catalogue fails tests. The catalogue test parses each physical file once and shares that
+   bundle across the parse and manifest checks; it MUST retain the independent line scanner and byte-digest checks.
 
 8. **PEN registry.** The default is the bundled snapshot (`defaultPENFilePath`; installed at
    `usr/lib/netdata/conf.d/go.d/snmp.profiles/metadata/iana-enterprise-numbers.txt`). With `--refresh-pen`, or when
