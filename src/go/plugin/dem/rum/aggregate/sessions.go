@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Session detail state holds per-session summaries and bounded event rings
-// for rum-sessions and rum-session-events, independent of window session measurement.
+// Session detail state holds each tracked session's investigation decision and
+// bounded event ring for rum-session-events, independent of window session
+// measurement.
 
 package aggregate
 
@@ -25,7 +26,7 @@ type sessionEvent struct {
 	metricID string
 	revision uint64
 	ts       time.Time
-	typ      string // pageview|error|event|view|request
+	typ      string // pageview, view, vital, error, frustration, request or event
 	page     string
 	text     string
 	traceID  string // traced requests
@@ -46,13 +47,10 @@ type eventContext struct {
 type sessionError struct{ fingerprint, typ, message, stack string }
 
 type sessionDetail struct {
-	id                  string
-	started, lastSeen   time.Time
-	pageviews, errors   uint64
-	frustrations        uint64 // rage, dead and error clicks
-	entryPage, lastPage string
-	events              []sessionEvent
-	investigated        bool // currently selected for retained/exported detail
+	id           string
+	lastSeen     time.Time
+	events       []sessionEvent
+	investigated bool // currently selected for retained/exported detail
 }
 
 // touchSession updates (or creates) the session behind b.SessionID and records
@@ -66,7 +64,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	if page == "" {
 		page = "/"
 	}
-	sd := st.trackSession(b.SessionID, page, now)
+	sd := st.trackSession(b.SessionID, now)
 	if !sd.investigated && st.cfg.Investigate.alwaysKeep(b) {
 		sd.investigated = true
 		// Replay only the preceding context. Current events must never be limited
@@ -80,7 +78,6 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	if now.After(sd.lastSeen) {
 		sd.lastSeen = now
 	}
-	sd.lastPage = page
 	t := timeline{
 		site:    st.cfg.Name,
 		session: sd,
@@ -88,7 +85,6 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 		context: newEventContext(b),
 	}
 	if pageView {
-		sd.pageviews++
 		t.record(sessionEvent{
 			ts:       now,
 			typ:      "pageview",
@@ -98,7 +94,6 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 	}
 	t.recordPoorVitals(b.Vitals, page, now)
 	for _, err := range b.Errors {
-		sd.errors++
 		event, detail := newErrorEvent(err, now, page)
 		event.error = &detail
 		t.record(event)
@@ -121,7 +116,7 @@ func (st *siteState) touchSession(b *beacon.Beacon, pageView bool, now time.Time
 // trackSession returns the detail of a current session, or creates one with its
 // sampling decision. A session idle longer than sessionTTL starts over; at
 // maxTrackedSessions the least recently seen session is evicted.
-func (st *siteState) trackSession(id, page string, now time.Time) *sessionDetail {
+func (st *siteState) trackSession(id string, now time.Time) *sessionDetail {
 	if el := st.sessIdx[id]; el != nil {
 		sd := el.Value.(*sessionDetail)
 		if now.Sub(sd.lastSeen) <= sessionTTL {
@@ -135,8 +130,6 @@ func (st *siteState) trackSession(id, page string, now time.Time) *sessionDetail
 	}
 	sd := &sessionDetail{
 		id:           id,
-		started:      now,
-		entryPage:    page,
 		investigated: SessionSampled(id, st.cfg.Investigate.Rate),
 	}
 	st.sessIdx[id] = st.sess.PushFront(sd)
@@ -231,7 +224,6 @@ func (t *timeline) recordEvents(events []beacon.Event, page string, now time.Tim
 				text:     target,
 			})
 		case beacon.IsFrustration(ev.Name):
-			t.session.frustrations++
 			t.record(sessionEvent{
 				ts:   now,
 				typ:  "frustration",
