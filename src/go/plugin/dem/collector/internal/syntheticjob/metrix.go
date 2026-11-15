@@ -8,6 +8,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 )
 
+// ExecutionStates are the states of the execution_state stateset, in declaration order.
+var ExecutionStates = []string{"unknown", "success", "failed", "timeout", "inconclusive", "error", "cancelled", "stale"}
+
 // attemptMetrics publishes the latest observation state and the session attempt counters of every synthetic kind.
 type attemptMetrics struct {
 	outcome                                                            metrix.StateSetInstrument
@@ -21,16 +24,7 @@ func newAttemptMetrics(m metrix.SnapshotMeter) attemptMetrics {
 		outcome: m.StateSet(
 			"execution_state",
 			metrix.WithStateSetMode(metrix.ModeEnum),
-			metrix.WithStateSetStates(
-				"unknown",
-				"success",
-				"failed",
-				"timeout",
-				"inconclusive",
-				"error",
-				"cancelled",
-				"stale",
-			),
+			metrix.WithStateSetStates(ExecutionStates...),
 		),
 		duration:     m.Gauge("duration", metrix.WithFloat(true)),
 		age:          m.Gauge("observation_age", metrix.WithFloat(true)),
@@ -100,4 +94,94 @@ func boolean(v bool) float64 {
 		return 1
 	}
 	return 0
+}
+
+// kindMetrics publishes the measurements of a fresh observation of one synthetic kind. A job declares only its own
+// kind's measurements, so the other kind's charts never materialize for it.
+type kindMetrics interface {
+	write(monitor.Observation)
+}
+
+func newKindMetrics(kind synthetic.Kind, m metrix.SnapshotMeter) kindMetrics {
+	switch kind {
+	case synthetic.Journey:
+		return newTestMetrics(m)
+	case synthetic.Lighthouse:
+		return newLabMetrics(m)
+	}
+	panic("syntheticjob: unsupported kind " + string(kind))
+}
+
+// testMetrics are the journey test counts.
+type testMetrics struct {
+	declared        metrix.SnapshotGauge
+	passed          metrix.SnapshotGauge
+	failed          metrix.SnapshotGauge
+	timedOut        metrix.SnapshotGauge
+	skipped         metrix.SnapshotGauge
+	expectedFailure metrix.SnapshotGauge
+	notRun          metrix.SnapshotGauge
+}
+
+func newTestMetrics(m metrix.SnapshotMeter) kindMetrics {
+	return testMetrics{
+		declared:        m.Gauge("tests_declared"),
+		passed:          m.Gauge("tests_passed"),
+		failed:          m.Gauge("tests_failed"),
+		timedOut:        m.Gauge("tests_timed_out"),
+		skipped:         m.Gauge("tests_skipped"),
+		expectedFailure: m.Gauge("tests_expected_failure"),
+		notRun:          m.Gauge("tests_not_run"),
+	}
+}
+
+func (m testMetrics) write(run monitor.Observation) {
+	if v := run.Tests; run.HasTests {
+		m.declared.Observe(float64(v.Declared))
+		m.passed.Observe(float64(v.Passed))
+		m.failed.Observe(float64(v.Failed))
+		m.timedOut.Observe(float64(v.TimedOut))
+		m.skipped.Observe(float64(v.Skipped))
+		m.expectedFailure.Observe(float64(v.ExpectedFailure))
+		m.notRun.Observe(float64(v.NotRun))
+	}
+}
+
+// labMetrics are the Lighthouse desktop lab measurements.
+type labMetrics struct {
+	performance metrix.SnapshotGauge
+	fcp         metrix.SnapshotGauge
+	lcp         metrix.SnapshotGauge
+	tbt         metrix.SnapshotGauge
+	si          metrix.SnapshotGauge
+	cls         metrix.SnapshotGauge
+}
+
+func newLabMetrics(m metrix.SnapshotMeter) kindMetrics {
+	return labMetrics{
+		performance: m.Gauge("performance", metrix.WithFloat(true)),
+		fcp:         m.Gauge("fcp", metrix.WithFloat(true)),
+		lcp:         m.Gauge("lcp", metrix.WithFloat(true)),
+		tbt:         m.Gauge("tbt", metrix.WithFloat(true)),
+		si:          m.Gauge("si", metrix.WithFloat(true)),
+		cls:         m.Gauge("cls", metrix.WithFloat(true)),
+	}
+}
+
+func (m labMetrics) write(run monitor.Observation) {
+	if v := run.Metrics; run.HasMetrics {
+		observe(m.performance, v.Performance)
+		observe(m.fcp, v.FCPMS)
+		observe(m.lcp, v.LCPMS)
+		observe(m.tbt, v.TBTMS)
+		observe(m.si, v.SIMS)
+		observe(m.cls, v.CLS)
+	}
+}
+
+// observe publishes a present measurement; the runner accepts only finite, non-negative lab values.
+func observe(gauge metrix.SnapshotGauge, value monitor.Scalar) {
+	if value.Present {
+		gauge.Observe(value.Value)
+	}
 }

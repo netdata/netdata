@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package syntheticjob owns the lifecycle shared by the native synthetic collectors: preparation, active
-// registration, the monitor session, vnode association and attempt metrics. A collector embeds Job and keeps its
-// configuration, request construction and kind-specific metrics.
+// Package syntheticjob owns the lifecycle shared by the journey and lighthouse collectors: preparation, rehearsal,
+// active registration, the monitor session, vnode association, and the attempt and kind metrics. A collector embeds
+// Job and keeps its configuration and request construction.
 package syntheticjob
 
 import (
@@ -33,11 +33,6 @@ type Dependencies struct {
 	ActivationDependencies func(map[string]any) ([]collectorapi.ActivationDependency, error)
 }
 
-// Metrics publishes the kind-specific values of a fresh observation.
-type Metrics interface {
-	Write(monitor.Observation)
-}
-
 var errNotInitialized = errors.New("collector is not initialized")
 
 // Job is embedded by a synthetic collector. Configured vnode snapshots, Init, Check and Collect share the framework
@@ -46,7 +41,7 @@ type Job struct {
 	deps        Dependencies
 	store       metrix.CollectorStore
 	attempt     attemptMetrics
-	metrics     Metrics
+	kind        kindMetrics
 	request     synthetic.Request
 	checkEvery  int
 	initialized bool
@@ -55,15 +50,15 @@ type Job struct {
 	session *monitor.Session
 }
 
-// New creates the job metric store. newMetrics registers the kind metrics on the same meter as the attempt metrics.
-func New(deps Dependencies, newMetrics func(metrix.SnapshotMeter) Metrics) Job {
+// New creates the job metric store with the attempt metrics and the measurements of kind.
+func New(deps Dependencies, kind synthetic.Kind) Job {
 	store := metrix.NewCollectorStore()
 	meter := store.Write().SnapshotMeter("")
 	return Job{
 		deps:    deps,
 		store:   store,
 		attempt: newAttemptMetrics(meter),
-		metrics: newMetrics(meter),
+		kind:    newKindMetrics(kind, meter),
 	}
 }
 

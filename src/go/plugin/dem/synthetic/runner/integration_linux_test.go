@@ -24,7 +24,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
+	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
@@ -242,15 +242,15 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 		})
 		require.NoError(t, err)
 		registry := syntheticregistry.New()
-		var collector *journey.Collector
-		makeFactory := func(executor journey.Executor) *joboutput.ConfigModuleFactory {
-			creator := journey.Creator(journey.Dependencies{
+		var collector *syntheticcollector.Journey
+		makeFactory := func(executor syntheticcollector.Executor) *joboutput.ConfigModuleFactory {
+			creator := syntheticcollector.JourneyCreator(syntheticcollector.Dependencies{
 				Executor: executor,
 				Registry: registry,
 			})
 			create := creator.CreateV2
 			creator.CreateV2 = func() collectorapi.CollectorV2 {
-				collector = create().(*journey.Collector)
+				collector = create().(*syntheticcollector.Journey)
 				return collector
 			}
 			factory, err := joboutput.NewConfigModuleFactory(joboutput.ConfigModuleFactoryConfig{

@@ -1,10 +1,10 @@
 plugin_name: dem.plugin
 modules:
-  - meta:
+  - meta: &meta
       id: collector-dem.plugin-journey
       plugin_name: dem.plugin
       module_name: journey
-      monitored_instance:
+      monitored_instance: &monitored_instance
         name: Browser Journey
         link: https://www.netdata.cloud/
         icon_filename: netdata.png
@@ -64,7 +64,7 @@ modules:
             Enabling browser_error_summary can add substantial CPU and memory cost on console-heavy pages, even without
             console errors; sample limits do not bound browser event-dispatch cost.
     setup:
-      prerequisites:
+      prerequisites: &prerequisites
         list:
           - title: Prepare the browser sandbox policy
             description: |
@@ -165,7 +165,8 @@ modules:
               default_value: 900
               required: false
               group: Collection
-            - name: update_every
+            - &option_update_every
+              name: update_every
               description: Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.
               default_value: 10
               required: false
@@ -175,7 +176,8 @@ modules:
               default_value: 120
               required: false
               group: Collection
-            - name: vnode
+            - &option_vnode
+              name: vnode
               description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               detailed_description: Define a static vnode through `dem:vnode` or a YAML file in the Netdata configuration directory’s `vnodes/` directory. Enter its reference name, not its GUID. Leave empty to keep charts on the collecting Agent.
                 Retained runs and captures keep the GUID resolved when the attempt entered the execution queue, even if the vnode changes before execution starts. Changing the vnode clears the latest observation without relabeling retained evidence; records without a GUID remain unassigned.
@@ -192,7 +194,7 @@ modules:
               config: "jobs:\n  - name: home\n    vnode: example-site\n    script: |\n      import { test, expect } from '@playwright/test';\n\
                 \      test('home page', async ({ page }) => {\n        await page.goto('https://example.org/');\n\
                 \        await expect(page).toHaveTitle(/Example Domain/);\n      });\n"
-    troubleshooting:
+    troubleshooting: &troubleshooting
       problems:
         list:
           - name: No conclusive observations
@@ -200,7 +202,7 @@ modules:
               waiting attempts or execution inability. Open the latest retained run for errors and actual failure
               phases. Missing measurements are gaps; stale, inconclusive and cancelled observations are not
               recovery.
-    metrics:
+    metrics: &metrics
       description: Charts repeat the latest completed observation until a new check finishes. Observation age and
         stale state retain its actual freshness; measurements older than two check intervals are omitted.
         Attempt and occurrence counters count each event once and reset when the native job restarts.
@@ -215,11 +217,13 @@ modules:
         enabled: false
         title: Metrics
       scopes:
-        - name: job
+        - &job_scope
+          name: job
           description: One configured native browser monitor.
           labels: []
           metrics:
-            - name: dem_synthetic.execution_state
+            - &metric_execution_state
+              name: dem_synthetic.execution_state
               description: Latest synthetic observation state
               unit: state
               chart_type: stacked
@@ -232,19 +236,22 @@ modules:
                 - name: error
                 - name: cancelled
                 - name: stale
-            - name: dem_synthetic.duration
+            - &metric_duration
+              name: dem_synthetic.duration
               description: Latest synthetic attempt duration
               unit: milliseconds
               chart_type: line
               dimensions:
                 - name: duration
-            - name: dem_synthetic.observation_age
+            - &metric_observation_age
+              name: dem_synthetic.observation_age
               description: Age of latest synthetic observation
               unit: seconds
               chart_type: line
               dimensions:
                 - name: age
-            - name: dem_synthetic.attempts
+            - &metric_attempts
+              name: dem_synthetic.attempts
               description: Completed synthetic attempts
               unit: attempts/s
               chart_type: stacked
@@ -256,7 +263,8 @@ modules:
                 - name: error
                 - name: cancelled
                 - name: unknown
-            - name: dem_synthetic.occurrences
+            - &metric_occurrences
+              name: dem_synthetic.occurrences
               description: Synthetic scheduled occurrences
               unit: occurrences/s
               chart_type: line
@@ -264,20 +272,23 @@ modules:
                 - name: scheduled
                 - name: admitted
                 - name: coalesced
-            - name: dem_synthetic.scheduler_state
+            - &metric_scheduler_state
+              name: dem_synthetic.scheduler_state
               description: Synthetic active and pending attempts
               unit: attempts
               chart_type: line
               dimensions:
                 - name: active
                 - name: pending
-            - name: dem_synthetic.queue_age
+            - &metric_queue_age
+              name: dem_synthetic.queue_age
               description: Oldest synthetic admission wait
               unit: seconds
               chart_type: line
               dimensions:
                 - name: age
-            - name: dem_synthetic.scheduling_delay
+            - &metric_scheduling_delay
+              name: dem_synthetic.scheduling_delay
               description: Latest synthetic admission delay from selected due time
               unit: seconds
               chart_type: line
@@ -300,7 +311,7 @@ modules:
                 - name: skipped
                 - name: expected_failure
                 - name: not_run
-    functions:
+    functions: &functions
       description: Use these process-wide Functions through the Agent or Cloud for both journey and Lighthouse
         jobs. Invoke their public synthetics-* names on the collecting Agent and select the exact configured vnode name
         with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
@@ -887,3 +898,133 @@ modules:
           require_cloud: true
           prerequisites:
             list: []
+  - meta:
+      <<: *meta
+      id: collector-dem.plugin-lighthouse
+      module_name: lighthouse
+      monitored_instance:
+        <<: *monitored_instance
+        name: Lighthouse Desktop Audit
+      keywords:
+        - dem
+        - synthetic
+        - browser
+        - lighthouse
+    overview:
+      data_collection:
+        metrics_description: Monitor desktop lab performance for a web page with Lighthouse. Inspect the performance
+          category score, individual lab timings, layout shift and audit execution outcomes.
+        method_description: Audits the configured HTTP or HTTPS page using the Lighthouse desktop preset and
+          sandboxed Chromium at the check_every interval. Configuration Test validates preparation without running
+          an audit. Lab measurements describe this browser attempt and are not field Core Web Vitals.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: '| Permission | Needed when |
+
+          |:--|:--|
+
+          | Execute the prepared Node runtime and sandboxed Chromium | Every browser attempt |
+
+          | Write to the DEM state directory | Retaining history and optional captures |
+
+          '
+      default_behavior:
+        auto_detection:
+          description: Jobs require explicit configuration; no websites or scripts are discovered automatically.
+        limits:
+          description: Missing scores or timings produce measurement gaps; a measured zero remains zero. Running
+            and waiting attempts do not refresh the prior observation, which becomes stale after two check
+            intervals. HTML reports are disabled unless requested. No stock performance-score threshold alert
+            is configured.
+        performance_impact:
+          description: Each attempt starts a fresh browser and consumes CPU, memory and target website requests.
+            Increasing check_every reduces browser frequency; update_every only refreshes charts. Jobs share the process browser.concurrency allowance (default 1), so concurrent
+            due jobs can wait. Optional captures consume local disk space.
+    setup:
+      prerequisites: *prerequisites
+      configuration:
+        file:
+          name: dem/lighthouse.conf
+        options:
+          description: Options apply independently to each native job.
+          folding:
+            enabled: true
+            title: Configuration options
+          list:
+            - name: name
+              description: Native job name used to identify this monitor and its history. Renaming creates
+                a separate monitor.
+              default_value: ''
+              required: true
+              group: Target
+            - name: url
+              description: Absolute HTTP or HTTPS URL of the page to audit. Embedded credentials are not accepted.
+              default_value: ''
+              required: true
+              group: Target
+            - name: save_report
+              description: Save the full Lighthouse HTML report. Reports can contain sensitive URLs and page
+                content.
+              default_value: false
+              required: false
+              group: Diagnosis
+            - name: check_every
+              description: Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.
+              default_value: 1800
+              required: false
+              group: Collection
+            - *option_update_every
+            - name: timeout
+              description: Browser attempt timeout, in seconds. Waiting for another browser attempt is excluded.
+              default_value: 180
+              required: false
+              group: Collection
+            - *option_vnode
+        examples:
+          folding:
+            enabled: true
+            title: Examples
+          list:
+            - name: Monitor a home page
+              description: Create one native browser monitor after preparing the runtime and defining the `example-site` vnode.
+              config: "jobs:\n  - name: home\n    vnode: example-site\n    url: https://example.org/\n"
+    troubleshooting: *troubleshooting
+    metrics:
+      <<: *metrics
+      scopes:
+        - <<: *job_scope
+          metrics:
+            - *metric_execution_state
+            - *metric_duration
+            - *metric_observation_age
+            - *metric_attempts
+            - *metric_occurrences
+            - *metric_scheduler_state
+            - *metric_queue_age
+            - *metric_scheduling_delay
+            - name: dem_synthetic.lighthouse.performance
+              description: Latest Lighthouse performance score
+              unit: points
+              chart_type: line
+              dimensions:
+                - name: performance
+            - name: dem_synthetic.lighthouse.timings
+              description: Latest Lighthouse lab timings
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: fcp
+                - name: lcp
+                - name: tbt
+                - name: speed_index
+            - name: dem_synthetic.lighthouse.cls
+              description: Latest Lighthouse cumulative layout shift
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: cls
+    functions: *functions

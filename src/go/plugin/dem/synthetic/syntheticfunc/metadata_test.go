@@ -15,11 +15,11 @@ import (
 )
 
 func TestBothIntegrationsDocumentSharedProcessFunctions(t *testing.T) {
-	for _, collector := range []string{"journey", "lighthouse"} {
-		t.Run(collector, func(t *testing.T) {
-			data, err := os.ReadFile("../../collector/" + collector + "/metadata.yaml")
-			require.NoError(t, err)
-			module, err := collecttest.DecodeMetadataModule(data, "")
+	data, err := os.ReadFile("../../collector/synthetic/metadata.yaml")
+	require.NoError(t, err)
+	for _, id := range []string{"collector-dem.plugin-journey", "collector-dem.plugin-lighthouse"} {
+		t.Run(id, func(t *testing.T) {
+			module, err := collecttest.DecodeMetadataModule(data, id)
 			require.NoError(t, err)
 			declarations := syntheticfunc.Declarations()
 			require.Len(t, module.Functions, len(declarations))
