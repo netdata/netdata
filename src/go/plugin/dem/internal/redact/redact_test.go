@@ -87,8 +87,8 @@ func TestApplyRemovingFollowsValueOrder(t *testing.T) {
 func TestSpansMatchApply(t *testing.T) {
 	r := siteRedactor()
 	collapse := func(s string) string {
-		for strings.Contains(s, redacted+redacted) {
-			s = strings.ReplaceAll(s, redacted+redacted, redacted)
+		for strings.Contains(s, Marker+Marker) {
+			s = strings.ReplaceAll(s, Marker+Marker, Marker)
 		}
 		return s
 	}
@@ -100,6 +100,48 @@ func TestSpansMatchApply(t *testing.T) {
 			t,
 			collapse(r.Apply(input)),
 			collapse(replaceSpans(input, r.spans(input), keep)),
+			"input %q",
+			input,
+		)
+	}
+}
+
+// RemovingSpans describes ApplyRemoving's result in the coordinates of its
+// input: replacing the spans gives the same text, apart from adjacent markers.
+func TestRemovingSpansMatchApplyRemoving(t *testing.T) {
+	r := siteRedactor()
+	collapse := func(s string) string {
+		for strings.Contains(s, Marker+Marker) {
+			s = strings.ReplaceAll(s, Marker+Marker, Marker)
+		}
+		return s
+	}
+	// Lone invalid UTF-8 bytes check the mapping around runes removal can cut or join.
+	lone := []string{"\xc2", "\x85", "\xff", "\xe2\x82", "\u0085"}
+	rng := rand.New(rand.NewPCG(7, 8))
+	for i := range 50000 {
+		input := randomText(rng)
+		if i%2 == 1 {
+			for range 1 + rng.IntN(3) {
+				pos := rng.IntN(len(input) + 1)
+				input = input[:pos] + lone[rng.IntN(len(lone))] + input[pos:]
+			}
+		}
+		var spans []span
+		previous := -1
+		for _, sp := range r.RemovingSpans(input, unicode.IsControl) {
+			require.Greater(t, sp.Start, previous, "input %q: spans are merged and ordered", input)
+			require.LessOrEqual(t, sp.Start, sp.End, "input %q", input)
+			previous = sp.End
+			spans = append(spans, span{
+				start: sp.Start,
+				end:   sp.End,
+			})
+		}
+		require.Equal(
+			t,
+			collapse(r.ApplyRemoving(input, unicode.IsControl)),
+			collapse(replaceSpans(input, spans, unicode.IsControl)),
 			"input %q",
 			input,
 		)

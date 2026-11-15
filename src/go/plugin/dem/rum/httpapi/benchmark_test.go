@@ -49,6 +49,21 @@ func BenchmarkCollectErrors(b *testing.B) {
 	)
 }
 
+// Percent-escaped URL paths in the page URL, a URL view, a resource, a traced
+// request and a stack frame; the credential case holds an escaped bearer token.
+func BenchmarkCollectEscapedURLs(b *testing.B) {
+	const body = `{"meta":{"session":{"id":"session"},"page":{"id":"document-1","url":"https://shop.example.com/caf%C3%A9/50%25-off?x=1"},"view":{"id":"view-1","name":"/caf%C3%A9/item%20one"}},"events":[
+ {"name":"faro.performance.resource","attributes":{"observation_id":"resource-1","observation_sequence":"3","name":"https://cdn.example.com/static/app%20v2.js","httpHost":"cdn.example.com","duration":"1000","transferSize":"1000","initiatorType":"script"}},
+ {"name":"faro.tracing.fetch","attributes":{"url.full":"https://api.example.com/search/QUERY","http.request.method":"GET","http.response.status_code":"200","duration_ns":"1000"}}
+ ],"exceptions":[{"type":"TypeError","value":"failed","stacktrace":{"frames":[{"filename":"https://cdn.example.com/static/app%20v2.js","function":"render","lineno":12,"colno":3}]}}]}`
+	for name, query := range map[string]string{
+		"clean":      "red%20shoes",
+		"credential": "Bearer%20abcdef.ghi",
+	} {
+		b.Run(name, func(b *testing.B) { benchmarkCollectBody(b, strings.Replace(body, "QUERY", query, 1)) })
+	}
+}
+
 func benchmarkCollectBody(b *testing.B, body string) {
 	cfg := testCfg()
 	cfg.RateLimit.PerIPPerMin = math.MaxInt32
