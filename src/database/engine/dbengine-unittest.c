@@ -729,12 +729,14 @@ static size_t dbengine_cadence_test_query_points(
 
 struct in_memory_test_page_filter {
     Word_t section;
+    Word_t metric_id;
     time_t start_time_s;
 };
 
 static bool in_memory_test_page_match(PGC_PAGE *page, void *data) {
     struct in_memory_test_page_filter *f = data;
-    return pgc_page_section(page) == f->section && pgc_page_start_time_s(page) == f->start_time_s;
+    return pgc_page_section(page) == f->section && pgc_page_metric(page) == f->metric_id &&
+           pgc_page_start_time_s(page) == f->start_time_s;
 }
 
 static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, time_t base_s, const char *what) {
@@ -810,6 +812,7 @@ static size_t test_dbengine_in_memory(void) {
     //    the metric's retention still starts at it
     struct in_memory_test_page_filter f = {
         .section = (Word_t)ctx,
+        .metric_id = (Word_t)rd->uuid,
         .start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS,
     };
     pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
@@ -846,6 +849,34 @@ static size_t test_dbengine_in_memory(void) {
         errors++;
     }
 
+    // 5. another metric loses its newest page first (the out of memory protection), then its oldest: no data is
+    //    left, so no retention may be left either (the latest time still remembers the newest page)
+    RRDDIM *rd2 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-2", 1);
+    if(!rd2)
+        return errors + 1;
+
+    for(size_t page = 0; page < 2; page++) {
+        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
+            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
+            dbengine_cadence_test_store_point(rd2, t, (NETDATA_DOUBLE)(t - base_s + 1));
+        }
+        unittest_storage_engine_store_flush(rd2->tiers[0].sch);
+    }
+
+    f.metric_id = (Word_t)rd2->uuid;
+    f.start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    f.start_time_s = base_s;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+
+    first_s = newest_s = 0;
+    if(rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd2->uuid, &first_s, &newest_s) && first_s && first_s <= newest_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: retention %jd - %jd left after the newest page, then the oldest, were evicted\n",
+                (intmax_t)first_s, (intmax_t)newest_s);
+        errors++;
+    }
+
+    rrdset_free(rd2->rrdset);
     rrdset_free(rd->rrdset);
 
     fprintf(stderr, "DBENGINE: in-memory instances: %s\n", errors ? "FAILED" : "OK");

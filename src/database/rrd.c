@@ -129,8 +129,14 @@ int rrd_init(const char *hostname, struct rrdhost_system_info *system_info, bool
 
             netdata_conf_dbengine_init(hostname);
         }
-        else
+        else {
             nd_profile.storage_tiers = 1;
+
+#ifdef ENABLE_DBENGINE
+            // the in-memory instances of db = ram / alloc are dbengine pages too
+            netdata_conf_dbengine_memory_protection_init();
+#endif
+        }
 
         if (!dbengine_enabled) {
             if (nd_profile.storage_tiers > 1) {

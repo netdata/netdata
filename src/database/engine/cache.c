@@ -2367,9 +2367,14 @@ void pgc_page_hot_to_clean_and_release(PGC *cache, PGC_PAGE *page) {
 
     pgc_queue_unlock(cache, &cache->hot);
 
-    if(likely(!(flags & PGC_PAGE_CLEAN)))
+    if(likely(!(flags & PGC_PAGE_CLEAN))) {
+        // queued as accessed, at the end of the clean queue: the out of memory protection evicts from its start, so
+        // it loses the oldest closed pages first, not the newest
+        page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
+
         // first add to linked list, the set the flag (required for move_page_last())
         pgc_queue_add(cache, &cache->clean, page, false, PGC_QUEUE_LOCK_PRIO_COLLECTORS);
+    }
 
     page_transition_unlock(cache, page);
 

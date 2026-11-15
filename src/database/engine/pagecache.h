@@ -51,6 +51,7 @@ struct pgc_page *pg_cache_lookup_next(struct rrdengine_instance *ctx, struct pag
 void pgc_and_mrg_initialize(bool in_memory_only);
 void pgc_ram_cache_initialize(void);
 void rrdeng_in_memory_enforce_retention(time_t now_s);
+bool rrdeng_in_memory_take_lost_retention(void);
 
 void pgc_open_add_hot_page(
     Word_t section,

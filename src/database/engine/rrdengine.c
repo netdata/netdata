@@ -2466,14 +2466,18 @@ static void after_cleanup(struct rrdengine_instance *ctx __maybe_unused, void *d
 
 static void rrdeng_in_memory_retention(void) {
     static time_t last_run_s = 0;
-    time_t now_s = now_realtime_sec();
+    time_t run_s = now_monotonic_sec();
 
     // the cleanup runs every second, or every 10 seconds without disk tiers: tolerate the timer jitter
-    if(now_s - last_run_s < 9)
+    if(last_run_s && run_s - last_run_s < 9)
         return;
 
-    last_run_s = now_s;
-    rrdeng_in_memory_enforce_retention(now_s);
+    last_run_s = run_s;
+    rrdeng_in_memory_enforce_retention(now_realtime_sec());
+
+    // metrics left without pages (by this pass or the out of memory protection) leave their contexts, like a rotation
+    if(rrdeng_in_memory_take_lost_retention())
+        rrdcontext_db_rotation();
 }
 
 static void *cleanup_tp_worker(struct rrdengine_instance *ctx __maybe_unused, void *data __maybe_unused, struct completion *completion __maybe_unused, uv_work_t *uv_work_req __maybe_unused) {

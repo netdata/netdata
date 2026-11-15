@@ -1237,10 +1237,17 @@ size_t pgc_main_nominal_page_size(void *data) {
 // evictions of the retention pass run inline): the free callback then judges the retention at the same time
 static __thread time_t in_memory_retention_now_s = 0;
 
+// a metric lost all its pages: the contexts holding it are rescanned (rrdeng_in_memory_take_lost_retention())
+static bool ram_cache_metrics_lost_retention = false;
+
+bool rrdeng_in_memory_take_lost_retention(void) {
+    return __atomic_exchange_n(&ram_cache_metrics_lost_retention, false, __ATOMIC_RELAXED);
+}
+
 // A page of an in-memory instance has no other copy: when it is freed, the data it held is gone. The metric's
 // retention then starts at its oldest page that remains (this one is already out of the index), so a page lost to
 // the out of memory protection in the middle leaves a gap without hiding the older data. With no page left, the
-// retention moves past this one: the metric has none, and its release deletes it when nothing collects it.
+// metric has no retention, whatever order its pages were freed in: its release deletes it when nothing collects it.
 static time_t ram_cache_metric_oldest_page_s(PGC *cache, Word_t section, Word_t metric_id) {
     time_t start_s = 0;
     PGC_SEARCH method = PGC_SEARCH_FIRST;
@@ -1271,7 +1278,21 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
 
     if (metric) {
         time_t oldest_s = ram_cache_metric_oldest_page_s(cache, entry.section, entry.metric_id);
-        mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s ? oldest_s : entry.end_time_s + (time_t)entry.update_every_s);
+        if (oldest_s)
+            mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s);
+        else {
+            // the latest time is a maximum that never moves back: moving the first time past this page is not enough
+            // when a newer page was freed before it
+            mrg_metric_clear_retention(main_mrg, metric);
+
+            // a collector may have started a page after the scan: its first point stamped the first time, which the
+            // clear above may have erased (its next point sets the latest time again)
+            oldest_s = ram_cache_metric_oldest_page_s(cache, entry.section, entry.metric_id);
+            if (oldest_s)
+                mrg_metric_expand_retention(main_mrg, metric, oldest_s, 0, 0);
+            else
+                __atomic_store_n(&ram_cache_metrics_lost_retention, true, __ATOMIC_RELAXED);
+        }
 
         // releasing it deletes it, when this was its last page and nothing collects it
         mrg_metric_release(main_mrg, metric);
@@ -1313,7 +1334,7 @@ void pgc_ram_cache_initialize(void) {
 
     // The clean pages are the database itself: only the retention evicts them, never the cache size. The
     // out of memory protection still applies. Nothing is saved: pages go from hot to clean.
-    ram_cache = pgc_create(
+    PGC *cache = pgc_create(
         "RAM_PGC",
         (size_t)1 << (sizeof(size_t) == 8 ? 40 : 30),
         ram_cache_free_clean_page_callback,
@@ -1327,7 +1348,10 @@ void pgc_ram_cache_initialize(void) {
         PGC_OPTIONS_EVICT_PAGES_NO_INLINE | PGC_OPTIONS_FLUSH_PAGES_NO_INLINE | PGC_OPTIONS_EVICT_ON_SIGNAL_ONLY,
         0,
         0);
-    pgc_set_nominal_page_size_callback(ram_cache, pgc_main_nominal_page_size);
+    pgc_set_nominal_page_size_callback(cache, pgc_main_nominal_page_size);
+
+    // pulse reads it without a lock
+    __atomic_store_n(&ram_cache, cache, __ATOMIC_RELEASE);
 }
 
 // ----------------------------------------------------------------------------

@@ -135,12 +135,10 @@ RRD_BACKFILL get_dbengine_backfill(RRD_BACKFILL backfill)
 }
 #endif
 
-void netdata_conf_dbengine_init(const char *hostname) {
 #ifdef ENABLE_DBENGINE
-
-    // ----------------------------------------------------------------------------------------------------------------
-    // out of memory protection and use all ram for caches
-
+// the out of memory protection and use all ram for caches: for the disk tiers and the in-memory instances
+// (db = ram / alloc) alike
+void netdata_conf_dbengine_memory_protection_init(void) {
     dbengine_out_of_memory_protection = 0; // will be calculated below
     OS_SYSTEM_MEMORY sm = os_system_memory();
     if(OS_SYSTEM_MEMORY_OK(sm) && sm.ram_total_bytes > sm.ram_available_bytes) {
@@ -176,6 +174,13 @@ void netdata_conf_dbengine_init(const char *hostname) {
                "DBENGINE memory protection is disabled because Netdata could not detect system memory size. "
                "\"use all RAM for caches\" is also disabled.");
     }
+}
+#endif
+
+void netdata_conf_dbengine_init(const char *hostname) {
+#ifdef ENABLE_DBENGINE
+
+    netdata_conf_dbengine_memory_protection_init();
 
     // ----------------------------------------------------------------------------------------------------------------
 
