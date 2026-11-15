@@ -82,23 +82,18 @@ func (o Options) redactLink(raw string, source bool) string {
 	}
 	u.User, u.RawQuery, u.Fragment, u.RawFragment = nil, "", "", ""
 	u.ForceQuery = false
-	// A site path rule can insert a malformed escape; repair it as for the
-	// received URL, so the path still decodes.
-	path := escapeInvalidPercent(redactPath(u.EscapedPath(), o.PathRules, source))
+	// Site path rules can insert a malformed escape or bytes an escaped path
+	// cannot hold; net/url would then escape the whole path again.
+	path := validEscapedPath(redactPath(u.EscapedPath(), o.PathRules, source))
 	plain, err := url.PathUnescape(path)
 	if err != nil {
 		return "" // unreachable: every escape is valid
 	}
 	u.Path, u.RawPath = plain, path
-	escaped := path
-	if plain == path {
-		// Nothing was decoded, but the URL escapes text a site path rule inserted.
-		escaped = u.EscapedPath()
-	}
-	if strings.IndexByte(escaped, '%') >= 0 {
+	if strings.IndexByte(path, '%') >= 0 {
 		// The final pass reads the escaped URL, where an escape can hide a
 		// credential (/a/Bearer%20token), so the redactor reads it decoded too.
-		u.Path, u.RawPath = o.redactDecodedPath(escaped, u.Path)
+		u.Path, u.RawPath = o.redactDecodedPath(path, plain)
 		if u.Host == "" && strings.HasPrefix(u.RawPath, "//") {
 			// Removed control characters can join two slashes; a relative path
 			// must not become a network-path reference with a host.
@@ -115,6 +110,17 @@ func (o Options) redactLink(raw string, source bool) string {
 // escaped URL still reads the original escapes. plain is escaped decoded; it
 // returns the new decoded and escaped path.
 func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
+	for {
+		plain, escaped = o.redactDecodedOnce(escaped, plain)
+		// Removing a control character can join invalid UTF-8 bytes into
+		// another one; each round removes at least one byte.
+		if strings.IndexFunc(plain, unicode.IsControl) < 0 {
+			return plain, escaped
+		}
+	}
+}
+
+func (o Options) redactDecodedOnce(escaped, plain string) (string, string) {
 	spans := o.redactor().RemovingSpans(plain, unicode.IsControl)
 	if len(spans) == 0 && strings.IndexFunc(plain, unicode.IsControl) < 0 {
 		return plain, escaped
@@ -154,6 +160,53 @@ func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
 	}
 	keep(pos, len(plain))
 	return decoded.String(), raw.String()
+}
+
+// validEscapedPath escapes what net/url does not keep in an escaped path: a
+// percent sign that does not start a valid escape, and every byte other than
+// unreserved characters, sub-delims, ":", "@", "/", "[" and "]". Valid escapes
+// stay; a valid path is returned as is.
+func validEscapedPath(path string) string {
+	valid := func(i int) (int, bool) {
+		c := path[i]
+		switch {
+		case c == '%':
+			if i+2 < len(path) && isHexByte(path[i+1]) && isHexByte(path[i+2]) {
+				return 3, true
+			}
+			return 1, false
+		case 'a' <= c && c <= 'z', 'A' <= c && c <= 'Z', '0' <= c && c <= '9':
+			return 1, true
+		}
+		return 1, strings.IndexByte("-._~!$&'()*+,;=:@/[]", c) >= 0
+	}
+	i := 0
+	for i < len(path) {
+		n, ok := valid(i)
+		if !ok {
+			break
+		}
+		i += n
+	}
+	if i == len(path) {
+		return path
+	}
+	const hex = "0123456789ABCDEF"
+	var out strings.Builder
+	out.Grow(len(path) + 8)
+	out.WriteString(path[:i])
+	for i < len(path) {
+		n, ok := valid(i)
+		if ok {
+			out.WriteString(path[i : i+n])
+		} else {
+			out.WriteByte('%')
+			out.WriteByte(hex[path[i]>>4])
+			out.WriteByte(hex[path[i]&15])
+		}
+		i += n
+	}
+	return out.String()
 }
 
 // escapeInvalidPercent encodes each percent sign that does not start a valid

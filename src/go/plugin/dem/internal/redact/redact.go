@@ -91,8 +91,10 @@ type Span struct{ Start, End int }
 // RemovingSpans returns the ranges of s that ApplyRemoving(s, remove) replaces,
 // merged and in order. Replacing each with one Marker and dropping the runes
 // remove selects elsewhere gives ApplyRemoving's result, apart from adjacent
-// markers Apply keeps separate. A caller rebuilding another form of s, such as
-// its escaped form, can so keep the provenance of every retained byte.
+// markers Apply keeps separate; with a configured value that contains marker
+// text the spans can cover more, never less. A caller rebuilding another form
+// of s, such as its escaped form, can so keep the provenance of every retained
+// byte.
 func (r *Redactor) RemovingSpans(s string, remove func(rune) bool) []Span {
 	spans := r.spans(s)
 	if strings.IndexFunc(s, remove) >= 0 {

@@ -88,6 +88,49 @@ func TestRedactURLRepairsEscapesSitePathRulesBreak(t *testing.T) {
 	)
 }
 
+// Bytes a site path rule inserts that an escaped path cannot hold are escaped
+// alone, so the rest of the path keeps its received escapes and the hostless
+// guard. cleanURL adds the final pass over the escaped URL.
+func TestRedactURLEscapesSitePathRuleBytesAlone(t *testing.T) {
+	for name, tc := range map[string]struct {
+		rule, replace string
+		raw, want     string
+	}{
+		"space": {
+			rule:    `_`,
+			replace: " ",
+			raw:     "https://example.org/a_b/password=a%26tail/z",
+			want:    "https://example.org/a%20b/password=[REDACTED]",
+		},
+		"braces": {
+			rule:    `/users/\d+`,
+			replace: "/users/{id}",
+			raw:     "https://example.org/users/42/password=a%26tail/z",
+			want:    "https://example.org/users/%7Bid%7D/password=[REDACTED]",
+		},
+		"relative path joined by a removed control": {
+			rule:    `_`,
+			replace: " ",
+			raw:     "/%00/evil.com/a_b",
+			want:    "/%2Fevil.com/a%20b",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			o := Options{
+				PathRules: []PathRule{{Re: regexp.MustCompile(tc.rule), Replace: tc.replace}},
+			}
+			assert.Equal(t, tc.want, o.cleanURL(tc.raw))
+		})
+	}
+}
+
+// Removing a control character can join invalid UTF-8 bytes into another
+// control character; the decoded reading repeats until none is left.
+func TestRedactURLRemovesControlsJoinedByRemoval(t *testing.T) {
+	var o Options
+	assert.Equal(t, "https://example.org/token=[REDACTED]", o.cleanURL("https://example.org/tok%C2%00%85en=hunter2"))
+}
+
 func TestRedactSelector(t *testing.T) {
 	if got := redactSelector("div#row-jane@example.com > button.buy-1234567"); got != "div#:email > button.buy-:id" {
 		t.Fatalf("got %q", got)
