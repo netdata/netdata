@@ -5,6 +5,8 @@ package history
 import (
 	"context"
 	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
 func (s *Store) QueryErrors(
@@ -21,7 +23,7 @@ func (s *Store) QueryErrors(
 	}
 	groups := make(map[[3]string]*group)
 	err := s.scan(ctx, site, after, before, vnodeGUID, func(r EventRecord) {
-		if r.Type != "error" || (fingerprint != "" && r.Fingerprint != fingerprint) {
+		if r.Type != aggregate.EventTypeError || (fingerprint != "" && r.Fingerprint != fingerprint) {
 			return
 		}
 		key := [3]string{r.Site, r.VnodeGUID, r.Fingerprint}

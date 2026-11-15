@@ -6,6 +6,8 @@ import (
 	"context"
 	"slices"
 	"sort"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 )
 
 // QuerySessions matches an optional exact user ID in the selected receipt-time range
@@ -60,13 +62,13 @@ func (s *Store) QuerySessions(
 			g.userIDs[r.UserID] = struct{}{}
 		}
 		switch r.Type {
-		case "pageview":
+		case aggregate.EventTypePageview:
 			g.record.Pageviews++
-		case "view":
+		case aggregate.EventTypeView:
 			g.record.ApplicationViews++
-		case "error":
+		case aggregate.EventTypeError:
 			g.record.Errors++
-		case "frustration":
+		case aggregate.EventTypeFrustration:
 			g.record.Frustrations++
 		}
 	})
@@ -115,7 +117,7 @@ func (s *Store) QuerySessionEvents(
 ) ([]SessionEventRecord, error) {
 	var out []SessionEventRecord
 	err := s.matchSession(ctx, site, sessionID, vnodeGUID, func(r EventRecord) {
-		if r.Type == "activity" {
+		if r.Type == aggregate.EventTypeActivity {
 			return
 		}
 		out = append(out, SessionEventOf(r))

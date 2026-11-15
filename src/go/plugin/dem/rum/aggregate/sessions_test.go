@@ -9,10 +9,14 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+// Reports of one session accumulate into one timeline in receipt order, each
+// entry with the context of its own report, and count as one investigated session.
 func TestSessionDetailAccumulates(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
+	start := *now
 	b1 := mk(*now, "sess1", "/a")
 	b1.AppVersion = "1.0.0"
 	a.Ingest(b1)
@@ -22,20 +26,51 @@ func TestSessionDetailAccumulates(t *testing.T) {
 	a.Ingest(b2)
 	*now = now.Add(5 * time.Second)
 
-	got := trackedSessions(a)
-	if len(got) != 1 {
-		t.Fatalf("sessions = %+v", got)
-	}
-	sd := got[0]
-	if sd.id != "sess1" || sd.pageviews != 2 || sd.errors != 1 {
-		t.Fatalf("session = %+v", sd)
-	}
-	if sd.entryPage != "/a" || sd.lastPage != "/b" {
-		t.Fatalf("entry/last page = %q/%q", sd.entryPage, sd.lastPage)
-	}
-	if now.Sub(sd.started) != 10*time.Second || sd.lastSeen.Sub(sd.started) != 5*time.Second {
-		t.Fatalf("times: started=%v lastSeen=%v", sd.started, sd.lastSeen)
-	}
+	events, ok := a.SessionEvents("sess1")
+	require.True(t, ok)
+	assert.Equal(t, []HistoryEvent{
+		{
+			ExperienceID: b1.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.UnixMicro(),
+			Type:         "pageview",
+			Page:         "/a",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Version:      "1.0.0",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "pageview",
+			Page:         "/b",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "error",
+			Page:         "/b",
+			Text:         "TypeError: boom",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Fingerprint:  "fp1",
+			ErrorType:    "TypeError",
+			Message:      "boom",
+		},
+	}, events)
+	assert.Equal(t, 1, a.Activity().InvestigatedSessions)
 }
 
 func trackedSessions(a *Aggregator) []*sessionDetail {

@@ -3,8 +3,6 @@
 package aggregate
 
 import (
-	"math"
-	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -83,7 +81,6 @@ func (a *Aggregator) Ingest(b *beacon.Beacon) Result {
 		Observation:  &obs,
 	}
 }
-func validMeasurement(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 func (st *siteState) countAccepted(now time.Time) {
 	st.counters[CounterAccepted]++
@@ -137,12 +134,12 @@ func (st *siteState) admitEvents(r *report) {
 			}
 			// Activations are occurrences, not revision-counted events.
 			key := identityKey{
-				kind:       "document",
+				kind:       identityDocument,
 				experience: b.ExperienceID,
 			}
 			if ev.Kind == beacon.EventView {
 				key = identityKey{
-					kind:       "view",
+					kind:       identityView,
 					experience: b.ExperienceID,
 					item:       b.ViewID,
 				}
@@ -161,7 +158,7 @@ func (st *siteState) admitEvents(r *report) {
 				continue
 			}
 			if !st.admitIdentity(identityKey{
-				kind:       "session",
+				kind:       identitySession,
 				experience: b.ExperienceID,
 				item:       ev.ID,
 			}, 1, r.now) {
@@ -199,8 +196,7 @@ func (st *siteState) admitEvents(r *report) {
 func (st *siteState) admitVitals(r *report) {
 	b := r.in
 	for _, v := range b.Vitals {
-		if _, supported := thresholds[v.Name]; !supported || b.ExperienceID == "" || v.ID == "" || v.Revision == 0 ||
-			!validMeasurement(v.Value) {
+		if b.ExperienceID == "" || v.ID == "" || v.Revision == 0 {
 			st.counters[CounterInvalidMeasurements]++
 			continue
 		}
@@ -229,20 +225,12 @@ func (st *siteState) admitNavigation(r *report) {
 		return
 	}
 	if !st.admitIdentity(identityKey{
-		kind:       "navigation",
+		kind:       identityNavigation,
 		experience: b.ExperienceID,
 	}, nav.Revision, r.now) {
 		return
 	}
 	n := *nav
-	if n.HasLoad && !validMeasurement(n.LoadMS) {
-		n.HasLoad = false
-		st.counters[CounterInvalidMeasurements]++
-	}
-	if n.HasDCL && !validMeasurement(n.DCLMS) {
-		n.HasDCL = false
-		st.counters[CounterInvalidMeasurements]++
-	}
 	// Revision replacement also removes a field absent from the newer report.
 	for _, metric := range []struct {
 		name    string
@@ -292,15 +280,11 @@ func (st *siteState) admitResources(r *report) {
 			continue
 		}
 		if !st.admitIdentity(identityKey{
-			kind:       "resource",
+			kind:       identityResource,
 			experience: b.ExperienceID,
 			item:       res.ID,
 		}, 1, r.now) {
 			continue
-		}
-		if res.HasDuration && !validMeasurement(res.DurationMS) {
-			res.HasDuration = false
-			st.counters[CounterInvalidMeasurements]++
 		}
 		st.resourcesSeen = true
 		firstParty := isFirstParty(b.PageHost, res.Host)
@@ -325,7 +309,7 @@ func (st *siteState) admitResources(r *report) {
 }
 func (st *siteState) admitIdentity(key identityKey, revision uint64, now time.Time) bool {
 	index := &st.identities
-	if key.kind == "resource" {
+	if key.kind == identityResource {
 		index = &st.resourceIdentities
 	}
 	if el := index.current(key, now, identityRetention); el != nil {
@@ -391,5 +375,8 @@ func (st *siteState) observeSession(id, page string, now time.Time) {
 		return
 	}
 	st.sessions.put(now, id, struct{}{})
-	st.pageSessions.put(now, strconv.Itoa(len(id))+":"+id+page, page)
+	st.pageSessions.put(now, pageSessionKey{
+		session: id,
+		page:    page,
+	}, struct{}{})
 }

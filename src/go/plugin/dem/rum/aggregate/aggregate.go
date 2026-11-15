@@ -108,7 +108,24 @@ type vitalObservation struct {
 	element  string
 	attrs    *attributes
 }
-type identityKey struct{ kind, experience, item string }
+
+// identityKind names the population a replay identity belongs to.
+type identityKind uint8
+
+const (
+	identityDocument identityKind = iota
+	identityView
+	identitySession
+	identityNavigation
+	identityResource
+)
+
+type pageSessionKey struct{ session, page string }
+
+type identityKey struct {
+	kind             identityKind
+	experience, item string
+}
 
 // vitalIdentity is the replay evidence of one vital: its SDK metric identity
 // and the dimensions frozen when it was first admitted.
@@ -138,10 +155,9 @@ type siteState struct {
 	identities, resourceIdentities receiptIndex[identityKey, uint64]
 	vitalIdentities                receiptIndex[observationKey, vitalIdentity]
 	activity, resources            receiptHeap[struct{}, activityObservation]
-	// sessions and pageSessions count observed sessions; a page session is keyed
-	// by session and page and holds the page.
+	// sessions and pageSessions count observed sessions, per site and per page.
 	sessions                                                   receiptIndex[string, struct{}]
-	pageSessions                                               receiptIndex[string, string]
+	pageSessions                                               receiptIndex[pageSessionKey, struct{}]
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -170,7 +186,7 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		resourceIdentities: newReceiptIndex[identityKey, uint64](),
 		vitalIdentities:    newReceiptIndex[observationKey, vitalIdentity](),
 		sessions:           newReceiptIndex[string, struct{}](),
-		pageSessions:       newReceiptIndex[string, string](),
+		pageSessions:       newReceiptIndex[pageSessionKey, struct{}](),
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},
 	}

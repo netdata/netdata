@@ -107,7 +107,8 @@ type Beacon struct {
 
 // Navigation is page-load timing extracted from a faro.performance.navigation
 // event. Has* distinguishes an absent attribute (SDK sent
-// no value) from a genuine zero.
+// no value) from a genuine zero. A present timing is finite and non-negative;
+// the producer drops any other value.
 type Navigation struct {
 	Revision uint64
 	LoadMS   float64
@@ -117,6 +118,8 @@ type Navigation struct {
 }
 
 // Resource is one entry from a faro.performance.resource event: a single sub-resource fetch (script, image, XHR,...).
+// A present duration and the transfer size are finite and non-negative; the
+// producer drops any other value.
 type Resource struct {
 	ID          string
 	HasDuration bool
@@ -139,6 +142,8 @@ type VitalOrigin struct {
 	AppVersion string
 }
 
+// Vital is one Web Vital measurement. Name is one of Vitals and Value is
+// finite and non-negative; the producer drops any other measurement.
 type Vital struct {
 	ID       string       // SDK metric identity, preserved across updates
 	Revision uint64       // Creation sequence, assigned before batching; zero means unavailable

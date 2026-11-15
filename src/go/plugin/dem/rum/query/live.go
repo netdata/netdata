@@ -72,7 +72,7 @@ func (s *Service) Live(
 			}
 		}
 		cursor.Sites[key] = pos
-		batch, _ := site.Aggregator.Live(pos.Sequence, limit, vnodeGUID)
+		batch := site.Aggregator.Live(pos.Sequence, limit, vnodeGUID)
 		redact := siteRedactor(site)
 		stream := make([]LiveEvent, 0, len(batch))
 		for _, row := range batch {

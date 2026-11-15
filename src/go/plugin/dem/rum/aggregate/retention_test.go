@@ -259,7 +259,7 @@ func TestOutOfOrderReceiptsDoNotHideExpiredState(t *testing.T) {
 	assert.Equal(t, 1, snap.Vitals[beacon.LCP].N)
 	assert.EqualValues(t, 1, snap.PageviewsWindow)
 	assert.Equal(t, 1, snap.ObservedSessions)
-	rows, _ := a.Live(0, 100, "")
+	rows := a.Live(0, 100, "")
 	require.NotEmpty(t, rows)
 	for _, row := range rows {
 		assert.Equal(t, "/new", row.Page)
@@ -333,7 +333,7 @@ func TestExpiredVitalKeepsDocumentOriginInLiveAndHistory(t *testing.T) {
 	result := a.Ingest(b)
 	require.Len(t, result.Observation.Vitals, 1)
 	assert.Equal(t, "/entry", result.Observation.Vitals[0].Origin.PageGroup)
-	rows, _ := a.Live(0, 100, "")
+	rows := a.Live(0, 100, "")
 	require.Len(t, rows, 1)
 	assert.Equal(t, uint64(2), rows[0].Revision)
 	assert.Equal(t, "/entry", rows[0].Page)
