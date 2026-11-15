@@ -12,7 +12,9 @@ import (
 // ErrorFilter selects error groups.
 type ErrorFilter struct {
 	Filter
-	Fingerprint string // one group with affected-session, page and browser details; "" lists every group without them
+	// Fingerprint selects that fingerprint's groups, one per site and vnode, with
+	// affected-session, page and browser details; "" lists every group without them.
+	Fingerprint string
 }
 
 func (s *Store) QueryErrors(ctx context.Context, f ErrorFilter) ([]ErrorGroup, error) {

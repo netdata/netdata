@@ -636,6 +636,34 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 	}
 }
 
+func TestSitesFunctionSelectsOneSite(t *testing.T) {
+	hub := rumregistry.New()
+	addSite(t, hub, "a", "first")
+	addSite(t, hub, "b", "first")
+	handler := rumfunc.New(query.New(hub, nil), nil)
+	for name, tc := range map[string]struct {
+		args []string
+		want []any
+	}{
+		"all sites": {want: []any{"a", "b"}},
+		"one site":  {args: []string{"site:b"}, want: []any{"b"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{
+				Method:      "rum-sites",
+				Args:        tc.args,
+				Permissions: "0x1b",
+			})
+			require.NotNil(t, response.RawResponse)
+			var sites []any
+			for _, row := range response.RawResponse["data"].([][]any) {
+				sites = append(sites, row[0])
+			}
+			assert.Equal(t, tc.want, sites)
+		})
+	}
+}
+
 func TestJournalFunctionFingerprintDetailAndReceiptTimeHelp(t *testing.T) {
 	ctx := context.Background()
 	journalStore, err := journalstore.Open(ctx, "")

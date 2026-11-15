@@ -143,19 +143,22 @@ func TestSitesSelectsOneSiteKey(t *testing.T) {
 	addSite(t, hub, "a", "first")
 	addSite(t, hub, "b", "first")
 	service := query.New(hub, nil)
-	for filter, want := range map[string][]string{
-		"":        {"a", "b"},
-		"b":       {"b"},
-		"missing": nil,
+	for name, tc := range map[string]struct {
+		filter string
+		want   []string
+	}{
+		"all sites":    {want: []string{"a", "b"}},
+		"one site":     {filter: "b", want: []string{"b"}},
+		"missing site": {filter: "missing"},
 	} {
-		t.Run(filter, func(t *testing.T) {
-			rows, err := service.Sites(context.Background(), filter, "")
+		t.Run(name, func(t *testing.T) {
+			rows, err := service.Sites(context.Background(), tc.filter, "")
 			require.NoError(t, err)
 			var names []string
 			for _, row := range rows {
 				names = append(names, row.Name)
 			}
-			assert.Equal(t, want, names)
+			assert.Equal(t, tc.want, names)
 		})
 	}
 }
