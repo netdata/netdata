@@ -19,18 +19,40 @@ import (
 
 // The frame limit includes the terminating LF.
 func TestFrameSplitter_Limit(t *testing.T) {
-	for _, size := range []int{1, maxMessageBytes - 1, maxMessageBytes, maxMessageBytes + 1} {
+	const limit = 1024
+	for _, size := range []int{1, limit - 1, limit, limit + 1} {
 		t.Run(fmt.Sprint(size), func(t *testing.T) {
 			scanner := bufio.NewScanner(strings.NewReader(strings.Repeat(" ", size-1) + "\n"))
-			scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
-			scanner.Split(newFrameSplitter())
-			if size > maxMessageBytes {
+			scanner.Buffer(make([]byte, 32), limit+1)
+			scanner.Split(newFrameSplitter(limit))
+			if size > limit {
 				assert.False(t, scanner.Scan())
 				require.ErrorIs(t, scanner.Err(), errResponseTooLarge)
 				return
 			}
 			require.True(t, scanner.Scan())
 			assert.Len(t, scanner.Bytes(), size-1)
+			assert.False(t, scanner.Scan())
+			require.NoError(t, scanner.Err())
+		})
+	}
+}
+
+func TestFrameSplitter_LimitCRLF(t *testing.T) {
+	const limit = 32
+	for name, extra := range map[string]int{"exact": 0, "over": 1} {
+		t.Run(name, func(t *testing.T) {
+			frame := strings.Repeat("x", limit-2+extra) + "\r\n"
+			scanner := bufio.NewScanner(strings.NewReader(frame))
+			scanner.Buffer(make([]byte, limit+1), limit+1)
+			scanner.Split(newFrameSplitter(limit))
+			if extra != 0 {
+				assert.False(t, scanner.Scan())
+				require.ErrorIs(t, scanner.Err(), errResponseTooLarge)
+				return
+			}
+			require.True(t, scanner.Scan())
+			assert.Equal(t, frame[:len(frame)-1], scanner.Text(), "CR counts and stays in the token")
 			assert.False(t, scanner.Scan())
 			require.NoError(t, scanner.Err())
 		})
@@ -74,7 +96,7 @@ func TestFrameSplitter_ReadBoundaries(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			scanner := bufio.NewScanner(tc.reader(tc.stream))
-			scanner.Split(newFrameSplitter())
+			scanner.Split(newFrameSplitter(maxMessageBytes))
 			var frames []string
 			for scanner.Scan() {
 				frames = append(frames, scanner.Text())
@@ -107,7 +129,7 @@ func BenchmarkFrameSplitter(b *testing.B) {
 			for b.Loop() {
 				scanner := bufio.NewScanner(&chunkReader{data: frame, chunk: 64 << 10})
 				scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
-				scanner.Split(newFrameSplitter())
+				scanner.Split(newFrameSplitter(maxMessageBytes))
 				if !scanner.Scan() {
 					b.Fatal(scanner.Err())
 				}

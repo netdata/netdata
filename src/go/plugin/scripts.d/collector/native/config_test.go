@@ -21,21 +21,40 @@ import (
 )
 
 // The limit covers the JSON envelope, effective defaults and terminating LF.
+// Use a small unit budget; real runtime tests retain the production cutoff.
 func TestConfigEnvelope_SizeLimit(t *testing.T) {
+	const limit = 1024
 	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
 	definition := registry["native-fixture"].CreateV2().(*Collector).definition
 	settings := Settings{
 		"text": "x",
 	}
-	frame, err := definition.configEnvelope(settings)
+	frame, err := definition.configEnvelopeWithLimit(settings, limit)
 	require.NoError(t, err)
-	settings["text"] = strings.Repeat("x", maxMessageBytes-len(frame)+1)
-	frame, err = definition.configEnvelope(settings)
+	settings["text"] = strings.Repeat("x", limit-len(frame)+1)
+	frame, err = definition.configEnvelopeWithLimit(settings, limit)
 	require.NoError(t, err)
-	assert.Len(t, frame, maxMessageBytes)
+	assert.Len(t, frame, limit)
 	settings["text"] = settings["text"].(string) + "x"
-	_, err = definition.configEnvelope(settings)
+	_, err = definition.configEnvelopeWithLimit(settings, limit)
 	require.ErrorContains(t, err, "config envelope exceeds 64 MiB")
+}
+
+func TestConfigEnvelope_EncodedLimit(t *testing.T) {
+	const limit = 1024
+	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
+	definition := registry["native-fixture"].CreateV2().(*Collector).definition
+	for name, text := range map[string]string{
+		"escaped bytes": strings.Repeat("\n", limit/2),
+		"utf8 bytes":    strings.Repeat("λ", limit/2),
+	} {
+		t.Run(name, func(t *testing.T) {
+			// The value fits by itself, but its encoded envelope exceeds the budget.
+			require.LessOrEqual(t, len(text), limit)
+			_, err := definition.configEnvelopeWithLimit(Settings{"text": text}, limit)
+			require.ErrorContains(t, err, "config envelope exceeds 64 MiB")
+		})
+	}
 }
 
 func TestConfigEnvelope_PackageWithoutForm(t *testing.T) {

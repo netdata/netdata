@@ -197,7 +197,7 @@ func (s *scriptSession) readFrames() {
 	defer close(s.readerDone)
 	scanner := bufio.NewScanner(s.stdout)
 	scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
-	scanner.Split(newFrameSplitter())
+	scanner.Split(newFrameSplitter(maxMessageBytes))
 	for scanner.Scan() {
 		frame := scriptFrame{
 			data: bytes.Clone(scanner.Bytes()),
@@ -229,19 +229,19 @@ func (s *scriptSession) readFrames() {
 // The scanner retries with the whole pending frame after every read, so the LF
 // search resumes after the bytes already checked: rescanning from the start
 // makes a frame delivered in pipe-sized reads cost quadratic time.
-func newFrameSplitter() bufio.SplitFunc {
+func newFrameSplitter(limit int) bufio.SplitFunc {
 	var checked int // leading bytes of the pending frame known to hold no LF
 	return func(data []byte, atEOF bool) (int, []byte, error) {
 		if i := bytes.IndexByte(data[checked:], '\n'); i >= 0 {
 			i += checked
 			checked = 0
-			if i+1 > maxMessageBytes {
+			if i+1 > limit {
 				return 0, nil, errResponseTooLarge
 			}
 			return i + 1, data[:i], nil
 		}
 		checked = len(data)
-		if len(data) >= maxMessageBytes {
+		if len(data) >= limit {
 			return 0, nil, errResponseTooLarge
 		}
 		if atEOF && len(data) != 0 {
