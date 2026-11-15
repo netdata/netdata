@@ -4,6 +4,7 @@ package faro
 
 import (
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -129,6 +130,18 @@ func TestRedactURLEscapesSitePathRuleBytesAlone(t *testing.T) {
 func TestRedactURLRemovesControlsJoinedByRemoval(t *testing.T) {
 	var o Options
 	assert.Equal(t, "https://example.org/token=[REDACTED]", o.cleanURL("https://example.org/tok%C2%00%85en=hunter2"))
+}
+
+// Work stays linear in the path: joins that removing control characters could
+// form are not undone one round at a time.
+func TestRedactURLJoinedControlsCostOnePass(t *testing.T) {
+	const n = 8000
+	raw := "https://example.org/" + strings.Repeat("%C2", n) + "%00" + strings.Repeat("%85", n) + "/token=hunter2"
+	var o Options
+	var got string
+	allocs := testing.AllocsPerRun(1, func() { got = o.cleanURL(raw) })
+	assert.Equal(t, "https://example.org//token=[REDACTED]", got)
+	assert.Less(t, allocs, 100.0, "allocations must not grow with the number of joins")
 }
 
 func TestRedactSelector(t *testing.T) {

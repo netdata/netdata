@@ -110,19 +110,16 @@ func (o Options) redactLink(raw string, source bool) string {
 // escaped URL still reads the original escapes. plain is escaped decoded; it
 // returns the new decoded and escaped path.
 func (o Options) redactDecodedPath(escaped, plain string) (string, string) {
-	for {
-		plain, escaped = o.redactDecodedOnce(escaped, plain)
-		// Removing a control character can join invalid UTF-8 bytes into
-		// another one; each round removes at least one byte.
-		if strings.IndexFunc(plain, unicode.IsControl) < 0 {
-			return plain, escaped
-		}
+	remove := unicode.IsControl
+	controls := strings.IndexFunc(plain, unicode.IsControl) >= 0
+	if controls {
+		// Removing a control character between invalid UTF-8 bytes could join
+		// them into another one (%C2%00%85). Dropping invalid bytes with it
+		// leaves only whole runes, which cannot join, so one pass is enough.
+		remove = isControlOrInvalid
 	}
-}
-
-func (o Options) redactDecodedOnce(escaped, plain string) (string, string) {
-	spans := o.redactor().RemovingSpans(plain, unicode.IsControl)
-	if len(spans) == 0 && strings.IndexFunc(plain, unicode.IsControl) < 0 {
+	spans := o.redactor().RemovingSpans(plain, remove)
+	if len(spans) == 0 && !controls {
 		return plain, escaped
 	}
 	// starts[i] is where decoded byte i begins in escaped.
@@ -138,13 +135,13 @@ func (o Options) redactDecodedOnce(escaped, plain string) (string, string) {
 	starts = append(starts, len(escaped))
 	if len(starts) != len(plain)+1 {
 		// Unreachable for a decoded escaped path; escaping the redacted text keeps it redacted.
-		return o.redactor().ApplyRemoving(plain, unicode.IsControl), ""
+		return o.redactor().ApplyRemoving(plain, remove), ""
 	}
 	var decoded, raw strings.Builder
 	keep := func(start, end int) {
 		for i := start; i < end; {
 			c, n := utf8.DecodeRuneInString(plain[i:end])
-			if !unicode.IsControl(c) {
+			if !remove(c) {
 				decoded.WriteString(plain[i : i+n])
 				raw.WriteString(escaped[starts[i]:starts[i+n]])
 			}
@@ -161,6 +158,10 @@ func (o Options) redactDecodedOnce(escaped, plain string) (string, string) {
 	keep(pos, len(plain))
 	return decoded.String(), raw.String()
 }
+
+// isControlOrInvalid selects control characters and what does not decode as a
+// whole rune: invalid UTF-8 bytes and the replacement character.
+func isControlOrInvalid(c rune) bool { return c == utf8.RuneError || unicode.IsControl(c) }
 
 // validEscapedPath escapes what net/url does not keep in an escaped path: a
 // percent sign that does not start a valid escape, and every byte other than

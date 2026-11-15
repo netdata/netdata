@@ -671,7 +671,8 @@ func TestCaptureRedactsCredentialsHiddenByURLEscapes(t *testing.T) {
 
 // A path without a credential keeps its received escaping. Control characters
 // are removed from it, as from text, so a credential cannot be joined by
-// removing only some of them.
+// removing only some of them; a path holding one also loses invalid UTF-8
+// bytes, so removal cannot join them into another control character.
 func TestCaptureURLPathEscapes(t *testing.T) {
 	for path, want := range map[string]string{
 		"/caf%C3%A9/50%25-off":      "/caf%C3%A9/50%25-off",
@@ -679,7 +680,9 @@ func TestCaptureURLPathEscapes(t *testing.T) {
 		"/a/Bearer":                 "/a/Bearer",
 		"/x%5By%5D":                 "/x%5By%5D",
 		"/%5BREDACTED%5D/x":         "/%5BREDACTED%5D/x",
-		"/a%00b%FF/c%0A":            "/ab%FF/c",
+		"/a%00b%FF/c%0A":            "/ab/c",
+		"/caf%E9/x":                 "/caf%E9/x",
+		"/caf%E9/Bearer%20abc.def":  "/caf%E9/[REDACTED]",
 		"/a/Bearer%09%00abcdef.ghi": "/a/Bearerabcdef.ghi",
 	} {
 		t.Run(path, func(t *testing.T) {
