@@ -6,10 +6,9 @@ package dem
 import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
@@ -32,7 +31,7 @@ type Dependencies struct {
 	GeoIPPaths geoip.Paths
 	History    *journalstore.Store
 	Artifacts  *artifacts.Store
-	Executor   journey.Executor
+	Executor   synthetic.Executor
 	// BrowserActivation names the process browser runtime that synthetic jobs
 	// wait for; nil when the runtime mode has no readiness owner (preloads).
 	BrowserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
@@ -66,12 +65,12 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 		Registry: rumRegistry,
 		History:  rumHistory,
 	}))
-	collectors.Register("journey", journey.Creator(journey.Dependencies{
+	collectors.Register("journey", synthetic.JourneyCreator(synthetic.Dependencies{
 		Registry:               syntheticRegistry,
 		Executor:               deps.Executor,
 		ActivationDependencies: deps.BrowserActivation,
 	}))
-	collectors.Register("lighthouse", lighthouse.Creator(lighthouse.Dependencies{
+	collectors.Register("lighthouse", synthetic.LighthouseCreator(synthetic.Dependencies{
 		Registry:               syntheticRegistry,
 		Executor:               deps.Executor,
 		ActivationDependencies: deps.BrowserActivation,

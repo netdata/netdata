@@ -13,8 +13,7 @@ import (
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
+	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -29,7 +28,7 @@ func TestProcessAutoEnableRejectsInvalidConfigBeforeDependencyWait(t *testing.T)
 	cfg := testProductionProcessConfig(reader, output)
 	cfg.AutoEnable = true
 	cfg.Services = []ProcessService{source}
-	creator := lighthouse.Creator(lighthouse.Dependencies{})
+	creator := syntheticcollector.LighthouseCreator(syntheticcollector.Dependencies{})
 	creator.ActivationDependencies = func(map[string]any) ([]collectorapi.ActivationDependency, error) {
 		return []collectorapi.ActivationDependency{
 			{Kind: "dem-runtime", Name: "browser", Ready: func() error { return errors.New("runtime missing") }},
@@ -89,7 +88,7 @@ func TestProcessStockJourneyRetryRecoversHiddenFailure(t *testing.T) {
 	cfg := testProductionProcessConfig(reader, output)
 	cfg.AutoEnable = true
 	executor := &admissionTestJourneyExecutor{}
-	creator := journey.Creator(journey.Dependencies{
+	creator := syntheticcollector.JourneyCreator(syntheticcollector.Dependencies{
 		Executor: executor,
 		Registry: syntheticregistry.New(),
 	})

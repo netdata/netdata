@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-package journey_test
+package synthetic_test
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/internal/syntheticjobtest"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -21,7 +21,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDraftUsesResolvedConfigurationWithoutActivating(t *testing.T) {
+func TestJourneyDraftUsesResolvedConfigurationWithoutActivating(t *testing.T) {
 	t.Setenv("DEM_TEST_REHEARSAL_SECRET", "synthetic-rehearsal-value")
 	hub := syntheticregistry.New()
 	var requests []model.Request
@@ -33,7 +33,7 @@ func TestDraftUsesResolvedConfigurationWithoutActivating(t *testing.T) {
 			return failure
 		},
 	}
-	creator := journey.Creator(journey.Dependencies{
+	creator := synthetic.JourneyCreator(synthetic.Dependencies{
 		Executor: exec,
 		Registry: hub,
 	})
@@ -72,7 +72,7 @@ func TestDraftUsesResolvedConfigurationWithoutActivating(t *testing.T) {
 	assert.Empty(t, hub.Snapshot(time.Now()))
 	assert.Equal(t, "${env:DEM_TEST_REHEARSAL_SECRET}", config["secrets"].([]any)[0].(map[string]any)["value"])
 
-	c := journey.New(journey.Dependencies{
+	c := synthetic.NewJourney(synthetic.Dependencies{
 		Executor: exec,
 		Registry: hub,
 	})

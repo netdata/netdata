@@ -468,8 +468,9 @@ Shared and process-wide packages:
 
 | Package | Responsibility |
 |---|---|
-| `collector/{receiver,rum,journey,lighthouse}` | Native lifecycle, configuration, scheduling callbacks and metric publication; journey and lighthouse embed the shared synthetic job and keep request building and their own metrics |
-| `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, registration, monitor session, vnode association and attempt metrics |
+| `collector/{receiver,rum}` | Native lifecycle, configuration, scheduling callbacks and metric publication |
+| `collector/synthetic` | The `journey` and `lighthouse` modules: each keeps its configuration, form and request building over the shared synthetic job; one chart template and one integration metadata file serve both |
+| `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, rehearsal, registration, monitor session, vnode association, and attempt and kind metrics |
 | `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/rawfunc` | Request and response plumbing shared by the three Function packages: access masks and the permission check, strict arguments, vnode selectors, cancellation, the row bound, method declarations and table responses built from ordered column lists |
@@ -594,8 +595,9 @@ Framework-owned behavior:
 
 Collectors:
 
-- Each package in `collector/` is a registered native collector. Its lifecycle methods show acquisition, readiness,
-  collection and retirement; its metric definitions show the measurements it publishes.
+- Each collector package under `collector/` registers native collectors: `receiver`, `rum`, and `synthetic`, which
+  registers both `journey` and `lighthouse`. Their lifecycle methods show acquisition, readiness, collection and
+  retirement. The synthetic modules' measurements are defined in `collector/internal/syntheticjob`.
 - Fixed instruments are prepared once.
 - Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 

@@ -12,10 +12,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
@@ -162,10 +161,10 @@ func TestFunctionAvailabilityWithActiveCollectors(t *testing.T) {
 			case *rum.Collector:
 				c.Name = "shop"
 				c.AllowedOrigins = []string{"https://example.org"}
-			case *journey.Collector:
+			case *syntheticcollector.Journey:
 				c.Name = "login"
 				c.Script = "test('login', async () => {});"
-			case *lighthouse.Collector:
+			case *syntheticcollector.Lighthouse:
 				c.Name = "home"
 				c.URL = "https://example.org"
 			case *receiver.Collector:
@@ -481,7 +480,7 @@ func TestRegistrySyntheticInventoryRedactsTargetCredentials(t *testing.T) {
 			waiting: waiting,
 		},
 	}, dem.DefaultConfig())
-	collector := components.Collectors["lighthouse"].CreateV2().(*lighthouse.Collector)
+	collector := components.Collectors["lighthouse"].CreateV2().(*syntheticcollector.Lighthouse)
 	collector.Name = "home"
 	collector.URL = "https://example.org/?token=fixture-token&password=fixture-password&page=home"
 	require.NoError(t, collector.Init(context.Background()))

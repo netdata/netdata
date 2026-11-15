@@ -21,7 +21,7 @@ func (j *Job) Collect(ctx context.Context) error {
 	snapshot := j.session.Snapshot(time.Now())
 	j.attempt.write(snapshot)
 	if snapshot.Fresh {
-		j.metrics.Write(snapshot.Latest)
+		j.kind.write(snapshot.Latest)
 	}
 	return nil
 }
