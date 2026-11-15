@@ -117,24 +117,22 @@ endfunction()
 # fails if there is none. Unlike the other ENABLE_BUNDLED_* options there is
 # no fallback to the bundled copy, so the result does not depend on the host.
 #
-# A system library has no recover extension, so recovery of the metadata
-# database is not available with it. It is usually built without
+# The recover extension is not part of the SQLite library. It would have to be
+# built from the SQLite sources, against a library that has
+# SQLITE_ENABLE_DBPAGE_VTAB, so recovery of the metadata database is left out
+# in this mode. A system library is usually built without
 # UPDATE/DELETE ... LIMIT too, which only the unit test relies on.
 macro(netdata_detect_sqlite3)
         if(ENABLE_BUNDLED_SQLITE)
                 netdata_bundle_sqlite3()
         else()
-                pkg_check_modules(SQLITE3 sqlite3>=${SQLITE_SYSTEM_MIN_VERSION})
+                pkg_check_modules(SQLITE3 IMPORTED_TARGET sqlite3>=${SQLITE_SYSTEM_MIN_VERSION})
 
-                if(NOT SQLITE3_FOUND)
+                if(NOT TARGET PkgConfig::SQLITE3)
                         message(FATAL_ERROR "ENABLE_BUNDLED_SQLITE is off, but SQLite >= ${SQLITE_SYSTEM_MIN_VERSION} could not be found.")
                 endif()
 
                 message(STATUS "Using system SQLite ${SQLITE3_VERSION}")
-
-                set(NETDATA_SQLITE_INCLUDE_DIRS ${SQLITE3_INCLUDE_DIRS})
-                set(NETDATA_SQLITE_CFLAGS_OTHER ${SQLITE3_CFLAGS_OTHER})
-                set(NETDATA_SQLITE_LIBRARIES ${SQLITE3_LDFLAGS})
         endif()
 endmacro()
 
@@ -144,8 +142,6 @@ function(netdata_add_sqlite3_to_target _target)
                 target_link_libraries(${_target} PUBLIC ${NETDATA_SQLITE_LIBRARIES})
                 add_dependencies(${_target} sqlite3)
         else()
-                target_include_directories(${_target} PUBLIC ${NETDATA_SQLITE_INCLUDE_DIRS})
-                target_compile_options(${_target} PUBLIC ${NETDATA_SQLITE_CFLAGS_OTHER})
-                target_link_libraries(${_target} PUBLIC ${NETDATA_SQLITE_LIBRARIES})
+                target_link_libraries(${_target} PUBLIC PkgConfig::SQLITE3)
         endif()
 endfunction()
