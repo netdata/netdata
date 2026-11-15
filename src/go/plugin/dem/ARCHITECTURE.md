@@ -544,8 +544,9 @@ Dependency direction:
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
   through `rum/query`, while synthetic Functions use the domain values directly: `synthetic` runs and events,
   `registry.Job`, `history.RunFilter`/`RunPage`, `artifacts.Filter`/`Set`/`Cursor`/`Status` and
-  `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status through its narrow
-  store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports no domain package.
+  `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status
+  through its narrow store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports
+  no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
   or acquire browser execution admission.
 - The history adapters borrow one `journalstore.Store`. They cannot close it or independently apply retention.

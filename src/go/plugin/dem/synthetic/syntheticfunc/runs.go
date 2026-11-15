@@ -20,7 +20,7 @@ var (
 		model.Journey,
 		"synthetics-journey-runs",
 		"Journey runs",
-		"Retained journey attempts with test counts and failure evidence.",
+		"Retained journey attempts with test counts and failure evidence. Missing test counts are null.",
 		journeyRunsColumns,
 	)
 	lighthouseRunsMethod = runsMethod(

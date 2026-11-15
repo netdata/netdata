@@ -164,6 +164,7 @@ func TestRunHistoryRowsShowOnlyTheirKindColumns(t *testing.T) {
 	}
 }
 
+// The journal-backed rows also carry each kind's own measurements.
 func TestRunHistoryTruncationCountsOnlyItsKind(t *testing.T) {
 	ctx := t.Context()
 	journalStore, err := journalstore.Open(ctx, t.TempDir())
@@ -172,37 +173,59 @@ func TestRunHistoryTruncationCountsOnlyItsKind(t *testing.T) {
 	store := synthetichistory.NewStore(journalStore)
 	now := time.Now().UnixMicro()
 	for i, kind := range []model.Kind{model.Journey, model.Journey, model.Journey, model.Lighthouse, model.Lighthouse} {
-		_, err := store.AppendRun(ctx, model.HistoryComplete, model.Run{
+		run := model.Run{
 			ID:          "run-" + strconv.Itoa(i),
 			JobID:       string(kind) + ":site",
 			Kind:        kind,
 			StartedUS:   now - int64(i),
 			CompletedUS: now,
 			Outcome:     model.Success,
-		})
+		}
+		switch i {
+		case 0:
+			run.Tests = &model.TestCounts{
+				Declared: 2,
+				Passed:   1,
+				Failed:   1,
+			}
+		case 3:
+			run.Metrics = &model.LabMetrics{
+				Performance: ptr(87),
+			}
+		}
+		_, err := store.AppendRun(ctx, model.HistoryComplete, run)
 		require.NoError(t, err)
 	}
 	h := syntheticfunc.New(query.New(syntheticregistry.New(), store, emptyArtifacts(t), noPolicyError), nil)
 	for method, tc := range map[string]struct {
 		runs      []any
 		truncated bool
+		column    string
+		values    []any
 	}{
 		"synthetics-journey-runs": {
 			runs:      []any{"run-0", "run-1"},
 			truncated: true,
+			column:    "tests_failed",
+			values:    []any{1, nil},
 		},
 		"synthetics-lighthouse-runs": {
 			runs:      []any{"run-3", "run-4"},
 			truncated: false,
+			column:    "performance",
+			values:    []any{87.0, nil},
 		},
 	} {
 		t.Run(method, func(t *testing.T) {
 			got := call(h, method, "limit:2")
-			var runs []any
+			var runs, values []any
 			for _, row := range responseData(t, got) {
-				runs = append(runs, rowValues(t, got, row)["run_id"])
+				row := rowValues(t, got, row)
+				runs = append(runs, row["run_id"])
+				values = append(values, row[tc.column])
 			}
 			assert.Equal(t, tc.runs, runs)
+			assert.Equal(t, tc.values, values)
 			assert.Equal(t, tc.truncated, got.RawResponse["truncated"])
 			assert.Equal(t, 2, got.RawResponse["limit"])
 			validate(t, got)

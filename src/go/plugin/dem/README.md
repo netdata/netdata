@@ -898,10 +898,10 @@ qualification failures.
 Functions show current execution and retained diagnosis.
 
 Lighthouse performance is a desktop lab score in points from 0 to 100; FCP, LCP, TBT and Speed Index are milliseconds,
-and CLS is dimensionless. `synthetics-lighthouse-runs` lists them for each retained audit. Missing values are gaps/null, distinct from measured zero. Audit completion is separate from
-page performance. A failed optional report save marks capture unavailable and retains its diagnostic while preserving
-completed audit measurements. These lab measurements are not browser field Web Vitals; no lab-score alert threshold is
-enabled.
+and CLS is dimensionless. `synthetics-lighthouse-runs` lists them for each retained audit. Missing values are gaps/null,
+distinct from measured zero. Audit completion is separate from page performance. A failed optional report save marks
+capture unavailable and retains its diagnostic while preserving completed audit measurements. These lab measurements are
+not browser field Web Vitals; no lab-score alert threshold is enabled.
 
 ## Synthetic diagnosis and captures
 

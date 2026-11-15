@@ -4,10 +4,12 @@ package syntheticfunc
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
+	model "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
 )
 
@@ -58,6 +60,14 @@ func (h *Handler) checks(
 	response["truncated"] = truncated
 	response["limit"] = limit
 	return funcapi.RawResponse(response)
+}
+
+// validKind accepts the synthetics-checks kind filter: empty, journey or lighthouse.
+func validKind(value string) error {
+	if value != "" && value != string(model.Journey) && value != string(model.Lighthouse) {
+		return errors.New("kind must be journey or lighthouse")
+	}
+	return nil
 }
 
 var checksColumns = rawfunc.Columns[registry.Job]{

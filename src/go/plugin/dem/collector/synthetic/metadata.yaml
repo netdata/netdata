@@ -312,15 +312,16 @@ modules:
                 - name: expected_failure
                 - name: not_run
     functions:
-      description: &functions_description Use these process-wide Functions through the Agent or Cloud. Run history
-        has one Function per kind (synthetics-journey-runs, synthetics-lighthouse-runs); the monitor overview, run detail
+      description: &functions_description Use these process-wide Functions through the Agent or Cloud. Run history has
+        one Function per kind (synthetics-journey-runs, synthetics-lighthouse-runs); the monitor overview, run detail
         and capture Functions serve journeys and Lighthouse audits alike. Invoke their public synthetics-* names on the
-        collecting Agent and select the exact configured vnode name with vnode:storefront, not its display hostname. Names use current configuration even with disabled or no jobs;
-        renamed or removed names stop resolving, and reused names select their current GUID. Use vnode_guid for retained
-        history by canonical GUID after removal. Omit both selectors for all vnodes and unassigned data. Filters retain
-        Agent-level access and do not provide per-site authorization; no active browser is required.
-        Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive
-        data, on a paid plan or an active trial; journeys and audits run and their history is stored on every plan.
+        collecting Agent and select the exact configured vnode name with vnode:storefront, not its display hostname.
+        Names use current configuration even with disabled or no jobs; renamed or removed names stop resolving, and
+        reused names select their current GUID. Use vnode_guid for retained history by canonical GUID after removal.
+        Omit both selectors for all vnodes and unassigned data. Filters retain Agent-level access and do not provide
+        per-site authorization; no active browser is required. Viewing them requires a signed-in member of the node's
+        Netdata Cloud Space with permission to view sensitive data, on a paid plan or an active trial; journeys and
+        audits run and their history is stored on every plan.
       list:
         - &function_checks
           id: synthetics-checks
@@ -478,10 +479,10 @@ modules:
         - id: synthetics-journey-runs
           function_name: synthetics-journey-runs
           name: Journey runs
-          description: Invoke `synthetics-journey-runs`. Retained journey attempts with test counts and failure evidence. Attempts are selected by start time, with their latest
-            retained outcome even when completion is outside the range. after and before include their entire Unix
-            second or accept negative offsets from now; omitted bounds cover retained history through now.
-            Results are capped at 2000 and disclose truncation.
+          description: Invoke `synthetics-journey-runs`. Retained journey attempts with test counts and failure
+            evidence. Attempts are selected by start time, with their latest retained outcome even when completion is
+            outside the range. after and before include their entire Unix second or accept negative offsets from now;
+            omitted bounds cover retained history through now. Results are capped at 2000 and disclose truncation.
           parameters:
             - id: vnode
               name: Virtual node name (`vnode`)
@@ -541,9 +542,9 @@ modules:
               default: '2000'
               options: []
           returns:
-            description: At most limit retained journey attempts selected by start time, with explicit truncated
-              and effective time bounds. Zero or missing execution timestamps, missing durations and test counts the run did not report are
-              null rather than fabricated measurements.
+            description: At most limit retained journey attempts selected by start time, with explicit truncated and
+              effective time bounds. Zero or missing execution timestamps, missing durations and test counts the run did
+              not report are null rather than fabricated measurements.
             columns:
               - name: run_id
                 type: string
@@ -658,11 +659,10 @@ modules:
                 type: string
                 unit: ''
                 description: Observed browser error counts by category, with sampling limitations when reported; missing evidence is not zero errors.
-          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
-            browser admission. Artifact fetch reads at most 5 MiB.
-          security: Requires member-equivalent access for observations and retained text; artifact bytes require
-            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
-            and user input; they are not universally redacted.
+          performance: Reads retained run history from the local journal, at most 2000 rows, without starting a
+            browser or acquiring browser admission.
+          security: Requires member-equivalent access. Rows can include target URLs, error text and journey test and
+            step titles; they are not universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
           require_cloud: true
@@ -1057,10 +1057,10 @@ modules:
         - id: synthetics-lighthouse-runs
           function_name: synthetics-lighthouse-runs
           name: Lighthouse runs
-          description: Invoke `synthetics-lighthouse-runs`. Retained Lighthouse audits with their lab measurements. Attempts are selected by start time, with their latest
-            retained outcome even when completion is outside the range. after and before include their entire Unix
-            second or accept negative offsets from now; omitted bounds cover retained history through now.
-            Results are capped at 2000 and disclose truncation.
+          description: Invoke `synthetics-lighthouse-runs`. Retained Lighthouse audits with their lab measurements.
+            Attempts are selected by start time, with their latest retained outcome even when completion is outside the
+            range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds
+            cover retained history through now. Results are capped at 2000 and disclose truncation.
           parameters:
             - id: vnode
               name: Virtual node name (`vnode`)
@@ -1120,9 +1120,9 @@ modules:
               default: '2000'
               options: []
           returns:
-            description: At most limit retained Lighthouse attempts selected by start time, with explicit truncated
-              and effective time bounds. Zero or missing execution timestamps, missing durations and measurements the audit did not report are
-              null rather than fabricated measurements.
+            description: At most limit retained Lighthouse attempts selected by start time, with explicit truncated and
+              effective time bounds. Zero or missing execution timestamps, missing durations and measurements the audit
+              did not report are null rather than fabricated measurements.
             columns:
               - name: run_id
                 type: string
@@ -1208,11 +1208,10 @@ modules:
                 type: float
                 unit: ''
                 description: Cumulative Layout Shift; dimensionless.
-          performance: Reads local active snapshots and retained evidence without starting a browser or acquiring
-            browser admission. Artifact fetch reads at most 5 MiB.
-          security: Requires member-equivalent access for observations and retained text; artifact bytes require
-            administrator-equivalent access. Captures and reports may contain sensitive URLs, page content
-            and user input; they are not universally redacted.
+          performance: Reads retained run history from the local journal, at most 2000 rows, without starting a
+            browser or acquiring browser admission.
+          security: Requires member-equivalent access. Rows can include target URLs and error text; they are not
+            universally redacted.
           availability: Available while dem.plugin is running, independently of active journey or Lighthouse
             jobs. Individual retained evidence may be absent or expired.
           require_cloud: true

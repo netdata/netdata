@@ -23,13 +23,6 @@ func rowLimit(value string) (int, error) {
 	return limit, nil
 }
 
-func validKind(value string) error {
-	if value != "" && value != string(model.Journey) && value != string(model.Lighthouse) {
-		return errors.New("kind must be journey or lighthouse")
-	}
-	return nil
-}
-
 // runFilter selects one kind's runs from the history method arguments.
 func runFilter(kind model.Kind, args map[string]string, now int64) (history.RunFilter, error) {
 	before := now

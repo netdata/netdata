@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -47,12 +48,7 @@ func TestLiveCursorReadsOnlyNewerObservations(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			journalStore, err := journalstore.Open(t.Context(), "")
-			require.NoError(t, err)
-			t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
-			hub := rumregistry.New()
-			a, _ := addSite(t, hub, "shop", "first")
-			handler := rumfunc.New(query.New(hub, history.NewStore(journalStore)), nil)
+			handler, a := liveHandler(t)
 			pages := func(response map[string]any) []any {
 				index := response["columns"].(map[string]any)["page"].(map[string]any)["index"].(int)
 				var out []any
@@ -63,38 +59,47 @@ func TestLiveCursorReadsOnlyNewerObservations(t *testing.T) {
 			}
 
 			page(a, "shop", "/one")
-			first := handler.HandleRaw(t.Context(), request("")).RawResponse
-			require.NotNil(t, first)
+			response := handler.HandleRaw(t.Context(), request(""))
+			first := response.RawResponse
+			require.NotNil(t, first, response.Message)
 			assert.Equal(t, []any{"/one"}, pages(first))
 			next, ok := first["next"].(string)
 			require.True(t, ok)
 			require.NotEmpty(t, next)
 
 			page(a, "shop", "/two")
-			second := handler.HandleRaw(t.Context(), request(next)).RawResponse
-			require.NotNil(t, second)
+			response = handler.HandleRaw(t.Context(), request(next))
+			second := response.RawResponse
+			require.NotNil(t, second, response.Message)
 			assert.Equal(t, []any{"/two"}, pages(second))
 		})
 	}
 }
 
 func TestLiveRejectsTheFormerCursorName(t *testing.T) {
-	journalStore, err := journalstore.Open(t.Context(), "")
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
-	hub := rumregistry.New()
-	a, _ := addSite(t, hub, "shop", "first")
-	handler := rumfunc.New(query.New(hub, history.NewStore(journalStore)), nil)
+	handler, a := liveHandler(t)
 	page(a, "shop", "/one")
-	first := handler.HandleRaw(t.Context(), funcapi.RawMethodRequest{
+	response := handler.HandleRaw(t.Context(), funcapi.RawMethodRequest{
 		Method:      "rum-live",
 		Permissions: "0x1b",
-	}).RawResponse
-	require.NotNil(t, first)
+	})
+	first := response.RawResponse
+	require.NotNil(t, first, response.Message)
 	got := handler.HandleRaw(t.Context(), funcapi.RawMethodRequest{
 		Method:      "rum-live",
 		Args:        []string{"after:" + first["next"].(string)},
 		Permissions: "0x1b",
 	})
 	assert.Equal(t, funcapi.ErrorResponse(400, `unsupported argument "after"`), got)
+}
+
+// liveHandler serves rum-live for one registered site, shop, over a temporary journal.
+func liveHandler(t *testing.T) (*rumfunc.Handler, *aggregate.Aggregator) {
+	t.Helper()
+	journalStore, err := journalstore.Open(t.Context(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	hub := rumregistry.New()
+	a, _ := addSite(t, hub, "shop", "first")
+	return rumfunc.New(query.New(hub, history.NewStore(journalStore)), nil), a
 }
