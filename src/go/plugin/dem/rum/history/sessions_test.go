@@ -43,7 +43,16 @@ func TestReceiptTimeFiltersAndSelectedSummaries(t *testing.T) {
 	for _, r := range records {
 		appendEvent(t, s, r)
 	}
-	sessions, err := s.QuerySessions(ctx, "shop", "", old.Unix()-1, old.Unix()+100, 0, "")
+	sessions, err := s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  old.Unix() - 1,
+				Before: old.Unix() + 100,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, sessions, 2)
 	got := sessions[0]
@@ -66,10 +75,24 @@ func TestReceiptTimeFiltersAndSelectedSummaries(t *testing.T) {
 	events, err = s.QuerySessionEvents(ctx, "shop", "activity", "")
 	require.NoError(t, err)
 	assert.Empty(t, events)
-	sessions, err = s.QuerySessions(ctx, "shop", "", saved.Unix()-1, saved.Unix()+5, 0, "")
+	sessions, err = s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  saved.Unix() - 1,
+				Before: saved.Unix() + 5,
+			},
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, sessions, "save time must not change receipt-time membership")
-	sessions, err = s.QuerySessions(ctx, "", "", 0, saved.Unix()+5, 1, "")
+	sessions, err = s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Before: saved.Unix() + 5,
+		},
+		Limit: 1,
+	})
 	require.NoError(t, err)
 	assert.Len(t, sessions, 1)
 }
@@ -89,7 +112,14 @@ func TestObservedRangeWholeSecondsAndOrdering(t *testing.T) {
 	} {
 		appendEvent(t, s, r)
 	}
-	rows, err := s.QuerySessions(ctx, "shop", "", 1, 1, 1, "")
+	rows, err := s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			After:  1,
+			Before: 1,
+		},
+		Limit: 1,
+	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, "z", rows[0].SessionID, "microsecond ordering precedes limit and identity tie breaks")
@@ -97,11 +127,26 @@ func TestObservedRangeWholeSecondsAndOrdering(t *testing.T) {
 	require.EqualValues(t, 2, rows[0].Pageviews)
 	require.Equal(t, "/first", rows[0].EntryPage)
 	require.Equal(t, "/last", rows[0].LastPage)
-	rows, err = s.QuerySessions(ctx, "shop", "match", 1, 1, 1, "")
+	rows, err = s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  1,
+				Before: 1,
+			},
+			UserID: "match",
+			Limit:  1,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.EqualValues(t, 2, rows[0].Pageviews)
-	rows, err = s.QuerySessions(ctx, "shop", "", 0, 0, 0, "")
+	rows, err = s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site: "shop",
+		},
+	})
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	require.Equal(t, "epoch", rows[1].SessionID)
@@ -113,11 +158,26 @@ func TestObservedRangeWholeSecondsAndOrdering(t *testing.T) {
 	timeline, err = s.QuerySessionEvents(ctx, "shop", "epoch", "")
 	require.NoError(t, err)
 	require.Empty(t, timeline, "activity remains summary-only")
-	rows, err = s.QuerySessions(ctx, "shop", "", math.MaxInt64, math.MaxInt64, 0, "")
+	rows, err = s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  math.MaxInt64,
+				Before: math.MaxInt64,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Empty(t, rows, "extreme seconds must not overflow microseconds")
 	for _, bounds := range [][2]int64{{-1, 1}, {2, 1}} {
-		_, err = s.QuerySessions(ctx, "shop", "", bounds[0], bounds[1], 0, "")
+		_, err = s.QuerySessions(ctx, SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  bounds[0],
+				Before: bounds[1],
+			},
+		})
 		require.Error(t, err)
 	}
 }
@@ -146,14 +206,34 @@ func TestSessionIdentityMembershipPrecedesLimitAndPreservesWholeSummary(t *testi
 		UserID:     "other",
 	})
 	for _, id := range []string{ids[0], ids[2], ids[3]} {
-		rows, err := s.QuerySessions(ctx, "shop", id, 0, now.Unix()+10, 1, "")
+		rows, err := s.QuerySessions(
+			ctx,
+			SessionFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix() + 10,
+				},
+				UserID: id,
+				Limit:  1,
+			},
+		)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		assert.Equal(t, "shared", rows[0].SessionID)
 		assert.EqualValues(t, 5, rows[0].Pageviews, "all session events count, including anonymous and other IDs")
 		assert.Equal(t, []string{ids[0], ids[3], ids[2]}, rows[0].UserIDs)
 	}
-	rows, err := s.QuerySessions(ctx, "shop", "123", 0, now.Unix()+10, 1, "")
+	rows, err := s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: now.Unix() + 10,
+			},
+			UserID: "123",
+			Limit:  1,
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, rows, "lookup is exact, not substring")
 	events, err := s.QuerySessionEvents(ctx, "shop", "shared", "")
@@ -189,15 +269,44 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 		Type:       "pageview",
 		Page:       "/anonymous",
 	})
-	rows, err := s.QuerySessions(ctx, "shop", "prior-user", now.Unix()-5, now.Unix()+5, 0, "")
+	rows, err := s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  now.Unix() - 5,
+				Before: now.Unix() + 5,
+			},
+			UserID: "prior-user",
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, rows, "an ID outside the selected receipt-time range must not match")
-	rows, err = s.QuerySessions(ctx, "shop", "", now.Unix()-5, now.Unix()+5, 0, "")
+	rows, err = s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  now.Unix() - 5,
+				Before: now.Unix() + 5,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, []string{}, rows[0].UserIDs)
 	assert.EqualValues(t, 1, rows[0].Pageviews)
-	rows, err = s.QuerySessions(ctx, "shop", "prior-user", old.Unix()-5, now.Unix()+5, 0, "")
+	rows, err = s.QuerySessions(
+		ctx,
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  old.Unix() - 5,
+				Before: now.Unix() + 5,
+			},
+			UserID: "prior-user",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.Equal(t, []string{"prior-user"}, rows[0].UserIDs)

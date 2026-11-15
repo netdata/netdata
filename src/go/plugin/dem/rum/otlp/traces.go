@@ -7,7 +7,6 @@ import (
 
 	"encoding/hex"
 
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 
 	"time"
@@ -45,9 +44,8 @@ func NewTraces(
 	cfg config.Destination,
 	siteName string,
 	counters Counters,
-	redactor *redact.Redactor,
 ) (*Traces, error) {
-	t, err := newTransport(ctx, cfg, siteName, counters, redactor)
+	t, err := newTransport(ctx, cfg, siteName, counters)
 	if err != nil {
 		return nil, err
 	}

@@ -53,7 +53,7 @@ func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 			cancel()
 			t.Fatal("runtime did not become ready")
 		}
-		rows, err := query.New(hub, nil).Sites(context.Background(), "")
+		rows, err := query.New(hub, nil).Sites(context.Background(), "", "")
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.NotEmpty(t, rows[0].Generation)
@@ -66,7 +66,7 @@ func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 		response := httptest.NewRecorder()
 		httpapi.New(&config.Receiver{}, hub, nil).Handler().ServeHTTP(response, preflight)
 		require.Equal(t, http.StatusForbidden, response.Code)
-		rows, err = query.New(hub, nil).Sites(context.Background(), "")
+		rows, err = query.New(hub, nil).Sites(context.Background(), "", "")
 		require.NoError(t, err)
 		require.Equal(t, "https://wrong.example", rows[0].Rejected.Origin)
 		cancel()

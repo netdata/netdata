@@ -17,12 +17,12 @@ import (
 // Deps exposes copied query results, independent of collectors and persistence.
 type Deps interface {
 	Receiver() query.Receiver
-	Sites(context.Context, string) ([]query.Site, error)
+	Sites(context.Context, string, string) ([]query.Site, error)
 	Pages(context.Context, string, string) ([]query.Page, error)
 	Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error)
-	Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error)
+	Sessions(context.Context, query.SessionFilter) ([]query.Session, error)
 	SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error)
-	Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error)
+	Errors(context.Context, query.ErrorFilter) ([]query.ErrorGroup, error)
 }
 
 type Handler struct {

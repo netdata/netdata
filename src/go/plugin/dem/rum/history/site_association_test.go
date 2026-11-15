@@ -26,11 +26,26 @@ func TestOptionalStoredSiteAssociation(t *testing.T) {
 		})
 	}
 	require.NoError(t, store.Sync(ctx))
-	all, err := store.QuerySessions(ctx, "", "", 0, now/1e6+1, 2000, "")
+	all, err := store.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Before: now/1e6 + 1,
+		},
+		Limit: 2000,
+	})
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	assert.Equal(t, "", all[0].VnodeGUID, "old records lacking DEM_VNODE_GUID stay unassigned")
-	selected, err := store.QueryErrors(ctx, "job", "same", 0, now/1e6+1, "11111111-1111-4111-8111-111111111111")
+	selected, err := store.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:      "job",
+				VnodeGUID: "11111111-1111-4111-8111-111111111111",
+				Before:    now/1e6 + 1,
+			},
+			Fingerprint: "same",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", selected[0].VnodeGUID)
@@ -89,7 +104,15 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 	var scanned []EventRecord
 	require.NoError(
 		t,
-		store.scan(ctx, "job", now/1e6, now/1e6+1, "", func(event EventRecord) { scanned = append(scanned, event) }),
+		store.scan(
+			ctx,
+			Filter{
+				Site:   "job",
+				After:  now / 1e6,
+				Before: now/1e6 + 1,
+			},
+			func(event EventRecord) { scanned = append(scanned, event) },
+		),
 	)
 	require.Len(t, scanned, len(groups))
 	for i, event := range scanned {

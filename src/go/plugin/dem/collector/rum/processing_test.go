@@ -92,7 +92,6 @@ func newProcessingTest(
 		},
 		"site",
 		transport,
-		nil,
 	)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, exporter.Close()) })

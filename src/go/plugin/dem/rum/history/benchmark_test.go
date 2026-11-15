@@ -82,11 +82,44 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 				name string
 				run  func() error
 			}{
-				{"sessions_global", func() error { _, err := store.QuerySessions(ctx, "", "", start, end, 0, ""); return err }},
-				{"sessions_site", func() error { _, err := store.QuerySessions(ctx, "site-42", "", start, end, 0, ""); return err }},
-				{"sessions_recent", func() error { _, err := store.QuerySessions(ctx, "site-42", "", end-900, end, 0, ""); return err }},
+				{"sessions_global", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							After:  start,
+							Before: end,
+						},
+					})
+					return err
+				}},
+				{"sessions_site", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							Site:   "site-42",
+							After:  start,
+							Before: end,
+						},
+					})
+					return err
+				}},
+				{"sessions_recent", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							Site:   "site-42",
+							After:  end - 900,
+							Before: end,
+						},
+					})
+					return err
+				}},
 				{"errors_guid", func() error {
-					_, err := store.QueryErrors(ctx, "", "fingerprint", start, end, "00000009-1111-4111-8111-111111111111")
+					_, err := store.QueryErrors(ctx, ErrorFilter{
+						Filter: Filter{
+							VnodeGUID: "00000009-1111-4111-8111-111111111111",
+							After:     start,
+							Before:    end,
+						},
+						Fingerprint: "fingerprint",
+					})
 					return err
 				}},
 			} {
@@ -183,16 +216,41 @@ func BenchmarkHistoryQueries(b *testing.B) {
 			return err
 		}},
 		{"sessions_15m", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", now.Add(-15*time.Minute).Unix(), now.Unix(), 0, "")
+			_, err := s.QuerySessions(context.Background(), SessionFilter{
+				Filter: Filter{
+					Site:   "shop",
+					After:  now.Add(-15 * time.Minute).Unix(),
+					Before: now.Unix(),
+				},
+			})
 			return err
 		}},
 		{"sessions_all", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", 0, now.Unix(), 0, "")
+			_, err := s.QuerySessions(context.Background(), SessionFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+			})
 			return err
 		}},
-		{"errors_overview_all", func() error { _, err := s.QueryErrors(context.Background(), "shop", "", 0, now.Unix(), ""); return err }},
+		{"errors_overview_all", func() error {
+			_, err := s.QueryErrors(context.Background(), ErrorFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+			})
+			return err
+		}},
 		{"error_selected_all", func() error {
-			_, err := s.QueryErrors(context.Background(), "shop", "fingerprint-1", 0, now.Unix(), "")
+			_, err := s.QueryErrors(context.Background(), ErrorFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+				Fingerprint: "fingerprint-1",
+			})
 			return err
 		}},
 	} {

@@ -18,8 +18,14 @@ type samplingFunctionSource struct {
 	sites []query.Site
 }
 
-func (s samplingFunctionSource) Sites(context.Context, string) ([]query.Site, error) {
-	return s.sites, nil
+func (s samplingFunctionSource) Sites(_ context.Context, site, _ string) ([]query.Site, error) {
+	var out []query.Site
+	for _, candidate := range s.sites {
+		if site == "" || candidate.Name == site {
+			out = append(out, candidate)
+		}
+	}
+	return out, nil
 }
 
 func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {

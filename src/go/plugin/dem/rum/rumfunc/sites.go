@@ -36,7 +36,10 @@ type siteRow struct {
 
 func (h *Handler) sitesRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {
 	now := time.Now().Unix()
-	sites, err := h.deps.Sites(ctx, args["vnode_guid"])
+	sites, err := h.deps.Sites(ctx, args["site"], args["vnode_guid"])
+	if err != nil {
+		return nil, err
+	}
 	receiver := h.deps.Receiver()
 	response["collector"] = map[string]any{
 		"public_url":        receiver.PublicURL,
@@ -45,9 +48,6 @@ func (h *Handler) sitesRows(ctx context.Context, args map[string]string, respons
 	}
 	var rows [][]any
 	for _, s := range sites {
-		if args["site"] != "" && s.Name != args["site"] {
-			continue
-		}
 		row := siteRow{
 			Site:     s,
 			now:      now,
@@ -55,7 +55,7 @@ func (h *Handler) sitesRows(ctx context.Context, args map[string]string, respons
 		}
 		rows = append(rows, sitesColumns.Row(row))
 	}
-	return rows, err
+	return rows, nil
 }
 
 var sitesColumns = rawfunc.Columns[siteRow]{

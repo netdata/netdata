@@ -59,7 +59,16 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 	for _, r := range records {
 		appendEvent(t, s, r)
 	}
-	groups, err := s.QueryErrors(ctx, "shop", "", now.Unix()-61, now.Unix()+5, "")
+	groups, err := s.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  now.Unix() - 61,
+				Before: now.Unix() + 5,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, groups, 2)
 	assert.Equal(t, 3, groups[0].CountWindow)
@@ -70,14 +79,33 @@ func TestSelfContainedErrorsAndSelectedDetails(t *testing.T) {
 	assert.Equal(t, "parentless", groups[0].Message)
 	assert.Equal(t, "stack", groups[0].SampleStack)
 	assert.Equal(t, now.Add(-time.Minute).Unix(), groups[0].FirstSeen)
-	groups, err = s.QueryErrors(ctx, "shop", "fp", now.Unix()-61, now.Unix()+5, "")
+	groups, err = s.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:   "shop",
+				After:  now.Unix() - 61,
+				Before: now.Unix() + 5,
+			},
+			Fingerprint: "fp",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	assert.True(t, groups[0].Details)
 	assert.Equal(t, 1, groups[0].SessionsAffected)
 	assert.Equal(t, "/a", groups[0].TopPage)
 	assert.Equal(t, []string{"z", "a"}, groups[0].Browsers)
-	groups, err = s.QueryErrors(ctx, "shop", "missing", 0, now.Unix()+5, "")
+	groups, err = s.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: now.Unix() + 5,
+			},
+			Fingerprint: "missing",
+		},
+	)
 	require.NoError(t, err)
 	assert.Empty(t, groups)
 }
@@ -93,12 +121,25 @@ func TestObservedErrorsSelectOccurrenceAndDetails(t *testing.T) {
 	} {
 		appendEvent(t, s, r)
 	}
-	rows, err := s.QueryErrors(ctx, "shop", "", 1, 1, "")
+	rows, err := s.QueryErrors(ctx, ErrorFilter{
+		Filter: Filter{
+			Site:   "shop",
+			After:  1,
+			Before: 1,
+		},
+	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, 2, rows[0].CountWindow)
 	require.False(t, rows[0].Details)
-	rows, err = s.QueryErrors(ctx, "shop", "fp", 1, 1, "")
+	rows, err = s.QueryErrors(ctx, ErrorFilter{
+		Filter: Filter{
+			Site:   "shop",
+			After:  1,
+			Before: 1,
+		},
+		Fingerprint: "fp",
+	})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	require.Equal(t, 2, rows[0].CountWindow)

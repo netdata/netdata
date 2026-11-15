@@ -24,7 +24,7 @@ type recordingSource struct{ reads *[]string }
 func (s recordingSource) read(name string) { *s.reads = append(*s.reads, name) }
 
 func (s recordingSource) Receiver() query.Receiver { s.read("Receiver"); return query.Receiver{} }
-func (s recordingSource) Sites(context.Context, string) ([]query.Site, error) {
+func (s recordingSource) Sites(context.Context, string, string) ([]query.Site, error) {
 	s.read("Sites")
 	return []query.Site{{Name: "shop"}}, nil
 }
@@ -36,7 +36,7 @@ func (s recordingSource) Live(context.Context, string, string, int, string) ([]q
 	s.read("Live")
 	return []query.LiveEvent{{}}, "", nil
 }
-func (s recordingSource) Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error) {
+func (s recordingSource) Sessions(context.Context, query.SessionFilter) ([]query.Session, error) {
 	s.read("Sessions")
 	return []query.Session{{Site: "shop"}}, nil
 }
@@ -44,7 +44,7 @@ func (s recordingSource) SessionEvents(context.Context, string, string, string) 
 	s.read("SessionEvents")
 	return []query.SessionEvent{{Site: "shop"}}, nil
 }
-func (s recordingSource) Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error) {
+func (s recordingSource) Errors(context.Context, query.ErrorFilter) ([]query.ErrorGroup, error) {
 	s.read("Errors")
 	return []query.ErrorGroup{{Site: "shop"}}, nil
 }
@@ -159,14 +159,8 @@ type sessionsSource struct {
 	n int
 }
 
-func (s sessionsSource) Sessions(
-	_ context.Context,
-	_, _ string,
-	_, _ int64,
-	limit int,
-	_ string,
-) ([]query.Session, error) {
-	out := make([]query.Session, 0, min(s.n, limit))
+func (s sessionsSource) Sessions(_ context.Context, f query.SessionFilter) ([]query.Session, error) {
+	out := make([]query.Session, 0, min(s.n, f.Limit))
 	for i := range cap(out) {
 		out = append(out, query.Session{
 			Site:      "shop",
@@ -284,14 +278,8 @@ type rangeSource struct {
 	after, before *int64
 }
 
-func (s rangeSource) Sessions(
-	_ context.Context,
-	_, _ string,
-	after, before int64,
-	_ int,
-	_ string,
-) ([]query.Session, error) {
-	*s.after, *s.before = after, before
+func (s rangeSource) Sessions(_ context.Context, f query.SessionFilter) ([]query.Session, error) {
+	*s.after, *s.before = f.After, f.Before
 	return nil, nil
 }
 

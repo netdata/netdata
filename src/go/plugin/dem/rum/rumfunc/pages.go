@@ -26,11 +26,14 @@ var pagesMethod = method{
 
 func (h *Handler) pagesRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {
 	pages, err := h.deps.Pages(ctx, args["site"], args["vnode_guid"])
+	if err != nil {
+		return nil, err
+	}
 	var rows [][]any
 	for _, p := range pages {
 		rows = append(rows, pagesColumns.Row(p))
 	}
-	return rows, err
+	return rows, nil
 }
 
 var pagesColumns = rawfunc.Columns[query.Page]{

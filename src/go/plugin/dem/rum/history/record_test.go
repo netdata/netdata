@@ -138,7 +138,10 @@ func TestEventCodecRoundTripsEveryField(t *testing.T) {
 	appendEvent(t, s, want)
 	var scanned, matched []EventRecord
 	second := want.ObservedUS / 1_000_000
-	require.NoError(t, s.scan(context.Background(), "", second, second, "", func(r EventRecord) {
+	require.NoError(t, s.scan(context.Background(), Filter{
+		After:  second,
+		Before: second,
+	}, func(r EventRecord) {
 		scanned = append(scanned, r)
 	}))
 	require.NoError(t, s.matchSession(context.Background(), "", want.SessionID, "", func(r EventRecord) {
@@ -203,7 +206,9 @@ func TestDecodedEventsOwnStringsAndDoNotInheritAbsentFields(t *testing.T) {
 		appendEvent(t, s, r)
 	}
 	var got []EventRecord
-	require.NoError(t, s.scan(context.Background(), "", 0, 4, "", func(r EventRecord) { got = append(got, r) }))
+	require.NoError(t, s.scan(context.Background(), Filter{
+		Before: 4,
+	}, func(r EventRecord) { got = append(got, r) }))
 	require.Equal(t, want, got, "records remain owned after later payload callbacks and reader close")
 	var matched []EventRecord
 	require.NoError(
@@ -263,7 +268,16 @@ func TestSelectedDomainScalarsAreValidated(t *testing.T) {
 			)
 			_, err := s.store.Append(context.Background(), tc.mutate(fields))
 			require.NoError(t, err)
-			rows, err := s.QuerySessions(context.Background(), "shop", "", 1, 1, 0, "")
+			rows, err := s.QuerySessions(
+				context.Background(),
+				SessionFilter{
+					Filter: Filter{
+						Site:   "shop",
+						After:  1,
+						Before: 1,
+					},
+				},
+			)
 			require.Error(t, err)
 			require.Nil(t, rows, "malformed candidates cannot return partial aggregates")
 		})

@@ -39,7 +39,18 @@ func (h *Handler) errorsRows(ctx context.Context, args map[string]string, _ map[
 	if err != nil {
 		return nil, badRequest(err)
 	}
-	groups, err := h.deps.Errors(ctx, args["site"], args["fingerprint"], after, before, args["vnode_guid"])
+	groups, err := h.deps.Errors(ctx, query.ErrorFilter{
+		Filter: query.HistoryFilter{
+			Site:      args["site"],
+			VnodeGUID: args["vnode_guid"],
+			After:     after,
+			Before:    before,
+		},
+		Fingerprint: args["fingerprint"],
+	})
+	if err != nil {
+		return nil, err
+	}
 	var rows [][]any
 	for _, g := range groups {
 		rows = append(rows, errorsColumns.Row(errorRow{
@@ -47,7 +58,7 @@ func (h *Handler) errorsRows(ctx context.Context, args map[string]string, _ map[
 			now:        now,
 		}))
 	}
-	return rows, err
+	return rows, nil
 }
 
 var errorsColumns = rawfunc.Columns[errorRow]{

@@ -151,3 +151,40 @@ func TestAllowedOrigins(t *testing.T) {
 		})
 	}
 }
+
+// An empty redact_paths row comes from the form: validation accepts it and it
+// compiles to no rule; any other pattern must compile.
+func TestRedactPathPatterns(t *testing.T) {
+	for name, tc := range map[string]struct {
+		pattern string
+		rule    bool
+		valid   bool
+	}{
+		"empty row": {valid: true},
+		"pattern":   {pattern: `/u/\d+`, rule: true, valid: true},
+		"invalid":   {pattern: `(`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			rule := PathRule{
+				Pattern: tc.pattern,
+				Replace: ":user",
+			}
+			re, regexpErr := rule.Regexp()
+			err := Site{
+				Name:           "shop",
+				PageGroups:     20,
+				Countries:      20,
+				AllowedOrigins: []string{"https://example.org"},
+				RedactPaths:    []PathRule{rule},
+			}.Validate()
+			assert.Equal(t, tc.rule, re != nil)
+			if tc.valid {
+				assert.NoError(t, regexpErr)
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, regexpErr)
+				assert.EqualError(t, err, `redact_paths pattern "(" is not a valid regular expression`)
+			}
+		})
+	}
+}
