@@ -105,12 +105,13 @@ modules:
 
               | Netdata installation | Install the runtime with |
               |:--|:--|
-              | Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. The package stops the Agent while it installs and starts it again (systemd hosts only). |
+              | Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. It requires a running systemd host, and stops the Agent while it installs and starts it again. |
               | Static or source installation | `kickstart.sh --install-dem-runtime` during an install or update, or the installed helper: `sudo /opt/netdata/usr/libexec/netdata/netdata-dem-runtime.sh install --agent /opt/netdata/usr/sbin/netdata --allow-download` (static paths). |
               | Docker (local, rootful) | `kickstart.sh --install-dem-runtime --docker-container NAME`, run on the Docker host. |
 
-              Online installation downloads the signed release named by `runtime.release_url` in `dem.conf`, so set it
-              to the release URL for the host's architecture first. The installation also prepares the host so
+              Static, source and Docker installations download the signed release named by `runtime.release_url` in
+              `dem.conf`, so set it to the release URL for the host's architecture first. The installation also prepares
+              the host so
               Chromium's sandbox can run (an AppArmor allowance on Ubuntu 24.04) and test-runs a journey and a
               Lighthouse audit before it is used.
 
@@ -120,8 +121,8 @@ modules:
             description: |
               A running Agent keeps the runtime it found when it started. After the first installation, restart the
               Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
-              does this for you. Runtime updates, which are prepared daily unless you installed with
-              `--manual-updates`, also take effect at the next restart.
+              does this for you. On static, source and Docker installations, runtime updates are prepared daily
+              (unless you installed with `--manual-updates`) and also take effect at the next restart.
 
               To check the runtime, run as the Netdata service account:
 
@@ -182,7 +183,7 @@ modules:
               required: false
               group: Diagnosis
             - name: trace_on_failure
-              description: Save a Playwright trace when a test fails. Requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.
+              description: Save a Playwright trace when a test fails; requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.
               default_value: false
               required: false
               group: Diagnosis
@@ -209,9 +210,9 @@ modules:
               required: false
               group: Collection
               detailed_description: |
-                A new job runs its first check right away. Later checks follow every `check_every` seconds, starting
-                at a point within the first interval that depends on the job name, so jobs created together do not all
-                run at once.
+                A new job runs its first check right away. The second comes one to two intervals later, at a point that
+                depends on the job name, so jobs created together do not all run at once. After that, checks follow
+                every `check_every` seconds.
             - &option_update_every
               name: update_every
               description: How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.
@@ -351,13 +352,19 @@ modules:
             cause: '`script_path` is a relative path, or does not end in `.js`, `.ts`, `.mjs`, `.cjs`, `.mts` or `.cts`.'
             fix: Use the absolute path of the test file.
           - error: script_path must reference a readable regular file
-            cause: The file does not exist, is not a regular file, or the Netdata service account cannot read it.
-            fix: |
+            cause: The file does not exist, is not a regular file, or a directory on its path cannot be searched by the Netdata service account.
+            fix: &fix_script_path |
               Check the path and the permissions as the service account:
 
               ```bash
               sudo -u netdata cat /etc/netdata/dem/journeys/checkout.spec.ts
               ```
+          - error: script_path must be readable
+            cause: The file exists, but the Netdata service account cannot read it.
+            fix: *fix_script_path
+          - error: script must not be blank
+            cause: '`script` contains only whitespace.'
+            fix: Put the Playwright Test source in `script`, or remove it and set `script_path`.
           - error: trace_on_failure requires screenshot_on_failure
             cause: Traces are saved only together with failure screenshots.
             fix: Set `screenshot_on_failure` to `true`, or `trace_on_failure` to `false`.
@@ -370,6 +377,9 @@ modules:
           - error: Runs end as `inconclusive`
             cause: No test failed, but not every declared test passed. The file has no tests, or tests were skipped, marked as expected to fail (`test.fail`), or did not run.
             fix: Check the test counts in the journey run history, and make every test in the file run and pass.
+          - error: Runs end as `error`
+            cause: The run could not produce test results, for example because the script has a syntax error or imports a module that is not available, or the browser failed to start.
+            fix: Open the run in the journey run history; its error column has the message. Check that the script runs with `npx playwright test` on a development machine.
           - error: Runs end as `timeout`
             cause: A test or the whole file took longer than `timeout`. The run's termination reason tells which.
             fix: Open the run in the journey run history. The last observed step and stop context show what the browser was waiting for; speed up that step or raise `timeout`.
@@ -881,7 +891,7 @@ modules:
           id: synthetics-artifacts
           function_name: synthetics-artifacts
           name: Retained synthetic captures
-          description: The saved failure screenshots, traces and Lighthouse reports, one set per run, newest first. Captures outlive the run history and stay after a job is removed, until they expire. The response also shows how much disk the captures use and the retention policy.
+          description: The saved failure screenshots, traces and Lighthouse reports, one set per run, newest first. Captures are kept separately from the run history (7 days or 2 GiB by default), so they can remain after their run's history or their job is gone, until they expire. The response also shows how much disk the captures use and the retention policy.
           parameters:
             - *param_vnode
             - *param_vnode_guid
@@ -1079,7 +1089,7 @@ modules:
             - Run history is shared with RUM and kept up to 30 days or 1 GiB, and reports up to 7 days or 2 GiB
               (`history` and `artifacts` in `dem.conf`). When the size limit is reached, the oldest entries go first.
             - A report larger than 5 MiB is not kept.
-            - There is no stock alert on the performance score. To get one, add a health alert on
+            - To be alerted on a low performance score, add your own health alert on
               `dem_synthetic.lighthouse.performance`.
         performance_impact:
           description: |
@@ -1124,9 +1134,9 @@ modules:
               required: false
               group: Collection
               detailed_description: |
-                A new job runs its first audit right away. Later audits follow every `check_every` seconds, starting
-                at a point within the first interval that depends on the job name, so jobs created together do not all
-                run at once.
+                A new job runs its first audit right away. The second comes one to two intervals later, at a point that
+                depends on the job name, so jobs created together do not all run at once. After that, audits follow
+                every `check_every` seconds.
             - *option_update_every
             - name: timeout
               description: Time limit for one audit, in seconds. Time spent waiting for a free browser does not count.

@@ -32,9 +32,7 @@ modules:
           requests end.
 
           The RUM receiver is the HTTP listener that websites load the RUM script from and send their visitors' reports
-          to. One receiver serves every RUM site on the Agent. Its settings decide how browsers reach it - address, TLS,
-          the public URL used in script tags, trusted reverse proxies, request limits and the location database - and
-          its charts show:
+          to. One receiver serves every RUM site on the Agent, and its charts show:
 
           - Whether the receiver is serving.
           - Requests per second that succeed, are refused (client errors, such as a refused origin, a rate limit or an
@@ -60,7 +58,6 @@ modules:
           |:--|:--|
           | The Netdata service account (usually `netdata`) can read `tls_cert` and `tls_key`. | The receiver serves HTTPS itself. |
           | The Netdata service account can read the location database. | `geoip_db` is set, or the Agent provides a database. |
-          | The Netdata service can bind privileged ports. | `listen` uses a port below 1024, which a reverse proxy makes unnecessary. |
       default_behavior:
         auto_detection:
           description: |
@@ -98,8 +95,9 @@ modules:
               address and `trusted_proxies` to the address the proxy connects from (see the first example).
           - title: Optional - provide a location database
             description: |
-              Countries and cities come from a local MMDB database. The receiver uses the one the Agent provides, when
-              present, or the file in `geoip_db`. Without a database, reports are still collected, without location.
+              Countries and cities come from a local MMDB database. The receiver reads the file in `geoip_db` when it is
+              set, and otherwise the database the Agent provides, if there is one. Without a database, reports are still
+              collected, without location.
               Supported types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`,
               `GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`; a country database gives no cities.
 
@@ -121,7 +119,8 @@ modules:
               group: Connection
               detailed_description: |
                 Keep the default behind a reverse proxy on the same host. To accept connections from other hosts
-                directly, listen on their address or on `0.0.0.0:19938`, and set `tls_cert` and `tls_key`. The address
+                directly, listen on this host's external address or on `0.0.0.0:19938`, and set `tls_cert` and
+                `tls_key`. The address
                 is opened when the receiver starts; the job editor's Test does not check that the port is free.
             - name: public_url
               description: Public base URL of the receiver, such as `https://rum.example.org`, used in the sites' script tags. Leave empty and no script tag is offered unless a site sets its own.
@@ -248,7 +247,7 @@ modules:
           - error: tls_cert and tls_key must be set together
             cause: Only one of `tls_cert` and `tls_key` is set.
             fix: Set both to serve HTTPS, or neither to serve plain HTTP.
-          - error: 'listener TLS: could not read certificate `"/etc/netdata/ssl/rum.crt"`: open `/etc/netdata/ssl/rum.crt`: permission denied'
+          - error: 'listener TLS: could not read certificate `"/etc/netdata/ssl/rum.crt"`: open `"/etc/netdata/ssl/rum.crt"`: permission denied'
             cause: The certificate or key file does not exist or the Netdata service account cannot read it. A similar message names the key file.
             fix: Check the path, and make the files readable by the Netdata service account (usually `netdata`).
           - error: body and rate limits must be positive

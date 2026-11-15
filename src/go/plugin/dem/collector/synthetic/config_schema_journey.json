@@ -62,7 +62,7 @@
       },
       "trace_on_failure": {
         "title": "Capture failure trace",
-        "description": "Save a Playwright trace when a test fails. Requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.",
+        "description": "Save a Playwright trace when a test fails; requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.",
         "type": "boolean",
         "default": false
       },

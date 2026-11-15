@@ -17,7 +17,7 @@
       },
       "allowed_origins": {
         "title": "Allowed origins",
-        "description": "Origins the website is served from, such as `https://shop.example.org`. Reports from other origins are refused. A leading `*.` matches any subdomain.",
+        "description": "Origins the website is served from, such as `https://shop.example.org`; reports from other origins are refused. A leading `*.` matches any subdomain.",
         "type": "array",
         "items": {
           "type": "string"
@@ -595,7 +595,7 @@
       }
     },
     "measure_sample_rate": {
-      "ui:help": "The decision is made once per browser session: a session that is not sampled sends nothing and cannot be saved later. Pages that are already open keep their earlier decision until they reload; at 0 the receiver also discards their reports."
+      "ui:help": "The decision is made once per browser session: a session that is not sampled sends nothing and cannot be saved later. A browser session keeps its decision until it ends, even across page reloads, so a new rate reaches a visitor in their next session.\n\nAt 0 the script stops loading the SDK at the next page load, and the receiver discards reports from pages that are still open."
     },
     "investigate": {
       "ui:help": "To save details only for problem sessions, set the sample rate to 0 and keep the default conditions. To save no sessions at all, also empty the conditions list.\n\nEvent logs and spans sent before a session matched a condition are not exported afterwards."

@@ -165,7 +165,7 @@ modules:
               required: false
               group: Site
             - name: allowed_origins
-              description: Origins the website is served from, such as `https://shop.example.org`. Reports from other origins
+              description: Origins the website is served from, such as `https://shop.example.org`; reports from other origins
                 are refused. A leading `*.` matches any subdomain.
               default_value: ''
               required: true
@@ -246,8 +246,9 @@ modules:
               group: Sampling
               detailed_description: |
                 The decision is made once per browser session: a session that is not sampled sends nothing, so it cannot be saved or
-                investigated later. Pages that are already open keep their earlier decision until they reload. At 0 the script does
-                not load the SDK, the receiver discards reports, and the measurement charts stop.
+                investigated later. A browser session keeps its decision until it ends, even across page reloads, so a new rate
+                reaches a visitor in their next session. At 0 the script stops loading the SDK at the next page load, the receiver
+                discards reports from pages that are still open, and the measurement charts stop.
             - name: investigate
               description: Which measured sessions are saved to history with their details, and exported when event logs or
                 tracing are on. Leave empty to save every session.
@@ -536,7 +537,7 @@ modules:
             fix: 'Test with a regular browser, or set `bots: include` to measure automated traffic as device `bot`.'
           - error: The script loads but no `collect` request is sent
             cause: The browser session was not sampled (`measure_sample_rate` below 1), or the browser is automated and `bots`
-              is `exclude`, so the script stops before loading the SDK.
+              is `exclude`, so nothing is sent.
             fix: 'For a reliable check, set `measure_sample_rate: 1` and open the website in a new private window of a regular
               browser.'
           - error: 'rum/otlp: site `"shop"` logs export failed: `Unavailable`'
@@ -560,6 +561,24 @@ modules:
           - error: 'name must be a nonempty URL-safe site key: letters, digits, underscores or hyphens'
             cause: The site key contains spaces, dots or other characters, or starts with an underscore or hyphen.
             fix: Use letters, digits, underscores and hyphens, starting with a letter or digit, such as `shop` or `shop-eu`.
+          - error: allowed_origins is required
+            cause: The site job lists no origins.
+            fix: Add the origins the website is served from, such as `https://shop.example.org`.
+          - error: page_groups and countries must be between 1 and 100
+            cause: '`page_groups` or `countries` is outside 1 to 100.'
+            fix: Use a value from 1 to 100, or remove the option to use the default of 20.
+          - error: bots must be exclude or include
+            cause: '`bots` has another value.'
+            fix: Use `exclude` or `include`.
+          - error: measure_sample_rate must be between 0 and 1
+            cause: '`measure_sample_rate` is negative or above 1. A percentage such as `50` is not accepted.'
+            fix: Use a share from 0 to 1, such as `0.5`.
+          - error: redact_paths pattern `"/accounts/[^/"` is not a valid regular expression
+            cause: A `redact_paths` pattern is not a valid regular expression in Go syntax.
+            fix: Fix the pattern, for example `/accounts/[^/]+`. Quote it in single quotes in YAML.
+          - error: tracing.propagate_to entry `https://api.example.org/v1` must be http(s)://host[:port] with port 1-65535
+            cause: A `tracing.propagate_to` entry has a path, query or credentials, or is not an `http` or `https` origin.
+            fix: List origins only, such as `https://api.example.org`.
           - error: capture.geolocation must be off, country or city
             cause: The value is not one of `off`, `country` and `city`. Unquoted `off` in YAML is read as a boolean.
             fix: 'Write `geolocation: ''off''` with quotes, or use `country` or `city`.'
@@ -574,9 +593,11 @@ modules:
             cause: '`tls_ca`, `tls_cert` or `tls_key` is set for an `http://` destination. The same message starts with `tracing.destination`
               for traces.'
             fix: Use an `https://` endpoint, or remove the TLS settings.
-          - error: 'event_logs.destination: open `/etc/netdata/ssl/otlp-ca.pem`: permission denied'
-            cause: The Netdata service account cannot read a TLS file of the destination.
-            fix: Make the file readable by the Netdata service account (usually `netdata`).
+          - error: 'event_logs.destination: invalid TLS material: could not read certificate `"/etc/netdata/ssl/otlp-ca.pem"`:
+              open `"/etc/netdata/ssl/otlp-ca.pem"`: permission denied'
+            cause: The Netdata service account cannot read a TLS file of the destination. A client key gives `could not read
+              key` instead, and traces give the same message starting with `tracing.destination`.
+            fix: Check the path, and make the file readable by the Netdata service account (usually `netdata`).
     metrics:
       description: |
         Each site has its own charts, under its virtual node when `vnode` is set and under this Agent's host otherwise.
