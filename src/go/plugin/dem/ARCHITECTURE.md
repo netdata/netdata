@@ -595,8 +595,9 @@ Framework-owned behavior:
 
 Collectors:
 
-- Each package in `collector/` is a registered native collector. Its lifecycle methods show acquisition, readiness,
-  collection and retirement; its metric definitions show the measurements it publishes.
+- Each collector package under `collector/` registers native collectors: `receiver`, `rum`, and `synthetic`, which
+  registers both `journey` and `lighthouse`. Their lifecycle methods show acquisition, readiness, collection and
+  retirement. The synthetic modules' measurements are defined in `collector/internal/syntheticjob`.
 - Fixed instruments are prepared once.
 - Publication uses typed metrix snapshots and static chart templates, with no V1 map bridge.
 
