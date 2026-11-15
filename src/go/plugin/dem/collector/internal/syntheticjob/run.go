@@ -24,7 +24,7 @@ func (j *Job) Run(ctx context.Context, ready func()) error {
 		return err
 	}
 	// Only URL-targeted kinds have a target; Functions show it without credentials.
-	retire, err := j.deps.Registry.Register(session, redact.NewRedactor().ApplyURL(j.request.URL))
+	retire, err := j.deps.Registry.Register(session, redact.Patterns.ApplyURL(j.request.URL))
 	if err != nil {
 		return err
 	}

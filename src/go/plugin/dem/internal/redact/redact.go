@@ -1,5 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package redact owns DEM's text redaction before egress. Each policy replaces
+// exact values, then the credential patterns, which match regardless of length:
+//
+//   - Redactor, for RUM site credentials: configured values of at least four
+//     bytes, replaced one after another in their configured order;
+//   - Secrets, for explicit journey secrets: every non-empty value, replaced in
+//     one pass that prefers the longest secret at each position.
+//
+// Patterns applies the credential patterns alone.
 package redact
 
 import (
@@ -12,12 +21,18 @@ import (
 	"unicode/utf8"
 )
 
-// Redactor removes secret values and common credential shapes from text
-// before egress. It replaces exact supplied values of at least four bytes, then
-// applies credential-pattern matches regardless of their value length.
+// Redactor removes configured values and common credential shapes from text.
 type Redactor struct {
-	values []string
+	values []string // at least minValueLen bytes each, in configured order
 }
+
+// minValueLen is the shortest configured value a Redactor replaces: shorter
+// values would redact ordinary text everywhere.
+const minValueLen = 4
+
+// Patterns redacts the credential patterns only, for text that has no
+// configured values.
+var Patterns = &Redactor{}
 
 // standalonePattern matches credentials that are replaced whole.
 var standalonePattern = regexp.MustCompile(
@@ -34,10 +49,16 @@ const credentialKeys = `api_key|apikey|access_token|client_secret|token|password
 var keyValuePattern = regexp.MustCompile(`(?i)\b((?:` + credentialKeys + `))=[^&\s"']*`)
 var queryKeyPattern = regexp.MustCompile(`(?i)^(?:` + credentialKeys + `)$`)
 
+// NewRedactor returns a Redactor for the configured values; values shorter
+// than minValueLen bytes are ignored.
 func NewRedactor(values ...string) *Redactor {
-	return &Redactor{
-		values: append([]string(nil), values...),
+	r := &Redactor{}
+	for _, v := range values {
+		if len(v) >= minValueLen {
+			r.values = append(r.values, v)
+		}
 	}
+	return r
 }
 
 // Marker replaces each redacted range.
@@ -47,9 +68,7 @@ const Marker = "[REDACTED]"
 func (r *Redactor) Apply(s string) string {
 	out := s
 	for _, v := range r.values {
-		if len(v) >= 4 { // avoid redacting trivially short values everywhere
-			out = strings.ReplaceAll(out, v, Marker)
-		}
+		out = strings.ReplaceAll(out, v, Marker)
 	}
 	// Most diagnostic strings contain no credentials. Avoid allocating copies
 	// when the replacement would leave them unchanged.
@@ -144,9 +163,6 @@ func (r *Redactor) spans(s string) []span {
 	var out []span
 	text := s
 	for _, v := range r.values {
-		if len(v) < 4 {
-			continue
-		}
 		earlier := len(out)
 		for i := 0; ; {
 			j := strings.Index(text[i:], v)
@@ -345,3 +361,39 @@ func (r *Redactor) ApplyURL(value string) string {
 	u.RawQuery = strings.Join(parts, "&")
 	return r.Apply(u.String())
 }
+
+// Secrets removes explicit secrets, such as journey secrets, and the credential
+// patterns from text. Unlike Redactor it replaces a secret of any length.
+type Secrets struct {
+	values   []string // non-empty, longest first
+	replacer *strings.Replacer
+}
+
+// NewSecrets returns the policy for values; empty values are ignored.
+func NewSecrets(values ...string) *Secrets {
+	var known []string
+	for _, v := range values {
+		if v != "" {
+			known = append(known, v)
+		}
+	}
+	// Longest first: at each position the replacer prefers the earlier pair, so
+	// a secret that contains another is replaced whole.
+	slices.SortFunc(known, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
+	pairs := make([]string, 0, 2*len(known))
+	for _, v := range known {
+		pairs = append(pairs, v, Marker)
+	}
+	return &Secrets{
+		values:   known,
+		replacer: strings.NewReplacer(pairs...),
+	}
+}
+
+// Values lists the secrets longest first, for callers that match them in
+// streamed text. Callers must not modify it.
+func (s *Secrets) Values() []string { return s.values }
+
+// Apply replaces every secret in one pass, then applies the credential
+// patterns.
+func (s *Secrets) Apply(text string) string { return Patterns.Apply(s.replacer.Replace(text)) }

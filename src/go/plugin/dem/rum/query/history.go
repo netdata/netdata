@@ -23,12 +23,13 @@ func (s *Service) redactors(ctx context.Context) (map[string]*redact.Redactor, e
 	return out, err
 }
 
-// outputRedactor redacts a history row of site, given the active sites' redactors.
+// outputRedactor redacts a history row of site, given the active sites'
+// redactors; a retired site's rows get the credential patterns.
 func outputRedactor(active map[string]*redact.Redactor, site string) *redact.Redactor {
 	if r := active[site]; r != nil {
 		return r
 	}
-	return credentialPatterns
+	return redact.Patterns
 }
 
 func (s *Service) Sessions(ctx context.Context, f SessionFilter) ([]Session, error) {

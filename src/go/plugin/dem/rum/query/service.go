@@ -64,13 +64,11 @@ func (s *Service) visit(ctx context.Context, filter string, fn func(string, *rum
 	return ctx.Err()
 }
 
-// credentialPatterns redacts output without configured values: retired-site
-// history and routes built without a redactor.
-var credentialPatterns = redact.NewRedactor()
-
+// siteRedactor is the site's redactor, or the credential patterns for a route
+// built without one.
 func siteRedactor(site *rumregistry.Site) *redact.Redactor {
 	if r := site.Route.Redactor(); r != nil {
 		return r
 	}
-	return credentialPatterns
+	return redact.Patterns
 }

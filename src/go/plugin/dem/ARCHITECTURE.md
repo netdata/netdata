@@ -477,7 +477,7 @@ Shared and process-wide packages:
 | `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/rawfunc` | Request and response plumbing shared by the three Function packages: request admission (access masks, strict parameters from arguments or a JSON body, vnode selectors), the cancellation status, the row bound, method declarations and table responses built from ordered column lists |
-| `internal/redact` | DEM text and credential redaction |
+| `internal/redact` | DEM text and credential redaction: the RUM site value policy, the journey secret policy and the credential patterns |
 | `config/` | Installed configuration files; not a Go package |
 
 RUM packages, in data-path order. RUM processing is separate from investigation queries and Function presentation:

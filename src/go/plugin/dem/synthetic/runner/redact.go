@@ -3,7 +3,7 @@
 package runner
 
 import (
-	"cmp"
+	"maps"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -11,35 +11,29 @@ import (
 	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 )
 
+// textRedactor applies the journey secret policy (redact.Secrets) to runner
+// text.
 type textRedactor struct {
-	known    []string
-	longest  int
-	exact    *strings.Replacer
+	secrets *redact.Secrets
+	// known (longest first) and longest let the diagnostic stream match secrets
+	// split across chunks.
+	known   []string
+	longest int
+	// patterns redacts the run target URL.
 	patterns *redact.Redactor
 }
 
 func newRedactor(values map[string]string) *textRedactor {
-	var known []string
-	for _, value := range values {
-		if value != "" {
-			known = append(known, value)
-		}
-	}
-	// Longest first, so a secret containing another is replaced whole.
-	slices.SortFunc(known, func(a, b string) int { return cmp.Compare(len(b), len(a)) })
-	var pairs []string
-	for _, value := range known {
-		pairs = append(pairs, value, "[REDACTED]")
-	}
+	secrets := redact.NewSecrets(slices.Collect(maps.Values(values))...)
 	longest := 1
-	for _, value := range known {
+	for _, value := range secrets.Values() {
 		longest = max(longest, len(value))
 	}
 	return &textRedactor{
-		known:    known,
+		secrets:  secrets,
+		known:    secrets.Values(),
 		longest:  longest,
-		exact:    strings.NewReplacer(pairs...),
-		patterns: redact.NewRedactor(),
+		patterns: redact.Patterns,
 	}
 }
 func (r *textRedactor) text(value string) string {
@@ -48,7 +42,7 @@ func (r *textRedactor) text(value string) string {
 
 // redacted leaves clipping to typed consumers that must disclose it.
 func (r *textRedactor) redacted(value string) string {
-	value = r.patterns.Apply(r.exact.Replace(value))
+	value = r.secrets.Apply(value)
 	// An upstream text cap or cancellation may remove a PEM closing marker.
 	// Retain no suffix of an unfinished block just because it no longer matches.
 	if start := strings.Index(asciiLower(value), "-----begin "); start >= 0 {
