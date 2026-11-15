@@ -164,13 +164,9 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 // This opt-in test uses authentic release descriptors and archives through the
 // production CLI acquisition, qualification and publication path.
 func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
-	manifest, archive, helper := os.Getenv(
-		"DEM_RUNTIME_TEST_RELEASE",
-	), os.Getenv(
-		"DEM_RUNTIME_TEST_ARCHIVE",
-	), os.Getenv(
-		"DEM_RUNTIME_TEST_HELPER",
-	)
+	manifest := os.Getenv("DEM_RUNTIME_TEST_RELEASE")
+	archive := os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")
+	helper := os.Getenv("DEM_RUNTIME_TEST_HELPER")
 	publicKey := os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
 		t.Skip(

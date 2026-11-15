@@ -104,19 +104,9 @@ func TestAdmissionLimitsActiveAttempts(t *testing.T) {
 func TestAdmissionRunsOneAttemptPerJob(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		o := newExecutionOwner(2)
-		monitor, rehearsal, other := requestSlot(
-			t,
-			o,
-			jobKey("a"),
-		), requestSlot(
-			t,
-			o,
-			jobKey("a"),
-		), requestSlot(
-			t,
-			o,
-			jobKey("b"),
-		)
+		monitor := requestSlot(t, o, jobKey("a"))
+		rehearsal := requestSlot(t, o, jobKey("a"))
+		other := requestSlot(t, o, jobKey("b"))
 		assert.Equal(t, []bool{true, false, true}, granted(monitor, rehearsal, other),
 			"a second request of a running job must not take a free slot")
 		monitor.release()

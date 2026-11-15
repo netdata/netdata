@@ -236,16 +236,9 @@ func TestUnverifiedDrainPoisonsAllSlotsWithoutReleasingUnknownAttempt(t *testing
 		<-releaseGood
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
-	bad, good, waiting := make(
-		chan synthetic.Execution,
-		1,
-	), make(
-		chan synthetic.Execution,
-		1,
-	), make(
-		chan synthetic.Execution,
-		1,
-	)
+	bad := make(chan synthetic.Execution, 1)
+	good := make(chan synthetic.Execution, 1)
+	waiting := make(chan synthetic.Execution, 1)
 	go func() { bad <- e.execute(t.Context(), namedRequest("bad", "bad")) }()
 	require.Equal(t, "bad", receive(t, started))
 	go func() { good <- e.execute(t.Context(), namedRequest("good", "good")) }()

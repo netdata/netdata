@@ -54,14 +54,12 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []*logspb.LogRecord {
 		out = append(out, e.record(attrs, "vital", vital.Time, sevInfo, "vital "+vital.Name+" @ "+page))
 	}
 	for _, err := range b.Errors {
-		msg := err.Message
-		stack := err.Stack
 		attrs := append(append([]*commonpb.KeyValue{}, base...),
-			strAttr("error.type", err.Type), strAttr("error.message", msg), strAttr("error.stack", stack))
+			strAttr("error.type", err.Type), strAttr("error.message", err.Message), strAttr("error.stack", err.Stack))
 		if err.Fingerprint != "" {
 			attrs = append(attrs, strAttr("error.fingerprint", err.Fingerprint))
 		}
-		body := err.Type + ": " + msg + " @ " + b.Path
+		body := err.Type + ": " + err.Message + " @ " + b.Path
 		out = append(out, e.record(attrs, "error", err.Time, sevError, body))
 	}
 	for _, ev := range b.Events {
@@ -83,8 +81,7 @@ func (e *Logs) build(b *beacon.Beacon, pageView bool) []*logspb.LogRecord {
 		out = append(out, e.record(attrs, "event", ev.Time, sevInfo, body))
 	}
 	for _, l := range b.Logs {
-		msg := l.Message
-		body := "console " + l.Level + ": " + msg
+		body := "console " + l.Level + ": " + l.Message
 		attrs := append(append([]*commonpb.KeyValue{}, base...), strAttr("console.level", l.Level))
 		if typ := l.ErrorType; typ != "" {
 			attrs = append(attrs, strAttr("error.type", typ))

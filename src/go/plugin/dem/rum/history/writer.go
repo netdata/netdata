@@ -11,8 +11,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 )
 
-// The existing burst budget bounds queued browser detail; a full queue counts
-// drops without blocking measurement. Batches amortize journal syncs.
+// queueCap bounds queued browser detail; a full queue counts drops without
+// blocking measurement. A batch is written at maxBatch records or every
+// batchPeriod, so journal syncs are amortized.
 const (
 	maxBatch    = 500
 	batchPeriod = 5 * time.Second
