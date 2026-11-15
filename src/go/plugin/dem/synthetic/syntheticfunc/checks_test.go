@@ -371,7 +371,11 @@ func TestChecksAndRunFollowActiveSessions(t *testing.T) {
 	assert.Equal(t, map[string]map[string]any{
 		"journey:checkout": expect("journey:checkout", waiting),
 	}, rows)
-	assert.Equal(t, 404, call(newHandler(src), "synthetics-run", "job_id:journey:checkout", "run_id:checkout-run").Status)
+	assert.Equal(
+		t,
+		404,
+		call(newHandler(src), "synthetics-run", "job_id:journey:checkout", "run_id:checkout-run").Status,
+	)
 	assert.Equal(t, 3, src.getCalls, "the predecessor's run is not served as active")
 }
 

@@ -24,7 +24,11 @@ type fakeProbe struct {
 	release  chan error
 }
 
-func newFakeProbe() *fakeProbe { return &fakeProbe{release: make(chan error)} }
+func newFakeProbe() *fakeProbe {
+	return &fakeProbe{
+		release: make(chan error),
+	}
+}
 
 func (p *fakeProbe) probe(ctx context.Context) error {
 	p.runs.Add(1)
@@ -46,9 +50,17 @@ type checkCall struct {
 	err    error
 }
 
-func callCheck(ctx context.Context, o *checkOwner, poisoned <-chan struct{}, probe func(context.Context) error) *checkCall {
+func callCheck(
+	ctx context.Context,
+	o *checkOwner,
+	poisoned <-chan struct{},
+	probe func(context.Context) error,
+) *checkCall {
 	ctx, cancel := context.WithCancel(ctx)
-	c := &checkCall{cancel: cancel, done: make(chan struct{})}
+	c := &checkCall{
+		cancel: cancel,
+		done:   make(chan struct{}),
+	}
 	go func() {
 		defer close(c.done)
 		c.err = o.do(ctx, poisoned, probe)
@@ -154,7 +166,12 @@ func TestCheckProbeHasItsOwnTimeout(t *testing.T) {
 			return nil
 		})
 		require.NoError(t, err)
-		assert.Equal(t, start.Add(checkTimeout), deadline, "the probe outlives a caller without a deadline only up to checkTimeout")
+		assert.Equal(
+			t,
+			start.Add(checkTimeout),
+			deadline,
+			"the probe outlives a caller without a deadline only up to checkTimeout",
+		)
 	})
 }
 

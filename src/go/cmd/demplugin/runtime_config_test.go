@@ -33,7 +33,16 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 	t.Helper()
 	root := t.TempDir()
 	user, stock = filepath.Join(root, "user"), filepath.Join(root, "stock")
-	buildUser, buildStock, cli = filepath.Join(root, "build-user"), filepath.Join(root, "build-stock"), filepath.Join(root, "cli")
+	buildUser, buildStock, cli = filepath.Join(
+		root,
+		"build-user",
+	), filepath.Join(
+		root,
+		"build-stock",
+	), filepath.Join(
+		root,
+		"cli",
+	)
 	for _, dir := range []string{user, stock, buildUser, buildStock, cli} {
 		require.NoError(t, os.MkdirAll(dir, 0700))
 	}
@@ -47,7 +56,10 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 
 func writeRuntimeConfig(t *testing.T, dir, cache string) {
 	t.Helper()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  cache_path: "+cache+"\n"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  cache_path: "+cache+"\n"), 0600),
+	)
 }
 
 func TestRuntimeConfigurationMatchesService(t *testing.T) {
@@ -121,7 +133,9 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 			}
 			report, err := runtimeCommand(t, args...)
 			require.Error(t, err) // Cache selection is observable before opening an absent installation.
-			pluginconfig.MustInit(pluginconfig.InitInput{ConfDir: confDirs})
+			pluginconfig.MustInit(pluginconfig.InitInput{
+				ConfDir: confDirs,
+			})
 			service, err := dem.LoadConfig(pluginconfig.ConfigDir())
 			require.NoError(t, err)
 			storeConfig, err := service.Runtime.StoreConfig(varlib)

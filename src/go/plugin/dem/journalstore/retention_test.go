@@ -37,7 +37,9 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 	for _, active := range []bool{false, true} {
 		t.Run(map[bool]string{false: "archive", true: "active"}[active], func(t *testing.T) {
 			root := t.TempDir()
-			host, err := journalhost.Load(journalhost.LoadOptions{StateDir: filepath.Join(root, "identity")})
+			host, err := journalhost.Load(journalhost.LoadOptions{
+				StateDir: filepath.Join(root, "identity"),
+			})
 			require.NoError(t, err)
 			machine, err := journal.ParseUUID("11111111111111111111111111111111")
 			require.NoError(t, err)
@@ -45,7 +47,14 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 			dir := filepath.Join(root, machine.String())
 			require.NoError(t, os.MkdirAll(dir, 0750))
 			path := filepath.Join(dir, "dem.journal")
-			writer, err := journal.Create(path, journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
+			writer, err := journal.Create(
+				path,
+				journal.Options{
+					MachineID: machine,
+					BootID:    host.BootID(),
+					Compact:   true,
+				},
+			)
 			require.NoError(t, err)
 			fields, _, err := appendEnvelope(testFields())
 			require.NoError(t, err)
@@ -55,7 +64,18 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 			require.NoError(t, writer.Close())
 			if !active {
 				// Finalize through the public Log lifecycle; caller owns the file.
-				log, err := journal.NewLog(root, journal.LogConfig{Source: "dem", StrictSystemdNaming: true, Options: journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true}})
+				log, err := journal.NewLog(
+					root,
+					journal.LogConfig{
+						Source:              "dem",
+						StrictSystemdNaming: true,
+						Options: journal.Options{
+							MachineID: machine,
+							BootID:    host.BootID(),
+							Compact:   true,
+						},
+					},
+				)
 				require.NoError(t, err)
 				require.NoError(t, log.CloseWithoutRetention())
 			}
@@ -79,7 +99,12 @@ func TestTailExpiryKeepsMixedHistoryAndPinnedSnapshot(t *testing.T) {
 		appendNamed(t, s, "synthetic", "last")
 		time.Sleep(2 * time.Hour)
 		require.NoError(t, s.EnforceHistoryRetention(ctx, 1, 1<<30))
-		assert.Equal(t, []string{"first", "last"}, retainedNames(t, s), "age uses the newest saved record, not the file head or observation time")
+		assert.Equal(
+			t,
+			[]string{"first", "last"},
+			retainedNames(t, s),
+			"age uses the newest saved record, not the file head or observation time",
+		)
 		reader, release, err := s.OpenReader(ctx)
 		require.NoError(t, err)
 		defer release()
@@ -109,7 +134,10 @@ func TestSharedSizePressureRemovesYoungerHistoryOnAppend(t *testing.T) {
 	status, err := s.Status(ctx)
 	require.NoError(t, err)
 	require.NotNil(t, status.Inventory)
-	assert.Equal(t, Inventory{Bytes: MinHistoryBytes, Files: 1}, *status.Inventory)
+	assert.Equal(t, Inventory{
+		Bytes: MinHistoryBytes,
+		Files: 1,
+	}, *status.Inventory)
 	assert.Empty(t, status.Cleanup.Error)
 }
 
@@ -130,7 +158,10 @@ func TestStatusDistinguishesUnknownInventoryAndSafeCleanupFailure(t *testing.T) 
 		healthy, err := s.Status(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, healthy.Inventory)
-		assert.Equal(t, Inventory{Bytes: MinHistoryBytes, Files: 1}, *healthy.Inventory)
+		assert.Equal(t, Inventory{
+			Bytes: MinHistoryBytes,
+			Files: 1,
+		}, *healthy.Inventory)
 		assert.False(t, healthy.Cleanup.LastSuccessfulAt.IsZero())
 		damaged := filepath.Join(filepath.Dir(s.log.ActivePath()), "dem@damaged.journal~")
 		require.NoError(t, os.WriteFile(damaged, []byte("preserve evidence"), 0600))
@@ -145,7 +176,10 @@ func TestStatusDistinguishesUnknownInventoryAndSafeCleanupFailure(t *testing.T) 
 		assert.Empty(t, status.WriterError, "safe cleanup failure must not fail a healthy append")
 		assert.Equal(t, healthy.Cleanup.LastSuccessfulAt, status.Cleanup.LastSuccessfulAt)
 		assert.True(t, status.Cleanup.AttemptedAt.After(healthy.Cleanup.AttemptedAt))
-		assert.Equal(t, RetentionPolicy{Days: 30, MaxBytes: 1 << 30}, *status.Policy)
+		assert.Equal(t, RetentionPolicy{
+			Days:     30,
+			MaxBytes: 1 << 30,
+		}, *status.Policy)
 		_, _, err = s.OpenReader(ctx)
 		require.Error(t, err, "queries share the unsafe-file rejection")
 		bytes, err := os.ReadFile(damaged)
@@ -164,7 +198,10 @@ func TestInvalidRetentionLeavesEffectivePolicyUnchanged(t *testing.T) {
 		status, err := s.Status(ctx)
 		require.NoError(t, err)
 		require.NotNil(t, status.Policy)
-		assert.Equal(t, RetentionPolicy{Days: 30, MaxBytes: 1 << 30}, *status.Policy)
+		assert.Equal(t, RetentionPolicy{
+			Days:     30,
+			MaxBytes: 1 << 30,
+		}, *status.Policy)
 		assert.Equal(t, 1, countEntries(t, s))
 	}
 }
@@ -176,7 +213,10 @@ func appendNamed(t *testing.T, s *Store, kind, name string) {
 		clock = "DEM_STARTED_US"
 	}
 	attempted, err := s.Append(context.Background(), []journal.Field{
-		journal.StringField("DEM_KIND", kind), journal.StringField(clock, "123456789"), journal.StringField("MESSAGE", name),
+		journal.StringField(
+			"DEM_KIND",
+			kind,
+		), journal.StringField(clock, "123456789"), journal.StringField("MESSAGE", name),
 	})
 	require.True(t, attempted)
 	require.NoError(t, err)

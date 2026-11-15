@@ -74,7 +74,10 @@ func (s *Store) Status(ctx context.Context) (Status, error) {
 	if err != nil {
 		status.InventoryError = err.Error()
 	} else {
-		status.Inventory = &Inventory{Bytes: inventory.Bytes, Files: len(inventory.Files)}
+		status.Inventory = &Inventory{
+			Bytes: inventory.Bytes,
+			Files: len(inventory.Files),
+		}
 	}
 	return status, nil
 }

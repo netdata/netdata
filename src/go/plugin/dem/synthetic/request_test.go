@@ -62,15 +62,27 @@ func TestValidateRequest(t *testing.T) {
 
 func TestBlankScriptDiagnostic(t *testing.T) {
 	require.EqualError(t, ValidateRequest(Request{
-		Kind: Journey, Name: "check", Script: " \t\n\u2003", Timeout: time.Minute,
+		Kind:    Journey,
+		Name:    "check",
+		Script:  " \t\n\u2003",
+		Timeout: time.Minute,
 	}), "script must not be blank")
 }
 
 func TestValidJobID(t *testing.T) {
 	for id, want := range map[string]bool{
-		Request{Kind: Journey, Name: "checkout"}.JobID(): true,
-		Request{Kind: Lighthouse, Name: "home"}.JobID():  true,
-		Request{Kind: Journey, Name: "a:b"}.JobID():      true,
+		Request{
+			Kind: Journey,
+			Name: "checkout",
+		}.JobID(): true,
+		Request{
+			Kind: Lighthouse,
+			Name: "home",
+		}.JobID(): true,
+		Request{
+			Kind: Journey,
+			Name: "a:b",
+		}.JobID(): true,
 		"journey:":         false,
 		"journey: \t":      false,
 		"journey":          false,

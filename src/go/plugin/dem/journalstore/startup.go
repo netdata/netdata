@@ -25,7 +25,12 @@ func (s *Store) verifyStartup(ctx context.Context) error {
 				return fmt.Errorf("verify active history %q: %w", path, err)
 			}
 		}
-		file, err := openSnapshot(ctx, path, journal.StringField(FieldKind, string(KindRUM)), journal.StringField(FieldKind, string(KindSynthetic)))
+		file, err := openSnapshot(
+			ctx,
+			path,
+			journal.StringField(FieldKind, string(KindRUM)),
+			journal.StringField(FieldKind, string(KindSynthetic)),
+		)
 		if err != nil {
 			return err
 		}

@@ -34,8 +34,29 @@ func TestNativeRuntimeRoleRouting(t *testing.T) {
 }
 
 func TestNativeChildEnvironmentDoesNotForwardInjection(t *testing.T) {
-	identity := nativeIdentity{uid: 123, gid: 456, home: "/service home"}
-	env := nativeServiceEnvironment(identity, []string{"HOME=/root", "USER=root", "LOGNAME=root", "PATH=/attacker", "LD_PRELOAD=synthetic-secret", "NODE_OPTIONS=synthetic-secret", "NETDATA_CLAIM_TOKEN=synthetic-secret", "HTTP_PROXY=http://secret.invalid", "CHROME_DEVEL_SANDBOX=/attacker/helper", "TMPDIR=/private tmp", "XDG_CACHE_HOME=/service/cache", "XDG_RUNTIME_DIR=relative", "TZ=:secret-file"})
+	identity := nativeIdentity{
+		uid:  123,
+		gid:  456,
+		home: "/service home",
+	}
+	env := nativeServiceEnvironment(
+		identity,
+		[]string{
+			"HOME=/root",
+			"USER=root",
+			"LOGNAME=root",
+			"PATH=/attacker",
+			"LD_PRELOAD=synthetic-secret",
+			"NODE_OPTIONS=synthetic-secret",
+			"NETDATA_CLAIM_TOKEN=synthetic-secret",
+			"HTTP_PROXY=http://secret.invalid",
+			"CHROME_DEVEL_SANDBOX=/attacker/helper",
+			"TMPDIR=/private tmp",
+			"XDG_CACHE_HOME=/service/cache",
+			"XDG_RUNTIME_DIR=relative",
+			"TZ=:secret-file",
+		},
+	)
 	joined := strings.Join(env, "\n")
 	require.NotContains(t, joined, "synthetic-secret")
 	require.NotContains(t, joined, "attacker")
@@ -54,7 +75,9 @@ func TestNativeChildEnvironmentDoesNotForwardInjection(t *testing.T) {
 type nativeTestReader struct{ io.Reader }
 
 func TestNativeChildOutputRemainsBoundedWhenDrained(t *testing.T) {
-	output := nativeOutput{limit: 64}
+	output := nativeOutput{
+		limit: 64,
+	}
 	written, err := io.Copy(&output, nativeTestReader{strings.NewReader(strings.Repeat("x", 4096))})
 	require.NoError(t, err)
 	require.EqualValues(t, 4096, written)
@@ -110,7 +133,9 @@ func TestNativeChildDropsActualCredentialsAndPreservesArguments(t *testing.T) {
 	t.Setenv("NODE_OPTIONS", "synthetic-secret")
 	t.Setenv("NETDATA_CLAIM_TOKEN", "synthetic-secret")
 	arguments := []string{"space value", "$(not a command)", "a;b", "single'quote"}
-	args := append([]string{"-test.run=^TestNativeCredentialChild$", "--", "--native-credential-fixture", "identity"}, arguments...)
+	args := append(
+		[]string{"-test.run=^TestNativeCredentialChild$", "--", "--native-credential-fixture", "identity"},
+		arguments...)
 	command := nativeCredentialCommand(ctx, executable, args, identity)
 	data, err := command.Output()
 	require.NoError(t, err)
@@ -128,7 +153,12 @@ func TestNativeChildDropsActualCredentialsAndPreservesArguments(t *testing.T) {
 	require.Equal(t, arguments, result.Args)
 	require.NotContains(t, strings.Join(result.Env, "\n"), "synthetic-secret")
 	require.Contains(t, result.Env, "HOME="+identity.home)
-	command = nativeCredentialCommand(ctx, executable, []string{"-test.run=^TestNativeCredentialChild$", "--", "--native-credential-fixture", "fail"}, identity)
+	command = nativeCredentialCommand(
+		ctx,
+		executable,
+		[]string{"-test.run=^TestNativeCredentialChild$", "--", "--native-credential-fixture", "fail"},
+		identity,
+	)
 	err = command.Run()
 	var exit *exec.ExitError
 	require.True(t, errors.As(err, &exit))
@@ -142,7 +172,14 @@ func (w nativeFailingDiagnostic) Write([]byte) (int, error) { return 0, w.err }
 
 func TestNativeChildRejectsBeforeExecution(t *testing.T) {
 	failure := errors.New("diagnostic writer failed")
-	child := nativeChild{executable: "/must-not-execute", identity: nativeIdentity{uid: 123, gid: 456}, diagnostic: nativeFailingDiagnostic{failure}}
+	child := nativeChild{
+		executable: "/must-not-execute",
+		identity: nativeIdentity{
+			uid: 123,
+			gid: 456,
+		},
+		diagnostic: nativeFailingDiagnostic{failure},
+	}
 	_, err := child.run(context.Background(), "unexpected", nil)
 	require.ErrorContains(t, err, "invalid native service")
 	_, err = child.run(context.Background(), "native-inspect", make([]byte, nativeProtocolLimit+1))

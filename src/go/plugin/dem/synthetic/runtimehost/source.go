@@ -4,14 +4,14 @@ package runtimehost
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 type Consumer interface {
-	Manifest() runtime.Manifest
-	BeginUse() (*runtime.Use, error)
+	Manifest() browserruntime.Manifest
+	BeginUse() (*browserruntime.Use, error)
 }
 
 // Borrow exposes a caller-owned process or candidate claim to the runner. It
@@ -25,13 +25,16 @@ func (s borrowedSource) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{use: use, identity: s.consumer.Manifest().Identity()}, nil
+	return managedUse{
+		use:      use,
+		identity: s.consumer.Manifest().Identity(),
+	}, nil
 }
 
 // managedUse is one execution pin on a held claim. The process source records
 // failed retirement as host maintenance; borrowed sources leave it to their owner.
 type managedUse struct {
-	use      *runtime.Use
+	use      *browserruntime.Use
 	host     *Host
 	identity synthetic.RuntimeIdentity
 }
@@ -62,6 +65,10 @@ func (u preloadedUse) Paths() runner.Paths                { return u.paths }
 func (u preloadedUse) Completion() *ndexec.TreeCompletion { return nil }
 func (u preloadedUse) Finish(bool) error                  { return nil }
 
-func runnerPaths(paths runtime.Paths, identity synthetic.RuntimeIdentity) runner.Paths {
-	return runner.Paths{Node: paths.Node, EntryPoint: paths.EntryPoint, Identity: identity}
+func runnerPaths(paths browserruntime.Paths, identity synthetic.RuntimeIdentity) runner.Paths {
+	return runner.Paths{
+		Node:       paths.Node,
+		EntryPoint: paths.EntryPoint,
+		Identity:   identity,
+	}
 }

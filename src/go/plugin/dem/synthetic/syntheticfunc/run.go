@@ -57,8 +57,20 @@ var runColumns = rawfunc.Columns[model.Event]{
 	column("title", "Title", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Title }),
 	column("phase", "Phase", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Phase }),
 	column("status", "Actual status", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Status }),
-	column("expected_status", "Expected status", funcapi.FieldTypeString, "", func(e model.Event) any { return e.ExpectedStatus }),
-	column("duration_ms", "Duration", funcapi.FieldTypeFloat, "ms", func(e model.Event) any { return number(e.DurationMS) }),
+	column(
+		"expected_status",
+		"Expected status",
+		funcapi.FieldTypeString,
+		"",
+		func(e model.Event) any { return e.ExpectedStatus },
+	),
+	column(
+		"duration_ms",
+		"Duration",
+		funcapi.FieldTypeFloat,
+		"ms",
+		func(e model.Event) any { return number(e.DurationMS) },
+	),
 	column("message", "Message", funcapi.FieldTypeString, "", func(e model.Event) any { return e.Message }),
 }
 

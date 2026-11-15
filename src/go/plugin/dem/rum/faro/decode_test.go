@@ -210,7 +210,13 @@ func TestParseFaro(t *testing.T) {
 				Device:    "desktop",
 				Country:   "GR",
 				Events: []beacon.Event{
-					{Kind: beacon.EventSession, Name: "session_start", Domain: "browser", Attrs: map[string]string{"a": "1"}, Time: ts},
+					{
+						Kind:   beacon.EventSession,
+						Name:   "session_start",
+						Domain: "browser",
+						Attrs:  map[string]string{"a": "1"},
+						Time:   ts,
+					},
 				},
 			},
 		},
@@ -245,9 +251,11 @@ func TestParseFaro(t *testing.T) {
 			got, err := Decode(
 				[]byte(tc.body),
 				Options{
-					Site:               "s",
-					Now:                now,
-					Location:           beacon.Location{Country: "GR"},
+					Site: "s",
+					Now:  now,
+					Location: beacon.Location{
+						Country: "GR",
+					},
 					ConsoleLogs:        tc.consoleLogs,
 					EventLogs:          true,
 					FrustrationSignals: true,

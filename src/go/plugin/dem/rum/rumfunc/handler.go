@@ -137,7 +137,12 @@ type requestError struct {
 
 func (e requestError) Error() string { return e.message }
 
-func badRequest(err error) requestError { return requestError{status: 400, message: err.Error()} }
+func badRequest(err error) requestError {
+	return requestError{
+		status:  400,
+		message: err.Error(),
+	}
+}
 
 func functionError(err error) *funcapi.FunctionResponse {
 	if r := rawfunc.Cancelled(err); r != nil {

@@ -65,8 +65,16 @@ func TestRedactSourceURLKeepsOnlyScriptBasename(t *testing.T) {
 	const raw = "https://user:password@example.org/eyJhbGciOiJIUzI1NiJ9/" + chunk + "?secret=private#fragment"
 	assert.Equal(t, "https://example.org/:token/:token", redactURL(raw, nil))
 	assert.Equal(t, "https://example.org/:token/"+chunk, redactSourceURL(raw, nil))
-	assert.Equal(t, "https://example.org/:token/:file", redactSourceURL(raw, []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}}))
+	assert.Equal(
+		t,
+		"https://example.org/:token/:file",
+		redactSourceURL(raw, []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}}),
+	)
 	assert.Equal(t, "https://example.org/:email", redactSourceURL("https://example.org/person@example.org.js", nil))
-	assert.Equal(t, "https://example.org/:id", redactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000", nil))
+	assert.Equal(
+		t,
+		"https://example.org/:id",
+		redactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000", nil),
+	)
 	assert.Equal(t, "https://example.org/:token", redactSourceURL("https://example.org/eyJhbGciOiJIUzI1NiJ9.txt", nil))
 }

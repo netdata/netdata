@@ -15,7 +15,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,16 +40,16 @@ func TestRuntimeSetupPlanModesAndOverrides(t *testing.T) {
 			case "preloaded":
 				config += fmt.Sprintf("  preload_path: %q\n", path)
 			case "native":
-				path = runtime.DefaultNativeConfig().PayloadPath
+				path = browserruntime.DefaultNativeConfig().PayloadPath
 			}
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(config), 0600))
-			canonical, err := runtime.CanonicalRoot(path)
+			canonical, err := browserruntime.CanonicalRoot(path)
 			require.NoError(t, err)
 			out, err := setupPlan(t, "--config-dir", dir)
 			require.NoError(t, err)
 			assert.Equal(t, "netdata-dem-runtime-setup-v1\nstandalone\n"+mode+"\n"+canonical+"\n", out)
 			override := filepath.Join(dir, "other")
-			canonicalOverride, err := runtime.CanonicalRoot(override)
+			canonicalOverride, err := browserruntime.CanonicalRoot(override)
 			require.NoError(t, err)
 			out, err = setupPlan(t, "--config-dir", dir, "--cache", override)
 			require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestRuntimeSetupPlanUsesEffectiveOverride(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"),
 		[]byte("runtime: {mode: managed, cache_path: relative}\n"), 0600))
 	root := filepath.Join(dir, "chosen")
-	canonical, err := runtime.CanonicalRoot(root)
+	canonical, err := browserruntime.CanonicalRoot(root)
 	require.NoError(t, err)
 	for _, test := range []struct{ flag, mode string }{{"--cache", "managed"}, {"--root", "preloaded"}} {
 		t.Run(test.flag, func(t *testing.T) {
@@ -122,7 +122,7 @@ func TestRuntimeSetupPlanDefaultsAndConfigPrecedence(t *testing.T) {
 		}
 		out, err := setupPlan(t, "--config-dir", empty)
 		require.NoError(t, err)
-		want, err := runtime.CanonicalRoot(filepath.Join(lib, "dem", "runtime"))
+		want, err := browserruntime.CanonicalRoot(filepath.Join(lib, "dem", "runtime"))
 		require.NoError(t, err)
 		assert.Equal(t, "netdata-dem-runtime-setup-v1\nstandalone\nmanaged\n"+want+"\n", out)
 		assert.NoDirExists(t, lib)
@@ -250,7 +250,7 @@ func TestRuntimeSetupPlanValidatesEnvironmentAndCanonicalPath(t *testing.T) {
 	literal := filepath.Join(dir, `space [glob]*?{brace}@"quote\slash`)
 	out, err = setupPlan(t, "--config-dir", dir, "--cache", literal)
 	require.NoError(t, err)
-	canonical, err := runtime.CanonicalRoot(literal)
+	canonical, err := browserruntime.CanonicalRoot(literal)
 	require.NoError(t, err)
 	assert.Equal(t, "netdata-dem-runtime-setup-v1\nstandalone\nmanaged\n"+canonical+"\n", out)
 	assert.NoDirExists(t, literal)
@@ -262,7 +262,14 @@ func TestRuntimeSetupPlanBuildOwnershipCannotBeChangedByRuntimeConfig(t *testing
 	runtimehost.DefaultMode = "native"
 	dir := t.TempDir()
 	root := filepath.Join(dir, "runtime")
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			filepath.Join(dir, "dem.conf"),
+			[]byte(fmt.Sprintf("runtime: {mode: managed, cache_path: %q}\n", root)),
+			0600,
+		),
+	)
 	for _, args := range [][]string{nil, {"--root", root}} {
 		out, err := setupPlan(t, append([]string{"--config-dir", dir}, args...)...)
 		require.NoError(t, err)

@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
@@ -20,7 +20,7 @@ import (
 
 // Select the authenticated, non-executable fixture through store APIs solely to
 // exercise installation diagnostics. These tests do not establish qualification.
-func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, selected runtime.Manifest) {
+func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, selected browserruntime.Manifest) {
 	t.Helper()
 	manifest, archive = adminBundleFixture(t)
 	root = t.TempDir()
@@ -28,11 +28,11 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	cfg := runtimehost.DefaultConfig()
 	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
 	cache = filepath.Join(root, "cache")
-	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
 	require.NoError(t, err)
-	options := runtime.ReleaseInstallOptions{
-		Operation: runtime.InstallRelease,
-		Updates:   runtime.ManualUpdates,
+	options := browserruntime.ReleaseInstallOptions{
+		Operation: browserruntime.InstallRelease,
+		Updates:   browserruntime.ManualUpdates,
 	}
 	candidate, err := store.BeginPublishedInstall(context.Background(), options, cfg.ReleaseLoader(manifest, false))
 	require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestRuntimeStatusReportsDamagedInstallation(t *testing.T) {
 			}
 			require.NoError(t, os.WriteFile(path, []byte("{broken"), 0600))
 			report, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
-			require.ErrorIs(t, err, runtime.ErrDamaged)
+			require.ErrorIs(t, err, browserruntime.ErrDamaged)
 			require.NotNil(t, report.Storage)
 			assert.Positive(t, report.Storage.UsedBytes)
 			assert.NotEmpty(t, report.StorageError)
@@ -83,7 +83,19 @@ func TestRuntimeFailedRepairReportsSelectedStateSeparately(t *testing.T) {
 				requested.Archive.SHA256 = strings.Repeat("b", 64)
 				writeAdminRelease(t, manifest, requested)
 			}
-			report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", manifest, "--archive", archive)
+			report, err := runtimeCommand(
+				t,
+				"runtime",
+				"repair",
+				"--config-dir",
+				root,
+				"--cache",
+				cache,
+				"--release",
+				manifest,
+				"--archive",
+				archive,
+			)
 			require.Error(t, err)
 			require.NotNil(t, report.Candidate)
 			assert.Equal(t, requested.Archive.SHA256, report.Candidate.SHA256)
@@ -123,14 +135,26 @@ func TestRuntimeRepairValidatesTrustBeforeChangingDamagedStore(t *testing.T) {
 			case "missing trust":
 				writeRuntimeConfig(t, root, cache)
 			case "untrusted signer":
-				release, err := runtime.ReadRelease(releasePath, adminTrust(t))
+				release, err := browserruntime.ReadRelease(releasePath, adminTrust(t))
 				require.NoError(t, err)
 				wrong := pgptest.Key(t, 30)
 				data, err := pgptest.Release(release.Release(), wrong)
 				require.NoError(t, err)
 				require.NoError(t, os.WriteFile(releasePath, data, 0600))
 			}
-			report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", releasePath, "--archive", archive)
+			report, err := runtimeCommand(
+				t,
+				"runtime",
+				"repair",
+				"--config-dir",
+				root,
+				"--cache",
+				cache,
+				"--release",
+				releasePath,
+				"--archive",
+				archive,
+			)
 			require.Error(t, err)
 			assert.Nil(t, report.Candidate)
 			assert.Nil(t, report.Qualification)
@@ -156,10 +180,18 @@ func TestRuntimeStatusReportsUnknownWhenSafetyStructureIsMissing(t *testing.T) {
 // Only authentic release inputs can establish both workload qualifications.
 func realAdminInputs(t *testing.T) (manifest, archive, publicKey string) {
 	t.Helper()
-	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	manifest, archive, helper := os.Getenv(
+		"DEM_RUNTIME_TEST_RELEASE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_ARCHIVE",
+	), os.Getenv(
+		"DEM_RUNTIME_TEST_HELPER",
+	)
 	publicKey = os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
-		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
+		t.Skip(
+			"requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER",
+		)
 	}
 	require.NotZero(t, os.Geteuid())
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
@@ -171,11 +203,23 @@ func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
 	root := t.TempDir()
 	writeRuntimeTrustConfig(t, root, "", publicKey)
 	cache := filepath.Join(root, "cache")
-	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
 	require.NoError(t, err)
 	require.NoError(t, store.Close())
 	require.NoError(t, os.WriteFile(filepath.Join(cache, "selection.json"), []byte("{broken"), 0600))
-	report, err := runtimeCommand(t, "runtime", "repair", "--config-dir", root, "--cache", cache, "--release", manifest, "--archive", archive)
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"repair",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+	)
 	require.NoError(t, err)
 	assert.Equal(t, "installed", report.State)
 	assert.Equal(t, "selected", report.CandidateState)
@@ -203,7 +247,7 @@ func TestRealRuntimePreloadReportsPreparedCandidate(t *testing.T) {
 	data, err := os.ReadFile(filepath.Join(final, "selection.json"))
 	require.NoError(t, err)
 	var selection struct {
-		Manifest *runtime.Manifest `json:"manifest"`
+		Manifest *browserruntime.Manifest `json:"manifest"`
 	}
 	require.NoError(t, json.Unmarshal(data, &selection))
 	assert.Nil(t, selection.Manifest)
@@ -215,7 +259,7 @@ func TestRealRuntimePreloadReportsPreparedCandidate(t *testing.T) {
 
 func TestRuntimeStatusReportsIncompleteOwnershipInventory(t *testing.T) {
 	root, cache, _, _, _ := selectedAdminFixture(t)
-	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
 	require.NoError(t, err)
 	defer func() { require.NoError(t, store.Close()) }()
 	consumer, err := store.AcquireSelected()
@@ -224,7 +268,10 @@ func TestRuntimeStatusReportsIncompleteOwnershipInventory(t *testing.T) {
 	claims, err := os.ReadDir(filepath.Join(cache, "claims"))
 	require.NoError(t, err)
 	require.Len(t, claims, 1)
-	require.NoError(t, os.WriteFile(filepath.Join(cache, "claims", claims[0].Name(), "owner.json"), []byte("{broken"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(cache, "claims", claims[0].Name(), "owner.json"), []byte("{broken"), 0600),
+	)
 	report, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
 	require.Error(t, err)
 	assert.Equal(t, "unknown", report.State)

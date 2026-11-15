@@ -73,9 +73,9 @@ func New(deps Dependencies) *Collector {
 	}
 }
 func (c *Collector) Configuration() any {
-	config := c.Config
-	config.Site = config.Site.Effective()
-	return config
+	cfg := c.Config
+	cfg.Site = cfg.Site.Effective()
+	return cfg
 }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }

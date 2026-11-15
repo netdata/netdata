@@ -50,7 +50,11 @@ func runtimeAllowed() error {
 // before anything is launched.
 func checkFiles(paths Paths) error {
 	if paths.Identity.Contract != synthetic.ExecutionContract {
-		return fmt.Errorf("unsupported runtime execution contract %d (Agent supports %d)", paths.Identity.Contract, synthetic.ExecutionContract)
+		return fmt.Errorf(
+			"unsupported runtime execution contract %d (Agent supports %d)",
+			paths.Identity.Contract,
+			synthetic.ExecutionContract,
+		)
 	}
 	digest, err := hex.DecodeString(paths.Identity.SHA256)
 	if paths.Identity.Version == "" || err != nil || len(digest) != 32 {
@@ -150,7 +154,10 @@ func (o *checkOwner) do(ctx context.Context, poisoned <-chan struct{}, probe fun
 // cancellation and stops at checkTimeout or when its last caller leaves.
 func (o *checkOwner) start(ctx context.Context, probe func(context.Context) error) *checkFlight {
 	probeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), checkTimeout)
-	f := &checkFlight{done: make(chan struct{}), cancel: cancel}
+	f := &checkFlight{
+		done:   make(chan struct{}),
+		cancel: cancel,
+	}
 	o.flight = f
 	go func() {
 		err := probe(probeCtx)
@@ -222,7 +229,8 @@ func (e *Engine) check(checkCtx context.Context) error {
 	if actual.Contract != identity.Contract || actual.Version != identity.Version {
 		return errors.New("prepared runtime check does not match its trusted release identity")
 	}
-	if actual.UID == nil || actual.GID == nil || *actual.UID == 0 || *actual.UID != os.Geteuid() || *actual.GID != os.Getegid() {
+	if actual.UID == nil || actual.GID == nil || *actual.UID == 0 || *actual.UID != os.Geteuid() ||
+		*actual.GID != os.Getegid() {
 		return errors.New("nd-run must preserve the plugin's unprivileged identity for private run directories")
 	}
 	return nil

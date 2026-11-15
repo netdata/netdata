@@ -73,12 +73,18 @@ func TestReceiptIndexOrder(t *testing.T) {
 // Every retained population stays exact: no count cap, sampling or
 // approximation applies within the window.
 func TestRetainedPopulationsAreExact(t *testing.T) {
-	a, now := newAgg(5*time.Minute, SiteCfg{Name: "s", PageGroups: 20, Countries: 20})
+	a, now := newAgg(5*time.Minute, SiteCfg{
+		Name:       "s",
+		PageGroups: 20,
+		Countries:  20,
+	})
 	const documents = 10001
 	for i := range documents {
 		b := mk(*now, fmt.Sprint(i), "/entry", v(beacon.LCP, 100), v(beacon.INP, 10), v(beacon.CLS, 0.1))
 		b.PageHost = "example.org"
-		b.Resources = []beacon.Resource{{ID: "resource", Host: "example.org", Initiator: "fetch", HasDuration: true, DurationMS: 5}}
+		b.Resources = []beacon.Resource{
+			{ID: "resource", Host: "example.org", Initiator: "fetch", HasDuration: true, DurationMS: 5},
+		}
 		a.Ingest(b)
 		a.Ingest(b) // Every population must retain replay evidence, too.
 	}
@@ -154,7 +160,10 @@ func TestIngestExpiresCanonicalStateWithoutReads(t *testing.T) {
 	a.Ingest(mk(*now, "last", "/last"))
 	require.Equal(t, 3, identities(), "the exact 30-minute boundary remains included")
 	*now = now.Add(time.Nanosecond)
-	a.Ingest(&beacon.Beacon{Site: "s", Received: *now})
+	a.Ingest(&beacon.Beacon{
+		Site:     "s",
+		Received: *now,
+	})
 	require.Equal(t, 1, identities())
 	require.Zero(t, a.site.resourceIdentities.len())
 }
@@ -180,7 +189,12 @@ func TestExpiryPreservesCurrentObservations(t *testing.T) {
 // A replaced value belongs to the window of its latest receipt.
 func TestNewerRevisionRenewsWindowMembership(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
-	first := mk(*now, "session", "/page", beacon.Vital{ID: "lcp-1", Revision: 1, Name: beacon.LCP, Value: 100})
+	first := mk(*now, "session", "/page", beacon.Vital{
+		ID:       "lcp-1",
+		Revision: 1,
+		Name:     beacon.LCP,
+		Value:    100,
+	})
 	a.Ingest(first)
 
 	*now = now.Add(4 * time.Minute)
@@ -190,7 +204,13 @@ func TestNewerRevisionRenewsWindowMembership(t *testing.T) {
 	a.Ingest(&update)
 
 	*now = now.Add(2 * time.Minute)
-	assert.Equal(t, VitalStats{N: 1, P50: 200, P75: 200, P95: 200, Good: 1}, a.Snapshot().Vitals[beacon.LCP])
+	assert.Equal(t, VitalStats{
+		N:    1,
+		P50:  200,
+		P75:  200,
+		P95:  200,
+		Good: 1,
+	}, a.Snapshot().Vitals[beacon.LCP])
 	*now = now.Add(3*time.Minute + time.Nanosecond)
 	assert.Equal(t, VitalStats{}, a.Snapshot().Vitals[beacon.LCP])
 }
@@ -277,8 +297,10 @@ func TestIdentityRetentionPreventsExpiredSessionReplay(t *testing.T) {
 	require.Zero(t, a.Snapshot().ObservedSessions)
 	for i := range 10001 {
 		a.Ingest(&beacon.Beacon{
-			Site: "s", ExperienceID: fmt.Sprint(i), Received: *now,
-			Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
+			Site:         "s",
+			ExperienceID: fmt.Sprint(i),
+			Received:     *now,
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "activation", Revision: 1}},
 		})
 	}
 	old.Received = *now

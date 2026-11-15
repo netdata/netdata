@@ -238,7 +238,11 @@ func TestLateDominantErrorAndResourceHostEnterTopGroups(t *testing.T) {
 }
 
 func TestConcurrentReadsCaptureRevisionAndVnodeTogether(t *testing.T) {
-	a, now := newAgg(5*time.Minute, SiteCfg{Name: "s", PageGroups: 20, Countries: 20})
+	a, now := newAgg(5*time.Minute, SiteCfg{
+		Name:       "s",
+		PageGroups: 20,
+		Countries:  20,
+	})
 	var workers sync.WaitGroup
 	start := make(chan struct{})
 	workers.Go(func() {

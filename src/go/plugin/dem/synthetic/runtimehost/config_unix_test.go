@@ -25,7 +25,7 @@ func TestInstalledReleaseRejectsFIFOWithoutBlocking(t *testing.T) {
 	case err := <-result:
 		require.ErrorContains(t, err, "regular")
 	case <-time.After(time.Second):
-		// Unblock the old implementation before reporting its failure.
+		// Open the write end so the blocked reader returns before the test fails.
 		writer, err := os.OpenFile(path, os.O_RDWR|unix.O_NONBLOCK, 0)
 		require.NoError(t, err)
 		<-result

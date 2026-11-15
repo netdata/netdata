@@ -21,7 +21,7 @@ type Site struct {
 	// exports. Nil selects all received sessions.
 	Investigate *Investigate `yaml:"investigate,omitempty"         json:"investigate"`
 	// Capture selects optional location and interaction evidence. Nil uses defaults.
-	Capture *Capture `yaml:"capture,omitempty" json:"capture"`
+	Capture *Capture `yaml:"capture,omitempty"             json:"capture"`
 	// Bots is BotsExclude (default: crawlers, headless browsers and other
 	// automation send nothing and are counted as filtered) or BotsInclude
 	// (kept, with device "bot").

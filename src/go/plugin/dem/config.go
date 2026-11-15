@@ -44,7 +44,9 @@ type Config struct {
 
 func DefaultConfig() Config {
 	return Config{
-		Browser: BrowserConfig{Concurrency: 1},
+		Browser: BrowserConfig{
+			Concurrency: 1,
+		},
 		Artifacts: RetentionConfig{
 			Days:     7,
 			MaxBytes: 2 << 30,

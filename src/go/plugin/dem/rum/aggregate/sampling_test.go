@@ -239,7 +239,13 @@ func TestHasPoorVital(t *testing.T) {
 // A vital promotes an otherwise unsampled session exactly when the charts
 // rate it poor, at and just above each Core Web Vitals poor limit.
 func TestPoorVitalPromotionMatchesChartRating(t *testing.T) {
-	limits := map[string]float64{beacon.LCP: 4000, beacon.FCP: 3000, beacon.TTFB: 1800, beacon.INP: 500, beacon.CLS: 0.25}
+	limits := map[string]float64{
+		beacon.LCP:  4000,
+		beacon.FCP:  3000,
+		beacon.TTFB: 1800,
+		beacon.INP:  500,
+		beacon.CLS:  0.25,
+	}
 	for _, name := range beacon.Vitals {
 		for _, value := range []float64{limits[name], limits[name] * 1.001} {
 			a, now, _ := sampledAgg(0, false, true)

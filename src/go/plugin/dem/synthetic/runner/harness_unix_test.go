@@ -152,11 +152,17 @@ func testEngineSlots(t *testing.T, concurrency int) (*Engine, *fakeHistory, *obs
 		Store: store,
 	}
 	engine, err := New(
-		fixtureRuntime{Paths: Paths{
-			Node:       bin,
-			EntryPoint: entrypoint,
-			Identity:   synthetic.RuntimeIdentity{Version: "release-a", SHA256: strings.Repeat("a", 64), Contract: synthetic.ExecutionContract},
-		}},
+		fixtureRuntime{
+			Paths: Paths{
+				Node:       bin,
+				EntryPoint: entrypoint,
+				Identity: synthetic.RuntimeIdentity{
+					Version:  "release-a",
+					SHA256:   strings.Repeat("a", 64),
+					Contract: synthetic.ExecutionContract,
+				},
+			},
+		},
 		history,
 		owner,
 		concurrency,
@@ -206,7 +212,9 @@ func requireSlotFree(t *testing.T, e *Engine) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 	defer cancel()
-	job, err := e.acquire(ctx, executionKey{jobID: "slot-probe"})
+	job, err := e.acquire(ctx, executionKey{
+		jobID: "slot-probe",
+	})
 	require.NoError(t, err, "the attempt kept its admission slot")
 	e.release(job)
 }
@@ -231,7 +239,9 @@ func waitQueued(t *testing.T, e *Engine, jobID string, n int) {
 	require.Eventually(t, func() bool {
 		e.mu.Lock()
 		defer e.mu.Unlock()
-		j := e.jobs[executionKey{jobID: jobID}]
+		j := e.jobs[executionKey{
+			jobID: jobID,
+		}]
 		return j != nil && len(j.waiters) == n
 	}, time.Second, time.Millisecond, "request did not join its job's queue")
 }
@@ -276,5 +286,8 @@ func (u *observedUse) finished() []bool {
 // checkReply answers --check for the fixture release as the current identity.
 func checkReply(out *os.File) ndexec.TreeResult {
 	_, err := fmt.Fprintf(out, `{"version":"release-a","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
-	return ndexec.TreeResult{Drained: true, Err: err}
+	return ndexec.TreeResult{
+		Drained: true,
+		Err:     err,
+	}
 }

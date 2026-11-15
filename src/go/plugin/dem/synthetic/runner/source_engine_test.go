@@ -23,7 +23,9 @@ import (
 
 func TestExecuteAcquiresRuntimeBeforeInspectionAndPassesCompletion(t *testing.T) {
 	e, _, _ := testEngine(t)
-	u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
+	u := &observedUse{
+		paths: e.source.(fixtureRuntime).Paths,
+	}
 	u.paths.Node = filepath.Join(t.TempDir(), "prepared-node")
 	e.source = sourceFunc(func() (Use, error) {
 		// The source makes its protected files available only after acquiring use.
@@ -56,7 +58,9 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 		for _, probe := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/probe=%t", name, probe), func(t *testing.T) {
 				e, _, _ := testEngine(t)
-				u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
+				u := &observedUse{
+					paths: e.source.(fixtureRuntime).Paths,
+				}
 				if tc.badFiles {
 					u.paths.Node = filepath.Join(t.TempDir(), "absent")
 				}
@@ -65,16 +69,23 @@ func TestRuntimeUseFinishesWithActualDrainage(t *testing.T) {
 				}
 				e.source = sourceFunc(func() (Use, error) { return u, nil })
 				starts := 0
-				child := starter(t, func(ctx context.Context, args []string, raw []byte, out, errOut *os.File) ndexec.TreeResult {
-					if tc.undrained {
-						return ndexec.TreeResult{Err: ndexec.ErrTreeNotDrained}
-					}
-					if probe {
-						_, _ = out.WriteString("version")
-						return ndexec.TreeResult{Drained: true}
-					}
-					return resultPayload(success())(ctx, args, raw, out, errOut)
-				})
+				child := starter(
+					t,
+					func(ctx context.Context, args []string, raw []byte, out, errOut *os.File) ndexec.TreeResult {
+						if tc.undrained {
+							return ndexec.TreeResult{
+								Err: ndexec.ErrTreeNotDrained,
+							}
+						}
+						if probe {
+							_, _ = out.WriteString("version")
+							return ndexec.TreeResult{
+								Drained: true,
+							}
+						}
+						return resultPayload(success())(ctx, args, raw, out, errOut)
+					},
+				)
 				e.start = func(ctx context.Context, opts ndexec.TreeOptions, bin string, args ...string) (treeProcess, error) {
 					starts++
 					assert.Same(t, u.Completion(), opts.Completion)
@@ -119,7 +130,9 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 	var uses []*observedUse
 	e.source = sourceFunc(func() (Use, error) {
 		paths.Identity.Version = fmt.Sprintf("release-%d", len(uses))
-		u := &observedUse{paths: paths}
+		u := &observedUse{
+			paths: paths,
+		}
 		uses = append(uses, u)
 		return u, nil
 	})
@@ -130,8 +143,16 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 		assert.Equal(t, u.paths.Node, bin)
 		assert.Equal(t, []string{u.paths.EntryPoint, "--check"}, args)
 		return starter(t, func(_ context.Context, _ []string, _ []byte, out, _ *os.File) ndexec.TreeResult {
-			fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
-			return ndexec.TreeResult{Drained: true}
+			fmt.Fprintf(
+				out,
+				`{"version":%q,"contract":2,"uid":%d,"gid":%d}`,
+				u.paths.Identity.Version,
+				os.Geteuid(),
+				os.Getegid(),
+			)
+			return ndexec.TreeResult{
+				Drained: true,
+			}
 		})(ctx, opts, bin, args...)
 	}
 	require.NoError(t, e.Check(context.Background()))
@@ -141,7 +162,9 @@ func TestCheckUsesOneAcquiredRelease(t *testing.T) {
 
 func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 	e, _, _ := testEngine(t)
-	u := &observedUse{paths: e.source.(fixtureRuntime).Paths}
+	u := &observedUse{
+		paths: e.source.(fixtureRuntime).Paths,
+	}
 	e.source = sourceFunc(func() (Use, error) { return u, nil })
 	waited := make(chan struct{})
 	var held *os.File
@@ -157,7 +180,10 @@ func TestRuntimeUseWaitsForLocalReaderJoin(t *testing.T) {
 			held.Close()
 			return nil, err
 		}
-		return &notifyingTree{treeProcess: process, waited: waited}, nil
+		return &notifyingTree{
+			treeProcess: process,
+			waited:      waited,
+		}, nil
 	}
 	result := make(chan synthetic.Execution, 1)
 	go func() { result <- e.execute(context.Background(), journey()) }()
@@ -222,7 +248,9 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 		if err := os.WriteFile(invocation.Node, []byte("fixture"), 0700); err != nil {
 			return nil, err
 		}
-		u := &observedUse{paths: invocation}
+		u := &observedUse{
+			paths: invocation,
+		}
 		mu.Lock()
 		uses = append(uses, u)
 		byCompletion[u.Completion()] = u
@@ -245,8 +273,16 @@ func TestConcurrentCheckAndExecutionKeepDistinctRuntimeUses(t *testing.T) {
 				assert.Empty(t, u.finished())
 				return resultPayload(success())(ctx, args, raw, out, errOut)
 			}
-			fmt.Fprintf(out, `{"version":%q,"contract":2,"uid":%d,"gid":%d}`, u.paths.Identity.Version, os.Geteuid(), os.Getegid())
-			return ndexec.TreeResult{Drained: true}
+			fmt.Fprintf(
+				out,
+				`{"version":%q,"contract":2,"uid":%d,"gid":%d}`,
+				u.paths.Identity.Version,
+				os.Geteuid(),
+				os.Getegid(),
+			)
+			return ndexec.TreeResult{
+				Drained: true,
+			}
 		})(ctx, opts, bin, args...)
 	}
 	done := make(chan synthetic.Execution, 1)

@@ -153,12 +153,8 @@ func (s *Store) HasObservedKind(kind Kind) bool {
 func (s *Store) observeKind(kind Kind) {
 	switch kind {
 	case KindRUM:
-		if !s.observedRUM.Load() {
-			s.observedRUM.Store(true)
-		}
+		s.observedRUM.Store(true)
 	case KindSynthetic:
-		if !s.observedSynthetic.Load() {
-			s.observedSynthetic.Store(true)
-		}
+		s.observedSynthetic.Store(true)
 	}
 }

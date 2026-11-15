@@ -58,7 +58,11 @@ func openSnapshot(ctx context.Context, path string, values ...journal.Field) (*j
 	}
 	coverage, err := file.CapturedValue([]byte(schemaField), []byte(schemaVersion))
 	if err == nil && coverage.EntryCount != file.EntryCount() {
-		err = fmt.Errorf("incompatible DEM history schema: current schema covers %d of %d records", coverage.EntryCount, file.EntryCount())
+		err = fmt.Errorf(
+			"incompatible DEM history schema: current schema covers %d of %d records",
+			coverage.EntryCount,
+			file.EntryCount(),
+		)
 	}
 	if err == nil && filepath.Base(path) != "dem.journal" && !file.IsArchived() {
 		err = fmt.Errorf("history archive is not finalized")

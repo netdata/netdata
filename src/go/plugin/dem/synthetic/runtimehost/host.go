@@ -13,8 +13,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -27,24 +27,24 @@ const (
 )
 
 type Snapshot struct {
-	Mode             Mode                       `json:"mode"`
-	Running          *synthetic.RuntimeIdentity `json:"running,omitempty"`
-	State            string                     `json:"state"`
-	SetupError       string                     `json:"setup_error,omitempty"`
-	MaintenanceError string                     `json:"maintenance_error,omitempty"`
-	Storage          *runtime.Status            `json:"storage,omitempty"`
-	Native           *runtime.NativeStatus      `json:"native,omitempty"`
-	StorageError     string                     `json:"storage_error,omitempty"`
-	RestartRequired  bool                       `json:"restart_required"`
-	Update           UpdateStatus               `json:"update"`
+	Mode             Mode                         `json:"mode"`
+	Running          *synthetic.RuntimeIdentity   `json:"running,omitempty"`
+	State            string                       `json:"state"`
+	SetupError       string                       `json:"setup_error,omitempty"`
+	MaintenanceError string                       `json:"maintenance_error,omitempty"`
+	Storage          *browserruntime.Status       `json:"storage,omitempty"`
+	Native           *browserruntime.NativeStatus `json:"native,omitempty"`
+	StorageError     string                       `json:"storage_error,omitempty"`
+	RestartRequired  bool                         `json:"restart_required"`
+	Update           UpdateStatus                 `json:"update"`
 }
 
 // Host holds one selected browser runtime for the plugin process. Missing
 // installation does not prevent RUM operation; browser jobs wait until an
 // installed runtime is selected by a new plugin process.
 type Host struct {
-	store           *runtime.Store  // managed hosts only; caller-owned
-	native          *runtime.Native // native hosts only; caller-owned
+	store           *browserruntime.Store  // managed hosts only; caller-owned
+	native          *browserruntime.Native // native hosts only; caller-owned
 	mode            Mode
 	consumer        processConsumer
 	identity        *synthetic.RuntimeIdentity
@@ -84,7 +84,7 @@ func newHost(mode Mode) *Host {
 // NewManaged acquires the store's selected installation and its process
 // protection atomically, once. Neither monitor changes nor subsequent
 // installations change this selection.
-func NewManaged(store *runtime.Store) *Host {
+func NewManaged(store *browserruntime.Store) *Host {
 	h := newHost(ModeManaged)
 	h.store = store
 	if consumer, err := store.AcquireSelected(); err != nil {
@@ -96,7 +96,7 @@ func NewManaged(store *runtime.Store) *Host {
 }
 
 // NewNative acquires the package payload's selection like NewManaged.
-func NewNative(native *runtime.Native) *Host {
+func NewNative(native *browserruntime.Native) *Host {
 	h := newHost(ModeNative)
 	h.native = native
 	if consumer, err := native.AcquireSelected(); err != nil {
@@ -122,7 +122,7 @@ func (h *Host) admit(consumer processConsumer) {
 
 func (h *Host) fail(err error) {
 	h.state, h.setupErr = StateUnavailable, err
-	if errors.Is(err, runtime.ErrUnavailable) {
+	if errors.Is(err, browserruntime.ErrUnavailable) {
 		h.state = StateMissing
 		h.setupErr = fmt.Errorf("install a browser runtime and restart dem.plugin: %w", err)
 		if h.mode == ModeNative {
@@ -143,7 +143,7 @@ func (h *Host) Ready() error {
 	if h.setupErr != nil {
 		return h.setupErr
 	}
-	return runtime.ErrUnavailable
+	return browserruntime.ErrUnavailable
 }
 
 func (h *Host) Dependencies(map[string]any) ([]collectorapi.ActivationDependency, error) {
@@ -159,7 +159,11 @@ func errorText(err error) string {
 
 func (h *Host) Status() Snapshot {
 	h.mu.Lock()
-	result := Snapshot{Mode: h.mode, State: h.state, SetupError: errorText(h.setupErr)}
+	result := Snapshot{
+		Mode:       h.mode,
+		State:      h.state,
+		SetupError: errorText(h.setupErr),
+	}
 	maintenance := h.maintenanceErrorLocked()
 	if h.identity != nil {
 		identity := *h.identity
@@ -177,7 +181,8 @@ func (h *Host) Status() Snapshot {
 		status, err := h.store.Inspect()
 		result.Storage = &status
 		result.StorageError = errorText(err)
-		if result.Storage.Selected != nil && result.Storage.SelectionError == "" && result.Storage.InventoryError == "" {
+		if result.Storage.Selected != nil && result.Storage.SelectionError == "" &&
+			result.Storage.InventoryError == "" {
 			result.RestartRequired = result.Running == nil || *result.Running != result.Storage.Selected.Identity()
 		}
 	}
@@ -197,7 +202,11 @@ func (h *Host) BeginUse() (runner.Use, error) {
 	if err != nil {
 		return nil, err
 	}
-	return managedUse{use: use, host: h, identity: *h.identity}, nil
+	return managedUse{
+		use:      use,
+		host:     h,
+		identity: *h.identity,
+	}, nil
 }
 
 // Run maintains storage independently of monitoring configuration. It never

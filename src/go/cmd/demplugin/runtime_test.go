@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +40,11 @@ func runtimeRun(t *testing.T, ctx context.Context, args ...string) runtimeResult
 	require.Equal(t, "runtime", args[0])
 	var out, diagnostic bytes.Buffer
 	err := runRuntimeCommand(ctx, args[1:], nil, &out, &diagnostic)
-	return runtimeResult{stdout: out.String(), stderr: diagnostic.String(), err: err}
+	return runtimeResult{
+		stdout: out.String(),
+		stderr: diagnostic.String(),
+		err:    err,
+	}
 }
 
 // jsonText renders a string as a JSON literal for golden reports.
@@ -76,7 +80,9 @@ func TestRuntimeCommandHelpAndFlagErrors(t *testing.T) {
 		t.Run(command, func(t *testing.T) {
 			usage := "Usage of runtime " + command + ":\n" + runtimeFlagUsage
 			result := runtimeRun(t, context.Background(), "runtime", command, "-h")
-			assert.Equal(t, runtimeResult{stderr: usage}, result)
+			assert.Equal(t, runtimeResult{
+				stderr: usage,
+			}, result)
 			result = runtimeRun(t, context.Background(), "runtime", command, "--bogus")
 			assert.Equal(t, "flag provided but not defined: -bogus\n"+usage, result.stderr)
 			assert.EqualError(t, result.err, "flag provided but not defined: -bogus")
@@ -84,14 +90,16 @@ func TestRuntimeCommandHelpAndFlagErrors(t *testing.T) {
 		})
 	}
 	result := runtimeRun(t, context.Background(), "runtime", "setup-plan", "-h")
-	assert.Equal(t, runtimeResult{stderr: `Usage of runtime setup-plan:
+	assert.Equal(t, runtimeResult{
+		stderr: `Usage of runtime setup-plan:
   -cache string
     	managed installation directory
   -config-dir string
     	directory containing administrator dem.conf
   -root string
     	preload final root
-`}, result)
+`,
+	}, result)
 }
 
 // Argument errors precede configuration loading: they print no report, and the
@@ -271,10 +279,26 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 	}
 	root := t.TempDir()
 	cache := filepath.Join(root, "absent", "cache")
-	canonical, err := runtime.CanonicalRoot(cache)
+	canonical, err := browserruntime.CanonicalRoot(cache)
 	require.NoError(t, err)
-	mismatch := fmt.Sprintf("configured canonical runtime root %q differs from --expected-root %q; no runtime storage changed", canonical, "/var/lib/netdata/dem/runtime")
-	result := runtimeRun(t, context.Background(), "runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--expected-root", "/var/lib/netdata/dem/runtime")
+	mismatch := fmt.Sprintf(
+		"configured canonical runtime root %q differs from --expected-root %q; no runtime storage changed",
+		canonical,
+		"/var/lib/netdata/dem/runtime",
+	)
+	result := runtimeRun(
+		t,
+		context.Background(),
+		"runtime",
+		"ensure",
+		"--allow-download",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--expected-root",
+		"/var/lib/netdata/dem/runtime",
+	)
 	assert.Equal(t, `{
   "outcome": "failed",
   "download_allowed": true,
@@ -289,7 +313,20 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	result = runtimeRun(t, ctx, "runtime", "ensure", "--config-dir", root, "--cache", cache, "--release", "/r.json", "--archive", "/a")
+	result = runtimeRun(
+		t,
+		ctx,
+		"runtime",
+		"ensure",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--release",
+		"/r.json",
+		"--archive",
+		"/a",
+	)
 	assert.Equal(t, `{
   "outcome": "failed",
   "download_allowed": false,
@@ -321,7 +358,16 @@ func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 			root := t.TempDir()
 			cache := filepath.Join(root, "cache")
 			writeAdminTrust(t, root, "")
-			args := []string{"runtime", command, "--config-dir", root, "--release", filepath.Join(root, "missing.json"), "--archive", filepath.Join(root, "archive.tar.zst")}
+			args := []string{
+				"runtime",
+				command,
+				"--config-dir",
+				root,
+				"--release",
+				filepath.Join(root, "missing.json"),
+				"--archive",
+				filepath.Join(root, "archive.tar.zst"),
+			}
 			if command == "preload" {
 				args = append(args, "--root", cache)
 			} else {
@@ -355,7 +401,14 @@ func TestRuntimeSelectionCommandsDoNotRequireOriginalDescriptor(t *testing.T) {
 }
 func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime: {mode: preloaded, preload_path: /absent/bundle}"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			filepath.Join(dir, "dem.conf"),
+			[]byte("runtime: {mode: preloaded, preload_path: /absent/bundle}"),
+			0600,
+		),
+	)
 	for _, command := range []string{"status", "qualify"} {
 		report, err := runtimeCommand(t, "runtime", command, "--config-dir", dir)
 		require.Error(t, err)

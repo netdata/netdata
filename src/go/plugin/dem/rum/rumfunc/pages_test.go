@@ -132,7 +132,15 @@ func TestPageActivityCountsAndOptionalFrustration(t *testing.T) {
 			for _, key := range []string{"pageviews_window", "errors_window", "frustration_window"} {
 				got[key] = rows[0][columns[key].(map[string]any)["index"].(int)]
 			}
-			require.Equal(t, map[string]any{"pageviews_window": tc.activity, "errors_window": tc.activity, "frustration_window": tc.frustration}, got)
+			require.Equal(
+				t,
+				map[string]any{
+					"pageviews_window":   tc.activity,
+					"errors_window":      tc.activity,
+					"frustration_window": tc.frustration,
+				},
+				got,
+			)
 		})
 	}
 }

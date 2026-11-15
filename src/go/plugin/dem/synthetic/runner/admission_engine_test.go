@@ -24,11 +24,18 @@ import (
 func TestRehearsalSharesMonitoringAdmission(t *testing.T) {
 	e, _, _ := testEngineSlots(t, 2)
 	started := make(chan string, 3)
-	releases := map[string]chan struct{}{"a-monitor": make(chan struct{}), "a-test": make(chan struct{}), "b": make(chan struct{})}
+	releases := map[string]chan struct{}{
+		"a-monitor": make(chan struct{}),
+		"a-test":    make(chan struct{}),
+		"b":         make(chan struct{}),
+	}
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var r wireRequest
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		started <- r.Script
 		<-releases[r.Script]
@@ -61,7 +68,10 @@ func TestQueuedCancellationRecordsNothing(t *testing.T) {
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var r wireRequest
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		started <- r.Script
 		if r.Script == "hold" {
@@ -102,7 +112,10 @@ func TestScheduledExecutionSnapshotsLatestOccurrenceAfterAdmission(t *testing.T)
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var r wireRequest
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		if r.Script == "hold" {
 			close(running)
@@ -123,7 +136,10 @@ func TestScheduledExecutionSnapshotsLatestOccurrenceAfterAdmission(t *testing.T)
 		result <- e.ExecuteScheduled(t.Context(), r, nil, func(at time.Time) synthetic.Schedule {
 			callbacks.Add(1)
 			assert.Positive(t, at.UnixMicro())
-			return synthetic.Schedule{DueUS: due.Load(), QueuedUS: 50}
+			return synthetic.Schedule{
+				DueUS:    due.Load(),
+				QueuedUS: 50,
+			}
 		})
 	}()
 	waitQueued(t, e, "journey:scheduled", 1)
@@ -156,14 +172,36 @@ func TestScheduledCancellationDoesNotAdmitAndInfrastructureErrorsAreRecorded(t *
 	var callbacks int
 	cancelled, cancel := context.WithCancel(t.Context())
 	cancel()
-	got := e.ExecuteScheduled(cancelled, journey(), nil, func(time.Time) synthetic.Schedule { callbacks++; return synthetic.Schedule{DueUS: 1, QueuedUS: 1} })
+	got := e.ExecuteScheduled(
+		cancelled,
+		journey(),
+		nil,
+		func(time.Time) synthetic.Schedule {
+			callbacks++
+			return synthetic.Schedule{
+				DueUS:    1,
+				QueuedUS: 1,
+			}
+		},
+	)
 	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
 	assert.Zero(t, callbacks)
 	assert.Empty(t, history.runs)
 	e.source = sourceFunc(func() (Use, error) { return nil, context.DeadlineExceeded })
 	r := journey()
 	r.VnodeGUID = "11111111-1111-4111-8111-111111111111"
-	got = e.ExecuteScheduled(t.Context(), r, nil, func(time.Time) synthetic.Schedule { callbacks++; return synthetic.Schedule{DueUS: 2, QueuedUS: 1} })
+	got = e.ExecuteScheduled(
+		t.Context(),
+		r,
+		nil,
+		func(time.Time) synthetic.Schedule {
+			callbacks++
+			return synthetic.Schedule{
+				DueUS:    2,
+				QueuedUS: 1,
+			}
+		},
+	)
 	require.True(t, got.Drained)
 	assert.Equal(t, synthetic.Error, got.Run.Outcome)
 	assert.Positive(t, got.Run.StartedUS)
@@ -182,17 +220,32 @@ func TestUnverifiedDrainPoisonsAllSlotsWithoutReleasingUnknownAttempt(t *testing
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var r wireRequest
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		started <- r.Script
 		if r.Script == "bad" {
 			<-releaseBad
-			return ndexec.TreeResult{Drained: false, Err: errors.New("unknown descendant")}
+			return ndexec.TreeResult{
+				Drained: false,
+				Err:     errors.New("unknown descendant"),
+			}
 		}
 		<-releaseGood
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
-	bad, good, waiting := make(chan synthetic.Execution, 1), make(chan synthetic.Execution, 1), make(chan synthetic.Execution, 1)
+	bad, good, waiting := make(
+		chan synthetic.Execution,
+		1,
+	), make(
+		chan synthetic.Execution,
+		1,
+	), make(
+		chan synthetic.Execution,
+		1,
+	)
 	go func() { bad <- e.execute(t.Context(), namedRequest("bad", "bad")) }()
 	require.Equal(t, "bad", receive(t, started))
 	go func() { good <- e.execute(t.Context(), namedRequest("good", "good")) }()
@@ -238,7 +291,9 @@ func TestAdmissionReleasesSlotGrantedAfterStop(t *testing.T) {
 		t.Error("a stopped caller launched")
 		return nil, errors.New("unexpected launch")
 	}
-	got := e.execute(&stopAfterGrant{Context: t.Context()}, journey())
+	got := e.execute(&stopAfterGrant{
+		Context: t.Context(),
+	}, journey())
 	assert.Equal(t, synthetic.Cancelled, got.Run.Outcome)
 	assert.Equal(t, synthetic.CallerCancelled, got.Run.TerminationReason)
 	assert.Zero(t, got.Run.StartedUS)
@@ -252,7 +307,10 @@ func TestAdmissionReleasesSlotGrantedAfterStop(t *testing.T) {
 func TestAdmissionReleasesSlotGrantedAfterPoison(t *testing.T) {
 	for range 20 {
 		e, _, _ := testEngine(t)
-		ctx := &poisonOnWait{Context: t.Context(), poison: func() { e.poison(errors.New("unknown descendant")) }}
+		ctx := &poisonOnWait{
+			Context: t.Context(),
+			poison:  func() { e.poison(errors.New("unknown descendant")) },
+		}
 		got := e.execute(ctx, journey())
 		assert.False(t, got.Drained)
 		e.mu.Lock()

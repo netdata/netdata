@@ -288,7 +288,9 @@ func TestChecksRowPresentsTheActiveSnapshot(t *testing.T) {
 		},
 	}
 	h := newHandler(&source{
-		active: activeJobs{jobs: []syntheticregistry.Job{job}},
+		active: activeJobs{
+			jobs: []syntheticregistry.Job{job},
+		},
 	})
 	got := call(h, "synthetics-checks")
 	rows := responseData(t, got)
@@ -479,7 +481,9 @@ func TestRunDetailPreservesPhaseAndNullableLabData(t *testing.T) {
 	)
 	validate(t, got)
 	// Current failed journal writes are still diagnosable through their exact ID.
-	src.active = activeJobs{runs: map[string]model.Run{run.JobID: run}}
+	src.active = activeJobs{
+		runs: map[string]model.Run{run.JobID: run},
+	}
 	call(newHandler(src), "synthetics-run", "job_id:journey:a", "run_id:r")
 	assert.Equal(t, 1, src.getCalls, "active exact run avoids a second history read")
 }
@@ -564,16 +568,33 @@ func TestCaptureLabelsThroughRealStore(t *testing.T) {
 		title string
 		trace bool
 	}{
-		{id: "trace-associated", trace: true, test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
+		{
+			id:    "trace-associated",
+			trace: true,
+			test: model.ArtifactTest{
+				ID:    "test1",
+				Title: "Checkout",
+			},
+			title: "Checkout",
+		},
 		{id: "trace-unassociated", trace: true, title: "Test not recorded"},
-		{id: "associated", test: model.ArtifactTest{ID: "test1", Title: "Checkout"}, title: "Checkout"},
+		{id: "associated", test: model.ArtifactTest{
+			ID:    "test1",
+			Title: "Checkout",
+		}, title: "Checkout"},
 		{id: "unassociated", title: "Test not recorded"},
 	}
 	var candidates []model.Capture
 	for _, tc := range cases {
 		path := "output/" + tc.id + ".png"
 		require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("\x89PNG\r\n\x1a\nfixture"), 0600))
-		c := model.Capture{ID: tc.id, Kind: "screenshot", MIME: "image/png", Path: path, Test: tc.test}
+		c := model.Capture{
+			ID:   tc.id,
+			Kind: "screenshot",
+			MIME: "image/png",
+			Path: path,
+			Test: tc.test,
+		}
 		if tc.trace {
 			c.Kind, c.MIME = "trace", "application/zip"
 			require.NoError(t, os.WriteFile(filepath.Join(dir, path), []byte("PK\x03\x04fixture"), 0600))
@@ -582,7 +603,9 @@ func TestCaptureLabelsThroughRealStore(t *testing.T) {
 	}
 	_, err = store.Finalize(t.Context(), runID, candidates)
 	require.NoError(t, err)
-	h := newHandler(&source{artifacts: store})
+	h := newHandler(&source{
+		artifacts: store,
+	})
 	got := call(h, "synthetics-artifact", "job_id:journey:checkout", "run_id:"+runID)
 	rows := responseData(t, got)
 	require.Len(t, rows, len(cases))
@@ -628,7 +651,10 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	run.CompletedUS = run.StartedUS + 1
 	_, err = synthetichistory.NewStore(journalStore).AppendRun(ctx, "complete", run)
 	require.NoError(t, err)
-	h := syntheticfunc.New(query.New(syntheticregistry.New(), synthetichistory.NewStore(journalStore), emptyArtifacts(t), noPolicyError), nil)
+	h := syntheticfunc.New(
+		query.New(syntheticregistry.New(), synthetichistory.NewStore(journalStore), emptyArtifacts(t), noPolicyError),
+		nil,
+	)
 	require.Len(t, responseData(t, call(h, "synthetics-runs")), 1)
 	got := call(h, "synthetics-runs", "before:0")
 	assert.Empty(t, responseData(t, got), "Unix epoch upper bound must exclude contemporary records")
@@ -681,9 +707,17 @@ func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) 
 }
 
 func TestTerminationReasonIsIndependentOfFirstError(t *testing.T) {
-	run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout,
-		TerminationReason: model.ExecutionBudget, Error: "earlier assertion failed"}
-	src := &source{history: map[string]model.Run{"journey:a/r": run}}
+	run := model.Run{
+		ID:                "r",
+		JobID:             "journey:a",
+		Kind:              model.Journey,
+		Outcome:           model.Timeout,
+		TerminationReason: model.ExecutionBudget,
+		Error:             "earlier assertion failed",
+	}
+	src := &source{
+		history: map[string]model.Run{"journey:a/r": run},
+	}
 	got := call(newHandler(src), "synthetics-run", "job_id:journey:a", "run_id:r")
 	detail := got.RawResponse["run"].(map[string]any)
 	assert.Equal(t, run.TerminationReason, detail["termination_reason"])
@@ -697,18 +731,66 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 			name = "rich history"
 		}
 		t.Run(name, func(t *testing.T) {
-			run := model.Run{ID: "r", JobID: "journey:a", Kind: model.Journey, Outcome: model.Timeout, TerminationReason: model.ExecutionBudget, Error: "core error", Events: []model.Event{{Kind: "step", Title: "observed step"}}}
+			run := model.Run{
+				ID:                "r",
+				JobID:             "journey:a",
+				Kind:              model.Journey,
+				Outcome:           model.Timeout,
+				TerminationReason: model.ExecutionBudget,
+				Error:             "core error",
+				Events:            []model.Event{{Kind: "step", Title: "observed step"}},
+			}
 			if rich {
-				run.Captures = &model.CaptureReport{Reporting: "partial", Unpublished: []model.CaptureOmission{{ID: "s1", Reason: "not_in_final_report"}}}
-				run.BrowserSummary = &model.BrowserSummary{Availability: "supported", Coverage: "fixture_context", Run: &model.BrowserAggregate{Tests: model.BrowserTestCounts{Observed: 1}, Counts: model.BrowserCounts{ConsoleError: 2}, Omissions: []string{"candidate_limit"}}}
+				run.Captures = &model.CaptureReport{
+					Reporting:   "partial",
+					Unpublished: []model.CaptureOmission{{ID: "s1", Reason: "not_in_final_report"}},
+				}
+				run.BrowserSummary = &model.BrowserSummary{
+					Availability: "supported",
+					Coverage:     "fixture_context",
+					Run: &model.BrowserAggregate{
+						Tests: model.BrowserTestCounts{
+							Observed: 1,
+						},
+						Counts: model.BrowserCounts{
+							ConsoleError: 2,
+						},
+						Omissions: []string{"candidate_limit"},
+					},
+				}
 				run.FailureEvidence = &model.FailureEvidence{
-					Availability: "supported", Truncated: []string{"user_steps"},
-					Steps:        []model.EvidenceStep{{ID: "s1", TestID: "t", Title: "pending submit", State: "running"}},
-					FirstFailure: &model.FailureDetail{Test: model.EvidenceTest{ID: "t", Title: "checkout", Status: "failed", ExpectedStatus: "passed"}, Message: "expected receipt", PathIncomplete: true},
-					StopContext:  &model.FailureDetail{Test: model.EvidenceTest{ID: "later", Title: "login", Status: "interrupted", ExpectedStatus: "passed"}, PathIncomplete: true},
+					Availability: "supported",
+					Truncated:    []string{"user_steps"},
+					Steps: []model.EvidenceStep{
+						{ID: "s1", TestID: "t", Title: "pending submit", State: "running"},
+					},
+					FirstFailure: &model.FailureDetail{
+						Test: model.EvidenceTest{
+							ID:             "t",
+							Title:          "checkout",
+							Status:         "failed",
+							ExpectedStatus: "passed",
+						},
+						Message:        "expected receipt",
+						PathIncomplete: true,
+					},
+					StopContext: &model.FailureDetail{
+						Test: model.EvidenceTest{
+							ID:             "later",
+							Title:          "login",
+							Status:         "interrupted",
+							ExpectedStatus: "passed",
+						},
+						PathIncomplete: true,
+					},
 				}
 			}
-			src := &source{history: map[string]model.Run{"journey:a/r": run}, page: synthetichistory.RunPage{Runs: []model.Run{run}}}
+			src := &source{
+				history: map[string]model.Run{"journey:a/r": run},
+				page: synthetichistory.RunPage{
+					Runs: []model.Run{run},
+				},
+			}
 			h := newHandler(src)
 			detailResponse := call(h, "synthetics-run", "job_id:journey:a", "run_id:r")
 			rows := responseData(t, detailResponse)
@@ -770,12 +852,33 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := synthetichistory.NewStore(journalStore)
-	active := activeJobs{runs: map[string]model.Run{}}
+	active := activeJobs{
+		runs: map[string]model.Run{},
+	}
 	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222", ""} {
 		name := []string{"checkout", "search", "legacy"}[i]
 		jobID := "journey:" + name
-		active.jobs = append(active.jobs, syntheticregistry.Job{Snapshot: monitor.Snapshot{JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site}})
-		run := model.Run{ID: name, JobID: jobID, Name: name, Kind: model.Journey, VnodeGUID: site, Outcome: model.Success, StartedUS: time.Now().UnixMicro(), CompletedUS: time.Now().UnixMicro()}
+		active.jobs = append(
+			active.jobs,
+			syntheticregistry.Job{
+				Snapshot: monitor.Snapshot{
+					JobID:     jobID,
+					Name:      name,
+					Kind:      model.Journey,
+					VnodeGUID: site,
+				},
+			},
+		)
+		run := model.Run{
+			ID:          name,
+			JobID:       jobID,
+			Name:        name,
+			Kind:        model.Journey,
+			VnodeGUID:   site,
+			Outcome:     model.Success,
+			StartedUS:   time.Now().UnixMicro(),
+			CompletedUS: time.Now().UnixMicro(),
+		}
 		if i == 0 {
 			run.VnodeGUID = "33333333-3333-4333-8333-333333333333"
 		}
@@ -784,13 +887,31 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 		active.runs[jobID] = run
 	}
 	h := syntheticfunc.New(query.New(active, store, emptyArtifacts(t), noPolicyError), nil)
-	checks := call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "kind:journey", "job_id:journey:checkout")
+	checks := call(
+		h,
+		"synthetics-checks",
+		"vnode_guid:11111111-1111-4111-8111-111111111111",
+		"kind:journey",
+		"job_id:journey:checkout",
+	)
 	rows := responseData(t, checks)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", rowValues(t, checks, rows[0])["vnode_guid"])
 	validate(t, checks)
-	assert.Empty(t, responseData(t, call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "job_id:journey:search")))
-	runs := call(h, "synthetics-runs", "vnode_guid:33333333-3333-4333-8333-333333333333", "kind:journey", "job_id:journey:checkout")
+	assert.Empty(
+		t,
+		responseData(
+			t,
+			call(h, "synthetics-checks", "vnode_guid:11111111-1111-4111-8111-111111111111", "job_id:journey:search"),
+		),
+	)
+	runs := call(
+		h,
+		"synthetics-runs",
+		"vnode_guid:33333333-3333-4333-8333-333333333333",
+		"kind:journey",
+		"job_id:journey:checkout",
+	)
 	rows = responseData(t, runs)
 	require.Len(t, rows, 1)
 	assert.Equal(t, "33333333-3333-4333-8333-333333333333", rowValues(t, runs, rows[0])["vnode_guid"])
@@ -802,7 +923,14 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 	assert.Equal(t, "33333333-3333-4333-8333-333333333333", detail.RawResponse["run"].(map[string]any)["vnode_guid"])
 	for _, method := range []string{"synthetics-checks", "synthetics-runs", "synthetics-artifacts"} {
 		assert.Equal(t, 400, call(h, method, "vnode_guid:INVALID").Status)
-		denied := h.HandleRaw(ctx, funcapi.RawMethodRequest{Method: method, Args: []string{"vnode_guid:11111111-1111-4111-8111-111111111111"}, Permissions: "0"})
+		denied := h.HandleRaw(
+			ctx,
+			funcapi.RawMethodRequest{
+				Method:      method,
+				Args:        []string{"vnode_guid:11111111-1111-4111-8111-111111111111"},
+				Permissions: "0",
+			},
+		)
 		assert.Equal(t, 403, denied.Status)
 	}
 }

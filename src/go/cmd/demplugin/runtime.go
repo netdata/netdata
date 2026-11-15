@@ -17,8 +17,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
@@ -29,7 +29,9 @@ import (
 // control channel; the caller retains ownership of input.
 func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
-		return errors.New("usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]")
+		return errors.New(
+			"usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]",
+		)
 	}
 	command, flags := args[0], args[1:]
 	switch {
@@ -48,7 +50,13 @@ func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdou
 
 // runAdminCommand runs an administrator command. Once configuration loads, it
 // prints exactly one JSON report, failures included.
-func runAdminCommand(ctx context.Context, command string, args []string, input *os.File, stdout, stderr io.Writer) error {
+func runAdminCommand(
+	ctx context.Context,
+	command string,
+	args []string,
+	input *os.File,
+	stdout, stderr io.Writer,
+) error {
 	f, err := parseAdminFlags(command, args, stderr)
 	if errors.Is(err, flag.ErrHelp) {
 		return nil
@@ -85,7 +93,13 @@ func runAdminCommand(ctx context.Context, command string, args []string, input *
 	if f.cache != "" {
 		cfg.CachePath = f.cache
 	}
-	report := runtimeCommandReport{Command: command, Mode: cfg.Mode, State: "unavailable", DownloadAllowed: f.allowDownload, ReleasePath: f.release}
+	report := runtimeCommandReport{
+		Command:         command,
+		Mode:            cfg.Mode,
+		State:           "unavailable",
+		DownloadAllowed: f.allowDownload,
+		ReleasePath:     f.release,
+	}
 	if command == "repair" {
 		report.State = "unknown"
 	}
@@ -116,14 +130,34 @@ func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlag
 	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.StringVar(&f.configDir, "config-dir", "", "directory containing administrator dem.conf")
-	flags.StringVar(&f.expectedRoot, "expected-root", "", "require this canonical managed root before ensure mutates storage")
-	flags.BoolVar(&f.cancelOnInputClose, "cancel-on-stdin-close", false, "cancel ensure cooperatively when its private stdin control channel closes")
+	flags.StringVar(
+		&f.expectedRoot,
+		"expected-root",
+		"",
+		"require this canonical managed root before ensure mutates storage",
+	)
+	flags.BoolVar(
+		&f.cancelOnInputClose,
+		"cancel-on-stdin-close",
+		false,
+		"cancel ensure cooperatively when its private stdin control channel closes",
+	)
 	flags.StringVar(&f.release, "release", "", "local signed release descriptor; otherwise use configured latest URL")
-	flags.BoolVar(&f.manualUpdates, "manual-updates", false, "disable automatic daily update preparation (install/repair); activation always requires restart")
+	flags.BoolVar(
+		&f.manualUpdates,
+		"manual-updates",
+		false,
+		"disable automatic daily update preparation (install/repair); activation always requires restart",
+	)
 	flags.StringVar(&f.cache, "cache", "", "managed installation directory")
 	flags.StringVar(&f.root, "root", "", "preload final root (must be new or empty; never move it)")
 	flags.StringVar(&f.archive, "archive", "", "offline archive checked against the trusted release descriptor")
-	flags.BoolVar(&f.allowDownload, "allow-download", false, "explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates")
+	flags.BoolVar(
+		&f.allowDownload,
+		"allow-download",
+		false,
+		"explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates",
+	)
 	if err := flags.Parse(args); err != nil {
 		return f, err
 	}
@@ -194,25 +228,25 @@ func preparesCandidate(command string) bool {
 }
 
 type runtimeCommandReport struct {
-	Outcome         string                     `json:"outcome,omitempty"`
-	DownloadAllowed bool                       `json:"download_allowed"`
-	Command         string                     `json:"command"`
-	Mode            runtimehost.Mode           `json:"mode"`
-	State           string                     `json:"state"`
-	ReleasePath     string                     `json:"release_path,omitempty"`
-	CachePath       string                     `json:"cache_path,omitempty"`
-	Generation      string                     `json:"generation,omitempty"`
-	Runtime         *synthetic.RuntimeIdentity `json:"runtime,omitempty"`
-	Candidate       *synthetic.RuntimeIdentity `json:"candidate,omitempty"`
-	CandidateState  string                     `json:"candidate_state,omitempty"`
-	SetupError      string                     `json:"setup_error,omitempty"`
-	Storage         *runtime.Status            `json:"storage,omitempty"`
-	StorageError    string                     `json:"storage_error,omitempty"`
-	Native          *runtime.NativeStatus      `json:"native,omitempty"`
-	Qualification   *runner.Qualification      `json:"qualification,omitempty"`
-	PreloadedConfig map[string]any             `json:"preloaded_config,omitempty"`
-	PreloadPath     string                     `json:"preload_path,omitempty"`
-	Notice          string                     `json:"notice,omitempty"`
+	Outcome         string                       `json:"outcome,omitempty"`
+	DownloadAllowed bool                         `json:"download_allowed"`
+	Command         string                       `json:"command"`
+	Mode            runtimehost.Mode             `json:"mode"`
+	State           string                       `json:"state"`
+	ReleasePath     string                       `json:"release_path,omitempty"`
+	CachePath       string                       `json:"cache_path,omitempty"`
+	Generation      string                       `json:"generation,omitempty"`
+	Runtime         *synthetic.RuntimeIdentity   `json:"runtime,omitempty"`
+	Candidate       *synthetic.RuntimeIdentity   `json:"candidate,omitempty"`
+	CandidateState  string                       `json:"candidate_state,omitempty"`
+	SetupError      string                       `json:"setup_error,omitempty"`
+	Storage         *browserruntime.Status       `json:"storage,omitempty"`
+	StorageError    string                       `json:"storage_error,omitempty"`
+	Native          *browserruntime.NativeStatus `json:"native,omitempty"`
+	Qualification   *runner.Qualification        `json:"qualification,omitempty"`
+	PreloadedConfig map[string]any               `json:"preloaded_config,omitempty"`
+	PreloadPath     string                       `json:"preload_path,omitempty"`
+	Notice          string                       `json:"notice,omitempty"`
 }
 
 // setRuntime reports a runtime with its generation, the archive digest.
@@ -223,7 +257,7 @@ func (r *runtimeCommandReport) setRuntime(identity synthetic.RuntimeIdentity) {
 
 // inventory records the store inventory and its error in the report's storage
 // fields. Only status treats the error as its own failure.
-func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, error) {
+func (r *runtimeCommandReport) inventory(store *browserruntime.Store) (browserruntime.Status, error) {
 	status, err := store.Inspect()
 	r.Storage = &status
 	r.StorageError = errorString(err)
@@ -232,7 +266,7 @@ func (r *runtimeCommandReport) inventory(store *runtime.Store) (runtime.Status, 
 
 // selectedInstallation reports executable selection independently of a candidate
 // and of damage to unrelated retained generations.
-func (r *runtimeCommandReport) selectedInstallation(status runtime.Status) {
+func (r *runtimeCommandReport) selectedInstallation(status browserruntime.Status) {
 	r.Runtime = nil
 	r.Generation = ""
 	r.State = "unavailable"

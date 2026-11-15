@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 )
 
 // Mode selects who owns the browser runtime files.
@@ -47,8 +47,8 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Mode:                  Mode(DefaultMode),
-		MaxBytes:              runtime.DefaultMaxBytes,
-		PreviousRetentionDays: int(runtime.DefaultPreviousRetention / day),
+		MaxBytes:              browserruntime.DefaultMaxBytes,
+		PreviousRetentionDays: int(browserruntime.DefaultPreviousRetention / day),
 	}
 }
 
@@ -70,7 +70,7 @@ func (c Config) Validate() error {
 	if c.Mode != ModeManaged && c.CachePath != "" {
 		return errors.New("cache_path is only valid in managed mode")
 	}
-	if c.ReleaseURL != "" && !runtime.ValidHTTPSURL(c.ReleaseURL) {
+	if c.ReleaseURL != "" && !browserruntime.ValidHTTPSURL(c.ReleaseURL) {
 		return errors.New("release_url requires HTTPS without credentials or a fragment")
 	}
 	if c.OfflineKeyring != "" && !filepath.IsAbs(c.OfflineKeyring) {
@@ -82,41 +82,48 @@ func (c Config) Validate() error {
 // ReleaseLoader selects canonical online trust only with network consent.
 // Offline imports require an explicit administrator-provisioned public keyring.
 // Call it under installation exclusion, never before checking update consent.
-func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Context) (runtime.VerifiedRelease, error) {
-	return func(ctx context.Context) (runtime.VerifiedRelease, error) {
+func (c Config) ReleaseLoader(
+	path string,
+	networkAllowed bool,
+) func(context.Context) (browserruntime.VerifiedRelease, error) {
+	return func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 		if path == "" {
 			if !networkAllowed {
-				return runtime.VerifiedRelease{}, errors.New("release download requires explicit network consent")
+				return browserruntime.VerifiedRelease{}, errors.New(
+					"release download requires explicit network consent",
+				)
 			}
 			if c.ReleaseURL == "" {
-				return runtime.VerifiedRelease{}, errors.New("online runtime preparation requires runtime.release_url")
+				return browserruntime.VerifiedRelease{}, errors.New(
+					"online runtime preparation requires runtime.release_url",
+				)
 			}
 		}
-		var keys *runtime.ReleaseTrust
+		var keys *browserruntime.ReleaseTrust
 		var trustErr error
 		if networkAllowed {
-			keys, trustErr = runtime.FetchReleaseKeyring(ctx)
+			keys, trustErr = browserruntime.FetchReleaseKeyring(ctx)
 		} else {
 			if c.OfflineKeyring == "" {
-				return runtime.VerifiedRelease{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
+				return browserruntime.VerifiedRelease{}, errors.New("offline preparation requires runtime.offline_keyring; no runtime release verification key is configured")
 			}
-			keys, trustErr = runtime.ReadReleaseKeyring(c.OfflineKeyring)
+			keys, trustErr = browserruntime.ReadReleaseKeyring(c.OfflineKeyring)
 		}
 		if trustErr != nil {
-			return runtime.VerifiedRelease{}, fmt.Errorf("runtime verification key: %w", trustErr)
+			return browserruntime.VerifiedRelease{}, fmt.Errorf("runtime verification key: %w", trustErr)
 		}
-		var release runtime.VerifiedRelease
+		var release browserruntime.VerifiedRelease
 		var err error
 		if path == "" {
-			release, err = runtime.FetchRelease(ctx, c.ReleaseURL, keys)
+			release, err = browserruntime.FetchRelease(ctx, c.ReleaseURL, keys)
 		} else {
-			release, err = runtime.ReadRelease(path, keys)
+			release, err = browserruntime.ReadRelease(path, keys)
 		}
 		if err != nil {
-			return runtime.VerifiedRelease{}, err
+			return browserruntime.VerifiedRelease{}, err
 		}
 		if !release.Release().Manifest.MatchesHost() {
-			return runtime.VerifiedRelease{}, errors.New("runtime release does not match this architecture")
+			return browserruntime.VerifiedRelease{}, errors.New("runtime release does not match this architecture")
 		}
 		return release, nil
 	}
@@ -124,18 +131,20 @@ func (c Config) ReleaseLoader(path string, networkAllowed bool) func(context.Con
 
 // StoreConfig resolves only explicit installation paths; debug mode cannot create
 // an implicit persistent cache in the working directory or temporary storage.
-func (c Config) StoreConfig(varLibPath string) (runtime.Config, error) {
+func (c Config) StoreConfig(varLibPath string) (browserruntime.Config, error) {
 	path := c.CachePath
 	if path == "" {
 		if !filepath.IsAbs(varLibPath) {
-			return runtime.Config{}, errors.New("runtime cache requires an absolute NETDATA_LIB_DIR or runtime.cache_path")
+			return browserruntime.Config{}, errors.New(
+				"runtime cache requires an absolute NETDATA_LIB_DIR or runtime.cache_path",
+			)
 		}
 		path = filepath.Join(varLibPath, "dem", "runtime")
 	}
 	if !filepath.IsAbs(path) {
-		return runtime.Config{}, errors.New("runtime.cache_path must be absolute")
+		return browserruntime.Config{}, errors.New("runtime.cache_path must be absolute")
 	}
-	return runtime.Config{
+	return browserruntime.Config{
 		Path:              path,
 		MaxBytes:          c.MaxBytes,
 		PreviousRetention: time.Duration(c.PreviousRetentionDays) * day,

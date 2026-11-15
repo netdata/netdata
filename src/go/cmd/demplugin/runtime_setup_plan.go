@@ -11,7 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
 
@@ -57,7 +57,7 @@ func runSetupPlan(args []string, stdout, stderr io.Writer) error {
 	case *root != "":
 		mode, path = runtimehost.ModePreloaded, *root
 	case mode == runtimehost.ModeNative:
-		path = runtime.DefaultNativeConfig().PayloadPath
+		path = browserruntime.DefaultNativeConfig().PayloadPath
 	case mode == runtimehost.ModePreloaded:
 		path = cfg.PreloadPath
 	default:
@@ -80,7 +80,7 @@ func runSetupPlan(args []string, stdout, stderr io.Writer) error {
 	if err := validateSetupPlanPath(path); err != nil {
 		return err
 	}
-	canonical, err := runtime.CanonicalRoot(path)
+	canonical, err := browserruntime.CanonicalRoot(path)
 	if err != nil {
 		return err
 	}

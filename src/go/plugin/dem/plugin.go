@@ -46,8 +46,8 @@ type Components struct {
 	Retention  *Retention
 }
 
-// New keeps the shared stores caller-owned across Agent run generations.
-// The registries contain admitted runtimes only; configuration stays in the framework.
+// New builds the four DEM collectors, the RUM, synthetic and history Functions,
+// and the retention worker over the caller's stores. It does not close them.
 func New(deps Dependencies, cfg Config) Components {
 	return compose(deps, cfg, synthetichistory.NewStore(deps.History))
 }
@@ -103,7 +103,8 @@ func compose(deps Dependencies, cfg Config, syntheticHistory *synthetichistory.S
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
 					return availableFunctions(syntheticfunc.Declarations(), func() bool {
-						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind(journalstore.KindSynthetic) ||
+						return syntheticRegistry.HasJobs() ||
+							deps.History.HasObservedKind(journalstore.KindSynthetic) ||
 							deps.Artifacts.HasObservedPublished()
 					})
 				},

@@ -60,7 +60,10 @@ func TestColumnsIndexAndRowFollowDefinitionOrder(t *testing.T) {
 			},
 		}.BuildColumn(),
 	}, built)
-	assert.Equal(t, []any{"a", 7}, columns.Row(point{name: "a", x: 7}))
+	assert.Equal(t, []any{"a", 7}, columns.Row(point{
+		name: "a",
+		x:    7,
+	}))
 }
 
 func TestMethodDeclarationAndTable(t *testing.T) {

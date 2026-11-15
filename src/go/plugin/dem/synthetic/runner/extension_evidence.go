@@ -50,7 +50,10 @@ type evidenceState struct {
 }
 
 func newEvidenceState() *evidenceState {
-	return &evidenceState{tests: make(map[string]int), steps: make(map[string]int)}
+	return &evidenceState{
+		tests: make(map[string]int),
+		steps: make(map[string]int),
+	}
 }
 
 func (e *evidenceState) truncate(scope string) {
@@ -76,7 +79,8 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 	valid := false
 	switch data.Record {
 	case "test":
-		if data.Test != nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" && validEvidenceTest(*data.Test) {
+		if data.Test != nil && data.Step == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" &&
+			validEvidenceTest(*data.Test) {
 			redactEvidenceTest(data.Test, redact)
 			if data.Test.TextTruncated {
 				e.truncate("text")
@@ -84,7 +88,8 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 			valid = e.test(*data.Test)
 		}
 	case "step":
-		if data.Step != nil && data.Test == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" && validEvidenceStep(*data.Step) {
+		if data.Step != nil && data.Test == nil && data.Failure == nil && data.Stop == nil && data.Scope == "" &&
+			validEvidenceStep(*data.Step) {
 			redactEvidenceStep(data.Step, redact)
 			if data.Step.TextTruncated {
 				e.truncate("text")
@@ -92,19 +97,24 @@ func (e *evidenceState) accept(raw json.RawMessage, redact *textRedactor) {
 			valid = e.step(*data.Step)
 		}
 	case "failure":
-		if data.Failure != nil && data.Stop == nil && data.Test == nil && data.Step == nil && data.Scope == "" && validFailure(*data.Failure) && e.value.FirstFailure == nil {
+		if data.Failure != nil && data.Stop == nil && data.Test == nil && data.Step == nil && data.Scope == "" &&
+			validFailure(*data.Failure) &&
+			e.value.FirstFailure == nil {
 			e.redactDetail(data.Failure, redact)
 			e.value.FirstFailure = data.Failure
 			valid = true
 		}
 	case "stop":
-		if data.Stop != nil && data.Test == nil && data.Step == nil && data.Failure == nil && data.Scope == "" && validStop(*data.Stop) && e.value.StopContext == nil {
+		if data.Stop != nil && data.Test == nil && data.Step == nil && data.Failure == nil && data.Scope == "" &&
+			validStop(*data.Stop) &&
+			e.value.StopContext == nil {
 			e.redactDetail(data.Stop, redact)
 			e.value.StopContext = data.Stop
 			valid = true
 		}
 	case "truncated":
-		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil && slices.Contains([]string{"tests", "user_steps", "other_steps", "text"}, data.Scope) {
+		if data.Test == nil && data.Step == nil && data.Failure == nil && data.Stop == nil &&
+			slices.Contains([]string{"tests", "user_steps", "other_steps", "text"}, data.Scope) {
 			e.truncate(data.Scope)
 			valid = true
 		}
@@ -138,7 +148,8 @@ func (e *evidenceState) redactDetail(detail *synthetic.FailureDetail, redact *te
 func (e *evidenceState) test(value synthetic.EvidenceTest) bool {
 	if i, ok := e.tests[value.ID]; ok {
 		old := e.value.Tests[i]
-		if old.ReportingComplete || !value.ReportingComplete || old.Title != value.Title || !reflect.DeepEqual(old.Location, value.Location) {
+		if old.ReportingComplete || !value.ReportingComplete || old.Title != value.Title ||
+			!reflect.DeepEqual(old.Location, value.Location) {
 			// Conflicting observations must not leave the disputed item looking valid.
 			e.value.Tests = slices.Delete(e.value.Tests, i, i+1)
 			if e.value.FirstFailure != nil && e.value.FirstFailure.Test.ID == value.ID {
@@ -168,7 +179,12 @@ func (e *evidenceState) test(value synthetic.EvidenceTest) bool {
 func (e *evidenceState) step(value synthetic.EvidenceStep) bool {
 	if i, ok := e.steps[value.ID]; ok {
 		old := e.value.Steps[i]
-		if old.State != "running" || value.State == "running" || old.TestID != value.TestID || old.Title != value.Title || old.Category != value.Category || old.ParentID != value.ParentID || old.ParentOmitted != value.ParentOmitted || !reflect.DeepEqual(old.Location, value.Location) {
+		if old.State != "running" || value.State == "running" || old.TestID != value.TestID ||
+			old.Title != value.Title ||
+			old.Category != value.Category ||
+			old.ParentID != value.ParentID ||
+			old.ParentOmitted != value.ParentOmitted ||
+			!reflect.DeepEqual(old.Location, value.Location) {
 			e.value.Steps = slices.Delete(e.value.Steps, i, i+1)
 			for j := range e.value.Steps {
 				if e.value.Steps[j].ParentID == value.ID {
@@ -249,7 +265,12 @@ func validLocation(l *synthetic.EvidenceLocation) bool {
 	if l == nil {
 		return true
 	}
-	if l.File == "" || strings.HasPrefix(l.File, "/") || strings.ContainsAny(l.File, "\\:\x00") || !boundedJSON(l.File, sourceBytes) || l.Line <= 0 || l.Column <= 0 || int64(l.Line) > maxSafeInteger || int64(l.Column) > maxSafeInteger {
+	if l.File == "" || strings.HasPrefix(l.File, "/") || strings.ContainsAny(l.File, "\\:\x00") ||
+		!boundedJSON(l.File, sourceBytes) ||
+		l.Line <= 0 ||
+		l.Column <= 0 ||
+		int64(l.Line) > maxSafeInteger ||
+		int64(l.Column) > maxSafeInteger {
 		return false
 	}
 	return !slices.Contains(strings.Split(l.File, "/"), "..")
@@ -271,7 +292,10 @@ func validEvidenceTest(t synthetic.EvidenceTest) bool {
 func validEvidenceStep(s synthetic.EvidenceStep) bool {
 	return validEvidenceID(s.ID, stepIDBytes) && validEvidenceID(s.TestID, testIDBytes) &&
 		(s.ParentID == "" || validEvidenceID(s.ParentID, stepIDBytes) && s.ParentID != s.ID) &&
-		boundedJSON(s.Title, titleBytes) && s.Category != "" && boundedJSON(s.Category, categoryBytes) && validLocation(s.Location) &&
+		boundedJSON(
+			s.Title,
+			titleBytes,
+		) && s.Category != "" && boundedJSON(s.Category, categoryBytes) && validLocation(s.Location) &&
 		slices.Contains([]string{"running", "passed", "failed"}, s.State) && validDuration(s.DurationMS) &&
 		boundedJSON(s.Message, stepMessageBytes) && boundedJSON(s, stepBytes)
 }
@@ -288,7 +312,9 @@ func validStop(f synthetic.FailureDetail) bool {
 
 func validDetail(f synthetic.FailureDetail) bool {
 	if !validEvidenceTest(f.Test) || !f.Test.ReportingComplete ||
-		len(f.Path) > failurePathLimit || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
+		len(
+			f.Path,
+		) > failurePathLimit || f.OmittedAncestors < 0 || int64(f.OmittedAncestors) > maxSafeInteger || !validLocation(f.Location) ||
 		utf8.RuneCountInString(f.Message) > textLimit || !boundedJSON(f, extensionBodyLimit) {
 		return false
 	}

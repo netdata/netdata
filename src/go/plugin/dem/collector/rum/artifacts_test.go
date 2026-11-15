@@ -29,5 +29,12 @@ func TestShippedArtifacts(t *testing.T) {
 	)
 	health, err := os.ReadFile("../../../../../health/health.d/dem.conf")
 	require.NoError(t, err)
-	collecttest.AssertHealthAlertsTargetChartTemplateWith(t, health, charts, collecttest.HealthAlertsCheck{ContextPrefix: "rum."})
+	collecttest.AssertHealthAlertsTargetChartTemplateWith(
+		t,
+		health,
+		charts,
+		collecttest.HealthAlertsCheck{
+			ContextPrefix: "rum.",
+		},
+	)
 }

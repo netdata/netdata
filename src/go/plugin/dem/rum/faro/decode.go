@@ -258,7 +258,8 @@ func (o Options) events(p *faroPayload, b *beacon.Beacon) {
 		}
 		// Classification uses protocol names, before free-text transformation.
 		name := clean(ev.Name, len(ev.Name))
-		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !o.FrustrationSignals) {
+		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" ||
+			(beacon.IsFrustration(name) && !o.FrustrationSignals) {
 			continue
 		}
 		kind := eventKind(name)

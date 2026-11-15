@@ -114,7 +114,9 @@ func (s *Store) readManifest(id string) (manifest, error) {
 	if err != nil {
 		return manifest{}, err
 	}
-	if vnodeguid.Validate(m.VnodeGUID) != nil || m.Version != 2 || m.RunID != id || !synthetic.ValidJobID(m.JobID) || m.PublishedUS <= 0 || len(m.Artifacts) == 0 {
+	if vnodeguid.Validate(m.VnodeGUID) != nil || m.Version != 2 || m.RunID != id || !synthetic.ValidJobID(m.JobID) ||
+		m.PublishedUS <= 0 ||
+		len(m.Artifacts) == 0 {
 		return manifest{}, fmt.Errorf("invalid artifact manifest")
 	}
 	ids := make(map[string]bool)

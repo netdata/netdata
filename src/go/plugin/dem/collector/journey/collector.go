@@ -24,17 +24,17 @@ type Secret struct {
 }
 
 type Config struct {
-	BrowserErrorSummary bool             `yaml:"browser_error_summary" json:"browser_error_summary"`
-	CheckEvery          int              `yaml:"check_every"           json:"check_every"`
-	Vnode               string           `yaml:"vnode,omitempty"       json:"vnode,omitempty"`
-	Name                string           `yaml:"name"                  json:"name"`
-	UpdateEvery         int              `yaml:"update_every"          json:"update_every"`
-	Timeout             confopt.Duration `yaml:"timeout"               json:"timeout"`
-	Script              string           `yaml:"script,omitempty"      json:"script,omitempty"`
-	ScriptPath          string           `yaml:"script_path,omitempty" json:"script_path,omitempty"`
-	Secrets             []Secret         `yaml:"secrets,omitempty"     json:"secrets,omitempty"`
-	TraceOnFailure      bool             `yaml:"trace_on_failure"      json:"trace_on_failure"`
-	ScreenshotOnFailure bool             `yaml:"screenshot_on_failure" json:"screenshot_on_failure"`
+	BrowserErrorSummary bool             `yaml:"browser_error_summary"  json:"browser_error_summary"`
+	CheckEvery          int              `yaml:"check_every"            json:"check_every"`
+	Vnode               string           `yaml:"vnode,omitempty"        json:"vnode,omitempty"`
+	Name                string           `yaml:"name"                   json:"name"`
+	UpdateEvery         int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout             confopt.Duration `yaml:"timeout"                json:"timeout"`
+	Script              string           `yaml:"script,omitempty"       json:"script,omitempty"`
+	ScriptPath          string           `yaml:"script_path,omitempty"  json:"script_path,omitempty"`
+	Secrets             []Secret         `yaml:"secrets,omitempty"      json:"secrets,omitempty"`
+	TraceOnFailure      bool             `yaml:"trace_on_failure"       json:"trace_on_failure"`
+	ScreenshotOnFailure bool             `yaml:"screenshot_on_failure"  json:"screenshot_on_failure"`
 }
 
 // Executor and Dependencies name the shared synthetic job types for callers outside the collector tree.

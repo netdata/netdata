@@ -98,7 +98,9 @@ func TestPublicURLs(t *testing.T) {
 				},
 				PublicURL: tc.url,
 			}
-			siteErr := validateWithRequired(Site{PublicURL: tc.url})
+			siteErr := validateWithRequired(Site{
+				PublicURL: tc.url,
+			})
 			receiverErr := receiver.Validate()
 			if tc.valid {
 				assert.NoError(t, siteErr)

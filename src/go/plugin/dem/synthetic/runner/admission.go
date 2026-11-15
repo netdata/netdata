@@ -68,10 +68,15 @@ func (o *executionOwner) acquire(ctx context.Context, key executionKey) (*admiss
 	}
 	job := o.jobs[key]
 	if job == nil {
-		job = &admissionJob{key: key}
+		job = &admissionJob{
+			key: key,
+		}
 		o.jobs[key] = job
 	}
-	waiter := &admissionWaiter{ready: make(chan struct{}), job: job}
+	waiter := &admissionWaiter{
+		ready: make(chan struct{}),
+		job:   job,
+	}
 	job.waiters = append(job.waiters, waiter)
 	if !job.active && len(job.waiters) == 1 {
 		o.ready = append(o.ready, job)

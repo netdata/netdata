@@ -11,7 +11,13 @@ import (
 )
 
 // scan selects receipt-time buckets, then checks inclusive whole-second bounds.
-func (s *Store) scan(ctx context.Context, site string, after, before int64, vnodeGUID string, visit func(EventRecord)) error {
+func (s *Store) scan(
+	ctx context.Context,
+	site string,
+	after, before int64,
+	vnodeGUID string,
+	visit func(EventRecord),
+) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -30,7 +36,9 @@ func (s *Store) scan(ctx context.Context, site string, after, before int64, vnod
 			return err
 		}
 		previous = record
-		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && (site == "" || record.Site == site) && record.ObservedUS/1_000_000 >= after && record.ObservedUS/1_000_000 <= before {
+		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && (site == "" || record.Site == site) &&
+			record.ObservedUS/1_000_000 >= after &&
+			record.ObservedUS/1_000_000 <= before {
 			visit(record)
 		}
 		return nil
@@ -51,7 +59,8 @@ func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID strin
 			return err
 		}
 		previous = record
-		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && record.SessionID == session && (site == "" || record.Site == site) {
+		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && record.SessionID == session &&
+			(site == "" || record.Site == site) {
 			visit(record)
 		}
 		return nil

@@ -38,7 +38,9 @@ func TestQualificationViewSharesAdmissionAndKeepsMonitoringSource(t *testing.T) 
 	paths := e.source.(fixtureRuntime).Paths
 	paths.Identity.Version = "candidate-b"
 	paths.Identity.SHA256 = strings.Repeat("b", 64)
-	candidate := e.unrecordedView(fixtureRuntime{Paths: paths}, artifacts)
+	candidate := e.unrecordedView(fixtureRuntime{
+		Paths: paths,
+	}, artifacts)
 	done := make(chan synthetic.Execution, 1)
 	go func() { done <- e.execute(context.Background(), journey()) }()
 	<-started
@@ -71,7 +73,10 @@ func TestQualificationViewReportsUnverifiedDrainToMonitoringOwner(t *testing.T) 
 	var calls atomic.Int32
 	e.start = starter(t, func(context.Context, []string, []byte, *os.File, *os.File) ndexec.TreeResult {
 		calls.Add(1)
-		return ndexec.TreeResult{Drained: false, Err: errors.New("qualification lost drainage proof")}
+		return ndexec.TreeResult{
+			Drained: false,
+			Err:     errors.New("qualification lost drainage proof"),
+		}
 	})
 	candidate := e.unrecordedView(e.source, artifacts)
 	result := candidate.execute(context.Background(), journey())
@@ -97,12 +102,23 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 	var kinds []synthetic.Kind
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		if slices.Contains(args, "--check") {
-			_, err := fmt.Fprintf(out, `{"version":"candidate-b","contract":2,"uid":%d,"gid":%d}`, os.Geteuid(), os.Getegid())
-			return ndexec.TreeResult{Drained: true, Err: err}
+			_, err := fmt.Fprintf(
+				out,
+				`{"version":"candidate-b","contract":2,"uid":%d,"gid":%d}`,
+				os.Geteuid(),
+				os.Getegid(),
+			)
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		var request wireRequest
 		if err := json.Unmarshal(raw, &request); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		kinds = append(kinds, request.Kind)
 		assert.False(t, request.Capture)
@@ -110,25 +126,38 @@ func TestQualificationUsesBothModesWithoutPublishingMonitorHistory(t *testing.T)
 		if request.Kind == synthetic.Lighthouse {
 			query, err := http.NewRequestWithContext(ctx, http.MethodGet, request.URL, nil)
 			if err != nil {
-				return ndexec.TreeResult{Drained: true, Err: err}
+				return ndexec.TreeResult{
+					Drained: true,
+					Err:     err,
+				}
 			}
 			response, err := http.DefaultClient.Do(query)
 			if err != nil {
-				return ndexec.TreeResult{Drained: true, Err: err}
+				return ndexec.TreeResult{
+					Drained: true,
+					Err:     err,
+				}
 			}
 			body, err := io.ReadAll(response.Body)
 			_ = response.Body.Close()
 			if err != nil {
-				return ndexec.TreeResult{Drained: true, Err: err}
+				return ndexec.TreeResult{
+					Drained: true,
+					Err:     err,
+				}
 			}
 			assert.Contains(t, string(body), "DEM runtime qualification")
 			score := 95.0
 			result.Tests = nil
-			result.Metrics = &synthetic.LabMetrics{Performance: &score}
+			result.Metrics = &synthetic.LabMetrics{
+				Performance: &score,
+			}
 		}
 		return resultPayload(result)(ctx, args, raw, out, stderr)
 	})
-	qualified, err := e.Qualify(context.Background(), fixtureRuntime{Paths: paths})
+	qualified, err := e.Qualify(context.Background(), fixtureRuntime{
+		Paths: paths,
+	})
 	require.NoError(t, err)
 	assert.True(t, qualified.ExecutionContract)
 	assert.True(t, qualified.SandboxedLocalJourney)
@@ -152,7 +181,10 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 		}
 		var r wireRequest
 		if err := json.Unmarshal(raw, &r); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		if r.Script == "monitor" {
 			monitoring <- struct{}{}
@@ -164,7 +196,9 @@ func TestQualificationIdentityDoesNotCollideWithUserJob(t *testing.T) {
 		if r.Kind == synthetic.Lighthouse {
 			result.Tests = nil
 			score := 100.0
-			result.Metrics = &synthetic.LabMetrics{Performance: &score}
+			result.Metrics = &synthetic.LabMetrics{
+				Performance: &score,
+			}
 		}
 		return resultPayload(result)(ctx, args, raw, out, stderr)
 	})

@@ -293,10 +293,18 @@ func TestDecodedObservationsPreservedAcrossOTLPLogsAndTraces(t *testing.T) {
 	require.Len(t, b.Spans, 1)
 	assert.Equal(t, "/orders/:id", b.Path)
 	assert.Equal(t, "internal-user-only", b.UserID)
-	changed, err := faro.Decode([]byte(strings.ReplaceAll(raw, "private-query=1#private-fragment", "different-query=2#different-fragment")), opt)
+	changed, err := faro.Decode(
+		[]byte(strings.ReplaceAll(raw, "private-query=1#private-fragment", "different-query=2#different-fragment")),
+		opt,
+	)
 	require.NoError(t, err)
 	require.Len(t, changed.Errors, 1)
-	assert.Equal(t, b.Errors[0].Fingerprint, changed.Errors[0].Fingerprint, "URL query and fragment do not change normalized error identity")
+	assert.Equal(
+		t,
+		b.Errors[0].Fingerprint,
+		changed.Errors[0].Fingerprint,
+		"URL query and fragment do not change normalized error identity",
+	)
 
 	remoteLogs := &fakeLogsService{}
 	// The transport guard is for diagnostics, never a second beacon normalization pass.

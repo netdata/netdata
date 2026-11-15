@@ -164,7 +164,14 @@ func TestPinnedSDKCaptureContract(t *testing.T) {
 			}
 			attrs := events["identified"].Events[0].Attrs
 			if enabled {
-				assert.Equal(t, map[string]string{"custom": "retained only in event logs", "url.full": "https://shop.example.org/api"}, attrs)
+				assert.Equal(
+					t,
+					map[string]string{
+						"custom":   "retained only in event logs",
+						"url.full": "https://shop.example.org/api",
+					},
+					attrs,
+				)
 			} else {
 				assert.Empty(t, attrs)
 			}
@@ -195,10 +202,21 @@ func TestPinnedSDKCaptureContract(t *testing.T) {
 			assert.Equal(t, "button#pay", vitals[0].Element)
 			require.Len(t, errors, 1)
 			assert.Equal(t, "TypeError", errors[0].Type)
-			assert.Equal(t, "render (https://shop.example.org/app.js:12:3)\nboot (https://shop.example.org/main.js:22:4)\n", errors[0].Stack)
+			assert.Equal(
+				t,
+				"render (https://shop.example.org/app.js:12:3)\nboot (https://shop.example.org/main.js:22:4)\n",
+				errors[0].Stack,
+			)
 			if enabled {
 				require.Len(t, spans, 1)
-				assert.Equal(t, []beacon.SpanAttr{{Key: "http.url", Str: "https://api.example.org/orders"}, {Key: "name", Str: "checkout"}}, spans[0].Attrs)
+				assert.Equal(
+					t,
+					[]beacon.SpanAttr{
+						{Key: "http.url", Str: "https://api.example.org/orders"},
+						{Key: "name", Str: "checkout"},
+					},
+					spans[0].Attrs,
+				)
 				require.Len(t, logs, 1)
 				assert.Equal(t, errors[0].Stack, logs[0].Stack)
 			} else {

@@ -120,7 +120,12 @@ type attrRule struct {
 	native   bool
 }
 
-func nativeAttr(semantic attrSemantic) attrRule { return attrRule{semantic: semantic, native: true} }
+func nativeAttr(semantic attrSemantic) attrRule {
+	return attrRule{
+		semantic: semantic,
+		native:   true,
+	}
+}
 
 // eventAttrRule declares, per event kind, the protocol attributes measurements
 // read. Values are interpreted by their original key, before custom-key
@@ -142,7 +147,9 @@ func eventAttrRule(kind beacon.EventKind, name, key string) attrRule {
 		case "pageLoadTime", "domContentLoadHandlerTime":
 			return nativeAttr(attrNumber)
 		case "name":
-			return attrRule{semantic: attrURL}
+			return attrRule{
+				semantic: attrURL,
+			}
 		}
 	case beacon.EventResource:
 		switch key {

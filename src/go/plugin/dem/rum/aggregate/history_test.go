@@ -212,14 +212,26 @@ func TestHistoryRecordsNoCredentialJoinedByCleaning(t *testing.T) {
 			"user":    map[string]string{"id": "tok\x00en=hunter2"},
 		},
 		"exceptions": []any{map[string]any{
-			"type":       "Error",
-			"value":      "request failed tok\x00en=hunter2",
-			"stacktrace": map[string]any{"frames": []any{map[string]any{"function": "Bea\x00rer abcdef.ghi", "filename": "https://example.org/app.js", "lineno": 1, "colno": 2}}},
+			"type":  "Error",
+			"value": "request failed tok\x00en=hunter2",
+			"stacktrace": map[string]any{
+				"frames": []any{
+					map[string]any{
+						"function": "Bea\x00rer abcdef.ghi",
+						"filename": "https://example.org/app.js",
+						"lineno":   1,
+						"colno":    2,
+					},
+				},
+			},
 		}},
 		"events": []any{map[string]any{"name": "Bea\x00rer abcdef.ghi"}},
 	})
 	require.NoError(t, err)
-	b, err := faro.Decode(raw, faro.Options{Site: "s", Now: *now})
+	b, err := faro.Decode(raw, faro.Options{
+		Site: "s",
+		Now:  *now,
+	})
 	require.NoError(t, err)
 	a.Ingest(b)
 	require.Len(t, sink.events, 2)

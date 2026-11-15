@@ -42,7 +42,10 @@ func (h *Handler) errorsRows(ctx context.Context, args map[string]string, _ map[
 	groups, err := h.deps.Errors(ctx, args["site"], args["fingerprint"], after, before, args["vnode_guid"])
 	var rows [][]any
 	for _, g := range groups {
-		rows = append(rows, errorsColumns.Row(errorRow{ErrorGroup: g, now: now}))
+		rows = append(rows, errorsColumns.Row(errorRow{
+			ErrorGroup: g,
+			now:        now,
+		}))
 	}
 	return rows, err
 }

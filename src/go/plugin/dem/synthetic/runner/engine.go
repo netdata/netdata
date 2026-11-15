@@ -152,7 +152,12 @@ func (e *Engine) execute(ctx context.Context, request synthetic.Request) synthet
 // ExecuteScheduled runs one attempt through admission. admitted, when set,
 // snapshots the latest pending occurrence only after admission. Drained is
 // false when the process tree may still be alive; the slot then stays held.
-func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) synthetic.Execution {
+func (e *Engine) ExecuteScheduled(
+	ctx context.Context,
+	request synthetic.Request,
+	state func(synthetic.JobState),
+	admitted func(time.Time) synthetic.Schedule,
+) synthetic.Execution {
 	a := newAttempt(request)
 	job, err := e.admit(ctx, request.JobID(), state)
 	if err != nil {
@@ -160,13 +165,19 @@ func (e *Engine) ExecuteScheduled(ctx context.Context, request synthetic.Request
 		a.stop(err, ctx, ctx)
 		a.run.Error = a.redact.text(err.Error())
 		a.run.CompletedUS = time.Now().UnixMicro()
-		return synthetic.Execution{Run: a.run, Drained: !errors.Is(err, ndexec.ErrTreeNotDrained)}
+		return synthetic.Execution{
+			Run:     a.run,
+			Drained: !errors.Is(err, ndexec.ErrTreeNotDrained),
+		}
 	}
 	drained := e.runAdmitted(ctx, a, state, admitted)
 	if drained {
 		e.release(job)
 	}
-	return synthetic.Execution{Run: a.run, Drained: drained}
+	return synthetic.Execution{
+		Run:     a.run,
+		Drained: drained,
+	}
 }
 
 // admit waits for the job's turn at a browser slot. A slot granted after
@@ -176,7 +187,10 @@ func (e *Engine) admit(ctx context.Context, jobID string, state func(synthetic.J
 		return nil, ndexec.ErrTreeNotDrained
 	}
 	notify(state, synthetic.JobWaiting)
-	job, err := e.acquire(ctx, executionKey{jobID: jobID, qualification: e.qualification})
+	job, err := e.acquire(ctx, executionKey{
+		jobID:         jobID,
+		qualification: e.qualification,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +207,12 @@ func (e *Engine) admit(ctx context.Context, jobID string, state func(synthetic.J
 
 // runAdmitted runs an admitted attempt to completion and reports whether its
 // process tree is known drained. Every drained path records completion once.
-func (e *Engine) runAdmitted(ctx context.Context, a *attempt, state func(synthetic.JobState), admitted func(time.Time) synthetic.Schedule) (drained bool) {
+func (e *Engine) runAdmitted(
+	ctx context.Context,
+	a *attempt,
+	state func(synthetic.JobState),
+	admitted func(time.Time) synthetic.Schedule,
+) (drained bool) {
 	admittedAt := time.Now()
 	if admitted != nil {
 		schedule := admitted(admittedAt)
@@ -289,12 +308,26 @@ func (e *Engine) prepareWork(attemptCtx context.Context, a *attempt, admittedAt 
 // launch runs the prepared request and records what the supervisor and the
 // reporter observed. It returns the captures eligible for publication and
 // whether the process tree is known drained.
-func (e *Engine) launch(ctx, attemptCtx context.Context, a *attempt, use Use, raw []byte, state func(synthetic.JobState)) ([]synthetic.Capture, bool) {
+func (e *Engine) launch(
+	ctx, attemptCtx context.Context,
+	a *attempt,
+	use Use,
+	raw []byte,
+	state func(synthetic.JobState),
+) ([]synthetic.Capture, bool) {
 	sink := newSink(a.request, a.redact)
 	started := time.Now()
 	notify(state, synthetic.JobRunning)
 	paths := use.Paths()
-	tree, err := e.executeProcess(attemptCtx, paths, use.Completion(), []string{paths.EntryPoint}, raw, sink.consume, sink.stderr)
+	tree, err := e.executeProcess(
+		attemptCtx,
+		paths,
+		use.Completion(),
+		[]string{paths.EntryPoint},
+		raw,
+		sink.consume,
+		sink.stderr,
+	)
 	if err != nil {
 		// Nothing started, so nothing was reported.
 		a.stop(attemptCtx.Err(), ctx, attemptCtx)
@@ -449,7 +482,10 @@ func (e *Engine) save(ctx context.Context, phase synthetic.HistoryPhase, a *atte
 		if attempted {
 			qualifier = "append outcome uncertain"
 		}
-		run.HistoryError = joinText(run.HistoryError, a.redact.text(string(phase)+" history "+qualifier+": "+err.Error()))
+		run.HistoryError = joinText(
+			run.HistoryError,
+			a.redact.text(string(phase)+" history "+qualifier+": "+err.Error()),
+		)
 	}
 	if err = e.history.Sync(ctx); err != nil {
 		run.HistoryError = joinText(run.HistoryError, a.redact.text(string(phase)+" history sync: "+err.Error()))

@@ -31,7 +31,11 @@ func appendEntry(t *testing.T, s *Store) {
 	require.NoError(t, err)
 }
 func testFields() []journal.Field {
-	return []journal.Field{journal.StringField("DEM_KIND", "rum"), journal.StringField("DEM_OBSERVED_US", "123456789"), journal.StringField("MESSAGE", "entry")}
+	return []journal.Field{
+		journal.StringField("DEM_KIND", "rum"),
+		journal.StringField("DEM_OBSERVED_US", "123456789"),
+		journal.StringField("MESSAGE", "entry"),
+	}
 }
 func countEntries(t *testing.T, s *Store) int {
 	t.Helper()
@@ -192,7 +196,9 @@ func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {
 	for _, foreign := range []bool{false, true} {
 		t.Run(map[bool]string{false: "current machine", true: "retained machine"}[foreign], func(t *testing.T) {
 			root := t.TempDir()
-			host, err := journalhost.Load(journalhost.LoadOptions{StateDir: filepath.Join(root, "identity")})
+			host, err := journalhost.Load(journalhost.LoadOptions{
+				StateDir: filepath.Join(root, "identity"),
+			})
 			require.NoError(t, err)
 			machine := host.MachineID()
 			if foreign {
@@ -202,7 +208,14 @@ func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {
 			dir := filepath.Join(root, machine.String())
 			require.NoError(t, os.MkdirAll(dir, 0750))
 			path := filepath.Join(dir, "dem.journal")
-			writer, err := journal.Create(path, journal.Options{MachineID: machine, BootID: host.BootID(), Compact: true})
+			writer, err := journal.Create(
+				path,
+				journal.Options{
+					MachineID: machine,
+					BootID:    host.BootID(),
+					Compact:   true,
+				},
+			)
 			require.NoError(t, err)
 			fields, _, err := appendEnvelope(testFields())
 			require.NoError(t, err)
@@ -232,9 +245,22 @@ func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {
 
 func TestStartupRejectsUnversionedArchiveWithoutRemoval(t *testing.T) {
 	root := t.TempDir()
-	host, err := journalhost.Load(journalhost.LoadOptions{StateDir: filepath.Join(root, "identity")})
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
 	require.NoError(t, err)
-	log, err := journal.NewLog(root, journal.LogConfig{Source: "dem", StrictSystemdNaming: true, Options: journal.Options{MachineID: host.MachineID(), BootID: host.BootID(), Compact: true}})
+	log, err := journal.NewLog(
+		root,
+		journal.LogConfig{
+			Source:              "dem",
+			StrictSystemdNaming: true,
+			Options: journal.Options{
+				MachineID: host.MachineID(),
+				BootID:    host.BootID(),
+				Compact:   true,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.NoError(t, log.Append(testFields(), host.EntryOptions()))
 	require.NoError(t, log.Close())

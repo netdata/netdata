@@ -31,7 +31,13 @@ var artifactColumns = rawfunc.Columns[query.Artifact]{
 	column("mime", "Content type", funcapi.FieldTypeString, "", func(a query.Artifact) any { return a.MIME }),
 	column("bytes", "Size", funcapi.FieldTypeInteger, "bytes", func(a query.Artifact) any { return a.Bytes }),
 	column("sha256", "SHA-256", funcapi.FieldTypeString, "", func(a query.Artifact) any { return a.SHA256 }),
-	column("availability", "Availability", funcapi.FieldTypeString, "", func(a query.Artifact) any { return a.Availability }),
+	column(
+		"availability",
+		"Availability",
+		funcapi.FieldTypeString,
+		"",
+		func(a query.Artifact) any { return a.Availability },
+	),
 	column("test", "Test", funcapi.FieldTypeString, "", func(a query.Artifact) any {
 		if a.Kind != model.ReportCapture && a.Test.ID == "" {
 			return "Test not recorded"

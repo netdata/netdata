@@ -53,7 +53,13 @@ func (w *functionWire) request(t *testing.T, input io.Writer, id, command, paylo
 	}
 	line := fmt.Sprintf("FUNCTION %s 10 %q %s \"user=fixture\"\n", id, command, permissions)
 	if payload != "" {
-		line = fmt.Sprintf("FUNCTION_PAYLOAD %s 10 %q %s \"user=fixture\" application/json\n%s\nFUNCTION_PAYLOAD_END\n", id, command, permissions, payload)
+		line = fmt.Sprintf(
+			"FUNCTION_PAYLOAD %s 10 %q %s \"user=fixture\" application/json\n%s\nFUNCTION_PAYLOAD_END\n",
+			id,
+			command,
+			permissions,
+			payload,
+		)
 	}
 	written := make(chan error, 1)
 	go func() {
@@ -80,7 +86,14 @@ func (w *functionWire) request(t *testing.T, input io.Writer, id, command, paylo
 		body, _, ok = strings.Cut(response, "FUNCTION_RESULT_END")
 		return ok
 	}, 3*time.Second, time.Millisecond, "wire: %s", w.String())
-	require.True(t, strings.HasPrefix(header, fmt.Sprintf("%d application/json", status)), "unexpected result for %s: %s %s", command, header, body)
+	require.True(
+		t,
+		strings.HasPrefix(header, fmt.Sprintf("%d application/json", status)),
+		"unexpected result for %s: %s %s",
+		command,
+		header,
+		body,
+	)
 	var response map[string]any
 	require.NoError(t, json.Unmarshal([]byte(body), &response))
 	return response
@@ -192,7 +205,14 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 			}
 			dir := t.TempDir()
 			require.NoError(t, os.Mkdir(filepath.Join(dir, "vnodes"), 0700))
-			require.NoError(t, os.WriteFile(filepath.Join(dir, "vnodes", "sites.yaml"), []byte("- hostname: storefront\n  guid: "+siteGUID+"\n"), 0600))
+			require.NoError(
+				t,
+				os.WriteFile(
+					filepath.Join(dir, "vnodes", "sites.yaml"),
+					[]byte("- hostname: storefront\n  guid: "+siteGUID+"\n"),
+					0600,
+				),
+			)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte(test.config), 0600))
 			for _, module := range []string{"receiver", "rum", "journey", "lighthouse"} {
 				require.NoError(t, os.WriteFile(filepath.Join(dir, module+".conf"), []byte("jobs: []\n"), 0600))
@@ -272,15 +292,36 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					assert.Equal(t, selectionData(byGUID), selectionData(byName))
 					assert.Contains(t, byName["accepted_params"], "vnode")
 					for n, selector := range []string{"vnode:unknown", "vnode:", "vnode:storefront vnode_guid:", "vnode:storefront vnode:storefront"} {
-						output.request(t, writer, fmt.Sprintf("invalid-%s-%d", id, n), method+args+" "+selector, "", 400)
+						output.request(
+							t,
+							writer,
+							fmt.Sprintf("invalid-%s-%d", id, n),
+							method+args+" "+selector,
+							"",
+							400,
+						)
 					}
 				}
 				if generation == 0 {
 					const replacement = "22222222-2222-4222-8222-222222222222"
-					output.request(t, writer, "vnode-add", "config dem:vnode add selection", `{"hostname":"display-name","guid":"33333333-3333-4333-8333-333333333333"}`, 202)
+					output.request(
+						t,
+						writer,
+						"vnode-add",
+						"config dem:vnode add selection",
+						`{"hostname":"display-name","guid":"33333333-3333-4333-8333-333333333333"}`,
+						202,
+					)
 					selected := output.call(t, writer, "dynamic-before", "synthetics-runs vnode:selection")
 					assert.Len(t, selected["data"], 1)
-					output.request(t, writer, "vnode-update", "config dem:vnode:selection update", `{"hostname":"new-display-name","guid":"`+replacement+`"}`, 202)
+					output.request(
+						t,
+						writer,
+						"vnode-update",
+						"config dem:vnode:selection update",
+						`{"hostname":"new-display-name","guid":"`+replacement+`"}`,
+						202,
+					)
 					updated := output.call(t, writer, "dynamic-updated", "synthetics-runs vnode:selection")
 					assert.Empty(t, updated["data"])
 					output.request(t, writer, "hostname-is-not-name", "synthetics-runs vnode:new-display-name", "", 400)
@@ -288,12 +329,26 @@ func TestDEMHistoryFunctionsIndependentOfCollectorSelection(t *testing.T) {
 					output.request(t, writer, "removed-name", "synthetics-runs vnode:selection", "", 400)
 					fallback := output.call(t, writer, "retained-guid", "synthetics-runs vnode_guid:"+other.VnodeGUID)
 					assert.Len(t, fallback["data"], 1)
-					output.request(t, writer, "vnode-reuse", "config dem:vnode add selection", `{"hostname":"reused-name","guid":"`+replacement+`"}`, 202)
+					output.request(
+						t,
+						writer,
+						"vnode-reuse",
+						"config dem:vnode add selection",
+						`{"hostname":"reused-name","guid":"`+replacement+`"}`,
+						202,
+					)
 				}
 				if generation == 1 {
 					// The Agent owns DynCfg persistence and replays configuration after plugin restart.
 					output.request(t, writer, "before-replay", "synthetics-runs vnode:selection", "", 400)
-					output.request(t, writer, "vnode-replay", "config dem:vnode add selection", `{"hostname":"replayed-name","guid":"`+other.VnodeGUID+`"}`, 202)
+					output.request(
+						t,
+						writer,
+						"vnode-replay",
+						"config dem:vnode add selection",
+						`{"hostname":"replayed-name","guid":"`+other.VnodeGUID+`"}`,
+						202,
+					)
 				}
 				selection := output.call(t, writer, "dynamic-current"+suffix, "synthetics-runs vnode:selection")
 				assert.Len(t, selection["data"], generation)
@@ -333,7 +388,14 @@ func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
 		Artifacts: captures,
 	}, dem.DefaultConfig())
 	dir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(
+			filepath.Join(dir, "dem.conf"),
+			[]byte("modules:\n  receiver: no\n  rum: no\n  journey: no\n  lighthouse: no\n"),
+			0600,
+		),
+	)
 	a := agent.New(agent.Config{
 		Name:                    "dem",
 		VarLibDir:               t.TempDir(),
@@ -364,7 +426,12 @@ func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
 			t.Error("Agent did not join")
 		}
 	})
-	require.Eventually(t, func() bool { return strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`) }, 3*time.Second, time.Millisecond)
+	require.Eventually(
+		t,
+		func() bool { return strings.Contains(output.String(), `FUNCTION GLOBAL "dem-history-status"`) },
+		3*time.Second,
+		time.Millisecond,
+	)
 	output.call(t, writer, "empty-status", "dem-history-status")
 	assert.NotContains(t, output.String(), `FUNCTION GLOBAL "rum-`)
 	assert.NotContains(t, output.String(), `FUNCTION GLOBAL "synthetics-`)

@@ -156,7 +156,10 @@ func TestFunctionsExposeRetainedIdentityAfterLogoutAndRetirement(t *testing.T) {
 			UserID:       id,
 			PageGroup:    "/checkout",
 			Received:     now.Add(time.Duration(i) * time.Second),
-			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}, {Name: "milestone"}},
+			Events: []beacon.Event{
+				{Kind: beacon.EventDocument, ID: "document", Revision: 1},
+				{Name: "milestone"},
+			},
 		})
 	}
 	handler := rumfunc.New(query.New(sites, retained), nil)
@@ -232,7 +235,9 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	}
 	owner.Ingest(b)
 	owner.Ingest(b)
-	b.Events = []beacon.Event{{Kind: beacon.EventView, ID: "view-two", Revision: 1, Attrs: map[string]string{"toView": "payment"}}}
+	b.Events = []beacon.Event{
+		{Kind: beacon.EventView, ID: "view-two", Revision: 1, Attrs: map[string]string{"toView": "payment"}},
+	}
 	b.View, b.ViewID = "payment", "view-two"
 	b.Vitals[0].Revision, b.Vitals[0].Value = 2, 0.5
 	owner.Ingest(b)
@@ -257,7 +262,12 @@ func TestMeasurementIdentitySurvivesLiveHistoryAndFunctions(t *testing.T) {
 	value := func(row []any, key string) any { return row[columns[key].(map[string]any)["index"].(int)] }
 	var updates []uint64
 	for _, row := range response["data"].([][]any) {
-		require.Equal(t, "opaque-secret-document", value(row, "experience_id"), "measurement IDs are not credential-masked display text")
+		require.Equal(
+			t,
+			"opaque-secret-document",
+			value(row, "experience_id"),
+			"measurement IDs are not credential-masked display text",
+		)
 		if value(row, "kind") == "vital" {
 			require.Equal(t, "opaque-secret-metric", value(row, "metric_id"))
 			require.Equal(t, 0, value(row, "pageview"))
@@ -291,35 +301,59 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := history.NewStore(journalStore)
 	owner := aggregate.New(time.Hour, aggregate.SiteCfg{
-		Name: "shop", PageGroups: 20, Countries: 20,
-		Investigate: aggregate.InvestigateCfg{Rate: 0, KeepErrors: true},
+		Name:       "shop",
+		PageGroups: 20,
+		Countries:  20,
+		Investigate: aggregate.InvestigateCfg{
+			Rate:       0,
+			KeepErrors: true,
+		},
 	})
 	writer := history.NewWriter(store, discardCounters{})
 	owner.SetHistorySink(writer)
 	observed := time.Now().Add(-20 * time.Minute).Truncate(time.Second)
 	prior := &beacon.Beacon{
-		Site: "shop", SessionID: "promoted", ExperienceID: "document", Received: observed,
-		PageGroup: "/prior", UserID: "prior-user",
-		Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: observed.Add(-24 * time.Hour)}},
+		Site:         "shop",
+		SessionID:    "promoted",
+		ExperienceID: "document",
+		Received:     observed,
+		PageGroup:    "/prior",
+		UserID:       "prior-user",
+		Events: []beacon.Event{
+			{Kind: beacon.EventDocument, ID: "document", Revision: 1, Time: observed.Add(-24 * time.Hour)},
+		},
 	}
 	require.False(t, owner.Ingest(prior).Investigated)
 	rows, err := store.QuerySessions(ctx, "shop", "", observed.Unix(), observed.Unix(), 0, "")
 	require.NoError(t, err)
 	require.Empty(t, rows)
 	trigger := &beacon.Beacon{
-		Site: "shop", SessionID: "promoted", ExperienceID: "document", Received: observed.Add(time.Minute),
-		PageGroup: "/error", Errors: []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "boom", Time: observed.Add(-24 * time.Hour)}},
+		Site:         "shop",
+		SessionID:    "promoted",
+		ExperienceID: "document",
+		Received:     observed.Add(time.Minute),
+		PageGroup:    "/error",
+		Errors:       []beacon.Error{{Fingerprint: "failure", Type: "Error", Message: "boom", Time: observed.Add(-24 * time.Hour)}},
 	}
 	require.True(t, owner.Ingest(trigger).Investigated)
 	flush, cancel := context.WithCancel(ctx)
 	cancel()
 	writer.Run(flush)
 	// Another session's later receipt is in the same whole second, saved after promotion.
-	_, err = store.AppendEvent(ctx, history.EventRecord{Site: "shop", SessionID: "newer", Type: "pageview", ObservedUS: observed.UnixMicro() + 999_999})
+	_, err = store.AppendEvent(
+		ctx,
+		history.EventRecord{
+			Site:       "shop",
+			SessionID:  "newer",
+			Type:       "pageview",
+			ObservedUS: observed.UnixMicro() + 999_999,
+		},
+	)
 	require.NoError(t, err)
 	handler := rumfunc.New(query.New(rumregistry.New(), store), nil)
 	response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
-		Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
+		Method:      "rum-sessions",
+		Args:        []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()), fmt.Sprintf("before:%d", observed.Unix())},
 		Permissions: "0x1b",
 	}).RawResponse
 	require.NotNil(t, response)
@@ -336,14 +370,37 @@ func TestPromotionPreservesReceiptTimeThroughJournalAndFunction(t *testing.T) {
 	require.EqualValues(t, 1, data[1][4])
 	require.EqualValues(t, 0, data[1][5])
 	require.Equal(t, []string{"prior-user"}, data[1][12])
-	timeline := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-session-events", Args: []string{"site:shop", "session_id:promoted"}, Permissions: "0x1b"}).RawResponse
+	timeline := handler.HandleRaw(
+		ctx,
+		funcapi.RawMethodRequest{
+			Method:      "rum-session-events",
+			Args:        []string{"site:shop", "session_id:promoted"},
+			Permissions: "0x1b",
+		},
+	).RawResponse
 	require.NotNil(t, timeline)
 	events := timeline["data"].([][]any)
 	require.Len(t, events, 2)
 	require.Equal(t, observed.UnixMicro(), events[0][0], "browser event time must not become the native history clock")
-	require.Equal(t, observed.Add(time.Minute).UnixMicro(), events[1][0], "identity timeline includes the later promotion trigger")
+	require.Equal(
+		t,
+		observed.Add(time.Minute).UnixMicro(),
+		events[1][0],
+		"identity timeline includes the later promotion trigger",
+	)
 	// No observation in the gap implies no selected activity, despite observations on both sides.
-	gap := handler.HandleRaw(ctx, funcapi.RawMethodRequest{Method: "rum-sessions", Args: []string{"site:shop", fmt.Sprintf("after:%d", observed.Unix()+10), fmt.Sprintf("before:%d", observed.Unix()+20)}, Permissions: "0x1b"}).RawResponse
+	gap := handler.HandleRaw(
+		ctx,
+		funcapi.RawMethodRequest{
+			Method: "rum-sessions",
+			Args: []string{
+				"site:shop",
+				fmt.Sprintf("after:%d", observed.Unix()+10),
+				fmt.Sprintf("before:%d", observed.Unix()+20),
+			},
+			Permissions: "0x1b",
+		},
+	).RawResponse
 	require.NotNil(t, gap)
 	require.Empty(t, gap["data"])
 }

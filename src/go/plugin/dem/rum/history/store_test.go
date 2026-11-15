@@ -257,7 +257,10 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, files, "expired idle history is unlinked")
 		var retained int
-		require.NoError(t, reader.VisitMatch("DEM_SESSION_ID", "s", func(*journal.SnapshotEntry) error { retained++; return nil }))
+		require.NoError(
+			t,
+			reader.VisitMatch("DEM_SESSION_ID", "s", func(*journal.SnapshotEntry) error { retained++; return nil }),
+		)
 		assert.Equal(t, 1, retained, "opened snapshot survives archive unlink")
 		sessions, err := s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0, "")
 		require.NoError(t, err)
@@ -278,7 +281,12 @@ func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
 		require.Len(t, files, 1, "a new append creates a protected active file")
 		info, err := os.Stat(files[0])
 		require.NoError(t, err)
-		assert.GreaterOrEqual(t, info.Size(), int64(journalstore.MinHistoryBytes), "file lengths include allocation space")
+		assert.GreaterOrEqual(
+			t,
+			info.Size(),
+			int64(journalstore.MinHistoryBytes),
+			"file lengths include allocation space",
+		)
 		sessions, err = s.QuerySessions(ctx, "", "", 0, time.Now().Unix()+5, 0, "")
 		require.NoError(t, err)
 		require.Len(t, sessions, 1)

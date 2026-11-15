@@ -148,7 +148,12 @@ func TestVitalIdentityAdmission(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			a, now := newAgg(5 * time.Minute)
-			first := mk(*now, "session", "/page", beacon.Vital{ID: "lcp-1", Revision: 1, Name: beacon.LCP, Value: 100})
+			first := mk(*now, "session", "/page", beacon.Vital{
+				ID:       "lcp-1",
+				Revision: 1,
+				Name:     beacon.LCP,
+				Value:    100,
+			})
 			require.Len(t, a.Ingest(first).Observation.Vitals, 1)
 			if tc.renewedAfter > 0 {
 				*now = now.Add(tc.renewedAfter)
@@ -269,15 +274,29 @@ func TestInvalidNavigationTimingIsCounted(t *testing.T) {
 	invalid := func() uint64 { return a.Snapshot().Counters[CounterInvalidMeasurements] }
 	b := mk(*now, "s", "/")
 	b.Events = nil
-	b.Navigation = &beacon.Navigation{Revision: 0, HasLoad: true, LoadMS: 10}
+	b.Navigation = &beacon.Navigation{
+		Revision: 0,
+		HasLoad:  true,
+		LoadMS:   10,
+	}
 	assert.Nil(t, a.Ingest(b).Observation.Navigation)
 	b.ExperienceID = ""
-	b.Navigation = &beacon.Navigation{Revision: 1, HasLoad: true, LoadMS: 10}
+	b.Navigation = &beacon.Navigation{
+		Revision: 1,
+		HasLoad:  true,
+		LoadMS:   10,
+	}
 	assert.Nil(t, a.Ingest(b).Observation.Navigation)
 	require.EqualValues(t, 2, invalid())
 
 	b.ExperienceID = "document"
-	b.Navigation = &beacon.Navigation{Revision: 1, HasLoad: true, LoadMS: math.NaN(), HasDCL: true, DCLMS: -1}
+	b.Navigation = &beacon.Navigation{
+		Revision: 1,
+		HasLoad:  true,
+		LoadMS:   math.NaN(),
+		HasDCL:   true,
+		DCLMS:    -1,
+	}
 	got := a.Ingest(b).Observation.Navigation
 	require.NotNil(t, got)
 	assert.False(t, got.HasLoad)
@@ -296,7 +315,9 @@ func TestNavigationRevisionIgnoresEmptyTimingReports(t *testing.T) {
 	} {
 		for _, separate := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/separate=%t", name, separate), func(t *testing.T) {
-				a := New(time.Hour, SiteCfg{Name: "shop"})
+				a := New(time.Hour, SiteCfg{
+					Name: "shop",
+				})
 				valid := `{"name":"faro.performance.navigation","attributes":{"observation_id":"nav1","observation_sequence":"1","pageLoadTime":"123","domContentLoadHandlerTime":"10"}}`
 				empty := `{"name":"faro.performance.navigation","attributes":{"observation_id":"nav2","observation_sequence":"2"` + timings + `}}`
 				batches := []string{valid + "," + empty}
@@ -305,7 +326,10 @@ func TestNavigationRevisionIgnoresEmptyTimingReports(t *testing.T) {
 				}
 				for i, events := range batches {
 					raw := `{"meta":{"page":{"id":"document","url":"https://shop.example/entry"}},"events":[` + events + `]}`
-					b, err := faro.Decode([]byte(raw), faro.Options{Site: "shop", Now: time.Now()})
+					b, err := faro.Decode([]byte(raw), faro.Options{
+						Site: "shop",
+						Now:  time.Now(),
+					})
 					require.NoError(t, err)
 					if separate && i == 1 {
 						assert.Nil(t, b.Navigation)
@@ -321,7 +345,10 @@ func TestNavigationRevisionIgnoresEmptyTimingReports(t *testing.T) {
 				// A valid partial revision still replaces the previous report,
 				// including removing its now-absent load measurement.
 				raw := `{"meta":{"page":{"id":"document","url":"https://shop.example/entry"}},"events":[{"name":"faro.performance.navigation","attributes":{"observation_id":"nav3","observation_sequence":"3","domContentLoadHandlerTime":"0"}}]}`
-				b, err := faro.Decode([]byte(raw), faro.Options{Site: "shop", Now: time.Now()})
+				b, err := faro.Decode([]byte(raw), faro.Options{
+					Site: "shop",
+					Now:  time.Now(),
+				})
 				require.NoError(t, err)
 				a.Ingest(b)
 				snapshot = a.Snapshot()
@@ -364,8 +391,16 @@ func TestSessionLifecycleOccurrenceAdmission(t *testing.T) {
 			now := time.Now()
 			decode := func(id, revision string, received time.Time) *beacon.Beacon {
 				raw, err := json.Marshal(map[string]any{
-					"meta":   map[string]any{"page": map[string]string{"id": "document", "url": "https://example.org/entry"}, "session": map[string]string{"id": "session"}},
-					"events": []any{map[string]any{"name": name, "attributes": map[string]string{"observation_id": id, "observation_sequence": revision}}},
+					"meta": map[string]any{
+						"page":    map[string]string{"id": "document", "url": "https://example.org/entry"},
+						"session": map[string]string{"id": "session"},
+					},
+					"events": []any{
+						map[string]any{
+							"name":       name,
+							"attributes": map[string]string{"observation_id": id, "observation_sequence": revision},
+						},
+					},
 				})
 				require.NoError(t, err)
 				b, err := faro.Decode(raw, faro.Options{
@@ -413,7 +448,9 @@ func TestSessionLifecycleRequiresIdentity(t *testing.T) {
 				Received:     time.Now(),
 				ExperienceID: "document",
 				SessionID:    "session",
-				Events:       []beacon.Event{{Kind: beacon.EventSession, Name: "session_start", ID: "occurrence", Revision: 1}},
+				Events: []beacon.Event{
+					{Kind: beacon.EventSession, Name: "session_start", ID: "occurrence", Revision: 1},
+				},
 			}
 			switch missing {
 			case "experience":

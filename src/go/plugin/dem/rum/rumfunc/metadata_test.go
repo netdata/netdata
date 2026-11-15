@@ -90,13 +90,30 @@ func (metadataFunctionSource) Pages(context.Context, string, string) ([]query.Pa
 func (metadataFunctionSource) Live(context.Context, string, string, int, string) ([]query.LiveEvent, string, error) {
 	return nil, "", nil
 }
-func (metadataFunctionSource) Sessions(context.Context, string, string, int64, int64, int, string) ([]query.Session, error) {
+
+func (metadataFunctionSource) Sessions(
+	context.Context,
+	string,
+	string,
+	int64,
+	int64,
+	int,
+	string,
+) ([]query.Session, error) {
 	return []query.Session{{Site: "shop", SessionID: "visit"}}, nil
 }
 func (metadataFunctionSource) SessionEvents(context.Context, string, string, string) ([]query.SessionEvent, error) {
 	return []query.SessionEvent{{Site: "shop", SessionID: "visit", Type: "pageview", Page: "/"}}, nil
 }
-func (metadataFunctionSource) Errors(context.Context, string, string, int64, int64, string) ([]query.ErrorGroup, error) {
+
+func (metadataFunctionSource) Errors(
+	context.Context,
+	string,
+	string,
+	int64,
+	int64,
+	string,
+) ([]query.ErrorGroup, error) {
 	return nil, nil
 }
 
@@ -110,7 +127,14 @@ func TestObservationTimestampColumnsDeclareMicroseconds(t *testing.T) {
 			if method == "rum-session-events" {
 				args = append(args, "session_id:visit")
 			}
-			response := handler.HandleRaw(context.Background(), funcapi.RawMethodRequest{Method: method, Args: args, Permissions: "0x1b"}).RawResponse
+			response := handler.HandleRaw(
+				context.Background(),
+				funcapi.RawMethodRequest{
+					Method:      method,
+					Args:        args,
+					Permissions: "0x1b",
+				},
+			).RawResponse
 			require.NotNil(t, response)
 			require.Equal(t, 200, response["status"])
 			fields := response["columns"].(map[string]any)

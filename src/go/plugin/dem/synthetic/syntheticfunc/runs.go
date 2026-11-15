@@ -14,9 +14,11 @@ import (
 
 var runsMethod = method{
 	Method: rawfunc.Method{
-		ID:          "synthetics-runs",
-		Title:       "Synthetic runs",
-		Help:        "Retained attempts selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(rawfunc.MaxRows) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		ID:    "synthetics-runs",
+		Title: "Synthetic runs",
+		Help: "Retained attempts selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(
+			rawfunc.MaxRows,
+		) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 		Sort:        "started_us",
 		UpdateEvery: 10,
 		History:     true,
@@ -53,15 +55,39 @@ var runsColumns = rawfunc.Columns[model.Run]{
 	column("kind", "Kind", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Kind }),
 	column("name", "Name", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Name }),
 	column("target", "Target", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Target }),
-	column("started_us", "Started", funcapi.FieldTypeTimestamp, "", func(r model.Run) any { return timestamp(r.StartedUS) }),
+	column(
+		"started_us",
+		"Started",
+		funcapi.FieldTypeTimestamp,
+		"",
+		func(r model.Run) any { return timestamp(r.StartedUS) },
+	),
 	column("completed_us", "Completed", funcapi.FieldTypeTimestamp, "", func(r model.Run) any {
 		return timestamp(r.CompletedUS)
 	}),
 	column("outcome", "Outcome", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Outcome }),
-	column("duration_ms", "Attempt duration", funcapi.FieldTypeFloat, "ms", func(r model.Run) any { return number(r.DurationMS) }),
-	column("capture_state", "Capture state", funcapi.FieldTypeString, "", func(r model.Run) any { return r.CaptureState }),
+	column(
+		"duration_ms",
+		"Attempt duration",
+		funcapi.FieldTypeFloat,
+		"ms",
+		func(r model.Run) any { return number(r.DurationMS) },
+	),
+	column(
+		"capture_state",
+		"Capture state",
+		funcapi.FieldTypeString,
+		"",
+		func(r model.Run) any { return r.CaptureState },
+	),
 	column("error", "Error", funcapi.FieldTypeString, "", func(r model.Run) any { return r.Error }),
-	column("history_error", "History error", funcapi.FieldTypeString, "", func(r model.Run) any { return r.HistoryError }),
+	column(
+		"history_error",
+		"History error",
+		funcapi.FieldTypeString,
+		"",
+		func(r model.Run) any { return r.HistoryError },
+	),
 	column("vnode_guid", "Vnode GUID", funcapi.FieldTypeString, "", func(r model.Run) any { return r.VnodeGUID }),
 	column("scheduled_us", "Selected due time", funcapi.FieldTypeTimestamp, "", func(r model.Run) any {
 		return timestamp(r.ScheduledUS)

@@ -167,6 +167,8 @@ See `src/go/tools/expandstructs/README.md`.
 - Prefer `testify/require` for prerequisites and `testify/assert` for comparisons. Use `t.Fatal`/`t.Fatalf`
   directly for genuine test control flow or when no clearer assertion exists. Test shape: root `AGENTS.md`, "Go
   Test Style".
+- testify `NotEqual` between a named string type and a plain string always passes (the types differ); convert one
+  side or use `NotEqualValues`.
 
 ## Go Review And Reachability
 

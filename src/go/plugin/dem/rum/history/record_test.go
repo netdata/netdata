@@ -206,7 +206,10 @@ func TestDecodedEventsOwnStringsAndDoNotInheritAbsentFields(t *testing.T) {
 	require.NoError(t, s.scan(context.Background(), "", 0, 4, "", func(r EventRecord) { got = append(got, r) }))
 	require.Equal(t, want, got, "records remain owned after later payload callbacks and reader close")
 	var matched []EventRecord
-	require.NoError(t, s.matchSession(context.Background(), "", "session", "", func(r EventRecord) { matched = append(matched, r) }))
+	require.NoError(
+		t,
+		s.matchSession(context.Background(), "", "session", "", func(r EventRecord) { matched = append(matched, r) }),
+	)
 	require.Equal(t, []EventRecord{full, full, full}, matched)
 }
 
@@ -249,7 +252,15 @@ func TestSelectedDomainScalarsAreValidated(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			s, _ := newTestStore(t)
-			fields := eventFields(EventRecord{Site: "shop", SessionID: "session", Type: "pageview", ObservedUS: 1_000_000, Page: "/page"})
+			fields := eventFields(
+				EventRecord{
+					Site:       "shop",
+					SessionID:  "session",
+					Type:       "pageview",
+					ObservedUS: 1_000_000,
+					Page:       "/page",
+				},
+			)
 			_, err := s.store.Append(context.Background(), tc.mutate(fields))
 			require.NoError(t, err)
 			rows, err := s.QuerySessions(context.Background(), "shop", "", 1, 1, 0, "")

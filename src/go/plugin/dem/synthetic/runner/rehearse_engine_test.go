@@ -30,7 +30,10 @@ func TestRehearseIsolatesOutputsAndUsesResolvedRequest(t *testing.T) {
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var wire wireRequest
 		if err := json.Unmarshal(raw, &wire); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		work = wire.WorkDir
 		assert.False(t, wire.Capture)
@@ -59,8 +62,14 @@ func TestRehearseIsolatesOutputsAndUsesResolvedRequest(t *testing.T) {
 
 func TestRehearseRejectsFailureAndIncompleteCoverage(t *testing.T) {
 	for _, result := range []reporterResult{
-		{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, Error: "assertion synthetic-secret", CaptureState: "disabled"},
-		{Status: synthetic.Inconclusive, Tests: &synthetic.TestCounts{Declared: 1, Skipped: 1}, Error: "skipped", CaptureState: "disabled"},
+		{Status: synthetic.Failed, Tests: &synthetic.TestCounts{
+			Declared: 1,
+			Failed:   1,
+		}, Error: "assertion synthetic-secret", CaptureState: "disabled"},
+		{Status: synthetic.Inconclusive, Tests: &synthetic.TestCounts{
+			Declared: 1,
+			Skipped:  1,
+		}, Error: "skipped", CaptureState: "disabled"},
 		{Status: synthetic.Error, Error: "load synthetic-secret", CaptureState: "disabled"},
 	} {
 		t.Run(string(result.Status), func(t *testing.T) {
@@ -87,22 +96,37 @@ func TestRehearseReportsWorkspaceCleanupFailure(t *testing.T) {
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		var wire wireRequest
 		if err := json.Unmarshal(raw, &wire); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		alias = wire.WorkDir
 		work, err := filepath.EvalSymlinks(alias)
 		if err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		locked = filepath.Join(work, "locked")
 		if err := os.Mkdir(locked, 0700); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		if err := os.WriteFile(filepath.Join(locked, "script-output"), []byte("synthetic data"), 0600); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		if err := os.Chmod(locked, 0); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})
@@ -132,7 +156,10 @@ func TestRehearseSharesAdmissionAndHonorsCancellation(t *testing.T) {
 			return resultPayload(success())(ctx, args, raw, out, stderr)
 		}
 		<-ctx.Done()
-		return ndexec.TreeResult{Drained: true, Err: ctx.Err()}
+		return ndexec.TreeResult{
+			Drained: true,
+			Err:     ctx.Err(),
+		}
 	})
 	done := make(chan error, 1)
 	go func() { done <- e.Rehearse(t.Context(), journey()) }()
@@ -166,11 +193,17 @@ func TestRehearseUnverifiedDrainPoisonsSharedOwnerAndPreservesWork(t *testing.T)
 	e.start = starter(t, func(_ context.Context, _ []string, raw []byte, _, _ *os.File) ndexec.TreeResult {
 		var wire wireRequest
 		if err := json.Unmarshal(raw, &wire); err != nil {
-			return ndexec.TreeResult{Drained: true, Err: err}
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		alias = wire.WorkDir
 		work, _ = filepath.EvalSymlinks(alias)
-		return ndexec.TreeResult{Drained: false, Err: errors.New("no drainage proof")}
+		return ndexec.TreeResult{
+			Drained: false,
+			Err:     errors.New("no drainage proof"),
+		}
 	})
 	require.ErrorIs(t, e.Rehearse(t.Context(), journey()), ndexec.ErrTreeNotDrained)
 	select {
@@ -193,20 +226,66 @@ func TestRehearseUsesWireFailureEvidence(t *testing.T) {
 	e, history, _ := testEngine(t)
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		encoder := json.NewEncoder(out)
-		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(t, err) {
-			return ndexec.TreeResult{Drained: true, Err: err}
+		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(
+			t,
+			err,
+		) {
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
-		failure := synthetic.FailureDetail{Test: synthetic.EvidenceTest{ID: "t", Title: "checkout", Status: "failed", ExpectedStatus: "passed", ReportingComplete: true}, Message: "receipt synthetic-secret missing", Location: &synthetic.EvidenceLocation{File: "checkout.spec.js", Line: 10, Column: 2}}
-		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "failure", "failure": failure}}}); !assert.NoError(t, err) {
-			return ndexec.TreeResult{Drained: true, Err: err}
+		failure := synthetic.FailureDetail{
+			Test: synthetic.EvidenceTest{
+				ID:                "t",
+				Title:             "checkout",
+				Status:            "failed",
+				ExpectedStatus:    "passed",
+				ReportingComplete: true,
+			},
+			Message: "receipt synthetic-secret missing",
+			Location: &synthetic.EvidenceLocation{
+				File:   "checkout.spec.js",
+				Line:   10,
+				Column: 2,
+			},
 		}
-		return resultPayload(reporterResult{Status: synthetic.Failed, Tests: &synthetic.TestCounts{Declared: 1, Failed: 1}, Error: "core assertion", CaptureState: "disabled"})(ctx, args, raw, out, stderr)
+		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "failure", "failure": failure}}}); !assert.NoError(
+			t,
+			err,
+		) {
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
+		}
+		return resultPayload(
+			reporterResult{
+				Status: synthetic.Failed,
+				Tests: &synthetic.TestCounts{
+					Declared: 1,
+					Failed:   1,
+				},
+				Error:        "core assertion",
+				CaptureState: "disabled",
+			},
+		)(
+			ctx,
+			args,
+			raw,
+			out,
+			stderr,
+		)
 	})
 	request := journey()
 	request.Secrets = map[string]string{"DEM_SECRET_TOKEN": "synthetic-secret"}
 	err := e.Rehearse(t.Context(), request)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "First unexpected failure: checkout [failed; expected passed] (checkout.spec.js:10:2): receipt")
+	assert.Contains(
+		t,
+		err.Error(),
+		"First unexpected failure: checkout [failed; expected passed] (checkout.spec.js:10:2): receipt",
+	)
 	assert.NotContains(t, err.Error(), "synthetic-secret")
 	assert.Empty(t, history.runs)
 }
@@ -215,11 +294,23 @@ func TestRehearseOptionalInvalidityPreservesSuccess(t *testing.T) {
 	e, history, _ := testEngine(t)
 	e.start = starter(t, func(ctx context.Context, args []string, raw []byte, out, stderr *os.File) ndexec.TreeResult {
 		encoder := json.NewEncoder(out)
-		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(t, err) {
-			return ndexec.TreeResult{Drained: true, Err: err}
+		if err := encoder.Encode(map[string]any{"type": "extension_init", "extension_init": map[string]any{"selected": []string{failureEvidenceFeature}}}); !assert.NoError(
+			t,
+			err,
+		) {
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
-		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "invalid"}}}); !assert.NoError(t, err) {
-			return ndexec.TreeResult{Drained: true, Err: err}
+		if err := encoder.Encode(map[string]any{"type": "extension", "extension": map[string]any{"feature": failureEvidenceFeature, "data": map[string]any{"record": "invalid"}}}); !assert.NoError(
+			t,
+			err,
+		) {
+			return ndexec.TreeResult{
+				Drained: true,
+				Err:     err,
+			}
 		}
 		return resultPayload(success())(ctx, args, raw, out, stderr)
 	})

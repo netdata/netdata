@@ -18,7 +18,11 @@ type healthChange struct {
 }
 
 func trackHealth(operation string, previous, current error) healthChange {
-	return healthChange{operation: operation, err: current, changed: errorText(previous) != errorText(current)}
+	return healthChange{
+		operation: operation,
+		err:       current,
+		changed:   errorText(previous) != errorText(current),
+	}
 }
 
 func (c healthChange) log(log *logger.Logger) {

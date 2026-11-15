@@ -84,7 +84,9 @@ func TestLatestCopiesOneActiveRun(t *testing.T) {
 		Events:      []synthetic.Event{{Message: "original"}},
 	}
 	h := registry.New()
-	session := newSession(t, "checkout", completingExecutor{run: run})
+	session := newSession(t, "checkout", completingExecutor{
+		run: run,
+	})
 	retire, err := h.Register(session, "")
 	require.NoError(t, err)
 	defer retire()

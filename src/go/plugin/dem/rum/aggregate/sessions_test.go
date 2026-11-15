@@ -262,7 +262,9 @@ func TestDocumentRevision(t *testing.T) {
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{Events: tc.events}))
+			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{
+				Events: tc.events,
+			}))
 		})
 	}
 }

@@ -33,9 +33,23 @@ func TestObservationIdentityNormalization(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{
-				"meta":         map[string]any{"session": map[string]string{"id": tc.id}, "page": map[string]string{"id": tc.id, "url": "https://example.org/entry"}, "view": map[string]string{"id": tc.id, "name": "checkout"}},
-				"measurements": []any{map[string]any{"values": map[string]float64{"cls": 0}, "context": map[string]string{"id": tc.id, "observation_sequence": tc.revision}}},
-				"events":       []any{map[string]any{"name": "document_activated", "attributes": map[string]string{"observation_id": tc.id, "observation_sequence": tc.revision}}},
+				"meta": map[string]any{
+					"session": map[string]string{"id": tc.id},
+					"page":    map[string]string{"id": tc.id, "url": "https://example.org/entry"},
+					"view":    map[string]string{"id": tc.id, "name": "checkout"},
+				},
+				"measurements": []any{
+					map[string]any{
+						"values":  map[string]float64{"cls": 0},
+						"context": map[string]string{"id": tc.id, "observation_sequence": tc.revision},
+					},
+				},
+				"events": []any{
+					map[string]any{
+						"name":       "document_activated",
+						"attributes": map[string]string{"observation_id": tc.id, "observation_sequence": tc.revision},
+					},
+				},
 			})
 			require.NoError(t, err)
 			b, err := Decode(raw, Options{
@@ -59,9 +73,13 @@ func TestObservationIdentityNormalization(t *testing.T) {
 }
 
 func TestCaptureNormalizesBeforeFingerprinting(t *testing.T) {
-	opt := Options{Site: "shop", Now: now, EventLogs: true, FrustrationSignals: true,
-		Redactor:  redact.NewRedactor("configured-value"),
-		PathRules: []PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
+	opt := Options{
+		Site:               "shop",
+		Now:                now,
+		EventLogs:          true,
+		FrustrationSignals: true,
+		Redactor:           redact.NewRedactor("configured-value"),
+		PathRules:          []PathRule{{Re: regexp.MustCompile(`/members/[^/]+`), Replace: "/members/:member"}},
 	}
 	var fingerprints []string
 	for _, query := range []string{"?request=one#first", "?request=two#second"} {
@@ -96,7 +114,9 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
   {"name":"securitypolicyviolation","attributes":{"sample":"unused"}},
   {"name":"faro.user.action","attributes":{"userActionName":"unused"}}
  ]}`)
-	b, err := Decode(raw, Options{Now: now})
+	b, err := Decode(raw, Options{
+		Now: now,
+	})
 	require.NoError(t, err)
 	require.Len(t, b.Events, 6)
 	assert.Equal(t, beacon.EventSession, b.Events[0].Kind)
@@ -115,7 +135,11 @@ func TestCaptureDiscardsUnusedAttributesButKeepsNativeEvidence(t *testing.T) {
 	for _, event := range b.Events {
 		assert.NotContains(t, event.Attrs, "unused")
 	}
-	enabled, err := Decode(raw, Options{Now: now, EventLogs: true, FrustrationSignals: true})
+	enabled, err := Decode(raw, Options{
+		Now:                now,
+		EventLogs:          true,
+		FrustrationSignals: true,
+	})
 	require.NoError(t, err)
 	require.Len(t, enabled.Events, 7)
 	assert.Equal(t, "value", enabled.Events[2].Attrs["context"])
@@ -128,9 +152,17 @@ func TestCaptureRedactsBeforeBounds(t *testing.T) {
 	// The credential crosses the type's boundary. Truncating it first would leave
 	// a credential prefix that the configured-value matcher could not recognize.
 	typ := strings.Repeat("x", maxNameLen-3) + "configured-value"
-	raw, err := json.Marshal(map[string]any{"exceptions": []any{map[string]any{"type": typ, "value": "failed"}}, "events": []any{map[string]any{"name": typ}}})
+	raw, err := json.Marshal(
+		map[string]any{
+			"exceptions": []any{map[string]any{"type": typ, "value": "failed"}},
+			"events":     []any{map[string]any{"name": typ}},
+		},
+	)
 	require.NoError(t, err)
-	b, err := Decode(raw, Options{Now: now, Redactor: redact.NewRedactor("configured-value")})
+	b, err := Decode(raw, Options{
+		Now:      now,
+		Redactor: redact.NewRedactor("configured-value"),
+	})
 	require.NoError(t, err)
 	require.Len(t, b.Errors, 1)
 	assert.Equal(t, strings.Repeat("x", maxNameLen-3)+"[RE", b.Errors[0].Type)
@@ -139,8 +171,14 @@ func TestCaptureRedactsBeforeBounds(t *testing.T) {
 }
 
 func TestCaptureSpanAttributeSemanticsPrecedeKeyRedaction(t *testing.T) {
-	raw := []byte(`{"traces":{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"1234567890abcdef1234567890abcdef","spanId":"1234567890abcdef","startTimeUnixNano":"1","endTimeUnixNano":"2","attributes":[{"key":"url.full","value":{"stringValue":"https://user:password@example.org/api?private=value#fragment"}}]}]}]}]}}`)
-	b, err := Decode(raw, Options{Now: now, Tracing: true, Redactor: redact.NewRedactor("url.full")})
+	raw := []byte(
+		`{"traces":{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"1234567890abcdef1234567890abcdef","spanId":"1234567890abcdef","startTimeUnixNano":"1","endTimeUnixNano":"2","attributes":[{"key":"url.full","value":{"stringValue":"https://user:password@example.org/api?private=value#fragment"}}]}]}]}]}}`,
+	)
+	b, err := Decode(raw, Options{
+		Now:      now,
+		Tracing:  true,
+		Redactor: redact.NewRedactor("url.full"),
+	})
 	require.NoError(t, err)
 	require.Len(t, b.Spans, 1)
 	require.Len(t, b.Spans[0].Attrs, 1)
@@ -157,7 +195,10 @@ func TestCapturePerformanceEventNamesAreStructuredURLs(t *testing.T) {
 			}}})
 			require.NoError(t, err)
 			for _, logs := range []bool{false, true} {
-				b, err := Decode(raw, Options{Now: now, EventLogs: logs})
+				b, err := Decode(raw, Options{
+					Now:       now,
+					EventLogs: logs,
+				})
 				require.NoError(t, err)
 				require.Len(t, b.Events, 1)
 				if native || logs {
@@ -187,7 +228,11 @@ func TestCaptureAttributeKeysNormalizeBeforeSemantics(t *testing.T) {
   "startTimeUnixNano":"1","endTimeUnixNano":"2",
   "attributes":[{"key":` + key + `,"value":{"stringValue":"https://user:password@example.org/api?private=value#fragment"}}]
  }]}]}]}}`)
-			b, err := Decode(raw, Options{Now: now, Tracing: true, EventLogs: true})
+			b, err := Decode(raw, Options{
+				Now:       now,
+				Tracing:   true,
+				EventLogs: true,
+			})
 			require.NoError(t, err)
 			require.Len(t, b.Spans, 1)
 			require.Len(t, b.Spans[0].Attrs, 1)
@@ -202,19 +247,38 @@ func TestCaptureRejectsNonfiniteTimingValues(t *testing.T) {
 	for _, value := range []string{"-1", "+Inf", "-Inf", "NaN", "Infinity", "1e1000", "I\tnf"} {
 		t.Run(value, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"events": []any{
-				map[string]any{"name": navigationEvent, "attributes": map[string]string{"pageLoadTime": value, "domContentLoadHandlerTime": "10"}},
-				map[string]any{"name": resourceEvent, "attributes": map[string]string{"duration": value, "httpHost": "example.org"}},
-				map[string]any{"name": resourceEvent, "attributes": map[string]string{"duration": "25", "transferSize": value, "httpHost": "example.org"}},
-				map[string]any{"name": "faro.tracing.fetch", "attributes": map[string]string{"duration_ns": value, "http.response.status_code": value}},
+				map[string]any{
+					"name":       navigationEvent,
+					"attributes": map[string]string{"pageLoadTime": value, "domContentLoadHandlerTime": "10"},
+				},
+				map[string]any{
+					"name":       resourceEvent,
+					"attributes": map[string]string{"duration": value, "httpHost": "example.org"},
+				},
+				map[string]any{
+					"name":       resourceEvent,
+					"attributes": map[string]string{"duration": "25", "transferSize": value, "httpHost": "example.org"},
+				},
+				map[string]any{
+					"name":       "faro.tracing.fetch",
+					"attributes": map[string]string{"duration_ns": value, "http.response.status_code": value},
+				},
 			}})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now, EventLogs: true})
+			b, err := Decode(raw, Options{
+				Now:       now,
+				EventLogs: true,
+			})
 			require.NoError(t, err)
 			require.NotNil(t, b.Navigation)
 			assert.False(t, b.Navigation.HasLoad)
 			assert.True(t, b.Navigation.HasDCL)
 			assert.Equal(t, float64(10), b.Navigation.DCLMS)
-			assert.Equal(t, []beacon.Resource{{Host: "example.org"}, {Host: "example.org", HasDuration: true, DurationMS: 25}}, b.Resources)
+			assert.Equal(
+				t,
+				[]beacon.Resource{{Host: "example.org"}, {Host: "example.org", HasDuration: true, DurationMS: 25}},
+				b.Resources,
+			)
 			require.Len(t, b.Events, 4)
 			assert.NotContains(t, b.Events[0].Attrs, "pageLoadTime")
 			assert.NotContains(t, b.Events[1].Attrs, "duration")
@@ -233,12 +297,21 @@ func TestCaptureURLPercentAndOpaqueViewHandling(t *testing.T) {
 	} {
 		t.Run(tc.view, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"meta": map[string]any{
-				"page": map[string]string{"url": "https://user:password@example.org/sale/50%-off?private=value#fragment"},
+				"page": map[string]string{
+					"url": "https://user:password@example.org/sale/50%-off?private=value#fragment",
+				},
 				"view": map[string]string{"name": tc.view}},
-				"events": []any{map[string]any{"name": "view_changed", "attributes": map[string]string{"fromView": tc.view, "toView": tc.view}}},
+				"events": []any{
+					map[string]any{
+						"name":       "view_changed",
+						"attributes": map[string]string{"fromView": tc.view, "toView": tc.view},
+					},
+				},
 			})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now})
+			b, err := Decode(raw, Options{
+				Now: now,
+			})
 			require.NoError(t, err)
 			assert.Equal(t, "/sale/50%25-off", b.Path)
 			assert.Equal(t, "example.org", b.PageHost)
@@ -262,7 +335,10 @@ func TestCaptureURLViewsReduceBeforeRedaction(t *testing.T) {
 		t.Run(view, func(t *testing.T) {
 			raw, err := json.Marshal(map[string]any{"meta": map[string]any{"view": map[string]string{"name": view}}})
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now, Redactor: redact.NewRedactor("configured-value")})
+			b, err := Decode(raw, Options{
+				Now:      now,
+				Redactor: redact.NewRedactor("configured-value"),
+			})
 			require.NoError(t, err)
 			assert.Equal(t, want, b.View)
 		})
@@ -301,7 +377,10 @@ func TestCaptureViewNamePathRules(t *testing.T) {
 
 // A rule that rewrites part of a credential cannot leave the rest unredacted.
 func TestCaptureViewNameDigitRule(t *testing.T) {
-	opt := Options{Now: now, PathRules: []PathRule{{Re: regexp.MustCompile(`\d+`), Replace: ":id"}}}
+	opt := Options{
+		Now:       now,
+		PathRules: []PathRule{{Re: regexp.MustCompile(`\d+`), Replace: ":id"}},
+	}
 	for view, want := range map[string]string{
 		"AKIA0123456789ABCDEF": "[REDACTED]",
 		"Bearer abc123xyz":     "[REDACTED]",
@@ -334,8 +413,20 @@ func TestCapturePreservesHashedScriptIdentity(t *testing.T) {
 		serialized, err := json.Marshal(frame)
 		require.NoError(t, err)
 		raw, err := json.Marshal(map[string]any{
-			"exceptions": []any{map[string]any{"type": "Error", "value": "failed", "stacktrace": map[string]any{"frames": []any{frame}}}},
-			"logs":       []any{map[string]any{"level": "error", "message": "failed", "context": map[string]string{"type": "Error", "stackFrames": string(serialized)}}},
+			"exceptions": []any{
+				map[string]any{
+					"type":       "Error",
+					"value":      "failed",
+					"stacktrace": map[string]any{"frames": []any{frame}},
+				},
+			},
+			"logs": []any{
+				map[string]any{
+					"level":   "error",
+					"message": "failed",
+					"context": map[string]string{"type": "Error", "stackFrames": string(serialized)},
+				},
+			},
 		})
 		require.NoError(t, err)
 		b, err := Decode(raw, opt)
@@ -381,7 +472,12 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 		"credential at the bound": {raw: bound + "tok\x00en=hunter2", secret: "hun", want: bound + "token=[REDACT"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			frame := map[string]any{"function": tc.raw, "filename": "https://example.org/app.js", "lineno": 1, "colno": 2}
+			frame := map[string]any{
+				"function": tc.raw,
+				"filename": "https://example.org/app.js",
+				"lineno":   1,
+				"colno":    2,
+			}
 			serialized, err := json.Marshal(frame)
 			require.NoError(t, err)
 			text := map[string]any{"stringValue": tc.raw}
@@ -394,15 +490,38 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 					"app":     map[string]string{"version": tc.raw, "environment": tc.raw},
 					"user":    map[string]string{"id": tc.raw},
 				},
-				"measurements": []any{map[string]any{"values": map[string]float64{"lcp": 5000}, "context": map[string]string{"element": tc.raw}}},
-				"exceptions":   []any{map[string]any{"type": tc.raw, "value": tc.raw, "stacktrace": map[string]any{"frames": []any{frame}}}},
+				"measurements": []any{
+					map[string]any{
+						"values":  map[string]float64{"lcp": 5000},
+						"context": map[string]string{"element": tc.raw},
+					},
+				},
+				"exceptions": []any{
+					map[string]any{
+						"type":       tc.raw,
+						"value":      tc.raw,
+						"stacktrace": map[string]any{"frames": []any{frame}},
+					},
+				},
 				"events": []any{
-					map[string]any{"name": tc.raw, "domain": tc.raw, "attributes": map[string]string{tc.raw: tc.raw, "target": tc.raw}},
+					map[string]any{
+						"name":       tc.raw,
+						"domain":     tc.raw,
+						"attributes": map[string]string{tc.raw: tc.raw, "target": tc.raw},
+					},
 					map[string]any{"name": "rage_click", "attributes": map[string]string{"target": tc.raw}},
 				},
-				"logs": []any{map[string]any{"level": tc.raw, "message": tc.raw, "context": map[string]string{"type": tc.raw, "stackFrames": string(serialized)}}},
+				"logs": []any{
+					map[string]any{
+						"level":   tc.raw,
+						"message": tc.raw,
+						"context": map[string]string{"type": tc.raw, "stackFrames": string(serialized)},
+					},
+				},
 				"traces": map[string]any{"resourceSpans": []any{map[string]any{
-					"resource": map[string]any{"attributes": []any{map[string]any{"key": "service.name", "value": text}}},
+					"resource": map[string]any{
+						"attributes": []any{map[string]any{"key": "service.name", "value": text}},
+					},
 					"scopeSpans": []any{map[string]any{
 						"scope": map[string]string{"name": tc.raw, "version": tc.raw},
 						"spans": []any{map[string]any{
@@ -447,9 +566,15 @@ func TestConsoleLevelRedactsBeforeLowercasing(t *testing.T) {
 		"Custom":    "Custom",
 	} {
 		t.Run(level, func(t *testing.T) {
-			raw, err := json.Marshal(map[string]any{"logs": []any{map[string]string{"level": level, "message": "failed"}}})
+			raw, err := json.Marshal(
+				map[string]any{"logs": []any{map[string]string{"level": level, "message": "failed"}}},
+			)
 			require.NoError(t, err)
-			b, err := Decode(raw, Options{Now: now, ConsoleLogs: true, Redactor: redact.NewRedactor("Lv1Secret")})
+			b, err := Decode(raw, Options{
+				Now:         now,
+				ConsoleLogs: true,
+				Redactor:    redact.NewRedactor("Lv1Secret"),
+			})
 			require.NoError(t, err)
 			require.Len(t, b.Logs, 1)
 			assert.Equal(t, want, b.Logs[0].Level)

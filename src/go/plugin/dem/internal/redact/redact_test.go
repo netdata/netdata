@@ -96,7 +96,13 @@ func TestSpansMatchApply(t *testing.T) {
 	rng := rand.New(rand.NewPCG(3, 4))
 	for range 20000 {
 		input := randomText(rng)
-		require.Equal(t, collapse(r.Apply(input)), collapse(replaceSpans(input, r.spans(input), keep)), "input %q", input)
+		require.Equal(
+			t,
+			collapse(r.Apply(input)),
+			collapse(replaceSpans(input, r.spans(input), keep)),
+			"input %q",
+			input,
+		)
 	}
 }
 

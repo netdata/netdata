@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 )
 
 // Handle owns the browser runtime resources of one plugin process. Close follows
@@ -22,11 +22,11 @@ type Handle struct {
 	Host *Host
 	// Manifest is the verified preload descriptor; nil in other modes or when
 	// the preload is unusable.
-	Manifest *runtime.Manifest
+	Manifest *browserruntime.Manifest
 	// SetupError reports why the runtime is unusable. RUM keeps working.
 	SetupError error
-	store      *runtime.Store
-	native     *runtime.Native
+	store      *browserruntime.Store
+	native     *browserruntime.Native
 	closeOnce  sync.Once
 	closeErr   error
 }
@@ -34,11 +34,13 @@ type Handle struct {
 // Open never fails: setup problems leave synthetic jobs waiting or failing
 // with SetupError while the rest of the plugin runs.
 func Open(cfg Config, varLibPath string) *Handle {
-	h := &Handle{SetupError: cfg.Validate()}
+	h := &Handle{
+		SetupError: cfg.Validate(),
+	}
 	if cfg.Mode == ModePreloaded && !filepath.IsAbs(cfg.PreloadPath) {
 		h.SetupError = errors.Join(h.SetupError, errors.New("runtime.preload_path must be absolute"))
 	}
-	if !runtime.SupportedHost() {
+	if !browserruntime.SupportedHost() {
 		h.SetupError = errors.Join(h.SetupError, errors.New("browser runtime requires Linux amd64 or arm64"))
 	}
 	switch cfg.Mode {
@@ -54,7 +56,7 @@ func Open(cfg Config, varLibPath string) *Handle {
 
 func (h *Handle) openPreload(path string) {
 	if h.SetupError == nil {
-		paths, manifest, err := runtime.ReadPreload(path)
+		paths, manifest, err := browserruntime.ReadPreload(path)
 		if err == nil {
 			h.Manifest = &manifest
 			h.Source = preloadedSource{runnerPaths(paths, manifest.Identity())}
@@ -67,7 +69,7 @@ func (h *Handle) openPreload(path string) {
 
 func (h *Handle) openNative() {
 	if h.SetupError == nil {
-		h.native, h.SetupError = runtime.OpenNative(runtime.DefaultNativeConfig())
+		h.native, h.SetupError = browserruntime.OpenNative(browserruntime.DefaultNativeConfig())
 	}
 	if h.SetupError != nil {
 		h.Host = NewUnavailable(ModeNative, h.SetupError)
@@ -80,10 +82,10 @@ func (h *Handle) openNative() {
 
 func (h *Handle) openManaged(cfg Config, varLibPath string) {
 	if h.SetupError == nil {
-		var storeConfig runtime.Config
+		var storeConfig browserruntime.Config
 		storeConfig, h.SetupError = cfg.StoreConfig(varLibPath)
 		if h.SetupError == nil {
-			h.store, h.SetupError = runtime.Open(storeConfig)
+			h.store, h.SetupError = browserruntime.Open(storeConfig)
 		}
 	}
 	if h.SetupError != nil {

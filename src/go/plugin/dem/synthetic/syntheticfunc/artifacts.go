@@ -14,9 +14,11 @@ import (
 
 var artifactsMethod = method{
 	Method: rawfunc.Method{
-		ID:          "synthetics-artifacts",
-		Title:       "Retained synthetic captures",
-		Help:        "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–" + strconv.Itoa(rawfunc.MaxRows) + ". Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		ID:    "synthetics-artifacts",
+		Title: "Retained synthetic captures",
+		Help: "Retained capture sets, newest publication first, independently of run history or active monitors. Optional job_id filters rows; storage facts remain global. before accepts the previous next cursor; limit is 1–" + strconv.Itoa(
+			rawfunc.MaxRows,
+		) + ". Retention can remove sets between pages. Metadata does not verify payload integrity. Storage sizes are logical file lengths; protected workspace and pending deletion are outside the retained-capture allowance. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
 		Sort:        "published_us",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "before", "limit", "vnode", "vnode_guid"},
@@ -28,9 +30,21 @@ var artifactsMethod = method{
 var artifactsColumns = rawfunc.Columns[artifacts.Set]{
 	column("run_id", "Run", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.RunID }),
 	column("job_id", "Monitor", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.JobID }),
-	column("published_us", "Published", funcapi.FieldTypeTimestamp, "", func(s artifacts.Set) any { return s.PublishedUS }),
+	column(
+		"published_us",
+		"Published",
+		funcapi.FieldTypeTimestamp,
+		"",
+		func(s artifacts.Set) any { return s.PublishedUS },
+	),
 	column("bytes", "Set size", funcapi.FieldTypeInteger, "bytes", func(s artifacts.Set) any { return s.Bytes }),
-	column("artifact_count", "Artifacts", funcapi.FieldTypeInteger, "", func(s artifacts.Set) any { return s.Artifacts }),
+	column(
+		"artifact_count",
+		"Artifacts",
+		funcapi.FieldTypeInteger,
+		"",
+		func(s artifacts.Set) any { return s.Artifacts },
+	),
 	column("vnode_guid", "Vnode GUID", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.VnodeGUID }),
 }
 

@@ -18,13 +18,13 @@ var charts string
 var schema string
 
 type Config struct {
-	CheckEvery  int              `yaml:"check_every"     json:"check_every"`
-	Vnode       string           `yaml:"vnode,omitempty" json:"vnode,omitempty"`
-	Name        string           `yaml:"name"            json:"name"`
-	UpdateEvery int              `yaml:"update_every"    json:"update_every"`
-	Timeout     confopt.Duration `yaml:"timeout"         json:"timeout"`
-	URL         string           `yaml:"url"             json:"url"`
-	SaveReport  bool             `yaml:"save_report"     json:"save_report"`
+	CheckEvery  int              `yaml:"check_every"            json:"check_every"`
+	Vnode       string           `yaml:"vnode,omitempty"        json:"vnode,omitempty"`
+	Name        string           `yaml:"name"                   json:"name"`
+	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
+	Timeout     confopt.Duration `yaml:"timeout"                json:"timeout"`
+	URL         string           `yaml:"url"                    json:"url"`
+	SaveReport  bool             `yaml:"save_report"            json:"save_report"`
 }
 
 // Dependencies names the shared synthetic job dependencies for callers outside the collector tree.
