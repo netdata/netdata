@@ -557,6 +557,121 @@ func TestCaptureRedactsCredentialsJoinedByCleaning(t *testing.T) {
 	}
 }
 
+// urlEscapeBeacon puts one escaped URL path into every URL-shaped value: the
+// page URL, a URL-shaped view name, URL attributes and a stack frame file name.
+func urlEscapeBeacon(t *testing.T, path string, redactor *redact.Redactor) *beacon.Beacon {
+	t.Helper()
+	frame := map[string]any{"function": "render", "filename": "https://example.org" + path + "/app.js", "lineno": 1}
+	raw, err := json.Marshal(map[string]any{
+		"meta": map[string]any{
+			"session": map[string]string{"id": "session"},
+			"page":    map[string]string{"url": "https://example.org" + path + "?private=1#fragment"},
+			"view":    map[string]string{"name": path},
+		},
+		"exceptions": []any{
+			map[string]any{"type": "Error", "value": "failed", "stacktrace": map[string]any{"frames": []any{frame}}},
+		},
+		"events": []any{
+			map[string]any{
+				"name":       "checkout",
+				"attributes": map[string]string{"url.full": "https://api.example.org" + path, "url": path},
+			},
+		},
+		"traces": map[string]any{"resourceSpans": []any{map[string]any{
+			"scopeSpans": []any{map[string]any{
+				"spans": []any{map[string]any{
+					"traceId": "1234567890abcdef1234567890abcdef", "spanId": "1234567890abcdef",
+					"startTimeUnixNano": "1", "endTimeUnixNano": "2", "name": "GET",
+					"attributes": []any{map[string]any{
+						"key":   "url.full",
+						"value": map[string]string{"stringValue": "https://api.example.org" + path},
+					}},
+				}},
+			}},
+		}}},
+	})
+	require.NoError(t, err)
+	b, err := Decode(raw, Options{
+		Now:       now,
+		EventLogs: true,
+		Tracing:   true,
+		Redactor:  redactor,
+	})
+	require.NoError(t, err)
+	require.Len(t, b.Errors, 1)
+	require.Len(t, b.Events, 1)
+	require.Len(t, b.Spans, 1)
+	return b
+}
+
+// Credential patterns also read the decoded URL path, so a percent-escape
+// cannot hide a credential. The email, ID and token path rules run first.
+func TestCaptureRedactsCredentialsHiddenByURLEscapes(t *testing.T) {
+	const pem = "-----BEGIN%20PRIVATE%20KEY-----MIIBOgIB/AAJBAKj34Gkx-----END%20PRIVATE%20KEY-----"
+	for name, tc := range map[string]struct {
+		path   string // escaped URL path holding the credential
+		secret string // the credential value; it must not survive in any form
+		want   string // the normalized page path and view
+	}{
+		"bearer behind an escaped space": {path: "/a/Bearer%20abcdef.ghi", secret: "abcdef.ghi", want: "/a/[REDACTED]"},
+		"bearer behind an escaped tab":   {path: "/a/Bearer%09abcdef.ghi", secret: "abcdef.ghi", want: "/a/[REDACTED]"},
+		"escaped credential key":         {path: "/a/tok%65n=hunter2", secret: "hunter2", want: "/a/token=[REDACTED]"},
+		"configured value with an escape": {
+			path:   "/files/open%20sesame/x",
+			secret: "sesame",
+			want:   "/files/[REDACTED]/x",
+		},
+		"PEM block across segments": {path: "/k/" + pem, secret: "AAJBAKj34Gkx", want: "/k/[REDACTED]"},
+		// Control characters are removed from a redacted path, as from text.
+		"bearer split by an escaped NUL": {path: "/a/Bea%00rer%20abcdef.ghi", secret: "abcdef.ghi", want: "/a/[REDACTED]"},
+		"bearer split by an escaped C1 control": {
+			path:   "/a/Bea%C2%85rer%20abcdef.ghi",
+			secret: "abcdef.ghi",
+			want:   "/a/[REDACTED]",
+		},
+		"after the email rule": {
+			path:   "/users/jane%40example.com/Bearer%20abcdef.ghi",
+			secret: "abcdef.ghi",
+			want:   "/users/:email/[REDACTED]",
+		},
+		// A redacted path is escaped again as a whole: an escaped slash in it
+		// becomes a separator.
+		"escaped slash beside a credential": {
+			path:   "/a%2Fb/Bearer%20abcdef.ghi",
+			secret: "abcdef.ghi",
+			want:   "/a/b/[REDACTED]",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			b := urlEscapeBeacon(t, tc.path, redact.NewRedactor("open sesame"))
+			assert.Equal(t, tc.want, b.Path)
+			assert.Equal(t, tc.want, b.View)
+			for _, value := range beaconStrings(reflect.ValueOf(b)) {
+				assert.NotContains(t, value, tc.secret)
+			}
+		})
+	}
+}
+
+// A path the decoded redaction leaves unchanged keeps its received escaping.
+func TestCaptureKeepsURLEscapesWithoutCredentials(t *testing.T) {
+	for _, path := range []string{
+		"/caf%C3%A9/50%25-off",
+		"/a%2Fb/c",
+		"/a/Bearer",
+		"/x%5By%5D",
+		"/a%00b%FF/c%0A", // control characters and invalid UTF-8 without a credential
+		"/%5BREDACTED%5D/x",
+	} {
+		t.Run(path, func(t *testing.T) {
+			b := urlEscapeBeacon(t, path, nil)
+			assert.Equal(t, path, b.Path)
+			assert.Equal(t, path, b.View)
+			assert.Equal(t, "https://api.example.org"+path, b.Events[0].Attrs["url.full"])
+		})
+	}
+}
+
 func TestConsoleLevelRedactsBeforeLowercasing(t *testing.T) {
 	for level, want := range map[string]string{
 		"WARN":      "warn",

@@ -87,8 +87,8 @@ func TestApplyRemovingFollowsValueOrder(t *testing.T) {
 func TestSpansMatchApply(t *testing.T) {
 	r := siteRedactor()
 	collapse := func(s string) string {
-		for strings.Contains(s, redacted+redacted) {
-			s = strings.ReplaceAll(s, redacted+redacted, redacted)
+		for strings.Contains(s, Marker+Marker) {
+			s = strings.ReplaceAll(s, Marker+Marker, Marker)
 		}
 		return s
 	}

@@ -40,23 +40,24 @@ func NewRedactor(values ...string) *Redactor {
 	}
 }
 
-const redacted = "[REDACTED]"
+// Marker replaces each redacted range.
+const Marker = "[REDACTED]"
 
 // Apply redacts from a copy of s.
 func (r *Redactor) Apply(s string) string {
 	out := s
 	for _, v := range r.values {
 		if len(v) >= 4 { // avoid redacting trivially short values everywhere
-			out = strings.ReplaceAll(out, v, redacted)
+			out = strings.ReplaceAll(out, v, Marker)
 		}
 	}
 	// Most diagnostic strings contain no credentials. Avoid allocating copies
 	// when the replacement would leave them unchanged.
 	if standalonePattern.MatchString(out) {
-		out = standalonePattern.ReplaceAllString(out, redacted)
+		out = standalonePattern.ReplaceAllString(out, Marker)
 	}
 	if keyValuePattern.MatchString(out) {
-		out = keyValuePattern.ReplaceAllString(out, "$1="+redacted)
+		out = keyValuePattern.ReplaceAllString(out, "$1="+Marker)
 	}
 	return out
 }
@@ -210,7 +211,7 @@ func keptToSource(spans []span, s string, remove func(rune) bool) []span {
 func replaceSpans(s string, spans []span, remove func(rune) bool) string {
 	slices.SortFunc(spans, func(a, b span) int { return cmp.Or(a.start-b.start, a.end-b.end) })
 	var out strings.Builder
-	out.Grow(len(s) + len(redacted))
+	out.Grow(len(s) + len(Marker))
 	pos := 0
 	for i := 0; i < len(spans); {
 		merged := spans[i]
@@ -218,7 +219,7 @@ func replaceSpans(s string, spans []span, remove func(rune) bool) string {
 			merged.end = max(merged.end, spans[i].end)
 		}
 		writeKept(&out, s[pos:merged.start], remove)
-		out.WriteString(redacted)
+		out.WriteString(Marker)
 		pos = merged.end
 	}
 	writeKept(&out, s[pos:], remove)
@@ -247,7 +248,7 @@ func (r *Redactor) ApplyURL(value string) string {
 		key, _, hasValue := strings.Cut(part, "=")
 		decoded, err := url.QueryUnescape(key)
 		if err == nil && hasValue && queryKeyPattern.MatchString(decoded) {
-			parts[i] = key + "=" + url.QueryEscape(redacted)
+			parts[i] = key + "=" + url.QueryEscape(Marker)
 		}
 	}
 	u.RawQuery = strings.Join(parts, "&")

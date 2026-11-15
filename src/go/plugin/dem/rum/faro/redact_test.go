@@ -29,12 +29,13 @@ func TestRedactPath(t *testing.T) {
 }
 
 func TestRedactURL(t *testing.T) {
-	if got := redactURL("https://api.example.com/users/jane@example.com", nil); got != "https://api.example.com/users/:email" {
-		t.Fatalf("got %q", got)
-	}
-	if got := redactURL("https://api.example.com", nil); got != "https://api.example.com" {
-		t.Fatalf("host only: %q", got)
-	}
+	var o Options
+	assert.Equal(
+		t,
+		"https://api.example.com/users/:email",
+		o.redactURL("https://api.example.com/users/jane@example.com"),
+	)
+	assert.Equal(t, "https://api.example.com", o.redactURL("https://api.example.com"), "host only")
 }
 
 func TestRedactSelector(t *testing.T) {
@@ -56,25 +57,25 @@ func TestRedactURLMalformedEscapes(t *testing.T) {
 		"https://example.org:bad/50%":                        "",
 		"https://example.org/path\n50%":                      "",
 	} {
-		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, redactURL(raw, nil)) })
+		t.Run(raw, func(t *testing.T) { assert.Equal(t, want, (Options{}).redactURL(raw)) })
 	}
 }
 
 func TestRedactSourceURLKeepsOnlyScriptBasename(t *testing.T) {
 	const chunk = "framework-2c79e2a64abdb08b.js"
 	const raw = "https://user:password@example.org/eyJhbGciOiJIUzI1NiJ9/" + chunk + "?secret=private#fragment"
-	assert.Equal(t, "https://example.org/:token/:token", redactURL(raw, nil))
-	assert.Equal(t, "https://example.org/:token/"+chunk, redactSourceURL(raw, nil))
-	assert.Equal(
-		t,
-		"https://example.org/:token/:file",
-		redactSourceURL(raw, []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}}),
-	)
-	assert.Equal(t, "https://example.org/:email", redactSourceURL("https://example.org/person@example.org.js", nil))
+	var o Options
+	assert.Equal(t, "https://example.org/:token/:token", o.redactURL(raw))
+	assert.Equal(t, "https://example.org/:token/"+chunk, o.redactSourceURL(raw))
+	ruled := Options{
+		PathRules: []PathRule{{Re: regexp.MustCompile(regexp.QuoteMeta(chunk)), Replace: ":file"}},
+	}
+	assert.Equal(t, "https://example.org/:token/:file", ruled.redactSourceURL(raw))
+	assert.Equal(t, "https://example.org/:email", o.redactSourceURL("https://example.org/person@example.org.js"))
 	assert.Equal(
 		t,
 		"https://example.org/:id",
-		redactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000", nil),
+		o.redactSourceURL("https://example.org/123e4567-e89b-12d3-a456-426614174000"),
 	)
-	assert.Equal(t, "https://example.org/:token", redactSourceURL("https://example.org/eyJhbGciOiJIUzI1NiJ9.txt", nil))
+	assert.Equal(t, "https://example.org/:token", o.redactSourceURL("https://example.org/eyJhbGciOiJIUzI1NiJ9.txt"))
 }

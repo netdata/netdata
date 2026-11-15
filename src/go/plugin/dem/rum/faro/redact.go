@@ -7,6 +7,10 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 )
 
 // PathRule is a site's own path redaction: Re's matches become
@@ -47,22 +51,22 @@ func redactPath(path string, rules []PathRule, source bool) string {
 
 // redactURL strips credentials, query and fragment and applies the site's path
 // rules. Relative paths follow the same policy.
-func redactURL(raw string, rules []PathRule) string {
-	return redactLink(raw, rules, false)
+func (o Options) redactURL(raw string) string {
+	return o.redactLink(raw, false)
 }
 
 // redactSourceURL retains script basenames for source attribution and error
 // fingerprints. Site rules and identifier redaction still apply; only the token
 // heuristic is skipped for the final .js, .mjs or .cjs path segment.
-func redactSourceURL(raw string, rules []PathRule) string {
-	return redactLink(raw, rules, true)
+func (o Options) redactSourceURL(raw string) string {
+	return o.redactLink(raw, true)
 }
 
 func isScriptFile(name string) bool {
 	return strings.HasSuffix(name, ".js") || strings.HasSuffix(name, ".mjs") || strings.HasSuffix(name, ".cjs")
 }
 
-func redactLink(raw string, rules []PathRule, source bool) string {
+func (o Options) redactLink(raw string, source bool) string {
 	raw = strings.TrimSpace(raw)
 	u, err := url.Parse(raw)
 	if err != nil {
@@ -78,13 +82,58 @@ func redactLink(raw string, rules []PathRule, source bool) string {
 	}
 	u.User, u.RawQuery, u.Fragment, u.RawFragment = nil, "", "", ""
 	u.ForceQuery = false
-	path := redactPath(u.EscapedPath(), rules, source)
+	path := redactPath(u.EscapedPath(), o.PathRules, source)
 	plain, err := url.PathUnescape(path)
 	if err != nil {
 		plain = path
 	}
+	if plain != path {
+		// The site redactor reads the URL in its escaped form, where an escape
+		// can hide a credential (/a/Bearer%20token), so it reads the decoded
+		// path too. A redacted path is escaped again with the markers literal.
+		if redacted, ok := o.redactDecoded(plain); ok {
+			plain, path = redacted, escapePath(redacted)
+		}
+	}
 	u.Path, u.RawPath = plain, path
 	return u.String()
+}
+
+// redactDecoded redacts a decoded path like text: every credential found in it
+// or in it without control characters. ok is false, and the path keeps its
+// received escaping, when it holds none.
+func (o Options) redactDecoded(plain string) (string, bool) {
+	redacted := o.redactor().ApplyRemoving(plain, unicode.IsControl)
+	if redacted == plain || redacted == withoutControls(plain) {
+		return "", false
+	}
+	return redacted, true
+}
+
+// withoutControls removes control characters, keeping every other byte as
+// ApplyRemoving does.
+func withoutControls(s string) string {
+	var out strings.Builder
+	for i := 0; i < len(s); {
+		c, n := utf8.DecodeRuneInString(s[i:])
+		if !unicode.IsControl(c) {
+			out.WriteString(s[i : i+n])
+		}
+		i += n
+	}
+	return out.String()
+}
+
+// escapePath escapes a decoded path, keeping each redaction marker literal;
+// net/url accepts brackets in an escaped path.
+func escapePath(plain string) string {
+	parts := strings.Split(plain, redact.Marker)
+	for i, part := range parts {
+		parts[i] = (&url.URL{
+			Path: part,
+		}).EscapedPath()
+	}
+	return strings.Join(parts, redact.Marker)
 }
 
 func escapeInvalidPercent(value string) string {
