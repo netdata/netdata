@@ -23,7 +23,7 @@ func (s *scriptSession) exchangeLines(ctx context.Context, id string) (snapshot,
 		}
 		// Frames retain CR and omit LF. Include both, and the terminator,
 		// before normalization so every wire byte shares the response budget.
-		if len(data)+len(frame)+1 > maxMessageBytes {
+		if len(data)+len(frame)+1 > s.messageLimit {
 			return snapshot{}, errResponseTooLarge
 		}
 		line := bytes.TrimSuffix(frame, []byte{'\r'})

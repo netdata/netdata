@@ -23,7 +23,7 @@ func TestRunOneshot_CancellationContainsDescendant(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { _, err := runOneshot(ctx, c.definition.command, "collect", nil); done <- err }()
+	go func() { _, err := runOneshot(ctx, c.definition.command, "collect", nil, maxMessageBytes); done <- err }()
 	waitFile(t, filepath.Join(dir, "started"))
 	cancel()
 	select {
@@ -60,7 +60,7 @@ printf '%s\n' 'version: v1'
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			done := make(chan error, 1)
-			go func() { _, err := runDescribe(ctx, c.definition.command); done <- err }()
+			go func() { _, err := runDescribe(ctx, c.definition.command, maxDescriptionBytes); done <- err }()
 			waitFile(t, filepath.Join(dir, "started"))
 			if tc.callerCancels {
 				cancel()
@@ -98,7 +98,7 @@ func TestRunOneshot_LeaderExitContainsDescendants(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			c, dir := fixtureCollector(t, "dir=$(dirname \"$0\")\n"+tc.child+"\nprintf done\n")
-			data, err := runOneshot(context.Background(), c.definition.command, opCollect, nil)
+			data, err := runOneshot(context.Background(), c.definition.command, opCollect, nil, maxMessageBytes)
 			require.NoError(t, err)
 			assert.Equal(t, "done", string(data))
 			time.Sleep(1100 * time.Millisecond)

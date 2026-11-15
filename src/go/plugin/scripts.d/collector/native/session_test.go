@@ -164,12 +164,12 @@ func TestScriptSession_BlockedWriteCancellation(t *testing.T) {
 		ctx:    context.Background(),
 		stdin:  output,
 		exited: make(chan struct{}),
-		frames: make(chan scriptFrame),
 	}
+	frame := []byte(strings.Repeat("1", testPipeBytes))
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 	finished := make(chan error, 1)
-	go func() { _, err := s.exchange(ctx, []byte(strings.Repeat("1", 1<<20))); finished <- err }()
+	go func() { finished <- s.write(ctx, frame) }()
 	select {
 	case err := <-finished:
 		require.ErrorIs(t, err, context.DeadlineExceeded)

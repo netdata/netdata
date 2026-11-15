@@ -78,11 +78,7 @@ func (d packageDefinition) effectiveSettings(settings Settings) Settings {
 
 // configEnvelope encodes a job's effective configuration as the first stdin
 // line of every script invocation. Packages without a form receive no envelope.
-func (d packageDefinition) configEnvelope(settings Settings) ([]byte, error) {
-	return d.configEnvelopeWithLimit(settings, maxMessageBytes)
-}
-
-func (d packageDefinition) configEnvelopeWithLimit(settings Settings, limit int) ([]byte, error) {
+func (d packageDefinition) configEnvelope(settings Settings, limit int) ([]byte, error) {
 	if d.form == nil {
 		if len(settings) != 0 {
 			return nil, errors.New("package does not declare config_schema")

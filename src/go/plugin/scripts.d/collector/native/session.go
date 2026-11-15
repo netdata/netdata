@@ -18,15 +18,16 @@ import (
 // scriptSession owns a persistent script process and its LF-framed stdio.
 // Canceling the session context or closing it terminates contained processes.
 type scriptSession struct {
-	ctx        context.Context
-	cancel     context.CancelFunc
-	process    *ndexec.Process
-	stdin      io.WriteCloser
-	stdout     *os.File
-	frames     chan scriptFrame
-	readerDone chan struct{}
-	exited     chan struct{}
-	waitErr    error // Published by closing exited.
+	ctx          context.Context
+	messageLimit int
+	cancel       context.CancelFunc
+	process      *ndexec.Process
+	stdin        io.WriteCloser
+	stdout       *os.File
+	frames       chan scriptFrame
+	readerDone   chan struct{}
+	exited       chan struct{}
+	waitErr      error // Published by closing exited.
 }
 
 // scriptFrame is one stdout frame, or the terminal read error.
@@ -35,7 +36,7 @@ type scriptFrame struct {
 	err  error
 }
 
-func startSession(ctx context.Context, command []string) (*scriptSession, error) {
+func startSession(ctx context.Context, command []string, limit int) (*scriptSession, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	childStdin, stdin, err := os.Pipe()
 	if err != nil {
@@ -69,14 +70,15 @@ func startSession(ctx context.Context, command []string) (*scriptSession, error)
 	_ = childStdin.Close()
 	_ = childStdout.Close() // Only the child may keep stdout alive.
 	s := &scriptSession{
-		ctx:        ctx,
-		cancel:     cancel,
-		process:    process,
-		stdin:      stdin,
-		stdout:     stdout,
-		frames:     make(chan scriptFrame),
-		readerDone: make(chan struct{}),
-		exited:     make(chan struct{}),
+		ctx:          ctx,
+		messageLimit: limit,
+		cancel:       cancel,
+		process:      process,
+		stdin:        stdin,
+		stdout:       stdout,
+		frames:       make(chan scriptFrame),
+		readerDone:   make(chan struct{}),
+		exited:       make(chan struct{}),
 	}
 	go func() {
 		s.waitErr = process.Wait()
@@ -196,8 +198,8 @@ func (s *scriptSession) write(ctx context.Context, data []byte) error {
 func (s *scriptSession) readFrames() {
 	defer close(s.readerDone)
 	scanner := bufio.NewScanner(s.stdout)
-	scanner.Buffer(make([]byte, 4096), maxMessageBytes+1)
-	scanner.Split(newFrameSplitter(maxMessageBytes))
+	scanner.Buffer(make([]byte, 4096), s.messageLimit+1)
+	scanner.Split(newFrameSplitter(s.messageLimit))
 	for scanner.Scan() {
 		frame := scriptFrame{
 			data: bytes.Clone(scanner.Bytes()),

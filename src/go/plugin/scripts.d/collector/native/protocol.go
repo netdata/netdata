@@ -94,11 +94,7 @@ func decodeReply(data []byte, id string) (snapshot, error) {
 
 // encodeFunctionRequest encodes one LF-terminated Function request frame. The
 // caller's deadline is forwarded so the script can bound its own work.
-func encodeFunctionRequest(ctx context.Context, id string, request funcapi.RawMethodRequest) ([]byte, error) {
-	return encodeFunctionRequestWithLimit(ctx, id, request, maxMessageBytes)
-}
-
-func encodeFunctionRequestWithLimit(
+func encodeFunctionRequest(
 	ctx context.Context, id string, request funcapi.RawMethodRequest, limit int,
 ) ([]byte, error) {
 	var deadlineMS int64
