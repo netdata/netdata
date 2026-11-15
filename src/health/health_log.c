@@ -416,10 +416,14 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     while(ae) {
         // Check if entry is old enough to be deleted
         if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
+           // Only remove entries that are not pinned (pending save or collected for notification). The pin count
+           // is read first: a dispatcher sets EXEC_IN_PROGRESS before the release that drops its pin, so this
+           // acquire makes that flag visible to the read below. Reading the flags first could miss it and free an
+           // entry whose notification is running.
+           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0 &&
            // Only remove entries that have been processed/updated, and whose notification is not running: the
            // in-progress queue keeps the pointer until health_alarm_wait_for_execution()
-           (atomic_flags_get(&ae->flags) & (HEALTH_ENTRY_FLAG_UPDATED | HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) == HEALTH_ENTRY_FLAG_UPDATED &&
-           __atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE) == 0) { // Only remove entries not pending save
+           (atomic_flags_get(&ae->flags) & (HEALTH_ENTRY_FLAG_UPDATED | HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS)) == HEALTH_ENTRY_FLAG_UPDATED) {
             
             // Remove from linked list
             ALARM_ENTRY *next = ae->next;
