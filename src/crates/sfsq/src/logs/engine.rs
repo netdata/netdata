@@ -25,6 +25,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use rayon::prelude::*;
 use tokio_util::sync::CancellationToken;
 
 use super::aggregate::LogsShard;
@@ -236,14 +237,23 @@ pub fn run(
     // and merge them. The merge is a monoid, so source order is irrelevant
     // and a failed source's empty shard is its identity — which also makes
     // a cancelled partial merge well-formed.
-    let mut shards = Vec::with_capacity(sources.len());
-    for (source, mapping) in sources.iter().zip(&mapped) {
-        if cancel.is_cancelled() {
-            break;
-        }
-        shards.push(source.to_shard(&query, mapping.as_ref()));
-        progress.fetch_add(1, Ordering::Relaxed);
-    }
+    //
+    // Sources are independent, so they are evaluated on the rayon pool
+    // (sized to the available cores); a full-text query over hundreds of
+    // files is CPU-bound and was limited to one core when folded serially.
+    // A source reached after cancellation contributes the empty shard.
+    let shards: Vec<LogsShard> = sources
+        .par_iter()
+        .zip(mapped.par_iter())
+        .map(|(source, mapping)| {
+            if cancel.is_cancelled() {
+                return LogsShard::default();
+            }
+            let shard = source.to_shard(&query, mapping.as_ref());
+            progress.fetch_add(1, Ordering::Relaxed);
+            shard
+        })
+        .collect();
     let stats = LogsShard::merge(shards);
 
     // `available_fields` is the merged table with high-card fields
