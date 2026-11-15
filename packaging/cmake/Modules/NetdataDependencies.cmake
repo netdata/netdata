@@ -142,11 +142,6 @@ if(NOT USE_LIBCAP)
   set(CAP_FOUND FALSE)
 endif()
 
-# log2journal is the only consumer of PCRE2.
-if(NOT ENABLE_LOG2JOURNAL)
-  set(PCRE2_FOUND FALSE)
-endif()
-
 #
 # Requirements.
 #
@@ -186,6 +181,10 @@ endif()
 
 if(ENABLE_PLUGIN_IBM AND NOT ODBC_FOUND)
   message(FATAL_ERROR "The IBM plugin needs unixODBC, but it could not be found. Pass -DENABLE_PLUGIN_IBM=Off to build without it.")
+endif()
+
+if(ENABLE_PLUGIN_NFACCT AND NOT USE_LIBMNL)
+  message(FATAL_ERROR "The nfacct plugin needs libmnl, but USE_LIBMNL is off. Pass -DENABLE_PLUGIN_NFACCT=Off to build without it, or -DUSE_LIBMNL=On.")
 endif()
 
 if(ENABLE_PLUGIN_NFACCT AND NOT MNL_FOUND)

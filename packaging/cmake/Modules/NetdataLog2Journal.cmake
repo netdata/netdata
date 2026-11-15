@@ -12,7 +12,7 @@
 #
 # Built only when libpcre2-8 was found. The lookup lives in NetdataDependencies.cmake, and
 # log2journal is optional, so this reads PCRE2_FOUND instead of requiring it.
-# ENABLE_LOG2JOURNAL=Off clears PCRE2_FOUND there.
+# ENABLE_LOG2JOURNAL=Off skips it even when the library is there.
 
 include_guard()
 
@@ -39,7 +39,7 @@ set(LOG2JOURNAL_FILES
 # build log2journal
 #
 
-if(PCRE2_FOUND)
+if(ENABLE_LOG2JOURNAL AND PCRE2_FOUND)
         add_executable(log2journal ${LOG2JOURNAL_FILES})
         target_include_directories(log2journal BEFORE PUBLIC ${CMAKE_BINARY_DIR} ${CMAKE_SOURCE_DIR}/src ${PCRE2_INCLUDE_DIRS})
         target_compile_options(log2journal PUBLIC ${PCRE2_CFLAGS_OTHER})
