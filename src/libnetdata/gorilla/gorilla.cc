@@ -484,30 +484,33 @@ void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
  * appends to a buffer right before it links the next one.
  */
 
-#include <cstdlib>
+#include <memory>
+#include <new>
+#include <utility>
 #include <vector>
 
 namespace {
 
+struct gorilla_unittest_buffer_delete {
+    void operator()(void *p) const { ::operator delete(p); }
+};
+
 struct gorilla_unittest_hot_page {
     static constexpr size_t slots = 8; // tiny buffers, so the writer links new ones often
 
-    std::vector<void *> storage; // zeroed malloc'd buffers, as the dbengine allocates them
+    // zeroed raw buffers, as the dbengine allocates them
+    std::vector<std::unique_ptr<void, gorilla_unittest_buffer_delete>> storage;
     std::vector<uint32_t> written;
     gorilla_writer_t gw{};
     uint32_t next_value = 1000;
 
-    ~gorilla_unittest_hot_page() {
-        for (void *p : storage)
-            std::free(p);
-    }
-
     gorilla_buffer_t *new_buffer() {
-        void *p = std::calloc(slots, sizeof(uint32_t));
-        if (!p)
-            std::abort();
-        storage.push_back(p);
-        return static_cast<gorilla_buffer_t *>(p);
+        size_t bytes = slots * sizeof(uint32_t);
+        std::unique_ptr<void, gorilla_unittest_buffer_delete> p(::operator new(bytes));
+        std::memset(p.get(), 0, bytes);
+        auto *buf = static_cast<gorilla_buffer_t *>(p.get());
+        storage.push_back(std::move(p));
+        return buf;
     }
 
     // as pgd_append_point() does: a full buffer makes the write fail, then link a new one
