@@ -63,7 +63,7 @@ func (s *Service) Runs(ctx context.Context, filter history.RunFilter) (history.R
 		return history.RunPage{}, err
 	}
 	page, err := s.history.QueryRuns(ctx, filter)
-	return page, queryError(err)
+	return page, historyError(err)
 }
 
 // Run prefers the exact active observation so failed journal publication does
@@ -76,16 +76,15 @@ func (s *Service) Run(ctx context.Context, jobID, runID string) (synthetic.Run, 
 		return run, nil
 	}
 	run, err := s.history.GetRun(ctx, jobID, runID)
-	return run, queryError(err)
+	return run, historyError(err)
 }
 
-func queryError(err error) error {
-	switch {
-	case errors.Is(err, os.ErrNotExist), errors.Is(err, artifacts.ErrNotFound):
+// historyError maps a run missing from retained history to ErrNotFound.
+func historyError(err error) error {
+	if errors.Is(err, os.ErrNotExist) {
 		return ErrNotFound
-	default:
-		return artifactError(err)
 	}
+	return err
 }
 
 func artifactError(err error) error {
