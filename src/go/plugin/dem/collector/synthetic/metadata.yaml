@@ -1037,8 +1037,7 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          Audit the load performance of a web page on a schedule with [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview)
-          and follow how it changes over time.
+          Audit the load performance of a web page on a schedule with Lighthouse and follow how it changes over time.
 
           Each job loads one URL in a fresh desktop Chromium browser and gives you:
 
@@ -1049,8 +1048,9 @@ modules:
           - Optionally, the full Lighthouse HTML report of each audit.
         method_description: |
           Every `check_every` seconds (30 minutes by default), the Agent starts a fresh, sandboxed Chromium browser on
-          this host and runs a Lighthouse performance audit of the configured URL with the desktop preset. The browser
-          loads the page like a visitor would, without clicking or submitting anything.
+          this host and runs a [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) performance audit of
+          the configured URL with the desktop preset. The browser loads the page like a visitor would, without clicking
+          or submitting anything.
 
           These are lab measurements from one browser on the Agent host, so they depend on that host's network and CPU
           and differ from what visitors experience. For measurements from real visitors, use Real User Monitoring. The
