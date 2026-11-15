@@ -1233,40 +1233,58 @@ size_t pgc_main_nominal_page_size(void *data) {
 // ----------------------------------------------------------------------------
 // the cache of the in-memory instances (db = ram / alloc)
 
-// A page of an in-memory instance has no other copy: when it is freed, the data it held is gone. The metric's
-// retention moves past it when nothing older remains: the page is the oldest one, or it ended before the retention
-// window (retention evicts every page that did, so nothing older is left). A newer page that the out of memory
-// protection evicts leaves a gap instead, and the metric's first time stays on the older data that is still there.
 // the time rrdeng_in_memory_enforce_retention() evaluates the retention at, while it evicts on this thread (the
 // evictions of the retention pass run inline): the free callback then judges the retention at the same time
 static __thread time_t in_memory_retention_now_s = 0;
 
-static void ram_cache_free_clean_page_callback(PGC *cache __maybe_unused, PGC_ENTRY entry)
+// A page of an in-memory instance has no other copy: when it is freed, the data it held is gone. The metric's
+// retention then starts at its oldest page that remains (this one is already out of the index), so a page lost to
+// the out of memory protection in the middle leaves a gap without hiding the older data. With no page left, the
+// retention moves past this one: the metric has none, and its release deletes it when nothing collects it.
+static time_t ram_cache_metric_oldest_page_s(PGC *cache, Word_t section, Word_t metric_id) {
+    time_t start_s = 0;
+    PGC_SEARCH method = PGC_SEARCH_FIRST;
+    PGC_PAGE *page;
+
+    while ((page = pgc_page_get_and_acquire(cache, section, metric_id, start_s, method))) {
+        method = PGC_SEARCH_NEXT;
+        start_s = pgc_page_start_time_s(page);
+        // a gap marker (pgc_inject_gap()) holds no data
+        bool has_data = pgc_page_data(page) != PGD_EMPTY;
+        // no inline eviction on release in this cache (PGC_OPTIONS_EVICT_PAGES_NO_INLINE)
+        pgc_page_release(cache, page);
+
+        if (has_data)
+            return start_s;
+    }
+
+    return 0;
+}
+
+static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) entry.section;
-    time_t now_s = in_memory_retention_now_s ? in_memory_retention_now_s : now_realtime_sec();
 
-    // a gap marker (pgc_inject_gap()) holds no data: it does not move the retention
+    // a gap marker holds no data: it does not move the retention
     METRIC *metric = (entry.data == PGD_EMPTY) ? NULL :
         mrg_metric_get_and_acquire_by_id(main_mrg, (UUIDMAP_ID)entry.metric_id, entry.section);
-    if (metric) {
-        time_t first_time_s = mrg_metric_get_first_time_s(main_mrg, metric);
-        time_t cutoff_s = rrdeng_in_memory_retention_cutoff_s(ctx, entry.update_every_s, now_s);
-        bool out_of_retention = entry.end_time_s < cutoff_s;
 
-        if (entry.start_time_s <= first_time_s || out_of_retention)
-            mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, entry.end_time_s + (time_t)entry.update_every_s);
+    if (metric) {
+        time_t oldest_s = ram_cache_metric_oldest_page_s(cache, entry.section, entry.metric_id);
+        mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s ? oldest_s : entry.end_time_s + (time_t)entry.update_every_s);
+
+        // releasing it deletes it, when this was its last page and nothing collects it
+        mrg_metric_release(main_mrg, metric);
 
         // the instance's retention (reported by the retention API) starts at the window the retention keeps
-        if (out_of_retention) {
+        time_t now_s = in_memory_retention_now_s ? in_memory_retention_now_s : now_realtime_sec();
+        time_t cutoff_s = rrdeng_in_memory_retention_cutoff_s(ctx, entry.update_every_s, now_s);
+        if (entry.end_time_s < cutoff_s) {
             time_t expected = __atomic_load_n(&ctx->atomic.first_time_s, __ATOMIC_RELAXED);
             while (expected < cutoff_s &&
                    !__atomic_compare_exchange_n(&ctx->atomic.first_time_s, &expected, cutoff_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
                 ;
         }
-
-        // releasing it deletes it, when this was its last page and nothing collects it
-        mrg_metric_release(main_mrg, metric);
     }
 
     pgd_free(entry.data);

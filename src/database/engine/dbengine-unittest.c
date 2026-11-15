@@ -823,20 +823,22 @@ static size_t test_dbengine_in_memory(void) {
     errors += in_memory_test_query(rd, base_s, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, base_s, "oldest page after a newer page was lost");
     errors += in_memory_test_query(rd, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS, last_s, base_s, "newest page after a middle page was lost");
 
-    // 3. the retention: at last_s + 1000 points, the oldest page is out of it and the newest is not
+    // 3. the retention: at last_s + 1000 points, the oldest page is out of it and the newest is not; the retention
+    //    then starts at the newest page, the oldest one that remains
     rrdeng_in_memory_enforce_retention(base_s + IN_MEMORY_TEST_PAGE_POINTS - 1 + IN_MEMORY_TEST_POINTS + 1);
 
     first_s = newest_s = 0;
     rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &newest_s);
-    if(first_s != base_s + IN_MEMORY_TEST_PAGE_POINTS) {
+    if(first_s != base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS) {
         fprintf(stderr, " >>> DBENGINE: in memory: after the retention the first time is %jd (expected %jd)\n",
-                (intmax_t)first_s, (intmax_t)(base_s + IN_MEMORY_TEST_PAGE_POINTS));
+                (intmax_t)first_s, (intmax_t)(base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS));
         errors++;
     }
     errors += in_memory_test_query(rd, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS, last_s, base_s, "newest page after the retention");
 
-    // 4. everything out of the retention: the metric has no data left
-    rrdeng_in_memory_enforce_retention(last_s + IN_MEMORY_TEST_POINTS + 1);
+    // 4. the last page is lost too, inside the retention: no data is left, so no retention may be left
+    f.start_time_s = base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
     first_s = newest_s = 0;
     if(rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &newest_s) && first_s && first_s <= newest_s) {
         fprintf(stderr, " >>> DBENGINE: in memory: retention %jd - %jd left after all pages were evicted\n",
@@ -1398,8 +1400,7 @@ static size_t test_dbengine_datafile_names(void) {
 }
 
 int test_dbengine(void) {
-    // provide enough threads to dbengine
-    setenv("UV_THREADPOOL_SIZE", "48", 1);
+    // the libuv pool is sized at the start of -W unittest (main.c): localhost (db = ram) starts dbengine before this
 
     size_t errors = 0, value_errors = 0, time_errors = 0;
 
