@@ -77,6 +77,8 @@ func TestFrameEnvelopes(t *testing.T) {
 		err          string
 	}{
 		"event": {lines: []string{step}},
+		// A frame is one JSON value; JSON allows whitespace around it.
+		"event with surrounding whitespace": {lines: []string{" \t" + step + " "}},
 		"event with null result": {
 			lines: []string{`{"type":"event","event":{"kind":"step"},"result":null}`},
 			err:   "invalid runner event envelope",
