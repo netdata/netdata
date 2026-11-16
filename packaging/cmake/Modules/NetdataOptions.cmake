@@ -75,6 +75,7 @@ if(ENABLE_ML)
 endif()
 
 option(ENABLE_DBENGINE "Enable dbengine metrics storage" True)
+option(ENABLE_UNITTESTS "Build the unit tests and test tools behind netdata -W into the agent" True)
 option(ENABLE_DASHBOARD "Enable local dashboard" True)
 mark_as_advanced(ENABLE_DASHBOARD)
 
