@@ -99,7 +99,7 @@ publication sequence, archive identity/bounds and source identity. Online prepar
 fetches the canonical package OpenPGP keyring over HTTPS. Offline imports require an
 explicit administrator-provisioned local keyring and do not fetch keys or the signed
 HTTPS URLs. The descriptor cannot choose its own key source.
-See `src/go/plugin/dem/README.md` for CLI options, automatic/manual update consent
+See `packaging/installer/DEM-RUNTIME.md` for CLI options, automatic/manual update consent
 and restart activation. Enabling a monitor does not acquire runtime components.
 
 Candidate qualification must run both a journey and a Lighthouse audit against

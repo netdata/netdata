@@ -18,8 +18,8 @@ import (
 const frameMaxBytes = 4 << 20
 
 // eventLimit is the per-run diagnostic event retention documented in the
-// plugin and runtime READMEs. Later events are counted as dropped; every
-// retained event is stored in the run's history record.
+// runtime contract (src/dem-runtime/README.md). Later events are counted as
+// dropped; every retained event is stored in the run's history record.
 const eventLimit = 500
 
 // textLimit is the character budget of each diagnostic text, shared with the
