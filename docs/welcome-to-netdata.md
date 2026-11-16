@@ -6,7 +6,7 @@ Install it, and every system and application you run is collected, charted, scor
 
 Instead of centralizing the data, Netdata **distributes the monitoring code** to each system, **keeping data local** while providing **unified access**. This architecture enables **linear scaling** to millions of metrics per second and terabytes of logs, **automated root cause analysis**, a faster experience and significantly **lower total cost of ownership**.
 
-This page explains what working with Netdata is like and the principles behind it. [Netdata Design](/docs/netdata-design.md), the [Complete Product Description](/docs/netdata-complete-product-description.md) and the [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) go deeper on each part.
+This page explains what Netdata is and the principles behind it. [Netdata Design](/docs/netdata-design.md), the [Complete Product Description](/docs/netdata-complete-product-description.md) and the [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) go deeper on each part.
 
 ## What it covers
 
