@@ -2372,7 +2372,8 @@ void pgc_page_hot_to_clean_and_release(PGC *cache, PGC_PAGE *page) {
         // it loses the oldest closed pages first, not the newest
         page_flag_set(page, PGC_PAGE_HAS_BEEN_ACCESSED);
 
-        // first add to linked list, the set the flag (required for move_page_last())
+        // the flag must be set before pgc_queue_add(): it reads it to append the page (instead of prepending it) and
+        // clears it
         pgc_queue_add(cache, &cache->clean, page, false, PGC_QUEUE_LOCK_PRIO_COLLECTORS);
     }
 

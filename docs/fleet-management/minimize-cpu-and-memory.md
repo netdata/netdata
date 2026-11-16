@@ -122,7 +122,7 @@ Select plugin bundles when [preparing the package](./minimize-disk-footprint.md)
 
 ## Plan the device's monitoring budget
 
-The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and `[db] retention = 120` rounded to memory pages, with StatsD disabled. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
+The examples below use Netdata **v2.12.0-2-nightly**, `apps` and `debugfs`, compressed streaming and `[db] retention = 120` (measured with the older RAM buffers, before `ram` became an in-memory Database Engine tier), with StatsD disabled. CPU covers the Agent and persistent plugins as a percentage of one core; memory covers their combined process footprint (PSS).
 
 | Device | Package / device OS | One-second collection: CPU / memory | Five-second collection: CPU / memory |
 |:--|:--|--:|--:|

@@ -468,6 +468,17 @@ void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric,
     __atomic_compare_exchange_n(&metric->latest_time_s_hot, &latest_time_s, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
+// is latest_time_s the metric's clean or hot latest time?
+bool mrg_metric_latest_time_is(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    return __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED) == latest_time_s ||
+           __atomic_load_n(&metric->latest_time_s_hot, __ATOMIC_RELAXED) == latest_time_s;
+}
+
+// sets the clean latest time, back or forward, only while it is still expected_s (a page whose data is gone set it)
+bool mrg_metric_replace_clean_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t expected_s, time_t latest_time_s) {
+    return __atomic_compare_exchange_n(&metric->latest_time_s_clean, &expected_s, latest_time_s, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
+}
+
 ALWAYS_INLINE
 time_t mrg_metric_get_latest_clean_time_s(MRG *mrg __maybe_unused, METRIC *metric) {
     time_t clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);

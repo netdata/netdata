@@ -1625,8 +1625,8 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
 }
 
 #ifndef ENABLE_DBENGINE
-// The gap filling of the ring (src/database/ram/). With dbengine, localhost (db = ram) stores in an in-memory dbengine
-// instance, and the ring only serves db = none.
+// The gap filling of the ring (src/database/ram/), the engine of db = ram / alloc in builds without dbengine (with
+// dbengine, they store in an in-memory dbengine instance; db = none is src/database/storage-none.c in both).
 static RRDSET *ram_gap_chart(const char *name, RRDDIM **rd) {
     RRDSET *st = rrdset_create_localhost(
         "netdata", name, name, "netdata", NULL, "Unit Testing", "value", "unittest", NULL, 1,

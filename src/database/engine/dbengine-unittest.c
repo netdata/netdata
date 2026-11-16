@@ -768,6 +768,16 @@ static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, tim
     return errors;
 }
 
+static size_t in_memory_test_latest(struct rrdengine_instance *ctx, RRDDIM *rd, time_t expected_s, const char *what) {
+    time_t first_s = 0, last_s = 0;
+    if(!rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd->uuid, &first_s, &last_s) || last_s != expected_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: %s the latest time is %jd (expected %jd)\n",
+                what, (intmax_t)last_s, (intmax_t)expected_s);
+        return 1;
+    }
+    return 0;
+}
+
 static size_t test_dbengine_in_memory(void) {
     fprintf(stderr, "\nDBENGINE: testing the in-memory instances of db = ram / alloc...\n");
     size_t errors = 0;
@@ -849,13 +859,13 @@ static size_t test_dbengine_in_memory(void) {
         errors++;
     }
 
-    // 5. another metric loses its newest page first (the out of memory protection), then its oldest: no data is
-    //    left, so no retention may be left either (the latest time still remembers the newest page)
+    // 5. another metric loses its newest pages first (the out of memory protection), then its oldest: the latest time
+    //    follows the newest page that remains, and with no data left no retention may be left either
     RRDDIM *rd2 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-2", 1);
     if(!rd2)
         return errors + 1;
 
-    for(size_t page = 0; page < 2; page++) {
+    for(size_t page = 0; page < 3; page++) {
         for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
             time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
             dbengine_cadence_test_store_point(rd2, t, (NETDATA_DOUBLE)(t - base_s + 1));
@@ -863,19 +873,100 @@ static size_t test_dbengine_in_memory(void) {
         unittest_storage_engine_store_flush(rd2->tiers[0].sch);
     }
 
+    // a hot time at the end of the newest page too, as another writer of the metric would leave it
+    METRIC *metric2 = mrg_metric_get_and_acquire_by_id(main_mrg, rd2->uuid, (Word_t)ctx);
+    if(!metric2)
+        return errors + 1;
+    mrg_metric_set_hot_latest_time_s(main_mrg, metric2, base_s + 3 * IN_MEMORY_TEST_PAGE_POINTS - 1);
+    mrg_metric_release(main_mrg, metric2);
+
     f.metric_id = (Word_t)rd2->uuid;
+    f.start_time_s = base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    errors += in_memory_test_latest(ctx, rd2, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS - 1, "after the newest page was evicted");
+
     f.start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS;
     pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    errors += in_memory_test_latest(ctx, rd2, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, "after the two newest pages were evicted");
+
     f.start_time_s = base_s;
     pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
 
     first_s = newest_s = 0;
     if(rrdeng_metric_retention_by_id((STORAGE_INSTANCE *)ctx, rd2->uuid, &first_s, &newest_s) && first_s && first_s <= newest_s) {
-        fprintf(stderr, " >>> DBENGINE: in memory: retention %jd - %jd left after the newest page, then the oldest, were evicted\n",
+        fprintf(stderr, " >>> DBENGINE: in memory: retention %jd - %jd left after the newest pages, then the oldest, were evicted\n",
                 (intmax_t)first_s, (intmax_t)newest_s);
         errors++;
     }
 
+    // 6. the newest data page is evicted while the collector's hot page holds only gaps: the gap page is no data, so
+    //    once it is discarded the latest time is the end of the data page that remains
+    RRDDIM *rd4 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-gaps", 1);
+    if(!rd4)
+        return errors + 1;
+
+    for(size_t page = 0; page < 2; page++) {
+        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
+            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
+            dbengine_cadence_test_store_point(rd4, t, (NETDATA_DOUBLE)(t - base_s + 1));
+        }
+        unittest_storage_engine_store_flush(rd4->tiers[0].sch);
+    }
+    for(time_t t = base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS; t < base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS + 5; t++)
+        unittest_storage_engine_store_metric(rd4->tiers[0].sch, (usec_t)t * USEC_PER_SEC, NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
+
+    f.metric_id = (Word_t)rd4->uuid;
+    f.start_time_s = base_s + IN_MEMORY_TEST_PAGE_POINTS;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    unittest_storage_engine_store_flush(rd4->tiers[0].sch);
+    errors += in_memory_test_latest(ctx, rd4, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, "after the newest data page was evicted under a page of gaps");
+
+    // 7. a page closed because it is full: no hot time is left at its end (it would outlive the page), and evicting it
+    //    moves the latest time back to the older page (a host with a longer retention, so the retention pass does not
+    //    touch these pages, older than the main test host's window)
+    RRDHOST *host_long = dbengine_rrdhost_find_or_create_mode("unittest-dbengine-in-memory-long", RRD_DB_MODE_RAM, 5 * IN_MEMORY_TEST_POINTS);
+    struct rrdengine_instance *ctx_long = host_long ? (struct rrdengine_instance *)host_long->db[0].si : NULL;
+    RRDDIM *rd3 = ctx_long ? dbengine_cadence_test_create_metric(host_long, "unittest-in-memory-full", 1) : NULL;
+    if(!rd3)
+        return errors + 1;
+
+    struct rrdeng_collect_handle *handle3 = (struct rrdeng_collect_handle *)rd3->tiers[0].sch;
+    const time_t base3_s = now_realtime_sec() - 3 * IN_MEMORY_TEST_POINTS;
+    for(time_t t = base3_s; t < base3_s + 10; t++)
+        dbengine_cadence_test_store_point(rd3, t, 1);
+    unittest_storage_engine_store_flush(rd3->tiers[0].sch);
+
+    time_t full_end_s = 0;
+    for(time_t t = base3_s + 10; t < base3_s + 4 * IN_MEMORY_TEST_POINTS; t++) {
+        dbengine_cadence_test_store_point(rd3, t, 2);
+        if(!handle3->pgc_page) {
+            full_end_s = t;
+            break;
+        }
+    }
+
+    if(!full_end_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the page did not close when full\n");
+        errors++;
+    }
+    else {
+        if(handle3->hot_time_s) {
+            fprintf(stderr, " >>> DBENGINE: in memory: a hot time %jd is left after the page closed full\n",
+                    (intmax_t)handle3->hot_time_s);
+            errors++;
+        }
+
+        struct in_memory_test_page_filter f3 = {
+            .section = (Word_t)ctx_long,
+            .metric_id = (Word_t)rd3->uuid,
+            .start_time_s = base3_s + 10,
+        };
+        pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f3);
+        errors += in_memory_test_latest(ctx_long, rd3, base3_s + 9, "after the page that closed full was evicted");
+    }
+
+    rrdset_free(rd3->rrdset);
+    rrdset_free(rd4->rrdset);
     rrdset_free(rd2->rrdset);
     rrdset_free(rd->rrdset);
 

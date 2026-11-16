@@ -363,7 +363,7 @@ void rrdeng_store_metric_flush_current_page(STORAGE_COLLECT_HANDLE *sch) {
     struct rrdeng_collect_handle *handle = (struct rrdeng_collect_handle *)sch;
 
     if (unlikely(!handle->pgc_page)) {
-        // a page-full flush already released the page, but storing its last point set the hot time again
+        // no page: the hot time of this handle, if any, has nothing waiting to be stored
         rrdeng_store_metric_clear_hot_time(handle);
         return;
     }
@@ -580,6 +580,7 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
 
     timing_step(TIMING_STEP_DBENGINE_PACK);
 
+    bool page_full = false;
     if(unlikely(!handle->pgc_page)) {
         rrdeng_store_metric_create_new_page(handle, point_in_time_ut, handle->page_data);
         // handle->position is set to 1 already
@@ -594,20 +595,23 @@ static ALWAYS_INLINE_HOT void rrdeng_store_metric_append_point(STORAGE_COLLECT_H
 
         rrdeng_store_metric_first_retention(handle);
 
-        if(unlikely(++handle->page_position >= handle->page_entries_max)) {
-            internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
-            handle->page_flags |= RRDENG_PAGE_FULL;
-            rrdeng_store_metric_flush_current_page(sch);
-        }
+        page_full = ++handle->page_position >= handle->page_entries_max;
     }
 
     timing_step(TIMING_STEP_DBENGINE_PAGE_FIN);
 
-    // update the metric information
+    // update the metric information, while the page is still hot: the flush of a full page below clears it, so no
+    // hot time is left for a page that is released (an in-memory page may be evicted as soon as it is released)
     if(mrg_metric_set_hot_latest_time_s(main_mrg, handle->metric, (time_t) (point_in_time_ut / USEC_PER_SEC)))
         handle->hot_time_s = (time_t) (point_in_time_ut / USEC_PER_SEC);
 
     timing_step(TIMING_STEP_DBENGINE_MRG_UPDATE);
+
+    if(unlikely(page_full)) {
+        internal_fatal(handle->page_position > handle->page_entries_max, "DBENGINE: exceeded page max number of points");
+        handle->page_flags |= RRDENG_PAGE_FULL;
+        rrdeng_store_metric_flush_current_page(sch);
+    }
 }
 
 static void store_metric_next_error_log(struct rrdeng_collect_handle *handle __maybe_unused, usec_t point_in_time_ut __maybe_unused, const char *msg __maybe_unused) {
