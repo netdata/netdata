@@ -9,8 +9,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 )
 
-// Store encodes and queries RUM records in the command-owned journal.
-// It borrows the journal; only the command may close it or enforce retention.
+// Store encodes and queries RUM records in the process-owned journal.
+// It borrows the journal; only the plugin process (dem.Process) may close it or enforce retention.
 type Store struct{ store *journalstore.Store }
 
 func NewStore(store *journalstore.Store) *Store {

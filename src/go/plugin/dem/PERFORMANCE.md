@@ -4,9 +4,10 @@ DEM capacity depends on browser service time, RUM identity and payload volume, r
 Job count or beacon rate alone is not a sizing rule. Browser attempts share one process allowance; RUM processing
 does not consume browser slots.
 
-The original mixed qualification met the tested target. A current-master repeat completed the offered-load interval
-but shed 43 requests in the generator and coalesced five occurrences during activation. It did not meet the same
-lossless-load and zero-coalescing targets. Both runs use fresh browsers. Browser reuse remains deferred, and the production default remains one shared browser slot.
+The original mixed qualification met the tested target. A repeat on master `d2c037a448` (2026-11-11) completed the
+offered-load interval but shed 43 requests in the generator and coalesced five occurrences during activation. It did
+not meet the same lossless-load and zero-coalescing targets. Both runs use fresh browsers. Browser reuse remains
+deferred, and the production default remains one shared browser slot.
 
 ## Qualification workload
 
@@ -98,7 +99,7 @@ control audits of the same page. Maximum total blocking time was 85 ms for recur
 activation, versus 51–71 ms in the serial control. These observed tails matter when interpreting lab measurements;
 the test does not establish equivalence to an unloaded runner.
 
-## Current-master repeat — 2026-11-11
+## Repeat on `d2c037a448` — 2026-11-11
 
 The same fixture was repeated on master `d2c037a448`, including the merged history-query, snapshot,
 bot-classification and retained-state changes. **This repeat did not qualify the complete target.** The generator's
@@ -106,7 +107,7 @@ bot-classification and retained-state changes. **This repeat did not qualify the
 by newer due occurrences while waiting for a browser slot. All requests actually sent received HTTP 202, with no
 transport errors. The failed generator and browser qualification verdicts are retained.
 
-| Observation | Original run | Current-master repeat |
+| Observation | Original run | Repeat on `d2c037a448` |
 |---|---:|---:|
 | Planned RUM requests | 2,100,000 | 2,100,000 |
 | Requests attempted / HTTP 202 | 2,100,000 / 2,100,000 | 2,099,957 / 2,099,957 |
@@ -159,9 +160,9 @@ SHA-256 is `92ad1006cd112847631f7dff16000d90b723dd573703ba06e76bfbf5a6d068b5`. N
 runtime or default changed. The private Agent drained successfully, all 43,477 tracked process identities exited,
 and the installed Agent/runtime remained unchanged.
 
-## Current DEM CPU attribution — 2026-11-11
+## DEM CPU attribution on `d2c037a448` — 2026-11-11
 
-A 180-second CPU profile at minutes 20–23 of the current-master repeat recorded 118.22 sampled CPU-seconds in the
+A 180-second CPU profile at minutes 20–23 of the `d2c037a448` repeat recorded 118.22 sampled CPU-seconds in the
 DEM Go process, about **0.66 core**. The profile PID matched the native Agent's DEM child; it completed without
 interruption. These are cumulative stack costs, so nested rows overlap.
 
@@ -178,7 +179,7 @@ Window reads include chart snapshots and Pages queries from the qualification ob
 all GC work. This profile excludes the native Agent, Node, Chromium and load generator, and does not measure blocked
 I/O time. It precedes the 30-minute replay-retention turnover; the full workload covers that turnover, but this
 profile does not attribute its mature expiry costs. No original-run CPU profile exists, so these figures establish
-current attribution, not a causal CPU reduction.
+attribution on `d2c037a448`, not a causal CPU reduction.
 
 ## Choosing browser concurrency
 
