@@ -7,9 +7,10 @@ source of operator configuration documentation. The [architecture guide](ARCHITE
 is built, from the overall data flow to package ownership and runtime lifetimes.
 
 The stock configuration starts one loopback receiver and no sites. Configuration follows the normal Go Agent layout:
-`dem.conf` for plugin policy and `dem/receiver.conf` / `dem/rum.conf` for collectors. The receiver is a canonical single
-object (`dem:collector:receiver`); each RUM monitor is an independent job (`dem:collector:rum:<name>`). Native `name` is the
-stable beacon/history key; `display_name` is presentation metadata. Renaming a RUM job starts a new history namespace.
+`dem.conf` for plugin policy and `dem/receiver.conf`, `dem/rum.conf`, `dem/journey.conf` and `dem/lighthouse.conf` for
+collectors. The receiver is a canonical single object (`dem:collector:receiver`); each RUM monitor is an independent
+job (`dem:collector:rum:<name>`). Native `name` is the stable beacon/history key; `display_name` is presentation
+metadata. Renaming a RUM job starts a new history namespace.
 
 ## Organize monitors on a site vnode
 
@@ -249,7 +250,7 @@ alarm because the Agent has no expected-traffic schedule.
 Customize alerts through normal Netdata health configuration, using `_collect_plugin=dem` and `_collect_job=<site>`
 chart-label filters for site-specific policies. The plugin does not generate health files or reload health configuration.
 Terminal/debug runs use private temporary journal and identity state, removed after readers and workers join; they leave
-live state untouched. Failed temporary history is preserved for investigation. An existing experimental `history.db` is not imported or deleted.
+live state untouched. Failed temporary history is preserved for investigation.
 
 New journals use `dem.journal` for active files and `dem@…journal` for finalized archives. Startup verifies preexisting
 active files before any journal reuse or archival, including retained machine directories. Finalized archives from the
@@ -608,8 +609,7 @@ Each `journey` job runs one configured Playwright Test entry and its imports. Ea
 performance lab audit. Both use native job configuration. Stock configuration enables no browser jobs.
 `check_every` controls browser execution: 900 seconds for journeys and 1800 seconds for Lighthouse by default.
 Admitted attempt timeouts default to 120 and 180 seconds respectively. `update_every` controls chart refreshes and defaults
-to 10 seconds for both. When updating an existing test configuration, move its old browser interval from `update_every`
-to `check_every`; otherwise it will only change chart refresh frequency.
+to 10 seconds for both.
 
 A job queues its first check immediately. The first recurring check is spread deterministically between one and two
 check intervals after activation; later due times follow a fixed cadence. A busy job keeps at most one active and one
