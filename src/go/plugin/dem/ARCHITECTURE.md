@@ -23,7 +23,7 @@ relative to `src/go/`.
 
 **Design contracts** — [Package boundaries](#package-boundaries) |
 [Process and framework ownership](#process-and-framework-ownership) | [RUM contracts](#rum-contracts) |
-[History contracts](#history-contracts) | [Synthetic contracts](#synthetic-contracts)
+[History contracts](#history-contracts) | [Synthetic contracts](#synthetic-contracts) | [Provenance](#provenance)
 
 ## Short version
 
@@ -335,6 +335,10 @@ Key points of this path:
 - **Proof of completion.** The Node adapter and its browser start through `nd-run`, the Agent's unprivileged launcher,
   acting as a Linux subreaper. A run finishes only when that supervision proves the whole child process tree has
   exited. Only then are captures published and the admission slot released.
+- **A separate completion budget.** The execution timeout does not bound the whole call. After verified drainage,
+  capture publication and history completion use their own ten-second budget (`cleanupTimeout` in
+  `synthetic/runner/engine.go`), and the browser slot stays held until they finish. Cleanup uncertainty preserves work
+  and closes admission; it never authorizes publication.
 
 How a run can end:
 
@@ -600,6 +604,7 @@ Framework-owned behavior:
   probes one published-directory entry, and successful publication sets its hint. Unclassified published entries or
   enumeration errors also expose catalogue diagnostics without bypassing manifest validation. Workspaces alone do not.
   Hints stay true across framework generations during the store lifetime; process restart derives them from disk again.
+  Data that startup retention then expires still leaves its group announced for that process lifetime.
 - The RUM registry contains actual admitted site registrations and receiver availability. It has no desired config
   mirror, scheduler or job status.
 
@@ -736,6 +741,26 @@ Status:
 - The worker publishes refresh/fault changes, and collection publishes source-generation lookup counts.
 - Neither copied status nor database build time proves freshness or coverage.
 
+`rum-sites` publishes the copied source status as `collector.geoip`, independently of each site's capture policy.
+Timestamps are Unix microseconds and are omitted when unseen.
+
+| Field | Meaning |
+|---|---|
+| `selection` | `auto` or `explicit`, matching receiver source selection; omitted until a receiver has been published |
+| `state` | `loaded`, `unavailable` or `using_previous` |
+| `source` | Active `cache`, `stock` or `explicit` source; omitted without an active source |
+| `database_type` | The active database's declared supported type; omitted without an active source |
+| `build_at` | Database metadata build time, not provider freshness |
+| `loaded_at` | When the active snapshot was accepted; unchanged checks and failed refreshes do not advance it |
+| `last_checked_at` | Most recent source check |
+| `reason` | Bounded source-status code, with no filesystem path or raw error; load errors are in the Agent log |
+| `lookup_errors` | Error count for the active source generation; unmatched addresses and absent fields are not errors |
+
+- `loaded` means the declared format is supported and the reader was accepted. It does not mean every record was
+  validated, nor establish freshness, accuracy or coverage.
+- Per-record decoding or invalid-field errors leave the affected fields absent and increment `lookup_errors`; they do
+  not reject the whole database.
+
 Fault containment for memory-mapped databases:
 
 - MMDB mappings are privately owned before reader construction.
@@ -811,6 +836,9 @@ Sampling:
 - Config owns omitted/null defaults. The aggregator receives literal effective rates, including zero.
 - Receiver collection zero acknowledges otherwise admissible requests before decode, geo lookup or processing.
   Bootstrap zero avoids SDK startup.
+- Observations without a session ID still contribute measurements. They are investigated only at a 100% investigation
+  rate or when an `always_keep` problem matches (`recordSessionless`); then their errors enter history as standalone
+  errors and the observation qualifies for export. They create no session and no standalone vital timeline.
 
 History promotion:
 
@@ -873,8 +901,9 @@ Retention and resources:
 - Memory is O(admitted distinct state and retained bytes over each horizon), plus detail and query state. Heap/map
   backing allocations may retain high-water capacity after entries expire. This is not a hard process-memory limit
   or evidence of a qualified full-scale workload.
-- Investigation-session LRU, event/live rings and history/export queues retain their separate limits and actual loss
-  diagnostics. Invalid measurements and receiver rejections remain independently counted.
+- Investigation-session LRU (2,000 tracked sessions per site, `maxTrackedSessions`), event/live rings and history/export
+  queues retain their separate limits and actual loss diagnostics. Inactivity expiry and eviction lose a session's
+  context and promotion state. Invalid measurements and receiver rejections remain independently counted.
 
 ### Metrics and alerts
 
@@ -1255,3 +1284,10 @@ Retention:
 - Filesystem traversal/retention is linear in files plus finalized-set sorting, without a rescan per victim.
 - Publication and current-check Functions do not recursively inventory artifact storage. No metrics collection path
   scans artifact bytes.
+
+## Provenance
+
+The browser normalization, rolling aggregation, OTLP and query behavior originated in the experimental
+[Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit `b3de4662f567dc63d33fee6201f8c2313568301b`.
+The native Agent framework replaced its private configuration controller, scheduler, protocol emitter and root state
+reconciliation. Embedded third-party asset notices stay beside their source ([Faro assets](rum/faro/assets/README.md)).

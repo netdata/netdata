@@ -109,8 +109,8 @@ before the initial-size decision. This is a format signature check, not archive 
 member. The store never rewrites or sanitizes ZIP content. The existing 5 MiB limit, per-item omissions, atomic set
 publication, administrator-equivalent byte access and shared retention apply.
 
-See [Optional journey failure traces](../../README.md#optional-journey-failure-traces) for configuration, recording
-cost, timeout behavior and raw-content disclosures, and the [runtime contract](../../../../../dem-runtime/README.md#optional-journey-failure-traces)
+See the `trace_on_failure` option on the [Browser Journey](../../collector/synthetic/integrations/browser_journey.md)
+page for configuration, recording cost, timeout behavior and raw-content disclosures, and the [runtime contract](../../../../../dem-runtime/README.md#optional-journey-failure-traces)
 for negotiation and candidate eligibility.
 
 Manifest version stays 2. Readers without trace support reject the entire mixed set, so its PNGs cannot be fetched
