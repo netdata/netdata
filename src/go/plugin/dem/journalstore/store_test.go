@@ -19,7 +19,7 @@ import (
 
 func newTestStore(t *testing.T) *Store {
 	t.Helper()
-	s, err := Open(context.Background(), "")
+	s, err := Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, s.Close()) })
 	return s
@@ -135,7 +135,7 @@ func TestPrivateCleanup(t *testing.T) {
 
 func TestPrivateCleanupPreservesUnsafeFiles(t *testing.T) {
 	ctx := context.Background()
-	s, err := Open(ctx, "")
+	s, err := Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close(); require.NoError(t, os.RemoveAll(s.root)) })
 	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
@@ -207,7 +207,7 @@ func TestStartupRejectsInterruptedActiveWithoutChangingFiles(t *testing.T) {
 			// Leave both native postings present, modelling an interrupted publication.
 			binary.LittleEndian.PutUint64(data[152:160], 1)
 			require.NoError(t, os.WriteFile(path, data, 0600))
-			_, err = Open(context.Background(), root)
+			_, err = Open(context.Background(), root, "")
 			require.Error(t, err)
 			assert.ErrorContains(t, err, "invalid journal file")
 			assert.ErrorContains(t, err, path)
@@ -248,7 +248,7 @@ func TestStartupRejectsUnversionedArchiveWithoutRemoval(t *testing.T) {
 	require.Len(t, files, 1)
 	before, err := os.ReadFile(files[0])
 	require.NoError(t, err)
-	_, err = Open(context.Background(), root)
+	_, err = Open(context.Background(), root, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "incompatible DEM history schema")
 	after, err := os.ReadFile(files[0])
@@ -258,7 +258,7 @@ func TestStartupRejectsUnversionedArchiveWithoutRemoval(t *testing.T) {
 
 func TestFailedJournalRejectsQueriesAndRetention(t *testing.T) {
 	ctx := context.Background()
-	s, err := Open(ctx, "")
+	s, err := Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = s.Close(); require.NoError(t, os.RemoveAll(s.root)) })
 	require.NoError(t, s.EnforceHistoryRetention(ctx, 30, 1<<30))
@@ -314,7 +314,7 @@ func TestObservedKindIgnoresRejectedAppend(t *testing.T) {
 func TestObservedKindAfterRetentionAndRestart(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		root := t.TempDir()
-		s, err := Open(t.Context(), root)
+		s, err := Open(t.Context(), root, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, s.Close()) })
 		appendEntry(t, s)
@@ -324,7 +324,7 @@ func TestObservedKindAfterRetentionAndRestart(t *testing.T) {
 		require.Zero(t, countEntries(t, s))
 		assert.True(t, s.HasObservedKind(KindRUM))
 		require.NoError(t, s.Close())
-		s, err = Open(t.Context(), root)
+		s, err = Open(t.Context(), root, "")
 		require.NoError(t, err)
 		assert.False(t, s.HasObservedKind(KindRUM))
 		assert.False(t, s.HasObservedKind(KindSynthetic))

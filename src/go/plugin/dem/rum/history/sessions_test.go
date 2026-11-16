@@ -258,7 +258,7 @@ func TestSessionUserIDsOnlyIncludeReceiptTimeRange(t *testing.T) {
 		Page:       "/old",
 		UserID:     "prior-user",
 	}, now)
-	owner, err := journalstore.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })
 	s := NewStore(owner)

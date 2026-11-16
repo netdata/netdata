@@ -80,7 +80,7 @@ func TestRetentionCoversRetiredActiveAndArchivedMachines(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, log.CloseWithoutRetention())
 			}
-			s, err := Open(context.Background(), root)
+			s, err := Open(context.Background(), root, "")
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, s.Close()) })
 			require.Equal(t, 1, countEntries(t, s))
@@ -146,7 +146,7 @@ func TestStatusDistinguishesUnknownInventoryAndSafeCleanupFailure(t *testing.T) 
 	synctest.Test(t, func(t *testing.T) {
 		ctx := context.Background()
 		root := t.TempDir()
-		s, err := Open(ctx, root)
+		s, err := Open(ctx, root, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { require.NoError(t, s.Close()) })
 		status, err := s.Status(ctx)

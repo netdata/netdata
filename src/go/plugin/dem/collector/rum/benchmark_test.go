@@ -27,7 +27,7 @@ func BenchmarkCollect(b *testing.B) {
 		}
 		b.Run(name, func(b *testing.B) {
 			ctx := context.Background()
-			db, err := journalstore.Open(ctx, "")
+			db, err := journalstore.Open(ctx, "", "")
 			require.NoError(b, err)
 			defer db.Close()
 			hub := rumregistry.New()

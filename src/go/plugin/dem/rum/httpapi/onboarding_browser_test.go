@@ -51,7 +51,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		"tracing-failure", "core-failure", "disabled", "wrong-origin", "alias-coherent", "alias-bootstrap-only",
 	}
 	hub := registry.New()
-	db, err := journalstore.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"))
+	db, err := journalstore.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 

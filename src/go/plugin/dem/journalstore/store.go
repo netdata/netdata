@@ -34,9 +34,9 @@ type Store struct {
 
 // Open opens one command-owned journal chain. An empty path uses private
 // temporary journal and identity state, removed by Close after readers finish.
-// Host identity files are read through journalhost; fallback state is confined
-// to this store's identity directory.
-func Open(ctx context.Context, path string) (*Store, error) {
+// Host identity files are read through journalhost, under hostPrefix first
+// when it is set; fallback state is confined to this store's identity directory.
+func Open(ctx context.Context, path, hostPrefix string) (*Store, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -67,7 +67,8 @@ func Open(ctx context.Context, path string) (*Store, error) {
 		return nil, err
 	}
 	host, err := journalhost.Load(journalhost.LoadOptions{
-		StateDir: filepath.Join(path, "identity"),
+		StateDir:             filepath.Join(path, "identity"),
+		HostFilesystemPrefix: hostPrefix,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("load journal identity: %w", err)

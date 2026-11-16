@@ -26,6 +26,10 @@ type Options struct {
 	ReloadConfig func() (Config, error)
 	// VarLibDir holds the live journal, the capture store and the default runtime cache.
 	VarLibDir string
+	// HostPrefix is the Agent's host filesystem prefix (NETDATA_HOST_PREFIX). On
+	// Linux the journal reads the host's machine and boot ids under it first;
+	// empty uses only the local ones.
+	HostPrefix string
 	// Private (terminal and debug) runs use temporary history and capture stores
 	// and leave the live ones untouched. The browser runtime store is shared.
 	Private    bool
@@ -53,7 +57,7 @@ func Open(opts Options) (*Process, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initializing DEM history: %w", err)
 	}
-	history, err := journalstore.Open(context.Background(), path)
+	history, err := journalstore.Open(context.Background(), path, opts.HostPrefix)
 	if err != nil {
 		return nil, fmt.Errorf("opening DEM history: %w", err)
 	}

@@ -167,7 +167,7 @@ func TestRunHistoryRowsShowOnlyTheirKindColumns(t *testing.T) {
 // The journal-backed rows also carry each kind's own measurements.
 func TestRunHistoryTruncationCountsOnlyItsKind(t *testing.T) {
 	ctx := t.Context()
-	journalStore, err := journalstore.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := synthetichistory.NewStore(journalStore)

@@ -18,7 +18,7 @@ import (
 func BenchmarkSyntheticRuns(b *testing.B) {
 	const runCount = 10000
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, b.TempDir())
+	journalStore, err := journalstore.Open(ctx, b.TempDir(), "")
 	require.NoError(b, err)
 	b.Cleanup(func() { require.NoError(b, journalStore.Close()) })
 	store := NewStore(journalStore)

@@ -87,6 +87,7 @@ func main() {
 		Config:       cfg,
 		ReloadConfig: func() (dem.Config, error) { return dem.LoadConfig(pluginconfig.ConfigDir()) },
 		VarLibDir:    pluginconfig.VarLibDir(),
+		HostPrefix:   pluginconfig.HostPrefix(),
 		Private:      debug,
 		GeoIPPaths:   geoip.AgentPaths(pluginconfig.CacheDir(), pluginconfig.StockDataDir()),
 	})

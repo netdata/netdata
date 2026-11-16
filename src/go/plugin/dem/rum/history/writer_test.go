@@ -64,7 +64,7 @@ func drain(w *Writer, final func() context.Context) {
 
 func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	ctx := context.Background()
-	st, err := journalstore.Open(ctx, "")
+	st, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()

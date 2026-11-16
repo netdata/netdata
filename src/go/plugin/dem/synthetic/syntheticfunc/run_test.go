@@ -21,7 +21,7 @@ import (
 // A retained run without events or artifacts reads back with null lists; synthetics-run shows them as empty.
 func TestStoredRunWithoutEventsOrArtifactsShowsEmptyLists(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := synthetichistory.NewStore(journalStore)

@@ -18,7 +18,7 @@ import (
 // The history store reports cancellation before reading; the query service
 // must return that error rather than an empty result.
 func TestSessionsReturnHistoryCancellation(t *testing.T) {
-	journalStore, err := journalstore.Open(context.Background(), "")
+	journalStore, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	ctx, cancel := context.WithCancel(context.Background())
@@ -38,7 +38,7 @@ func TestSessionsReturnHistoryCancellation(t *testing.T) {
 // under an older pattern set, can still hold a credential.
 func TestRetiredSiteHistoryGetsCredentialPatterns(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, "")
+	journalStore, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := history.NewStore(journalStore)

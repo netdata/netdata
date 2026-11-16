@@ -50,7 +50,7 @@ func (a activeRuns) Latest(jobID, runID string) (synthetic.Run, bool) {
 
 func TestRunUsesActiveEvidenceThenRetainedHistory(t *testing.T) {
 	ctx := context.Background()
-	log, err := journalstore.Open(ctx, t.TempDir())
+	log, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, log.Close()) })
 	retained := history.NewStore(log)
@@ -295,7 +295,7 @@ func TestRetainedCapturesOutliveHistoryAndActiveJobs(t *testing.T) {
 			[]synthetic.Capture{{ID: "report", Kind: "report", MIME: "text/html", Path: "output/report.html"}},
 		)
 		require.NoError(t, err)
-		log, err := journalstore.Open(ctx, t.TempDir())
+		log, err := journalstore.Open(ctx, t.TempDir(), "")
 		require.NoError(t, err)
 		defer log.Close()
 		retained := history.NewStore(log)
@@ -434,7 +434,7 @@ func TestInvalidManifestAndWrongOwnerNeverFallBackToHistory(t *testing.T) {
 // emptyHistory is a real run history holding no runs.
 func emptyHistory(t *testing.T) *history.Store {
 	t.Helper()
-	store, err := journalstore.Open(t.Context(), "")
+	store, err := journalstore.Open(t.Context(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	return history.NewStore(store)

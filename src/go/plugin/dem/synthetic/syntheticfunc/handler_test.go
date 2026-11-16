@@ -636,7 +636,7 @@ func TestCaptureAbsenceStates(t *testing.T) {
 
 func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	run := model.Run{
@@ -665,7 +665,7 @@ func TestHistoryExplicitEpochBoundThroughJournal(t *testing.T) {
 
 func TestHistoryPickerUsesStartAndLatestCompletionThroughFunction(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	retained := synthetichistory.NewStore(journalStore)
@@ -838,7 +838,7 @@ func TestFailureEvidenceFunctionsAreAdditive(t *testing.T) {
 
 func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *testing.T) {
 	ctx := context.Background()
-	journalStore, err := journalstore.Open(ctx, t.TempDir())
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	store := synthetichistory.NewStore(journalStore)
@@ -931,7 +931,7 @@ func TestFunctionSiteFilterUsesIndependentCurrentAndHistoricalAssociations(t *te
 // emptyHistory is a real run history holding no runs.
 func emptyHistory(t *testing.T) *synthetichistory.Store {
 	t.Helper()
-	store, err := journalstore.Open(t.Context(), "")
+	store, err := journalstore.Open(t.Context(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	return synthetichistory.NewStore(store)
