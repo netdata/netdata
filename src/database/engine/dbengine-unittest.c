@@ -778,6 +778,123 @@ static size_t in_memory_test_latest(struct rrdengine_instance *ctx, RRDDIM *rd, 
     return 0;
 }
 
+// the raw retention of the metric in the MRG (no fallback of the retention API)
+static size_t in_memory_test_retention(struct rrdengine_instance *ctx, RRDDIM *rd, time_t first_expected_s, time_t last_expected_s, const char *what) {
+    time_t first_s = 0, last_s = 0;
+    METRIC *metric = mrg_metric_get_and_acquire_by_id(main_mrg, rd->uuid, (Word_t)ctx);
+    if(metric) {
+        mrg_metric_get_retention(main_mrg, metric, &first_s, &last_s, NULL);
+        mrg_metric_release(main_mrg, metric);
+    }
+
+    if(!metric || first_s != first_expected_s || last_s != last_expected_s) {
+        fprintf(stderr, " >>> DBENGINE: in memory: %s the retention is %jd - %jd (expected %jd - %jd)\n",
+                what, (intmax_t)first_s, (intmax_t)last_s, (intmax_t)first_expected_s, (intmax_t)last_expected_s);
+        return 1;
+    }
+    return 0;
+}
+
+// closed pages of IN_MEMORY_TEST_PAGE_POINTS points from from_s: points have value = seconds since from_s + 1
+static void in_memory_test_store_pages(RRDDIM *rd, time_t from_s, size_t pages) {
+    for(size_t page = 0; page < pages; page++) {
+        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
+            time_t t = from_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
+            dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)(t - from_s + 1));
+        }
+        unittest_storage_engine_store_flush(rd->tiers[0].sch);
+    }
+}
+
+// The free callbacks of one metric's pages run on several threads, and its collector adds pages meanwhile. The hook
+// pauses the callback of one page after it scanned the pages that remain, and while it is paused:
+// - a collector adds a page (collect_rd), or
+// - another thread evicts the metric's other page (other_start_s): its callback must wait for this one to decide.
+//   Waiting for it to finish would never end then: the hook waits a little, so without that wait it finishes first.
+struct in_memory_race_state {
+    Word_t section;
+    Word_t metric_id;
+    time_t paused_start_s;
+
+    RRDDIM *collect_rd;
+    time_t collect_from_s;
+
+    time_t other_start_s;
+    ND_THREAD *other_thread;
+    bool other_entered;
+    bool other_done;
+
+    size_t errors;
+};
+
+static struct in_memory_race_state in_memory_race;
+
+static bool in_memory_race_wait(bool *flag, usec_t timeout_ut) {
+    usec_t until_ut = now_monotonic_usec() + timeout_ut;
+    while(!__atomic_load_n(flag, __ATOMIC_ACQUIRE)) {
+        if(now_monotonic_usec() >= until_ut)
+            return false;
+        sleep_usec(USEC_PER_MS);
+    }
+    return true;
+}
+
+static void in_memory_race_evict_other(void *arg __maybe_unused) {
+    struct in_memory_test_page_filter f = {
+        .section = in_memory_race.section,
+        .metric_id = in_memory_race.metric_id,
+        .start_time_s = in_memory_race.other_start_s,
+    };
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    __atomic_store_n(&in_memory_race.other_done, true, __ATOMIC_RELEASE);
+}
+
+static void in_memory_race_hook(const PGC_ENTRY *entry, RAM_CACHE_RETENTION_HOOK_POINT point) {
+    // the retention pass and the out of memory protection may evict pages of other metrics meanwhile
+    if(entry->section != in_memory_race.section || entry->metric_id != in_memory_race.metric_id)
+        return;
+
+    if(point == RAM_CACHE_RETENTION_HOOK_ENTER) {
+        if(in_memory_race.other_start_s && entry->start_time_s == in_memory_race.other_start_s)
+            __atomic_store_n(&in_memory_race.other_entered, true, __ATOMIC_RELEASE);
+        return;
+    }
+
+    if(entry->start_time_s != in_memory_race.paused_start_s)
+        return;
+
+    if(in_memory_race.collect_rd)
+        in_memory_test_store_pages(in_memory_race.collect_rd, in_memory_race.collect_from_s, 1);
+
+    else if(in_memory_race.other_start_s) {
+        in_memory_race.other_thread = nd_thread_create("UTIMRACE", NETDATA_THREAD_OPTION_MANUAL_JOIN, in_memory_race_evict_other, NULL);
+        if(!in_memory_race.other_thread || !in_memory_race_wait(&in_memory_race.other_entered, 10 * USEC_PER_SEC)) {
+            fprintf(stderr, " >>> DBENGINE: in memory: the callback of the other page did not start\n");
+            in_memory_race.errors++;
+            return;
+        }
+        in_memory_race_wait(&in_memory_race.other_done, 200 * USEC_PER_MS);
+    }
+}
+
+// evicts the page of in_memory_race at start_s with the hook set, and waits for every callback it started
+static size_t in_memory_race_evict(time_t start_s) {
+    struct in_memory_test_page_filter f = {
+        .section = in_memory_race.section,
+        .metric_id = in_memory_race.metric_id,
+        .start_time_s = start_s,
+    };
+
+    rrdeng_in_memory_set_retention_test_hook(in_memory_race_hook);
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    rrdeng_in_memory_set_retention_test_hook(NULL);
+
+    if(in_memory_race.other_thread)
+        nd_thread_join(in_memory_race.other_thread);
+
+    return in_memory_race.errors;
+}
+
 static size_t test_dbengine_in_memory(void) {
     fprintf(stderr, "\nDBENGINE: testing the in-memory instances of db = ram / alloc...\n");
     size_t errors = 0;
@@ -805,13 +922,7 @@ static size_t test_dbengine_in_memory(void) {
     // three pages of recent data (inside the retention by the wall clock, which the out of memory protection of
     // step 2 judges by): points have value = seconds since base + 1
     const time_t base_s = now_realtime_sec() - 4 * IN_MEMORY_TEST_PAGE_POINTS;
-    for(size_t page = 0; page < 3; page++) {
-        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
-            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
-            dbengine_cadence_test_store_point(rd, t, (NETDATA_DOUBLE)(t - base_s + 1));
-        }
-        unittest_storage_engine_store_flush(rd->tiers[0].sch);
-    }
+    in_memory_test_store_pages(rd, base_s, 3);
 
     const time_t last_s = base_s + 3 * IN_MEMORY_TEST_PAGE_POINTS - 1;
 
@@ -865,13 +976,7 @@ static size_t test_dbengine_in_memory(void) {
     if(!rd2)
         return errors + 1;
 
-    for(size_t page = 0; page < 3; page++) {
-        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
-            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
-            dbengine_cadence_test_store_point(rd2, t, (NETDATA_DOUBLE)(t - base_s + 1));
-        }
-        unittest_storage_engine_store_flush(rd2->tiers[0].sch);
-    }
+    in_memory_test_store_pages(rd2, base_s, 3);
 
     // a hot time at the end of the newest page too, as another writer of the metric would leave it
     METRIC *metric2 = mrg_metric_get_and_acquire_by_id(main_mrg, rd2->uuid, (Word_t)ctx);
@@ -905,13 +1010,7 @@ static size_t test_dbengine_in_memory(void) {
     if(!rd4)
         return errors + 1;
 
-    for(size_t page = 0; page < 2; page++) {
-        for(size_t i = 0; i < IN_MEMORY_TEST_PAGE_POINTS; i++) {
-            time_t t = base_s + (time_t)(page * IN_MEMORY_TEST_PAGE_POINTS + i);
-            dbengine_cadence_test_store_point(rd4, t, (NETDATA_DOUBLE)(t - base_s + 1));
-        }
-        unittest_storage_engine_store_flush(rd4->tiers[0].sch);
-    }
+    in_memory_test_store_pages(rd4, base_s, 2);
     for(time_t t = base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS; t < base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS + 5; t++)
         unittest_storage_engine_store_metric(rd4->tiers[0].sch, (usec_t)t * USEC_PER_SEC, NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
 
@@ -965,6 +1064,43 @@ static size_t test_dbengine_in_memory(void) {
         errors += in_memory_test_latest(ctx_long, rd3, base3_s + 9, "after the page that closed full was evicted");
     }
 
+    // 8. no data is left when a callback scans, and the collector adds a page before the callback clears the retention:
+    //    the clear must not erase the retention of the new page
+    RRDDIM *rd5 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-race-collect", 1);
+    if(!rd5)
+        return errors + 1;
+
+    in_memory_test_store_pages(rd5, base_s, 1);
+    in_memory_race = (struct in_memory_race_state){
+        .section = (Word_t)ctx,
+        .metric_id = (Word_t)rd5->uuid,
+        .paused_start_s = base_s,
+        .collect_rd = rd5,
+        .collect_from_s = base_s + IN_MEMORY_TEST_PAGE_POINTS,
+    };
+    errors += in_memory_race_evict(base_s);
+    errors += in_memory_test_retention(ctx, rd5, base_s + IN_MEMORY_TEST_PAGE_POINTS, base_s + 2 * IN_MEMORY_TEST_PAGE_POINTS - 1,
+                                       "after a collector added a page while the callback of the last page decided");
+
+    // 9. both pages of a metric are evicted at once: the callback of the older page scanned while the newer one was
+    //    still in the index, and the callback of the newer page finds no page left. The latter decides last, so no
+    //    retention is left
+    RRDDIM *rd6 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-race-evict", 1);
+    if(!rd6)
+        return errors + 1;
+
+    in_memory_test_store_pages(rd6, base_s, 2);
+    in_memory_race = (struct in_memory_race_state){
+        .section = (Word_t)ctx,
+        .metric_id = (Word_t)rd6->uuid,
+        .paused_start_s = base_s,
+        .other_start_s = base_s + IN_MEMORY_TEST_PAGE_POINTS,
+    };
+    errors += in_memory_race_evict(base_s);
+    errors += in_memory_test_retention(ctx, rd6, 0, 0, "after both pages were evicted at once");
+
+    rrdset_free(rd6->rrdset);
+    rrdset_free(rd5->rrdset);
     rrdset_free(rd3->rrdset);
     rrdset_free(rd4->rrdset);
     rrdset_free(rd2->rrdset);

@@ -53,6 +53,15 @@ void pgc_ram_cache_initialize(void);
 void rrdeng_in_memory_enforce_retention(time_t now_s);
 bool rrdeng_in_memory_take_lost_retention(void);
 
+// the unit tests pause the retention decision of an in-memory page's free callback at these points (no hook otherwise)
+struct pgc_entry;
+typedef enum {
+    RAM_CACHE_RETENTION_HOOK_ENTER,     // the page is out of the index; the callback has not waited for the others yet
+    RAM_CACHE_RETENTION_HOOK_SCANNED,   // the callback scanned the pages that remain, and holds the decision lock
+} RAM_CACHE_RETENTION_HOOK_POINT;
+typedef void (*ram_cache_retention_hook_t)(const struct pgc_entry *entry, RAM_CACHE_RETENTION_HOOK_POINT point);
+void rrdeng_in_memory_set_retention_test_hook(ram_cache_retention_hook_t hook);
+
 void pgc_open_add_hot_page(
     Word_t section,
     Word_t metric_id,

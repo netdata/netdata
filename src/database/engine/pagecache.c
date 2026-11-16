@@ -1288,6 +1288,19 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
 // the callback of the last page removed from the index decides last, from the pages that remain.
 static SPINLOCK ram_cache_retention_spinlock = SPINLOCK_INITIALIZER;
 
+// set by the unit tests only, to stage the interleavings of the callbacks with each other and with a collector
+static ram_cache_retention_hook_t ram_cache_retention_test_hook = NULL;
+
+void rrdeng_in_memory_set_retention_test_hook(ram_cache_retention_hook_t hook) {
+    __atomic_store_n(&ram_cache_retention_test_hook, hook, __ATOMIC_RELEASE);
+}
+
+static inline void ram_cache_retention_test_point(const PGC_ENTRY *entry, RAM_CACHE_RETENTION_HOOK_POINT point) {
+    ram_cache_retention_hook_t hook = __atomic_load_n(&ram_cache_retention_test_hook, __ATOMIC_ACQUIRE);
+    if (unlikely(hook))
+        hook(entry, point);
+}
+
 static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) entry.section;
@@ -1297,6 +1310,7 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
         mrg_metric_get_and_acquire_by_id(main_mrg, (UUIDMAP_ID)entry.metric_id, entry.section);
 
     if (metric) {
+        ram_cache_retention_test_point(&entry, RAM_CACHE_RETENTION_HOOK_ENTER);
         spinlock_lock(&ram_cache_retention_spinlock);
 
         // this page may have been the newest only while the metric's latest time is its end: then all the pages that
@@ -1304,6 +1318,7 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
         bool was_latest = mrg_metric_latest_time_is(main_mrg, metric, entry.end_time_s);
         time_t newest_end_s = 0;
         time_t oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, was_latest ? &newest_end_s : NULL);
+        ram_cache_retention_test_point(&entry, RAM_CACHE_RETENTION_HOOK_SCANNED);
         if (oldest_s) {
             mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s);
 
