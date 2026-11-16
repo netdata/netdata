@@ -4,8 +4,16 @@ This guide explains how `dem.plugin` (Digital Experience Monitoring) is built. R
 with what DEM does and one picture of the whole plugin, follows the data along each path, and ends with the design
 contracts that maintainers MUST preserve. The last part is reference material to come back to.
 
-Operator setup, configuration options, Function arguments and troubleshooting live in the [README](README.md) and in
-each collector's `metadata.yaml`. This guide links there instead of repeating it.
+Other documents own the operator and package-level detail; this guide links to them instead of repeating them:
+
+| Topic | Owner |
+|---|---|
+| Plugin-wide requirements, sites, `dem.conf`, storage and the Functions index | [README](README.md) |
+| Each module's setup, options, metrics, alerts, Function columns and troubleshooting | The module's integration page (its collector's `metadata.yaml`) |
+| Browser runtime installation, updates and the `dem.plugin runtime` CLI | [Browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md) |
+| Journey runner protocol, outcomes, failure evidence and capture eligibility | [DEM runtime contract](../../../dem-runtime/README.md) |
+| Rules internal to one package | The package guides listed under [Package map](#package-map) |
+| Measured workloads and sizing | [PERFORMANCE.md](PERFORMANCE.md) |
 
 **Path convention.** Code paths are relative to `src/go/plugin/dem/`, except paths starting with `cmd/`, which are
 relative to `src/go/`.
@@ -157,32 +165,38 @@ Keep these identities distinct:
 | `vnode` reference | Configured vnode lookup name, independent of physical job identity |
 | Recorded `vnode_guid` | Canonical resolved node identity captured for observations and attempts |
 
-The framework delivers configured vnode snapshots before initialization and on revision changes before collection.
-Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates with their admission boundaries.
-History queries MUST use captured GUIDs, not current configuration. Session/error reductions retain physical identity
-and recorded GUID so reassignment cannot merge evidence. Saved and buffered investigation records retain their old GUID.
-A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname/label edits do not.
-Transport and history counters remain job-wide. Old evidence lacking a captured GUID remains unassigned: no
-current-config backfill or speculative migration is performed.
+Identity rules:
 
-DEM Functions remain process-owned on the collecting Agent with existing public names and Agent-level permissions.
-All six RUM Functions and `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs` and
-`synthetics-artifacts` accept either `vnode` or `vnode_guid`. The detail Functions `synthetics-run` and
-`synthetics-artifact` retain their existing parameters.
-Neither selector is an authorization boundary. Omitting both, or supplying only an empty `vnode_guid`, preserves
-all-vnode and unassigned reads. Empty or unknown `vnode` names and requests containing both selectors MUST fail,
-even if either value is empty.
+- **Delivery.** The framework delivers configured vnode snapshots before initialization and on revision changes before
+  collection. Long-lived RUM ingestion and synthetic attempt work MUST reconcile those updates with their admission
+  boundaries.
+- **Captured GUIDs.** History queries MUST use captured GUIDs, not current configuration. Session and error reductions
+  keep physical identity and the recorded GUID, so reassignment cannot merge evidence. Saved and buffered
+  investigation records keep their old GUID.
+- **Resets.** A changed RUM GUID starts a fresh rolling measurement window and Pages view; metadata-only hostname or
+  label edits do not. Transport and history counters stay job-wide.
+- **Old evidence.** Evidence without a captured GUID stays unassigned: there is no current-config backfill or
+  speculative migration.
 
-The `vnode` selector is the exact configured resource name used by collector jobs, not the display hostname.
-Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
-active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
-and perform no I/O or job/history scan. Renamed or removed names have no aliases; name reuse resolves only the current
-GUID. Keep `vnode_guid` as the canonical UUID fallback for earlier identities, including after configuration removal.
-Name selection MUST NOT rewrite captured GUIDs or add stored name history.
+Function site selection:
 
-Apply the resolved GUID filter before row limits and cursor advancement, retaining physical job, session, run and
-capture ownership checks on every evidence read. No Function registration or host-context protocol extension per vnode
-is part of this contract. Retained history remains available with all collector jobs disabled or a vnode archived.
+- **Scope.** DEM Functions stay process-owned on the collecting Agent, with Agent-level permissions. All six RUM
+  Functions and `synthetics-checks`, `synthetics-journey-runs`, `synthetics-lighthouse-runs` and `synthetics-artifacts`
+  accept `vnode` or `vnode_guid`; the detail Functions `synthetics-run` and `synthetics-artifact` do not.
+- **Not authorization.** Neither selector is an authorization boundary. Omitting both, or supplying only an empty
+  `vnode_guid`, reads every vnode and unassigned data. Empty or unknown `vnode` names and requests containing both
+  selectors MUST fail, even if either value is empty.
+- **Name lookup.** `vnode` is the exact configured resource name used by collector jobs, not the display hostname.
+  Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
+  active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
+  and perform no I/O or job/history scan.
+- **No aliases.** Renamed or removed names have no aliases; name reuse resolves only the current GUID. `vnode_guid` is
+  the canonical fallback for earlier identities, including after configuration removal. Name selection MUST NOT
+  rewrite captured GUIDs or add stored name history.
+- **Filter placement.** Apply the resolved GUID filter before row limits and cursor advancement, keeping physical job,
+  session, run and capture ownership checks on every evidence read. There is no per-vnode Function registration or
+  host-context protocol extension. Retained history stays available with every collector job disabled or a vnode
+  archived.
 
 Frontend consumers retain collecting-Agent identity, vnode GUID, module and job name. Desired native configuration
 includes disabled and failed-startup jobs that active registries omit. Guided site setup creates/selects a configured
@@ -193,11 +207,13 @@ Netdata configuration directory's `vnodes/` YAML format; DEM supports static con
 
 ### Capacity remains process-owned
 
-Journey and Lighthouse share the process Executor and configured browser concurrency. Vnode association MUST NOT
-allocate a separate executor or browser pool. Scheduling is fair between ready jobs; vnode placement does not define quotas.
-Native `Run` owns due times and a bounded pending occurrence, while `Collect` publishes scalar latest observations. This avoids
-losing due occurrences when framework publication ticks are skipped. Retirement cancels and joins the session before
-native predecessor release; a replacement cannot inherit its pending work or completed observation.
+- **One executor.** Journey and Lighthouse share the process Executor and the configured browser concurrency. Vnode
+  association MUST NOT allocate a separate executor or browser pool. Scheduling is fair between ready jobs; vnode
+  placement does not define quotas.
+- **Run owns due times.** Native `Run` owns due times and a bounded pending occurrence, while `Collect` publishes scalar
+  latest observations, so skipped framework publication ticks never lose due occurrences.
+- **Clean replacement.** Retirement cancels and joins the session before the native predecessor is released; a
+  replacement cannot inherit its pending work or completed observation.
 
 Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
 state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
@@ -263,7 +279,7 @@ The first failing step decides the response. The body is read only after step 5 
 | 9 | Faro payload decodes and normalizes | 400 |
 | 10 | The site processor ingests the beacon | 202 Accepted |
 
-The README explains what operators should do for each status code.
+The RUM integration page's troubleshooting section tells operators what to do about rejected requests.
 
 ### Inside the site
 
@@ -352,7 +368,8 @@ How a run can end:
 | An admitted monitor cannot load or run | `error`, still counted in metrics and the registry | Start and completion, including preparation failures | None |
 | Process-tree completion cannot be verified | No outcome published | A saved start record stays `unknown` | Admission is poisoned and the plugin fail-stops |
 
-The README defines the full outcome semantics.
+The Browser Journey integration page and the [DEM runtime contract](../../../dem-runtime/README.md) define the outcome
+semantics in full.
 
 ## Journey 3: investigation
 
@@ -417,7 +434,8 @@ What makes this layer predictable:
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
   edits apply at the next hourly sweep, without a restart. Runtime settings and newly installed releases apply after
   restarting the plugin process, including the first installation.
-- Budgets are targets, not physical disk caps. The README explains what can exceed them.
+- Budgets are targets, not physical disk caps. The [README](README.md#storage-and-retention) lists what can exceed
+  them.
 - Terminal and debug runs use a private temporary journal and capture store and leave live history and captures
   untouched. The browser runtime store is shared with normal operation: it still uses `runtime.cache_path` or
   `${NETDATA_LIB_DIR}/dem/runtime`.
@@ -517,9 +535,16 @@ Synthetic packages:
 | `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
-Deeper package guides: [runtime store](synthetic/browserruntime/README.md), [runtime host](synthetic/runtimehost/README.md),
-[capture store](synthetic/artifacts/README.md), [runtime release](../../../dem-runtime/README.md) and
-[Faro assets](rum/faro/assets/README.md).
+Package guides own the rules internal to their package:
+
+| Guide | Owns |
+|---|---|
+| [Runtime store](synthetic/browserruntime/README.md) | Release trust, the managed store, protection, repair and uninstall, preloads, native packages |
+| [Runtime host](synthetic/runtimehost/README.md) | Runtime modes, fixed startup selection, maintenance, the automatic updater |
+| [Capture store](synthetic/artifacts/README.md) | Work directories, publication, manifests, catalogue, fetch, retention |
+| [Faro assets](rum/faro/assets/README.md) | The pinned browser SDK files, their verification and update procedure |
+| [DEM runtime contract](../../../dem-runtime/README.md) | The journey runner protocol, outcomes, evidence and capture eligibility (JavaScript side) |
+| [Runtime release](../../../../packaging/dem-runtime/README.md) | Building, locking and publishing runtime releases |
 
 ## Design contracts
 
@@ -699,8 +724,6 @@ Sites:
 | `country` (default) | Performed | Country only | Country only |
 | `city` | Performed | Country plus approximate city/coordinates | Country only; never city coordinates |
 
-- City mode adds approximate city/coordinates to live observations only. Journals and OTLP never receive city
-  coordinates.
 - Disabled frustration has no instruments or page counts.
 - Application-provided user IDs use bounded text normalization without path-style numeric/UUID substitution.
 - Per-event user attribution and retained observed-ID membership are distinct from display summaries.
@@ -1088,11 +1111,15 @@ Job ownership:
   or captures, and repeated snapshots never increment attempt counters. Missing/stale measurements remain gaps;
   known chart identities disable cycle expiry. The latest outcome becomes `stale` after two check intervals.
 
-Activation checks coalesce only while a contract probe is in flight for the exact runtime source view. Their caller
-deadlines remain independent; the last departing caller cancels and joins physical completion before a replacement
-probe can start. A later check probes again. Running and candidate runtime consumers have separate probe ownership,
-but share the fatal execution owner. Probes stay outside browser-attempt slots to preserve short startup deadlines;
-deployment resource sizing must include them. The concurrency setting does not impose a host-wide or CPU/RAM limit.
+Runtime contract probes (activation checks):
+
+- **Coalescing.** Activation checks coalesce only while a contract probe is in flight for the exact runtime source
+  view. Their caller deadlines stay independent; the last departing caller cancels and joins physical completion before
+  a replacement probe can start. A later check probes again.
+- **Ownership.** Running and candidate runtime consumers have separate probe ownership but share the fatal execution
+  owner.
+- **Outside browser slots.** Probes run outside browser-attempt slots, so a long audit cannot block activation
+  deadlines. Deployment sizing must include them; `browser.concurrency` is not a host-wide CPU or memory limit.
 
 Draft rehearsal:
 
@@ -1147,79 +1174,42 @@ Node adapter and supervision:
   fail-stop before attempting reader joins.
 - The command cannot close stores when the host returns forced recovery or the engine reports unverified cleanup.
 
-### Browser runtime installation and process ownership
+### Browser runtime ownership
 
-Fixed startup selection (`synthetic/runtimehost`):
+The runtime packages own their internal rules: [`synthetic/runtimehost`](synthetic/runtimehost/README.md) (modes,
+fixed startup selection, maintenance, the updater) and [`synthetic/browserruntime`](synthetic/browserruntime/README.md)
+(release trust, the managed store, protection, repair and uninstall, preloads, native packages). The operator procedure
+is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md). The cross-package rules:
 
-- The host atomically acquires the selected installation and a process claim at construction. It keeps that release
-  across monitor changes and internal framework restarts. A missing startup installation remains unavailable until
-  the plugin process restarts, even after an administrator installs a runtime.
-- Enabling or validating a monitor never downloads executables. Contained structural configuration validation remains
-  required before a malformed binding can become a named-dependency waiter; no per-monitor runtime claim is reserved.
-- Readiness reads the fixed process state. There is no import polling or installation-driven readiness notification.
-  The automatic updater (`runtimehost.Updater`, managed hosts only) is the one preparation worker. It checks within
-  five minutes of startup and then every 23-25 hours; a check does nothing unless the installed selection enabled
-  automatic updates (install or repair without `--manual-updates`). It retries a failed check at the next scheduled
-  check and changes only the next process's selection.
-- Startup and hourly maintenance retire unprotected old versions independently of enabled monitors. Maintenance
-  errors do not invalidate an otherwise usable runtime or change website outcomes.
-
-Explicit installation and protection (`synthetic/browserruntime`):
-
-- Fresh/empty stores publish an initialization record, complete the private layout under coordination, then durably mark
-  it ready before admission. Interrupted initialization is retryable; ready stores never recreate missing safety
-  namespaces or locks. A missing selection record or field is damage, not an uninstall.
-- Precreated roots, including mountpoints, initialize in place without requiring parent write access. Creating an absent
-  path stages its missing suffix and records the parent durability barrier in each created directory. New stores sharing
-  those ancestors reconcile that barrier too; successful setup retires the publication records. Interrupted
-  publication can leave a small unpublished sibling containing only initial metadata, never payloads. Published roots
-  and lock identities are preserved. Preload readers require ready state without modifying it.
-- Administrator commands hold candidate protection and serialize installation, update, repair and uninstall.
-  Install/update/repair verify and prepare the trusted archive, qualify both a sandboxed journey and Lighthouse,
-  then publish the selection. Installation accepts only a `VerifiedRelease`, which only signature verification
-  against a trusted keyring produces.
-- Selected installation, process claims, candidates and each invocation's durable use pin protect files independently.
-  Preparation reservations account for workspace. The selected release never expires for inactivity; process and
-  execution protection keep older releases safe after an update.
-- Unprotected old releases can retire; the most recently used gets a seven-day soft grace, which pressure can shorten.
-  Protected files may prevent a new installation within the configured allowance.
-- Diagnostic inventory separates executable metadata validity from independent ownership evidence. Status reports
-  selection and generation damage with available bytes and owners; incomplete ownership or I/O inspection is explicit.
-  Execution still requires a valid selected release; ordinary installation and automatic retirement do not repair metadata.
-- Repair and uninstall refuse live consumers, candidates, preparation and unresolved executions across all generations.
-  Complete ownership evidence permits removing generations even when executable metadata is damaged. Missing safety
-  structure and operational I/O errors still block removal; neither command recreates lost ownership evidence.
-- Repair retires damaged generations plus the requested generation, then uses ordinary import/download, qualification
-  and selection. It durably clears a damaged selection or one being rebuilt before retirement. A healthy different
-  selection remains protected; other unselected generations remain subject to ordinary retention.
-- Uninstall durably clears selection before retiring all generations. Publication uncertainty is reconciled before
-  admission, another mutation or cleanup. Neither repair nor uninstall replaces the store root or its locks.
-- The runner acquires a use before inspecting runtime files, passes its completion handle to `nd-run`, and releases it
-  after supervised drainage and local reader joins.
-- Completed preparation releases its local claim and staging locks before coordinated record reclamation.
-- Failed local lock closes remain owned for maintenance/final-close retry. Released records are reclaimed by the
-  existing dead-owner inventory.
-- Cleanup health survives coordination failures and cannot be cleared by an older sweep.
-- Unknown execution completion retains protection across process restart. A positively verified host reboot may
-  release the old execution pin, because its children cannot remain alive.
-- Install/update preparation and qualification errors preserve the previous selection. Repair errors preserve a healthy
-  different selection, but cannot restore a cleared selection. Retrying repair is supported after the reported problem
-  is resolved; successful repair requires a DEM restart. CLI errors do not produce website observations.
-- Repair reports candidate identity/progress separately from the final selected installation. A damaged old generation
-  does not make a healthy selection unavailable in status output. Uncertain inventory is reported as unknown.
-
-Protected preloads and shutdown:
-
-- The preload command qualifies a fresh root and seals its trusted descriptor and final location into that root.
-  Readers use the sealed metadata without a separate installed manifest.
-- Preloads remain private, service-account-owned and outside managed retirement. They can be mounted read-only;
-  managed operations refuse their roots. Stop every consumer before replacement/removal and restart DEM to switch.
-- Native package payloads have a separate root-owned admission gate and service-owned process/execution proof.
-  Package hooks close admission and require drainage before replacing files, then qualify both browser workloads
-  before reopening it. The package manager owns those payloads; DEM does not retire or replace them.
-- Independent component paths are unsupported.
-- Command shutdown closes the host and store only after jobs and contained configuration work have joined. Fail-stop
-  paths retain the existing execution evidence.
+- **One release per process.** `runtimehost.Host` atomically acquires the selected installation and a process claim at
+  construction and keeps that release across monitor changes and framework restarts. A missing startup installation
+  stays unavailable until the plugin process restarts, even after an administrator installs a runtime. Packages:
+  `runtimehost`, `browserruntime`, framework.
+- **Monitors never acquire.** Enabling or validating a monitor never downloads executables, and no per-monitor runtime
+  claim is reserved. Contained structural configuration validation still runs before a malformed binding can become a
+  named-dependency waiter. Packages: `collector/internal/syntheticjob`, `runtimehost`.
+- **Fixed readiness.** Readiness reads the fixed process state: there is no import polling or installation-driven
+  readiness notification. The managed-host updater (`runtimehost.Updater`) is the only preparation worker, and it
+  changes only the next process's selection. Packages: `runtimehost`.
+- **A use per execution.** The runner acquires a use (`BeginUse`) before inspecting runtime files, passes its completion
+  handle to `nd-run`, and releases it after supervised drainage and local reader joins. Packages: `runner`,
+  `browserruntime`.
+- **Explicit installation.** Install, update and repair verify and prepare the trusted archive, qualify a sandboxed
+  journey and a Lighthouse audit, then publish the selection. Installation accepts only a `VerifiedRelease`. Packages:
+  `cmd/demplugin`, `browserruntime`, `runner`.
+- **Maintenance is not monitoring.** Startup and hourly maintenance retire unprotected old releases independently of
+  enabled monitors. Maintenance and CLI errors never become website observations or invalidate a usable runtime.
+  Packages: `runtimehost`, `cmd/demplugin`.
+- **Package-owned payloads.** Native payloads have a root-owned admission gate and service-owned execution proof.
+  Package hooks close admission and require drainage before replacing files, then qualify both browser workloads before
+  reopening it. DEM never retires or replaces them. Packages: `browserruntime`, `packaging/dem-runtime/native`.
+- **Preloads are borrowed.** A sealed preload is private, service-account-owned and outside managed retirement; managed
+  operations refuse its root. Replacing one needs every consumer stopped and a DEM restart. Packages: `browserruntime`,
+  `runtimehost`.
+- **No component paths.** The runtime is one signed release; independent Node, Chromium or adapter paths
+  are unsupported. Packages: `browserruntime`, `src/dem-runtime`.
+- **Shutdown order.** The command closes the host and store only after jobs and contained configuration work have
+  joined. Fail-stop paths close nothing and keep the execution evidence. Packages: `cmd/demplugin`, `dem`.
 
 ### Synthetic history records
 
@@ -1238,56 +1228,31 @@ Protected preloads and shutdown:
 
 ### Captures
 
-Work directory:
+The [capture store guide](synthetic/artifacts/README.md) owns the store's rules: work directories, verified
+publication, manifests, the catalogue, fetch, retention and eviction. The cross-package rules:
 
-- Chromium receives a short `/tmp/nd-dem-<run-id>` alias for its private work directory, because its profile
-  singleton uses Unix sockets with a small pathname limit.
-- The artifact owner never adopts an existing alias and removes it only after verified drainage and an exact target
-  check.
-
-Publication:
-
-- Artifact publication starts only after verified tree/reader completion.
-- A Go-owned synced drained marker grants cleanup permission. Work without it remains protected across restart.
-- Captures are constrained beneath output and copied into synced immutable manifests with actual size/digest.
-- Final publication, fetch, retention and close serialize at the store.
-- Failed publication remains protected for the current owner. A later owner reconciles only marked drained leftovers.
-- Nonempty publication records Go-owned JobID, RunID, publication time and artifact membership. Empty captures leave no
-  persistent manifest.
-
-Catalogue and fetch:
-
-- Catalogue and fetch use the Go-owned publication record (JobID, RunID, publication time, membership)
-  independently of journal survival. History only explains absent sets.
-- The catalogue reads metadata and logical file lengths, sorts by publication time/RunID, and exposes bounded keyset
-  pages plus an unfiltered global storage snapshot.
-- Unknown byte categories carry errors rather than zeroes.
-
-Retention:
-
-- The shared allowance counts all logical file lengths inside trusted published set directories, including manifests.
-  Eviction removes whole set directories.
-- Unclassified published entries lack trusted set identity and remain separate, along with workspace and pending
-  deletion.
-- An unreadable trusted set makes retained bytes unknown and defers retention selection until the retained inventory
-  is complete.
-
-| Order | Selection rule |
-|---|---|
-| 1 | Age expiry, and any single set larger than the whole allowance |
-| 2 | Size pressure removes older non-preferred sets before each JobID's newest eligible set |
-| 3 | If preferred sets still exceed the allowance, they expire oldest first as well |
-
-- Eviction renames complete sets into `deleting/`, syncs both parents before removal, then syncs the deletion parent
-  again.
-- Recovery retries this transition without needing surviving manifest bytes. Uncertain ownership blocks deletion.
-- Filesystem traversal/retention is linear in files plus finalized-set sorting, without a rescan per victim.
-- Publication and current-check Functions do not recursively inventory artifact storage. No metrics collection path
-  scans artifact bytes.
+- **Publication follows drainage.** The runner calls `Finalize` only after verified process-tree and reader completion.
+  A Go-owned synced drained marker is the only cleanup permission, so unmarked work stays protected across restarts.
+  Packages: `runner`, `artifacts`.
+- **Short work alias.** Chromium gets a `/tmp/nd-dem-<run-id>` alias for its private work directory, because its profile
+  singleton uses Unix sockets with a small pathname limit. The store never adopts an existing alias and removes it only
+  after verified drainage and an exact target check. Packages: `runner`, `artifacts`.
+- **Manifests, not history.** Catalogue and fetch use the Go-owned publication record (job ID, run ID, publication time,
+  membership), independently of journal survival. Run history only explains absent sets and never grants byte access.
+  Packages: `artifacts`, `synthetic/history`, `synthetic/query`.
+- **Ownership on every read.** `Manifest` and `Fetch` require the owning job ID. Vnode filters select sets without
+  changing ownership, retention preference or byte access. Packages: `artifacts`, `synthetic/query`, `syntheticfunc`.
+- **No scans on hot paths.** Publication, current-check Functions and metrics collection never inventory artifact
+  storage or read capture bytes. Packages: `artifacts`, `collector/internal/syntheticjob`, `syntheticfunc`.
+- **One retention worker.** The process retention worker sweeps captures with the `artifacts:` policy at startup and
+  hourly. An initial cleanup failure does not stop startup. Packages: `dem`, `artifacts`.
+- **Size outcomes.** The 5 MiB per-file limit applies at publication and fetch. The runner records `too_large` and
+  `publication_failed` per candidate from the store's result. Packages: `artifacts`, `runner`.
 
 ## Provenance
 
 The browser normalization, rolling aggregation, OTLP and query behavior originated in the experimental
-[Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit `b3de4662f567dc63d33fee6201f8c2313568301b`.
-The native Agent framework replaced its private configuration controller, scheduler, protocol emitter and root state
-reconciliation. Embedded third-party asset notices stay beside their source ([Faro assets](rum/faro/assets/README.md)).
+[Netdata digital-experience POC](https://github.com/netdata-labs/dem), commit
+`b3de4662f567dc63d33fee6201f8c2313568301b`. The native Agent framework replaced its private configuration controller,
+scheduler, protocol emitter and root state reconciliation. Embedded third-party asset notices stay beside their source
+([Faro assets](rum/faro/assets/README.md)).

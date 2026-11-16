@@ -172,11 +172,47 @@ Objects retire to trash under coordination. Parent directories are synced before
 physical deletion outside coordination. Failed lock releases remain owned by the
 store for retry; a failed execution release never supplies completion evidence.
 
+## Store setup, damage and repair
+
+These rules complement the protection model above.
+
+- **Initialization.** A fresh or empty store publishes an initialization record, completes its private layout under
+  coordination, then durably marks itself ready before admission. Interrupted initialization is retryable. A ready
+  store never recreates missing safety namespaces or locks, and a missing selection record or field is damage, not an
+  uninstall.
+- **Precreated roots.** Precreated roots, including mountpoints, initialize in place without parent write access.
+  Creating an absent path stages its missing suffix and records the parent durability barrier in each created
+  directory; new stores sharing those ancestors reconcile that barrier too, and successful setup retires the
+  publication records. Interrupted publication can leave a small unpublished sibling with initial metadata only, never
+  payloads. Published roots and lock identities are preserved. Preload readers require ready state without modifying
+  it.
+- **Diagnostic inventory.** Inventory separates executable metadata validity from independent ownership evidence.
+  Status reports selection and generation damage with the available bytes and owners, and an incomplete ownership or
+  I/O inspection is explicit (unknown). A damaged old generation does not make a healthy selection unavailable.
+  Execution still requires a valid selected release; ordinary installation and automatic retirement do not repair
+  metadata.
+- **Repair and uninstall admission.** Both refuse live consumers, candidates, preparation and unresolved executions
+  across all generations. Complete ownership evidence permits removing generations even when executable metadata is
+  damaged. Missing safety structure and operational I/O errors still block removal, and neither command recreates lost
+  ownership evidence or replaces the store root or its locks.
+- **Repair.** Repair retires damaged generations plus the requested generation, then uses ordinary import or download,
+  qualification and selection. It durably clears a damaged selection, or the one being rebuilt, before retirement. A
+  healthy different selection stays protected; other unselected generations follow ordinary retention. Repair reports
+  candidate identity and progress separately from the final selected installation.
+- **Errors.** Install and update preparation or qualification errors keep the previous selection. Repair errors keep a
+  healthy different selection but cannot restore a cleared one; retrying repair is supported once the reported problem
+  is resolved, and a successful repair needs a DEM restart.
+- **Lock and record release.** Completed preparation releases its local claim and staging locks before coordinated
+  record reclamation. Failed local lock closes stay owned for maintenance or final-close retry; released records are
+  reclaimed by the dead-owner inventory. Cleanup health survives coordination failures and cannot be cleared by an
+  older sweep.
+
 ## Protected preloads
 
 `Candidate.SealPreload` finishes a fresh, qualified root and records its trusted
 identity/final location. Managed operations then refuse the root, including stores
-opened before sealing. `ReadPreload` supports read-only mounts without state writes.
+opened before sealing. `ReadPreload` supports read-only mounts without state writes
+and uses the sealed metadata without a separate installed manifest.
 The administrator must keep it private, service-account-owned and immutable, and
 stop every consumer before removal/replacement.
 
