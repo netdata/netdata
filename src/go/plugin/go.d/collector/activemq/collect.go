@@ -3,6 +3,7 @@
 package activemq
 
 import (
+	"context"
 	"fmt"
 	"strings"
 )
@@ -15,7 +16,7 @@ const (
 
 var nameReplacer = strings.NewReplacer(".", "_", " ", "")
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	metrics := make(map[string]int64)
 
 	var (
@@ -24,11 +25,11 @@ func (c *Collector) collect() (map[string]int64, error) {
 		err    error
 	)
 
-	if queues, err = c.apiClient.getQueues(); err != nil {
+	if queues, err = c.apiClient.getQueues(ctx); err != nil {
 		return nil, err
 	}
 
-	if topics, err = c.apiClient.getTopics(); err != nil {
+	if topics, err = c.apiClient.getTopics(ctx); err != nil {
 		return nil, err
 	}
 

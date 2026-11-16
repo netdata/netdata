@@ -7,12 +7,25 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Confirming that Netdata is statically linked" || true
 
-# Ensure the netdata binary is in fact statically linked
-if run readelf -l "${NETDATA_INSTALL_PATH}/bin/netdata" | grep 'INTERP'; then
-  printf >&2 "Ooops. %s is not a statically linked binary!\n" "${NETDATA_INSTALL_PATH}/bin/netdata"
-  ldd "${NETDATA_INSTALL_PATH}/bin/netdata"
-  exit 1
-fi
+# Job 81 owns required-file checks. Inspect all installed ELF executables here;
+# scripts and non-executable data do not have program headers to validate.
+find "${NETDATA_INSTALL_PATH}" -type f \( -perm -100 -o -perm -010 -o -perm -001 \) -print0 |
+while IFS= read -r -d '' binary; do
+  magic="$(head -c 4 "${binary}")"
+  [ "${magic}" = $'\177ELF' ] || continue
+  if elf_headers="$(run readelf -l "${binary}")"; then
+    :
+  else
+    status=$?
+    printf >&2 "Failed to inspect ELF program headers: %s (status %s)\n" "${binary}" "${status}"
+    exit "${status}"
+  fi
+  if printf '%s\n' "${elf_headers}" | grep 'INTERP'; then
+    printf >&2 "Ooops. %s is not a statically linked binary!\n" "${binary}"
+    ldd "${binary}"
+    exit 1
+  fi
+done
 
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::endgroup::" || true

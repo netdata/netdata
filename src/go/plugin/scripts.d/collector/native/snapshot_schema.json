@@ -1,0 +1,317 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Native collection snapshot v1",
+  "$comment": "Structural authoring schema. Runtime additionally rejects duplicate JSON keys, out-of-range floating point numbers, duplicate families/series, unknown active states, missing check identity values, and a StateSet label matching its metric name. Metadata contracts are stable per metric name.",
+  "definitions": {
+    "labels": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+        "not": {
+          "const": "_collect_job"
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "scalar_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "labels": {
+          "$ref": "#/definitions/labels"
+        }
+      },
+      "required": [
+        "value"
+      ]
+    },
+    "state_sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "active": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "labels": {
+          "$ref": "#/definitions/labels"
+        }
+      },
+      "required": [
+        "active"
+      ]
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_.]*$",
+          "not": {
+            "anyOf": [
+              {
+                "pattern": "^native\\."
+              },
+              {
+                "pattern": "^native_check_"
+              },
+              {
+                "const": "check_state"
+              }
+            ]
+          }
+        },
+        "type": {
+          "enum": [
+            "",
+            "gauge",
+            "counter",
+            "stateset"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "anyOf": [
+            {
+              "const": ""
+            },
+            {
+              "pattern": "\\S"
+            }
+          ]
+        },
+        "mode": {
+          "enum": [
+            "",
+            "enum",
+            "bitset"
+          ]
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "not": {
+              "pattern": "[\\\\'\\n\\r\u0000]|^[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]|[\t-\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]$"
+            }
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "chart_meta": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "family": {
+              "type": "string"
+            },
+            "priority": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "samples": {
+          "type": "array",
+          "items": {}
+        }
+      },
+      "required": [
+        "name",
+        "samples"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "stateset"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "states"
+            ],
+            "properties": {
+              "unit": {
+                "const": ""
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/state_sample"
+                }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "mode": {
+                      "const": "bitset"
+                    }
+                  },
+                  "required": [
+                    "mode"
+                  ]
+                },
+                "else": {
+                  "properties": {
+                    "samples": {
+                      "type": "array",
+                      "items": {
+                        "properties": {
+                          "active": {
+                            "minItems": 1,
+                            "maxItems": 1
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "states"
+              ]
+            },
+            "properties": {
+              "mode": {
+                "const": ""
+              },
+              "samples": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/scalar_sample"
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "counter"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "properties": {
+              "samples": {
+                "type": "array",
+                "items": {
+                  "properties": {
+                    "value": {
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$"
+        },
+        "title": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "by_labels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+            "not": {
+              "const": "_collect_job"
+            }
+          },
+          "uniqueItems": true
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "state": {
+                "enum": [
+                  "ok",
+                  "warning",
+                  "critical",
+                  "unknown"
+                ]
+              },
+              "labels": {
+                "$ref": "#/definitions/labels"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "samples"
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": "v1"
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/metric"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/check"
+      }
+    }
+  },
+  "required": [
+    "version"
+  ]
+}

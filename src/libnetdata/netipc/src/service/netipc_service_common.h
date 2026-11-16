@@ -23,20 +23,19 @@ typedef struct {
 
 typedef nipc_error_t (*nipc_service_common_attempt_fn)(nipc_client_ctx_t *ctx,
                                                        void *state);
+/* Sends within timeout_ms (0 = no deadline), ending early on abort. */
 typedef nipc_error_t (*nipc_service_common_transport_send_fn)(
     nipc_client_ctx_t *ctx, nipc_header_t *hdr, const void *payload,
-    size_t payload_len);
+    size_t payload_len, uint32_t timeout_ms);
 typedef nipc_error_t (*nipc_service_common_transport_receive_fn)(
     nipc_client_ctx_t *ctx, void *buf, size_t buf_size, nipc_header_t *hdr_out,
     const void **payload_out, size_t *payload_len_out, uint32_t timeout_ms);
 
 typedef struct {
   void (*disconnect)(nipc_client_ctx_t *ctx);
+  /* Both connect within the time left on ctx->op_deadline_ms. */
   nipc_client_state_t (*try_connect)(nipc_client_ctx_t *ctx);
   bool (*reconnect_for_call)(nipc_client_ctx_t *ctx);
-  void (*sleep_ms)(uint32_t ms);
-  uint32_t reconnect_drain_ms;
-  uint32_t reconnect_retry_interval_ms;
 } nipc_service_common_client_ops_t;
 
 typedef void *(*nipc_service_common_calloc_fn)(size_t count, size_t size,
@@ -97,6 +96,12 @@ uint32_t
 nipc_service_common_client_call_timeout_ms(const nipc_client_ctx_t *ctx,
                                            uint32_t timeout_ms);
 bool nipc_service_common_client_abort_requested(const nipc_client_ctx_t *ctx);
+/* Start a call or refresh: one deadline, timeout_ms resolved as for calls,
+ * bounds every connect, handshake, attach and retry inside it. */
+void nipc_service_common_client_begin_op(nipc_client_ctx_t *ctx,
+                                         uint32_t timeout_ms);
+/* Time left before the current deadline; 0 once it passed. */
+uint32_t nipc_service_common_client_op_remaining_ms(const nipc_client_ctx_t *ctx);
 bool nipc_service_common_client_refresh(
     nipc_client_ctx_t *ctx, const nipc_service_common_client_ops_t *ops);
 void nipc_service_common_client_note_request_capacity(nipc_client_ctx_t *ctx,
@@ -120,9 +125,9 @@ nipc_error_t nipc_service_common_do_raw_call(
     nipc_service_common_transport_receive_fn receive_fn);
 nipc_error_t nipc_service_common_call_with_retry(
     nipc_client_ctx_t *ctx, nipc_service_common_attempt_fn attempt, void *state,
-    const nipc_service_common_client_ops_t *ops);
+    uint32_t timeout_ms, const nipc_service_common_client_ops_t *ops);
 nipc_error_t nipc_service_common_client_ensure_request_capacity(
-    nipc_client_ctx_t *ctx, size_t required_payload_bytes,
+    nipc_client_ctx_t *ctx, size_t required_payload_bytes, uint32_t timeout_ms,
     const nipc_service_common_client_ops_t *ops);
 
 void nipc_service_common_server_note_request_capacity(

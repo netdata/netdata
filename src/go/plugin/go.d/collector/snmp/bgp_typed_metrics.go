@@ -294,6 +294,7 @@ func bgpTypedMetricTags(row ddsnmp.BGPRow, scope bgpScope) map[string]string {
 			tags[key] = value
 		}
 	}
+	add("process_id", firstNonEmpty(row.Identity.ProcessID, row.Tags["process_id"]))
 	add("routing_instance", bgpRoutingInstance(row))
 	add("neighbor", firstNonEmpty(row.Identity.Neighbor, row.Tags["neighbor"]))
 	add("remote_as", firstNonEmpty(row.Identity.RemoteAS, row.Tags["remote_as"]))

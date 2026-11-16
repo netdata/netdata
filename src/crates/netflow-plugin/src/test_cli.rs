@@ -1,7 +1,7 @@
 use crate::api::{FLOWS_FUNCTION_NAME, FlowsFunctionResponse, NetflowFlowsHandler};
 use crate::{facet_runtime, ingest, plugin_config, query};
 use anyhow::{Context, Result, bail};
-use rt::ProgressState;
+use netdata_plugin_rt::ProgressState;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Read, Write};
 use std::path::PathBuf;

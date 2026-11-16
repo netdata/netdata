@@ -146,6 +146,8 @@ func useFakeClient(c *Collector, fake cloudwatchClient) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
+	// Discovered RDS instances trigger attribute lookups; never reach the network.
+	c.newRDSClient = func(aws.Config) rdsClient { return &fakeRDS{} }
 }
 
 func TestCollector_Init(t *testing.T) {

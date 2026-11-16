@@ -16,7 +16,9 @@ import (
 // BenchmarkV1HostCollection measures the real collection/render/write path. Its
 // per-cycle cost is independent of other jobs; frame admission uses the production owner.
 func BenchmarkV1HostCollection(b *testing.B) {
-	for name, tc := range map[string]struct{ vnode bool }{"global": {}, "vnode": {vnode: true}} {
+	for name, tc := range map[string]struct{ vnode, generated bool }{
+		"global": {}, "vnode": {vnode: true}, "generated": {vnode: true, generated: true},
+	} {
 		b.Run(name, func(b *testing.B) {
 			charts := collectorapi.Charts{
 				&collectorapi.Chart{
@@ -50,6 +52,13 @@ func BenchmarkV1HostCollection(b *testing.B) {
 					Hostname: "device",
 					Labels:   map[string]string{"site": "athens", "vendor": "cisco"},
 				}
+			}
+			if tc.generated {
+				cfg.Module = &v1ModuleOwnedVnodeCollector{
+					MockCollectorV1: *module,
+					vnode:           cfg.Vnode.Copy(),
+				}
+				cfg.Vnode = vnodes.VirtualNode{}
 			}
 			job := NewJob(cfg)
 			if err := job.AutoDetectionManaged(context.Background()); err != nil {

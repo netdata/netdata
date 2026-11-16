@@ -93,7 +93,12 @@ struct websocket_server_client;
 // Message and payload processing functions
 void websocket_client_message_reset(struct websocket_server_client *wsc);
 bool websocket_client_process_message(struct websocket_server_client *wsc);
-bool websocket_client_decompress_message(struct websocket_server_client *wsc);
+typedef enum {
+    WS_DECOMPRESS_OK = 0,
+    WS_DECOMPRESS_FAILED,               // not compressed, or corrupt compressed data
+    WS_DECOMPRESS_TOO_LARGE,            // expands beyond the allowed message size
+} WS_DECOMPRESS_RESULT;
+WS_DECOMPRESS_RESULT websocket_client_decompress_message(struct websocket_server_client *wsc);
 
 // Additional helper functions
 bool websocket_frame_is_control_opcode(WEBSOCKET_OPCODE opcode);
@@ -107,6 +112,7 @@ struct websocket_server_client {
     ND_SOCK sock;        // Socket with SSL abstraction
     uint32_t id;         // Unique client ID
     size_t max_outbound_frame_size;     // Maximum size of outgoing frames for this client
+    size_t max_inbound_message_size;    // Maximum size of an incoming message (all its frames, decompressed)
     time_t connected_t;  // Connection timestamp
     time_t last_activity_t; // Last activity timestamp
 

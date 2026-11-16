@@ -116,28 +116,25 @@ type PerformanceMetrics struct {
 	VolumeID    string `json:"volume_id,omitempty"`
 	FePortID    string `json:"fe_port_id,omitempty"`
 
-	// Current values
-	ReadIops       float64 `json:"read_iops"`
-	WriteIops      float64 `json:"write_iops"`
-	TotalIops      float64 `json:"total_iops"`
-	ReadBandwidth  float64 `json:"read_bandwidth"`
-	WriteBandwidth float64 `json:"write_bandwidth"`
-	TotalBandwidth float64 `json:"total_bandwidth"`
+	// Five_Mins rollup averages
+	AvgReadIops       float64 `json:"avg_read_iops"`
+	AvgWriteIops      float64 `json:"avg_write_iops"`
+	AvgTotalIops      float64 `json:"avg_total_iops"`
+	AvgReadBandwidth  float64 `json:"avg_read_bandwidth"`
+	AvgWriteBandwidth float64 `json:"avg_write_bandwidth"`
+	AvgTotalBandwidth float64 `json:"avg_total_bandwidth"`
 
 	// Averages
 	AvgReadLatency  float64 `json:"avg_read_latency"`
 	AvgWriteLatency float64 `json:"avg_write_latency"`
 	AvgLatency      float64 `json:"avg_latency"`
 	AvgIoSize       float64 `json:"avg_io_size"`
-	AvgReadIops     float64 `json:"avg_read_iops"`
-	AvgWriteIops    float64 `json:"avg_write_iops"`
 
-	// Appliance-specific
-	IoWorkloadCPUUtilization    float64 `json:"io_workload_cpu_utilization,omitempty"`
-	AvgIoWorkloadCPUUtilization float64 `json:"avg_io_workload_cpu_utilization,omitempty"`
+	// Appliance-specific peak ratio over the rollup interval
+	MaxIoWorkloadCPUUtilization float64 `json:"max_io_workload_cpu_utilization,omitempty"`
 
 	// Node-specific
-	CurrentLogins *int64 `json:"current_logins,omitempty"`
+	AvgCurrentLogins *float64 `json:"avg_current_logins,omitempty"`
 }
 
 // EthPortMetrics contains Ethernet port performance fields.
@@ -146,32 +143,32 @@ type EthPortMetrics struct {
 	FePortID    string `json:"fe_port_id,omitempty"`
 	NodeID      string `json:"node_id,omitempty"`
 
-	BytesRxPs            float64 `json:"bytes_rx_ps"`
-	BytesTxPs            float64 `json:"bytes_tx_ps"`
-	PktRxPs              float64 `json:"pkt_rx_ps"`
-	PktTxPs              float64 `json:"pkt_tx_ps"`
-	PktRxCrcErrorPs      float64 `json:"pkt_rx_crc_error_ps"`
-	PktRxNoBufferErrorPs float64 `json:"pkt_rx_no_buffer_error_ps"`
-	PktTxErrorPs         float64 `json:"pkt_tx_error_ps"`
+	BytesRxPs            float64 `json:"avg_bytes_rx_ps"`
+	BytesTxPs            float64 `json:"avg_bytes_tx_ps"`
+	PktRxPs              float64 `json:"avg_pkt_rx_ps"`
+	PktTxPs              float64 `json:"avg_pkt_tx_ps"`
+	PktRxCrcErrorPs      float64 `json:"avg_pkt_rx_crc_error_ps"`
+	PktRxNoBufferErrorPs float64 `json:"avg_pkt_rx_no_buffer_error_ps"`
+	PktTxErrorPs         float64 `json:"avg_pkt_tx_error_ps"`
 }
 
-// SpaceMetrics contains capacity/space fields.
+// SpaceMetrics contains the last capacity/space values in each rollup interval.
 type SpaceMetrics struct {
 	ClusterID   string `json:"cluster_id,omitempty"`
 	ApplianceID string `json:"appliance_id,omitempty"`
 	VolumeID    string `json:"volume_id,omitempty"`
 
-	PhysicalTotal      *int64 `json:"physical_total,omitempty"`
-	PhysicalUsed       *int64 `json:"physical_used,omitempty"`
-	LogicalProvisioned *int64 `json:"logical_provisioned,omitempty"`
-	LogicalUsed        *int64 `json:"logical_used,omitempty"`
-	DataPhysicalUsed   *int64 `json:"data_physical_used,omitempty"`
-	SharedLogicalUsed  *int64 `json:"shared_logical_used,omitempty"`
+	PhysicalTotal      *int64 `json:"last_physical_total,omitempty"`
+	PhysicalUsed       *int64 `json:"last_physical_used,omitempty"`
+	LogicalProvisioned *int64 `json:"last_logical_provisioned,omitempty"`
+	LogicalUsed        *int64 `json:"last_logical_used,omitempty"`
+	DataPhysicalUsed   *int64 `json:"last_data_physical_used,omitempty"`
+	SharedLogicalUsed  *int64 `json:"last_shared_logical_used,omitempty"`
 
-	EfficiencyRatio float64 `json:"efficiency_ratio"`
-	DataReduction   float64 `json:"data_reduction"`
-	SnapshotSavings float64 `json:"snapshot_savings"`
-	ThinSavings     float64 `json:"thin_savings"`
+	EfficiencyRatio float64 `json:"last_efficiency_ratio"`
+	DataReduction   float64 `json:"last_data_reduction"`
+	SnapshotSavings float64 `json:"last_snapshot_savings"`
+	ThinSavings     float64 `json:"last_thin_savings"`
 }
 
 // WearMetrics contains drive wear/endurance fields.
@@ -192,13 +189,13 @@ type CopyMetrics struct {
 type FileSystemMetrics struct {
 	FileSystemID string `json:"file_system_id"`
 
-	ReadIops        float64 `json:"read_iops"`
-	WriteIops       float64 `json:"write_iops"`
-	TotalIops       float64 `json:"total_iops"`
-	ReadBandwidth   float64 `json:"read_bandwidth"`
-	WriteBandwidth  float64 `json:"write_bandwidth"`
-	TotalBandwidth  float64 `json:"total_bandwidth"`
-	AvgReadLatency  float64 `json:"avg_read_latency"`
-	AvgWriteLatency float64 `json:"avg_write_latency"`
-	AvgLatency      float64 `json:"avg_latency"`
+	AvgReadIops       float64 `json:"avg_read_iops"`
+	AvgWriteIops      float64 `json:"avg_write_iops"`
+	AvgTotalIops      float64 `json:"avg_total_iops"`
+	AvgReadBandwidth  float64 `json:"avg_read_bandwidth"`
+	AvgWriteBandwidth float64 `json:"avg_write_bandwidth"`
+	AvgTotalBandwidth float64 `json:"avg_total_bandwidth"`
+	AvgReadLatency    float64 `json:"avg_read_latency"`
+	AvgWriteLatency   float64 `json:"avg_write_latency"`
+	AvgLatency        float64 `json:"avg_latency"`
 }

@@ -150,16 +150,23 @@ type SNMPActorDetail struct {
 }
 
 type Data struct {
-	SchemaVersion string
-	Source        string
-	Layer         string
-	AgentID       string
-	CollectedAt   time.Time
-	View          string
-	Actors        []Actor
-	Links         []Link
-	Stats         Stats
-	actorHandles  graph.ActorHandleAllocator
+	SchemaVersion     string
+	Source            string
+	Layer             string
+	AgentID           string
+	CollectedAt       time.Time
+	View              string
+	Actors            []Actor
+	Links             []Link
+	Stats             Stats
+	FocusRootBindings []FocusRootBinding
+	actorHandles      graph.ActorHandleAllocator
+}
+
+// FocusRootBinding stays request-local until the renderer resolves the private handle.
+type FocusRootBinding struct {
+	OptionID    string
+	ActorHandle ActorHandle
 }
 
 type ManagementAddress struct {

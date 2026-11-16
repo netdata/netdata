@@ -1,17 +1,28 @@
 ---
 name: query-netdata-cloud
-description: Query Netdata Cloud via its REST API -- metrics, logs (systemd-journal / windows-events / macos-logs / otel-logs), topology graphs (topology:snmp), network flows (flows:netflow), alerts, dynamic configuration (DynCfg), and generic Functions on a node. Use when the user asks about querying Netdata Cloud, fetching metrics from the cloud, querying logs / topology / netflow / sflow / ipfix through Cloud, listing or modifying configurations via DynCfg, calling agent Functions through Cloud, listing spaces/rooms/nodes, or building a curl command against `app.netdata.cloud`. Pairs with the `query-netdata-agents` skill when direct-agent access is needed.
+description: Query or explain Netdata Cloud APIs for metrics, logs, topology, flows, alerts, DynCfg, Functions and discovery; review Cloud-query recipes. Use query-netdata-agents for direct Agent access.
 ---
 
-# Query Netdata Cloud via REST API
+# Query Netdata Cloud
 
-This skill teaches end-users (and AI assistants helping them) how to
-construct REST API queries against Netdata Cloud
-(`https://app.netdata.cloud`) using a long-lived API token.
+Use this skill for Cloud REST queries and for reviewing or explaining those queries. Load the guide for the requested
+domain; the sibling [Agent skill](../query-netdata-agents/SKILL.md) owns direct access and the shared query helpers.
 
-It is split into one shared overview (this file) and four
-domain-specific guides. Each guide is self-contained and includes
-runnable curl commands.
+## Choose The Task
+
+- **Explain or review:** inspect the relevant guide and helper as reference material. Loading this skill does not
+  authorize live requests, credential loading or configuration changes. An explanation need not end in a command.
+- **Run a requested query:** follow [Prerequisites](#prerequisites) and [Safe Execution](#safe-execution), then the
+  selected guide. Preserve authorization already given for the task; do not ask again for ordinary query steps.
+- **Change configuration or invoke a state-changing Function:** establish that the user requested that operation.
+  A request to inspect data does not authorize DynCfg updates or arbitrary Function execution. HTTP method alone does
+  not establish whether a request changes state; consult the Function or action contract.
+
+For an execution recipe, provide a complete runnable wrapper invocation with locally supplied inputs and the response
+fields needed for the question. For discovery, use the endpoint appropriate to the missing identifier. Domain
+requirements remain in their guides; metric queries MUST set `scope.contexts` as explained in the metrics guide.
+
+## Domain Guides
 
 | Domain | Guide |
 |---|---|
@@ -28,24 +39,68 @@ runnable curl commands.
 | Event feed (audit + activity log) | [query-feed.md](./query-feed.md) |
 | **Operational how-tos (live catalog)** | [how-tos/INDEX.md](./how-tos/INDEX.md) |
 
-### Canonical reference docs (in this repo)
+## Prerequisites
 
-For the query protocol details these guides build on, read the authoritative
-sources directly:
+Explanation and saved-data review need no credentials. Executable recipes require Bash, Git, curl, jq and a checkout
+containing the shared helper, plus access to the chosen Cloud host. Configure `NETDATA_CLOUD_TOKEN` and
+`NETDATA_CLOUD_HOSTNAME` locally; never request credential values in conversation. Use identifier placeholders or
+local discovery for space, room and node IDs. Only endpoints that include those IDs require them.
 
-| File | What it covers |
+[Access And Discovery](./access-and-discovery.md) covers token setup, identifier lookup and error diagnosis.
+[Helper configuration](../query-netdata-agents/authentication.md#configuration) owns the environment keys and trusted
+`.env` loading. Source the helper and load configuration only for authorized execution:
+
+```bash
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
+```
+
+## Safe Execution
+
+Credential-bearing requests MUST use `agents_query_cloud`, `agents_query_agent` or `agents_call_function` from the
+shared helper. Do not construct raw bearer-auth curl examples or print credentials. Ordinary local processing and
+unauthenticated probes MAY use ordinary commands when they capture or suppress sensitive responses.
+
+[Shared Safe Execution](../query-netdata-agents/SKILL.md#safe-execution) owns credential and response handling.
+The wrappers mask known request-auth values in their command log; they **forward responses unchanged** and do not
+scrub arbitrary request-body fields. Keep sensitive bodies in private local files (the body argument accepts `@file`)
+and capture or project sensitive responses before display. Do not display credential-issuing endpoint output through
+these wrappers. Avoid shell tracing around credentials. Use the minimum response fields needed for the task.
+
+For JSON bodies, use a quoted heredoc in command substitution, or a private payload file. The helper enables
+`set -e`; an empty-delimiter `read` returns failure at EOF and stops the recipe. For example, after setup:
+
+```bash
+SPACE="YOUR_SPACE_ID"
+ROOM="YOUR_ROOM_ID"
+PAYLOAD="$(cat <<'JSON'
+{}
+JSON
+)"
+agents_query_cloud POST \
+  "/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" "$PAYLOAD" \
+  | jq '{node_count: (.nodes | length)}'
+```
+
+Cloud payloads can contain customer identifiers, hostnames, labels, addresses and secrets. Raw responses MUST NOT go
+into committed files; token, bearer and session values MUST NOT be pasted into conversation or shared artifacts.
+Repository workflows capture raw output privately under `<repo>/.local/audits/` and report sanitized summaries.
+Repository contributors follow `.agents/sensitive-data-discipline.md`; outside a checkout apply the same redaction to
+shared artifacts. The public helpers' exact interfaces live in
+[Helper Interfaces](../query-netdata-agents/authentication.md#helper-interfaces).
+
+## Protocol Owners
+
+Open these when the selected task needs the underlying protocol or schema. They describe Agent payloads and DynCfg,
+not Cloud-server permission mappings.
+
+| Owner | Subject |
 |---|---|
-| `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md` | Functions v3 protocol -- envelope, simple-table vs log-explorer, facets, histograms, charts, field types, pagination, delta mode, PLAY mode, error handling. The single most important reference for any Function work. |
-| `<repo>/src/plugins.d/FUNCTION_UI_SCHEMA.json` | JSON Schema for validating Function responses |
-| `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | JSON Schema for validating production topology payloads |
-| `<repo>/src/plugins.d/DYNCFG.md` | External-plugin DynCfg protocol (go.d.plugin and other external collectors) |
-| `<repo>/src/daemon/dyncfg/README.md` | Internal DynCfg (high-level and low-level APIs, command enums, lifecycle) |
-
-For querying agents directly (without going through Cloud) -- including
-auto-minting agent bearer tokens from a Cloud token -- see the sibling
-skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
-
----
+| `<repo>/src/plugins.d/FUNCTION_UI_REFERENCE.md` | Function envelopes, tables, logs, facets, pagination, PLAY and errors |
+| `<repo>/src/plugins.d/FUNCTION_UI_SCHEMA.json` | Function response schema |
+| `<repo>/src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Topology response schema |
+| `<repo>/src/plugins.d/DYNCFG.md` | External-plugin DynCfg protocol |
+| `<repo>/src/daemon/dyncfg/README.md` | Internal DynCfg APIs and lifecycle |
 
 ## Knowledge Capture
 
@@ -65,179 +120,3 @@ skill [`query-netdata-agents`](../query-netdata-agents/SKILL.md).
 - Prefer updating an existing guide over duplicating it. Keep recipes operator-facing: fetching or using Cloud
   data. Developer contract validation for collectors, topology producers, schemas, fixtures, UI adapters, or
   aggregator handoffs belongs in the relevant project developer skill, not in this public skill.
-
-## Mandatory Requirements (READ FIRST)
-
-1. **Preserve reusable discoveries** under [Knowledge Capture](#knowledge-capture).
-2. **Use the token-safe wrappers.** Every example in this skill
-   uses `agents_query_cloud` (and friends) from
-   `../query-netdata-agents/scripts/_lib.sh`. Never paste raw
-   `Authorization: Bearer $TOKEN` curl commands -- that exposes
-   the cloud token to the assistant. The wrappers handle auth
-   internally and emit only the response body to stdout.
-3. **Provide actionable instructions.** You don't run queries for
-   users. Your role is to teach them. Every response that proposes a
-   query must end in a complete, runnable command (wrapper-based,
-   not raw curl).
-
-2. **Never ask for credentials.** Do not request API tokens, Space
-   IDs, or Room IDs. Use placeholders (`YOUR_API_TOKEN`,
-   `YOUR_SPACE_ID`, `YOUR_ROOM_ID`) at the top of your curl examples
-   so the user fills them in locally.
-
-3. **Always include a runnable curl command.** A response without a
-   complete `curl -X METHOD ... -H ... -d '...'` block is incomplete.
-   Use a heredoc for the JSON body so the user does not have to
-   escape quotes:
-
-   ```bash
-   read -r -d '' PAYLOAD <<'EOF'
-   { "scope": { "contexts": ["system.cpu"] }, ... }
-   EOF
-   ```
-
-4. **Domain-specific gotchas live in the per-domain guide.** For
-   metrics, the most important is `scope.contexts` MUST be set. See
-   the per-domain guide for the rest.
-
----
-
-## Prerequisites
-
-Three things are needed for any query:
-
-### 1. API Token
-
-1. Login to [app.netdata.cloud](https://app.netdata.cloud)
-2. Click the user icon (lower-left corner -- tooltip shows your name)
-3. Select **User Settings**
-4. Open the **API Tokens** tab
-5. Click the **[+]** button (top-left)
-6. Pick a scope, enter a description, click **Create**
-7. **Copy the token immediately** -- it is shown once.
-
-Recommended scope: `scope:all` (full access) or `scope:grafana-plugin`
-(read-only data endpoints).
-
-### 2. Space ID
-
-1. In the dashboard, click the **gear icon** below the spaces list
-   (tooltip: "Space Settings")
-2. In the **Info** tab, copy the **Space Id**.
-
-### 3. Room ID
-
-1. In Space Settings, open the **Rooms** tab
-2. Click the **>** icon at the right of the row (tooltip: "Room
-   Settings")
-3. In the **Room** tab, copy the **Room Id**.
-
----
-
-## Authentication
-
-All endpoints accept the cloud token as an HTTP `Authorization`
-header:
-
-```
-Authorization: Bearer YOUR_API_TOKEN
-Content-Type: application/json   (for POST endpoints)
-```
-
-GET endpoints do not require the `Content-Type` header but accept it.
-
----
-
-## Discovery Endpoints (used by every domain)
-
-These endpoints enumerate what the cloud token can see. Use them when
-you don't know the Space ID, Room ID, or node UUID up front.
-
-| Endpoint | Method | Purpose |
-|---|---|---|
-| `/api/v2/accounts/me` | GET | Confirm the token works; returns the user identity. |
-| `/api/v2/spaces` | GET | List spaces visible to this token. |
-| `/api/v2/spaces/{spaceID}/rooms` | GET | List rooms in a space. |
-| `/api/v3/spaces/{spaceID}/rooms/{roomID}/nodes` | POST `{}` | List nodes in a room with full metadata. |
-
-### Example: list spaces
-
-```bash
-TOKEN="YOUR_API_TOKEN"
-
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces"
-```
-
-Each space record contains `id`, `slug`, `name`, `permissions[]`, and
-metadata. Match by `name` or `slug` to find the space you want.
-
-### Example: list rooms in a space
-
-```bash
-TOKEN="YOUR_API_TOKEN"
-SPACE="YOUR_SPACE_ID"
-
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/spaces/$SPACE/rooms"
-```
-
-### Example: list nodes in a room
-
-```bash
-TOKEN="YOUR_API_TOKEN"
-SPACE="YOUR_SPACE_ID"
-ROOM="YOUR_ROOM_ID"
-
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v3/spaces/$SPACE/rooms/$ROOM/nodes" \
-  -d '{}'
-```
-
-Per-node response fields:
-
-| Field | Description |
-|---|---|
-| `nd` | Node UUID -- required for any node-targeted call |
-| `mg` | Machine GUID |
-| `nm` | Hostname |
-| `state` | `reachable` (live) or `stale` (disconnected) |
-| `v` | Agent version |
-| `labels` | Key-value labels |
-| `hw`, `os`, `health`, `capabilities` | Metadata blocks |
-
-The `nd` value is what the four domain guides call "node UUID" or
-`{nodeId}` in their endpoint paths.
-
----
-
-## Common errors
-
-| Symptom | Likely cause |
-|---|---|
-| HTTP 401 | Token missing, malformed, or revoked. Re-create. |
-| HTTP 403 | Token lacks the scope/role for this endpoint or space. |
-| HTTP 404 with HTML body | Wrong path; check method (GET vs POST) and version (`/api/v2` vs `/api/v3`). The API does not enumerate paths via Swagger, so 404 means the path does not exist. |
-| HTTP 400 with `errorCode` JSON | Missing required parameter. The error message names the missing field. |
-| Empty/silent response | Filter excludes everything. Most endpoints return empty data without error. Verify scope/selectors. |
-
----
-
-## Sensitive data
-
-Cloud responses contain space names, node hostnames, machine GUIDs,
-node UUIDs, claim IDs, cloud-provider labels, IP addresses, and other
-identifiers. Treat fetched payloads as personal/customer data:
-
-- Do not paste raw response bodies into committed files.
-- Do not paste tokens, bearer values, or session ids anywhere.
-- For maintainer workflows in this repository, redirect raw output
-  to `<repo>/.local/audits/...` (gitignored) and report only
-  sanitized summaries upstream.
-
-See `<repo>/.agents/sensitive-data-discipline.md` for the
-full rule and the pre-commit verification grep.

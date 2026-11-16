@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -39,9 +39,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -80,10 +77,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.cpu_limit | average cgroup CPU utilization over the last 10 minutes |
-| [ cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.mem_usage | cgroup memory utilization |
-| [ cgroup_1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.net_packets | average number of packets received by the network interface ${label:device} over the last minute |
-| [ cgroup_10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.net_packets | ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ cgroup_10min_cpu_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.cpu_limit | Cgroup ${label:cgroup_name} average CPU utilization over the last 10 minutes |
+| [ cgroup_ram_in_use ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cgroups.conf) | cgroup.mem_usage | Cgroup ${label:cgroup_name} memory utilization |
 
 
 
@@ -152,6 +147,10 @@ Metrics:
 | cgroup.dc_reference | Count file access | reference | files |
 | cgroup.dc_not_cache | Files not present inside directory cache | slow | files |
 | cgroup.dc_not_found | Files not found | miss | files |
+| cgroup.fd_open | Number of open files | calls | calls/s |
+| cgroup.fd_open_error | Fails to open files | calls | calls/s |
+| cgroup.fd_close | Files closed | calls | calls/s |
+| cgroup.fd_close_error | Fails to close files | calls | calls/s |
 | cgroup.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
 | cgroup.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
 | cgroup.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |

@@ -16,9 +16,9 @@ One value only: `planning`, `ready`, `in-progress`, `paused`, or `completed`.
 `planning` means analysis or decisions are incomplete. `ready` means the
 Pre-Implementation Gate is complete and, where the goal-approval round ("Plan
 Before Non-Trivial Work") applies, the user has approved the goal and plan.
-`completed` means work is validated and required memory transfer under `AGENTS.md#sow-lifecycle` is complete. SOW files
-are local-only working memory under `.agents/sow/q/` (gitignored) and are never
-committed.
+`completed` means required review, validation and memory transfer under `AGENTS.md#sow-lifecycle` are complete.
+Review evidence belongs under Validation, following `AGENTS.md#review`. SOW files are local-only working memory under
+`.agents/sow/q/` (gitignored) and are never committed.
 
 Sub-state: <short current truth>
 
@@ -84,6 +84,8 @@ Problem / root-cause model:
 Evidence reviewed:
 
 - <Specs, code, docs, tests, logs, traces, prior PRs/issues, external references.>
+- <Owner sections applied, not skill titles: `path.md#section` plus the artifact or operation it governs (a skill
+  listed as "reviewed" is not evidence that its rules were applied).>
 - <For mirrored open-source repositories: cite `owner/repo @ commit` and repository-relative paths; never paste
   machine-specific absolute mirror paths (the mirror lives at `${NETDATA_REPOS_DIR}`).>
 
@@ -189,6 +191,8 @@ Clean-end-state evidence:
 - <Delivered state vs the recorded target: (i) removed/migrated, (ii) intentionally retained, (iii) deferred/excluded,
   and the recorded reference search where a path or contract was replaced; include required user approval for any
   non-clean state.>
+- <For each owner section named under Evidence reviewed: where it was checked in the final diff, the result, and any
+  justified exception; say which checks were automated and which were manual review.>
 
 Deferred clean-end-state remainder:
 
@@ -207,8 +211,10 @@ Real-use evidence:
 
 Reviewer findings:
 
-- <reviewer; scope and reviewed checkpoint commit or working-tree state; each finding and how it was handled:
-  verified and fixed, rejected with evidence, or tracked; note Git operations not performed because unauthorized.>
+- <Assessment evidence required by AGENTS.md#review: chosen approach and why sufficient, assessed commit or identified
+  working-tree state, covered scope and interactions, findings and dispositions (or none), and remaining limitations.
+  Identify independent reviewers when used and explain why any reused earlier review still covers the final state.
+  Note Git operations not performed because unauthorized.>
 
 Same-failure scan:
 

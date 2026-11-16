@@ -6,25 +6,32 @@
     "properties": {
       "update_every": {
         "title": "Update every",
-        "description": "Data collection interval, measured in seconds.",
+        "description": "Data collection interval, in seconds.",
         "type": "integer",
         "minimum": 1,
         "default": 10
       },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
       "dsn": {
         "title": "DSN",
-        "description": "Microsoft SQL Server [Data Source Name](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn). When `cloud_auth.provider` is `azure_ad`, use URL format with `sqlserver://` scheme.",
+        "description": "Connection string in [go-mssqldb DSN format](https://github.com/microsoft/go-mssqldb#connection-parameters-and-dsn), such as `sqlserver://user:password@host:1433`. With `cloud_auth.provider` set to `azure_ad`, only the `sqlserver://` URL form is accepted.",
         "type": "string",
         "default": "sqlserver://localhost:1433"
       },
       "cloud_auth": {
         "title": "Cloud auth",
-        "description": "Optional cloud authentication settings for Azure SQL.",
+        "description": "Optional cloud authentication settings for Azure SQL Managed Instance.",
         "type": "object",
         "properties": {
           "provider": {
             "title": "Provider",
-            "description": "Cloud auth provider. Use `none` to disable cloud authentication.",
+            "description": "Authentication provider for Azure SQL Managed Instance. `none` uses the credentials in `dsn`; `azure_ad` signs in with a Microsoft Entra ID token.",
             "type": "string",
             "enum": [
               "none",
@@ -55,7 +62,7 @@
                     "properties": {
                       "mode": {
                         "title": "Mode",
-                        "description": "Azure AD credential mode.",
+                        "description": "How Netdata obtains the Microsoft Entra ID token. `service_principal` uses an app registration with a client secret, `managed_identity` the identity of the Azure resource running Netdata, and `default` the Azure SDK credential chain.",
                         "type": "string",
                         "enum": [
                           "service_principal",
@@ -80,17 +87,17 @@
                                 "properties": {
                                   "tenant_id": {
                                     "title": "Tenant ID",
-                                    "description": "Azure tenant ID.",
+                                    "description": "Directory (tenant) ID of the Microsoft Entra tenant that holds the service principal. Required in `service_principal` mode.",
                                     "type": "string"
                                   },
                                   "client_id": {
                                     "title": "Client ID",
-                                    "description": "Service principal client ID.",
+                                    "description": "Application (client) ID of the service principal. Required in `service_principal` mode.",
                                     "type": "string"
                                   },
                                   "client_secret": {
                                     "title": "Client Secret",
-                                    "description": "Service principal client secret.",
+                                    "description": "Client secret of the service principal. Required in `service_principal` mode.",
                                     "type": "string"
                                   }
                                 },
@@ -117,7 +124,7 @@
                                 "properties": {
                                   "client_id": {
                                     "title": "Client ID",
-                                    "description": "Optional client ID of a user-assigned managed identity.",
+                                    "description": "Client ID of a user-assigned managed identity. Leave empty to use the system-assigned identity of the Azure resource.",
                                     "type": "string"
                                   }
                                 }
@@ -148,8 +155,8 @@
         }
       },
       "vnode": {
-        "title": "Virtual Node",
-        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
         "type": "string",
         "default": ""
       },
@@ -162,7 +169,7 @@
       },
       "collect_disabled_jobs": {
         "title": "Collect disabled SQL Agent job executions",
-        "description": "Collect execution-result, execution-age, execution-duration, and current-runtime charts for disabled SQL Server Agent jobs. Their administrative enabled/disabled status is always collected. Enabling this option adds four charts and eight dimensions per disabled job; stock execution alerts remain gated by the job's enabled state.",
+        "description": "Also create execution charts for disabled SQL Server Agent jobs. The enabled/disabled status chart always covers every job.",
         "type": "boolean",
         "default": false
       },
@@ -173,24 +180,25 @@
         "properties": {
           "top_queries": {
             "title": "Top Queries",
-            "description": "Configuration for top-queries. Uses Query Store across enabled user databases on SQL Server/Managed Instance, or the connected database on Azure SQL Database, and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
+            "description": "Configuration for top-queries. Uses Query Store across enabled user databases and falls back to the plan cache (sys.dm_exec_query_stats) when Query Store is unavailable or disabled.",
             "type": "object",
             "properties": {
               "disabled": {
                 "title": "Disabled",
-                "description": "Disable the top-queries function.",
+                "description": "Disable the top-queries Function.",
                 "type": "boolean",
                 "default": false
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout for top-queries requests, in seconds, independent of the metrics `timeout`. Zero uses the built-in 30 seconds.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "limit": {
                 "title": "Limit",
-                "description": "Maximum number of queries to return. Set to 0 to use the default (500).",
+                "description": "Maximum number of query patterns top-queries returns. Zero uses the built-in 500.",
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 5000,
@@ -198,7 +206,7 @@
               },
               "time_window_days": {
                 "title": "Time Window (Days)",
-                "description": "How many days of query statistics to query. On the plan-cache fallback this filters by last execution time instead of aggregating a period. Set to 0 to use the default (7). Set to -1 to query all available data (not recommended for busy servers).",
+                "description": "Days of query statistics top-queries covers. Zero uses the built-in 7 days; -1 covers all retained history.",
                 "type": "integer",
                 "minimum": -1,
                 "default": 7
@@ -212,19 +220,20 @@
             "properties": {
               "disabled": {
                 "title": "Disabled",
-                "description": "Disable the deadlock-info function.",
+                "description": "Disable the deadlock-info Function.",
                 "type": "boolean",
                 "default": false
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout for deadlock-info requests, in seconds, independent of the metrics `timeout`. Zero uses the built-in 30 seconds.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "use_ring_buffer": {
                 "title": "Use Ring Buffer",
-                "description": "Use the ring_buffer target instead of event_file for the built-in system_health session on SQL Server or Azure SQL Managed Instance. deadlock-info is unavailable on Azure SQL Database.",
+                "description": "Read deadlock reports from the ring_buffer target of the built-in `system_health` session instead of its event_file target.",
                 "type": "boolean",
                 "default": false
               }
@@ -237,25 +246,26 @@
             "properties": {
               "disabled": {
                 "title": "Disabled",
-                "description": "Disable the error-info function.",
+                "description": "Disable the error-info Function.",
                 "type": "boolean",
                 "default": false
               },
               "timeout": {
                 "title": "Timeout",
-                "description": "Query timeout in seconds. Set to 0 to use the collector's timeout.",
+                "description": "Query timeout for error-info requests, in seconds, independent of the metrics `timeout`. Zero uses the built-in 30 seconds.",
                 "type": "number",
-                "minimum": 0
+                "minimum": 0,
+                "default": 30
               },
               "session_name": {
                 "title": "Session Name",
-                "description": "Name of the server-scoped (SQL Server/Managed Instance) or database-scoped (Azure SQL Database) Extended Events session that captures error_reported events.",
+                "description": "Name of the server-scoped Extended Events session that captures `error_reported` events.",
                 "type": "string",
                 "default": "netdata_errors"
               },
               "use_ring_buffer": {
                 "title": "Use Ring Buffer",
-                "description": "Use ring_buffer instead of event_file. The session must remain running; data is volatile and XML parsing can be slower. Useful when persistent event_file storage is unavailable, including Azure SQL Database without Blob Storage.",
+                "description": "Read error events from the session's ring_buffer target instead of its event_file target.",
                 "type": "boolean",
                 "default": false
               }
@@ -275,10 +285,11 @@
   "uiSchema": {
     "dsn": {
       "ui:placeholder": "sqlserver://user:password@localhost:1433",
-      "ui:widget": "password"
+      "ui:widget": "password",
+      "ui:help": "URL form: `sqlserver://user:password@host:1433`; `sqlserver://host:1433` for Windows Authentication (Windows only); `sqlserver://user:password@host/INSTANCENAME` for a named instance (needs the SQL Server Browser service); `sqlserver://my-instance.dns-zone.database.windows.net:1433?database=master` for an Azure SQL Managed Instance private endpoint. Append `?encrypt=true` for an encrypted connection to a trusted certificate. Percent-encode reserved characters in the password (`@` as `%40`). Azure SQL Database is not supported by this collector."
     },
     "vnode": {
-      "ui:help": "Optional: Group metrics under a virtual node for multi-instance setups."
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
     },
     "timeout": {
       "ui:help": "Accepts decimals for sub-second granularity (e.g., 0.5 for 500ms)."
@@ -288,7 +299,8 @@
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
-        }
+        },
+        "ui:help": "`azure_ad` needs a login created `FROM EXTERNAL PROVIDER` for the service principal or managed identity on Azure SQL Managed Instance; the DSN then carries no username and password."
       },
       "azure_ad": {
         "mode": {
@@ -311,7 +323,10 @@
           "ui:help": "WARNING: query text may contain unmasked PII (customer names, emails, IDs). Query text and runtime views require version-specific server and per-database performance-state permissions."
         },
         "time_window_days": {
-          "ui:help": "Limits query statistics to recent days. Lower positive values improve performance on busy servers; 0 uses 7 days and -1 includes all available history."
+          "ui:help": "With Query Store the window selects the runtime statistics intervals to aggregate; on the plan-cache fallback it keeps only plans executed within the window. Shorter windows are cheaper on busy servers."
+        },
+        "limit": {
+          "ui:help": "The same limit caps the rows error-info returns."
         }
       },
       "deadlock_info": {
@@ -319,15 +334,18 @@
           "ui:help": "WARNING: Query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, or VIEW SERVER STATE on older versions. Unavailable on Azure SQL Database."
         },
         "use_ring_buffer": {
-          "ui:help": "Use the volatile system_health ring buffer on SQL Server or Azure SQL Managed Instance. It can be slower to parse. Azure SQL Database is unsupported."
+          "ui:help": "The ring buffer is volatile (lost on restart or failover), small, and costlier to parse than the event files. SQL Server and Azure SQL Managed Instance only: Azure SQL Database has no system_health session, so deadlock-info is unavailable there regardless."
         }
       },
       "error_info": {
         "disabled": {
-          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions, or on Azure SQL Database VIEW DATABASE PERFORMANCE STATE for event_file and VIEW DATABASE STATE for ring_buffer."
+          "ui:help": "WARNING: Error messages and query text may contain unmasked sensitive literals. Requires VIEW SERVER PERFORMANCE STATE on SQL Server 2022+, VIEW SERVER STATE on older versions."
         },
         "session_name": {
-          "ui:help": "For full error coverage, configure an administrator-created session capturing sqlserver.error_reported with sql_text and query_hash actions, using event_file (default) or ring_buffer. If unavailable, SQL Server and Managed Instance use system_health with reduced coverage. Azure SQL Database requires an ON DATABASE session."
+          "ui:help": "Create the session as an administrator, capturing sqlserver.error_reported with the sql_text and query_hash actions, with an event_file target (default) or a ring_buffer target. When it is missing, SQL Server and Managed Instance fall back to system_health with reduced coverage. On Managed Instance, event_file requires an Azure Blob Storage URL and storage access configured for the Database Engine."
+        },
+        "use_ring_buffer": {
+          "ui:help": "Use it where event files cannot be stored, such as Managed Instance without configured Blob Storage. The session must be running; events are lost on restart or failover, capacity is limited, and XML parsing costs more CPU than reading event files."
         }
       }
     },
@@ -338,6 +356,7 @@
           "title": "Base",
           "fields": [
             "update_every",
+            "autodetection_retry",
             "dsn",
             "timeout",
             "vnode"
@@ -362,6 +381,9 @@
           ]
         }
       ]
+    },
+    "collect_disabled_jobs": {
+      "ui:help": "Adds the same four execution charts (last status, duration, age, current run time) for each disabled job. The stock last-execution alerts still fire only for enabled jobs."
     }
   }
 }

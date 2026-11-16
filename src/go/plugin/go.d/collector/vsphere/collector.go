@@ -73,26 +73,26 @@ func New() *Collector {
 
 type Config struct {
 	// Job identity and scheduling.
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
 
 	// Inventory discovery and resource selectors.
-	DiscoveryInterval        confopt.Duration               `yaml:"discovery_interval,omitempty" json:"discovery_interval"`
-	HostsInclude             match.HostIncludes             `yaml:"host_include,omitempty" json:"host_include"`
-	VMsInclude               match.VMIncludes               `yaml:"vm_include,omitempty" json:"vm_include"`
-	DatastoresInclude        match.DatastoreIncludes        `yaml:"datastore_include,omitempty" json:"datastore_include"`
-	ClustersInclude          match.ClusterIncludes          `yaml:"cluster_include,omitempty" json:"cluster_include"`
+	DiscoveryInterval        confopt.Duration               `yaml:"discovery_interval,omitempty"         json:"discovery_interval"`
+	HostsInclude             match.HostIncludes             `yaml:"host_include,omitempty"               json:"host_include"`
+	VMsInclude               match.VMIncludes               `yaml:"vm_include,omitempty"                 json:"vm_include"`
+	DatastoresInclude        match.DatastoreIncludes        `yaml:"datastore_include,omitempty"          json:"datastore_include"`
+	ClustersInclude          match.ClusterIncludes          `yaml:"cluster_include,omitempty"            json:"cluster_include"`
 	CollectDatastoreClusters bool                           `yaml:"collect_datastore_clusters,omitempty" json:"collect_datastore_clusters"`
-	DatastoreClustersInclude match.DatastoreClusterIncludes `yaml:"datastore_cluster_include,omitempty" json:"datastore_cluster_include"`
-	CollectVSAN              bool                           `yaml:"collect_vsan,omitempty" json:"collect_vsan"`
-	VSANClustersInclude      match.VSANClusterIncludes      `yaml:"vsan_cluster_include,omitempty" json:"vsan_cluster_include"`
-	VSANHostsInclude         match.VSANHostIncludes         `yaml:"vsan_host_include,omitempty" json:"vsan_host_include"`
-	VSANVMsInclude           match.VSANVMIncludes           `yaml:"vsan_vm_include,omitempty" json:"vsan_vm_include"`
+	DatastoreClustersInclude match.DatastoreClusterIncludes `yaml:"datastore_cluster_include,omitempty"  json:"datastore_cluster_include"`
+	CollectVSAN              bool                           `yaml:"collect_vsan,omitempty"               json:"collect_vsan"`
+	VSANClustersInclude      match.VSANClusterIncludes      `yaml:"vsan_cluster_include,omitempty"       json:"vsan_cluster_include"`
+	VSANHostsInclude         match.VSANHostIncludes         `yaml:"vsan_host_include,omitempty"          json:"vsan_host_include"`
+	VSANVMsInclude           match.VSANVMIncludes           `yaml:"vsan_vm_include,omitempty"            json:"vsan_vm_include"`
 
 	// Opt-in label enrichment.
-	TagCategories    []string `yaml:"tag_categories,omitempty" json:"tag_categories"`
+	TagCategories    []string `yaml:"tag_categories,omitempty"    json:"tag_categories"`
 	CustomAttributes []string `yaml:"custom_attributes,omitempty" json:"custom_attributes"`
 
 	// Optional cached topology Function data.
@@ -152,7 +152,7 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	c.ensureRuntimeState()
 	c.stopDiscoveryTask(true)
 	c.closeClient()
@@ -162,7 +162,7 @@ func (c *Collector) Init(context.Context) error {
 		return fmt.Errorf("validate vSphere collector configuration: %w", err)
 	}
 
-	vsClient, err := c.initClient()
+	vsClient, err := c.initClient(ctx)
 	if err != nil {
 		return fmt.Errorf("create vSphere client: %w", err)
 	}

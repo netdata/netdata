@@ -10,22 +10,22 @@ metadata:
       #      manufacturer:
       #        symbol:
       #          MIB: GIGAMON-SNMP-MIB
-      #          OID: 1.3.6.1.4.1.26866.2.1
+      #          OID: 1.3.6.1.4.1.26866.2.1.0
       #          name: manufacturer
       model:
         symbol:
           MIB: GIGAMON-SNMP-MIB
-          OID: 1.3.6.1.4.1.26866.2.2
+          OID: 1.3.6.1.4.1.26866.2.2.0
           name: model
       serial_number:
         symbol:
           MIB: GIGAMON-SNMP-MIB
-          OID: 1.3.6.1.4.1.26866.2.4
+          OID: 1.3.6.1.4.1.26866.2.4.0
           name: serialNumber
       description:
         symbol:
           MIB: GIGAMON-SNMP-MIB
-          OID: 1.3.6.1.4.1.26866.2.5
+          OID: 1.3.6.1.4.1.26866.2.5.0
           name: systemDescription
 
 selector:
@@ -40,7 +40,7 @@ metrics:
   - MIB: GIGAMON-SNMP-MIB
     symbol:
       name: cpuUtilization
-      OID: 1.3.6.1.4.1.26866.2.13
+      OID: 1.3.6.1.4.1.26866.2.13.0
       extract_value: '(\d+)'
       chart_meta:
         description: Cpu usage

@@ -188,6 +188,8 @@ Netdata generates a local MCP API key automatically on startup. Authentication b
 
 - **Bearer protection disabled (`no`)**: anonymous MCP access works for non-sensitive operations (metrics, alerts, node info). The API key unlocks sensitive operations.
 - **Bearer protection enabled (`yes`)**: anonymous MCP access is rejected on all MCP transports (HTTP, SSE, WebSocket). The API key is required for all MCP requests.
+- **Claiming required**: the Agent accepts the API key only while it is claimed to Netdata Cloud. On an unclaimed Agent every key is rejected, so with bearer protection enabled MCP is unavailable.
+- **MCP only**: the API key does not authorize the Agent's REST API (`/api/...`). With bearer protection enabled, those endpoints still require a Cloud-issued bearer token.
 
 ### Transport Options
 
@@ -203,6 +205,7 @@ Netdata implements the MCP protocol with multiple transport options:
 - **Bridge Required**: AI clients that only support stdio need the `nd-mcp` (stdio-to-websocket) or `mcp-remote` (stdio-to-http or stdio-to-sse) bridge
 - **Preferred authentication**: pass the MCP API key via `Authorization: Bearer <mcp_key>`.
 - **Backward compatibility**: WebSocket also accepts `?api_key=<mcp_key>`. Keep this only for legacy clients, since URL query strings are more likely to be logged by proxies and tools.
+- **Request limits**: an HTTP or SSE request body can be about 1 MiB, and a WebSocket message up to 1 MiB (a larger one closes the connection with code 1009). A JSON-RPC batch can hold up to 64 requests. Once its responses reach 16 MiB, the remaining requests are not run: each valid request with an `id` gets a `-32001` error, and a response that would cross the limit is replaced by that error too.
 
 ### MCP Access Control in `netdata.conf`
 

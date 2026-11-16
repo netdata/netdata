@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
 func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) bool {
@@ -51,30 +50,7 @@ func (tx *jobV1Emission) processMetrics(mx collectedMetrics, sinceLastRun int) b
 		j.buf.Reset()
 	}
 	tx.hostBytes = j.buf.Len()
-	j.api.HOST("")
-	var status jobV1ChartChange
-	status.prepare(j.collectStatusChart, j)
-	status.global = true
-	var duration jobV1ChartChange
-	duration.prepare(j.collectDurationChart, j)
-	duration.global = true
-	if !status.created || createCharts {
-		tx.createChart(&status)
-	}
-	if !duration.created || createCharts {
-		tx.createChart(&duration)
-	}
-	intMx := collectedMetrics{
-		intMetrics: map[string]int64{"success": oldmetrix.Bool(updated > 0), "failed": oldmetrix.Bool(updated == 0)},
-	}
-	tx.updateChart(&status, intMx, sinceLastRun)
-	tx.record(&status)
-	if updated > 0 {
-		tx.updateChart(&duration, collectedMetrics{
-			intMetrics: map[string]int64{"duration": elapsed},
-		}, sinceLastRun)
-	}
-	tx.record(&duration)
+	tx.self = j.selfMetrics.prepare(j.api, sinceLastRun, elapsed, updated > 0, createCharts)
 	return updated > 0
 }
 
@@ -129,15 +105,15 @@ func (tx *jobV1Emission) createChart(change *jobV1ChartChange) {
 			if ls == 0 {
 				ls = collectorapi.LabelSourceAuto
 			}
-			j.api.CLABEL(l.Key, lblValueReplacer.Replace(l.Value), ls)
+			j.api.CLABEL(netdataapi.SanitizeWireValue(l.Key), netdataapi.SanitizeWireValue(l.Value), ls)
 		}
 	}
 	for k, v := range j.labels {
 		if !seen[k] {
-			j.api.CLABEL(k, lblValueReplacer.Replace(v), collectorapi.LabelSourceConf)
+			j.api.CLABEL(netdataapi.SanitizeWireValue(k), netdataapi.SanitizeWireValue(v), collectorapi.LabelSourceConf)
 		}
 	}
-	j.api.CLABEL("_collect_job", lblValueReplacer.Replace(j.Name()), collectorapi.LabelSourceAuto)
+	j.api.CLABEL("_collect_job", netdataapi.SanitizeWireValue(j.Name()), collectorapi.LabelSourceAuto)
 	j.api.CLABELCOMMIT()
 
 	for _, dim := range chart.Dims {

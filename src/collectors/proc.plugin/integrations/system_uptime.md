@@ -50,9 +50,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -86,7 +83,12 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ system_reboot_detection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/reboot.conf) | system.uptime | System has rebooted within the last 10 minutes |
 
 
 

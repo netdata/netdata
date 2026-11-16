@@ -317,7 +317,7 @@ func TestCompileScenarios(t *testing.T) {
 								Context: "requests",
 								Units:   "requests/s",
 								Lifecycle: &charttpl.Lifecycle{
-									ExpireAfterCycles: 9,
+									ExpireAfterCycles: new(9),
 								},
 								Dimensions: []charttpl.Dimension{
 									{Selector: "svc_requests_total", Name: "total"},

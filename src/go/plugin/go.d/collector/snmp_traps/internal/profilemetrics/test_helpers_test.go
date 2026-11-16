@@ -226,6 +226,9 @@ func cloneTestChartLifecycle(src *charttpl.Lifecycle) *charttpl.Lifecycle {
 		return nil
 	}
 	dst := *src
+	if src.ExpireAfterCycles != nil {
+		dst.ExpireAfterCycles = new(*src.ExpireAfterCycles)
+	}
 	if src.Dimensions != nil {
 		dimensions := *src.Dimensions
 		dst.Dimensions = &dimensions
@@ -380,7 +383,7 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 			Type:      "line",
 			Lifecycle: &charttpl.Lifecycle{
 				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+				ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 			},
 		},
 		{
@@ -392,7 +395,7 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 			Type:      "line",
 			Lifecycle: &charttpl.Lifecycle{
 				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+				ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 			},
 		},
 		{
@@ -404,7 +407,7 @@ func newPopulatedTestCatalog(t *testing.T) *staticTestCatalog {
 			Type:      "line",
 			Lifecycle: &charttpl.Lifecycle{
 				MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-				ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+				ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 			},
 		},
 	}
@@ -628,7 +631,7 @@ func profileMetricChartForTest(id, title, context, units, algorithm string) cata
 		Type:      "line",
 		Lifecycle: &charttpl.Lifecycle{
 			MaxInstances:      catalog.DefaultMetricChartMaxInstances,
-			ExpireAfterCycles: catalog.DefaultMetricExpireAfterCycles,
+			ExpireAfterCycles: new(catalog.DefaultMetricExpireAfterCycles),
 		},
 	}
 }

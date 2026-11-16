@@ -1111,31 +1111,37 @@ mod proptests {
 
     proptest! {
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_header_never_panics(data: Vec<u8>) {
             let _ = Header::decode(&data);
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_chunk_header_never_panics(data: Vec<u8>) {
             let _ = ChunkHeader::decode(&data);
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_hello_never_panics(data: Vec<u8>) {
             let _ = Hello::decode(&data);
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_hello_ack_never_panics(data: Vec<u8>) {
             let _ = HelloAck::decode(&data);
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_cgroups_request_never_panics(data: Vec<u8>) {
             let _ = CgroupsRequest::decode(&data);
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_cgroups_response_never_panics(data: Vec<u8>) {
             let result = CgroupsResponseView::decode(&data);
             if let Ok(view) = result {
@@ -1150,6 +1156,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_cgroups_lookup_request_never_panics(data: Vec<u8>) {
             let result = CgroupsLookupRequestView::decode(&data);
             if let Ok(view) = result {
@@ -1162,6 +1169,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_cgroups_lookup_response_never_panics(data: Vec<u8>) {
             let result = CgroupsLookupResponseView::decode(&data);
             if let Ok(view) = result {
@@ -1180,6 +1188,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_apps_lookup_request_never_panics(data: Vec<u8>) {
             let result = AppsLookupRequestView::decode(&data);
             if let Ok(view) = result {
@@ -1192,6 +1201,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn decode_apps_lookup_response_never_panics(data: Vec<u8>) {
             let result = AppsLookupResponseView::decode(&data);
             if let Ok(view) = result {
@@ -1210,6 +1220,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn batch_dir_decode_never_panics(
             data: Vec<u8>,
             item_count in 0u32..128,
@@ -1219,6 +1230,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn batch_item_get_never_panics(
             data: Vec<u8>,
             item_count in 0u32..128,
@@ -1232,6 +1244,7 @@ mod proptests {
 
     proptest! {
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn encode_decode_header_roundtrip(
             kind in 1u16..=3,
             flags in any::<u16>(),
@@ -1261,6 +1274,7 @@ mod proptests {
         }
 
         #[test]
+        #[ignore = "fuzz: run by tests/run-extended-fuzz.sh"]
         fn encode_decode_hello_roundtrip(
             supported in any::<u32>(),
             preferred in any::<u32>(),
@@ -1312,6 +1326,7 @@ fn nipc_error_display_all_variants() {
         (NipcError::BadItemCount, "item count inconsistent"),
         (NipcError::Overflow, "builder out of space"),
         (NipcError::HandlerFailed, "dispatch handler failed"),
+        (NipcError::Transport, "transport I/O failed"),
     ];
     for (err, expected) in cases {
         let msg = format!("{}", err);
@@ -1566,7 +1581,7 @@ fn cgroups_resp_decode_bad_dir_alignment() {
     let mut buf = [0u8; 128];
     buf[0..2].copy_from_slice(&1u16.to_ne_bytes()); // layout_version
     buf[4..8].copy_from_slice(&1u32.to_ne_bytes()); // item_count = 1
-                                                    // Dir entry at offset 24: offset=3 (unaligned), length=32
+    // Dir entry at offset 24: offset=3 (unaligned), length=32
     buf[24..28].copy_from_slice(&3u32.to_ne_bytes());
     buf[28..32].copy_from_slice(&32u32.to_ne_bytes());
     assert_eq!(

@@ -49,7 +49,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -173,6 +173,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -191,7 +204,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -383,7 +396,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -638,23 +651,23 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_cognitive_services_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.availability | Cognitive Services availability on ${label:resource_name} |
-| [ am_cognitive_services_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services server errors on ${label:resource_name} |
-| [ am_cognitive_services_client_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Cognitive Services client errors on ${label:resource_name} |
-| [ am_cognitive_services_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.latency | Cognitive Services latency on ${label:resource_name} |
-| [ am_cognitive_services_rate_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.rate_limit | Cognitive Services rate limiting on ${label:resource_name} |
-| [ am_cognitive_services_blocked_calls ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.calls | Cognitive Services blocked calls on ${label:resource_name} |
-| [ am_cognitive_services_openai_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_availability | Azure OpenAI availability on ${label:resource_name} |
-| [ am_cognitive_services_openai_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to response on ${label:resource_name} |
-| [ am_cognitive_services_openai_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Azure OpenAI time to first token on ${label:resource_name} |
-| [ am_cognitive_services_openai_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_provisioned_utilization | Azure OpenAI provisioned utilization on ${label:resource_name} |
-| [ am_cognitive_services_model_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_availability | Model availability on ${label:resource_name} |
-| [ am_cognitive_services_model_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to response on ${label:resource_name} |
-| [ am_cognitive_services_model_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Model time to first token on ${label:resource_name} |
-| [ am_cognitive_services_model_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_provisioned_utilization | Model provisioned utilization on ${label:resource_name} |
-| [ am_cognitive_services_harmful_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Harmful content requests on ${label:resource_name} |
-| [ am_cognitive_services_blocked_content_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Blocked content requests on ${label:resource_name} |
-| [ am_cognitive_services_abusive_users ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_abusive_users | Abusive users detected on ${label:resource_name} |
+| [ am_cognitive_services_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.availability | Success rate of Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_server_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Rate of server errors (5xx) from Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_client_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.errors | Rate of client errors (4xx) from Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}). High client error rates may indicate misconfigured API calls or invalid requests |
+| [ am_cognitive_services_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.latency | Average API latency of Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_rate_limit ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.rate_limit | Rate of throttled requests due to rate limiting on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates the service is hitting its API call quota |
+| [ am_cognitive_services_blocked_calls ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.calls | Rate of blocked API calls on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}). Blocked calls indicate authorization or policy violations |
+| [ am_cognitive_services_openai_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_availability | Availability rate of Azure OpenAI service on ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_openai_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Average time to response for Azure OpenAI requests on ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_openai_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_latency | Average normalized time to first token for Azure OpenAI requests on ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_openai_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.openai_provisioned_utilization | Provisioned-managed utilization of Azure OpenAI deployment on ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization means requests may be throttled or rejected |
+| [ am_cognitive_services_model_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_availability | Model availability rate on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_model_time_to_response ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Average time to response for model requests on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_model_time_to_first_token ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_latency | Average normalized time to first token for model requests on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_model_provisioned_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.model_provisioned_utilization | Provisioned utilization of model deployment on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization means requests may be throttled or rejected |
+| [ am_cognitive_services_harmful_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Rate of requests flagged as harmful by content safety on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}). High rates may indicate abuse or prompt injection attempts |
+| [ am_cognitive_services_blocked_content_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_requests | Rate of requests rejected by content safety on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_cognitive_services_abusive_users ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_cognitive_services.conf) | azure_monitor.cognitive_services.content_safety_abusive_users | Rate of potentially abusive users detected on Cognitive Services resource ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

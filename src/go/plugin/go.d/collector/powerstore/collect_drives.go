@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectDriveWear() {
+func (c *Collector) collectDriveWear(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, drv := range c.discovered.drives {
@@ -14,7 +17,7 @@ func (c *Collector) collectDriveWear() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			wm, err := c.client.WearMetricsByDrive(id)
+			wm, err := c.client.WearMetricsByDrive(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting drive %s wear metrics: %v", id, err)
 				return

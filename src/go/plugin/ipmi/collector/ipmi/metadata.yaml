@@ -1,0 +1,480 @@
+plugin_name: ipmi.plugin
+modules:
+  - meta:
+      id: collector-ipmi.plugin-ipmi
+      plugin_name: ipmi.plugin
+      module_name: ipmi
+      monitored_instance:
+        name: IPMI (Go collector)
+        link: https://www.intel.com/content/www/us/en/products/docs/servers/ipmi/ipmi-home.html
+        icon_filename: microchip.svg
+        categories:
+          - data-collection.hardware-and-sensors
+      keywords:
+        - ipmi
+        - bmc
+        - openipmi
+        - hardware sensors
+        - system event log
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: Monitor hardware sensor readings, sensor health and System Event Log entries through IPMI.
+        method_description: Queries a local Linux OpenIPMI device or a remote BMC over IPMI 1.5 LAN or IPMI 2.0 LAN+
+          using the configured account. The collector reads sensors and the System Event Log (SEL); it does not
+          change BMC configuration or clear the event log.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          | Permission | Needed when |
+          |------------|-------------|
+          | Read/write access to the selected OpenIPMI device | Collecting locally with `driver: open`. |
+          | BMC account with User privilege and LAN access | Collecting remotely with `driver: lan` or `driver: lanplus`. Some BMC policies require a higher session privilege. |
+
+          Installers give the dedicated `ipmi.plugin` binary root ownership and setuid permission, restricted to
+          the Netdata group, for local device access. Containers must expose the device, for example with
+          `--device /dev/ipmi0`. Remote collection needs no local device access.
+      default_behavior:
+        auto_detection:
+          description: On standard Linux installations, the stock job attempts to collect the local OpenIPMI device 0
+            every ten seconds. Containers require ipmi=yes in the plugins section of netdata.conf and an exposed
+            device for local collection. Hosts without an accessible device do not collect local IPMI metrics.
+            Netdata prefers this plugin when both IPMI implementations are installed and enabled. An existing
+            freeipmi=no keeps collection disabled; non-blank legacy command options keep C when FreeIPMI is enabled.
+            Set ipmi=yes explicitly in the plugins section of netdata.conf to migrate either case to Go.
+        limits:
+          description: This plugin requires Linux. Keep FreeIPMI for legacy direct drivers, bridged sensors,
+            OEM interpretation or custom FreeIPMI interpretation files. Unknown or unavailable sensor readings leave
+            gaps. Default FreeIPMI policy treats non-critical threshold assertions as nominal. Netdata starts only
+            one IPMI implementation; switch implementations by changing netdata.conf and restarting the Agent.
+        performance_impact:
+          description: IPMI command latency grows with sensor count. Increase update_every when a complete sensor scan
+            takes longer than the configured interval. Sensor thresholds are read with the SDR inventory, about every
+            five minutes, at most one command per threshold sensor. With collect_sel enabled, the first collections after a start
+            also read the existing System Event Log, for up to two seconds each (a quarter of update_every when
+            shorter), until all records are read. Later collections read only new records, or the whole log again after
+            the BMC clears or rewrites it.
+    setup:
+      prerequisites:
+        list:
+          - title: Install the IPMI plugin
+            description: Linux source and static builds include the Go IPMI plugin by default. For DEB/RPM
+              installations, install the optional netdata-plugin-ipmi package separately. Source builds can disable
+              it with --disable-plugin-ipmi.
+          - title: Migrate an existing FreeIPMI configuration
+            description: Configure the target in ipmi/ipmi.conf, set `ipmi = yes` in the `[plugins]` section of
+              netdata.conf, and restart Netdata. C command options are not translated. To switch back, install
+              netdata-plugin-freeipmi if needed, set `ipmi = no` and `freeipmi = yes`, and restart Netdata.
+          - title: Enable remote BMC access
+            description: For LAN/LAN+, enable IPMI over LAN on the BMC, configure an account with User privilege,
+              and allow UDP traffic from the Agent to the BMC port (623 by default). Select a higher privilege only
+              if the BMC access policy requires it.
+      configuration:
+        file:
+          name: ipmi/ipmi.conf
+          description: |
+            Replace the stock local job to collect remote BMCs, or set `jobs: []` to disable local collection.
+        options:
+          description: Options apply to each IPMI job. Configure one local device or remote BMC per job.
+          folding:
+            title: Options
+            enabled: false
+          list:
+            - name: driver
+              description: "IPMI transport: local Linux OpenIPMI, IPMI 1.5 LAN or IPMI 2.0 LAN+."
+              default_value: open
+              required: false
+              group: Connection
+            - name: device
+              description: "Local OpenIPMI device number."
+              default_value: 0
+              required: false
+              group: Connection
+            - name: hostname
+              description: "BMC hostname or IP address for LAN/LAN+, without a URL scheme or port."
+              default_value: ''
+              required: true
+              group: Connection
+            - name: port
+              description: "BMC UDP port for LAN/LAN+."
+              default_value: 623
+              required: false
+              group: Connection
+            - name: username
+              description: "BMC account for LAN/LAN+. Leave empty only for anonymous access."
+              default_value: ''
+              required: false
+              group: Connection
+            - name: password
+              description: "BMC account password for LAN/LAN+. Leave empty only if the account has no password."
+              default_value: ''
+              required: false
+              group: Connection
+            - name: privilege_level
+              description: "Session privilege requested from the BMC. User privilege is sufficient for standard sensor and SEL commands."
+              default_value: user
+              required: false
+              group: Connection
+            - name: update_every
+              description: "Data collection frequency in seconds."
+              default_value: 10
+              required: false
+              group: Collection
+            - name: timeout
+              description: "Timeout for session setup and for each IPMI command."
+              default_value: 5s
+              required: false
+              group: Collection
+            - name: collect_sel
+              description: "Read the System Event Log: the entry count and new records charts, and the ipmi-sel Live Data view."
+              default_value: true
+              required: false
+              group: Collection
+            - name: vnode
+              description: "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes)."
+              default_value: ''
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            title: Config
+            enabled: false
+          list:
+            - name: Local device
+              description: Monitor the first kernel IPMI device.
+              config: |
+                jobs:
+                  - name: local
+                    driver: open
+            - name: Remote BMC
+              description: Monitor a remote BMC using IPMI 2.0. Use driver lan for BMCs that require IPMI 1.5.
+              config: |
+                jobs:
+                  - name: server-bmc
+                    driver: lanplus
+                    hostname: bmc.example
+                    username: monitor
+                    password: '${env:IPMI_PASSWORD}'
+            - name: Attach a remote BMC to a virtual node
+              description: Define server-node in vnodes.conf first. Without vnode, metrics belong to the Agent host.
+              config: |
+                jobs:
+                  - name: server-bmc
+                    driver: lanplus
+                    hostname: bmc.example
+                    username: monitor
+                    password: '${env:IPMI_PASSWORD}'
+                    vnode: server-node
+    troubleshooting:
+      errors:
+        list:
+          - error: permission denied
+            cause: The plugin account cannot open the local IPMI device for reading and writing.
+            fix: Check that the dedicated binary retains the ownership and setuid permissions installed by Netdata.
+              In a container, expose the IPMI device. For a manually built binary, grant device access through the host
+              security policy or run a trusted local test explicitly with sudo.
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: |
+        Each sensor has its own reading and state chart. SEL is the raw repository entry count, including
+        records FreeIPMI may filter during interpretation. The stock ipmi_events alert template matches the ipmi.sel
+        context and applies to every Go job and to the C collector.
+
+        The SEL new records chart counts records newly observed since the previous value, by default FreeIPMI state.
+        Records already in the log when collection starts are not counted: the chart appears once the first read of
+        the log completes. After the BMC log is cleared or rewritten, rereading the same record does not count it
+        again. After the initial baseline, observed events are reported during rescans even if rollover prevents the
+        whole log from being read. A failed SEL read leaves a gap, and records observed during it count in the next
+        successful value.
+      scopes:
+        - name: sensor
+          description: A sensor on the selected BMC.
+          labels:
+            - name: sensor
+              description: Sensor name.
+            - name: type
+              description: IPMI sensor type.
+            - name: component
+              description: Component inferred from the sensor name and type.
+          metrics:
+            - name: ipmi.sensor_temperature_c
+              description: IPMI Sensor Temperature
+              unit: Celsius
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_temperature_f
+              description: IPMI Sensor Temperature
+              unit: Fahrenheit
+              chart_type: line
+              dimensions:
+                - name: temperature
+            - name: ipmi.sensor_voltage
+              description: IPMI Sensor Voltage
+              unit: Volts
+              chart_type: line
+              dimensions:
+                - name: voltage
+            - name: ipmi.sensor_ampere
+              description: IPMI Sensor Current
+              unit: Amps
+              chart_type: line
+              dimensions:
+                - name: ampere
+            - name: ipmi.sensor_fan_speed
+              description: IPMI Sensor Fan Speed
+              unit: RPM
+              chart_type: line
+              dimensions:
+                - name: rotations
+            - name: ipmi.sensor_power
+              description: IPMI Sensor Power
+              unit: Watts
+              chart_type: line
+              dimensions:
+                - name: power
+            - name: ipmi.sensor_reading_percent
+              description: IPMI Sensor Percentage Reading
+              unit: '%'
+              chart_type: line
+              dimensions:
+                - name: percentage
+            - name: ipmi.sensor_state
+              description: IPMI Sensor State
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: nominal
+                - name: warning
+                - name: critical
+                - name: unknown
+        - name: global
+          description: The selected BMC System Event Log.
+          labels: []
+          metrics:
+            - name: ipmi.sel
+              description: IPMI System Event Log Entries
+              unit: events
+              chart_type: line
+              dimensions:
+                - name: events
+        - name: SEL event type
+          description: New System Event Log records of one event type on the selected BMC.
+          labels:
+            - name: event_type
+              description: "`threshold` for threshold events, which also change the state of their sensor; `discrete`
+                for every other record, OEM records included."
+          metrics:
+            - name: ipmi.sel_new_records
+              description: IPMI System Event Log New Records
+              unit: records
+              chart_type: stacked
+              dimensions:
+                - name: nominal
+                - name: warning
+                - name: critical
+                - name: unknown
+      availability: []
+    functions:
+      description: Inspect the latest successful collection without issuing more IPMI commands.
+      list:
+        - id: sensors
+          function_name: ipmi-sensors
+          name: IPMI Sensors
+          description: Show current readings, the thresholds the BMC uses for each threshold sensor, and default
+            FreeIPMI health states, with sensor counts by component and state. Compare a reading with its thresholds to
+            see how close it is to a limit; by default only crossing a critical or non-recoverable threshold makes the
+            state critical.
+          parameters:
+            - id: __job
+              name: Instance
+              type: select
+              description: Select the IPMI collection job.
+              required: false
+              default: First available job
+              options: []
+          returns:
+            description: One row per discovered full or compact sensor record, expanded for sharing. Unavailable numeric
+              readings are null. Thresholds are in the reading's units and are null when the sensor has none or they
+              could not be read.
+            columns:
+              - name: Sensor
+                type: string
+                unit: ''
+                description: Sensor name.
+              - name: Type
+                type: string
+                unit: ''
+                description: IPMI sensor type.
+              - name: Component
+                type: string
+                unit: ''
+                description: Component inferred from the sensor name and type.
+              - name: Reading
+                type: float
+                unit: ''
+                description: Current reading; null when unavailable.
+              - name: Units
+                type: string
+                unit: ''
+                description: Reading units; null for discrete sensors.
+              - name: State
+                type: string
+                unit: ''
+                description: Default FreeIPMI health interpretation.
+              - name: LNR
+                type: float
+                unit: ''
+                description: Lower non-recoverable threshold.
+              - name: LCR
+                type: float
+                unit: ''
+                description: Lower critical threshold.
+              - name: LNC
+                type: float
+                unit: ''
+                description: Lower non-critical threshold.
+              - name: UNC
+                type: float
+                unit: ''
+                description: Upper non-critical threshold.
+              - name: UCR
+                type: float
+                unit: ''
+                description: Upper critical threshold.
+              - name: UNR
+                type: float
+                unit: ''
+                description: Upper non-recoverable threshold.
+              - name: Key
+                type: string
+                unit: ''
+                description: Stable sensor identity within the collection job.
+                visibility: hidden
+              - name: rowOptions
+                type: none
+                unit: ''
+                description: Row health severity.
+                visibility: hidden
+          require_cloud: false
+          performance: Reads the latest completed snapshot without additional BMC requests.
+          security: Read-only sensor data from the configured target.
+          availability: Available while a collection job runs. Returns HTTP 503 before the first successful collection
+            or after a collection failure.
+        - id: sel
+          function_name: ipmi-sel
+          name: IPMI System Event Log
+          description: Browse the hardware events the BMC recorded, such as threshold crossings, fan, power and memory
+            errors, processor throttling and boots, with default FreeIPMI states. Use it to see when a problem started
+            and how often it recurs; the sensor charts show only the current state.
+          parameters:
+            - id: __job
+              name: Instance
+              type: select
+              description: Select the IPMI collection job.
+              required: false
+              default: First available job
+              options: []
+            - id: state
+              name: State
+              type: select
+              description: Show only records with this default FreeIPMI state.
+              required: false
+              default: all
+              options:
+                - {id: all, name: All states, default: true}
+                - {id: critical, name: Critical}
+                - {id: warning, name: Warning}
+                - {id: nominal, name: Nominal}
+                - {id: unknown, name: Unknown}
+            - id: query
+              name: Search
+              type: string
+              description: 'Case-sensitive Netdata simple patterns against sensor, type, event, direction, state,
+                generator and record ID. Use `*DIMM*` for a substring. Space-separated patterns are checked in order;
+                the first match decides, `!` excludes, and no match excludes the row.'
+              required: false
+              default: No text filter
+              options: []
+          returns:
+            description: |
+              One row per SEL record the BMC retains, newest first in log order. The dashboard time range does not
+              filter the table, because SEL records are often weeks apart. Times are converted to UTC with the BMC's
+              SEL UTC offset. When the BMC reports none, times are the BMC clock, and the view shows how far that
+              clock is from the Agent clock. Records logged before a daylight saving change can be off by an hour,
+              because the BMC reports only its current offset. Records without a date (OEM records without a
+              timestamp, or records logged before the BMC clock was set) show Time as Unavailable.
+            columns:
+              - name: Order
+                type: integer
+                unit: ''
+                description: Position in the log, newest first.
+                visibility: hidden
+              - name: Time
+                type: timestamp
+                unit: ''
+                description: When the BMC logged the record, in UTC; Unavailable when the record has no date.
+              - name: Sensor
+                type: string
+                unit: ''
+                description: "SDR sensor name, or the event generator and sensor number (for example BIOS #34) when
+                  the BMC has no record of that sensor."
+              - name: Sensor Type
+                type: string
+                unit: ''
+                description: IPMI sensor type.
+              - name: Event
+                type: string
+                unit: ''
+                description: Event description; threshold events include the trigger reading and threshold when the
+                  BMC records them and the sensor's SDR record describes their conversion.
+              - name: Direction
+                type: string
+                unit: ''
+                description: Assertion (the condition started) or Deassertion (it ended).
+              - name: State
+                type: string
+                unit: ''
+                description: Default FreeIPMI interpretation of the record.
+              - name: Record ID
+                type: string
+                unit: ''
+                description: SEL record identifier.
+                visibility: hidden
+              - name: Generator
+                type: string
+                unit: ''
+                description: Event generator, such as the BMC, BIOS or SMI handler, and its ID.
+                visibility: hidden
+              - name: BMC Time
+                type: string
+                unit: ''
+                description: Timestamp as the BMC recorded it, before UTC conversion.
+                visibility: hidden
+              - name: Raw
+                type: string
+                unit: ''
+                description: Record bytes as returned by the BMC.
+                visibility: hidden
+              - name: rowOptions
+                type: none
+                unit: ''
+                description: Row health severity.
+                visibility: hidden
+          require_cloud: true
+          performance: Reads the records the collector already read from the BMC; sends no BMC requests.
+          security: Read-only hardware event records from the configured target.
+          availability: Available for jobs with collect_sel enabled while they run; when no job collects the SEL,
+            requests return HTTP 404. Returns HTTP 503 before the first successful collection, after a collection
+            failure, or while the BMC has not answered SEL requests. On the first collections of a large log, it shows
+            the oldest records read so far.

@@ -1,8 +1,8 @@
 use super::client::{ClientConfig, RawCallKind, RawClient};
 use super::dispatch::{DispatchError, DispatchHandler};
 use crate::protocol::{
-    self, batch_item_get, increment_decode, increment_encode, BatchBuilder, NipcError,
-    INCREMENT_PAYLOAD_SIZE, METHOD_INCREMENT,
+    self, BatchBuilder, INCREMENT_PAYLOAD_SIZE, METHOD_INCREMENT, NipcError, batch_item_get,
+    increment_decode, increment_encode,
 };
 use std::sync::Arc;
 

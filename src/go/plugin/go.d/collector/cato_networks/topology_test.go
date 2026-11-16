@@ -88,7 +88,7 @@ func TestBuildTopology(t *testing.T) {
 
 				rows := topologyTableRows(t, data.Links, data.Dictionaries)
 				require.Len(t, rows, 1)
-				require.Equal(t, catofunc.LinkTypeTunnel, rows[0]["type"])
+				require.Equal(t, catofunc.LinkTypePopAssociation, rows[0]["type"])
 				require.Nil(t, rows[0]["bytes_upstream_max"])
 				require.Nil(t, rows[0]["bytes_downstream_max"])
 				require.Nil(t, rows[0]["lost_upstream_percent"])
@@ -117,7 +117,7 @@ func TestBuildTopology(t *testing.T) {
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
-				peerActor := requireTopologyRow(t, actors, "type", catofunc.ActorTypeBGPPeer)
+				peerActor := requireTopologyRow(t, actors, "type", catofunc.ActorTypeBGPPeerObservation)
 				require.Empty(t, peerActor["remote_ip"])
 				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "site_id")
 				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "pop_name")

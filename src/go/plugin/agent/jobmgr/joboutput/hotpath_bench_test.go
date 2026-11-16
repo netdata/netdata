@@ -26,8 +26,7 @@ func BenchmarkBConfigFactoryCold(b *testing.B) {
 					},
 				},
 			},
-			Resolver:   resolver,
-			StoreScope: unavailableStoreScope,
+			Configs: testConfigResolver(b, resolver, unavailableStoreScope),
 		},
 	)
 	if err != nil {

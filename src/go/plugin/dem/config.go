@@ -1,0 +1,126 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package dem
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
+	"gopkg.in/yaml.v2"
+)
+
+type RetentionConfig struct {
+	Days     int   `yaml:"days"`
+	MaxBytes int64 `yaml:"max_bytes"`
+}
+
+type BrowserConfig struct {
+	Concurrency int `yaml:"concurrency"`
+}
+
+func (c *BrowserConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	// yaml.v2 converts fractional numbers to int silently; a slot count must be integral.
+	input := struct {
+		Concurrency any `yaml:"concurrency"`
+	}{Concurrency: c.Concurrency}
+	if err := unmarshal(&input); err != nil {
+		return err
+	}
+	value, ok := input.Concurrency.(int)
+	if !ok || value < 1 {
+		return fmt.Errorf("browser.concurrency must be a positive integer")
+	}
+	c.Concurrency = value
+	return nil
+}
+
+type Config struct {
+	History   RetentionConfig    `yaml:"history"`
+	Artifacts RetentionConfig    `yaml:"artifacts"`
+	Runtime   runtimehost.Config `yaml:"runtime"`
+	Browser   BrowserConfig      `yaml:"browser"`
+}
+
+func DefaultConfig() Config {
+	return Config{
+		Browser: BrowserConfig{
+			Concurrency: 1,
+		},
+		Artifacts: RetentionConfig{
+			Days:     7,
+			MaxBytes: 2 << 30,
+		},
+		Runtime: runtimehost.DefaultConfig(),
+		History: RetentionConfig{
+			Days:     30,
+			MaxBytes: 1 << 30,
+		},
+	}
+}
+
+// Runtime validation must not decode settings owned by other configuration readers.
+type opaqueConfigValue struct{}
+
+func (*opaqueConfigValue) UnmarshalYAML(func(any) error) error { return nil }
+
+// LoadConfig reads the same highest-priority dem.conf as the Agent. Framework
+// fields are decoded by the Agent; this owner decodes browser, runtime and retention policy.
+//
+// Each section decodes through a pointer to its default. yaml.v2 zeroes the
+// target of a null node, such as a section whose settings are all commented
+// out; through a pointer it clears only the pointer, so the default stays.
+func LoadConfig(paths multipath.MultiPath) (Config, error) {
+	cfg := DefaultConfig()
+	path, err := paths.Find("dem.conf")
+	if multipath.IsNotFound(err) {
+		return cfg, nil
+	}
+	if err != nil {
+		return cfg, err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg, err
+	}
+	// Decode the original document strictly for runtime settings, including merges
+	// and aliases, while leaving other sections opaque to this schema.
+	runtimeInput := struct {
+		Runtime *runtimehost.Config          `yaml:"runtime"`
+		Other   map[string]opaqueConfigValue `yaml:",inline"`
+	}{Runtime: &cfg.Runtime}
+	if err = yaml.UnmarshalStrict(data, &runtimeInput); err != nil {
+		return cfg, fmt.Errorf("read dem.conf runtime settings: %w", err)
+	}
+	// The other sections are decoded leniently: unknown keys are ignored.
+	sections := struct {
+		History   *RetentionConfig `yaml:"history"`
+		Artifacts *RetentionConfig `yaml:"artifacts"`
+		Browser   *BrowserConfig   `yaml:"browser"`
+	}{History: &cfg.History, Artifacts: &cfg.Artifacts, Browser: &cfg.Browser}
+	if err = yaml.Unmarshal(data, &sections); err != nil {
+		return cfg, fmt.Errorf("read dem.conf: %w", err)
+	}
+	if err = cfg.History.validate(journalstore.MinHistoryBytes); err != nil {
+		return cfg, fmt.Errorf("history.%w", err)
+	}
+	if err = cfg.Artifacts.validate(1); err != nil {
+		return cfg, fmt.Errorf("artifacts.%w", err)
+	}
+	if err = cfg.Runtime.Validate(); err != nil {
+		return cfg, fmt.Errorf("runtime.%w", err)
+	}
+	return cfg, nil
+}
+
+func (c RetentionConfig) validate(minBytes int64) error {
+	if c.Days < 1 || c.Days > 365 {
+		return fmt.Errorf("days must be between 1 and 365")
+	}
+	if c.MaxBytes < minBytes {
+		return fmt.Errorf("max_bytes must be at least %d", minBytes)
+	}
+	return nil
+}

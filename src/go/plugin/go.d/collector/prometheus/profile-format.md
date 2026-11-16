@@ -6,7 +6,7 @@ a designed dashboard menu: named sections, per-instance charts, meaningful dimen
 limited to the stock library -- you can author a profile for your own application's metrics too.
 
 This page documents the profile file format. Profiles may also classify an exporter's untyped scalar metrics and
-provide [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) that normalizes its metrics
+provide [metric relabeling](/src/go/pkg/relabel/README.md) that normalizes its metrics
 after the profile is selected and before its chart template sees them. Jobs retain higher-precedence type and
 relabeling policy for operator-specific overrides before profile processing.
 
@@ -148,7 +148,7 @@ At runtime the collector uses profiles in seven ordered steps:
 1. **Scrape** -- the job scrapes the endpoint. The `selector` job option filters unwanted series
    ([selector syntax](/src/go/pkg/prometheus/selector/README.md)).
 2. **Job normalization** -- the job's
-   [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) rewrites names and labels. Histogram and
+   [relabeling](/src/go/pkg/relabel/README.md) rewrites names and labels. Histogram and
    summary integrity is checked before continuing.
 3. **Selection** -- once, at job autodetection, each profile's `match` is tested against the post-job metric family
    names, per the job's `profiles.mode` (see
@@ -199,7 +199,7 @@ profile name used everywhere else -- in `profiles.mode_exact`/`mode_combined` en
   `example_http_request_duration_seconds_bucket`). Counters keep their `_total` suffix in the family name -- Netdata
   does not strip it, so match `foo_total` or a glob, never a bare `foo`. (This is the opposite of the template's
   dimension selectors and the relabeling block `match`, which both work on the full suffixed names -- see
-  [Chart template rules](#chart-template-rules) and [the relabeling block `match`](/src/go/plugin/go.d/collector/prometheus/relabel/README.md#match).)
+  [Chart template rules](#chart-template-rules) and [the relabeling block `match`](/src/go/pkg/relabel/README.md#match).)
 - It sees the names **after** the job's `selector` and `relabeling` have been applied, so a rename can bring an
   endpoint's metrics into (or out of) a profile's match.
 - It sees names **before** this profile's own `relabeling`. A profile cannot rename an otherwise non-matching metric
@@ -250,7 +250,7 @@ template:
 ### `relabeling`
 
 `relabeling` stores normalization required by the exporter profile itself. It uses the exact same ordered block and
-rule format as job-level [metric relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md), including the
+rule format as job-level [metric relabeling](/src/go/pkg/relabel/README.md), including the
 full action set. Use it when the profile's template needs a stable metric or label shape across exporter versions. Use
 job-level relabeling for deployment-specific policy, filtering, or normalization needed before profile selection.
 
@@ -310,7 +310,7 @@ to the final post-profile family that reaches the chart engine.
 - Authored routing wins. A profile can create a heatmap from `foo_bucket` and deny `foo`; the bucket series still
   reaches the heatmap, while unmatched fallback charts for `foo_sum` and `foo_count` are suppressed.
 - This is chart suppression, not ingestion filtering. Use the job `selector` or a
-  [relabeling](/src/go/plugin/go.d/collector/prometheus/relabel/README.md) `drop` rule when the
+  [relabeling](/src/go/pkg/relabel/README.md) `drop` rule when the
   matching samples must be discarded.
 
 Example:
@@ -452,6 +452,29 @@ dimension, presentation, and selector field. Prometheus profiles add these rules
   and cannot make an unclassified sample collectible.
 - **Every group that contains charts must list the metrics its selectors reference in its `metrics` list** (or inherit
   them from an ancestor group). A selector on a metric outside the group's declared scope fails validation.
+
+## Input and output limits
+
+The same limits apply with profiles, without profiles, to automatic fallback charts, and to raw counter companion charts:
+
+- `max_input_series` defaults to `10000`. Check and every Collect count the final assembled input after the job
+  selector and job/profile relabeling, before writer eligibility. Each scalar counts once. Each histogram counts
+  its stored buckets plus two count/sum slots; each summary counts its quantiles plus two count/sum slots. The two
+  slots count even when an incomplete distribution will later be skipped. A supplied `+Inf` bucket counts once;
+  the store's later synthesized bucket does not add to input. Exceeding the limit rejects the whole attempt before
+  any family is written; no partial totals are published.
+- `max_output_series_per_context` defaults to `1000`. After routing and aggregation, the chart engine counts
+  distinct current `(chart ID, dimension ID)` pairs across all charts in each published context within one job/host
+  scope. Context names use the emitter's wire normalization, so authored aliases of one published context share one
+  budget and omission/recovery report. Hidden and unavailable-valued dimensions count when currently observed;
+  quiet historical dimensions do not. Exceeding the limit omits the whole context, independently of other contexts. A summary view retains its
+  complete inputs even if a detailed view is omitted. Limits are evaluated before optional template lifecycle caps.
+
+Equality is admitted. Zero disables the corresponding limit; negative values are invalid. Later collection or
+configured startup retry attempts reconsider input. Ordinary logs distinguish input rejection/recovery from committed
+output omission/resumption; an input admission recovery does not promise chart publication. These limits protect
+writer/planner work and current output populations; they do not bound download, parser memory, the number of contexts,
+or total retained storage. Defaults are starting points, not resource-safety guarantees.
 
 ## Selecting profiles in job configuration
 

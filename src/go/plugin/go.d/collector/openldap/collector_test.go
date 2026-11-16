@@ -336,7 +336,7 @@ type mockOpenLDAPConn struct {
 	errOnSearch             bool
 }
 
-func (m *mockOpenLDAPConn) connect() error {
+func (m *mockOpenLDAPConn) connect(ctx context.Context) error {
 	if m.errOnConnect {
 		return errors.New("mock.connect() error")
 	}

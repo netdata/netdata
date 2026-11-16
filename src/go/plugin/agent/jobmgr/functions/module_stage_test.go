@@ -38,6 +38,7 @@ func TestContainedControllerAcceptsInvalidUTF8ModuleIdentity(t *testing.T) {
 		context.Background(),
 		1,
 		attempts,
+		nil,
 		collectorapi.Registry{module: {}},
 	)
 	require.NoError(t, err)
@@ -57,6 +58,7 @@ func TestContainedControllerAcceptsLongModuleIdentity(t *testing.T) {
 		context.Background(),
 		1,
 		attempts,
+		nil,
 		collectorapi.Registry{module: {}},
 	)
 	require.NoError(t, err)
@@ -76,6 +78,7 @@ func TestContainedControllerConsumesPlanPublishedBeforeSuccessfulSettlement(t *t
 				context.Background(),
 				1,
 				attempts,
+				nil,
 				collectorapi.Registry{"module": {}},
 			)
 			require.NoError(t, err)
@@ -96,6 +99,7 @@ func TestContainedControllerConstructionSettlesWhileModuleCallbackRemainsOwned(t
 			ctx,
 			1,
 			attempts,
+			nil,
 			collectorapi.Registry{
 				"module": {
 					AgentFunctions: func() []funcapi.FunctionConfig {
@@ -139,6 +143,7 @@ func TestContainedControllerAbortDoesNotWaitForHandlerCleanup(t *testing.T) {
 		context.Background(),
 		1,
 		attempts,
+		nil,
 		collectorapi.Registry{
 			"module": {
 				AgentFunctions: func() []funcapi.FunctionConfig {
@@ -188,7 +193,7 @@ func TestContainedControllerWaitsForPriorEpochModuleRelease(t *testing.T) {
 			},
 		},
 	}
-	first, _, err := NewContainedController(context.Background(), 1, attempts, modules)
+	first, _, err := NewContainedController(context.Background(), 1, attempts, nil, modules)
 	require.NoError(t, err)
 	require.NoError(t, first.AbortConstruction(context.Background()))
 	<-handler.cleanupEntered
@@ -201,7 +206,7 @@ func TestContainedControllerWaitsForPriorEpochModuleRelease(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	go func() {
-		controller, _, buildErr := NewContainedController(ctx, 2, attempts, modules)
+		controller, _, buildErr := NewContainedController(ctx, 2, attempts, nil, modules)
 		secondResult <- controllerResult{controller: controller, err: buildErr}
 	}()
 	select {
@@ -238,14 +243,14 @@ func TestContainedControllerRejectsPriorEpochModuleQuarantine(t *testing.T) {
 			},
 		},
 	}
-	first, _, err := NewContainedController(context.Background(), 1, attempts, modules)
+	first, _, err := NewContainedController(context.Background(), 1, attempts, nil, modules)
 	require.NoError(t, err)
 	require.NoError(t, first.AbortConstruction(context.Background()))
 	require.Eventually(t, func() bool {
 		return attempts.Census() == (containment.Census{Quarantined: 1})
 	}, time.Second, time.Millisecond)
 
-	second, _, err := NewContainedController(context.Background(), 2, attempts, modules)
+	second, _, err := NewContainedController(context.Background(), 2, attempts, nil, modules)
 	require.Nil(t, second)
 	require.ErrorIs(t, err, jobmgr.ErrProcessAttemptQuarantined)
 	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
@@ -264,6 +269,7 @@ func TestContainedControllerCanceledAfterModuleAdmissionCleansAbandonedPlan(t *t
 			ctx,
 			1,
 			attempts,
+			nil,
 			collectorapi.Registry{
 				"module": {
 					AgentFunctions: func() []funcapi.FunctionConfig {

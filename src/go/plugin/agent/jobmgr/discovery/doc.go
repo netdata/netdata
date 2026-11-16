@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package discovery adapts provider, pipeline, decision, and vnode
+// Package discovery adapts provider, pipeline, inventory, and vnode
 // configuration work to Job Manager ports.
 package discovery

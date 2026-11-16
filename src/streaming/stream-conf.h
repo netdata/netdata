@@ -36,7 +36,6 @@ struct _stream_send {
         STRING *destination;
         STRING *ssl_ca_path;
         STRING *ssl_ca_file;
-        bool h2o;
         uint16_t default_port;
         time_t timeout_s;
         time_t reconnect_delay_s;

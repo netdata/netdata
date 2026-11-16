@@ -60,16 +60,16 @@ func TestConfigAttemptsAcceptPubliclyValidNamesAcrossContainmentBoundary(t *test
 					factory,
 					config,
 					kind,
-					func(context.Context, confgroup.Config) ([]byte, error) {
-						return []byte(`{"accepted":true}`), nil
+					func(context.Context, confgroup.Config) configOperationResult {
+						return configOperationResult{payload: []byte(`{"accepted":true}`)}
 					},
 				)
 				require.NoError(t, err)
 				stage.Start()
 				requireConfigOperationReady(t, stage)
-				payload, err := stage.take()
+				result, err := stage.take()
 				require.NoError(t, err)
-				require.JSONEq(t, `{"accepted":true}`, string(payload))
+				require.JSONEq(t, `{"accepted":true}`, string(result.payload))
 				stage.Release()
 			}
 		})
@@ -111,6 +111,7 @@ func TestCandidateAndRuntimeAttemptsAcceptLongPublicJobName(t *testing.T) {
 	resource, err := prepared.AcceptStart(t.Context(), identity.Generation)
 	require.NoError(t, err)
 	generation := resource.(*JobGeneration)
+	require.NoError(t, generation.AwaitReady(t.Context()))
 	require.NoError(t, generation.Publish())
 	require.NoError(t, generation.reserveInstallation())
 	require.NoError(t, generation.acknowledgeInstallation())

@@ -13,6 +13,7 @@ import (
 
 func normalizeBGP(rows []BGPConfig) {
 	for i := range rows {
+		normalizeBGPValue(&rows[i].Identity.ProcessID)
 		normalizeBGPValue(&rows[i].Identity.RoutingInstance)
 		normalizeBGPValue(&rows[i].Identity.Neighbor)
 		normalizeBGPValue(&rows[i].Identity.RemoteAS)
@@ -54,6 +55,7 @@ func validateEnrichBGP(rows []BGPConfig) error {
 		isTable := row.Table.OID != ""
 
 		errs = append(errs, validateEnrichBGPRowShape(i, row))
+		errs = append(errs, validateEnrichBGPValue(fmt.Sprintf("bgp[%d].identity.process_id", i), &row.Identity.ProcessID, isTable))
 		errs = append(
 			errs,
 			validateEnrichBGPValue(
@@ -170,7 +172,7 @@ func validateEnrichBGPRowShape(rowIdx int, row *BGPConfig) error {
 		if !row.Identity.Neighbor.IsSet() {
 			errs = append(errs, fmt.Errorf("bgp[%d].identity.neighbor: peer rows require neighbor identity", rowIdx))
 		}
-		if !row.Identity.RemoteAS.IsSet() {
+		if !row.Identity.RemoteAS.IsSet() && !(row.Identity.ProcessID.IsSet() && row.Identity.RoutingInstance.IsSet()) {
 			errs = append(errs, fmt.Errorf("bgp[%d].identity.remote_as: peer rows require remote_as identity", rowIdx))
 		}
 	case BGPRowKindPeerFamily:
@@ -180,7 +182,7 @@ func validateEnrichBGPRowShape(rowIdx int, row *BGPConfig) error {
 				fmt.Errorf("bgp[%d].identity.neighbor: peer_family rows require neighbor identity", rowIdx),
 			)
 		}
-		if !row.Identity.RemoteAS.IsSet() {
+		if !row.Identity.RemoteAS.IsSet() && !(row.Identity.ProcessID.IsSet() && row.Identity.RoutingInstance.IsSet()) {
 			errs = append(
 				errs,
 				fmt.Errorf("bgp[%d].identity.remote_as: peer_family rows require remote_as identity", rowIdx),
@@ -578,6 +580,7 @@ func collectBGPValueReferences(row BGPConfig) []bgpValueValidationRef {
 			})
 		}
 	}
+	add("identity.process_id", row.Identity.ProcessID)
 	add("identity.routing_instance", row.Identity.RoutingInstance)
 	add("identity.neighbor", row.Identity.Neighbor)
 	add("identity.remote_as", row.Identity.RemoteAS)

@@ -140,6 +140,9 @@ func (c *Collector) Init(context.Context) error {
 
 	cfg, err := mysql.ParseDSN(c.DSN)
 	if err != nil {
+		if c.MyCNF != "" {
+			return errors.New("error on parsing DSN derived from MySQL configuration: invalid DSN")
+		}
 		return fmt.Errorf("error on parsing DSN: %v", err)
 	}
 

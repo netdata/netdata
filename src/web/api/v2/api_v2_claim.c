@@ -245,7 +245,12 @@ static int api_claim(uint8_t version, struct web_client *w, char *url) {
 
     if(can_be_claimed && key) {
         if(!netdata_random_session_id_matches(key)) {
-            netdata_random_session_id_generate(); // generate a new key, to avoid an attack to find it
+            // Do NOT rotate the challenge here. The claim endpoints are unauthenticated,
+            // so rotating on any wrong key lets an unauthenticated client repeatedly
+            // reset the challenge and block an administrator's in-progress claim.
+            // The challenge is a random UUID, so there is no guessing benefit in rotating.
+            // It is still rotated at startup, after a valid key is presented, and on a
+            // successful claim.
             if(version < 3) return claim_txt_response(wb, "invalid key");
             return claim_json_response(wb, CLAIM_RESP_ERROR, "invalid key");
         }

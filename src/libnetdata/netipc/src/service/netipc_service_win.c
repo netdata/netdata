@@ -25,10 +25,9 @@
 #include <string.h>
 #include <windows.h>
 
-#define CLIENT_SHM_ATTACH_RETRY_INTERVAL_MS 5u
-#define CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS 5000u
-#define CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS 5u
-#define CLIENT_CALL_RECONNECT_RETRIES 20u
+#ifdef __MSYS__
+#include <pthread.h>
+#endif
 
 static uint64_t g_win_service_test_fault_state = 0;
 
@@ -95,6 +94,39 @@ static void *service_realloc(void *ptr, size_t size, int fault_site) {
   return realloc(ptr, size);
 }
 
+#ifdef __MSYS__
+/* The MSYS runtime does not support threads started with CreateThread: under
+ * load such a thread may never run and the process dies silently. Threads
+ * start through pthread_create instead, and each one duplicates its own
+ * handle for the creator, so callers keep using CancelSynchronousIo,
+ * WaitForSingleObject and CloseHandle on a real thread handle. */
+typedef struct {
+  unsigned(__stdcall *start_address)(void *);
+  void *arglist;
+  HANDLE started;
+  HANDLE thread;
+  DWORD thread_id;
+} service_win_thread_start_t;
+
+static void *service_win_thread_trampoline(void *p) {
+  service_win_thread_start_t *start = (service_win_thread_start_t *)p;
+  unsigned(__stdcall *start_address)(void *) = start->start_address;
+  void *arglist = start->arglist;
+  HANDLE thread = NULL;
+  if (!DuplicateHandle(GetCurrentProcess(), GetCurrentThread(),
+                       GetCurrentProcess(), &thread, 0, FALSE,
+                       DUPLICATE_SAME_ACCESS))
+    thread = NULL;
+  start->thread = thread;
+  start->thread_id = GetCurrentThreadId();
+  /* start lives on the creator's stack: no access after this. */
+  SetEvent(start->started);
+  if (thread)
+    start_address(arglist);
+  return NULL;
+}
+#endif
+
 uintptr_t
 nipc_service_win_beginthreadex(void *security, unsigned stack_size,
                                unsigned(__stdcall *start_address)(void *),
@@ -105,14 +137,30 @@ nipc_service_win_beginthreadex(void *security, unsigned stack_size,
     return 0;
 #ifdef __MSYS__
   {
-    DWORD thread_id = 0;
-    HANDLE thread =
-        CreateThread((LPSECURITY_ATTRIBUTES)security, (SIZE_T)stack_size,
-                     (LPTHREAD_START_ROUTINE)start_address, arglist,
-                     (DWORD)initflag, &thread_id);
+    /* Callers pass no security attributes, stack size or creation flags. */
+    (void)security;
+    (void)stack_size;
+    (void)initflag;
+    service_win_thread_start_t start = {
+        .start_address = start_address,
+        .arglist = arglist,
+        .started = CreateEventW(NULL, TRUE, FALSE, NULL),
+    };
+    if (!start.started)
+      return 0;
+    pthread_t thread;
+    if (pthread_create(&thread, NULL, service_win_thread_trampoline, &start) !=
+        0) {
+      CloseHandle(start.started);
+      return 0;
+    }
+    pthread_detach(thread);
+    /* A created pthread always runs, so this wait ends. */
+    WaitForSingleObject(start.started, INFINITE);
+    CloseHandle(start.started);
     if (thrdaddr)
-      *thrdaddr = (unsigned)thread_id;
-    return (uintptr_t)thread;
+      *thrdaddr = (unsigned)start.thread_id;
+    return (uintptr_t)start.thread;
   }
 #else
   return _beginthreadex(security, stack_size, start_address, arglist, initflag,

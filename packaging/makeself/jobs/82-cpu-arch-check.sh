@@ -7,7 +7,7 @@
 # shellcheck disable=SC2015
 [ "${GITHUB_ACTIONS}" = "true" ] && echo "::group::Checking Go plugin CPU architecture" || true
 
-check_files="${NETDATA_INSTALL_PATH}/bin/netdata ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/go.d.plugin"
+check_files="${NETDATA_INSTALL_PATH}/bin/netdata ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/go.d.plugin ${NETDATA_INSTALL_PATH}/usr/libexec/netdata/plugins.d/ipmi.plugin"
 
 case "${BUILDARCH}" in
   aarch64)

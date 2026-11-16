@@ -125,7 +125,6 @@ void aggregate_pid_fds_on_targets(struct pid_stat *p) {
                                              "parameter to [plugin:apps] section of netdata.conf", all_files_size);
 
         enable_file_charts = CONFIG_BOOLEAN_NO;
-        obsolete_file_charts = true;
         return;
     }
 

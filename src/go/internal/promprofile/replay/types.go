@@ -67,7 +67,7 @@ type SemanticChartPolicy struct {
 	DeclaredType        string
 	MaxInstances        int
 	MaxDimensions       int
-	ExpireAfterCycles   int
+	ExpireAfterCycles   *int
 	DimensionExpiry     int
 	Dimensions          []SemanticDimensionPolicy
 }
@@ -200,6 +200,9 @@ func CloneSemanticSnapshot(in *SemanticSnapshot) *SemanticSnapshot {
 		out.Profiles[i].Charts = make([]SemanticChartPolicy, len(in.Profiles[i].Charts))
 		for j := range in.Profiles[i].Charts {
 			out.Profiles[i].Charts[j] = in.Profiles[i].Charts[j]
+			if expiry := in.Profiles[i].Charts[j].ExpireAfterCycles; expiry != nil {
+				out.Profiles[i].Charts[j].ExpireAfterCycles = new(*expiry)
+			}
 			out.Profiles[i].Charts[j].Dimensions = append(
 				[]SemanticDimensionPolicy(nil), in.Profiles[i].Charts[j].Dimensions...,
 			)

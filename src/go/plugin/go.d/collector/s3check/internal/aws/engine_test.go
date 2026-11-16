@@ -688,6 +688,9 @@ func TestCleanupStopsAfterActiveRetirementJournalFailure(t *testing.T) {
 }
 
 func TestPublicationUncertaintyPreservesCleanupResultOnLaterCollections(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("directory-sync failure uses Unix directory permissions")
+	}
 	source, destination, model := newAWSClients()
 	engine := newAWSEngineWithOptions(t, source, destination, nil, func(opts *Options) {
 		opts.QueueCapacity = 1
@@ -723,9 +726,15 @@ func TestPublicationUncertaintyPreservesCleanupResultOnLaterCollections(t *testi
 	require.Empty(t, engine.state.ActiveKey)
 	destination.DeleteFunc = originalDelete
 
-	tmpPath := engine.journal.Path() + ".tmp"
-	require.NoError(t, os.Mkdir(tmpPath, 0o700))
-	require.NoError(t, os.WriteFile(filepath.Join(tmpPath, "blocker"), []byte("block"), 0o600))
+	// Allow unlink but deny opening the directory for its subsequent durability sync.
+	// This exercises Clear's real post-publication failure without depending on temp cleanup.
+	root := filepath.Dir(engine.journal.Path())
+	require.NoError(t, os.Chmod(root, 0300))
+	t.Cleanup(func() { require.NoError(t, os.Chmod(root, 0700)) })
+	if file, err := os.Open(root); err == nil {
+		require.NoError(t, file.Close())
+		t.Skip("current process can bypass directory read permissions")
+	}
 
 	publicationFailure := engine.Collect(context.Background())
 	require.ErrorIs(t, publicationFailure.Err, journal.ErrPublicationUncertain)

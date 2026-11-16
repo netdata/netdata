@@ -42,7 +42,7 @@ func TestValidateProfilePassesThroughRealPipeline(t *testing.T) {
 	if result.report.Counts.AuthoredCharts != 4 || result.report.Counts.CuratedCharts != 4 {
 		t.Fatalf("unexpected chart counts: %#v", result.report.Counts)
 	}
-	if result.report.Job.MaxTimeSeries != 2000 || result.report.Job.MaxSeriesPerMetric != 200 {
+	if result.report.Job.MaxInputSeries != 10000 || result.report.Job.MaxOutputSeriesPerContext != 1000 {
 		t.Fatalf("collector defaults were not preserved: %#v", result.report.Job)
 	}
 	if len(result.report.AuthoredMapping) != 4 {
@@ -316,7 +316,7 @@ func TestLoadJobPolicyDecodesSafeFieldsOntoCollectorDefaults(t *testing.T) {
 	if policy.Name != "custom" || !slices.Equal(policy.Selector.Allow, []string{"app_*"}) {
 		t.Fatalf("safe fields were not decoded: %#v", policy)
 	}
-	if policy.MaxTS != 2000 || policy.MaxTSPerMetric != 200 {
+	if policy.MaxInputSeries != 10000 || policy.MaxOutputSeriesPerContext != 1000 {
 		t.Fatalf("collector defaults were not retained: %#v", policy)
 	}
 	if policy.URL != "" {
@@ -760,5 +760,32 @@ relabeling:
 		renamed.RawLogicalSeries != 2 ||
 		renamed.MaterializedLogicalSeries != 1 {
 		t.Fatalf("unexpected partial rename lineage: %#v", renamed)
+	}
+}
+
+func TestLoadJobPolicySeriesLimits(t *testing.T) {
+	for _, job := range []string{
+		"max_input_series: -1\n",
+		"max_output_series_per_context: -1\n",
+		"max_time_series: 100\n",
+		"max_time_series_per_metric: 100\n",
+	} {
+		t.Run(strings.TrimSpace(job), func(t *testing.T) {
+			result := runValidation(t, validProfile, validDump, job)
+			requireFinding(t, result, "job_policy")
+		})
+	}
+	result := runValidation(t, validProfile, validDump, "max_input_series: 0\nmax_output_series_per_context: 0\n")
+	if result.exitCode != 0 || result.report.Job.MaxInputSeries != 0 || result.report.Job.MaxOutputSeriesPerContext != 0 {
+		t.Fatalf("explicit disabled limits were not preserved: %s", result.stdout)
+	}
+}
+
+func TestValidateProfileRejectsWholeInputAboveLimit(t *testing.T) {
+	dump := "# TYPE app_value gauge\napp_value{instance=\"a\"} 1\napp_value{instance=\"b\"} 2\n"
+	result := runValidation(t, singleInstanceValueGaugeProfile, dump, "max_input_series: 1\n")
+	requireFinding(t, result, "collector_check")
+	if len(result.report.Charts) != 0 {
+		t.Fatalf("input rejection published charts: %#v", result.report.Charts)
 	}
 }

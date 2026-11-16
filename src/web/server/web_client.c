@@ -200,6 +200,7 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     w->websocket.protocol = WS_PROTOCOL_DEFAULT;
     w->websocket.client_max_window_bits = 0;
     w->websocket.server_max_window_bits = 0;
+    web_client_flag_clear(w, WEB_CLIENT_FLAG_WEBSOCKET_CLIENT | WEB_CLIENT_FLAG_WEBSOCKET_HANDSHAKE);
 
     // if we had enabled compression, release it
     if(w->response.zinitialized) {
@@ -762,6 +763,24 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     return s;
 }
 
+// Header lines before the malformed one were already dispatched and may have enabled keep-alive; a client that sent
+// a malformed header section gets its 400 and the connection is closed.
+static HTTP_VALIDATION http_request_malformed_header(struct web_client *w) {
+    web_client_disable_keepalive(w);
+    w->header_parse_tries = 0;
+    w->header_parse_last_size = 0;
+    w->header_parse_expected_size = 0;
+    web_client_disable_wait_receive(w);
+    return HTTP_VALIDATION_MALFORMED_HEADER;
+}
+
+// A POST/PUT keeps waiting for its body after the header section is complete, and its header lines are parsed only
+// once the body has arrived. Check their syntax once, when the section completes (the body framing state leaves 0),
+// so a malformed request is rejected without waiting for a body that may never be framed.
+static bool http_request_headers_completed_malformed(struct web_client *w, const char *request, size_t expected_before) {
+    return !expected_before && w->header_parse_expected_size && !http_header_section_is_valid(request);
+}
+
 /**
  * Request validate
  *
@@ -774,6 +793,7 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     char *request = (char *)buffer_tostring(w->response.data), *s = request, *encoded_url = NULL;
 
     size_t last_pos = w->header_parse_last_size;
+    size_t expected_before = w->header_parse_expected_size;
 
     w->header_parse_last_size = buffer_strlen(w->response.data);
 
@@ -798,6 +818,9 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                                                                   &w->payload, &w->header_parse_expected_size);
 
         if(!is_it_valid) {
+            if(http_request_headers_completed_malformed(w, request, expected_before))
+                return http_request_malformed_header(w);
+
             if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
                 netdata_log_info(
                     "Disabling slow client after %zu attempts to read the request (%zu bytes received)",
@@ -829,6 +852,9 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
         return HTTP_VALIDATION_NOT_SUPPORTED;
     } else if (!is_it_valid) {
+        if(http_request_headers_completed_malformed(w, request, expected_before))
+            return http_request_malformed_header(w);
+
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }
@@ -870,15 +896,15 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
                 char c = *ue;
                 *ue = '\0';
-                bool decoded = web_client_decode_path_and_query_string(w, encoded_url);
+                HTTP_VALIDATION decoded = web_client_decode_path_and_query_string(w, encoded_url);
                 *ue = c;
 
-                if(unlikely(!decoded)) {
+                if(unlikely(decoded != HTTP_VALIDATION_OK)) {
                     w->header_parse_tries = 0;
                     w->header_parse_last_size = 0;
                     w->header_parse_expected_size = 0;
                     web_client_disable_wait_receive(w);
-                    return HTTP_VALIDATION_URI_TOO_LONG;
+                    return decoded;
                 }
 
                 if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
@@ -899,7 +925,11 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
             }
 
             // another header line
-            s = http_header_parse_line(w, s);
+            char *line_end = http_header_parse_line(w, s);
+            if(!line_end)
+                return http_request_malformed_header(w);
+
+            s = line_end;
         }
     }
 
@@ -1658,6 +1688,15 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
             w->response.code = HTTP_RESP_BAD_REQUEST;
             break;
+
+        case HTTP_VALIDATION_MALFORMED_HEADER:
+            netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Malformed request header line.", w->id);
+
+            buffer_flush(w->response.data);
+            buffer_strcat(w->response.data, "Malformed request header...\r\n");
+            w->response.code = HTTP_RESP_BAD_REQUEST;
+            break;
+
         case HTTP_VALIDATION_TOO_MANY_READ_RETRIES:
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Too many retries to read request '%s'.", w->id, w->response.data->buffer);
 
@@ -2085,9 +2124,9 @@ static bool web_client_ensure_url_decode_buffer(struct web_client *w, const char
     return true;
 }
 
-bool web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
+HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
     if(unlikely(!web_client_ensure_url_decode_buffer(w, path_and_query_string)))
-        return false;
+        return HTTP_VALIDATION_URI_TOO_LONG;
 
     char *buffer = w->url_decode_buffer;
 
@@ -2106,7 +2145,9 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
 
-        url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size);
+        if(unlikely(!url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size)))
+            return HTTP_VALIDATION_MALFORMED_URL;
+
         buffer_strcat(w->url_query_string_decoded, buffer);
     }
     else {
@@ -2116,7 +2157,8 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size);
+        if(unlikely(!url_decode_r(buffer, path_and_query_string, w->url_decode_buffer_size)))
+            return HTTP_VALIDATION_MALFORMED_URL;
 
         char *question_mark_start = strchr(buffer, '?');
         if (question_mark_start) {
@@ -2145,7 +2187,7 @@ bool web_client_decode_path_and_query_string(struct web_client *w, const char *p
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
 
-    return true;
+    return HTTP_VALIDATION_OK;
 }
 
 void web_client_reuse_from_cache(struct web_client *w) {

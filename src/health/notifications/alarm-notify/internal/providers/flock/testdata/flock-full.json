@@ -1,0 +1,10 @@
+{
+  "sendAs": {"name": "netdata on test-node"},
+  "text": "test-node WARNING: Temperature is high",
+  "attachments": [{
+    "title": "test_alert",
+    "description": "Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z",
+    "color": "#f0ad4e",
+    "url": "https://example.com/alert?id=1&view=chart#details"
+  }]
+}

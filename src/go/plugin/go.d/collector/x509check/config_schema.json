@@ -1,65 +1,80 @@
 {
   "jsonSchema": {
     "$schema": "http://json-schema.org/draft-07/schema#",
-    "title": "X509Check collector configuration.",
+    "title": "X.509 certificate collector configuration.",
     "type": "object",
     "properties": {
-      "update_every": {
-        "title": "Update every",
-        "description": "Data collection interval, measured in seconds.",
-        "type": "integer",
-        "minimum": 1,
-        "default": 1
-      },
       "source": {
         "title": "Certificate source",
-        "description": "The source of the certificate. Allowed schemes: https, tcp, tcp4, tcp6, udp, udp4, udp6, file, smtp.",
+        "description": "Where to read the certificate, as a URL: `https`, `tcp`, `tcp4` or `tcp6` for a TLS server, `smtp` for an SMTP server with STARTTLS, `file` for a local PEM file.",
         "type": "string"
       },
       "timeout": {
         "title": "Timeout",
-        "description": "The timeout in seconds for the certificate retrieval.",
+        "description": "Certificate retrieval timeout, in seconds. Covers the connection, the SMTP exchange and the TLS handshake.",
         "type": "number",
         "minimum": 0.5,
-        "default": 1
+        "default": 2
       },
-      "check_full_chain": {
-        "title": "Full chain",
-        "description": "Monitor expiration time for all certificates in the SSL/TLS chain, including intermediate and root certificates.",
-        "type": "boolean"
-      },
-      "check_revocation_status": {
-        "title": "Revocation status",
-        "description": "Whether to check the revocation status of the certificate.",
-        "type": "boolean"
-      },
-      "vnode": {
-        "title": "Vnode",
-        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+      "tls_server_name": {
+        "title": "TLS server name",
+        "description": "Host name sent to the server (SNI) and checked against the certificate, instead of the host in `source`. Leave empty to use the host in `source`.",
         "type": "string"
       },
       "tls_skip_verify": {
         "title": "Skip TLS verification",
-        "description": "If set, TLS certificate verification will be skipped.",
-        "type": "boolean"
+        "description": "Skip TLS certificate and hostname verification, so certificates that are self-signed, expired or issued for another name are still read.",
+        "type": "boolean",
+        "default": false
       },
       "tls_ca": {
         "title": "TLS CA",
-        "description": "The path to the CA certificate file for TLS verification.",
+        "description": "Path to a CA bundle used to verify the server certificate. Leave empty to use the system trust store.",
         "type": "string",
         "pattern": "^$|^/"
       },
       "tls_cert": {
-        "title": "TLS certificate",
-        "description": "The path to the client certificate file for TLS authentication.",
+        "title": "TLS client certificate",
+        "description": "Path to a client certificate file for mutual TLS. Requires a client key.",
         "type": "string",
         "pattern": "^$|^/"
       },
       "tls_key": {
-        "title": "TLS key",
-        "description": "The path to the client key file for TLS authentication.",
+        "title": "TLS client key",
+        "description": "Path to the client key file for mutual TLS. Requires a client certificate.",
         "type": "string",
         "pattern": "^$|^/"
+      },
+      "check_full_chain": {
+        "title": "Check full chain",
+        "description": "Report the expiration time of every certificate the server sends, such as intermediates, not only the server certificate.",
+        "type": "boolean",
+        "default": false
+      },
+      "check_revocation_status": {
+        "title": "Check revocation status",
+        "description": "Check whether the server certificate has been revoked, using the CRL and OCSP endpoints listed in it.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
       }
     },
     "required": [
@@ -67,37 +82,59 @@
     ]
   },
   "uiSchema": {
-    "vnode": {
-      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
-    },
     "source": {
       "ui:placeholder": "https://example.com:443",
-      "ui:help": " Website: `https://domainName:443`. Local file: `file:///path/to/cert.pem`. SMTP: `smtp://smtp.example.com:587`."
+      "ui:help": "Network sources need a port.\n\n- Website: `https://example.com:443`\n- Other TLS service, such as LDAPS or SMTPS: `tcp://ldap.example.com:636`\n- SMTP with STARTTLS: `smtp://smtp.example.com:587`\n- Local file: `file:///etc/ssl/certs/example.com.pem`"
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
+    },
+    "tls_server_name": {
+      "ui:placeholder": "www.example.com",
+      "ui:help": "The connection still goes to the host and port in `source`. For example, with `source` set to `https://127.0.0.1:443` on a server that hosts several sites, enter the name of the site to check.\n\nOnly this value decides whether SNI is sent: an IP address entered here sends no SNI and is checked against the IP addresses in the certificate, while a host name is sent even when `source` is an IP address. Not available for `file://` sources."
+    },
+    "vnode": {
+      "ui:placeholder": "my-vnode",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define the Virtual Node in `vnodes.conf` first, then enter its name here."
     },
     "ui:flavour": "tabs",
     "ui:options": {
       "tabs": [
         {
-          "title": "Base",
+          "title": "Target",
           "fields": [
-            "update_every",
             "source",
-            "timeout",
-            "check_full_chain",
-            "check_revocation_status",
-            "vnode"
+            "timeout"
           ]
         },
         {
           "title": "TLS",
           "fields": [
+            "tls_server_name",
             "tls_skip_verify",
             "tls_ca",
             "tls_cert",
             "tls_key"
+          ]
+        },
+        {
+          "title": "Checks",
+          "fields": [
+            "check_full_chain",
+            "check_revocation_status"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
           ]
         }
       ]

@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - windows
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -41,7 +41,10 @@ All running Windows services are automatically discovered. No configuration is n
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+- **Idle Windows services disappear after 1 hour:** the charts of a Windows service with no processes for `retire-targets-after` seconds (default 3600) are removed.
+- **At most 500 Windows services:** up to `max-targets` (default 500) Windows services get their own charts. Beyond that, new ones are aggregated into `service.other_*`, and an info message is logged once.
+- Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
+
 
 #### Performance Impact
 

@@ -1,0 +1,12 @@
+update_every: 2
+autodetection_retry: 5
+listeners:
+  - protocol: udp
+    address: 127.0.0.1:18125
+  - protocol: both
+    address: 127.0.0.1:18126
+profiles:
+  - app
+max_series: 15
+metric_idle_timeout: 0s
+max_tcp_connections: 3

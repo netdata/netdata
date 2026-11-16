@@ -20,7 +20,13 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 	var requestCount int
 	var errCount int
 	for _, siteID := range order {
+		site := sites[siteID]
+		if site == nil {
+			continue
+		}
+		site.BGPCollection = "unavailable"
 		if c.isNoBGPCached(siteID, now) {
+			site.BGPCollection = "empty_cached"
 			continue
 		}
 
@@ -33,6 +39,10 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 		}
 
 		peers, issues := normalizeBGP(raw)
+		site.BGPCollection = "observed"
+		if len(issues) > 0 {
+			site.BGPCollection = "partial"
+		}
 		for _, issue := range issues {
 			c.logNormalizationIssue(normalizationSurfaceBGP, issue)
 		}
@@ -41,6 +51,7 @@ func (c *Collector) collectBGP(ctx context.Context, sites map[string]*siteState,
 			if len(issues) > 0 {
 				continue
 			}
+			site.BGPCollection = "empty"
 			c.bgp.noBGPUntil[siteID] = c.noBGPCacheUntil(siteID, now)
 			continue
 		}

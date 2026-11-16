@@ -28,7 +28,7 @@ Monitor Applications for optimal software performance and resource usage.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -39,7 +39,10 @@ This integration doesn't support auto-detection.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+- **Idle process groups disappear after 1 hour:** the charts of a process group with no processes for `retire-targets-after` seconds (default 3600) are removed. Groups defined in `apps_groups.conf` are never removed and do not count against the limit.
+- **At most 500 process groups:** up to `max-targets` (default 500) process groups get their own charts. Beyond that, new ones are aggregated into `app.other_*`, and an info message is logged once.
+- Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
+
 
 #### Performance Impact
 
@@ -73,7 +76,12 @@ There are no configuration examples.
 
 ## Alerts
 
-There are no alerts configured by default for this integration.
+
+The following alerts are available:
+
+| Alert name  | On metric | Description |
+|:------------|:----------|:------------|
+| [ apps_group_file_descriptors_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/file_descriptors.conf) | app.fds_open_limit | Open files percentage against the processes limits, among all PIDs in application group |
 
 
 
@@ -116,6 +124,10 @@ Metrics:
 | app.ebpf_dc_reference | Count file access. | files | files |
 | app.ebpf_dc_not_cache | Files not present inside directory cache. | files | files |
 | app.ebpf_dc_not_found | Files not found. | files | files |
+| app.ebpf_file_open | Number of open files | calls | calls/s |
+| app.ebpf_file_open_error | Fails to open files. | calls | calls/s |
+| app.ebpf_file_closed | Files closed. | calls | calls/s |
+| app.ebpf_file_close_error | Fails to close files. | calls | calls/s |
 | app.swap_usage | Apps swap usage | swap | MiB |
 | app.disk_physical_io | Apps disk physical IO | reads, writes | KiB/s |
 | app.disk_logical_io | Apps disk logical IO | reads, writes | KiB/s |

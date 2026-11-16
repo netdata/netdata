@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"context"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,94 +15,94 @@ import (
 )
 
 func TestNew(t *testing.T) {
-	_, err := New(web.ClientConfig{}, web.RequestConfig{})
+	_, err := New(context.Background(), web.ClientConfig{}, web.RequestConfig{})
 	assert.NoError(t, err)
 }
 
 func TestClient_Login(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	assert.NoError(t, client.Login())
+	assert.NoError(t, client.Login(context.Background()))
 	assert.Equal(t, testToken, client.token.get())
 }
 
 func TestClient_Logout(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	require.NoError(t, client.Login())
+	require.NoError(t, client.Login(context.Background()))
 
-	assert.NoError(t, client.Logout())
+	assert.NoError(t, client.Logout(context.Background()))
 	assert.False(t, client.token.isSet())
 
 }
 
 func TestClient_LoggedIn(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
 	assert.False(t, client.LoggedIn())
-	assert.NoError(t, client.Login())
+	assert.NoError(t, client.Login(context.Background()))
 	assert.True(t, client.LoggedIn())
 }
 
 func TestClient_APIVersion(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	err := client.Login()
+	err := client.Login(context.Background())
 	require.NoError(t, err)
 
-	version, err := client.APIVersion()
+	version, err := client.APIVersion(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, Version{Major: 2, Minor: 5}, version)
 }
 
 func TestClient_Instances(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	err := client.Login()
+	err := client.Login(context.Background())
 	require.NoError(t, err)
 
-	instances, err := client.Instances()
+	instances, err := client.Instances(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testInstances, instances)
 }
 
 func TestClient_Instances_RetryOnExpiredToken(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	instances, err := client.Instances()
+	instances, err := client.Instances(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testInstances, instances)
 }
 
 func TestClient_SelectedStatistics(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	err := client.Login()
+	err := client.Login(context.Background())
 	require.NoError(t, err)
 
-	stats, err := client.SelectedStatistics(SelectedStatisticsQuery{})
+	stats, err := client.SelectedStatistics(context.Background(), SelectedStatisticsQuery{})
 	assert.NoError(t, err)
 	assert.Equal(t, testStatistics, stats)
 }
 
 func TestClient_SelectedStatistics_RetryOnExpiredToken(t *testing.T) {
-	srv, client := prepareSrvClient(t)
+	srv, client := prepareSrvClient(context.Background(), t)
 	defer srv.Close()
 
-	stats, err := client.SelectedStatistics(SelectedStatisticsQuery{})
+	stats, err := client.SelectedStatistics(context.Background(), SelectedStatisticsQuery{})
 	assert.Equal(t, testStatistics, stats)
 	assert.NoError(t, err)
 	assert.Equal(t, testStatistics, stats)
 }
 
-func prepareSrvClient(t *testing.T) (*httptest.Server, *Client) {
+func prepareSrvClient(ctx context.Context, t *testing.T) (*httptest.Server, *Client) {
 	t.Helper()
 	srv := httptest.NewServer(MockScaleIOAPIServer{
 		User:       testUser,
@@ -110,7 +112,7 @@ func prepareSrvClient(t *testing.T) (*httptest.Server, *Client) {
 		Instances:  testInstances,
 		Statistics: testStatistics,
 	})
-	client, err := New(web.ClientConfig{}, web.RequestConfig{
+	client, err := New(ctx, web.ClientConfig{}, web.RequestConfig{
 		URL:      srv.URL,
 		Username: testUser,
 		Password: testPassword,

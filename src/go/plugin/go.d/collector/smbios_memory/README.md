@@ -1,0 +1,1 @@
+integrations/smbios_memory.md

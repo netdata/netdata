@@ -42,6 +42,9 @@ func cloneLifecycle(in *Lifecycle) *Lifecycle {
 		return nil
 	}
 	out := *in
+	if in.ExpireAfterCycles != nil {
+		out.ExpireAfterCycles = new(*in.ExpireAfterCycles)
+	}
 	if in.Dimensions != nil {
 		dims := *in.Dimensions
 		out.Dimensions = &dims

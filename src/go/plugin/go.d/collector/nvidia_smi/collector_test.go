@@ -450,6 +450,8 @@ type mockNvidiaSmi struct {
 	errOnQueryGPUInfo bool
 }
 
+func (m *mockNvidiaSmi) start(context.Context) error { return nil }
+
 func (m *mockNvidiaSmi) queryGPUInfo() ([]byte, error) {
 	if m.errOnQueryGPUInfo {
 		return nil, errors.New("error on mock.queryGPUInfo()")

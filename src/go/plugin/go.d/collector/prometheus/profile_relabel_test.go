@@ -18,9 +18,9 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/promprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 )
 
 func TestCollector_ProfileRelabelingAppliesAutomatically(t *testing.T) {
@@ -566,10 +566,10 @@ app_keep 1
 app_drop 2
 `, "app")
 	defer srv.Close()
-	collr.MaxTS = 1
+	collr.MaxInputSeries = 1
 	require.NoError(t, collr.Init(context.Background()))
 
-	require.NoError(t, collr.Check(context.Background()), "the final one-series output must satisfy MaxTS")
+	require.NoError(t, collr.Check(context.Background()), "the final one-series output must satisfy MaxInputSeries")
 	collectProfileRelabelOnce(t, collr)
 	got := collr.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten())
 	assert.InDelta(t, 1, value(t, got, "app_keep", nil), 1e-9)
@@ -800,7 +800,7 @@ type countingPrometheus struct {
 	sampleCalls int
 }
 
-func (p *countingPrometheus) ScrapeSeries() (prompkg.Series, error) { return nil, nil }
+func (p *countingPrometheus) ScrapeSeries(context.Context) (prompkg.Series, error) { return nil, nil }
 
 func (p *countingPrometheus) Scrape() (prompkg.MetricFamilies, error) {
 	return p.ScrapeContext(context.Background())

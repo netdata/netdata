@@ -462,7 +462,7 @@ func TestConfigSchemaJSON(t *testing.T) {
 	assert.ElementsMatch(t, []any{"array", "null"}, rules["type"])
 	_, ok = rules["minItems"]
 	assert.False(t, ok)
-	assert.Len(t, engineAutogenProps, 4)
+	assert.Len(t, engineAutogenProps, 5)
 
 	chart, ok := defs["chart"].(map[string]any)
 	require.True(t, ok)

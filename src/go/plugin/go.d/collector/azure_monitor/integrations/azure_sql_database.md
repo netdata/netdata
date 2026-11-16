@@ -44,7 +44,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -168,6 +168,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -186,7 +199,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -378,7 +391,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -633,25 +646,25 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | SQL Database availability on ${label:resource_name} |
-| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | SQL Database CPU on ${label:resource_name} |
-| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL Database instance CPU on ${label:resource_name} |
-| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL Database instance memory on ${label:resource_name} |
-| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | SQL Database DTU consumption on ${label:resource_name} |
-| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database data I/O on ${label:resource_name} |
-| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | SQL Database log write I/O on ${label:resource_name} |
-| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database worker utilization on ${label:resource_name} |
-| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | SQL Database session utilization on ${label:resource_name} |
-| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database system connection failures on ${label:resource_name} |
-| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | SQL Database firewall blocks on ${label:resource_name} |
-| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | SQL Database deadlocks on ${label:resource_name} |
-| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | SQL Database storage utilization on ${label:resource_name} |
-| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | SQL Database In-Memory OLTP storage on ${label:resource_name} |
-| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | SQL Database tempdb log utilization on ${label:resource_name} |
-| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | SQL Database replication lag on ${label:resource_name} |
-| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless CPU on ${label:resource_name} |
-| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | SQL Database serverless memory on ${label:resource_name} |
-| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | SQL Database ledger digest failures on ${label:resource_name} |
+| [ am_sql_database_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.availability | Database availability of Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.cpu | Average CPU utilization of Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_instance_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_cpu | SQL process CPU utilization (including background tasks) on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_instance_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.instance_memory | SQL process memory utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_dtu_consumption ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.dtu_consumption | DTU consumption on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for DTU-based service tiers |
+| [ am_sql_database_data_io ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | Physical data read I/O utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_log_write ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.io_utilization | Transaction log write I/O utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_workers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | Worker thread utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting workers causes query failures |
+| [ am_sql_database_sessions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.resource_utilization | Session utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting sessions prevents new connections |
+| [ am_sql_database_connection_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | Rate of system-caused connection failures on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_firewall_blocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.connections | Rate of connections blocked by firewall on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). May indicate misconfigured firewall rules or unauthorized access attempts |
+| [ am_sql_database_deadlocks ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.deadlocks | Deadlock rate on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_storage_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.storage_utilization | Data storage utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_sql_database_xtp_storage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.xtp_storage | In-Memory OLTP storage utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when In-Memory OLTP is enabled |
+| [ am_sql_database_tempdb_log_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.tempdb_log_utilization | Tempdb transaction log utilization on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization may indicate long-running transactions or excessive version store usage |
+| [ am_sql_database_replication_lag ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.replication_lag | Geo-replication lag on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when geo-replication is configured |
+| [ am_sql_database_serverless_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | App-level CPU utilization on serverless Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for serverless tier databases |
+| [ am_sql_database_serverless_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.serverless_utilization | App-level memory utilization on serverless Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant for serverless tier databases |
+| [ am_sql_database_ledger_digest_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_sql_database.conf) | azure_monitor.sql_database.ledger_digest | Failed ledger digest uploads on Azure SQL Database ${label:resource_name} in ${label:resource_group} (${label:region}). Only relevant when database ledger is enabled |
 
 
 

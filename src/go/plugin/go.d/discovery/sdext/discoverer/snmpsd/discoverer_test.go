@@ -283,6 +283,7 @@ func prepareNewTarget(sub subnet, ip string) *target {
 			PDUCount:        5,
 			SeenSysDescr:    true,
 			SeenSysObjectID: true,
+			SysObjectIDType: "ObjectIdentifier",
 			SeenSysContact:  true,
 			SeenSysName:     true,
 			SeenSysLocation: true,

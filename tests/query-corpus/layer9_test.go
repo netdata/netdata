@@ -398,6 +398,18 @@ func TestLayer9V2V3Parity(t *testing.T) {
 		delete(doc, "agents")
 		delete(doc, "timings")
 		delete(doc, "api") // 2 vs 3 by definition — the rest must match
+		// per-node query time is wall-clock, like timings
+		if summary, ok := doc["summary"].(map[string]any); ok {
+			if nodes, ok := summary["nodes"].([]any); ok {
+				for _, n := range nodes {
+					if node, ok := n.(map[string]any); ok {
+						if st, ok := node["st"].(map[string]any); ok {
+							delete(st, "ms")
+						}
+					}
+				}
+			}
+		}
 		return doc
 	}
 

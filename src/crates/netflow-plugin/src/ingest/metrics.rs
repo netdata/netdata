@@ -398,10 +398,11 @@ fn insert_snapshot_stat(stats: &mut HashMap<String, u64>, key: &'static str, val
 }
 
 impl IngestMetrics {
-    /// Mirror one tier's slot telemetry, called by the tick once per second.
-    /// `last_commit_usec == 0` means no claim has completed yet (workers not
-    /// spawned, or the first anniversary is still ahead): report age 0, not
-    /// the distance to the epoch.
+    /// Mirror one tier's slot telemetry, called by the tick once per
+    /// `listener.sync_interval` (1s by default). `last_commit_usec == 0`
+    /// means no claim has completed yet (workers not spawned, or the first
+    /// anniversary is still ahead): report age 0, not the distance to the
+    /// epoch.
     pub(super) fn store_tier_commit_telemetry(
         &self,
         tier: TierKind,

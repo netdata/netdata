@@ -4,7 +4,7 @@
 
 #define PLUGIN_DISKSPACE_NAME "diskspace.plugin"
 
-#define DEFAULT_EXCLUDED_PATHS "/dev /dev/shm /proc/* /sys/* /var/run/user/* /run/lock /run/user/* /snap/* /var/lib/docker/* /var/lib/containers/storage/* /run/credentials/* /run/containerd/*  /rpool /rpool/*"
+#define DEFAULT_EXCLUDED_PATHS "/dev /dev/shm /proc/* /sys/* /var/run/user/* /run/lock /run/user/* /snap/* /var/lib/docker/* /var/lib/containers/storage/* /run/credentials/* /run/containerd/* /rpool /rpool/*"
 #define DEFAULT_EXCLUDED_FILESYSTEMS "*gvfs *gluster* *s3fs *ipfs *davfs2 *httpfs *sshfs *gdfs *moosefs fusectl autofs cgroup cgroup2 hugetlbfs devtmpfs fuse.lxcfs"
 #define DEFAULT_EXCLUDED_FILESYSTEMS_INODES "msdosfs msdos vfat overlayfs aufs* *unionfs"
 #define CONFIG_SECTION_DISKSPACE "plugin:proc:diskspace"
@@ -285,7 +285,7 @@ static void calculate_values_and_show_charts(
     if(m->do_inodes == CONFIG_BOOLEAN_AUTO && favail == (fsfilcnt_t)-1) {
         // this file system does not support inodes reporting
         // eg. cephfs
-        m->do_inodes = CONFIG_BOOLEAN_NO;
+        __atomic_store_n(&m->do_inodes, CONFIG_BOOLEAN_NO, __ATOMIC_RELAXED);
     }
 
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -297,7 +297,7 @@ static void calculate_values_and_show_charts(
 
     if (m->do_space == CONFIG_BOOLEAN_YES || m->do_space == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_space) || m->st_space->update_every != update_every) {
-            m->do_space = CONFIG_BOOLEAN_YES;
+            __atomic_store_n(&m->do_space, CONFIG_BOOLEAN_YES, __ATOMIC_RELAXED);
             m->st_space = rrdset_find_active_bytype_localhost("disk_space", disk);
             if(unlikely(!m->st_space || m->st_space->update_every != update_every)) {
                 char title[4096 + 1];
@@ -335,7 +335,7 @@ static void calculate_values_and_show_charts(
 
     if (m->do_inodes == CONFIG_BOOLEAN_YES || m->do_inodes == CONFIG_BOOLEAN_AUTO) {
         if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
-            m->do_inodes = CONFIG_BOOLEAN_YES;
+            __atomic_store_n(&m->do_inodes, CONFIG_BOOLEAN_YES, __ATOMIC_RELAXED);
             m->st_inodes = rrdset_find_active_bytype_localhost("disk_inodes", disk);
             if(unlikely(!m->st_inodes) || m->st_inodes->update_every != update_every) {
                 char title[4096 + 1];
@@ -438,20 +438,33 @@ static void zfs_cache_pool_capacity(const char *filesystem, const char *mount_so
     dictionary_set(zfs_cache, mount_source, &new_entry, sizeof(new_entry));
 }
 
-// Check if a ZFS dataset has a cached exclusion decision that's still valid
-// Returns: true if cached as excluded (skip statvfs), false otherwise
-static bool zfs_dataset_cached_excluded(const char *filesystem, const char *mount_point, const char *mount_source) {
-    // Quick checks that don't need cache
+// A ZFS dataset the exclusion rules apply to: not a pool (datasets have '/' in mount_source),
+// not the root mount, and not inside an LXC container (it sees virtualized mounts)
+static bool zfs_is_excludable_dataset(const char *filesystem, const char *mount_point, const char *mount_source) {
     if (!filesystem || strcmp(filesystem, "zfs") != 0)
         return false;
-    if (!zfs_datasets_heuristic || !zfs_cache)
-        return false;
-    if (zfs_inside_lxc_container)
-        return false;
+
     if (mount_point && strcmp(mount_point, "/") == 0)
         return false;
-    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
-        return false;  // not a dataset
+
+    if (zfs_inside_lxc_container)
+        return false;
+
+    return mount_source && mount_source[0] && strchr(mount_source, '/');
+}
+
+// Check if a ZFS dataset is known to be excluded before statvfs(): by path when the heuristic is disabled,
+// or by a cached exclusion decision that is still valid
+// Returns: true if excluded (skip statvfs), false otherwise
+static bool zfs_dataset_excluded_before_statvfs(const char *filesystem, const char *mount_point, const char *mount_source) {
+    if (!zfs_is_excludable_dataset(filesystem, mount_point, mount_source))
+        return false;
+
+    if (!zfs_datasets_heuristic)
+        return excluded_zfs_datasets_pattern && simple_pattern_matches(excluded_zfs_datasets_pattern, mount_point);
+
+    if (!zfs_cache)
+        return false;
 
     const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(zfs_cache, mount_source);
     if (!item)
@@ -473,21 +486,8 @@ static bool zfs_dataset_cached_excluded(const char *filesystem, const char *moun
 // Determine if a ZFS mount should be excluded and cache the decision
 // Returns: true if should exclude, false if should keep
 static bool should_exclude_zfs(const char *filesystem, const char *mount_point, const char *mount_source, struct statvfs *buff) {
-    // 1. Not ZFS → keep
-    if (!filesystem || strcmp(filesystem, "zfs") != 0)
-        return false;
-
-    // 2. Root mount → always keep
-    if (mount_point && strcmp(mount_point, "/") == 0)
-        return false;
-
-    // 3. Inside LXC container → keep all (container sees virtualized mounts)
-    if (zfs_inside_lxc_container)
-        return false;
-
-    // 4. Not a dataset (it's a pool) → keep
-    // Dataset = has '/' in mount_source, Pool = no '/'
-    if (!mount_source || !mount_source[0] || !strchr(mount_source, '/'))
+    // 1-4. Not ZFS, root mount, inside LXC, or a pool → keep
+    if (!zfs_is_excludable_dataset(filesystem, mount_point, mount_source))
         return false;
 
     // 5. Heuristic disabled → use pattern matching (default "!*" excludes nothing)
@@ -548,8 +548,33 @@ static bool should_exclude_zfs(const char *filesystem, const char *mount_point, 
     return excluded;
 }
 
-static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
+// the filesystems (major:minor) collected in the current iteration
+static Pvoid_t collected_devs_judyl = NULL;
+
+static inline Word_t collected_devs_key(unsigned long major, unsigned long minor) {
+    // major and minor are 12 and 20 bits in the kernel's dev_t
+    return (Word_t)((major << 20) | (minor & 0xFFFFF));
+}
+
+static inline bool collected_devs_contains(unsigned long major, unsigned long minor) {
+    return JudyLGet(collected_devs_judyl, collected_devs_key(major, minor), PJE0) != NULL;
+}
+
+static inline void collected_devs_add(unsigned long major, unsigned long minor) {
+    Pvoid_t *PValue = JudyLIns(&collected_devs_judyl, collected_devs_key(major, minor), PJE0);
+    if(PValue && PValue != PJERR)
+        *PValue = (void *)1;
+}
+
+static inline void collected_devs_reset(void) {
+    (void)JudyLFreeArray(&collected_devs_judyl, PJE0);
+}
+
+// returns true when the mount point is collected (or handed to the slow thread),
+// false when configuration, read-only state or the ZFS heuristics skip it
+static inline bool do_disk_space_stats(struct mountinfo *mi, int update_every) {
     const char *disk = mi->persistent_id;
+    bool collected = false;
 
     usec_t slow_timeout = MAX_STAT_USEC * update_every;
 
@@ -584,24 +609,30 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
             usec_t start_time = now_monotonic_high_precision_usec();
             struct stat bs;
 
+            // a bind mount is only a fallback for a filesystem without a chart, and many are files that never get
+            // one (each container network namespace is an nsfs bind), so it is skipped without an error
+            bool log_errors = !(mi->flags & MOUNTINFO_IS_BIND);
+
             if(stat(mi->mount_point_stat_path, &bs) == -1) {
-                collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
-                               , mi->mount_point_stat_path
-                               , disk
-                               , mi->filesystem?mi->filesystem:""
-                               , mi->root?mi->root:""
-                               );
-                def_space = CONFIG_BOOLEAN_NO;
-                def_inodes = CONFIG_BOOLEAN_NO;
-            }
-            else {
-                if((bs.st_mode & S_IFMT) != S_IFDIR) {
-                    collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                if(log_errors)
+                    collector_error("DISKSPACE: Cannot stat() mount point '%s' (disk '%s', filesystem '%s', root '%s')."
                                    , mi->mount_point_stat_path
                                    , disk
                                    , mi->filesystem?mi->filesystem:""
                                    , mi->root?mi->root:""
                                    );
+                def_space = CONFIG_BOOLEAN_NO;
+                def_inodes = CONFIG_BOOLEAN_NO;
+            }
+            else {
+                if((bs.st_mode & S_IFMT) != S_IFDIR) {
+                    if(log_errors)
+                        collector_error("DISKSPACE: Mount point '%s' (disk '%s', filesystem '%s', root '%s') is not a directory."
+                                       , mi->mount_point_stat_path
+                                       , disk
+                                       , mi->filesystem?mi->filesystem:""
+                                       , mi->root?mi->root:""
+                                       );
                     def_space = CONFIG_BOOLEAN_NO;
                     def_inodes = CONFIG_BOOLEAN_NO;
                 }
@@ -663,29 +694,41 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     }
 
     struct mount_point_metadata *m = dictionary_acquired_item_value(item);
+
+    // the slow thread updates these on slow mount points while we read them
+    do_space = __atomic_load_n(&m->do_space, __ATOMIC_RELAXED);
+    do_inodes = __atomic_load_n(&m->do_inodes, __ATOMIC_RELAXED);
+
+    // A slow mount point counts as collected exactly when the slow thread charts it, so it is skipped only by the
+    // gates the slow thread applies too. The read-only gate is not one of them: the slow thread charts read-only
+    // mount points, and m->collected of a slow mount point belongs to the slow thread.
+    bool skip =
+        (do_space == CONFIG_BOOLEAN_NO && do_inodes == CONFIG_BOOLEAN_NO) ||
+
+        (!m->slow &&
+         mi->flags & MOUNTINFO_READONLY &&
+         !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
+         !m->collected &&
+         do_space != CONFIG_BOOLEAN_YES &&
+         do_inodes != CONFIG_BOOLEAN_YES) ||
+
+        // Check if this ZFS dataset is excluded by path or by a cached decision (skip statvfs entirely)
+        zfs_dataset_excluded_before_statvfs(mi->filesystem, mi->mount_point, mi->mount_source);
+
     if (m->slow) {
+        // the slow thread keeps its mount points alive, even the ones it does not collect
         add_basic_mountinfo(&slow_mountinfo_tmp_root, mi);
+        collected = !skip;
         goto cleanup;
     }
 
     m->updated = true;
 
-    if(unlikely(m->do_space == CONFIG_BOOLEAN_NO && m->do_inodes == CONFIG_BOOLEAN_NO)) {
+    if (unlikely(skip))
         goto cleanup;
-    }
 
-    if (unlikely(
-            mi->flags & MOUNTINFO_READONLY &&
-            !(mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST) &&
-            !m->collected &&
-            m->do_space != CONFIG_BOOLEAN_YES &&
-            m->do_inodes != CONFIG_BOOLEAN_YES)) {
-        goto cleanup;
-    }
-
-    // Check if this ZFS dataset has a cached exclusion decision (skip statvfs entirely)
-    if (zfs_dataset_cached_excluded(mi->filesystem, mi->mount_point, mi->mount_source))
-        goto cleanup;
+    // from here on the mount point is collected, even when statvfs() fails this time
+    collected = true;
 
     usec_t start_time = now_monotonic_high_precision_usec();
     struct statvfs buff_statvfs;
@@ -710,8 +753,10 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
     zfs_cache_pool_capacity(mi->filesystem, mi->mount_source, &buff_statvfs);
 
     // Check if this ZFS mount should be excluded (capacity-based heuristic)
-    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs))
+    if (should_exclude_zfs(mi->filesystem, mi->mount_point, mi->mount_source, &buff_statvfs)) {
+        collected = false;
         goto cleanup;
+    }
 
     m->shown_error = false;
 
@@ -725,6 +770,7 @@ static inline void do_disk_space_stats(struct mountinfo *mi, int update_every) {
 
 cleanup:
     dictionary_acquired_item_release(dict_mountpoints, item);
+    return collected;
 }
 
 static inline void do_slow_disk_space_stats(struct basic_mountinfo *mi, int update_every) {
@@ -861,6 +907,8 @@ static void diskspace_main_cleanup(void *ptr) {
     // Free the mountpoints dictionary
     dictionary_destroy(dict_mountpoints);
     dict_mountpoints = NULL;
+
+    collected_devs_reset();
 
     simple_pattern_free(excluded_mountpoints);
     excluded_mountpoints = NULL;
@@ -1186,19 +1234,34 @@ void diskspace_main(void *ptr) {
         free_basic_mountinfo_list(slow_mountinfo_tmp_root);
         slow_mountinfo_tmp_root = NULL;
 
-        struct mountinfo *mi;
-        for(mi = disk_mountinfo_root; mi; mi = mi->next) {
-            if(unlikely(mi->flags & (MOUNTINFO_IS_DUMMY | MOUNTINFO_IS_BIND)))
-                continue;
+        // A filesystem mounted more than once is charted once: mountinfo keeps one of its mounts and marks the
+        // others as BIND. The kept one is collected first; a BIND mount is collected only when no mount of
+        // its filesystem has been collected, e.g. because the kept one is excluded by path or disabled.
+        collected_devs_reset();
 
-            // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
-            // https://github.com/netdata/netdata/issues/11498#issuecomment-950982878
-            if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
-                continue;
+        for(int pass = 0; pass < 2 && service_running(SERVICE_COLLECTORS); pass++) {
+            for(struct mountinfo *mi = disk_mountinfo_root; mi; mi = mi->next) {
+                if(unlikely(mi->flags & MOUNTINFO_IS_DUMMY))
+                    continue;
 
-            worker_is_busy(WORKER_JOB_MOUNTPOINT);
-            do_disk_space_stats(mi, update_every);
-            if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+                bool is_bind = (mi->flags & MOUNTINFO_IS_BIND);
+                if(is_bind != (pass == 1))
+                    continue;
+
+                // exclude mounts made by ProtectHome and ProtectSystem systemd hardening options
+                // https://github.com/netdata/netdata/issues/11498#issuecomment-950982878
+                if(mi->flags & MOUNTINFO_READONLY && mi->flags & MOUNTINFO_IS_IN_SYSD_PROTECTED_LIST && !strcmp(mi->root, mi->mount_point))
+                    continue;
+
+                if(is_bind && collected_devs_contains(mi->major, mi->minor))
+                    continue;
+
+                worker_is_busy(WORKER_JOB_MOUNTPOINT);
+                if(do_disk_space_stats(mi, update_every))
+                    collected_devs_add(mi->major, mi->minor);
+
+                if(unlikely(!service_running(SERVICE_COLLECTORS))) break;
+            }
         }
         netdata_mutex_unlock(&slow_mountinfo_mutex);
 

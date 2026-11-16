@@ -46,7 +46,7 @@ type jobV1ChartChange struct {
 	typeID, id                string
 	pruneDims                 bool
 	definition                *netdataapi.ChartOpts
-	global, obsolete          bool
+	obsolete                  bool
 }
 
 func (change *jobV1ChartChange) prepare(chart *collectorapi.Chart, j *Job) {
@@ -75,6 +75,7 @@ type jobV1Emission struct {
 	hostBytes   int
 	pruneCharts bool
 	settled     bool
+	self        *jobSelfMetricsEmission
 }
 
 func (j *Job) prepareEmission(started time.Time) (*jobV1Emission, error) {
@@ -111,7 +112,8 @@ func (j *Job) prepareEmission(started time.Time) (*jobV1Emission, error) {
 
 func (tx *jobV1Emission) record(change *jobV1ChartChange) {
 	c := change.chart
-	if change.definition != nil || change.pruneDims || change.created != c.IsCreated() || change.updated != c.IsUpdated() ||
+	if change.definition != nil || change.pruneDims || change.created != c.IsCreated() ||
+		change.updated != c.IsUpdated() ||
 		change.ignored != c.IsIgnored() ||
 		change.retries != c.Retries ||
 		change.priority != c.Priority ||
@@ -161,11 +163,7 @@ func (tx *jobV1Emission) Commit() error {
 			c.Dims = kept
 		}
 		if change.definition != nil {
-			inventory := j.hostCharts
-			if change.global {
-				inventory = j.selfCharts
-			}
-			inventory.record(*change.definition, change.obsolete)
+			j.hostCharts.record(*change.definition, change.obsolete)
 		}
 	}
 	if tx.pruneCharts {
@@ -181,6 +179,7 @@ func (tx *jobV1Emission) Commit() error {
 	}
 	j.priority = tx.priority
 	j.prevRun = tx.started
+	_ = tx.self.Commit()
 	tx.finish()
 	return nil
 }
@@ -192,6 +191,7 @@ func (tx *jobV1Emission) Abort() error {
 	if tx.owner != tx.job.hostOwner {
 		tx.owner.Release()
 	}
+	_ = tx.self.Abort()
 	tx.finish()
 	return nil
 }
@@ -205,6 +205,7 @@ func (tx *jobV1Emission) finish() {
 	tx.hostBytes = 0
 	tx.pruneCharts = false
 	tx.settled = true
+	tx.self = nil
 }
 
 func (j *Job) clearOutputState() {
@@ -213,5 +214,5 @@ func (j *Job) clearOutputState() {
 	j.hostGUID = ""
 	j.hostDefinition = nil
 	clear(j.hostCharts)
-	clear(j.selfCharts)
+	j.selfMetrics.clear()
 }

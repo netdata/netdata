@@ -109,6 +109,12 @@ type ResourcePolicy struct {
 	Argument    uint16
 	Prefix      string
 	ScopePrefix string
+	// Named resources never collapse a name that equals its kind/module.
+	named bool
+	// An observer command may submit its own resource transaction, then wait
+	// without retaining that transaction's serialization lane.
+	CommandArgument    uint16
+	IndependentCommand string
 }
 
 // DynCfgJobResource derives a collector job resource from DynCfg arguments.
@@ -128,6 +134,13 @@ func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourceP
 	}
 }
 
+// ScopedDynCfgNamedResource keeps template and named-object identities distinct.
+func ScopedDynCfgNamedResource(index uint16, prefix, scopePrefix string) ResourcePolicy {
+	policy := ScopedDynCfgJobResource(index, prefix, scopePrefix)
+	policy.named = true
+	return policy
+}
+
 func (rp ResourcePolicy) validate() error {
 	if rp == (ResourcePolicy{}) {
 		return nil
@@ -135,7 +148,9 @@ func (rp ResourcePolicy) validate() error {
 	if rp.Prefix == "" ||
 		len(rp.Prefix)+len(rp.ScopePrefix) >
 			maximumDeclarationMetadataBytes ||
-		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix {
+		strings.TrimSpace(rp.ScopePrefix) != rp.ScopePrefix ||
+		len(rp.IndependentCommand) > maximumDeclarationMetadataBytes ||
+		strings.TrimSpace(rp.IndependentCommand) != rp.IndependentCommand {
 		return errors.New("jobmgr Function catalog: invalid resource policy")
 	}
 	return nil
@@ -143,6 +158,10 @@ func (rp ResourcePolicy) validate() error {
 
 func (rp ResourcePolicy) resolve(arguments []string) string {
 	if rp == (ResourcePolicy{}) {
+		return ""
+	}
+	if rp.IndependentCommand != "" && int(rp.CommandArgument) < len(arguments) &&
+		strings.EqualFold(arguments[rp.CommandArgument], rp.IndependentCommand) {
 		return ""
 	}
 	resourceID := resolveDynCfgJobResource(rp, arguments)
@@ -172,6 +191,9 @@ func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string 
 		name = replaced
 		hasName = name != ""
 	}
+	if policy.named {
+		return jobmgr.DynCfgNamedResourceID("", module, name)
+	}
 	if !hasName || name == module {
 		return module
 	}
@@ -180,10 +202,10 @@ func resolveDynCfgJobResource(policy ResourcePolicy, arguments []string) string 
 
 // addCommandJobName extracts the job name from a DynCfg "add" command's
 // arguments. It reports whether this is an add command (arguments[1] == "add");
-// the returned name is the replacer-normalized arguments[2] and may be empty.
+// the returned name is the raw arguments[2] and may be empty.
 func addCommandJobName(arguments []string) (string, bool) {
 	if len(arguments) > 2 && dyncfg.CommandFromArgs(arguments) == dyncfg.CommandAdd {
-		return dyncfg.NormalizeJobName(arguments[2]), true
+		return arguments[2], true
 	}
 	return "", false
 }
@@ -511,6 +533,17 @@ func validateDeclaration(declaration Declaration) error {
 	}
 	if declaration.Transaction != nil && declaration.Resource == (ResourcePolicy{}) {
 		return errors.New("jobmgr Function catalog: transaction has no resource policy")
+	}
+	if transaction := declaration.Transaction; transaction != nil &&
+		declaration.Resource.IndependentCommand != "" {
+		if declaration.Resource.CommandArgument != transaction.CommandArgument {
+			return errors.New("jobmgr Function catalog: independent and transaction command arguments differ")
+		}
+		for _, command := range transaction.Commands {
+			if strings.EqualFold(command.Name, declaration.Resource.IndependentCommand) {
+				return errors.New("jobmgr Function catalog: transaction cannot use an independent invocation lane")
+			}
+		}
 	}
 	return declaration.Resource.validate()
 }

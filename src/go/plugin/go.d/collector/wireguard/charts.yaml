@@ -1,0 +1,75 @@
+version: v1
+context_namespace: wireguard
+groups:
+  - family: device traffic
+    metrics:
+      - device_receive
+      - device_transmit
+    chart_defaults:
+      priority: 70000
+    charts:
+      - id: device_network_io
+        title: Device traffic
+        context: device_network_io
+        units: B/s
+        type: area
+        instances:
+          by_labels: [device]
+        dimensions:
+          - selector: device_receive
+            name: receive
+          - selector: device_transmit
+            name: transmit
+            options:
+              multiplier: -1
+  - family: device peers
+    metrics:
+      - device_peers
+    chart_defaults:
+      priority: 70001
+    charts:
+      - id: device_peers
+        title: Device peers
+        context: device_peers
+        units: peers
+        instances:
+          by_labels: [device]
+        dimensions:
+          - selector: device_peers
+            name: peers
+  - family: peer traffic
+    metrics:
+      - peer_receive
+      - peer_transmit
+    chart_defaults:
+      priority: 70002
+    charts:
+      - id: peer_network_io
+        title: Peer traffic
+        context: peer_network_io
+        units: B/s
+        type: area
+        instances:
+          by_labels: [device, public_key]
+        dimensions:
+          - selector: peer_receive
+            name: receive
+          - selector: peer_transmit
+            name: transmit
+            options:
+              multiplier: -1
+  - family: peer latest handshake
+    metrics:
+      - peer_latest_handshake_ago
+    chart_defaults:
+      priority: 70003
+    charts:
+      - id: peer_latest_handshake_ago
+        title: Peer time elapsed since the latest handshake
+        context: peer_latest_handshake_ago
+        units: seconds
+        instances:
+          by_labels: [device, public_key]
+        dimensions:
+          - selector: peer_latest_handshake_ago
+            name: time

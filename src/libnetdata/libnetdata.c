@@ -559,7 +559,7 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     bool relative_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
 
     time_t absolute_minimum_time = rrdr_time_wide_to_time_t(rrdr_time_wide_subtract(
-        rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(10 * 365 * 86400)));
+        rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(API_QUERY_TIME_SPAN_MAX)));
     time_t absolute_maximum_time = rrdr_time_wide_to_time_t(rrdr_time_wide_add(
         rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(1 * 365 * 86400)));
 

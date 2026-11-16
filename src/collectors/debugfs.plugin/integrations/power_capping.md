@@ -43,9 +43,6 @@ This integration requires read access to files under `/sys/devices/virtual/power
 Assuming the kernel exposes the Intel RAPL powercap interface and the required permissions are available, this integration runs automatically.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

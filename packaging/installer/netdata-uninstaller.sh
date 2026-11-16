@@ -15,13 +15,15 @@ where:
     -e, --env    path to environment file (defaults to '/etc/netdata/.environment'
     -f, --force  force uninstallation and do not ask any questions
     -h           show this help text
-    -y, --yes    flag needs to be set to proceed with uninstallation"
+    -y, --yes    flag needs to be set to proceed with uninstallation
+    --dem-deployments-stopped  explicitly declare all protected DEM preload deployments retired"
 
 FILE_REMOVAL_STATUS=0
 ENVIRONMENT_FILE="/etc/netdata/.environment"
 # shellcheck disable=SC2034
 INTERACTIVITY="-i"
 YES=0
+DEM_DEPLOYMENTS_STOPPED=0
 while :; do
   case "$1" in
     -h | --help)
@@ -35,6 +37,10 @@ while :; do
     -y | --yes)
       YES=1
       FLAG=-y
+      shift
+      ;;
+    --dem-deployments-stopped)
+      DEM_DEPLOYMENTS_STOPPED=1
       shift
       ;;
     -e | --env)
@@ -353,98 +359,112 @@ rm_dir() {
 detect_existing_install
 disable_updater
 
-if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
-  if dpkg -s netdata > /dev/null; then
-    echo "Found netdata native installation"
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      apt-get remove netdata ${FLAG}
-    fi
-    if dpkg -s netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
+remove_native_install() {
+  if [ -x "$(command -v apt-get)" ] && [ "${INSTALL_TYPE}" = "binpkg-deb" ]; then
+    if dpkg -s netdata > /dev/null; then
+      echo "Found netdata native installation"
+      if user_input "Do you want to remove netdata? "; then
+        prepare_native_dem_removal
         # shellcheck disable=SC2086
-        apt-get remove netdata-repo-edge ${FLAG}
+        apt-get remove netdata ${FLAG} || exit $?
+      else
+        exit 0
       fi
+      if dpkg -s netdata-repo-edge > /dev/null; then
+        if user_input "Do you want to remove netdata-repo-edge? "; then
+          # shellcheck disable=SC2086
+          apt-get remove netdata-repo-edge ${FLAG}
+        fi
+      fi
+      if dpkg -s netdata-repo > /dev/null; then
+        if user_input "Do you want to remove netdata-repo? "; then
+          # shellcheck disable=SC2086
+          apt-get remove netdata-repo ${FLAG}
+        fi
+      fi
+      cleanup_data_and_config
+      exit 0
     fi
-    if dpkg -s netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
+  elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+    if rpm -q netdata > /dev/null; then
+      echo "Found netdata native installation."
+      if user_input "Do you want to remove netdata? "; then
+        prepare_native_dem_removal
         # shellcheck disable=SC2086
-        apt-get remove netdata-repo ${FLAG}
+        dnf remove netdata ${FLAG} || exit $?
+      else
+        exit 0
       fi
+      if rpm -q netdata-repo-edge > /dev/null; then
+        if user_input "Do you want to remove netdata-repo-edge? "; then
+          # shellcheck disable=SC2086
+          dnf remove netdata-repo-edge ${FLAG}
+        fi
+      fi
+      if rpm -q netdata-repo > /dev/null; then
+        if user_input "Do you want to remove netdata-repo? "; then
+          # shellcheck disable=SC2086
+          dnf remove netdata-repo ${FLAG}
+        fi
+      fi
+      cleanup_data_and_config
+      exit 0
     fi
-    cleanup_data_and_config
-    exit 0
+  elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+    if rpm -q netdata > /dev/null; then
+      echo "Found netdata native installation."
+      if user_input "Do you want to remove netdata? "; then
+        prepare_native_dem_removal
+        # shellcheck disable=SC2086
+        yum remove netdata ${FLAG} || exit $?
+      else
+        exit 0
+      fi
+      if rpm -q netdata-repo-edge > /dev/null; then
+        if user_input "Do you want to remove netdata-repo-edge? "; then
+          # shellcheck disable=SC2086
+          yum remove netdata-repo-edge ${FLAG}
+        fi
+      fi
+      if rpm -q netdata-repo > /dev/null; then
+        if user_input "Do you want to remove netdata-repo? "; then
+          # shellcheck disable=SC2086
+          yum remove netdata-repo ${FLAG}
+        fi
+      fi
+      cleanup_data_and_config
+      exit 0
+    fi
+  elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
+    if [ "${FLAG}" = "-y" ]; then
+      FLAG=-n
+    fi
+    if zypper search -i netdata > /dev/null; then
+      echo "Found netdata native installation."
+      if user_input "Do you want to remove netdata? "; then
+        prepare_native_dem_removal
+        # shellcheck disable=SC2086
+        zypper ${FLAG} remove netdata || exit $?
+      else
+        exit 0
+      fi
+      if zypper search -i netdata-repo-edge > /dev/null; then
+        if user_input "Do you want to remove netdata-repo-edge? "; then
+          # shellcheck disable=SC2086
+          zypper ${FLAG} remove netdata-repo-edge
+        fi
+      fi
+      if zypper search -i netdata-repo > /dev/null; then
+        if user_input "Do you want to remove netdata-repo? "; then
+          # shellcheck disable=SC2086
+          zypper ${FLAG} remove netdata-repo
+        fi
+      fi
+      cleanup_data_and_config
+      exit 0
+    fi
   fi
-elif [ -x "$(command -v dnf)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if rpm -q netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      dnf remove netdata ${FLAG}
-    fi
-    if rpm -q netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        dnf remove netdata-repo-edge ${FLAG}
-      fi
-    fi
-    if rpm -q netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        dnf remove netdata-repo ${FLAG}
-      fi
-    fi
-    cleanup_data_and_config
-    exit 0
-  fi
-elif [ -x "$(command -v yum)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if rpm -q netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      yum remove netdata ${FLAG}
-    fi
-    if rpm -q netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        yum remove netdata-repo-edge ${FLAG}
-      fi
-    fi
-    if rpm -q netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        yum remove netdata-repo ${FLAG}
-      fi
-    fi
-    cleanup_data_and_config
-    exit 0
-  fi
-elif [ -x "$(command -v zypper)" ] && [ "${INSTALL_TYPE}" = "binpkg-rpm" ]; then
-  if [ "${FLAG}" = "-y" ]; then
-    FLAG=-n
-  fi
-  if zypper search -i netdata > /dev/null; then
-    echo "Found netdata native installation."
-    if user_input "Do you want to remove netdata? "; then
-      # shellcheck disable=SC2086
-      zypper ${FLAG} remove netdata
-    fi
-    if zypper search -i netdata-repo-edge > /dev/null; then
-      if user_input "Do you want to remove netdata-repo-edge? "; then
-        # shellcheck disable=SC2086
-        zypper ${FLAG} remove netdata-repo-edge
-      fi
-    fi
-    if zypper search -i netdata-repo > /dev/null; then
-      if user_input "Do you want to remove netdata-repo? "; then
-        # shellcheck disable=SC2086
-        zypper ${FLAG} remove netdata-repo
-      fi
-    fi
-    cleanup_data_and_config
-    exit 0
-  fi
-fi
+}
 
 # -----------------------------------------------------------------------------
 # portable service command
@@ -770,6 +790,50 @@ stop_all_netdata() {
   fi
 }
 
+remove_dem_runtime() {
+  dem_prefix="${1-${NETDATA_PREFIX}}"
+  while [ "${dem_prefix%/}" != "${dem_prefix}" ]; do
+    dem_prefix="${dem_prefix%/}"
+  done
+  dem_helper="${dem_prefix}/usr/libexec/netdata/netdata-dem-runtime.sh"
+  if [ -x "${dem_helper}" ]; then
+    # This checks standalone consumers and retained execution proof too. Stopping
+    # the Agent alone does not authorize deleting its executable runtime state.
+    set -- agent-remove --agent "${dem_prefix}/usr/sbin/netdata"
+    if [ "${DEM_DEPLOYMENTS_STOPPED:-0}" = 1 ]; then
+      set -- "$@" --deployments-stopped
+    fi
+    run "${dem_helper}" "$@"
+  elif [ -e "${dem_prefix}/usr/libexec/netdata/plugins.d/dem.plugin" ] ||
+       [ -L "${dem_helper}" ]; then
+    error "DEM host setup helper is missing or unusable; runtime drainage cannot be established. Repair the installation before removing it."
+    return 1
+  fi
+}
+
+remove_dem_runtime_or_exit() {
+  if remove_dem_runtime "$@"; then :; else
+    dem_remove_status=$?
+    error "DEM runtime removal refused or failed. No Agent files were erased; stop standalone consumers and resolve the reported runtime/policy state before retrying."
+    # Keep the original helper failure instead of the generic incomplete-removal trap.
+    trap - EXIT
+    exit "${dem_remove_status}"
+  fi
+}
+
+prepare_native_dem_removal() {
+  dem_native_prefix="${ndprefix%/}"
+  if [ -e "${dem_native_prefix}/usr/libexec/netdata/netdata-dem-runtime.sh" ] ||
+     [ -L "${dem_native_prefix}/usr/libexec/netdata/netdata-dem-runtime.sh" ] ||
+     [ -e "${dem_native_prefix}/usr/libexec/netdata/plugins.d/dem.plugin" ]; then
+    # Stop only the packaged service; runtime drainage checks standalone users.
+    service netdata stop || error "Could not stop the packaged Agent; DEM runtime drainage must still succeed."
+    remove_dem_runtime_or_exit "${dem_native_prefix}"
+  fi
+}
+
+remove_native_install
+
 trap quit_msg EXIT
 
 # shellcheck source=/dev/null
@@ -779,6 +843,8 @@ trap quit_msg EXIT
 #### STOP NETDATA
 info "Stopping a possibly running netdata..."
 stop_all_netdata
+
+remove_dem_runtime_or_exit
 
 if [ "$(uname -s)" = "Darwin" ]; then
   launchctl unload /Library/LaunchDaemons/com.github.netdata.plist 2>/dev/null

@@ -16,7 +16,8 @@ Get flow monitoring running in 15 minutes. The path: install the plugin, configu
 
 - The Netdata Agent is running on the host that will collect flow data.
 - The [netflow plugin is installed](/docs/npm/network-flows/installation.md) on that host.
-- A Space Admin has connected the Agent to your Netdata Cloud Space, you are signed in, and your Space role allows sensitive functions. The free Community tier is sufficient; see the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
+- A Space Admin has connected the Agent to your Netdata Cloud Space, you are signed in, and your Space role allows sensitive functions.
+- Your Space is on a paid plan or an active trial. The free Community plan does not include Network Flows. See the [Network Flows access requirement](/docs/npm/network-flows/installation.md#connect-this-agent-to-netdata-to-use-this-function).
 - You can configure flow export on at least one router or switch.
 - The router can reach the agent's IP on the matching UDP listener port: `2055` for NetFlow/IPFIX, or `6343` for sFlow.
 
@@ -167,7 +168,7 @@ If the Sankey is empty after 60-90 seconds, work through this:
 
 3. **Plugin actually decoding.**
 
-   Open the standard Netdata charts page. `netflow.input_packets` confirms UDP arrival; `netflow.protocol_packets` shows whether the packets are v5, v7, v9, IPFIX, or sFlow. If UDP rises but no protocol does, check `parse_errors` in `netflow.decoder_exceptions`. For v9/IPFIX, check missing-template dimensions in `netflow.flow_sets`. See [Plugin Health Charts](/docs/npm/network-flows/visualization/dashboard-cards.md).
+   Open the standard Netdata charts page. `netdata.netflow.input_packets` confirms UDP arrival; `netdata.netflow.protocol_packets` shows whether the packets are v5, v7, v9, IPFIX, or sFlow. If UDP rises but no protocol does, check `parse_errors` in `netdata.netflow.decoder_exceptions`. For v9/IPFIX, check missing-template dimensions in `netdata.netflow.flow_sets`. See [Plugin Health Charts](/docs/npm/network-flows/visualization/dashboard-cards.md).
 
 4. **Plugin log lines.**
 

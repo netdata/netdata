@@ -5,6 +5,7 @@ package docker_engine
 import (
 	"fmt"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
@@ -13,8 +14,8 @@ func isDockerEngineMetrics(pms prometheus.Series) bool {
 	return pms.FindByName("engine_daemon_engine_info").Len() > 0
 }
 
-func (c *Collector) collect() (map[string]int64, error) {
-	pms, err := c.prom.ScrapeSeries()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	pms, err := c.prom.ScrapeSeries(ctx)
 	if err != nil {
 		return nil, err
 	}

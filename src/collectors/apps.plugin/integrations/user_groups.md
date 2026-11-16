@@ -28,7 +28,7 @@ This integration monitors resource utilization on a user groups context.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -39,7 +39,10 @@ This integration doesn't support auto-detection.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+- **Idle user groups disappear after 1 hour:** the charts of a user group with no processes for `retire-targets-after` seconds (default 3600) are removed.
+- **At most 500 user groups:** up to `max-targets` (default 500) user groups get their own charts. Beyond that, new ones are aggregated into `usergroup.other_*`, and an info message is logged once.
+- Both are set in `netdata.conf`, for example `[plugin:apps]` `command options = retire-targets-after 7200 max-targets 1000` (seconds, and targets per family).
+
 
 #### Performance Impact
 

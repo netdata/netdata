@@ -18,13 +18,14 @@ use crate::value_guard::ValueGuard;
 // Size to pad objects to (8 bytes)
 const OBJECT_ALIGNMENT: u64 = 8;
 
-/// A reader for systemd journal files that efficiently maps small regions of the file into memory.
+/// A handle to a systemd journal file that maps small regions of the file into memory.
 ///
 /// # Memory Management
 ///
 /// This implementation uses a window-based memory mapping strategy similar to systemd's original
-/// implementation. Instead of mapping the entire file, it maintains a small set of memory-mapped
-/// windows and reuses them as needed.
+/// implementation. Instead of mapping the entire file, it keeps persistent maps for the header
+/// and, when present, the two hash tables and serves all other objects from a small set of
+/// memory-mapped windows that are reused as needed.
 ///
 /// # Concurrency and Safety
 ///
@@ -32,11 +33,11 @@ const OBJECT_ALIGNMENT: u64 = 8;
 ///
 /// - The window manager is wrapped in an `UnsafeCell` to allow mutation through a shared reference.
 /// - A single `RefCell<bool>` guards access to ensure only one object can be active at a time.
-/// - Methods like `data_object()` return a `ValueGuard<T>` that automatically releases the lock
+/// - Methods like [`JournalFile::data_ref`] return a `ValueGuard<T>` that releases the lock
 ///   when dropped.
 ///
-/// This design ensures that memory safety is maintained even though references to memory-mapped
-/// regions could be invalidated when new objects are created.
+/// The single-object guard matters because reusing a window for another object invalidates
+/// references into previously mapped regions.
 pub struct JournalFile<M: MemoryMap> {
     // Persistent memory maps for journal header and data/field hash tables
     header_map: M,
@@ -263,7 +264,7 @@ impl<M: MemoryMap> JournalFile<M> {
     pub fn open(path: impl AsRef<Path>, window_size: u64) -> Result<Self> {
         debug_assert_eq!(window_size % OBJECT_ALIGNMENT, 0);
 
-        // Open file and check its size
+        // Open the file for reading
         let file = OpenOptions::new().read(true).write(false).open(&path)?;
 
         // Create a memory map for the header
@@ -274,7 +275,7 @@ impl<M: MemoryMap> JournalFile<M> {
             return Err(JournalError::InvalidMagicNumber);
         }
 
-        // Initialize the hash table maps if they exist
+        // Map the data and field hash tables from the file
         let data_hash_table_map = header.map_data_hash_table(&file)?;
         let field_hash_table_map = header.map_field_hash_table(&file)?;
 
@@ -473,10 +474,12 @@ impl<M: MemoryMap> JournalFile<M> {
         )
     }
 
-    /// Run a directed partition point query on a data object's entry array
+    /// Applies `predicate` as a partition test over the entries referencing a data object.
     ///
-    /// This finds the first/last entry (depending on direction) that satisfies the given predicate
-    /// in the entry array chain of the data object.
+    /// `Forward` returns the offset of the first entry in the data object's entry array chain
+    /// whose offset fails `predicate`; `Backward` the last entry whose offset satisfies it.
+    /// `None` when no entry in the chain lands on that side — including a chain with no entry
+    /// referencing the data object.
     pub fn data_object_directed_partition_point<F>(
         &self,
         data_offset: u64,
@@ -539,7 +542,6 @@ impl<M: MemoryMap> JournalFile<M> {
         &'a self,
         field_name: &'a [u8],
     ) -> Result<FieldDataIterator<'a, M>> {
-        // Find the field offset by name
         let field_hash = self.hash(field_name);
         let field_offset = self.find_field_offset_by_name(field_name, field_hash)?;
 
@@ -547,7 +549,6 @@ impl<M: MemoryMap> JournalFile<M> {
         let field_guard = self.field_ref(field_offset)?;
         let head_data_offset = field_guard.header.head_data_offset;
 
-        // Create the iterator
         Ok(FieldDataIterator {
             journal: self,
             current_data_offset: head_data_offset,
@@ -559,13 +560,11 @@ impl<M: MemoryMap> JournalFile<M> {
         // Get the entry object to determine how many data items it has
         let entry_guard = self.entry_ref(entry_offset)?;
 
-        // Get the total number of items
         let total_items = match &entry_guard.items {
             EntryItemsType::Regular(items) => items.len(),
             EntryItemsType::Compact(items) => items.len(),
         };
 
-        // Create the iterator
         Ok(EntryDataIterator {
             journal: self,
             entry_offset,
@@ -642,7 +641,6 @@ impl<M: MemoryMap> Iterator for OffsetArrayListIterator<'_, M> {
             Err(e) => return Some(Err(e)),
         };
 
-        // Increment index for next iteration
         self.index += 1;
 
         // If offset is zero, we've reached the end of all entries

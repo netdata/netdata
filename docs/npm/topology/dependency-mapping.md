@@ -104,8 +104,9 @@ of per-PID entries the APPS_LOOKUP cache keeps — the cgroup identity already r
 resolvable, it only keeps more of the resolved ones cached.
 
 The function is not anonymous. It exposes process names, command lines, users, and every address the host talks to, so
-it requires a signed-in Netdata identity, membership of the same Space as the node, and permission to view sensitive
-data. If the map is missing while the node is otherwise healthy, check your access before suspecting the collector.
+it requires a signed-in Netdata identity, membership of the same Space as the node, permission to view sensitive
+data, and a Space on a paid plan or an active trial. The live `network-connections` table needs only the sign-in,
+Space membership and sensitive-data permission. If the map is missing while the node is otherwise healthy, check your access before suspecting the collector.
 
 Two levels of detail are available:
 

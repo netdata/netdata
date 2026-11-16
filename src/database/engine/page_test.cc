@@ -449,6 +449,28 @@ TEST(PGD, RejectCorruptGorillaDiskNbits) {
     pgd_free(pg_collector);
 }
 
+TEST(PGD, RejectGorillaDiskSizeNotBufferMultiple) {
+    PGD *pg_collector = pgd_create(page_type, slots_for_page(1));
+
+    pgd_append_point(pg_collector, 0, 666, 0, 0, 1, 1, SN_DEFAULT_FLAGS, 0);
+
+    uint32_t size_in_bytes = pgd_disk_footprint(pg_collector);
+    uint32_t size_in_words = size_in_bytes / sizeof(uint32_t);
+
+    alignas(sizeof(uintptr_t)) uint32_t disk_buffer[size_in_words];
+    pgd_copy_to_extent(pg_collector, (uint8_t *) &disk_buffer[0], size_in_bytes);
+
+    // A valid gorilla page length is a positive multiple of RRDENG_GORILLA_32BIT_BUFFER_SIZE. A length that is
+    // not (here one buffer minus a slot, which truncates to zero buffers) must be rejected: otherwise
+    // gorilla_buffer_patch() walks header.next past the allocation.
+    uint32_t bad_size = size_in_bytes - RRDENG_GORILLA_32BIT_SLOT_BYTES;
+
+    PGD *pg_disk = pgd_create_from_disk_data(page_type, &disk_buffer[0], bad_size);
+    EXPECT_EQ(pg_disk, PGD_EMPTY);
+
+    pgd_free(pg_collector);
+}
+
 int pgd_test(int argc, char *argv[])
 {
     // Dummy/necessary initialization stuff

@@ -1,21 +1,36 @@
-//! Uploader component that copies index and catalog files to remote object
-//! storage.
+//! The uploader: copies index (SFST) and catalog files to remote object
+//! storage. One worker per ledger process, shared by every signal pipeline
+//! (like the cleaner): steady-state requests come from the indexer-response
+//! path and catalog rotations, and recovery queues every un-uploaded file at
+//! startup.
 //!
 //! Uploads run in spawned async tasks, but the number in flight at once is
 //! bounded by a [`Semaphore`]: the receive loop acquires a permit before
-//! spawning, so a recovery backlog (which enqueues every un-uploaded file at
-//! once) can't fan out into thousands of simultaneous file reads + PUTs. Each
-//! task buffers its whole file in memory, so the permit count also caps peak
-//! upload memory. In-flight tasks are tracked in a [`JoinSet`] so a shutdown
-//! drains them briefly instead of abandoning detached uploads mid-PUT.
+//! spawning, so a recovery backlog can't fan out into thousands of
+//! simultaneous file reads + PUTs. Each task buffers its whole file in
+//! memory, so the permit count also caps peak upload memory. In-flight tasks
+//! are tracked in a [`JoinSet`], so they end with the component: at a stop
+//! the uploads in flight are cut. An upload is idempotent (a deterministic
+//! remote key, and `storage.write` overwrites), and the next start uploads
+//! again whatever the remote does not have.
+//!
+//! Failure handling: a failed read/write is logged and returned as a
+//! `*Failed` response carrying the error string — there is no retry here.
+//! The caller records failures in the backoff queue (`crate::upload_retry`),
+//! which re-issues them with capped exponential backoff.
 //!
 //! The backend is abstracted behind [`Storage`]; the component is generic over
 //! it so production uses opendal and tests inject a mock.
+//!
+//! Consumers (grep-verified): spawned once by otel-ledger's `Ledger::new`
+//! (`ComponentHandle::spawn::<Uploader<OpendalStorage>>`, remote storage
+//! enabled only). Senders: `ledger/indexer.rs`, `ledger/catalog_builder.rs`,
+//! and `recovery/remote.rs`. Responses are handled by `ledger/uploader.rs`
+//! (`handle_uploader_resp`).
 
 use std::marker::PhantomData;
 use std::path::Path;
 use std::sync::Arc;
-use std::time::Duration;
 
 use tokio::sync::{Semaphore, mpsc};
 use tokio::task::JoinSet;
@@ -26,15 +41,10 @@ use crate::component::Component;
 use crate::ipc::{UploaderRequest, UploaderResponse};
 use crate::storage::{Storage, WriteMeta};
 
-/// How long a graceful shutdown waits for in-flight uploads to finish before
-/// abandoning them. Abandoned uploads are idempotently re-driven on the next
-/// restart (deterministic remote key, `storage.write` overwrites), so this is a
-/// best-effort courtesy, not a correctness requirement.
-const SHUTDOWN_DRAIN: Duration = Duration::from_secs(5);
-
 /// Construction args for the uploader. The `Storage` bound lives on the
-/// `Component` impl, not here, so this `pub` type doesn't leak the crate-private
-/// trait into its signature.
+/// `Component` impl — the only place the backend is used — so this struct
+/// stays bound-free; callers name the concrete backend in the `Component`
+/// type anyway (`spawn::<Uploader<OpendalStorage>>`).
 pub struct UploaderArgs<S> {
     pub storage: S,
     /// Maximum uploads in flight at once. Bounds concurrent PUTs/sockets and,
@@ -99,14 +109,6 @@ impl<S: Storage> Component for Uploader<S> {
                     });
                 }
             }
-        }
-
-        // Give in-flight uploads a brief window to finish (so their responses
-        // land and PUTs aren't cut mid-flight), then drop `tasks`, aborting the
-        // rest — those are re-driven idempotently on the next restart.
-        let drain = async { while tasks.join_next().await.is_some() {} };
-        if tokio::time::timeout(SHUTDOWN_DRAIN, drain).await.is_err() {
-            tracing::warn!("uploader shutdown: abandoning in-flight uploads after drain timeout");
         }
     }
 }

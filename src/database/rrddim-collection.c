@@ -62,7 +62,9 @@ static void store_metric_at_tier_save_last_completed(RRDDIM *rd, size_t tier, st
 
 ALWAYS_INLINE_HOT
 void store_metric_at_tier(RRDDIM *rd, size_t tier, struct rrddim_tier *t, STORAGE_POINT sp, usec_t now_ut __maybe_unused) {
-    if(LAST_COMPLETED_POINT_EXISTS(t) && sp.start_time_s % t->last_completed_point_flush_modulo == 0)
+    // Slow collection can skip a flush instant; preserve the modulo phase without requiring an exact hit.
+    if(LAST_COMPLETED_POINT_EXISTS(t) &&
+       sp.start_time_s - sp.start_time_s % t->last_completed_point_flush_modulo > t->last_completed_point.end_time_s)
         store_metric_at_tier_flush_last_completed(rd, tier, t);
 
     if (unlikely(!t->next_point_end_time_s))

@@ -37,31 +37,13 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 }
 
 func TestCollector_Init(t *testing.T) {
-	tests := map[string]struct {
-		prepare  func(collr *Collector)
-		wantFail bool
-	}{
-		"fails if can't locate ndsudo": {
-			wantFail: true,
-			prepare: func(collr *Collector) {
-				collr.ndsudoName += "!!!"
-			},
-		},
-	}
+	collr := New()
 
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			collr := New()
+	require.NoError(t, collr.Init(context.Background()))
 
-			test.prepare(collr)
-
-			if test.wantFail {
-				assert.Error(t, collr.Init(context.Background()))
-			} else {
-				assert.NoError(t, collr.Init(context.Background()))
-			}
-		})
-	}
+	topExec, ok := collr.exec.(*intelGpuTopExec)
+	require.True(t, ok)
+	assert.Nil(t, topExec.stopSource, "Init does not start intel_gpu_top")
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -75,6 +57,10 @@ func TestCollector_Check(t *testing.T) {
 		},
 		"fail on error": {
 			prepareMock: prepareMockErrOnGPUSummaryJson,
+			wantFail:    true,
+		},
+		"fail on start error": {
+			prepareMock: prepareMockErrOnStart,
 			wantFail:    true,
 		},
 	}
@@ -188,11 +174,26 @@ func prepareMockErrOnGPUSummaryJson() *mockIntelGpuTop {
 	}
 }
 
+func prepareMockErrOnStart() *mockIntelGpuTop {
+	return &mockIntelGpuTop{
+		errOnStart:     true,
+		gpuSummaryJson: dataIntelTopGpuJSON,
+	}
+}
+
 type mockIntelGpuTop struct {
+	errOnStart               bool
 	errOnQueryGPUSummaryJson bool
 	gpuSummaryJson           []byte
 
 	stopCalled bool
+}
+
+func (m *mockIntelGpuTop) start(context.Context) error {
+	if m.errOnStart {
+		return errors.New("error on mock.start()")
+	}
+	return nil
 }
 
 func (m *mockIntelGpuTop) queryGPUSummaryJson() ([]byte, error) {
@@ -202,7 +203,6 @@ func (m *mockIntelGpuTop) queryGPUSummaryJson() ([]byte, error) {
 	return m.gpuSummaryJson, nil
 }
 
-func (m *mockIntelGpuTop) stop() error {
+func (m *mockIntelGpuTop) stop() {
 	m.stopCalled = true
-	return nil
 }

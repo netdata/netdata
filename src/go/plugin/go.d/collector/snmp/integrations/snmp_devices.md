@@ -102,10 +102,16 @@ A **profile** defines:
 2. Picks the best matching vendor/model profile(s)
 3. Collects exactly the metrics those profiles define
 
+Jobs collecting SNMP metrics check standard system information once per minute. When the name, description,
+contact, location or `sysObjectID` changes, the job identifies the device again: it reselects profiles and
+rebuilds device-specific collection state. The vnode GUID and history stay the same, and configured hostname
+and label overrides keep precedence. A device swapped for hardware reporting the same five values is not
+detected until the job restarts. `ping_only` jobs retain their setup-only SNMP probe.
+
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -130,9 +136,6 @@ sudo ./edit-config go.d/sd/snmp.conf
 ```
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -205,11 +208,13 @@ The following options can be defined globally: update_every, autodetection_retry
 |  | ping.packets | Number of ping packets to send per iteration. | 3 | no |
 |  | ping.interval | Interval between sending ping packets. | 100ms | no |
 | **Profiles** | manual_profiles | A list of profiles to use when `sysObjectID`-based auto-detection cannot be used. To retain baseline IPv4 topology for a device without a usable `sysObjectID`, include `generic-device` alongside its vendor profile. | [] | no |
-| **Virtual node** | create_vnode | If set, the collector will create a Netdata Virtual Node for this SNMP device, which will appear as a separate Node in Netdata. | true | no |
-|  | vnode_device_down_threshold | Number of consecutive failed data collections before marking the device as down. | 3 | no |
-|  | vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
-|  | vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
-|  | vnode.labels | Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence. |  | no |
+| **Virtual node** | create_vnode | Create a Virtual Node for this SNMP device when no named vnode reference is set. A named reference takes precedence, including when this option is true. | true | no |
+|  | vnode_device_down_threshold | Number of consecutive failed data collections before marking a collector-generated vnode as down. Named vnodes use their own stale_after setting. | 3 | no |
+|  | [vnode](#option-virtual-node-vnode) | Name of a centrally configured Virtual Node to attach this job to. Takes precedence over local vnode creation. |  | no |
+|  | [local_vnode](#option-virtual-node-local-vnode) | Configuration for the Virtual Node created by this job when create_vnode is enabled and no named vnode reference is set. |  | no |
+|  | local_vnode.guid | A unique identifier for the Virtual Node. If not set, a GUID will be automatically generated from the device's IP address. |  | no |
+|  | local_vnode.hostname | The hostname that will be used for the Virtual Node. If not set, the device's hostname will be used. |  | no |
+|  | local_vnode.labels | Additional key-value pairs to associate with the Virtual Node. These are merged with the labels SNMP detects automatically from the device (for example, `vendor` and `sys_object_id`). If a key here matches an auto-detected label, your value takes precedence. |  | no |
 
 <a id="option-snmpv3-user-level"></a>
 ##### user.level
@@ -255,6 +260,27 @@ The encryption algorithm for SNMPv3 messages that require privacy (`user.priv_pr
 |   aes256c    |     7     | 256-bit AES encryption (CFB-AES-256) with "Reeder" key localization     |
 
 
+<a id="option-virtual-node-vnode"></a>
+##### vnode
+
+A string such as `vnode: router` attaches this job to a vnode defined in `vnodes/*.conf` or dynamic
+configuration. Static YAML vnodes use their hostname as the reference; SNMP-mode vnodes use their
+required stable name. SNMP-mode identity is acquired independently, so this job waits for its first
+usable identity before starting. The reference supplies host identity and labels only: configure this
+job's own address, credentials, and metric profiles. It takes precedence over `create_vnode`.
+
+Use `local_vnode` to configure a vnode created by this job. Legacy inline `vnode` objects remain
+accepted; opening them through dynamic configuration returns the same settings under `local_vnode`.
+
+
+<a id="option-virtual-node-local-vnode"></a>
+##### local_vnode
+
+Optional hostname, GUID, and host-label settings for the vnode owned by this job. Without these
+settings, the collector uses its existing device-derived identity. A named `vnode` reference takes
+precedence. Do not combine a legacy inline `vnode` object with `local_vnode`; use one object.
+
+
 
 </details>
 
@@ -269,7 +295,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -295,6 +321,26 @@ sudo ./edit-config go.d/snmp.conf
 ```
 
 ##### Examples
+
+###### Attach to an independently configured vnode
+
+First define the vnode named `router` in `vnodes/*.conf` or the Vnodes dynamic configuration view.
+This job uses its own SNMP connection and metric profiles; the vnode owns host identity and labels.
+
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: router_metrics
+    vnode: router
+    hostname: 192.0.2.1
+    community: example-collector-community
+    options:
+      version: 2c
+
+```
+</details>
 
 ###### SNMPv1/2
 
@@ -414,8 +460,8 @@ jobs:
 
 ###### Additional node labels
 
-Because `create_vnode` defaults to true, each SNMP job automatically creates a Virtual Node for its device — no separate vnode definition file is needed.
-Use `vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
+Without a named vnode reference, `create_vnode: true` (the default) creates a Virtual Node from this job — no separate vnode definition is needed.
+Use `local_vnode.labels` to attach your own labels, for example to group devices by site or rack. These are merged with the labels SNMP detects automatically from the device (such as `vendor` and `sys_object_id`). If a key you set matches an auto-detected label, your value takes precedence.
 
 
 <details open><summary>Config</summary>
@@ -428,7 +474,7 @@ jobs:
     community: public
     options:
       version: 2
-    vnode:
+    local_vnode:
       labels:
         site: dc1
         rack: a12
@@ -452,13 +498,13 @@ The following alerts are available:
 | [ snmp_license_state_warning ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are degraded, in grace, or otherwise in warning state. |
 | [ snmp_license_state_critical ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.state | One or more monitored licenses on this device are expired, invalid, unauthorized, or otherwise in critical state. |
 | [ snmp_license_usage_high ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp.conf) | snmp.license.usage_percent | The most constrained monitored license pool on this device is nearing exhaustion. |
-| [ snmp_bgp_peer_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.availability | BGP peer is administratively enabled but remains out of Established |
-| [ snmp_bgp_peer_family_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.availability | BGP peer-family is administratively enabled but remains out of Established |
-| [ snmp_bgp_peer_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.established_transitions | ML anomaly detection on per-peer established transition activity |
-| [ snmp_bgp_peer_family_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.established_transitions | ML anomaly detection on per-peer-family established transition activity |
-| [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | ML anomaly detection on per-peer BGP UPDATE traffic |
-| [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | ML anomaly detection on per-peer-family BGP UPDATE traffic |
-| [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | ML anomaly detection on accepted-prefix gauges where the vendor MIB exposes them |
+| [ snmp_bgp_peer_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.availability | SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) is administratively enabled but has remained out of Established for the full 2-minute evaluation window |
+| [ snmp_bgp_peer_family_down ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.availability | SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family} has remained out of Established for the full 2-minute evaluation window |
+| [ snmp_bgp_peer_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.established_transitions | Rolling ML anomaly rate for established-transition counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}); sustained anomalies usually indicate flaps or unstable reachability |
+| [ snmp_bgp_peer_family_transitions_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.established_transitions | Rolling ML anomaly rate for established-transition counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually indicate flaps or unstable reachability |
+| [ snmp_bgp_peer_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peers.update_traffic | Rolling ML anomaly rate for BGP UPDATE traffic on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}); sustained anomalies usually indicate route churn or unstable adjacencies |
+| [ snmp_bgp_peer_family_updates_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.update_traffic | Rolling ML anomaly rate for BGP UPDATE traffic on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually indicate route churn or unstable adjacencies |
+| [ snmp_bgp_peer_family_prefixes_accepted_anomaly ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_bgp.conf) | snmp.bgp.peer_families.route_counts.current | Rolling ML anomaly rate for accepted prefix counts on SNMP BGP peer ${label:neighbor} (AS${label:remote_as}) for ${label:address_family}/${label:subsequent_address_family}; sustained anomalies usually mean unexpected route loss or route growth after policy |
 
 
 
@@ -469,6 +515,8 @@ Metrics grouped by *scope*.
 The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
 
 Metrics and charts are **defined by the matched SNMP profile(s)** at runtime. They differ by vendor/model/OS and may include, for example, interface counters, optics, CPU/memory, temperature, VLANs, and more. Use the **Metrics** tab on the device’s dashboard to see exactly what is collected for that device.
+
+Stock profiles that identify interfaces by IF-MIB `ifName` also attach the interface alias (IF-MIB `ifAlias`, the description an administrator assigns to a port) as the `if_alias` label, so you can filter and group interfaces by it. An interface without an alias shows `[none]`. The alias is read when the chart is created, so a change on the device appears after the collector restarts.
 
 Supported licensing profiles also emit a small set of shared **device-level licensing contexts**:
 
@@ -510,6 +558,7 @@ If `ping.enabled` is true, ICMP latency/packet-loss charts are also provided (or
 - `snmp.bgp.devices.peer_counts` for device-level peer/session counts
 - `snmp.bgp.devices.peer_states` for device-level peer-state summaries where the source MIB exposes canonical peer rows
 - Rich peer diagnostics live in the Live function `snmp:bgp-peers`, not in charted time-series
+- Process-scoped rows retain the BGP process and routing instance. AS, BGP version and description remain blank when their association cannot be proved.
 
 **BGP capability notes**
 
@@ -578,7 +627,7 @@ Data is sourced from the IF-MIB (RFC 2863) interface counters and is cached from
 | Name | `Snmp:interfaces` |
 | Require Cloud | no |
 | Performance | Uses cached SNMP data only, no additional SNMP requests are triggered:<br/>• Responses are instantaneous from memory cache<br/>• Large devices with many interfaces may return many rows |
-| Security | Exposes interface names, operational status, and traffic counters only:<br/>• No packet payloads or authentication credentials are exposed<br/>• No device configuration details are exposed |
+| Security | Exposes interface names, aliases, operational status, and traffic counters only:<br/>• Aliases are free text set by device administrators and may describe sites, circuits, or connected equipment<br/>• No packet payloads or authentication credentials are exposed<br/>• No other device configuration is exposed |
 | Availability | Available when:<br/>• The collector has completed at least one data collection cycle<br/>• Interface data is cached from the last successful SNMP collection<br/>• Returns HTTP 503 if cache is not ready yet |
 
 #### Prerequisites
@@ -598,6 +647,7 @@ Network interface metrics from cached SNMP data, including traffic rates, packet
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Interface | string |  |  | Network interface name or identifier (e.g., eth0, GigabitEthernet1/0/1, Vlan100) |
+| Alias | string |  |  | Interface alias (IF-MIB ifAlias), the description an administrator assigns to a port (e.g., "Uplink to core switch"). Empty when the device reports no alias. A change on the device appears within about an hour, when the collector re-reads the interface table. |
 | Type | string |  |  | IANA-assigned interface type from IF-MIB (e.g., ethernetCsmacd, ieee80211, softwareLoopback) |
 | Type Group | string |  |  | Custom categorization mapping IANA interface types into practical groups: Ethernet (physical Ethernet interfaces), Aggregation (LAG/port-channels, bonds), Virtual (VLANs, loopbacks), or Other (all remaining types) |
 | Admin Status | string |  |  | Administrative state configured on the interface: up (enabled for use), down (administratively disabled), or testing (currently in test mode). Different from operational status. |
@@ -656,10 +706,11 @@ Current BGP peer and peer-family details from cached normalized SNMP data. Each 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
 | Scope | string |  |  | Whether the row represents a peer or a peer-family. |
+| Process ID | string |  |  | BGP process identifier when exposed by the source MIB; blank when unavailable. |
 | Routing Instance | string |  |  | Routing-instance / VRF identifier when exposed by the source MIB. |
 | Neighbor | string |  |  | Remote peer address. |
 | Local Address | string |  |  | Local address used for the BGP session when exposed by the source MIB. |
-| Remote AS | string |  |  | Remote Autonomous System number. |
+| Remote AS | string |  |  | Remote Autonomous System number when its association with the peer is known. |
 | Peer Description | string |  |  | Peer description or label when exposed by the source MIB. |
 | Family | string |  |  | Address-family / SAFI scope for peer-family rows. |
 | Admin Status | string |  |  | Whether the peer is administratively enabled. |

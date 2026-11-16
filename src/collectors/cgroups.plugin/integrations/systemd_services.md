@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -39,9 +39,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -124,6 +121,10 @@ Metrics:
 | systemd.service.dc_reference | Count file access | reference | files |
 | systemd.service.dc_not_cache | Files not present inside directory cache | slow | files |
 | systemd.service.dc_not_found | Files not found | miss | files |
+| systemd.service.fd_open | Number of open files | calls | calls/s |
+| systemd.service.fd_open_error | Fails to open files | calls | calls/s |
+| systemd.service.fd_close | Files closed | calls | calls/s |
+| systemd.service.fd_close_error | Fails to close files | calls | calls/s |
 | systemd.service.net_conn_ipv4 | TCP v4 outbound connections | connections | connections/s |
 | systemd.service.net_conn_ipv6 | TCP v6 outbound connections | connections | connections/s |
 | systemd.service.net_total_bandwidth | Bandwidth | received, sent | kilobits/s |

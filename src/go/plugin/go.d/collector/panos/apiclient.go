@@ -41,13 +41,13 @@ type pangoAPIClient struct {
 	initialized bool
 }
 
-func newPangoAPIClient(cfg Config) (panosAPIClient, error) {
+func newPangoAPIClient(ctx context.Context, cfg Config) (panosAPIClient, error) {
 	apiURL, err := parseAPIURL(cfg.URL)
 	if err != nil {
 		return nil, err
 	}
 
-	transport, err := newPangoTransport(cfg.ClientConfig)
+	transport, err := newPangoTransport(ctx, cfg.ClientConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,10 @@ func (c *pangoAPIClient) op(ctx context.Context, cmd string) ([]byte, error) {
 	}
 	if refreshErr := c.client.RetrieveApiKey(); refreshErr != nil {
 		c.initialized = false
-		return nil, fmt.Errorf("refresh PAN-OS API key after unauthorized response: %w", sanitizePANOSAPIError(refreshErr))
+		return nil, fmt.Errorf(
+			"refresh PAN-OS API key after unauthorized response: %w",
+			sanitizePANOSAPIError(refreshErr),
+		)
 	}
 
 	if err := contextError(ctx); err != nil {
@@ -129,7 +132,10 @@ func (c *pangoAPIClient) ensureInitialized(ctx context.Context) error {
 		return err
 	}
 	if refreshErr := c.client.RetrieveApiKey(); refreshErr != nil {
-		return fmt.Errorf("refresh PAN-OS API key after unauthorized initialization: %w", sanitizePANOSAPIError(refreshErr))
+		return fmt.Errorf(
+			"refresh PAN-OS API key after unauthorized initialization: %w",
+			sanitizePANOSAPIError(refreshErr),
+		)
 	}
 
 	if err := contextError(ctx); err != nil {
@@ -250,15 +256,16 @@ func hasExplicitPort(host string) bool {
 	return strings.Count(host, ":") == 1
 }
 
-func newPangoTransport(cfg web.ClientConfig) (*http.Transport, error) {
-	client, err := web.NewHTTPClient(cfg)
+func newPangoTransport(ctx context.Context,
+	cfg web.ClientConfig,
+) (*http.Transport, error) {
+	if cfg.ForceHTTP2 {
+		return nil, errors.New("PAN-OS SDK requires an HTTP/1.x transport")
+	}
+	// Pango requires a concrete transport and cannot accept a bounded wrapper.
+	transport, err := web.NewHTTPTransport(ctx, cfg)
 	if err != nil {
 		return nil, err
-	}
-
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok {
-		return nil, errors.New("PAN-OS SDK requires an HTTP/1.x transport")
 	}
 	transport.MaxConnsPerHost = 2
 	transport.MaxIdleConnsPerHost = 2

@@ -1,3 +1,43 @@
+//! The ledger-side WAL file index: one [`Registry`] per tenant directory,
+//! rebuilt from disk at startup and kept current by applying the writer's
+//! [`FileEvent`]s as they arrive over the ingestor→ledger link. The writer
+//! queues events and the ingestor forwards them; the ledger applies them
+//! here, so this file owns event application and the candidate filtering
+//! the resulting state feeds.
+//!
+//! - Event application ([`Registry::apply_event`]): every event re-reports
+//!   the writer's current accumulator state (not a delta), so applying one
+//!   is an overwrite; `Closed` is authoritative and final — a late `Synced`
+//!   is ignored. The link delivers a file's events once and in order
+//!   (`format.rs`, [`Message`](crate::Message)); an event that never comes,
+//!   as when the ingestor stops, leaves an entry stale or untracked and
+//!   cannot corrupt one. Field semantics are `format.rs`'s.
+//! - Candidate filtering ([`Registry::candidates`]): the pure in-memory
+//!   time + partition filter the live query planner and the stream selector
+//!   drive. It scales the seconds-based `Query` to the registry's
+//!   nanosecond file ranges and re-applies the shared `range_overlaps`
+//!   rule. Offline WAL discovery (sfsq-cli) deliberately bypasses it —
+//!   recovered files carry no log-data range — and enumerates + row-scans
+//!   instead.
+//!
+//! Recovery limits shape both: the WAL format carries no footer, so
+//! [`Registry::recover`] restores identity and header facts but not the
+//! log-data range or the durable prefix — those exist only as in-process
+//! event state. Startup recovery (file-lifecycle's `recover_unindexed`)
+//! re-indexes recovered files whole; the resulting SFST's summary carries
+//! the authoritative range, and an SFST always wins over its WAL in the
+//! query path.
+//!
+//! Consumers (grep-verified): `file-lifecycle` composes one registry per
+//! tenant (its `Registry::wal` field), forwards events via `apply_wal_event`,
+//! recovers at startup, and drives queries through [`Registry::candidates`]
+//! (`query_snapshot`, `local_streams`, `local_servable_seqs`); `otel-ledger`
+//! routes events to it, hands sealed files to the indexer by `file_path`,
+//! seeds seq→tenant routing from `archived_files`, untracks entries on
+//! cleaner confirmations (`remove_by_seq`), reads entries back after
+//! indexing (`get`), and walks `values()` for the `files: true` inventory.
+//! The seq-keyed map and path derivation are `file-registry`'s
+//! ([`FileRegistry`]); the query vocabulary is `query.rs`'s ([`Query`]).
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -6,6 +46,9 @@ use file_registry::{ByteSize, FileDir, FileId, FileRegistry, Query, TimestampNs}
 use crate::format::{FileEvent, HEADER_SIZE};
 use crate::{Error, Result};
 
+/// Extension of WAL data files: `{stem}.wal`. The registry's directory
+/// scans, the writer's path derivation, and the crate-root
+/// `scan_max_sequence_recursive` walk all name files with it.
 pub(crate) const WAL_EXT: &str = "wal";
 
 /// Lifecycle status of a WAL file.
@@ -19,74 +62,112 @@ pub enum FileStatus {
 
 /// A WAL file tracked by the registry.
 ///
-/// `min_timestamp_ns` / `max_timestamp_ns` are the **log-data** time
-/// range of the records written into the file (per the OTel hierarchy,
-/// `time_unix_nano` → `observed_time_unix_nano`). They're populated
-/// incrementally from `FileEvent::Synced` while the file is `Active`,
-/// and finalized by `FileEvent::Closed` once it's `Archived`.
+/// `min_timestamp_ns` / `max_timestamp_ns` are the **log-data** time range
+/// of the records written into the file — the caller-supplied per-record
+/// OTel timestamps, not the frames' wall-clock ingestion stamps. Each
+/// `Synced` overwrites both with the writer's current accumulator state
+/// (`ZERO` on both = nothing observed yet) and `Closed` finalizes them; the
+/// field semantics are `format.rs`'s.
 ///
-/// On recovery (registry rebuilt from disk), these fields are left at
-/// `TimestampNs::ZERO` — the WAL file format does not yet carry a
-/// summary footer, so the values can only come from in-process events.
-/// A re-index of the WAL produces an SFST whose summary has the
+/// On recovery the registry is rebuilt from file headers alone, and the WAL
+/// format carries no footer: the log-data range, the durable prefix, and
+/// the record count are event-only state that cannot be reconstructed from
+/// disk. A recovered entry keeps them at `ZERO`/`0`; startup recovery
+/// re-indexes the file whole, and the resulting SFST's summary carries the
 /// authoritative range.
 ///
-/// `#[non_exhaustive]`: this entry has grown fields over time
-/// (`valid_up_to`, `entry_count`) and will likely grow more; external
-/// crates read its fields but never construct it, so marking it spares
-/// them a breaking change on the next addition.
+/// `#[non_exhaustive]`: other crates read this type's fields but never
+/// construct it, so a future field addition is non-breaking for them.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct File {
     pub id: FileId,
     pub status: FileStatus,
+    /// Wall-clock creation time, from the file's header stamp (the
+    /// `Created` event, or the recovery header read). A diagnostic —
+    /// ordering is by seq, not by this.
     pub created_at_ns: TimestampNs,
+    /// Total bytes in the file (header page + frames + padding), written
+    /// only by `Closed`; an active file stays at `ZERO`, so a caller that
+    /// needs a size for an unsealed WAL uses `valid_up_to` as the proxy.
     pub size: ByteSize,
     /// Opaque content-plane identity blob, recovered cheaply from the WAL
-    /// header (no frame decode). The content plane decodes it to name the
-    /// stream in enumeration / the query-side selector; the WAL never parses it.
-    /// The partition key lives in `id` (the filename `FileId`), not here.
+    /// header (no frame decode); the WAL never parses it. The content plane
+    /// decodes it to name the stream — in the query-side selector and the
+    /// `files: true` inventory. The partition key lives in `id` (the
+    /// filename `FileId`), not here.
     pub content_meta: Vec<u8>,
     pub min_timestamp_ns: TimestampNs,
     pub max_timestamp_ns: TimestampNs,
-    /// Byte offset of the durable, fully-written prefix — the end of the
-    /// last frame fsynced to disk (the `valid_up_to` of the most recent
-    /// `Synced` event). Frame-aligned by construction. A concurrent
-    /// reader of an actively-written file must not read past this offset:
-    /// the writer's buffer can flush mid-frame, so the bytes beyond it may
-    /// be a torn frame. `ByteSize::ZERO` means "unknown" — a file recovered
-    /// from disk (no in-process event history; the format carries no
-    /// footer) or one not yet synced. For a sealed (`Archived`) file the
-    /// final `Synced` set this equal to `size`.
+    /// Byte offset of the durable, fully-written prefix: the end of the
+    /// last frame fsynced to disk, as reported by the latest `Synced` or
+    /// `Closed` event. Frame-aligned by construction. A concurrent reader
+    /// of an actively-written file must not read past this offset — the
+    /// writer's buffer can flush mid-frame, so the bytes beyond it may be
+    /// a torn frame.
+    ///
+    /// `ByteSize::ZERO` means "unknown": the file was recovered from disk
+    /// (no in-process event history; the format carries no footer) or has
+    /// not been synced yet. A first sync of a fresh file reports the header
+    /// page size, so `ZERO` never stands for a known-empty file. `Closed`
+    /// reports the durable prefix alongside `size`; the two are equal
+    /// whenever the seal follows a sync (the writer's rotation, idle-sweep,
+    /// and shutdown paths); a file that the writer closed after a failed
+    /// write or fsync can carry `valid_up_to < size`.
     pub valid_up_to: ByteSize,
-    /// Number of log records in the durable prefix (the `entry_count` of
-    /// the most recent `Synced` event). `0` after recovery (unknown).
-    /// A bounded read of `[HEADER, valid_up_to)` must decode exactly this
-    /// many records — the cross-check that the prefix wasn't truncated.
+    /// Number of log records in the durable prefix, as reported by the
+    /// latest `Synced` or `Closed` event; `0` when unknown (recovered from
+    /// disk, or no sync yet). A bounded read of `[HEADER_SIZE,
+    /// valid_up_to)` must decode exactly this many records — the
+    /// cross-check that the prefix was not truncated.
     pub entry_count: u64,
 }
 
+// The registry key is the entry's `FileId.seq`; `apply_event` never
+// rewrites `id`, so the key derived at insert stays stable for the entry's
+// lifetime.
 impl file_registry::Sequenced for File {
     fn seq(&self) -> u64 {
         self.id.seq
     }
 }
 
-/// An ordered collection of WAL files.
+/// The WAL file index over one tenant directory.
 ///
-/// Files are keyed by sequence number, which provides chronological ordering.
+/// A [`FileRegistry`] keyed by each entry's `FileId.seq` — a `BTreeMap`
+/// underneath, so every iterator is ascending-seq (chronological). Purely
+/// in-memory and unsynchronized: mutators take `&mut self`, readers
+/// `&self`, and the caller serializes access (file-lifecycle wraps the
+/// per-tenant registries behind one `RwLock`). Population is the caller's:
+/// [`recover`](Self::recover) from disk at startup, then
+/// [`apply_event`](Self::apply_event) as the writer's events arrive.
 pub struct Registry {
     files: FileRegistry<File>,
 }
 
 impl Registry {
+    /// An empty registry over `path` (one tenant's WAL directory). Pure
+    /// construction — no disk access, and the directory need not exist
+    /// yet; population is the caller's (a recovery scan, or events).
     pub fn new(path: &Path) -> Self {
         Self {
             files: FileRegistry::new(FileDir::new(path, WAL_EXT)),
         }
     }
 
-    /// Recovers registry state by scanning the directory and reading file headers.
+    /// Rebuild the registry from the directory's files: scan it, then read
+    /// each file's header. Identity comes from the filename (`FileId`,
+    /// including the `partition_key` the header does not store);
+    /// `created_at_ns`, `size`, and `content_meta` come from the header. The
+    /// log-data range and durable prefix stay unknown (see [`File`]'s recovery
+    /// note), and every entry lands as `Archived` — whether the file was
+    /// mid-write at the last crash is unknowable from the header, so startup
+    /// recovery re-indexes every recovered WAL that has no SFST yet.
+    ///
+    /// Failure policy: an unreadable file (I/O, or a header format
+    /// rejection) is logged and skipped — it stays on disk but untracked. A
+    /// missing directory scans as empty; any other scan error propagates
+    /// (file-registry's scan contract).
     pub fn recover(&mut self) -> Result<()> {
         let entries = self.files.dir().scan()?;
 
@@ -110,16 +191,14 @@ impl Registry {
                 size,
                 // Recovered cheaply from the header.
                 content_meta: header.content_meta,
-                // Recovery cannot retrieve log-data range from the
-                // WAL file format today. Re-indexing populates the
-                // SFST summary with the authoritative values.
+                // Unknown without in-process event history; see `File`'s
+                // recovery note.
                 min_timestamp_ns: TimestampNs::ZERO,
                 max_timestamp_ns: TimestampNs::ZERO,
-                // Likewise unknown without event history: a crash may
-                // have left a torn tail past the last sync, and the
-                // file carries no durable-prefix marker. ZERO = "do
-                // not trust a byte bound"; such files are re-indexed
-                // whole by the existing pipeline.
+                // Unknown without in-process event history; recovery
+                // re-indexes such files whole. ZERO = do not trust a byte
+                // bound: a crash can leave a torn tail past the last sync,
+                // and the file carries no durable-prefix marker.
                 valid_up_to: ByteSize::ZERO,
                 entry_count: 0,
             });
@@ -132,17 +211,49 @@ impl Registry {
         self.files.dir().path()
     }
 
-    /// Derive the on-disk path for a WAL file.
+    /// Derive the on-disk path for a WAL file. The registry itself never
+    /// opens files; the derived path is what the ledger hands to the
+    /// indexer and what the query readers open.
     pub fn file_path(&self, id: FileId) -> PathBuf {
         self.files.file_path(id)
     }
 
-    /// Scan the directory for the highest existing sequence number.
+    /// The highest `FileId.seq` among the directory's parseable `.wal`
+    /// files — `FileDir::scan_max_sequence`'s contract: `0` for a missing
+    /// or empty directory; scan-open errors propagate. Startup seq seeding
+    /// goes through the crate-root `scan_max_sequence_recursive` walk, not
+    /// through this method.
     pub fn scan_max_sequence(&self) -> Result<u64> {
         Ok(self.files.dir().scan_max_sequence()?)
     }
 
-    /// Applies a `FileEvent` from the writer.
+    /// Apply one writer event, updating the entry it names.
+    ///
+    /// - `Created`: register a new `Active` file — header-derived identity
+    ///   (`created_at_ns`, `content_meta`), accumulators at ZERO/0.
+    ///   `Error::DuplicateSequence` when the seq is already tracked: the
+    ///   [`FileRegistry`] itself would silently replace the entry, so the
+    ///   check here is the dedup.
+    /// - `Synced`: overwrite the log-data range and the durable prefix with
+    ///   the writer's current accumulator state — every event re-reports
+    ///   the totals, not a delta, so a direct overwrite is correct. Ignored
+    ///   (reported as success) for an `Archived` file: `Closed` is
+    ///   authoritative and final, and a `Synced` applied after it must not
+    ///   regress a sealed file's prefix.
+    /// - `Closed`: seal — set `Archived` and write the final size, range,
+    ///   and durable prefix. The event carries the durable prefix itself,
+    ///   so the sealed entry does not depend on a `Synced` before it (no
+    ///   seal of the writer sends one). `Error::AlreadyClosed` for a file that
+    ///   is `Archived` already: a file is closed once, and the caller starts
+    ///   an indexing operation for every `Closed` that is applied.
+    ///
+    /// Errors: `Error::UnknownSequence` when `Synced`/`Closed` names a file
+    /// the registry does not track (no `Created` was applied for it, or the
+    /// entry was already removed). otel-ledger logs and drops the event on
+    /// any of the three errors. The event link delivers a file's events once
+    /// and in order ([`Message`](crate::Message)), so a ledger does not meet
+    /// them: they are the registry's own rules, whoever feeds it. The
+    /// `frame_count` field is informational; the registry ignores it.
     pub fn apply_event(&mut self, event: &FileEvent) -> Result<()> {
         match event {
             FileEvent::Created {
@@ -174,15 +285,10 @@ impl Registry {
                 max_timestamp_ns,
                 ..
             } => {
-                // The event carries the writer's current accumulator
-                // state (not a delta), so a direct overwrite is correct.
                 let entry = self
                     .files
                     .get_mut(file_id.seq)
                     .ok_or(Error::UnknownSequence(file_id.seq))?;
-                // `Closed` is authoritative and final; ignore a `Synced` that
-                // arrives after it (a reordered or late in-flight event) so it
-                // can never regress a sealed file's prefix.
                 if entry.status == FileStatus::Archived {
                     return Ok(());
                 }
@@ -205,12 +311,13 @@ impl Registry {
                     .files
                     .get_mut(file_id.seq)
                     .ok_or(Error::UnknownSequence(file_id.seq))?;
+                if entry.status == FileStatus::Archived {
+                    return Err(Error::AlreadyClosed(file_id.seq));
+                }
                 entry.status = FileStatus::Archived;
                 entry.size = *size;
                 entry.min_timestamp_ns = *min_timestamp_ns;
                 entry.max_timestamp_ns = *max_timestamp_ns;
-                // Carry the authoritative durable prefix so it is correct even if
-                // the final `Synced` was reordered or lost before this event.
                 entry.valid_up_to = *valid_up_to;
                 entry.entry_count = *entry_count;
                 Ok(())
@@ -223,53 +330,63 @@ impl Registry {
         self.files.get(seq)
     }
 
-    /// Removes a file by sequence number.
+    /// Untrack the file for `seq`, returning the removed entry. Registry-only:
+    /// it never touches the file's bytes. Callers untrack when a WAL's
+    /// lifecycle completes (the cleaner's delete confirmation after
+    /// indexing) or as the orphan policy at recovery (a file whose indexing
+    /// failed stays on disk, untracked, and is retried at the next restart).
     pub fn remove_by_seq(&mut self, seq: u64) -> Option<File> {
         self.files.remove(seq)
     }
 
-    /// Returns all archived files, ordered by sequence number.
+    /// The sealed files (`Archived`), ascending-seq — the set startup
+    /// recovery walks (index the unindexed; delete WALs that already have
+    /// an SFST) and that otel-ledger's pipeline uses to seed seq→tenant
+    /// routing.
     pub fn archived_files(&self) -> impl Iterator<Item = &File> {
         self.files
             .values()
             .filter(|f| f.status == FileStatus::Archived)
     }
 
-    /// Every tracked file (active and archived), ordered by sequence
-    /// number. Used by stream enumeration to list a tenant's streams from
-    /// the per-file `stream` recorded in the header — including streams
-    /// that exist only as an unsealed WAL with no SFST summary yet.
+    /// Every tracked file, `Active` and `Archived`, ascending-seq. The
+    /// `files: true` inventory in otel-ledger's logs handler walks this to
+    /// list each tenant's files, decoding each file's `content_meta` to
+    /// name its stream — including a stream that exists only as an active,
+    /// un-indexed WAL (no SFST summary yet).
     pub fn values(&self) -> impl Iterator<Item = &File> {
         self.files.values()
     }
 
-    /// Files in the registry whose log-data range intersects `q`.
+    /// The tracked files whose log-data range intersects `q` — a pure
+    /// in-memory filter that opens no WAL file. Both `Active` and
+    /// `Archived` files match: active files are how the planner reaches
+    /// real-time data not yet flushed into an SFST.
     ///
-    /// Pure filter — does not open any WAL file. Both `Active` (currently
-    /// being written) and `Archived` (sealed, awaiting indexing) files
-    /// are included; Active files are how the planner reaches real-time
-    /// data not yet flushed into an SFST.
+    /// Time filter: `q.time_range` is seconds (the `Query` unit); it is
+    /// scaled to the registry's nanoseconds and tested with
+    /// `range_overlaps`' shared rule (inclusive `[min, max]` data range vs
+    /// half-open `[start, end)` window; a degenerate window matches
+    /// nothing).
     ///
-    /// Files with `min_timestamp_ns == ZERO` are skipped: such a file
-    /// either hasn't received its first `Synced` event yet (a sub-second
-    /// window between `Created` and the first sync of a brand-new
-    /// stream) or was recovered from disk after a process restart
-    /// (recovery cannot retrieve the log-data range from the WAL format
-    /// today). Either way the planner has no authoritative range to
-    /// filter against. The same `Archived(ZERO, ZERO)` case from a
-    /// failed `recover_unindexed` is impossible in steady state because
-    /// recovery untracks the entry on a seal failure (the file is kept
-    /// on disk as an orphan and retried at the next restart), so it
-    /// never reaches this filter.
+    /// Partition filter: membership over the opaque `id.partition_key` — an
+    /// empty `partition_keys` matches every partition. One key per stream
+    /// identity per tenant (the ingestor's collision table keeps it so),
+    /// so key equality is stream equality.
     ///
-    /// Partition filter is matched against the file's `id.part_key`
-    /// (one key per `(namespace, name)` pair); equivalent to comparing
-    /// canonical stream identities given the ingestor's collision-
-    /// detection invariant.
+    /// Files with `min_timestamp_ns == ZERO` are skipped: no event has
+    /// reported an authoritative range yet — a file between `Created` and
+    /// its first sync, or one recovered from disk. Either way there is no
+    /// range to filter against, so the planner drops the file;
+    /// file-lifecycle also excludes candidates with `valid_up_to == 0`, so
+    /// an unsynced entry can never reach a reader. A recovered file is
+    /// never a steady-state candidate: recovery re-indexes it (the SFST
+    /// wins) or untracks it as an orphan on a failed seal, so no `Archived`
+    /// ZERO-range entry survives recovery.
     pub fn candidates<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a File> + 'a {
-        // Extract q's contents upfront so the filter closures don't borrow
-        // q. This decouples the iterator's lifetime from q's, letting
-        // callers pass a temporary `Query` without binding it to a local.
+        // Extract q's fields upfront so the `move` closures capture values,
+        // not `q`: the returned iterator's lifetime then stays bound to
+        // `self` alone, and a caller may hand over a temporary `Query`.
         let q_min_ns = (q.time_range.start as u64) * 1_000_000_000;
         let q_max_ns = (q.time_range.end as u64) * 1_000_000_000;
         let partition_keys = q.partition_keys.clone();
@@ -278,7 +395,9 @@ impl Registry {
             .values()
             .filter(|f| f.min_timestamp_ns != TimestampNs::ZERO)
             .filter(move |f| range_overlaps_ns(f, q_min_ns, q_max_ns))
-            .filter(move |f| partition_keys.is_empty() || partition_keys.contains(&f.id.part_key))
+            .filter(move |f| {
+                partition_keys.is_empty() || partition_keys.contains(&f.id.partition_key)
+            })
     }
 
     pub fn len(&self) -> usize {
@@ -290,9 +409,9 @@ impl Registry {
     }
 }
 
-/// True iff the file's nanosecond range `[min, max]` (inclusive on both
-/// ends) overlaps the query's `[q_start_ns, q_end_ns)` (half-open) —
-/// the shared [`file_registry::range_overlaps`] rule in nanoseconds.
+/// Whether the file's inclusive nanosecond range `[min, max]` overlaps the
+/// query's half-open `[q_start_ns, q_end_ns)` window — the shared
+/// `file_registry::range_overlaps` rule applied over ns bounds.
 fn range_overlaps_ns(file: &File, q_start_ns: u64, q_end_ns: u64) -> bool {
     file_registry::range_overlaps(
         &(q_start_ns..q_end_ns),
@@ -301,7 +420,10 @@ fn range_overlaps_ns(file: &File, q_start_ns: u64, q_end_ns: u64) -> bool {
     )
 }
 
-/// Read and parse the WAL file header.
+/// Read exactly the first `HEADER_SIZE` bytes of `path` and parse the
+/// header page — the cheap identity read recovery uses (no frame is
+/// decoded). Failures are I/O (open, short read) or the header's format
+/// rejections (`format.rs`); `recover` logs and skips the file on either.
 fn read_header(path: &std::path::Path) -> Result<crate::format::FileHeader> {
     use std::io::Read;
     let mut file = fs::File::open(path)?;
@@ -351,7 +473,7 @@ mod tests {
             for i in 0..count {
                 writer
                     .write_frame(
-                        crate::opaque_part_key("ns", "svc"),
+                        crate::opaque_partition_key("ns", "svc"),
                         &[],
                         &(i as u32).to_le_bytes(),
                         crate::FrameMeta {
@@ -405,11 +527,11 @@ mod tests {
         assert_eq!(seqs, vec![1, 2]);
 
         // Recovery reads the partition key from the filename (FileId), not the
-        // header — the header stores no part_key.
+        // header — the header stores no partition_key.
         assert!(
             registry
                 .archived_files()
-                .all(|f| f.id.part_key == crate::opaque_part_key("ns", "svc")),
+                .all(|f| f.id.partition_key == crate::opaque_partition_key("ns", "svc")),
             "recovery must recover each file's partition key from its filename (FileId)"
         );
     }
@@ -656,9 +778,9 @@ mod tests {
 
     // ── candidates() tests ───────────────────────────────────────
 
-    fn fid_with(seq: u64, part_key: u64) -> FileId {
+    fn fid_with(seq: u64, partition_key: u64) -> FileId {
         let identity = crate::test_identity();
-        FileId::new(identity, 0, seq, part_key)
+        FileId::new(identity, 0, seq, partition_key)
     }
 
     /// Insert a file via the event flow with the given (min, max) range
@@ -666,12 +788,12 @@ mod tests {
     fn track(
         reg: &mut Registry,
         seq: u64,
-        part_key: u64,
+        partition_key: u64,
         min_ns: u64,
         max_ns: u64,
         status: FileStatus,
     ) -> FileId {
-        let id = fid_with(seq, part_key);
+        let id = fid_with(seq, partition_key);
         reg.apply_event(&FileEvent::Created {
             file_id: id,
             created_at_ns: TimestampNs(0),
@@ -766,15 +888,15 @@ mod tests {
     }
 
     #[test]
-    fn candidates_filter_by_part_key() {
-        // The WAL filter matches files by their opaque `part_key` (the content
-        // plane's stream-hash collapse — absent vs empty namespace — is the
-        // content plane's concern, covered by otel-logs-identity's tests).
+    fn candidates_filter_by_partition_key() {
+        // The WAL filter matches files by their opaque `partition_key` (the
+        // content plane's stream-hash collapse — absent vs empty namespace — is
+        // the content plane's concern, covered by otel-logs-identity's tests).
         let dir = tempfile::tempdir().unwrap();
         let mut reg = Registry::new(dir.path());
 
-        let api = crate::opaque_part_key("prod", "api");
-        let worker = crate::opaque_part_key("prod", "worker");
+        let api = crate::opaque_partition_key("prod", "api");
+        let worker = crate::opaque_partition_key("prod", "worker");
         track(&mut reg, 1, api, 100 * NS, 200 * NS, FileStatus::Archived);
         track(
             &mut reg,
@@ -843,6 +965,37 @@ mod tests {
             partition_keys: Vec::new(),
         };
         assert!(reg.candidates(&q).next().is_none());
+    }
+
+    /// A file is closed once. The ledger starts an indexing operation for
+    /// every `Closed` it applies, so a second one must not be applied.
+    #[test]
+    fn a_second_closed_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let id = test_file_id(1);
+        let closed = FileEvent::Closed {
+            file_id: id,
+            frame_count: 2,
+            min_timestamp_ns: TimestampNs(150),
+            max_timestamp_ns: TimestampNs(400),
+            size: ByteSize(200),
+            valid_up_to: ByteSize(200),
+            entry_count: 2,
+        };
+
+        let mut registry = Registry::new(dir.path());
+        registry.recover().unwrap();
+        registry
+            .apply_event(&FileEvent::Created {
+                file_id: id,
+                created_at_ns: TimestampNs(1_000_000_000),
+                content_meta: Vec::new(),
+            })
+            .unwrap();
+        registry.apply_event(&closed).unwrap();
+
+        let err = registry.apply_event(&closed).unwrap_err();
+        assert!(matches!(err, Error::AlreadyClosed(1)), "{err}");
     }
 
     #[test]

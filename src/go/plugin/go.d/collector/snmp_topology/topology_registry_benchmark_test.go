@@ -99,7 +99,7 @@ func TestSNMPTopologyRegistryPreservesInferredLLDPAliasesWithCompactLinkHandles(
 	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(options)
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.Equal(t, linkCount, payload.Links.Rows)
+	require.Equal(t, linkCount, payload.Data.Links.Rows)
 }
 
 func BenchmarkSNMPTopologyFunctionInferredActorIDScaling(b *testing.B) {
@@ -149,8 +149,8 @@ func BenchmarkSNMPTopologyFunctionInferredActorIDScaling(b *testing.B) {
 
 			deps := funcDepsAdapter{registry: registry}
 			probe, ok, err := deps.Snapshot(options)
-			if err != nil || !ok || probe.Links.Rows != tc.links {
-				b.Fatalf("Function probe rows=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+			if err != nil || !ok || probe.Data.Links.Rows != tc.links {
+				b.Fatalf("Function probe rows=%d ok=%t err=%v", probe.Data.Links.Rows, ok, err)
 			}
 
 			b.ReportAllocs()
@@ -267,15 +267,15 @@ func BenchmarkSNMPTopologyFDBFunctionRenderingScaling(b *testing.B) {
 			options := topologyoptions.DefaultQueryOptions()
 
 			probe, ok, err := deps.Snapshot(options)
-			if err != nil || !ok || probe.Links.Rows == 0 {
-				b.Fatalf("Function probe links=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+			if err != nil || !ok || probe.Data.Links.Rows == 0 {
+				b.Fatalf("Function probe links=%d ok=%t err=%v", probe.Data.Links.Rows, ok, err)
 			}
-			encoded, err := json.Marshal(probe)
+			encoded, err := json.Marshal(probe.Data)
 			if err != nil {
 				b.Fatalf("encode Function probe: %v", err)
 			}
-			b.ReportMetric(float64(probe.Actors.Rows), "actors/op")
-			b.ReportMetric(float64(probe.Links.Rows), "links/op")
+			b.ReportMetric(float64(probe.Data.Actors.Rows), "actors/op")
+			b.ReportMetric(float64(probe.Data.Links.Rows), "links/op")
 			b.ReportMetric(float64(len(encoded)), "payload-B")
 
 			b.ReportAllocs()
@@ -285,7 +285,7 @@ func BenchmarkSNMPTopologyFDBFunctionRenderingScaling(b *testing.B) {
 				if err != nil || !ok {
 					b.Fatalf("Function snapshot ok=%t err=%v", ok, err)
 				}
-				encoded, err := json.Marshal(payload)
+				encoded, err := json.Marshal(payload.Data)
 				if err != nil {
 					b.Fatalf("encode Function payload: %v", err)
 				}
@@ -365,7 +365,7 @@ func BenchmarkSNMPTopologyFDBSegmentDensityEndToEnd(b *testing.B) {
 				if err != nil || !ok {
 					b.Fatalf("high-segment Function snapshot ok=%t err=%v", ok, err)
 				}
-				encoded, err := json.Marshal(payload)
+				encoded, err := json.Marshal(payload.Data)
 				if err != nil {
 					b.Fatalf("encode high-segment Function payload: %v", err)
 				}
@@ -387,7 +387,7 @@ func benchmarkTopologyPayloadSizes(b *testing.B, registry *topologyRegistry, opt
 	if err != nil || !ok {
 		b.Fatalf("topology Function payload ok=%t err=%v", ok, err)
 	}
-	encoded, err := json.Marshal(payload)
+	encoded, err := json.Marshal(payload.Data)
 	if err != nil {
 		b.Fatalf("marshal topology Function payload: %v", err)
 	}
@@ -529,8 +529,8 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricConcurrent(b *testing.B) {
 	registry := benchmarkManagedFabricFDBTopologyRegistry(8, 128, true)
 	deps := funcDepsAdapter{registry: registry}
 	options := topologyoptions.DefaultQueryOptions()
-	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {
-		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Links.Rows, ok, err)
+	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Data.Links.Rows == 0 {
+		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Data.Links.Rows, ok, err)
 	}
 
 	b.ReportAllocs()
@@ -571,8 +571,8 @@ func BenchmarkSNMPTopologyFunctionDefaultManagedFabricMixedReadPublish(b *testin
 		diagnostic:        published.diagnostic,
 	}
 
-	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Links.Rows == 0 {
-		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Links.Rows, ok, err)
+	if payload, ok, err := deps.Snapshot(options); err != nil || !ok || payload.Data.Links.Rows == 0 {
+		b.Fatalf("default managed-fabric Function probe rows=%d ok=%t err=%v", payload.Data.Links.Rows, ok, err)
 	}
 
 	var operations atomic.Uint64
@@ -790,11 +790,11 @@ func BenchmarkSNMPTopologyFunctionAliasScaling(b *testing.B) {
 			if err != nil || !ok {
 				b.Fatalf("topology snapshot probe failed: ok=%t err=%v", ok, err)
 			}
-			if minimumLinks := logicalPeers * 3; !tc.sharedPrimary && probe.Links.Rows < minimumLinks {
-				b.Fatalf("topology snapshot emitted %d links, want at least %d", probe.Links.Rows, minimumLinks)
+			if minimumLinks := logicalPeers * 3; !tc.sharedPrimary && probe.Data.Links.Rows < minimumLinks {
+				b.Fatalf("topology snapshot emitted %d links, want at least %d", probe.Data.Links.Rows, minimumLinks)
 			}
-			if tc.sharedPrimary && probe.Links.Rows != 0 {
-				b.Fatalf("shared-primary topology emitted %d links after actor collapse, want 0", probe.Links.Rows)
+			if tc.sharedPrimary && probe.Data.Links.Rows != 0 {
+				b.Fatalf("shared-primary topology emitted %d links after actor collapse, want 0", probe.Data.Links.Rows)
 			}
 
 			b.ReportAllocs()

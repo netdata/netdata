@@ -1,3 +1,46 @@
+//! Tests for the `otel-traces` wire types in `wire.rs` (this file is its
+//! child `mod tests`): the request deserialization contract — which JSON
+//! shape selects which `TracesMode`, and every strictness rule that
+//! turns a bad request into a transport 400 before the handler runs —
+//! plus the `InfoResponse` descriptor and `StatusWire` serialization.
+//!
+//! Fixtures are inline `json!` literals driven straight through
+//! serde_json, so the message fragments asserted here are the strings
+//! clients see; raw byte slices exist only where a `json!` literal
+//! cannot go (duplicate top-level keys). One test reads the published
+//! `FUNCTION_UI_SCHEMA.json` — the only file fixture.
+//!
+//! Pins:
+//!
+//! - mode selection: no selector means the implicit Functions view,
+//!   each of the three selectors its own mode, `tenant` riding beside
+//!   a selector;
+//! - leniency: a top-level key this build does not know is ignored in
+//!   every mode;
+//! - strictness: an unknown key inside a mode object, a selector mixed
+//!   with Functions parameters, conflicting selectors (reported even
+//!   when one is also malformed), selector values that are not objects,
+//!   present-but-null selectors, duplicate top-level keys, and a
+//!   non-object top level — all client errors, with the message
+//!   fragments clients match on;
+//! - the implicit view's parameter mapping through
+//!   `FunctionsParams::search_params`: defaults, relative-window
+//!   resolution, and the chips and text forwarding;
+//! - per-mode param objects: self-contained windows;
+//! - `InfoResponse`'s exact descriptor JSON and the untagged response
+//!   envelope;
+//! - `StatusWire` serialization: the two status shapes, deterministic
+//!   partial-reason order, the round trip, the unrepresentable
+//!   `{"complete": false}`, and every reason present in the published
+//!   UI schema.
+//!
+//! Not pinned here: the anchor's format (an opaque string on the wire —
+//! cursor parsing and the "malformed anchor" rejections are the
+//! adapter's pin, `rpc/traces/adapter.rs`), the chip key grammar
+//! (also the adapter's), semantic validation beyond deserialization
+//! (trace-id shape, limit caps, window bounds — the handler's and
+//! engine's job), and data-mode response semantics (the handler tests,
+//! end to end).
 use super::*;
 use serde_json::json;
 use sfsq::traces::StatusBuilder;
@@ -14,6 +57,11 @@ fn req_err(v: serde_json::Value) -> String {
         .to_string()
 }
 
+/// The implicit Functions view: no selector becomes Functions params
+/// with their serde defaults — `last` falls to the engine default,
+/// windows stay at the `0` sentinel — and `tenant` rides beside. A
+/// relative window resolves against `now`; a relative `after`
+/// resolves against the already-resolved `before`, not `now` again.
 #[test]
 fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     let TracesMode::Functions(p) = req(json!({})).mode else {
@@ -21,7 +69,7 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     };
     assert_eq!((p.after, p.before, p.last), (0, 0, 20));
     assert_eq!(p.anchor, None);
-    assert!(p.selections.is_empty());
+    assert!(p.conditions.is_empty() && p.text.is_empty());
 
     let r = req(json!({"tenant": "t1"}));
     assert!(matches!(r.mode, TracesMode::Functions(_)));
@@ -32,7 +80,8 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
         "before": -60,
         "last": 7,
         "anchor": "cursor",
-        "selections": {"root_name": ["GET /api"]},
+        "conditions": [{"key": "root_name", "op": "=", "values": ["GET /api"]}],
+        "text": ["timeout"],
         "timeout": 120000
     }))
     .mode
@@ -41,69 +90,19 @@ fn a_request_without_a_mode_selector_selects_the_functions_search_view() {
     };
     assert_eq!((p.after, p.before, p.last), (-3600, -60, 7));
     assert_eq!(p.anchor.as_deref(), Some("cursor"));
-    assert_eq!(p.selections["root_name"], ["GET /api"]);
+    assert_eq!(p.conditions[0].key, "root_name");
+    assert_eq!(p.text, ["timeout"]);
 
     let search = p.search_params(10_000).unwrap();
     assert_eq!((search.after, search.before), (6_340, 9_940));
 }
 
 #[test]
-fn the_functions_view_forwards_the_minimum_trace_duration() {
-    let TracesMode::Functions(p) = req(json!({"min_trace_duration_ns": 250_000_000})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(
-        p.search_params(10_000).unwrap().min_trace_duration_ns,
-        Some(250_000_000)
-    );
-
-    // Omitted stays unset — existing callers keep their behaviour.
-    let TracesMode::Functions(p) = req(json!({})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(p.search_params(10_000).unwrap().min_trace_duration_ns, None);
-}
-
-#[test]
-fn the_functions_view_forwards_the_maximum_trace_duration() {
-    let TracesMode::Functions(p) = req(json!({"max_trace_duration_ns": 250_000_000})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(
-        p.search_params(10_000).unwrap().max_trace_duration_ns,
-        Some(250_000_000)
-    );
-
-    // Omitted stays unset — existing callers keep their behaviour.
-    let TracesMode::Functions(p) = req(json!({})).mode else {
-        panic!("Functions mode expected");
-    };
-    assert_eq!(p.search_params(10_000).unwrap().max_trace_duration_ns, None);
-}
-
-#[test]
-fn overview_facets_rides_with_the_functions_parameters() {
-    // The aggregate's facet opt-in is a Functions parameter: it selects
-    // the Functions view like the others, and it cannot ride with a
-    // mode selector (the response key is not a request field — the
-    // `overview` selector still means the legacy mode).
-    assert!(matches!(
-        req(json!({"after": -900, "overview_facets": true})).mode,
-        TracesMode::Functions(_)
-    ));
-    let err = req_err(json!({"overview": {}, "overview_facets": true}));
-    assert!(
-        err.contains("cannot mix a mode selector with Functions parameters"),
-        "{err}"
-    );
-}
-
-#[test]
 fn info_is_the_strict_empty_object() {
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
-    // Both of the old wire's boolean forms, junk scalars, null, and
-    // non-empty objects are malformed selectors — a malformed selector
-    // must not silently select.
+    // Bools (the old wire's two forms), junk scalars, null, arrays,
+    // and non-empty objects are all malformed selectors — a malformed
+    // selector must not silently select.
     for body in [
         json!({"info": true}),
         json!({"info": false}),
@@ -124,24 +123,8 @@ fn each_selector_selects_its_mode() {
         TracesMode::Trace(_)
     ));
     assert!(matches!(
-        req(json!({"attributes": {}})).mode,
-        TracesMode::Attributes(_)
-    ));
-    assert!(matches!(
-        req(json!({"attribute_values": {"key": "kind"}})).mode,
-        TracesMode::AttributeValues(_)
-    ));
-    assert!(matches!(
-        req(json!({"overview": {}})).mode,
-        TracesMode::Overview(_)
-    ));
-    assert!(matches!(
-        req(json!({"slowest": {}})).mode,
-        TracesMode::Slowest(_)
-    ));
-    assert!(matches!(
-        req(json!({"search": {}})).mode,
-        TracesMode::Search(_)
+        req(json!({"suggest": {"key": "kind"}})).mode,
+        TracesMode::Suggest(_)
     ));
     assert!(matches!(req(json!({"info": {}})).mode, TracesMode::Info));
 }
@@ -153,9 +136,7 @@ fn a_present_but_null_selector_selects_then_rejects() {
     // deserializer keeps the selection so the error names the selector.
     for (body, needle) in [
         (json!({"trace": null}), "invalid trace selector"),
-        (json!({"overview": null}), "invalid overview selector"),
-        (json!({"slowest": null}), "invalid slowest selector"),
-        (json!({"search": null}), "invalid search selector"),
+        (json!({"suggest": null}), "invalid suggest selector"),
     ] {
         let err = req_err(body.clone());
         assert!(err.contains(needle), "for {body}: {err}");
@@ -164,12 +145,12 @@ fn a_present_but_null_selector_selects_then_rejects() {
 
 #[test]
 fn selectors_are_object_only_arrays_reject() {
-    // serde-derived structs also accept positional JSON arrays via the
-    // seq visitor; the object gate closes that hole at both levels.
+    // serde-derived struct visitors also accept positional JSON arrays
+    // via the seq visitor; the is_object gate before the typed parse
+    // closes that hole for every selector value.
     for (body, needle) in [
-        (json!({"overview": []}), "invalid overview selector"),
+        (json!({"suggest": []}), "invalid suggest selector"),
         (json!({"trace": ["00ff", 7]}), "invalid trace selector"),
-        (json!({"search": []}), "invalid search selector"),
     ] {
         let err = req_err(body.clone());
         assert!(
@@ -183,24 +164,54 @@ fn selectors_are_object_only_arrays_reject() {
 fn the_top_level_must_be_a_json_object() {
     for body in [json!([]), json!([{}]), json!([1, 2]), json!(7), json!("x")] {
         let err = req_err(body.clone());
-        assert!(err.contains("otel-traces request object"), "for {body}: {err}");
+        assert!(
+            err.contains("otel-traces request object"),
+            "for {body}: {err}"
+        );
     }
 }
 
+/// The top level is built by generic Functions clients (the dashboard's
+/// shared request builder, the Agent's MCP tool), which add keys of
+/// their own: a key this build does not know is ignored in every mode,
+/// `timeout` and retired parameters included.
 #[test]
-fn unknown_and_retired_top_level_keys_are_client_errors() {
-    for body in [json!({"search": {}, "bogus": 1}), json!({"bogus": 1})] {
-        let err = req_err(body.clone());
-        assert!(err.contains("unknown field"), "for {body}: {err}");
+fn unknown_top_level_keys_are_ignored() {
+    for body in [
+        json!({"bogus": 1}),
+        json!({"timeout": 120000}),
+        json!({"selections": {"name": ["GET"]}}),
+        json!({"min_trace_duration_ns": 1}),
+    ] {
+        let TracesMode::Functions(p) = req(body.clone()).mode else {
+            panic!("Functions mode expected for {body}");
+        };
+        assert_eq!((p.after, p.before, p.last), (0, 0, 20), "for {body}");
+        assert!(p.conditions.is_empty() && p.text.is_empty(), "for {body}");
     }
 
+    assert!(matches!(
+        req(json!({"info": {}, "bogus": 1})).mode,
+        TracesMode::Info
+    ));
+    assert!(matches!(
+        req(json!({"info": {}, "timeout": 30})).mode,
+        TracesMode::Info
+    ));
+    let r = req(json!({"trace": {"id": "00"}, "source": "ui", "tenant": "t1"}));
+    assert!(matches!(r.mode, TracesMode::Trace(_)));
+    assert_eq!(r.tenant.as_deref(), Some("t1"));
+}
+
+/// A legal Functions parameter beside any selector is a
+/// deserialization-time client error: the two request forms do not mix.
+#[test]
+fn functions_parameters_beside_a_selector_are_client_errors() {
     for body in [
-        json!({"search": {}, "after": 1, "before": 2}),
-        json!({"search": {}, "last": 5}),
-        json!({"search": {}, "timeout": 30}),
-        json!({"search": {}, "min_trace_duration_ns": 1}),
-        json!({"search": {}, "max_trace_duration_ns": 1}),
+        json!({"info": {}, "after": 1, "before": 2}),
+        json!({"info": {}, "last": 5}),
         json!({"trace": {"id": "00"}, "anchor": "x"}),
+        json!({"explore": {}, "skip_overview": true}),
     ] {
         let err = req_err(body.clone());
         assert!(
@@ -210,22 +221,29 @@ fn unknown_and_retired_top_level_keys_are_client_errors() {
     }
 }
 
+/// The `trace` selector's strictness and parse-through: junk shapes and
+/// unknown fields are client errors; a well-formed body carries `id`
+/// and the optional window through untouched — semantic
+/// validation is not the wire's job.
 #[test]
 fn trace_params_reject_malformed_and_parse_bounds() {
     let cases = [
         (json!({"trace": 7}), "invalid trace selector"),
         (json!({"trace": {}}), "missing field `id`"),
         (json!({"trace": {"id": "00", "bogus": 1}}), "unknown field"),
+        (
+            json!({"trace": {"id": "00", "span_cap": 9}}),
+            "unknown field",
+        ),
     ];
     for (body, needle) in cases {
         let err = req_err(body.clone());
         assert!(err.contains(needle), "for {body}: {err}");
     }
-    let TracesMode::Trace(ok) = req(json!({"trace": {"id": "00ff", "span_cap": 9}})).mode else {
+    let TracesMode::Trace(ok) = req(json!({"trace": {"id": "00ff"}})).mode else {
         panic!("trace mode expected");
     };
     assert_eq!(ok.id, "00ff");
-    assert_eq!(ok.span_cap, Some(9));
     assert_eq!(ok.after, None);
     assert_eq!(ok.before, None);
 
@@ -238,16 +256,55 @@ fn trace_params_reject_malformed_and_parse_bounds() {
     assert_eq!(bounded.before, Some(200));
 }
 
+/// The `explore` selector: strict, mutually exclusive with the others and
+/// with the Functions parameters, and its sections parse through.
+#[test]
+fn explore_params_are_strict_and_parse_through() {
+    for (body, needle) in [
+        (json!({"explore": []}), "invalid explore selector"),
+        (json!({"explore": {"bogus": 1}}), "unknown field"),
+        (json!({"explore": {"rows": {"page": 2}}}), "unknown field"),
+        (
+            json!({"explore": {"histogram": {"stack": "kind", "x": 1}}}),
+            "unknown field",
+        ),
+        (
+            json!({"explore": {}, "suggest": {}}),
+            "conflicting mode selectors: suggest, explore",
+        ),
+        (
+            json!({"explore": {}, "after": -900}),
+            "cannot mix a mode selector with Functions parameters",
+        ),
+    ] {
+        let err = req_err(body.clone());
+        assert!(err.contains(needle), "for {body}: {err}");
+    }
+    let TracesMode::Explore(p) = req(json!({"explore": {
+        "after": -900,
+        "conditions": [{"key": "kind", "op": "=", "values": ["SERVER"]}],
+        "text": ["boom"],
+        "histogram": {},
+        "rows": {"limit": 5, "columns": ["name"]}
+    }}))
+    .mode
+    else {
+        panic!("explore mode expected");
+    };
+    assert_eq!((p.after, p.before), (-900, 0));
+    assert_eq!(p.conditions.len(), 1);
+    assert_eq!(p.text, ["boom"]);
+    assert_eq!(p.histogram.unwrap().stack, None);
+    let rows = p.rows.unwrap();
+    assert_eq!(rows.limit, Some(5));
+    assert_eq!(rows.columns, Some(vec!["name".to_string()]));
+}
+
 #[test]
 fn conflicting_selectors_are_a_client_error() {
-    let err = req_err(json!({"trace": {}, "overview": {}}));
+    let err = req_err(json!({"trace": {}, "suggest": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, overview"),
-        "{err}"
-    );
-    let err = req_err(json!({"overview": {}, "slowest": {}}));
-    assert!(
-        err.contains("conflicting mode selectors: overview, slowest"),
+        err.contains("conflicting mode selectors: trace, suggest"),
         "{err}"
     );
     // info is a PEER selector — no precedence.
@@ -260,12 +317,11 @@ fn conflicting_selectors_are_a_client_error() {
 
 #[test]
 fn a_conflict_is_reported_before_a_malformed_selector() {
-    // ALL present selectors are counted before any is decoded — a
-    // conflicting body reports the conflict even when one selector is
-    // also malformed.
-    let err = req_err(json!({"trace": null, "overview": {}}));
+    // All present selectors are counted before any is decoded, so the
+    // conflict wins over a malformed selector in the same body.
+    let err = req_err(json!({"trace": null, "suggest": {}}));
     assert!(
-        err.contains("conflicting mode selectors: trace, overview"),
+        err.contains("conflicting mode selectors: trace, suggest"),
         "{err}"
     );
 }
@@ -283,76 +339,72 @@ fn duplicate_keys_are_rejected_not_last_value_wins() {
     assert!(err.to_string().contains("duplicate field"), "{err}");
 
     let err = serde_json::from_slice::<OtelTracesRequest>(
-        br#"{"search": {}, "tenant": "a", "tenant": "b"}"#,
+        br#"{"info": {}, "tenant": "a", "tenant": "b"}"#,
     )
     .expect_err("duplicate tenant must be rejected");
     assert!(err.to_string().contains("duplicate field"), "{err}");
 }
 
 #[test]
-fn search_params_defaults_and_strictness() {
-    let TracesMode::Search(p) = req(json!({"search": {}})).mode else {
-        panic!("search mode expected");
-    };
-    assert_eq!(p.after, 0);
-    assert_eq!(p.before, 0);
-    assert_eq!(p.limit, sfsq::traces::DEFAULT_SEARCH_LIMIT);
-    assert_eq!(p.spans_per_trace, None);
-    assert!(p.selections.is_empty());
-    assert_eq!(p.anchor, None);
-
-    let TracesMode::Search(p) = req(json!({"search": {
-        "after": 10, "before": 20, "limit": 1,
-        "selections": {"kind": ["SERVER"]}
-    }}))
-    .mode
-    else {
-        panic!("search mode expected");
-    };
-    assert_eq!((p.after, p.before), (10, 20));
-    assert_eq!(p.limit, 1);
-    assert_eq!(p.selections["kind"], vec!["SERVER"]);
-
-    let err = req_err(json!({"search": {"last": 5}}));
-    assert!(
-        err.contains("invalid search selector") && err.contains("unknown field"),
-        "the old `last` name is retired: {err}"
-    );
-}
-
-#[test]
 fn windowed_mode_objects_carry_their_own_window() {
-    let TracesMode::Overview(p) = req(json!({"overview": {"after": 1, "before": 2}})).mode else {
-        panic!("overview mode expected");
-    };
-    assert_eq!((p.after, p.before), (1, 2));
-    let TracesMode::Attributes(p) = req(json!({"attributes": {"after": 3, "before": 4}})).mode
+    let TracesMode::Suggest(p) =
+        req(json!({"suggest": {"key": "kind", "after": 5, "before": 6}})).mode
     else {
-        panic!("attributes mode expected");
-    };
-    assert_eq!((p.after, p.before), (3, 4));
-    let TracesMode::AttributeValues(p) =
-        req(json!({"attribute_values": {"key": "kind", "after": 5, "before": 6}})).mode
-    else {
-        panic!("attribute_values mode expected");
+        panic!("suggest mode expected");
     };
     assert_eq!((p.after, p.before), (5, 6));
-    let TracesMode::Slowest(p) = req(json!({"slowest": {"after": 7, "before": 8}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!((p.after, p.before), (7, 8));
 
     // Omitted windows keep the 0 = "unspecified" sentinel — the
     // adapter's resolve_window defaults are untouched.
-    let TracesMode::Overview(p) = req(json!({"overview": {}})).mode else {
-        panic!("overview mode expected");
+    let TracesMode::Suggest(p) = req(json!({"suggest": {"key": "kind"}})).mode else {
+        panic!("suggest mode expected");
     };
     assert_eq!((p.after, p.before), (0, 0));
 }
 
 #[test]
+fn suggest_params_parse_with_defaults_and_reject_strays() {
+    let TracesMode::Suggest(p) = req(json!({"suggest": {}})).mode else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(
+        (
+            p.after,
+            p.before,
+            p.key,
+            p.term.as_str(),
+            p.max_items,
+            p.tier
+        ),
+        (0, 0, None, "", None, None)
+    );
+    let TracesMode::Suggest(p) =
+        req(json!({"suggest": {"key": "name", "term": "ab", "max_items": 7}})).mode
+    else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(
+        (p.key.as_deref(), p.term.as_str(), p.max_items),
+        (Some("name"), "ab", Some(7))
+    );
+    let TracesMode::Suggest(p) = req(json!({"suggest": {"tier": "low"}})).mode else {
+        panic!("suggest mode expected");
+    };
+    assert_eq!(p.tier, Some(TierWire::Low));
+    let err = req_err(json!({"suggest": {"terms": "ab"}}));
+    assert!(err.contains("invalid suggest selector"), "{err}");
+    let err = req_err(json!({"suggest": {"tier": "lowest"}}));
+    assert!(err.contains("invalid suggest selector"), "{err}");
+    let err = req_err(json!({"info": {}, "suggest": {}}));
+    assert!(
+        err.contains("conflicting mode selectors: info, suggest"),
+        "{err}"
+    );
+}
+
+#[test]
 fn tenant_rides_beside_any_mode() {
-    let r = req(json!({"search": {}, "tenant": "t1"}));
+    let r = req(json!({"trace": {"id": "00"}, "tenant": "t1"}));
     assert_eq!(r.tenant.as_deref(), Some("t1"));
     let r = req(json!({"info": {}}));
     assert_eq!(r.tenant, None);
@@ -360,6 +412,10 @@ fn tenant_rides_beside_any_mode() {
 
 // ── Info response ───────────────────────────────────────────────────
 
+/// The capability-discovery descriptor, field for field: the envelope
+/// fields, the help string, and `accepted_params` equal to the
+/// module's `ACCEPTED_PARAMS` list — the list the UI builds requests
+/// from, so a missing entry makes a request field unreachable.
 #[test]
 fn info_response_shape_is_pinned() {
     let v = serde_json::to_value(InfoResponse::default()).unwrap();
@@ -373,9 +429,8 @@ fn info_response_shape_is_pinned() {
             "has_history": true,
             "v": 3,
             "accepted_params": [
-                "info", "trace", "attributes", "attribute_values", "overview",
-                "slowest", "search", "tenant", "after", "before", "last", "anchor", "selections",
-                "min_trace_duration_ns", "max_trace_duration_ns", "overview_facets"
+                "info", "trace", "suggest", "explore", "tenant", "after", "before", "last", "anchor",
+                "conditions", "text", "skip_overview"
             ],
             "required_params": [],
             "help": "Query and visualize OpenTelemetry traces.",
@@ -398,7 +453,10 @@ fn response_envelope_is_untagged() {
 #[test]
 fn complete_status_serializes_as_complete_true() {
     let wire = StatusWire::from(&QueryStatus::Complete);
-    assert_eq!(serde_json::to_value(&wire).unwrap(), json!({"complete": true}));
+    assert_eq!(
+        serde_json::to_value(&wire).unwrap(),
+        json!({"complete": true})
+    );
 }
 
 #[test]
@@ -415,70 +473,97 @@ fn partial_status_serializes_reason_names_deterministically() {
     );
 }
 
+/// Every engine reason. The exhaustive match fails compilation when the
+/// engine gains a reason, so the pins below cannot silently miss it.
+fn every_partial_reason() -> Vec<PartialReason> {
+    let all = vec![
+        PartialReason::SizeCap,
+        PartialReason::SourceFailure,
+        PartialReason::WorkCeiling,
+        PartialReason::Cancelled,
+        PartialReason::OverviewCeiling,
+        PartialReason::RollupAbsent,
+        PartialReason::RemoteUnavailable,
+        PartialReason::ByteBudget,
+        PartialReason::Busy,
+        PartialReason::FileBudget,
+        PartialReason::Deadline,
+        PartialReason::NoNewMatches,
+        PartialReason::TraceFragments,
+        PartialReason::DroppedFields,
+        PartialReason::StackFieldHighCard,
+    ];
+    for reason in &all {
+        match reason {
+            PartialReason::SizeCap
+            | PartialReason::SourceFailure
+            | PartialReason::WorkCeiling
+            | PartialReason::Cancelled
+            | PartialReason::OverviewCeiling
+            | PartialReason::RollupAbsent
+            | PartialReason::RemoteUnavailable
+            | PartialReason::ByteBudget
+            | PartialReason::Busy
+            | PartialReason::FileBudget
+            | PartialReason::Deadline
+            | PartialReason::NoNewMatches
+            | PartialReason::TraceFragments
+            | PartialReason::DroppedFields
+            | PartialReason::StackFieldHighCard => {}
+        }
+    }
+    all
+}
+
 #[test]
 fn every_partial_reason_wire_name_is_pinned() {
     let mut b = StatusBuilder::new();
-    b.add(PartialReason::SizeCap);
-    b.add(PartialReason::SourceFailure);
-    b.add(PartialReason::WorkCeiling);
-    b.add(PartialReason::Cancelled);
-    b.add(PartialReason::OverviewCeiling);
-    b.add(PartialReason::RollupAbsent);
-    b.add(PartialReason::SlowestCeiling);
+    for reason in every_partial_reason() {
+        b.add(reason);
+    }
     let wire = StatusWire::from(&b.finish());
     assert_eq!(
         serde_json::to_value(&wire).unwrap(),
         json!({"partial": [
             "size_cap", "source_failure", "work_ceiling", "cancelled",
-            "overview_ceiling", "rollup_absent", "slowest_ceiling"
+            "overview_ceiling", "rollup_absent", "remote_unavailable", "byte_budget", "busy",
+            "file_budget", "deadline", "no_new_matches", "trace_fragments", "dropped_fields",
+            "stack_field_high_card"
         ]})
     );
 }
 
 #[test]
-fn slowest_params_reject_junk_and_unknown_fields() {
-    for (body, needle) in [
-        (json!({"slowest": 7}), "invalid slowest selector"),
-        (json!({"slowest": {"bogus": 1}}), "unknown field"),
-    ] {
-        let err = req_err(body.clone());
-        assert!(err.contains(needle), "for {body}: {err}");
-    }
-    let TracesMode::Slowest(p) = req(json!({"slowest": {}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!(p.limit, None);
-    let TracesMode::Slowest(p) = req(json!({"slowest": {"limit": 5}})).mode else {
-        panic!("slowest mode expected");
-    };
-    assert_eq!(p.limit, Some(5));
-}
-
-#[test]
-fn overview_facets_knob_parses_and_junk_is_rejected() {
-    let facets = |v: serde_json::Value| -> Option<bool> {
-        let TracesMode::Overview(p) = req(v).mode else {
-            panic!("overview mode expected");
-        };
-        p.facets
-    };
-    assert_eq!(facets(json!({"overview": {}})), None);
-    assert_eq!(facets(json!({"overview": {"facets": true}})), Some(true));
-    assert_eq!(facets(json!({"overview": {"facets": false}})), Some(false));
-    assert_eq!(
-        facets(json!({"overview": {"facets": null}})),
-        None,
-        "null means off, not an error (Option<bool> semantics)"
+fn every_partial_reason_is_in_the_published_schema() {
+    // The published Functions schema closes the reason list; a wire name
+    // missing there makes a valid response fail schema validation.
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../plugins.d/FUNCTION_UI_SCHEMA.json"
     );
-    for body in [
-        json!({"overview": {"facets": "yes"}}),
-        json!({"overview": {"bogus": 1}}),
-    ] {
-        let err = req_err(body.clone());
-        assert!(err.contains("invalid overview selector"), "for {body}: {err}");
+    let schema: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let published: Vec<&str> = schema["definitions"]["traces_status"]["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|variant| variant["properties"]["partial"]["items"]["enum"].as_array())
+        .flatten()
+        .map(|name| name.as_str().unwrap())
+        .collect();
+    for reason in every_partial_reason() {
+        let wire = serde_json::to_value(PartialReasonWire::from(reason)).unwrap();
+        let name = wire.as_str().unwrap();
+        assert!(
+            published.contains(&name),
+            "{name} is not in {path}: {published:?}"
+        );
     }
 }
 
+/// The untagged enum reads back exactly what it writes: the distinct
+/// field names (`complete` vs `partial`) make the round trip a real
+/// contract even though both directions are derived.
 #[test]
 fn status_wire_round_trips() {
     for status in [

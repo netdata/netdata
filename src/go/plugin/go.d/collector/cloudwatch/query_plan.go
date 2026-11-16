@@ -26,18 +26,20 @@ type plannedQuery struct {
 	policy     cwquery.Policy
 	seriesName string
 	labels     []metrix.Label
-	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
-	nilAsZero  bool           // record 0 (vs a gap) when the query returns no datapoint
-	rate       bool           // normalize a per-period total to a per-second value on write
-	query      cwtypes.MetricDataQuery
+	// enrichmentLabels are non-identity resource attribute and tag labels; emitted
+	// but excluded from the stable query key.
+	enrichmentLabels []metrix.Label
+	nilAsZero        bool // record 0 (vs a gap) when the query returns no datapoint
+	rate             bool // normalize a per-period total to a per-second value on write
+	query            cwtypes.MetricDataQuery
 }
 
 type instancePresentation struct {
-	instanceID  structuralID
-	dimensionID structuralID
-	labels      []metrix.Label
-	tagLabels   []metrix.Label
-	dims        []cwtypes.Dimension
+	instanceID       structuralID
+	dimensionID      structuralID
+	labels           []metrix.Label
+	enrichmentLabels []metrix.Label
+	dims             []cwtypes.Dimension
 }
 
 type queryPlanCandidate struct {
@@ -173,7 +175,10 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				presentation = instancePresentation{
 					instanceID: instanceKey, dimensionID: metricDimensionID(prof.Config.Namespace, dims),
 					labels: labels, dims: dims,
-					tagLabels: c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, join, inst.DimensionValues),
+					enrichmentLabels: enrichmentLabels(
+						c.attributeLabelsFor(scope.Target.Name, scope.Region, prof, inst.DimensionValues),
+						c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, join, inst.DimensionValues),
+					),
 				}
 				presentations[instanceKey] = presentation
 			}
@@ -284,17 +289,17 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 	for i, selected := range candidate.series {
 		m := candidate.profile.Config.Metrics[selected.MetricIndex]
 		pq := plannedQuery{
-			target:     candidate.targetRef,
-			accountID:  candidate.accountID,
-			region:     candidate.region,
-			profile:    candidate.profile.Name,
-			policy:     selected.Policy,
-			billingKey: candidate.billingKeys[i],
-			seriesName: selected.Name,
-			labels:     candidate.presentation.labels,
-			tagLabels:  candidate.presentation.tagLabels,
-			nilAsZero:  m.EmitZeroOnNoData(selected.Statistic),
-			rate:       m.Rate && cwprofiles.IsPerPeriodTotal(selected.Statistic),
+			target:           candidate.targetRef,
+			accountID:        candidate.accountID,
+			region:           candidate.region,
+			profile:          candidate.profile.Name,
+			policy:           selected.Policy,
+			billingKey:       candidate.billingKeys[i],
+			seriesName:       selected.Name,
+			labels:           candidate.presentation.labels,
+			enrichmentLabels: candidate.presentation.enrichmentLabels,
+			nilAsZero:        m.EmitZeroOnNoData(selected.Statistic),
+			rate:             m.Rate && cwprofiles.IsPerPeriodTotal(selected.Statistic),
 			query: cwtypes.MetricDataQuery{
 				MetricStat: &cwtypes.MetricStat{
 					Metric: &cwtypes.Metric{

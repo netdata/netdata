@@ -52,6 +52,7 @@ const (
 	_ERROR_PIPE_NOT_CONNECTED = 233
 	_ERROR_ACCESS_DENIED      = 5
 	_ERROR_PIPE_BUSY          = 231
+	_ERROR_SEM_TIMEOUT        = 121
 )
 
 // ---------------------------------------------------------------------------
@@ -79,6 +80,9 @@ var (
 	ErrDisconnected   = errors.New("peer disconnected")
 	ErrTimeout        = errors.New("receive deadline expired")
 	ErrAborted        = errors.New("receive aborted")
+	// ErrUntrustedServer: the pipe owner is not this account, SYSTEM or
+	// Administrators.
+	ErrUntrustedServer = errors.New("pipe owned by an untrusted account")
 )
 
 func wrapErr(sentinel error, detail string) error {
@@ -95,13 +99,23 @@ var (
 	procCreateNamedPipeW        = modkernel32.NewProc("CreateNamedPipeW")
 	procConnectNamedPipe        = modkernel32.NewProc("ConnectNamedPipe")
 	procDisconnectNamedPipe     = modkernel32.NewProc("DisconnectNamedPipe")
-	procFlushFileBuffers        = modkernel32.NewProc("FlushFileBuffers")
 	procPeekNamedPipe           = modkernel32.NewProc("PeekNamedPipe")
 	procSetNamedPipeHandleState = modkernel32.NewProc("SetNamedPipeHandleState")
 	procSwitchToThread          = modkernel32.NewProc("SwitchToThread")
+	procWaitNamedPipeW          = modkernel32.NewProc("WaitNamedPipeW")
 )
 
-func createNamedPipe(name *uint16, openMode, pipeMode, maxInstances, outBufSize, inBufSize, defaultTimeout uint32) (syscall.Handle, error) {
+// waitNamedPipe waits up to timeoutMs for a free instance of pipe name. It
+// fails with ERROR_SEM_TIMEOUT when none became free in time.
+func waitNamedPipe(name *uint16, timeoutMs uint32) error {
+	r, _, err := procWaitNamedPipeW.Call(uintptr(unsafe.Pointer(name)), uintptr(timeoutMs))
+	if r != 0 {
+		return nil
+	}
+	return err
+}
+
+func createNamedPipe(name *uint16, openMode, pipeMode, maxInstances, outBufSize, inBufSize, defaultTimeout uint32, attrs uintptr) (syscall.Handle, error) {
 	r, _, err := procCreateNamedPipeW.Call(
 		uintptr(unsafe.Pointer(name)),
 		uintptr(openMode),
@@ -110,7 +124,7 @@ func createNamedPipe(name *uint16, openMode, pipeMode, maxInstances, outBufSize,
 		uintptr(outBufSize),
 		uintptr(inBufSize),
 		uintptr(defaultTimeout),
-		0, // NULL security attributes
+		attrs,
 	)
 	handle := syscall.Handle(r)
 	if handle == syscall.InvalidHandle {
@@ -131,13 +145,11 @@ func disconnectNamedPipe(handle syscall.Handle) {
 	procDisconnectNamedPipe.Call(uintptr(handle))
 }
 
-func flushFileBuffers(handle syscall.Handle) {
-	procFlushFileBuffers.Call(uintptr(handle))
-}
-
+// peekNamedPipeAvailable runs in the receive poll loop. SyscallN, unlike
+// LazyProc.Call, keeps its arguments and &available on the stack.
 func peekNamedPipeAvailable(handle syscall.Handle) (uint32, error) {
 	var available uint32
-	r, _, err := procPeekNamedPipe.Call(
+	r, _, err := syscall.SyscallN(procPeekNamedPipe.Addr(),
 		uintptr(handle),
 		0,
 		0,
@@ -300,17 +312,8 @@ func rawRecv(handle syscall.Handle, buf []byte) (int, error) {
 	var read uint32
 	err := syscall.ReadFile(handle, buf, &read, nil)
 	if err != nil {
-		// ERROR_MORE_DATA (234): message mode pipe message is larger
-		// than the buffer. The data read so far is valid; the
-		// remaining data can be read with another ReadFile call.
-		// For our protocol this should not happen if the buffer is
-		// sized correctly, but treat it as a successful partial read
-		// rather than a fatal error.
-		if err == syscall.Errno(234) {
-			if read > 0 {
-				return int(read), nil
-			}
-		}
+		// A message larger than buf (ERROR_MORE_DATA) fails, as in C and
+		// Rust: returning the part read would make its rest the next message.
 		if isDisconnectError(err) {
 			return 0, ErrDisconnected
 		}

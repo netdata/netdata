@@ -137,7 +137,12 @@ bool websocket_client_process_message(WS_CLIENT *wsc) {
 
     // Handle decompression if needed
     if (wsc->is_compressed) {
-        if (!websocket_client_decompress_message(wsc)) {
+        WS_DECOMPRESS_RESULT rc = websocket_client_decompress_message(wsc);
+        if (rc == WS_DECOMPRESS_TOO_LARGE) {
+            websocket_protocol_exception(wsc, WS_CLOSE_MESSAGE_TOO_BIG, "Message too large");
+            return false;
+        }
+        if (rc != WS_DECOMPRESS_OK) {
             websocket_protocol_exception(wsc, WS_CLOSE_INTERNAL_ERROR, "Decompression failed");
             return false;
         }

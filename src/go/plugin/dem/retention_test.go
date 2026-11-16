@@ -1,0 +1,320 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package dem
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"sync/atomic"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/pkg/multipath"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func privateCaptures(t *testing.T) *artifacts.Store {
+	t.Helper()
+	captures, err := artifacts.Open("")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, captures.Close()) })
+	return captures
+}
+
+// The retention store adapters let tests observe and fail sweeps.
+type historyRetentionFunc func(context.Context, int, int64) error
+
+func (f historyRetentionFunc) EnforceHistoryRetention(ctx context.Context, days int, maxBytes int64) error {
+	return f(ctx, days, maxBytes)
+}
+
+type artifactRetentionFunc func(context.Context, int, int64) (artifacts.Status, error)
+
+func (f artifactRetentionFunc) Enforce(ctx context.Context, days int, maxBytes int64) (artifacts.Status, error) {
+	return f(ctx, days, maxBytes)
+}
+
+// keptArtifacts is an artifact store with nothing to expire.
+var keptArtifacts = artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
+	return artifacts.Status{}, nil
+})
+
+func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
+	ctx := context.Background()
+	st, err := journalstore.Open(ctx, "", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	now := time.Now().Unix()
+	_, err = rumhistory.NewStore(st).AppendEvent(ctx, rumhistory.EventRecord{
+		Site:       "disabled",
+		SessionID:  "recent",
+		ObservedUS: now * 1e6,
+		Type:       "pageview",
+	})
+	require.NoError(t, err)
+	components := New(Dependencies{
+		History:   st,
+		Artifacts: privateCaptures(t),
+	}, Config{
+		History: RetentionConfig{
+			Days:     1,
+			MaxBytes: 1 << 30,
+		},
+		Artifacts: DefaultConfig().Artifacts,
+	})
+	service := components.Retention
+	swept := make(chan error, 1)
+	service.history = historyRetentionFunc(func(ctx context.Context, days int, maxBytes int64) error {
+		err := st.EnforceHistoryRetention(ctx, days, maxBytes)
+		swept <- err
+		return err
+	})
+	runCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() { defer close(done); service.Run(runCtx) }()
+	t.Cleanup(func() { cancel(); <-done })
+	select {
+	case err := <-swept:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("retention did not sweep with no site jobs")
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("retention did not stop")
+	}
+	// The command still owns the journal while native site jobs drain.
+	rows, err := rumhistory.NewStore(st).
+		QuerySessions(ctx, rumhistory.SessionFilter{
+			Filter: rumhistory.Filter{
+				Before: now + 1,
+			},
+			Limit: 2000,
+		})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "recent", rows[0].SessionID)
+}
+
+func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
+	entered := make(chan struct{})
+	service := &Retention{
+		history: historyRetentionFunc(func(ctx context.Context, _ int, _ int64) error {
+			close(entered)
+			<-ctx.Done()
+			return ctx.Err()
+		}),
+		historyPolicy:  DefaultConfig().History,
+		artifacts:      keptArtifacts,
+		artifactPolicy: DefaultConfig().Artifacts,
+		log:            logger.New(),
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	go func() { defer close(done); service.Run(ctx) }()
+	<-entered
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("retention did not join cancelled query")
+	}
+}
+
+func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dem.conf")
+	history, err := journalstore.Open(context.Background(), "", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, history.Close()) })
+	components := New(
+		Dependencies{
+			History:      history,
+			Artifacts:    privateCaptures(t),
+			ReloadConfig: func() (Config, error) { return LoadConfig(multipath.New(dir)) },
+		},
+		DefaultConfig(),
+	)
+	service := components.Retention
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 7, max_bytes: 8388608}"), 0600))
+	service.reloadPolicy()
+	assert.Equal(t, RetentionConfig{
+		Days:     7,
+		MaxBytes: 8388608,
+	}, service.historyPolicy)
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
+	service.reloadPolicy()
+	assert.Equal(t, RetentionConfig{
+		Days:     14,
+		MaxBytes: 16777216,
+	}, service.historyPolicy)
+	for name, body := range map[string]string{
+		"invalid value":  "history: {days: 0, max_bytes: 1}",
+		"invalid syntax": "history: [",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.NoError(t, os.WriteFile(path, []byte(body), 0600))
+			service.reloadPolicy()
+			assert.NotEmpty(t, service.PolicyError())
+			assert.Equal(t, RetentionConfig{
+				Days:     14,
+				MaxBytes: 16777216,
+			}, service.historyPolicy)
+		})
+	}
+	require.NoError(t, os.WriteFile(path, []byte("history: {days: 14, max_bytes: 16777216}"), 0600))
+	service.reloadPolicy()
+	assert.Empty(t, service.PolicyError())
+}
+
+// A failed sweep is logged and retried promptly without sweeping the other
+// store again; each store gets its own policy.
+func TestRetentionRetriesOnlyFailedStore(t *testing.T) {
+	for _, failedStore := range []string{"history", "artifacts"} {
+		t.Run(failedStore, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				var historyCalls, artifactCalls atomic.Int32
+				var logs bytes.Buffer
+				service := &Retention{
+					history: historyRetentionFunc(func(_ context.Context, days int, maxBytes int64) error {
+						historyCalls.Add(1)
+						assert.Equal(t, DefaultConfig().History, RetentionConfig{
+							Days:     days,
+							MaxBytes: maxBytes,
+						})
+						if failedStore == "history" {
+							return errors.New("history unavailable")
+						}
+						return nil
+					}),
+					artifacts: artifactRetentionFunc(
+						func(_ context.Context, days int, maxBytes int64) (artifacts.Status, error) {
+							artifactCalls.Add(1)
+							assert.Equal(t, DefaultConfig().Artifacts, RetentionConfig{
+								Days:     days,
+								MaxBytes: maxBytes,
+							})
+							if failedStore == "artifacts" {
+								return artifacts.Status{}, errors.New("artifacts unavailable")
+							}
+							return artifacts.Status{}, nil
+						},
+					),
+					historyPolicy:  DefaultConfig().History,
+					artifactPolicy: DefaultConfig().Artifacts,
+					log:            logger.NewWithWriter(&logs),
+				}
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				go service.Run(ctx)
+				synctest.Wait()
+				require.Equal(t, int32(1), historyCalls.Load())
+				require.Equal(t, int32(1), artifactCalls.Load())
+				time.Sleep(10 * time.Second)
+				synctest.Wait()
+				if failedStore == "history" {
+					assert.Equal(t, int32(3), historyCalls.Load())
+					assert.Equal(t, int32(1), artifactCalls.Load())
+				} else {
+					assert.Equal(t, int32(1), historyCalls.Load())
+					assert.Equal(t, int32(3), artifactCalls.Load())
+				}
+				for store, warning := range map[string]string{
+					"history":   "DEM history retention failed",
+					"artifacts": "DEM artifact retention failed",
+				} {
+					if store == failedStore {
+						assert.Contains(t, logs.String(), warning)
+					} else {
+						assert.NotContains(t, logs.String(), warning)
+					}
+				}
+			})
+		})
+	}
+}
+
+func TestRetentionMaintainsHourlySweep(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		var historyCalls, artifactCalls atomic.Int32
+		service := &Retention{
+			history: historyRetentionFunc(func(context.Context, int, int64) error { historyCalls.Add(1); return nil }),
+			artifacts: artifactRetentionFunc(func(context.Context, int, int64) (artifacts.Status, error) {
+				artifactCalls.Add(1)
+				return artifacts.Status{}, nil
+			}),
+			historyPolicy:  DefaultConfig().History,
+			artifactPolicy: DefaultConfig().Artifacts,
+			log:            logger.NewWithWriter(&bytes.Buffer{}),
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		go service.Run(ctx)
+		synctest.Wait()
+		time.Sleep(time.Hour - time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(1), historyCalls.Load())
+		assert.Equal(t, int32(1), artifactCalls.Load())
+		time.Sleep(time.Second)
+		synctest.Wait()
+		assert.Equal(t, int32(2), historyCalls.Load())
+		assert.Equal(t, int32(2), artifactCalls.Load())
+	})
+}
+
+func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
+	ctx := context.Background()
+	store, err := journalstore.Open(ctx, "", "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	initial := DefaultConfig()
+	require.NoError(t, store.EnforceHistoryRetention(ctx, initial.History.Days, initial.History.MaxBytes))
+	var reloadErr error
+	edited := initial
+	edited.History.Days = 7
+	components := New(Dependencies{
+		History:      store,
+		Artifacts:    privateCaptures(t),
+		ReloadConfig: func() (Config, error) { return edited, reloadErr },
+	}, initial)
+	var handler funcapi.RawMethodHandler
+	for _, provider := range components.Functions {
+		if provider.ID == "dem-history" {
+			handler = provider.NewHandler().(funcapi.RawMethodHandler)
+		}
+	}
+	require.NotNil(t, handler)
+	read := func() []any {
+		response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method:      "dem-history-status",
+			Permissions: "0x1b",
+		})
+		require.NotNil(t, response.RawResponse, response.Message)
+		require.Equal(t, 200, response.RawResponse["status"])
+		return response.RawResponse["data"].([][]any)[0]
+	}
+	components.Retention.reloadPolicy()
+	assert.Equal(t, 30, read()[0], "loading a policy alone does not make it effective")
+	require.NoError(t, store.EnforceHistoryRetention(ctx, edited.History.Days, edited.History.MaxBytes))
+	assert.Equal(t, 7, read()[0])
+	reloadErr = errors.New("invalid retention edit")
+	components.Retention.reloadPolicy()
+	assert.Equal(t, "invalid retention edit", read()[10])
+	assert.Equal(t, 7, read()[0])
+	reloadErr = nil
+	components.Retention.reloadPolicy()
+	assert.Nil(t, read()[10])
+}

@@ -5,7 +5,9 @@ package composition
 import (
 	"context"
 	"errors"
+	"slices"
 
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
@@ -27,18 +29,45 @@ func NewContainedFunctionAssembly(
 	ctx context.Context,
 	epoch uint64,
 	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
 	modules collectorapi.Registry,
+	frames *lifecycle.FrameOwner,
+	initial ...functionadapter.InitialRoute,
+) (*FunctionAssembly, error) {
+	return newContainedFunctionAssembly(ctx, epoch, attempts, diagnostics, modules, nil, funcapi.ProcessFunctionContext{}, frames, initial...)
+}
+
+func newContainedFunctionAssembly(
+	ctx context.Context,
+	epoch uint64,
+	attempts jobmgr.ProcessAttemptAuthority,
+	diagnostics jobmgr.DiagnosticObserver,
+	modules collectorapi.Registry,
+	providers []funcapi.ProcessFunctionProvider,
+	providerContext funcapi.ProcessFunctionContext,
 	frames *lifecycle.FrameOwner,
 	initial ...functionadapter.InitialRoute,
 ) (*FunctionAssembly, error) {
 	if ctx == nil || epoch == 0 || attempts == nil || modules == nil || frames == nil {
 		return nil, errors.New("jobmgr composition: invalid contained Function assembly")
 	}
-	controller, catalog, err := functionadapter.NewContainedController(
+	if err := functionadapter.ValidateProcessProviders(providers); err != nil {
+		return nil, err
+	}
+	providers = slices.Clone(providers)
+	for i, provider := range providers {
+		if provider.NewHandlerWithContext != nil {
+			providers[i].NewHandler = func() funcapi.MethodHandler { return provider.NewHandlerWithContext(providerContext) }
+			providers[i].NewHandlerWithContext = nil
+		}
+	}
+	controller, catalog, err := functionadapter.NewContainedControllerWithProviders(
 		ctx,
 		epoch,
 		attempts,
+		diagnostics,
 		modules,
+		providers,
 		initial...,
 	)
 	if err != nil {
@@ -139,11 +168,11 @@ func (fa *FunctionAssembly) BeforeFunctionCatalogClose(_ context.Context, genera
 
 // FinalizeRun terminalizes controller-owned Function state after the kernel has
 // drained the catalog and every job handle.
-func (fa *FunctionAssembly) FinalizeRun(_ context.Context, generation uint64) error {
+func (fa *FunctionAssembly) FinalizeRun(ctx context.Context, generation uint64) error {
 	if fa == nil {
 		return nil
 	}
-	return fa.controller.Stop(generation)
+	return fa.controller.Stop(ctx, generation)
 }
 
 type functionJobLifecycle struct {

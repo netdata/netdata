@@ -109,7 +109,6 @@ int ebpf_get_pid_map_fd(int idx);
 typedef struct __attribute__((packed)) ebpf_pid_data {
     uint32_t pid;
     uint32_t ppid;
-    uint64_t thread_collecting;
 
     char comm[EBPF_MAX_COMPARE_NAME + 1];
     char *cmdline;
@@ -139,45 +138,23 @@ void ebpf_del_pid_entry(pid_t pid);
 
 ebpf_pid_data_t *ebpf_find_or_create_pid_data(pid_t pid);
 
-static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid, uint32_t tgid, char *name, uint32_t idx)
+// Every linked entry is counted once; ebpf_del_pid_entry() relies on it.
+static inline ebpf_pid_data_t *ebpf_get_pid_data(uint32_t pid)
 {
     ebpf_pid_data_t *ptr = ebpf_find_or_create_pid_data(pid);
-    ptr->thread_collecting |= 1 << idx;
-    // The caller is getting data to work.
-    if (!name && idx != NETDATA_EBPF_PIDS_PROC_FILE)
+    if (ptr->pid == pid)
         return ptr;
-
-    if (ptr->pid == pid) {
-        return ptr;
-    }
 
     ptr->pid = pid;
-    ptr->ppid = tgid;
-
-    if (name)
-        strncpyz(ptr->comm, name, EBPF_MAX_COMPARE_NAME);
 
     if (likely(ebpf_pids_link_list))
         ebpf_pids_link_list->prev = ptr;
 
     ptr->next = ebpf_pids_link_list;
     ebpf_pids_link_list = ptr;
-    if (idx == NETDATA_EBPF_PIDS_PROC_FILE) {
-        ebpf_all_pids_count++;
-    }
+    __atomic_add_fetch(&ebpf_all_pids_count, 1, __ATOMIC_RELAXED);
 
     return ptr;
-}
-
-// The only caller of ebpf_get_pid_data() passes NETDATA_EBPF_PIDS_PROC_FILE,
-// so `thread_collecting` in an ebpf_pid_data_t only ever has that single high
-// bit set. The per-module (idx < PROC_FILE) branch in the old
-// ebpf_reset_specific_pid_data() was therefore unreachable. Collapse the
-// function to its effective behaviour so a future reader is not confused by
-// dead BPF/freez housekeeping that never ran.
-static inline void ebpf_reset_specific_pid_data(ebpf_pid_data_t *ptr)
-{
-    ebpf_del_pid_entry(ptr->pid);
 }
 
 typedef struct ebpf_pid_stat {

@@ -7,12 +7,13 @@ import (
 	"database/sql"
 	_ "embed"
 	"errors"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mssql/mssqlfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
 
 	_ "github.com/microsoft/go-mssqldb"
@@ -30,7 +31,7 @@ func init() {
 		},
 		Create:          func() collectorapi.CollectorV1 { return New() },
 		Config:          func() any { return &Config{} },
-		SharedFunctions: mssqlMethods,
+		SharedFunctions: mssqlfunc.Methods,
 		MethodHandler:   mssqlFunctionHandler,
 	})
 }
@@ -41,8 +42,8 @@ func New() *Collector {
 			DSN:                 "sqlserver://localhost:1433",
 			Timeout:             confopt.Duration(time.Second * 5),
 			CollectDisabledJobs: false,
-			Functions: FunctionsConfig{
-				TopQueries: TopQueriesConfig{
+			Functions: mssqlfunc.FunctionsConfig{
+				TopQueries: mssqlfunc.TopQueriesConfig{
 					Limit:          500,
 					TimeWindowDays: 7,
 				},
@@ -69,84 +70,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode               string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery         int              `yaml:"update_every,omitempty" json:"update_every"`
-	DSN                 string           `yaml:"dsn" json:"dsn"`
-	Timeout             confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	CollectDisabledJobs bool             `yaml:"collect_disabled_jobs" json:"collect_disabled_jobs"`
-	CloudAuth           cloudauth.Config `yaml:"cloud_auth" json:"cloud_auth"`
-	Functions           FunctionsConfig  `yaml:"functions,omitempty" json:"functions"`
-}
-
-type FunctionsConfig struct {
-	TopQueries   TopQueriesConfig   `yaml:"top_queries,omitempty" json:"top_queries"`
-	DeadlockInfo DeadlockInfoConfig `yaml:"deadlock_info,omitempty" json:"deadlock_info"`
-	ErrorInfo    ErrorInfoConfig    `yaml:"error_info,omitempty" json:"error_info"`
-}
-
-type TopQueriesConfig struct {
-	Disabled       bool             `yaml:"disabled" json:"disabled"`
-	Timeout        confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	Limit          int              `yaml:"limit,omitempty" json:"limit"`
-	TimeWindowDays int              `yaml:"time_window_days,omitempty" json:"time_window_days"`
-}
-
-type DeadlockInfoConfig struct {
-	Disabled      bool             `yaml:"disabled" json:"disabled"`
-	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
-}
-
-type ErrorInfoConfig struct {
-	Disabled      bool             `yaml:"disabled" json:"disabled"`
-	Timeout       confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
-	SessionName   string           `yaml:"session_name,omitempty" json:"session_name,omitempty"`
-	UseRingBuffer bool             `yaml:"use_ring_buffer" json:"use_ring_buffer"`
-}
-
-func (c Config) topQueriesTimeout() time.Duration {
-	if c.Functions.TopQueries.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.TopQueries.Timeout.Duration()
-}
-
-func (c Config) topQueriesLimit() int {
-	if c.Functions.TopQueries.Limit <= 0 {
-		return 500
-	}
-	return c.Functions.TopQueries.Limit
-}
-
-func (c Config) topQueriesTimeWindowDays() int {
-	if c.Functions.TopQueries.TimeWindowDays == -1 {
-		return 0 // -1 means "query all history"
-	}
-	if c.Functions.TopQueries.TimeWindowDays <= 0 {
-		return 7
-	}
-	return c.Functions.TopQueries.TimeWindowDays
-}
-
-func (c Config) deadlockInfoTimeout() time.Duration {
-	if c.Functions.DeadlockInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.DeadlockInfo.Timeout.Duration()
-}
-
-func (c Config) errorInfoTimeout() time.Duration {
-	if c.Functions.ErrorInfo.Timeout == 0 {
-		return c.Timeout.Duration()
-	}
-	return c.Functions.ErrorInfo.Timeout.Duration()
-}
-
-func (c Config) errorInfoSessionName() string {
-	if strings.TrimSpace(c.Functions.ErrorInfo.SessionName) == "" {
-		return "netdata_errors"
-	}
-	return c.Functions.ErrorInfo.SessionName
+	Vnode               string                    `yaml:"vnode,omitempty" json:"vnode"`
+	UpdateEvery         int                       `yaml:"update_every,omitempty" json:"update_every"`
+	DSN                 string                    `yaml:"dsn" json:"dsn"`
+	Timeout             confopt.Duration          `yaml:"timeout,omitempty" json:"timeout"`
+	CollectDisabledJobs bool                      `yaml:"collect_disabled_jobs" json:"collect_disabled_jobs"`
+	CloudAuth           cloudauth.Config          `yaml:"cloud_auth" json:"cloud_auth"`
+	Functions           mssqlfunc.FunctionsConfig `yaml:"functions,omitempty" json:"functions"`
 }
 
 type Collector struct {
@@ -155,7 +85,11 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	db *sql.DB
+	// Metrics and Functions use separate single-connection pools so a slow diagnostic
+	// query never delays metric collection. db is opened lazily by the first collect;
+	// functionDB is created in Init and never replaced by a request.
+	db         *sql.DB
+	functionDB *sql.DB
 
 	serverPropertiesMu     sync.RWMutex
 	serverPropertiesLoaded bool
@@ -182,22 +116,10 @@ type Collector struct {
 	seenAGPageRepairDBs    map[string]bool // key: database_name
 	agClusterChartAdded    bool            // true after cluster quorum chart has been added
 
-	// top-queries source discovery caches (per-instance to handle different SQL Server versions).
-	// Each probe has its own lock so they cannot block each other on the database round trip.
-	queryStoreColsMu      sync.RWMutex
-	queryStoreCols        map[string]bool
-	queryStoreSupportedMu sync.RWMutex
-	queryStoreSupported   *bool // nil until the capability probe has run
-	planCacheColsMu       sync.RWMutex
-	planCacheCols         map[string]bool
-
-	funcRouter *funcRouter
+	funcRouter funcapi.MethodHandler
 }
 
-const (
-	engineEditionAzureSQLDatabase = 5
-	engineEditionAzureSQLMI       = 8
-)
+const engineEditionAzureSQLDatabase = 5
 
 func (c *Collector) currentEngineEdition() int {
 	c.serverPropertiesMu.RLock()
@@ -237,7 +159,7 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 		return edition, nil
 	}
 
-	version, edition, err := c.queryServerProperties(ctx)
+	version, edition, err := queryServerProperties(ctx, c.functionDB)
 	if err != nil {
 		return 0, err
 	}
@@ -254,10 +176,10 @@ func (c *Collector) ensureEngineEdition(ctx context.Context) (int, error) {
 	return edition, nil
 }
 
-func (c *Collector) queryServerProperties(ctx context.Context) (string, int, error) {
+func queryServerProperties(ctx context.Context, db *sql.DB) (string, int, error) {
 	var version string
 	var edition int
-	if err := c.db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
+	if err := db.QueryRowContext(ctx, queryVersion).Scan(&version, &edition); err != nil {
 		return "", 0, err
 	}
 	return version, edition, nil
@@ -278,9 +200,14 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.CloudAuth.Validate(); err != nil {
 		return err
 	}
-	c.Debugf("using DSN [%s]", c.DSN)
 
-	c.funcRouter = newFuncRouter(c)
+	db, err := c.newConnectionPool()
+	if err != nil {
+		return err
+	}
+	c.functionDB = db
+
+	c.funcRouter = mssqlfunc.NewRouter(functionDeps{collector: c}, c.Logger, c.Functions)
 
 	return nil
 }
@@ -312,6 +239,13 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 func (c *Collector) Cleanup(ctx context.Context) {
 	if c.funcRouter != nil {
 		c.funcRouter.Cleanup(ctx)
+	}
+	// functionDB stays set after Close so an in-flight request fails with a closed-database
+	// error instead of a nil dereference; sql.DB.Close tolerates a repeated Cleanup.
+	if c.functionDB != nil {
+		if err := c.functionDB.Close(); err != nil {
+			c.Errorf("cleanup: error closing Function database connection: %v", err)
+		}
 	}
 	if c.db == nil {
 		return

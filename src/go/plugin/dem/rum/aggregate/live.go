@@ -1,0 +1,189 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// The rum-live Function data source is a bounded ring of recently admitted
+// document activations, application-view occurrences, vital reports and JS errors.
+// The ring belongs to this aggregator runtime and is guarded by its mutex.
+
+package aggregate
+
+import (
+	"sort"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+)
+
+// liveRingCap bounds rows retained by one aggregator runtime.
+const liveRingCap = 5000
+
+// LiveRow.Kind values: the observation a rum-live row reports.
+const (
+	LiveKindDocument = "document" // document activation
+	LiveKindView     = "view"     // application view occurrence
+	LiveKindVital    = "vital"    // vital report
+	LiveKindError    = "error"    // JavaScript errors of one report
+)
+
+// LiveRow is one rum-live ring entry. Has* distinguishes an absent vital
+// from a genuine zero, matching the FUNCTION's "null when absent" column
+// contract.
+type LiveRow struct {
+	VnodeGUID                                         string
+	ExperienceID, View, ViewID, MetricID, Kind, Vital string
+	Revision                                          uint64
+	Seq                                               uint64
+	TS                                                time.Time
+	Site                                              string
+	Country                                           string // ISO code, "" when unknown
+	City                                              string // "" when unknown
+	Lat, Lon                                          float64
+	HasGeo                                            bool
+
+	Page            string
+	Browser, Device string
+	PageView        bool
+
+	LCPMS, INPMS, FCPMS, TTFBMS     float64
+	HasLCP, HasINP, HasFCP, HasTTFB bool
+	CLS                             float64
+	HasCLS                          bool
+
+	Errors int
+}
+
+// appendLive gives each measurement its own unambiguous update identity.
+func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) {
+	base := LiveRow{
+		VnodeGUID:    b.VnodeGUID,
+		TS:           now,
+		Site:         b.Site,
+		Country:      b.Country,
+		City:         b.City,
+		Lat:          b.Lat,
+		Lon:          b.Lon,
+		HasGeo:       b.HasGeo,
+		Page:         b.PageGroup,
+		Browser:      b.Browser,
+		Device:       b.Device,
+		ExperienceID: b.ExperienceID,
+		View:         b.View,
+		ViewID:       b.ViewID,
+	}
+	appendRow := func(row LiveRow) {
+		a.liveSeq++
+		row.Seq = a.liveSeq
+		a.live = append(a.live, row)
+		if len(a.live)-a.liveStart > liveRingCap {
+			a.liveStart = len(a.live) - liveRingCap
+		}
+	}
+	if pageView {
+		row := base
+		row.Kind = LiveKindDocument
+		row.Revision = documentRevision(b)
+		row.PageView = true
+		appendRow(row)
+	}
+	for _, ev := range b.Events {
+		if ev.Kind == beacon.EventView {
+			row := base
+			row.Kind = LiveKindView
+			row.Revision = ev.Revision
+			appendRow(row)
+		}
+	}
+	for _, v := range b.Vitals {
+		row := base
+		row.Kind = LiveKindVital
+		row.Vital = v.Name
+		row.MetricID = v.ID
+		row.Revision = v.Revision
+		if origin := v.Origin; origin != nil {
+			if origin.Country != row.Country {
+				// Current location must not contradict the saved measurement country.
+				row.City, row.Lat, row.Lon, row.HasGeo = "", 0, 0, false
+			}
+			row.Page, row.Browser, row.Device, row.Country = origin.PageGroup, origin.Browser, origin.Device, origin.Country
+		}
+		switch v.Name {
+		case beacon.LCP:
+			row.LCPMS, row.HasLCP = v.Value, true
+		case beacon.INP:
+			row.INPMS, row.HasINP = v.Value, true
+		case beacon.FCP:
+			row.FCPMS, row.HasFCP = v.Value, true
+		case beacon.TTFB:
+			row.TTFBMS, row.HasTTFB = v.Value, true
+		case beacon.CLS:
+			row.CLS, row.HasCLS = v.Value, true
+		}
+		appendRow(row)
+	}
+	if len(b.Errors) > 0 {
+		row := base
+		row.Kind = LiveKindError
+		row.Errors = len(b.Errors)
+		appendRow(row)
+	}
+	a.evictLive(now)
+}
+
+// evictLive drops the expired prefix of the ring. Live also filters stale
+// rows behind fresh ones, because receipt times can arrive out of order. Called
+// on every Ingest and Live read — rum-live is polled directly, never
+// through Snapshot's chart-emission cadence, so eviction can't ride on
+// that path alone.
+//
+// Dropped rows are skipped by advancing liveStart; the slice is compacted
+// only once the dead prefix is as large as the ring, so appends stay O(1)
+// instead of shifting every row each time.
+func (a *Aggregator) evictLive(now time.Time) {
+	cutoff := now.Add(-a.window)
+	for a.liveStart < len(a.live) && a.live[a.liveStart].TS.Before(cutoff) {
+		a.liveStart++
+	}
+	if a.liveStart >= liveRingCap || a.liveStart == len(a.live) {
+		a.live = append(a.live[:0], a.live[a.liveStart:]...)
+		a.liveStart = 0
+	}
+}
+
+// Live returns at most maxRows ring rows with Seq > after, oldest first; a
+// non-positive maxRows returns none. A caller resumes from the Seq of the last
+// row it received. A cursor ahead of this runtime sequence is treated as 0; the
+// Function routing owner fences generations.
+func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	now := a.now()
+	a.evictLive(now)
+	cutoff := now.Add(-a.window)
+
+	// A cursor beyond anything this runtime issued cannot identify a row
+	// in this ring; serve the current ring from its start.
+	if after > a.liveSeq {
+		after = 0
+	}
+	if maxRows <= 0 {
+		return nil
+	}
+	// Seq grows along the ring, so the rows after the cursor are its suffix.
+	ring := a.live[a.liveStart:]
+	ring = ring[sort.Search(len(ring), func(i int) bool { return ring[i].Seq > after }):]
+	var out []LiveRow
+	for i := range ring {
+		row := &ring[i]
+		if row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
+			continue
+		}
+		if out == nil {
+			// The rows from the first match on bound the result.
+			out = make([]LiveRow, 0, min(maxRows, len(ring)-i))
+		}
+		out = append(out, *row)
+		if len(out) == maxRows {
+			break
+		}
+	}
+	return out
+}

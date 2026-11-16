@@ -27,7 +27,7 @@ Module: net.inet.tcp.states
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -100,12 +97,7 @@ There are no configuration examples.
 
 ## Alerts
 
-
-The following alerts are available:
-
-| Alert name  | On metric | Description |
-|:------------|:----------|:------------|
-| [ tcp_connections ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf) | ipv4.tcpsock | IPv4 TCP connections utilization |
+There are no alerts configured by default for this integration.
 
 
 

@@ -3,8 +3,10 @@
 package ddsnmpcollector
 
 import (
+	"encoding/json"
 	"maps"
 	"math/rand"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -444,6 +446,40 @@ func (tc *tableCache) generateConfigID(cfg ddprofiledefinition.MetricsConfig) st
 	}
 
 	sb.WriteString(strings.Join(names, ","))
+	extended := false
+	for _, tag := range cfg.MetricTags {
+		extended = tag.IndexDecode != nil || tag.Symbol.Format == "octet_string" || tag.LookupSymbol.Format == "octet_string"
+		if extended {
+			break
+		}
+	}
+	if extended {
+		// Cache entries contain the whole tag set, including companion legacy tags.
+		// Keep their source/selector semantics together and omit compiled runtime state.
+		type tagIdentity struct {
+			ddprofiledefinition.MetricTagConfig
+			Match string
+			Tags  map[string]string
+		}
+		tags := make([]tagIdentity, len(cfg.MetricTags))
+		for i, tag := range cfg.MetricTags {
+			// Metric scaling is unused for tags; normalize it so even a non-finite
+			// unused value cannot prevent JSON encoding of the identity.
+			tag.Symbol.ScaleFactor = 0
+			tag.LookupSymbol.ScaleFactor = 0
+			if len(tag.IndexFrom) > 0 {
+				tag.IndexFrom = slices.Clone(tag.IndexFrom)
+				for j := range tag.IndexFrom {
+					tag.IndexFrom[j].Symbol.ScaleFactor = 0
+				}
+			}
+			tags[i] = tagIdentity{MetricTagConfig: tag, Match: tag.Match, Tags: tag.Tags}
+		}
+		// All remaining serialized fields are JSON-supported strings, integers and collections.
+		identity, _ := json.Marshal(tags)
+		sb.WriteString("|index:")
+		sb.Write(identity)
+	}
 
 	return sb.String()
 }

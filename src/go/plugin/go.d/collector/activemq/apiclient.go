@@ -3,6 +3,7 @@
 package activemq
 
 import (
+	"context"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -56,8 +57,8 @@ type apiClient struct {
 	webadmin   string
 }
 
-func (a *apiClient) getQueues() (*queues, error) {
-	req, err := web.NewHTTPRequestWithPath(a.request, fmt.Sprintf(pathStats, a.webadmin, keyQueues))
+func (a *apiClient) getQueues(ctx context.Context) (*queues, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyQueues))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request '%s': %v", a.request.URL, err)
 	}
@@ -71,8 +72,8 @@ func (a *apiClient) getQueues() (*queues, error) {
 	return &queues, nil
 }
 
-func (a *apiClient) getTopics() (*topics, error) {
-	req, err := web.NewHTTPRequestWithPath(a.request, fmt.Sprintf(pathStats, a.webadmin, keyTopics))
+func (a *apiClient) getTopics(ctx context.Context) (*topics, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, a.request, fmt.Sprintf(pathStats, a.webadmin, keyTopics))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request '%s': %v", a.request.URL, err)
 	}

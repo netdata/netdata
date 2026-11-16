@@ -38,6 +38,7 @@ type ModeTokenFileConfig struct {
 }
 
 type runtime struct {
+	readFile           func(context.Context, string) ([]byte, error)
 	httpClient         *http.Client
 	httpClientInsecure *http.Client
 }

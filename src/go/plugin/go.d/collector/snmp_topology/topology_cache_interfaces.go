@@ -50,13 +50,12 @@ func (c *topologyBuilder) updateIfNameByIndex(tags map[string]string) {
 		status.mac = mac
 	}
 	if ifHighSpeed := topologyutil.ParsePositiveInt64(tags[tagTopoIfHigh]); ifHighSpeed > 0 {
-		if ifHighSpeed > math.MaxInt64/topologyHighSpeedMultiplier {
-			status.speedBps = math.MaxInt64
-		} else {
-			status.speedBps = ifHighSpeed * topologyHighSpeedMultiplier
-		}
-	} else if ifSpeed := topologyutil.ParsePositiveInt64(tags[tagTopoIfSpeed]); ifSpeed > 0 {
-		status.speedBps = ifSpeed
+		status.ifHighSpeed = ifHighSpeed
+	}
+	// RFC 2863: ifSpeed reports its maximum value when the speed does not fit, and only ifHighSpeed carries it.
+	if ifSpeed := topologyutil.ParsePositiveInt64(tags[tagTopoIfSpeed]); ifSpeed > 0 &&
+		ifSpeed != topologyIfSpeedSaturated {
+		status.ifSpeed = ifSpeed
 	}
 	if lastChange := topologyutil.ParsePositiveInt64(tags[tagTopoIfLast]); lastChange > 0 {
 		status.lastChange = lastChange
@@ -70,10 +69,24 @@ func (c *topologyBuilder) updateIfNameByIndex(tags map[string]string) {
 		status.ifDescr != "" ||
 		status.ifAlias != "" ||
 		status.mac != "" ||
-		status.speedBps > 0 ||
+		status.ifHighSpeed > 0 ||
+		status.ifSpeed > 0 ||
 		status.lastChange > 0 ||
 		status.duplex != "" {
 		c.ifStatusByIndex[ifIndex] = status
+	}
+}
+
+// speedBps prefers ifHighSpeed over ifSpeed. It is derived after ingest because the ifXTable and ifTable rows that
+// carry them arrive separately, in either order.
+func (s ifStatus) speedBps() int64 {
+	switch {
+	case s.ifHighSpeed > math.MaxInt64/topologyHighSpeedMultiplier:
+		return math.MaxInt64
+	case s.ifHighSpeed > 0:
+		return s.ifHighSpeed * topologyHighSpeedMultiplier
+	default:
+		return s.ifSpeed
 	}
 }
 

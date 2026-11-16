@@ -46,7 +46,7 @@ func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 				assert.EqualValues(t, 4, row.Transitions.Established.Value)
 			},
 		},
-		"peer statistics resolves non-default VRF index and remote AS by peer address": {
+		"peer statistics retains process VPN and address without unproved AS": {
 			rowID: "huawei-bgp-peer-statistics",
 			pdus: []gosnmp.SnmpPDU{
 				createPDU("1.3.6.1.4.1.2011.5.25.177.1.1.2.1.4.42.1.1.1.4.192.0.2.22", gosnmp.OctetString, []byte{192, 0, 2, 22}),
@@ -62,7 +62,8 @@ func TestCollector_Collect_HuaweiTypedBGPRows(t *testing.T) {
 				assert.Equal(t, ddprofiledefinition.BGPRowKindPeer, row.Kind)
 				assert.Equal(t, "42", row.Identity.RoutingInstance)
 				assert.Equal(t, "192.0.2.22", row.Identity.Neighbor)
-				assert.Equal(t, "65002", row.Identity.RemoteAS)
+				assert.Equal(t, "0", row.Identity.ProcessID)
+				assert.Empty(t, row.Identity.RemoteAS)
 				assert.Equal(t, "ipv4", row.Descriptors.PeerType)
 				assert.EqualValues(t, 5, row.Transitions.Established.Value)
 				assert.EqualValues(t, 2, row.Transitions.Down.Value)

@@ -8,8 +8,8 @@
 #   Token is sent as basic-auth username with empty password.
 #
 # COMMENTS MUST BE ASCII-ONLY:
-#   Cloudflare's WAF in front of api.sonarcloud.io blocks non-ASCII bodies
-#   (em-dashes, smart quotes, accented characters). Stick to "--", '"', etc.
+#   Enforced workaround for observed non-ASCII request challenges.
+#   Use "--" and straight quotes; this is not a universal service claim.
 #
 # USAGE:
 #   sonar-mark.sh fp     <ISSUE_KEY>   <COMMENT>     # Bug/Vuln -> False Positive
@@ -28,7 +28,7 @@
 #   SONAR_MARK_YES=1 is set in the environment.
 #
 # DRY RUN:
-#   Set SONAR_DRY_RUN=1 to print the curl commands without executing.
+#   SONAR_DRY_RUN=1 skips writes; enumeration reads still execute.
 
 set -euo pipefail
 

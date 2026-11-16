@@ -24,9 +24,16 @@ func (r *crossTableResolver) resolveLookupIndexByValue(
 	refTablePDUs map[string]gosnmp.SnmpPDU,
 	ctx *crossTableContext,
 ) (string, error) {
-	normalizedLookupValue, ok := r.normalizeLookupValue(ddprofiledefinition.SymbolConfig(tagCfg.LookupSymbol), lookupValue)
+	normalizedLookupValue, ok := r.normalizeLookupValue(
+		ddprofiledefinition.SymbolConfig(tagCfg.LookupSymbol),
+		lookupValue,
+	)
 	if !ok {
-		return "", fmt.Errorf("value '%s' could not be normalized for lookup column %s", lookupValue, tagCfg.LookupSymbol.OID)
+		return "", fmt.Errorf(
+			"value '%s' could not be normalized for lookup column %s",
+			lookupValue,
+			tagCfg.LookupSymbol.OID,
+		)
 	}
 
 	valueIndex := r.lookupValueIndex(tagCfg, refTableOID, refTablePDUs, ctx)
@@ -121,7 +128,10 @@ func lookupMappingsEqual(a, b ddprofiledefinition.MappingConfig) bool {
 	return a.EffectiveMode() == b.EffectiveMode() && maps.Equal(a.Items, b.Items)
 }
 
-func (r *crossTableResolver) processLookupSymbolValue(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) (string, bool) {
+func (r *crossTableResolver) processLookupSymbolValue(
+	sym ddprofiledefinition.SymbolConfig,
+	pdu gosnmp.SnmpPDU,
+) (string, bool) {
 	val, err := convPduToStringf(pdu, sym.Format)
 	if err != nil {
 		return "", false
@@ -134,14 +144,25 @@ func (r *crossTableResolver) normalizeLookupValue(sym ddprofiledefinition.Symbol
 	return r.normalizeLookupText(sym, raw, true)
 }
 
-func (r *crossTableResolver) normalizeLookupText(sym ddprofiledefinition.SymbolConfig, val string, applyFormat bool) (string, bool) {
+func (r *crossTableResolver) normalizeLookupText(
+	sym ddprofiledefinition.SymbolConfig,
+	val string,
+	applyFormat bool,
+) (string, bool) {
 	if sym.ExtractValueCompiled != nil {
 		sm := sym.ExtractValueCompiled.FindStringSubmatch(val)
 		if len(sm) > 1 {
 			val = sm[1]
 		}
 	}
+	return r.finishLookupText(sym, val, applyFormat)
+}
 
+func (r *crossTableResolver) finishLookupText(
+	sym ddprofiledefinition.SymbolConfig,
+	val string,
+	applyFormat bool,
+) (string, bool) {
 	if sym.MatchPatternCompiled != nil {
 		sm := sym.MatchPatternCompiled.FindStringSubmatch(val)
 		if len(sm) == 0 {
@@ -200,13 +221,15 @@ func (r *crossTableResolver) resolveLookupTargetTagValue(
 	rowIndex string,
 	refTablePDUs map[string]gosnmp.SnmpPDU,
 ) (string, bool) {
-	pdu, err := r.lookupValue(tagCfg, rowIndex, refTablePDUs)
-	if err != nil {
+	pdu, failure := lookupTableColumn(tagCfg.Symbol.OID, rowIndex, refTablePDUs)
+	if failure != nil {
 		return "", false
 	}
 
 	tags := make(map[string]string, 1)
-	if err := r.tagProcessor.processTag(tagCfg, pdu, tagAdder{tags: tags}); err != nil {
+	if err := r.tagProcessor.processTag(tagCfg, pdu, tagAdder{
+		tags: tags,
+	}); err != nil {
 		return "", false
 	}
 

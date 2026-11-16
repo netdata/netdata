@@ -107,17 +107,17 @@ struct rrddim_tier {
 // --------------------------------------------------------------------------------------------------------------------
 // DATA COLLECTION STORAGE OPS
 
-STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
-STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, nd_uuid_t *uuid);
+STORAGE_METRICS_GROUP *rrdeng_metrics_group_get(STORAGE_INSTANCE *si, uint64_t seed);
+STORAGE_METRICS_GROUP *rrddim_metrics_group_get(STORAGE_INSTANCE *si, uint64_t seed);
 
-static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, nd_uuid_t *uuid) {
+static inline STORAGE_METRICS_GROUP *storage_engine_metrics_group_get(STORAGE_ENGINE_BACKEND seb __maybe_unused, STORAGE_INSTANCE *si, uint64_t seed) {
     internal_fatal(!is_valid_backend(seb), "STORAGE: invalid backend");
 
 #ifdef ENABLE_DBENGINE
     if(likely(seb == STORAGE_ENGINE_BACKEND_DBENGINE))
-        return rrdeng_metrics_group_get(si, uuid);
+        return rrdeng_metrics_group_get(si, seed);
 #endif
-    return rrddim_metrics_group_get(si, uuid);
+    return rrddim_metrics_group_get(si, seed);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -281,6 +281,33 @@ static inline void storage_engine_store_flush(STORAGE_COLLECT_HANDLE *sch) {
     else
 #endif
         rrddim_store_metric_flush(sch);
+}
+
+// --------------------------------------------------------------------------------------------------------------------
+
+time_t rrdeng_store_metric_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch);
+
+// How many seconds of collected data the dimension's current tier page still needs before it is complete (the
+// distance from its last stored point to the point that fills it and makes it flush, start + (capacity - 1) *
+// update_every), or -1 when there is no open page or the backend has no pages. It is measured in the dimension's
+// own timestamps, so it does not depend on how far a child's data lags the local clock: while the dimension keeps
+// collecting, the page completes about that many seconds from now. A page left idle by a collection gap keeps the
+// value it had when collection stopped. The caller MUST hold rd->tiers[tier].spinlock so the handle cannot be
+// finalized under it; the fields themselves are read atomically, without the collector's cooperation, so a page
+// change racing the read yields a value that is off by one page or -1 - acceptable for the ML training scheduler,
+// its only user (see src/ml/ml_queue.h).
+static inline time_t storage_engine_store_page_time_to_close_s(STORAGE_COLLECT_HANDLE *sch) {
+    if(unlikely(!sch))
+        return -1;
+
+    internal_fatal(!is_valid_backend(sch->seb), "STORAGE: invalid backend");
+
+#ifdef ENABLE_DBENGINE
+    if(likely(sch->seb == STORAGE_ENGINE_BACKEND_DBENGINE))
+        return rrdeng_store_metric_page_time_to_close_s(sch);
+#endif
+
+    return -1;
 }
 
 // --------------------------------------------------------------------------------------------------------------------

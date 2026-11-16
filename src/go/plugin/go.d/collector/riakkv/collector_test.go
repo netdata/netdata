@@ -179,6 +179,7 @@ func TestCollector_Collect(t *testing.T) {
 				"object_set_merge_time_median":     1,
 				"pbc_active":                       46,
 				"read_repairs":                     1,
+				"sys_process_count":                2169,
 				"vnode_counter_update_total":       1,
 				"vnode_map_update_total":           1,
 				"vnode_set_update_total":           1,
@@ -212,6 +213,12 @@ func TestCollector_Collect(t *testing.T) {
 			if len(test.wantMetrics) > 0 {
 				require.True(t, len(*collr.Charts()) > 0, "charts > 0")
 				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+				seen := make(map[string]bool)
+				for _, chart := range *collr.Charts() {
+					assert.NotEmptyf(t, chart.Dims, "chart %q has no dimensions", chart.ID)
+					assert.Falsef(t, seen[chart.ID], "chart %q is listed twice", chart.ID)
+					seen[chart.ID] = true
+				}
 			}
 		})
 	}

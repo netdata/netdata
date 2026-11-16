@@ -1,7 +1,7 @@
 //! APPS_LOOKUP codec.
 
 use super::common::*;
-use crate::protocol::{align8, NipcError, StrView};
+use crate::protocol::{NipcError, StrView, align8};
 
 pub const NIPC_UID_UNSET: u32 = u32::MAX;
 
@@ -813,7 +813,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::super::common::{put_u16, put_u32, response_item_bounds, LOOKUP_DIR_ENTRY_SIZE};
+    use super::super::common::{LOOKUP_DIR_ENTRY_SIZE, put_u16, put_u32, response_item_bounds};
     use super::*;
     use crate::protocol::ORCHESTRATOR_DOCKER;
 
@@ -958,8 +958,8 @@ mod tests {
     fn apps_lookup_comm_boundary() {
         let mut buf = [0u8; 256];
         let mut b = AppsLookupBuilder::new(&mut buf, 1, 0);
-        assert!(b
-            .add(
+        assert!(
+            b.add(
                 PID_LOOKUP_KNOWN,
                 APPS_CGROUP_HOST_ROOT,
                 0,
@@ -972,7 +972,8 @@ mod tests {
                 b"",
                 &[],
             )
-            .is_ok());
+            .is_ok()
+        );
         let mut b = AppsLookupBuilder::new(&mut buf, 1, 0);
         assert_eq!(
             b.add(

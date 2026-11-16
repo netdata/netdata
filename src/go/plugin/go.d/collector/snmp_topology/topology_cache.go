@@ -52,15 +52,16 @@ type topologyBuilder struct {
 }
 
 type ifStatus struct {
-	admin      string
-	oper       string
-	ifType     string
-	ifDescr    string
-	ifAlias    string
-	mac        string
-	speedBps   int64
-	lastChange int64
-	duplex     string
+	admin       string
+	oper        string
+	ifType      string
+	ifDescr     string
+	ifAlias     string
+	mac         string
+	ifHighSpeed int64 // Mbit/s
+	ifSpeed     int64 // bit/s, never the saturated 32-bit value
+	lastChange  int64
+	duplex      string
 }
 
 type lldpLocPort struct {

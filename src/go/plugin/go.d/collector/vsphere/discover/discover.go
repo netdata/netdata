@@ -39,9 +39,10 @@ type Client interface {
 	CounterInfoByName() (map[string]*types.PerfCounterInfo, error)
 }
 
-func New(client Client) *Discoverer {
+func New(client Client, vCenterInstanceUUID string) *Discoverer {
 	return &Discoverer{
 		Client:                     client,
+		vCenterInstanceUUID:        strings.TrimSpace(vCenterInstanceUUID),
 		missingPerfCounterWarnings: make(map[string]bool),
 	}
 }
@@ -60,6 +61,7 @@ type Discoverer struct {
 	TagCategoryMatcher         matcher.Matcher
 	CustomAttributeMatcher     matcher.Matcher
 	missingPerfCounterWarnings map[string]bool
+	vCenterInstanceUUID        string
 }
 
 type resources struct {

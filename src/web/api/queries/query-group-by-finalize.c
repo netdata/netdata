@@ -325,7 +325,7 @@ void rrd2rrdr_convert_values_to_percentage_of_total(RRDR *r) {
             .count = count,
             .min = min,
             .max = max,
-            .anomaly_count = (size_t)(ars * (NETDATA_DOUBLE)count),
+            .anomaly_count = (size_t)(ars * RRDR_DVIEW_ANOMALY_COUNT_MULTIPLIER / 100.0),
         };
     }
 }
@@ -413,6 +413,12 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     // the hidden contribution counters are internal to the group-by passes
     onewayalloc_freez(owa, last_r->hgbc);
     last_r->hgbc = NULL;
+
+    // execution flags a cancellation on the first grouped RRDR; keep it on the one returned
+    RRDR_RESULT_FLAGS cancel_flags = 0;
+    for(r = r_tmp; r; r = r->group_by.r)
+        cancel_flags |= r->view.flags & (RRDR_RESULT_FLAG_CANCEL | RRDR_RESULT_FLAG_TIMEOUT);
+    last_r->view.flags |= cancel_flags;
 
     // free all RRDRs except the last one
     r = r_tmp;

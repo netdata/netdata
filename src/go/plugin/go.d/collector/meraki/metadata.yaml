@@ -1,0 +1,620 @@
+plugin_name: go.d.plugin
+modules:
+  - meta:
+      id: collector-go.d.plugin-meraki
+      plugin_name: go.d.plugin
+      module_name: meraki
+      monitored_instance:
+        name: Cisco Meraki
+        link: https://meraki.cisco.com/
+        icon_filename: cisco.svg
+        categories:
+          - network-performance-monitoring.device-metrics
+      keywords:
+        - cisco meraki
+        - meraki
+        - meraki dashboard
+        - meraki api
+        - dashboard api
+        - cisco
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor Cisco Meraki device availability, switch port traffic and appliance uplink traffic and health, with a Netdata node per assigned device.
+
+          - **Device availability**: the status Meraki Dashboard reports for each device: `online`, `alerting`, `offline` or `dormant`.
+          - **Inventory**: how many devices are assigned to the organization's networks, and which ones.
+          - **Switch ports** (two opt-in options): sent and received kilobits/s, and packets/s, of every switch port, on the switch's node.
+          - **Uplink traffic** (opt-in): sent and received kilobits/s of each WAN and cellular uplink of every MX security appliance and Z teleworker gateway network.
+          - **Uplink health** (opt-in): on the node of each assigned device of product type `appliance`, such as MX and Z, the status of every uplink and how long ago the appliance last reported, plus ICMP packet loss, latency and sample age per uplink and destination IP, which Meraki documents for MX.
+          - **Fleet filtering**: device nodes and charts carry organization, network, model and product type labels, so a large fleet can be grouped and filtered.
+
+          Every device type Meraki reports availability for is covered, including security appliances (MX), switches (MS), wireless access points (MR), cameras (MV), sensors (MT) and cellular gateways (MG).
+        method_description: |
+          The collector sends read-only HTTPS requests to the Meraki Dashboard API in the cloud, authenticated with an API key. It never connects to the devices: the Agent needs outbound HTTPS (port 443) to the regional API host and to the Meraki shard hosts the API redirects to, such as `n123.meraki.com`.
+
+          Every collection (every 5 minutes by default) reads these API operations completely, page by page:
+
+          | Operation | Used for | Read |
+          |:----------|:---------|:-----|
+          | `getOrganizations` | The name of the configured organization | Always |
+          | `getOrganizationNetworks` | Network names for the labels | Always |
+          | `getOrganizationDevices` | The devices assigned to networks, one node each | Always |
+          | `getOrganizationDevicesAvailabilities` | The status of each device | Always |
+          | `getOrganizationSwitchPortsUsageHistoryByDeviceByInterval` | Switch port traffic | With `collect_switch_port_traffic` |
+          | `getDeviceSwitchPortsStatusesPackets` | Switch port packet rates, one request per switch | With `collect_switch_port_packets` |
+          | `getOrganizationApplianceUplinksUsageByNetwork` | Uplink traffic | With `collect_appliance_uplink_traffic` |
+          | `getOrganizationApplianceUplinkStatuses` | Appliance uplink status and last report time | With `collect_appliance_uplink_health`, when an appliance is assigned |
+          | `getOrganizationDevicesUplinksLossAndLatency` | MX ICMP packet loss and latency, one request for the organization | With `collect_appliance_uplink_health`, when an appliance is assigned |
+
+          Whatever `update_every` is, switch port traffic is looked up in the last 15 minutes, uplink traffic is read for the 5 minutes that ended 5 minutes ago, and packet rates for the last 5 minutes. ICMP samples are read for the 5 minutes that ended 2 minutes ago, and each uplink and destination shows the latest one.
+
+          When a job starts, one small `getOrganizationDevices` request checks that the API key can reach the organization.
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The collector needs an API key whose owner has at least read-only access to the organization. A Meraki API key acts with the permissions of the Dashboard administrator who created it; the collector only reads.
+      default_behavior:
+        auto_detection:
+          description: |
+            Nothing is detected automatically: each job monitors the one organization set in `organization_id`, with the API key you configure. Within that organization, every collection finds all assigned devices and adds a node for each new one.
+        limits:
+          description: |
+            - **Five-minute data.** Meraki refreshes device availability every 5 minutes without a sample time, and traffic values are averages over at least 5 minutes, so an `update_every` below 300 seconds adds requests, not detail. Above 300 seconds, each traffic value still covers only one Meraki window, usually 5 minutes, not the whole collection interval.
+            - **Traffic lags behind.** Meraki publishes traffic some minutes after it happens. Switch port traffic is the latest interval Meraki has reported within the last 15 minutes, so it can be up to 15 minutes old; the interval age chart shows how old it is, and the chart has a gap when Meraki has reported no usable interval in that time. Uplink traffic covers the 5 minutes that ended 5 minutes earlier, to give Meraki time to count the bytes. Packet rates cover the last 5 minutes, which Meraki may not have finished reporting. Missed collections are not backfilled.
+            - **Health is per appliance and destination.** A `ready` uplink is standby, not failed. ICMP packet loss can reach 100% when a destination blocks probes while internet access still works. Integrated cellular may have no probe statistics by default; missing statistics do not establish an outage. Device last report age is not an interface transition age.
+            - **Uplinks belong to the network.** When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface. Uplink traffic charts are therefore per network and interface, on the job's node or its virtual node, not on an appliance's node.
+            - **Shared API budget.** Meraki allows 10 requests per second per organization and 100 per source IP address, shared with every other application using them. The collector sends at most 10 requests per second per job, and after a `429 Too Many Requests` answer it sends nothing until the `Retry-After` wait Meraki requested has passed. See [Meraki API rate limits](https://developer.cisco.com/meraki/api-v1/rate-limit/).
+        performance_impact:
+          description: |
+            Collecting costs the Agent little CPU; the nodes and charts it creates, counted below, use Agent memory and disk like any others. On the Meraki side, each operation costs one request per page, plus one for each redirect Meraki answers with:
+
+            | Operation | Page size |
+            |:----------|:----------|
+            | `getOrganizations` | 9,000 organizations visible to the API key |
+            | `getOrganizationNetworks` | 1,000 networks |
+            | `getOrganizationDevices` | 1,000 assigned devices |
+            | `getOrganizationDevicesAvailabilities` | 1,000 devices |
+
+            An organization with 2,500 devices in 40 networks takes 1 + 1 + 3 + 3 = 8 requests per collection. Increase `update_every` to make fewer requests; increase `timeout` if a very large organization cannot finish within it.
+
+            Each opt-in option adds requests to every collection:
+
+            | Option | Requests | Charts |
+            |:-------|:---------|:-------|
+            | `collect_switch_port_traffic` | 1 per 50 switches Meraki lists for the organization | 2 per switch port |
+            | `collect_switch_port_packets` | 1 per assigned switch | 1 per switch port |
+            | `collect_appliance_uplink_traffic` | 1 | 1 per network uplink |
+            | `collect_appliance_uplink_health` | 1 per 1,000 appliances plus 1 probe request; none without assigned appliances | 1 per appliance plus 1 per uplink and 3 per uplink/destination with samples |
+
+            Requests are paced at 10 per second, so packet rates for 1,000 switches add about 100 seconds to every collection, more than the default `timeout` of 60 seconds. A collection that runs past `timeout` updates no chart, availability included. For a large fleet, raise `timeout` with `collect_switch_port_packets`, or leave it off.
+
+            Health chart count grows with assigned appliances, uplinks and configured ICMP destinations; Meraki documents no fixed destination count for this API.
+
+            Every assigned device becomes a Netdata node: an organization with 2,000 devices adds 2,000 nodes.
+    setup:
+      prerequisites:
+        list:
+          - title: Enable Dashboard API access for the organization
+            description: |
+              API requests are rejected until the organization allows them. In Meraki Dashboard, open **Organization > Settings** and enable **Dashboard API access**. See [How to use the Meraki Dashboard API](https://documentation.meraki.com/Platform_Management/Dashboard_Administration/Operate_and_Maintain/How-Tos/How_to_Use_the_Cisco_Meraki_Dashboard_API).
+          - title: Create an API key for a read-only administrator
+            description: |
+              A Meraki API key has the permissions of the administrator who creates it. Use a Dashboard administrator account with read-only access to the organization, and generate an API key from that account's **My profile** page. Keep the key out of the configuration file: put it in an environment variable of the Netdata service or in a file readable by the `netdata` user.
+
+              To verify the key, list the organizations it can see with the command shown for the `organization_id` option.
+          - title: Allow the Agent's address if the organization restricts API access by IP
+            description: |
+              This applies only when the organization limits Dashboard API access to specific source addresses. Add the public IP address the Agent's requests leave from; otherwise organization requests fail with HTTP 403.
+      configuration:
+        file:
+          name: go.d/meraki.conf
+        options:
+          description: 'Configure one organization per job. The following options can be defined globally: update_every, autodetection_retry.'
+          folding:
+            title: Config options
+            enabled: true
+          list:
+            - name: url
+              description: URL of the Meraki Dashboard API endpoint.
+              default_value: https://api.meraki.com/api/v1
+              required: false
+              group: Target
+              detailed_description: |
+                Use the API endpoint of the region that hosts the organization:
+
+                | Region | URL |
+                |:-------|:----|
+                | Global (default) | `https://api.meraki.com/api/v1` |
+                | Canada | `https://api.meraki.ca/api/v1` |
+                | China | `https://api.meraki.cn/api/v1` |
+                | India | `https://api.meraki.in/api/v1` |
+                | United States FedRAMP | `https://api.gov-meraki.com/api/v1` |
+
+                The URL must use HTTPS with the path exactly `/api/v1` (a prefix such as `/meraki/api/v1` is not accepted), without credentials, query or fragment.
+
+                A private endpoint or reverse proxy in front of the API also works, with one condition. Meraki's redirects and next-page links point at Meraki hosts, and with a custom endpoint the collector follows them only within that endpoint. The proxy must therefore rewrite the `Location` and `Link` headers to its own address; otherwise every list longer than one page fails with `invalid pagination target`.
+            - name: organization_id
+              description: Meraki organization ID to monitor.
+              default_value: ''
+              required: true
+              group: Target
+              detailed_description: |
+                The ID of the organization, not its name. The organizations an API key can see, with their IDs, are listed by the command below; for an organization in another region, replace the host with the one in `url`.
+
+                ```bash
+                curl -s -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
+                ```
+            - name: api_key
+              description: Meraki API key. Set either this or bearer_token_file.
+              default_value: ''
+              required: false
+              group: Authentication
+            - name: bearer_token_file
+              description: Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.
+              default_value: ''
+              required: false
+              group: Authentication
+              detailed_description: |
+                Use this when a secret manager rotates the key in place: the next request uses the new key without a restart. The file must be readable by the `netdata` user.
+            - name: collect_switch_port_traffic
+              description: Collect the average traffic of every switch port, shown on its switch's node.
+              default_value: false
+              required: false
+              group: Optional metrics
+              detailed_description: |
+                Adds two charts per port to each switch's node: sent and received kilobits/s from the latest interval Meraki has reported within the last 15 minutes, usually 5 minutes long, or a gap when it has reported none, and how old that interval is.
+            - name: collect_switch_port_packets
+              description: Collect the packet rates of every switch port, at one API request per switch per collection.
+              default_value: false
+              required: false
+              group: Optional metrics
+              detailed_description: |
+                Adds a chart of the sent and received packets/s of each port, counting every packet type, to each switch's node. Because it costs a request per switch, it is the option that decides `timeout` on large fleets; see Performance Impact.
+            - name: collect_appliance_uplink_traffic
+              description: Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.
+              default_value: false
+              required: false
+              group: Optional metrics
+              detailed_description: |
+                Adds a chart per network and uplink interface (for example `wan1`, `wan2` or `cellular`) with the sent and received kilobits/s of the 5 minutes that ended 5 minutes earlier, on the job's node or `vnode`.
+            - name: collect_appliance_uplink_health
+              description: Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node.
+              default_value: false
+              required: false
+              group: Optional metrics
+              detailed_description: |
+                Adds to each appliance's node a status chart per uplink (`active`, `connecting`, `failed`, `not_connected` or `ready`) and a chart of how long ago the appliance last reported. Where Meraki reports ICMP measurements, which it documents for MX, it also adds packet loss, latency and sample age charts per uplink and ICMP destination IP. Each appliance of a warm spare pair keeps its own node, nothing is averaged across appliances or destinations, and a missing, unknown or conflicting status or ICMP value is a gap, never an older value.
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 300
+              required: false
+              group: Collection
+            - name: autodetection_retry
+              description: How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.
+              default_value: 0
+              required: false
+              group: Collection
+            - name: timeout
+              description: Complete collection or connection-check timeout, in seconds, including all pages and request pacing.
+              default_value: 60
+              required: false
+              group: Collection
+            - name: vnode
+              description: Associates the organization and appliance uplink traffic charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.
+              default_value: ''
+              required: false
+              group: Collection
+            - name: proxy_url
+              description: HTTP proxy URL. Empty value uses environment proxy variables.
+              default_value: ''
+              required: false
+              group: Transport
+              detailed_description: If the proxy URL contains credentials, use a secret reference such as `${env:MERAKI_PROXY_URL}` instead of entering the authenticated URL directly into the form.
+            - name: tls_ca
+              description: Path to a CA certificate file used to verify the server certificate.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_cert
+              description: Path to a client certificate file. Requires tls_key.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_key
+              description: Path to the client certificate key file. Requires tls_cert.
+              default_value: ''
+              required: false
+              group: Transport
+            - name: tls_skip_verify
+              description: Skip verification of the server certificate and hostname.
+              default_value: false
+              required: false
+              group: Transport
+        examples:
+          folding:
+            title: Config
+            enabled: true
+          list:
+            - name: Basic
+              description: Monitor one organization, with the API key read from an environment variable.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+            - name: Switch port and uplink traffic
+              description: Also collect the traffic of every switch port and MX or Z uplink.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    collect_switch_port_traffic: yes
+                    collect_appliance_uplink_traffic: yes
+            - name: Switch port packets on a large fleet
+              description: Also collect packet rates, which cost one request per switch. The longer `timeout` leaves room for about 1,500 switches.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    collect_switch_port_packets: yes
+                    timeout: 180
+            - name: Appliance uplink health
+              description: Also collect appliance uplink status and MX ICMP measurements on the existing device nodes.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    collect_appliance_uplink_health: yes
+            - name: API key in a rotated file
+              description: Read the key from a file that a secret manager rotates. The file is read again for every request.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    bearer_token_file: /run/secrets/meraki_api_key
+            - name: Regional API endpoint
+              description: Monitor an organization hosted outside the global region, here Canada.
+              config: |
+                jobs:
+                  - name: meraki-canada
+                    url: https://api.meraki.ca/api/v1
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+            - name: Through an HTTP proxy
+              description: Reach the API through an outbound proxy.
+              config: |
+                jobs:
+                  - name: meraki
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+                    proxy_url: http://proxy.example.com:3128
+            - name: Several organizations
+              description: One job per organization. Each organization has its own API budget; the jobs share the per-IP budget.
+              config: |
+                jobs:
+                  - name: meraki-hq
+                    organization_id: "123456"
+                    api_key: ${env:MERAKI_API_KEY}
+
+                  - name: meraki-retail
+                    organization_id: "654321"
+                    api_key: ${env:MERAKI_API_KEY}
+    metrics:
+      description: |
+        - **Where charts appear.** The organization and uplink traffic charts are on the node that runs the job, or on its virtual node when `vnode` is set. Device charts, switch port charts included, are on each device's own node, named after the device; `meraki-` followed by the serial when the device has no name; or `meraki-` followed by a generated ID when the name contains an apostrophe, backslash or line break.
+        - **Gaps, not offline or zero.** A device whose status is missing, unknown or reported for another network has no availability value for that collection; it is never reported offline because of missing data. Its inventory chart stays at 1 while the device is assigned. Likewise, a traffic value Meraki leaves out, or reports twice with different values, is a gap, not a zero.
+        - **Failed collections.** A failed inventory request, a timeout or a cancellation updates no chart. A failed optional traffic or health request leaves gaps only in its own charts, except an HTTP 429, after which no more optional telemetry is requested in that collection.
+        - **Removed devices.** When a device leaves the inventory, its charts stop updating and become obsolete. Netdata keeps the node and its history.
+      scopes:
+        - name: organization
+          description: The configured Meraki organization.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID, for example `123456`.
+            - name: organization_name
+              description: Meraki organization name.
+          metrics:
+            - name: meraki.organization_assigned_devices
+              description: Meraki Assigned Devices
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: assigned
+        - name: device
+          description: One device assigned to a network of the organization, shown as its own node.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+          metrics:
+            - name: meraki.device_assigned
+              description: Meraki Device Inventory Membership
+              unit: devices
+              chart_type: line
+              dimensions:
+                - name: assigned
+            - name: meraki.device_availability
+              description: Meraki Device Availability
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: alerting
+                - name: dormant
+                - name: offline
+                - name: online
+            - name: meraki.appliance_report_age
+              description: Meraki Appliance Last Report Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+        - name: appliance uplink health
+          description: One uplink of an assigned appliance on its device node, when collect_appliance_uplink_health is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: interface
+              description: Uplink interface as Meraki reports it, for example wan1, wan2 or cellular.
+          metrics:
+            - name: meraki.appliance_uplink_status
+              description: Meraki Appliance Uplink Status
+              unit: status
+              chart_type: stacked
+              dimensions:
+                - name: active
+                - name: connecting
+                - name: failed
+                - name: not_connected
+                - name: ready
+        - name: appliance uplink probe
+          description: The latest MX ICMP sample per appliance, uplink and destination IP, on the device node, when collect_appliance_uplink_health is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: interface
+              description: Uplink interface as Meraki reports it, for example wan1, wan2 or cellular.
+            - name: destination_ip
+              description: Destination IP address of the ICMP probe.
+          metrics:
+            - name: meraki.appliance_uplink_packet_loss
+              description: Meraki Appliance Uplink ICMP Packet Loss
+              unit: percentage
+              chart_type: line
+              dimensions:
+                - name: loss
+            - name: meraki.appliance_uplink_latency
+              description: Meraki Appliance Uplink ICMP Latency
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: latency
+            - name: meraki.appliance_uplink_sample_age
+              description: Meraki Appliance Uplink ICMP Sample Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+        - name: switch port
+          description: One port of an assigned switch, on the switch's node, when `collect_switch_port_traffic` or `collect_switch_port_packets` is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: serial
+              description: Device serial number, for example `Q2XX-XXXX-XXXX`.
+            - name: device_name
+              description: Device name in Dashboard; empty when unnamed.
+            - name: model
+              description: Device model, for example `MS120-8`.
+            - name: product_type
+              description: Meraki product type, for example `appliance`, `switch`, `wireless`, `camera`, `sensor` or `cellularGateway`.
+            - name: network_id
+              description: ID of the network the device is assigned to.
+            - name: network_name
+              description: Name of the network the device is assigned to.
+            - name: port_id
+              description: Port ID as Meraki reports it, usually the port number such as `1`; ports on a module also carry the slot and module type.
+          metrics:
+            - name: meraki.switch_port_traffic
+              description: Meraki Switch Port Traffic
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+            - name: meraki.switch_port_traffic_interval_age
+              description: Meraki Switch Port Traffic Interval Age
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - name: meraki.switch_port_packets
+              description: Meraki Switch Port Packets
+              unit: packets/s
+              chart_type: line
+              dimensions:
+                - name: received
+                - name: sent
+        - name: appliance uplink
+          description: One uplink interface of an MX or Z network, on the job's node or its virtual node, when `collect_appliance_uplink_traffic` is enabled.
+          labels:
+            - name: organization_id
+              description: Meraki organization ID.
+            - name: organization_name
+              description: Meraki organization name.
+            - name: network_id
+              description: ID of the MX or Z network.
+            - name: network_name
+              description: Name of the MX or Z network.
+            - name: interface
+              description: Uplink interface, for example `wan1`, `wan2` or `cellular`.
+          metrics:
+            - name: meraki.appliance_uplink_traffic
+              description: Meraki Appliance Uplink Traffic
+              unit: kilobits/s
+              chart_type: area
+              dimensions:
+                - name: received
+                - name: sent
+      folding:
+        title: Metrics
+        enabled: false
+      availability: []
+    troubleshooting:
+      errors:
+        list:
+          - error: '`operation`: HTTP status 401'
+            cause: Meraki rejected the API key. It is mistyped, revoked, or belongs to a deleted administrator account.
+            fix: Generate a new API key and update `api_key` and restart the job, or replace the contents of the file named by `bearer_token_file`, which is read again on the next request.
+          - error: '`operation`: HTTP status 403'
+            cause: The API key's owner lacks permission for the request, or the organization restricts API access by source IP and the Agent's address is not allowed.
+            fix: Grant the key's owner read-only access to the organization and, if it restricts API access by IP, allow the Agent's public address. See the prerequisites.
+          - error: '`operation`: HTTP status 404'
+            cause: Meraki answers 404 when the API key cannot reach the organization at all. The organization ID is wrong, the key's owner has no access to it, or Dashboard API access is disabled for it.
+            fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), grant the key's owner read-only access, and enable Dashboard API access for the organization.
+          - error: configured organization_id is not visible to the Meraki credential
+            cause: The API key works, but the organization in `organization_id` is not among the organizations it can see.
+            fix: Check `organization_id` against the organizations the key can see (see the `organization_id` option), or use an API key of an administrator of that organization.
+          - error: '`operation`: HTTP status 429'
+            cause: Meraki rate-limited the request. The budgets of 10 requests per second per organization and 100 per source IP address are shared with every other application and job using them.
+            fix: |
+              The collector sends nothing until the `Retry-After` delay Meraki requested has passed. If this happens when the job starts, the job retries after that delay only when `autodetection_retry` is set.
+
+              If it happens regularly, reduce the organization's other API usage, move other API clients off the Agent's address, or increase `update_every`.
+          - error: Meraki API Retry-After delay has not elapsed
+            cause: An earlier request was rate-limited and the wait Meraki requested is still running, so the collector skipped this collection without contacting the API.
+            fix: No action is needed; collection resumes when the wait ends. If it recurs, see the HTTP status 429 entry.
+          - error: '`operation`: HTTP status `5xx`'
+            cause: The Meraki API had a temporary failure, or a proxy in between could not reach it.
+            fix: Usually none; the next collection tries again. If it persists, check Meraki's service status and, when `proxy_url` is set, the proxy.
+          - error: '`operation`: HTTP request failed: `reason`'
+            cause: The request got no HTTP answer. The end of the message says why; for `context deadline exceeded`, see that entry.
+            fix: |
+              | Reason contains | Check |
+              |:----------------|:------|
+              | `no such host` | DNS resolution of the API host on the Agent |
+              | `connection refused`, `i/o timeout`, `connection reset` | Firewall rules for outbound HTTPS (port 443) to the API host and the Meraki shard hosts |
+              | `proxyconnect` | `proxy_url`, or the proxy environment variables when `proxy_url` is empty |
+              | `x509:` or `tls:` | Certificate trust: set `tls_ca` when a proxy or private endpoint uses its own CA |
+              | `Meraki redirect` | The API or a proxy redirected the request to a host the collector does not trust; see the `url` option |
+
+              To test the same path from the Agent host, preferably as the `netdata` user (replace the host with the one in `url` for another region):
+
+              ```bash
+              curl -sS -o /dev/null -w '%{http_code}\n' -H "Authorization: Bearer $MERAKI_API_KEY" https://api.meraki.com/api/v1/organizations
+              ```
+          - error: context deadline exceeded
+            cause: A collection or the startup check took longer than `timeout`. Every page counts toward it, and the collector sends at most 10 requests per second, so a very large organization or a slow network can run out of time.
+            fix: Check connectivity to the API endpoint. If requests succeed but the organization cannot finish in time, increase `timeout`. With `collect_switch_port_packets`, every switch adds a request; raise `timeout` with the number of switches, or disable the option.
+          - error: '`operation`: invalid pagination target'
+            cause: A next-page link pointed outside the endpoint in `url`. This happens when `url` is a proxy or private endpoint that passes Meraki's `Link` headers through unchanged, and only for lists longer than one page.
+            fix: Configure the proxy to rewrite `Location` and `Link` headers to its own address, or set `url` to the Meraki API endpoint of the organization's region.
+          - error: '`operation`: cannot prepare authenticated request'
+            when: '`bearer_token_file` is set.'
+            cause: The key file is missing, empty or not readable by the `netdata` user.
+            fix: Check the path in `bearer_token_file`, that the file contains the API key, and that the `netdata` user can read it.
+          - error: '`operation`: invalid JSON array response'
+            cause: The endpoint answered with something other than Meraki API data, typically because `url` points to another service or a proxy answered with its own page.
+            fix: Set `url` to a Meraki API endpoint with the path `/api/v1` (see the `url` option), and check `proxy_url`.
+          - error: Meraki requires exactly one API key or bearer token file
+            cause: Both authentication options are empty, both are set, or `api_key` contains a line break.
+            fix: Set either `api_key` or `bearer_token_file` and clear the other. Make sure the key is on one line.
+          - error: Meraki base URL must be an HTTPS /api/v1 URL without credentials, query or fragment
+            cause: '`url` is not an HTTPS URL with the path `/api/v1`, or it contains a user name, password, query or fragment.'
+            fix: Use one of the regional endpoints listed for the `url` option, or your endpoint's HTTPS URL with the path `/api/v1`.
+          - error: organization_id must be a nonempty organization ID without surrounding whitespace
+            cause: '`organization_id` is empty, has leading or trailing spaces, or is `.` or `..`.'
+            fix: Set `organization_id` to the organization's ID, quoted as a string in YAML (`"123456"`).
+          - error: cannot initialize Meraki HTTP transport; check proxy and TLS configuration
+            cause: '`proxy_url` is not a valid URL, or a TLS file in `tls_ca`, `tls_cert` or `tls_key` cannot be read or parsed.'
+            fix: Check `proxy_url`, and that the TLS files exist, are readable by the `netdata` user and contain PEM data.
+          - error: tls_cert and tls_key must be configured together
+            cause: Only one of the client certificate options is set.
+            fix: Set both `tls_cert` and `tls_key`, or neither.
+          - error: Meraki assigned device has no serial
+            cause: The assigned-device list from Meraki contained an entry without a serial number. The whole collection is dropped rather than shown with a device missing.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support with the time of the error.
+          - error: conflicting Meraki assigned-device records
+            cause: The assigned-device list listed the same serial twice with different details, typically because a device was renamed or moved while the pages were read. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: conflicting Meraki network records
+            cause: The network list listed the same network ID twice with different names, typically because a network was renamed while the pages were read. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: conflicting Meraki organization records
+            cause: The organization list listed the configured organization ID twice with different details. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: Meraki network belongs to a different organization
+            cause: The network list for the configured organization contained a network of another organization. The whole collection is dropped.
+            fix: Usually temporary; the next collection reads the list again. If it persists, report it to Cisco Meraki support.
+          - error: Device node shows inventory but no availability chart
+            cause: Meraki did not report a usable status for the device in the last collection. Availability can lag a new assignment or a network move by one refresh.
+            fix: Check the device's status in Dashboard and wait for the next 5-minute refresh. Run the collector in debug mode (see Diagnostics) to see how many devices had no usable status.
+          - error: 'Meraki `traffic` unavailable: `error`'
+            cause: A switch port traffic, switch port packets or appliance uplink traffic request failed. That traffic has gaps for this collection (for packets, only the ports of that switch); inventory, availability and the other traffic options still update. After an HTTP 429, no more optional telemetry requests are sent in this collection. The warning is logged at most once an hour per kind of traffic.
+            fix: 'Most messages continue with another error on this page, such as `getDeviceSwitchPortsStatusesPackets: HTTP status 403`; follow that entry. Inventory worked in the same collection, so an HTTP 403 or 404 here is about that traffic data, not about `organization_id`: check in Meraki Dashboard that the API key''s administrator can see the switch or network and that it reports this data.'
+          - error: Switch port or uplink traffic charts are missing
+            cause: The traffic option is off, the organization has no switches or no MX or Z networks, or Meraki reported no usable value. Switch port traffic also has gaps while Meraki has reported no interval that ended in the last 15 minutes.
+            fix: Enable `collect_switch_port_traffic`, `collect_switch_port_packets` or `collect_appliance_uplink_traffic`. If they are on, look for the traffic warning above in the logs, and compare with the traffic Meraki Dashboard shows for the switch or network.
+          - error: 'Meraki appliance uplink status unavailable: `error`'
+            cause: The appliance uplink status request failed, leaving gaps in uplink status and device report age while inventory, availability and independent telemetry can still update. An HTTP 429 also skips all remaining optional reads in this collection.
+            fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
+          - error: 'Meraki appliance uplink probes unavailable: `error`'
+            cause: The MX ICMP probe request failed, leaving gaps in packet loss, latency and sample age while inventory, availability and independent telemetry can still update. An HTTP 429 also skips all remaining optional reads in this collection.
+            fix: Follow the corresponding HTTP or transport error on this page. For HTTP 403 or 404, verify the API key's access to appliance telemetry; the successful inventory read does not prove access to every optional API.
+          - error: Appliance uplink health charts are missing
+            cause: The health option is off, no appliance is assigned, the optional API request failed, or Meraki reported no usable data. ICMP loss and latency are documented for MX only; cellular may have no samples by default.
+            fix: Enable `collect_appliance_uplink_health`, check the collector warning and Meraki Dashboard, and confirm that ICMP monitoring destinations answer probes.

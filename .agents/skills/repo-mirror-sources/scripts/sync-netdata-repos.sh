@@ -35,8 +35,10 @@ Maintains a local mirror of Netdata-org source repositories at
 locally without GitHub API round-trips and rate limits.
 
 Phase 1 (always): for each repo in scope, skip if there are staged or
-modified changes; otherwise switch to the default branch (master/main/
-develop), pull, and recursively update submodules.
+modified changes; otherwise select cached origin/HEAD (falling back to
+origin/master, main, develop), switch, pull, and force-update recursive
+submodules. Unknown defaults and failed switches are skipped. These checks
+do not guarantee preservation of arbitrary nested or untracked work.
 
 Phase 2 (only when no --repo flags AND 'gh' is available + authed):
 discover new netdata-org source repos via 'gh repo list netdata
@@ -71,8 +73,8 @@ done
 # 1. NETDATA_REPOS_DIR set and points to an existing directory.
 if [ -z "${NETDATA_REPOS_DIR:-}" ]; then
     echo "ERROR: NETDATA_REPOS_DIR is not set." >&2
-    echo "       Export it (for example: set -a; source <repo>/.env; set +a); this script does" >&2
-    echo "       not read .env. It names the directory that holds your Netdata-org repos mirror." >&2
+    echo "       Export it explicitly: export NETDATA_REPOS_DIR='/path/to/mirror'" >&2
+    echo "       This script does not read .env; the variable names your Netdata-org mirror directory." >&2
     exit 2
 fi
 MIRROR_DIR="$NETDATA_REPOS_DIR"
@@ -142,7 +144,7 @@ has_uncommitted_changes() {
     # First check if we have a valid HEAD (repo might be empty or corrupted)
     if ! git rev-parse HEAD >/dev/null 2>&1; then
         cd "$MIRROR_DIR" 2>/dev/null || true
-        return 1  # No HEAD means no commits, so no uncommitted changes to worry about
+        return 1  # Legacy no-HEAD path bypasses the dirty check; not a safety guarantee
     fi
     
     # Refresh the index to avoid false positives from timestamp changes
@@ -150,7 +152,7 @@ has_uncommitted_changes() {
     
     # Check only for staged or modified files, not untracked files
     # git diff-index checks for staged and modified files
-    # We ignore untracked files since they don't affect pulls
+    # Untracked files are not a gate here; checkout/pull can still encounter conflicts
     git diff-index --quiet HEAD -- 2>/dev/null
     local diff_result=$?
     
@@ -308,6 +310,14 @@ update_repo() {
     local current_branch default_branch
     current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
     default_branch=$(get_default_branch)
+
+    # Pulling the current branch would violate default-only synchronization.
+    if [ -z "$default_branch" ]; then
+        print_status "  ${YELLOW}⚠️  Cannot determine default branch; skipping $repo${NC}"
+        REPOS_WRONG_BRANCH+=("$repo: default branch unknown (current: $current_branch)")
+        cd "$MIRROR_DIR" 2>/dev/null || true
+        return 1
+    fi
 
     # Check for unpushed commits (we're already in the repo directory)
     if [ -n "$current_branch" ] && git rev-parse --verify "origin/$current_branch" >/dev/null 2>&1; then

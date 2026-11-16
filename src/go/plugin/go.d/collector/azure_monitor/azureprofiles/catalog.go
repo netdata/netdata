@@ -197,6 +197,33 @@ func (c Catalog) ResourceTypes() []string {
 	return types
 }
 
+// ResourceProperties lists the resource properties that profiles of the given resource types
+// read during discovery; with no types it lists them for every profile.
+func (c Catalog) ResourceProperties(resourceTypes ...string) []string {
+	wanted := make(map[string]struct{}, len(resourceTypes))
+	for _, resourceType := range resourceTypes {
+		wanted[normalizeKey(resourceType)] = struct{}{}
+	}
+
+	seen := make(map[string]struct{})
+	var properties []string
+	for _, n := range c.Sorted() {
+		if _, ok := wanted[normalizeKey(n.Profile.ResourceType)]; len(wanted) > 0 && !ok {
+			continue
+		}
+		for _, property := range n.Profile.ResourceProperties() {
+			if _, ok := seen[property]; ok {
+				continue
+			}
+			seen[property] = struct{}{}
+			properties = append(properties, property)
+		}
+	}
+
+	sort.Strings(properties)
+	return properties
+}
+
 func defaultDirSpecs() []DirSpec {
 	if executable.Name == "test" {
 		if dir := azureProfilesDirFromThisFile(); dir != "" {

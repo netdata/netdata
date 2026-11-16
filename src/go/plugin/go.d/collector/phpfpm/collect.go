@@ -5,11 +5,13 @@ package phpfpm
 import (
 	"math"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/stm"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
-	st, err := c.client.getStatus()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	st, err := c.client.getStatus(ctx)
 	if err != nil {
 		return nil, err
 	}

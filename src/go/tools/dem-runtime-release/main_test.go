@@ -1,0 +1,328 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+type fixture struct {
+	dir      string
+	manifest browserruntime.Manifest
+	trust    *browserruntime.ReleaseTrust
+	args     []string
+}
+
+func newFixture(t *testing.T, arch string) fixture {
+	t.Helper()
+	dir := t.TempDir()
+	write := func(name string, data []byte) { require.NoError(t, os.WriteFile(filepath.Join(dir, name), data, 0600)) }
+	write("archive", []byte("local runtime archive fixture"))
+	write("sources", []byte("local source archive fixture"))
+	hash, size, err := hashFile(filepath.Join(dir, "archive"))
+	require.NoError(t, err)
+	m := browserruntime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  "release-1",
+		Platform: "linux/" + arch,
+		Archive: browserruntime.Archive{
+			SHA256:        hash,
+			Bytes:         size,
+			TarBytes:      4096,
+			ExpandedBytes: 100,
+			Entries:       8,
+		},
+		Layout: browserruntime.Layout{
+			EntryPoint:   "runner/run.mjs",
+			Node:         "bin/node",
+			Dependencies: "dependencies",
+			Browser:      "bin/chromium",
+			Loader:       "lib/loader",
+			Fonts:        "fonts",
+		},
+		Bindings: []browserruntime.Binding{
+			{Path: "bin/node", Offset: 42, Expected: []byte("loader\x00")},
+			{Path: "bin/chromium", Offset: 84, Expected: []byte("loader\x00")},
+		},
+	}
+	data, err := json.Marshal(m)
+	require.NoError(t, err)
+	write("manifest.json", data)
+	return fixture{
+		dir:      dir,
+		manifest: m,
+		args: []string{
+			"sign",
+			"--manifest",
+			filepath.Join(dir, "manifest.json"),
+			"--archive",
+			filepath.Join(dir, "archive"),
+			"--sources",
+			filepath.Join(dir, "sources"),
+			"--archive-url",
+			"https://example.invalid/runtime.tar.zst",
+			"--sources-url",
+			"https://example.invalid/sources.tar.zst",
+			"--sequence",
+			"17",
+			"--output",
+			filepath.Join(dir, "release.json"),
+		},
+	}
+}
+
+func newSigningFixture(t *testing.T, arch string) fixture {
+	t.Helper()
+	f := newFixture(t, arch)
+	fingerprint, public := gpgFixture(t)
+	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), public, 0600))
+	var err error
+	f.trust, err = browserruntime.ParseReleaseKeyring(public)
+	require.NoError(t, err)
+	f.args = append(f.args, "--key", fingerprint, "--public-key", filepath.Join(f.dir, "public.gpg"))
+	return f
+}
+
+func (f fixture) verifyArgs() []string {
+	return []string{
+		"verify",
+		"--key",
+		filepath.Join(f.dir, "public.gpg"),
+		"--release",
+		filepath.Join(f.dir, "release.json"),
+		"--archive",
+		filepath.Join(f.dir, "archive"),
+		"--sources",
+		filepath.Join(f.dir, "sources"),
+	}
+}
+
+func TestSignVerifyBothArchitectures(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			f := newSigningFixture(t, arch)
+			require.NoError(t, run(f.args, io.Discard))
+			require.NoError(t, run(f.verifyArgs(), io.Discard))
+			data, err := os.ReadFile(filepath.Join(f.dir, "release.json"))
+			require.NoError(t, err)
+			verified, err := browserruntime.VerifyRelease(data, f.trust)
+			require.NoError(t, err)
+			release := verified.Release()
+			expected := f.manifest
+			expected.Archive.URL = "https://example.invalid/runtime.tar.zst"
+			assert.Equal(t, expected, release.Manifest)
+			assert.Equal(t, uint64(17), release.Sequence)
+			var envelope struct {
+				Payload   []byte `json:"payload"`
+				Signature []byte `json:"signature"`
+			}
+			require.NoError(t, json.Unmarshal(data, &envelope))
+			signedPayload, err := browserruntime.ReleaseSigningPayload(release)
+			require.NoError(t, err)
+			payloadPath, signaturePath := filepath.Join(f.dir, "signed-payload"), filepath.Join(f.dir, "signature")
+			require.NoError(t, os.WriteFile(payloadPath, signedPayload, 0600))
+			require.NoError(t, os.WriteFile(signaturePath, envelope.Signature, 0600))
+			output, err := exec.Command("gpg", "--batch", "--verify", signaturePath, payloadPath).CombinedOutput()
+			require.NoError(t, err, string(output))
+			hash, size, err := hashFile(filepath.Join(f.dir, "sources"))
+			require.NoError(t, err)
+			assert.Equal(t, hash, release.Sources.SHA256)
+			assert.Equal(t, size, release.Sources.Bytes)
+			assert.ErrorContains(t, run(f.args, io.Discard), "existing outputs are never replaced")
+			after, err := os.ReadFile(filepath.Join(f.dir, "release.json"))
+			require.NoError(t, err)
+			assert.Equal(t, data, after)
+		})
+	}
+}
+
+func TestSignRejectsInvalidInputs(t *testing.T) {
+	for _, kind := range []string{"digest", "size", "unknown", "trailing", "oversize", "url", "sequence", "key", "empty-sources"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newSigningFixture(t, "amd64")
+			switch kind {
+			case "digest":
+				require.NoError(
+					t,
+					os.WriteFile(
+						filepath.Join(f.dir, "archive"),
+						bytes.Repeat([]byte("x"), int(f.manifest.Archive.Bytes)),
+						0600,
+					),
+				)
+			case "size":
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "archive"), []byte("short"), 0600))
+			case "unknown", "trailing", "oversize":
+				p := filepath.Join(f.dir, "manifest.json")
+				data, err := os.ReadFile(p)
+				require.NoError(t, err)
+				if kind == "unknown" {
+					data = append([]byte(`{"unexpected":1,`), data[1:]...)
+				}
+				if kind == "trailing" {
+					data = append(data, []byte(` {}`)...)
+				}
+				if kind == "oversize" {
+					data = bytes.Repeat([]byte(" "), browserruntime.ReleaseEnvelopeLimit+1)
+				}
+				require.NoError(t, os.WriteFile(p, data, 0600))
+			case "url":
+				f.args = append(f.args, "--archive-url", "http://example.invalid/archive")
+			case "sequence":
+				f.args = append(f.args, "--sequence", "0")
+			case "key":
+				f.args = append(f.args, "--key", "PRIVATE CONTENT MUST NOT APPEAR IN ERROR")
+			case "empty-sources":
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "sources"), nil, 0600))
+			}
+			err := run(f.args, io.Discard)
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), "PRIVATE CONTENT")
+			_, err = os.Stat(filepath.Join(f.dir, "release.json"))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+		})
+	}
+}
+
+func TestVerifyRequiresAuthenticationAndArtifactIntegrity(t *testing.T) {
+	for _, kind := range []string{"wrong-key", "tampered", "archive", "sources"} {
+		t.Run(kind, func(t *testing.T) {
+			f := newSigningFixture(t, "arm64")
+			require.NoError(t, run(f.args, io.Discard))
+			switch kind {
+			case "wrong-key":
+				require.NoError(
+					t,
+					os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, pgptest.Key(t, 8)), 0600),
+				)
+			case "tampered":
+				p := filepath.Join(f.dir, "release.json")
+				data, err := os.ReadFile(p)
+				require.NoError(t, err)
+				var envelope map[string]json.RawMessage
+				require.NoError(t, json.Unmarshal(data, &envelope))
+				envelope["signature"] = json.RawMessage(`"AAAA"`)
+				data, err = json.Marshal(envelope)
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(p, data, 0600))
+			default:
+				require.NoError(t, os.WriteFile(filepath.Join(f.dir, kind), []byte("changed"), 0600))
+			}
+			require.Error(t, run(f.verifyArgs(), io.Discard))
+		})
+	}
+}
+
+func TestCommandErrors(t *testing.T) {
+	for _, args := range [][]string{nil, {"unknown"}, {"sign"}, {"verify"}, {"sign", "--sequence", "-1"}, {"verify", "extra"}, {"sign", "--unknown"}} {
+		assert.Error(t, run(args, io.Discard))
+	}
+}
+
+func TestStageNativeUsesBuilderManifestWithoutSigningKey(t *testing.T) {
+	for _, arch := range []string{"amd64", "arm64"} {
+		t.Run(arch, func(t *testing.T) {
+			f := newFixture(t, arch)
+			b := browserruntimetest.NewBundle(t, "stage-"+arch)
+			f.manifest.Layout = browserruntime.Layout(b.Layout)
+			f.manifest.Bindings = nil
+			for _, binding := range b.Bindings {
+				f.manifest.Bindings = append(f.manifest.Bindings, browserruntime.Binding(binding))
+			}
+			f.manifest.Archive = browserruntime.Archive(b.Bounds)
+			archive := filepath.Join(f.dir, "archive")
+			require.NoError(t, os.WriteFile(archive, b.Data, 0600))
+			raw, err := json.Marshal(f.manifest)
+			require.NoError(t, err)
+			manifestPath := filepath.Join(f.dir, "manifest.json")
+			require.NoError(t, os.WriteFile(manifestPath, raw, 0600))
+			output := filepath.Join(f.dir, "payload")
+			args := []string{"stage-native", "--manifest", manifestPath, "--archive", archive, "--output", output}
+			require.NoError(t, run(args, io.Discard))
+			raw, err = os.ReadFile(filepath.Join(output, "native.json"))
+			require.NoError(t, err)
+			var record browserruntime.NativePackage
+			require.NoError(t, json.Unmarshal(raw, &record))
+			assert.Equal(t, f.manifest, record.Manifest)
+			assert.Equal(t, browserruntime.DefaultNativeConfig().PayloadPath, record.Path)
+			require.ErrorContains(t, run(args, io.Discard), "must be empty")
+		})
+	}
+}
+
+func TestStageNativeRejectsInvalidInputs(t *testing.T) {
+	for _, args := range [][]string{{"stage-native"}, {"stage-native", "extra"}, {"stage-native", "--key", "key.pem"}} {
+		require.Error(t, run(args, io.Discard))
+	}
+	f := newFixture(t, "amd64")
+	output := filepath.Join(f.dir, "payload")
+	// This signed-tool fixture has a valid manifest and matching bytes but no tar
+	// structure: staging must reject it through the shared production extractor.
+	err := run(
+		[]string{
+			"stage-native",
+			"--manifest",
+			filepath.Join(f.dir, "manifest.json"),
+			"--archive",
+			filepath.Join(f.dir, "archive"),
+			"--output",
+			output,
+		},
+		io.Discard,
+	)
+	require.Error(t, err)
+	assert.NoFileExists(t, filepath.Join(output, "native.json"))
+}
+
+func gpgFixture(t *testing.T) (string, []byte) {
+	t.Helper()
+	if _, err := exec.LookPath("gpg"); err != nil {
+		t.Skip("GPG interoperability requires host gpg")
+	}
+	home := t.TempDir()
+	require.NoError(t, os.Chmod(home, 0700))
+	t.Setenv("GNUPGHOME", home)
+	command := exec.Command(
+		"gpg",
+		"--batch",
+		"--pinentry-mode",
+		"loopback",
+		"--passphrase",
+		"",
+		"--quick-generate-key",
+		"DEM release test <release@example.invalid>",
+		"rsa2048",
+		"sign",
+		"1d",
+	)
+	output, err := command.CombinedOutput()
+	require.NoError(t, err, string(output))
+	output, err = exec.Command("gpg", "--batch", "--with-colons", "--list-keys").Output()
+	require.NoError(t, err)
+	var fingerprint string
+	for _, line := range strings.Split(string(output), "\n") {
+		fields := strings.Split(line, ":")
+		if fields[0] == "fpr" {
+			fingerprint = fields[9]
+			break
+		}
+	}
+	require.NotEmpty(t, fingerprint)
+	public, err := exec.Command("gpg", "--batch", "--export", fingerprint).Output()
+	require.NoError(t, err)
+	return fingerprint, public
+}

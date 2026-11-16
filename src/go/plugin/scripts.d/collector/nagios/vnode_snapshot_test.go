@@ -71,8 +71,9 @@ func TestNamedVnodeSnapshotMatchesRunningCheck(t *testing.T) {
 		},
 	)
 	require.NoError(t, job.AutoDetectionManaged(context.Background()))
-	ready, done := make(chan struct{}), make(chan struct{})
-	go func() { defer close(done); job.StartManaged(ready) }()
+	run := jobruntime.NewManagedRun(context.Background(), nil)
+	ready, done := run.StartupDone(), make(chan struct{})
+	go func() { defer close(done); job.StartManaged(run) }()
 	<-ready
 	t.Cleanup(func() { job.Stop(); <-done; job.Cleanup() })
 	tickJobUntil(t, job, func() bool { return len(runner.requests) > 0 }, "first check did not start")

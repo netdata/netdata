@@ -60,7 +60,7 @@ func TestCollector_Init_ErrorOnCreatingClientWrongTLSCA(t *testing.T) {
 }
 
 func TestCollector_Check(t *testing.T) {
-	srv, _, collr := prepareSrvMockScaleIO(t)
+	srv, _, collr := prepareSrvMockScaleIO(context.Background(), t)
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 
@@ -68,7 +68,7 @@ func TestCollector_Check(t *testing.T) {
 }
 
 func TestCollector_Check_ErrorOnLogin(t *testing.T) {
-	srv, mock, collr := prepareSrvMockScaleIO(t)
+	srv, mock, collr := prepareSrvMockScaleIO(context.Background(), t)
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 	mock.Password = "new password"
@@ -81,7 +81,7 @@ func TestCollector_Charts(t *testing.T) {
 }
 
 func TestCollector_Cleanup(t *testing.T) {
-	srv, _, collr := prepareSrvMockScaleIO(t)
+	srv, _, collr := prepareSrvMockScaleIO(context.Background(), t)
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
@@ -91,7 +91,7 @@ func TestCollector_Cleanup(t *testing.T) {
 }
 
 func TestCollector_Collect(t *testing.T) {
-	srv, _, collr := prepareSrvMockScaleIO(t)
+	srv, _, collr := prepareSrvMockScaleIO(context.Background(), t)
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
@@ -307,7 +307,7 @@ func TestCollector_Collect(t *testing.T) {
 }
 
 func TestCollector_Collect_ConnectionRefused(t *testing.T) {
-	srv, _, collr := prepareSrvMockScaleIO(t)
+	srv, _, collr := prepareSrvMockScaleIO(context.Background(), t)
 	defer srv.Close()
 	require.NoError(t, collr.Init(context.Background()))
 	require.NoError(t, collr.Check(context.Background()))
@@ -339,7 +339,8 @@ func ensureSdcChartsAreCreated(t *testing.T, collr *Collector) {
 	}
 }
 
-func prepareSrvMockScaleIO(t *testing.T) (*httptest.Server, *client.MockScaleIOAPIServer, *Collector) {
+func prepareSrvMockScaleIO(ctx context.Context,
+	t *testing.T) (*httptest.Server, *client.MockScaleIOAPIServer, *Collector) {
 	t.Helper()
 	const (
 		user     = "user"

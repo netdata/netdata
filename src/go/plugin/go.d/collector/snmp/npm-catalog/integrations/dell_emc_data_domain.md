@@ -88,7 +88,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -151,7 +151,7 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_diskPerfState` | `{status}` | per datadomain_disk_perf_index | Performance state of the disk |
+| `snmp.device_prof_diskPerfState` | `{status}` | per datadomain_disk_perf_enclosure_id, datadomain_disk_perf_index | Performance state of the disk |
 | `snmp.device_prof_diskPropState` | `{status}` | per datadomain_disk_prop_enclosure_id, datadomain_disk_prop_index, datadomain_disk_model, datadomain_disk_firmware_version, datadomain_disk_serial_number, datadomain_disk_pack | State of the disk |
 
 ### Hardware / Fan
@@ -242,12 +242,12 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_datadomain_diskBusy` | `%` | per datadomain_disk_perf_index | Percentage of time disk is busy |
+| `snmp.device_prof_datadomain_diskBusy` | `%` | per datadomain_disk_perf_enclosure_id, datadomain_disk_perf_index | Percentage of time disk is busy |
 | `snmp.device_prof_datadomain_diskBusyPercentage` | `%` | per datadomain_system_stats_index | Percentage of time disks were busy |
 | `snmp.device_prof_datadomain_diskReadKBytesPerSecond` | `By/s` | per datadomain_system_stats_index | Number of kilobytes per second read from disk |
-| `snmp.device_prof_datadomain_diskSectorsRead` | `{sector}/s` | per datadomain_disk_perf_index | Number of disk sectors read per second |
-| `snmp.device_prof_datadomain_diskSectorsWritten` | `{sector}/s` | per datadomain_disk_perf_index | Number of disk sectors written per second |
-| `snmp.device_prof_datadomain_diskTotalKBytes` | `By/s` | per datadomain_disk_perf_index | Total number of kilobytes read or written per second |
+| `snmp.device_prof_datadomain_diskSectorsRead` | `{sector}/s` | per datadomain_disk_perf_enclosure_id, datadomain_disk_perf_index | Number of disk sectors read per second |
+| `snmp.device_prof_datadomain_diskSectorsWritten` | `{sector}/s` | per datadomain_disk_perf_enclosure_id, datadomain_disk_perf_index | Number of disk sectors written per second |
+| `snmp.device_prof_datadomain_diskTotalKBytes` | `By/s` | per datadomain_disk_perf_enclosure_id, datadomain_disk_perf_index | Total number of kilobytes read or written per second |
 | `snmp.device_prof_datadomain_diskWriteKBytesPerSecond` | `By/s` | per datadomain_system_stats_index | Number of kilobytes per second written to disk |
 
 ### System / Memory

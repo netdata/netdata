@@ -4,11 +4,12 @@ package httpcheck
 
 import (
 	"bufio"
+	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,8 +21,12 @@ import (
 // relevant forum topic: https://community.netdata.cloud/t/howto-http-endpoint-collector-with-cookie-and-user-pass/3981/5?u=ilyam8
 
 // cookie file format: https://everything.curl.dev/http/cookies/fileformat.html
-func loadCookieJar(path string) (http.CookieJar, error) {
-	file, err := os.Open(path)
+func loadCookieJar(
+	ctx context.Context,
+	path string,
+	openFile func(context.Context, string) (io.ReadCloser, error),
+) (http.CookieJar, error) {
+	file, err := openFile(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +39,9 @@ func loadCookieJar(path string) (http.CookieJar, error) {
 
 	sc := bufio.NewScanner(file)
 
+	lineNumber := 0
 	for sc.Scan() {
+		lineNumber++
 		line, httpOnly := strings.CutPrefix(strings.TrimSpace(sc.Text()), "#HttpOnly_")
 
 		if strings.HasPrefix(line, "#") || line == "" {
@@ -43,7 +50,7 @@ func loadCookieJar(path string) (http.CookieJar, error) {
 
 		parts := strings.Fields(line)
 		if len(parts) != 6 && len(parts) != 7 {
-			return nil, fmt.Errorf("got %d fields in line '%s', want 6 or 7", len(parts), line)
+			return nil, fmt.Errorf("cookie line %d: got %d fields, want 6 or 7", lineNumber, len(parts))
 		}
 
 		for i, v := range parts {
@@ -58,11 +65,11 @@ func loadCookieJar(path string) (http.CookieJar, error) {
 		}
 		cookie.Secure, err = strconv.ParseBool(parts[3])
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cookie line %d: invalid secure flag", lineNumber)
 		}
 		expires, err := strconv.ParseInt(parts[4], 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("cookie line %d: invalid expiry", lineNumber)
 		}
 		if expires > 0 {
 			cookie.Expires = time.Unix(expires, 0)
@@ -85,5 +92,8 @@ func loadCookieJar(path string) (http.CookieJar, error) {
 		jar.SetCookies(cookieURL, cookies)
 	}
 
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("read cookie file: %w", err)
+	}
 	return jar, nil
 }

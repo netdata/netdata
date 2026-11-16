@@ -32,8 +32,8 @@ cov_repo_root() {
 
 # Source `<repo-root>/.env` if it exists. .env is the user's local-only
 # secrets file (gitignored). It must export at least:
-#   COVERITY_COOKIE        — the full Cookie header value pasted from a curl
-#                            copy-as-cURL captured in DevTools
+#   COVERITY_COOKIE        — full Cookie header value configured locally from
+#                            the browser request; never paste it into chat
 #   COVERITY_PROJECT_ID    — Coverity Scan numeric projectId (constant per project)
 #   COVERITY_HOST          — defaults to https://scan4.scan.coverity.com
 # Optional:
@@ -44,7 +44,7 @@ cov_load_env() {
     root="$(cov_repo_root)"
     env="${root}/.env"
     if [[ ! -f "${env}" || ! -r "${env}" ]]; then
-        echo -e "${COV_RED}[ERROR]${COV_NC} Missing ${env}. See SKILL.md for the .env template." >&2
+        echo -e "${COV_RED}[ERROR]${COV_NC} Missing ${env}. See ${root}/.agents/skills/triage-coverity/operations.md for the local .env template." >&2
         return 1
     fi
     set -a
@@ -83,16 +83,16 @@ cov_audit_dir() {
     echo "${dir}"
 }
 
-# Reject non-ASCII bytes in a string. Coverity's edge (Cloudflare) rejects
-# em-dashes and smart quotes with a 403 challenge; far better to fail before
-# the network round-trip than to debug a Cloudflare block.
+# Reject non-ASCII bytes in a string. Coverity's edge (Cloudflare) rejected
+# em-dashes and smart quotes in past runs. Keep the local ASCII constraint;
+# live WAF behavior is not established by this check.
 #
 # `tr -d '\000-\177'` deletes ALL ASCII bytes; anything left is non-ASCII.
 # This is portable across GNU and BSD/macOS (unlike `grep -P`, which is GNU-only).
 cov_require_ascii() {
     local s="$1"
     if LC_ALL=C printf '%s' "${s}" | LC_ALL=C tr -d '\000-\177' | grep -q .; then
-        echo -e "${COV_RED}[ERROR]${COV_NC} Comment contains non-ASCII characters. Cloudflare blocks them. Replace em-dashes with '--' and curly quotes with straight quotes." >&2
+        echo -e "${COV_RED}[ERROR]${COV_NC} Comment contains non-ASCII characters. The helper requires ASCII. Replace em-dashes with '--' and curly quotes with straight quotes." >&2
         return 1
     fi
 }

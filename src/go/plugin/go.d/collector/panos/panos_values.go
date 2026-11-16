@@ -111,6 +111,12 @@ func panosCommandName(cmd string) string {
 		return "license info query"
 	case ipsecSACommand:
 		return "IPsec SA query"
+	case ipsecFlowCommand:
+		return "IPsec tunnel flow query"
+	case ipsecGatewayCommand:
+		return "IPsec gateway query"
+	case ipsecIKESACommand:
+		return "IPsec IKE SA query"
 	default:
 		return bgpCommandName(cmd)
 	}

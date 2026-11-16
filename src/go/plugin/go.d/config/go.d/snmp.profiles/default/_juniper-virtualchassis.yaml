@@ -108,7 +108,14 @@ metrics:
           description: Total number of Collisions on the virtual-chassis port
           unit: "{collision}"
     metric_tags:
+      - tag: member_index
+        index: 1
       - tag: port_name
         symbol:
-          OID: 1.3.6.1.4.1.2636.3.40.1.4.1.2.1.2
           name: jnxVirtualChassisPortName
+          format: octet_string
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+          component: 2

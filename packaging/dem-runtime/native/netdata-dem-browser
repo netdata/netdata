@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Deliberate user-namespace exception for the immutable native Chromium binary.
+# This special unconfined profile does NOT confine Chromium. ABI 3 lacks userns
+# mediation, so its compatibility behavior permits Chromium's namespace sandbox
+# on restricted Ubuntu while remaining readable by AppArmor 3 and 4 parsers.
+# Administrator ABI/parser overrides remain authoritative; qualification must
+# succeed under the resulting policy. Keep this profile's name and attachment.
+abi <abi/3.0>,
+profile netdata-dem-browser /usr/lib/netdata/dem-runtime/browsers/chromium-debian/chromium flags=(unconfined) {
+}

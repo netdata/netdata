@@ -77,7 +77,7 @@ nipc_error_t nipc_client_call_cgroups_snapshot_timeout(
         .timeout_ms = timeout_ms,
     };
     return nipc_service_platform_call_with_retry(
-        ctx, do_cgroups_snapshot_attempt, &state);
+        ctx, do_cgroups_snapshot_attempt, &state, timeout_ms);
 }
 
 nipc_error_t nipc_server_init_typed(

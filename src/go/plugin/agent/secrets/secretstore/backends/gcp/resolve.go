@@ -16,7 +16,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -146,7 +145,7 @@ func (s *publishedStore) metadataToken(ctx context.Context) (string, error) {
 }
 
 func (s *publishedStore) serviceAccountToken(ctx context.Context, credFile string) (string, error) {
-	data, err := os.ReadFile(credFile)
+	data, err := s.runtime.readFile(ctx, credFile)
 	if err != nil {
 		return "", fmt.Errorf("reading service account file '%s': %w", credFile, err)
 	}

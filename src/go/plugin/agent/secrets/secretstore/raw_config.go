@@ -3,8 +3,11 @@
 package secretstore
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
+
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 
@@ -23,6 +26,66 @@ const (
 // It carries structural metadata alongside provider payload and excludes __ metadata
 // from content hashing.
 type Config map[string]any
+
+// ProviderPayload excludes Store identity and source metadata from readback
+// and provider reference validation.
+func (c Config) ProviderPayload() map[string]any {
+	payload := make(map[string]any, len(c))
+	for key, value := range c {
+		switch key {
+		case keyName, keyKind, ikeySource, ikeySourceType:
+			continue
+		}
+		payload[key] = value
+	}
+	return payload
+}
+
+// PayloadJSON preserves unresolved references, including values whose resolved
+// type differs from the raw string. YAML maps need string keys for JSON.
+func (c Config) PayloadJSON() ([]byte, error) {
+	value, err := secretresolver.CloneLiteral(c.ProviderPayload())
+	if err != nil {
+		return nil, err
+	}
+	value, err = jsonPayloadValue(value)
+	if err != nil {
+		return nil, err
+	}
+	return json.Marshal(value)
+}
+
+func jsonPayloadValue(value any) (any, error) {
+	switch value := value.(type) {
+	case map[any]any:
+		converted := make(map[string]any, len(value))
+		for key, child := range value {
+			text, ok := key.(string)
+			if !ok {
+				return nil, fmt.Errorf("secretstore: provider object key is not a string")
+			}
+			converted[text] = child
+		}
+		return jsonPayloadValue(converted)
+	case map[string]any:
+		for key, child := range value {
+			converted, err := jsonPayloadValue(child)
+			if err != nil {
+				return nil, err
+			}
+			value[key] = converted
+		}
+	case []any:
+		for index, child := range value {
+			converted, err := jsonPayloadValue(child)
+			if err != nil {
+				return nil, err
+			}
+			value[index] = converted
+		}
+	}
+	return value, nil
+}
 
 func (c Config) Set(key string, value any) Config { c[key] = value; return c }
 

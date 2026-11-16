@@ -1,9 +1,7 @@
 use super::*;
 use crate::protocol::{CgroupsBuilder, NipcError, PROFILE_BASELINE, PROFILE_SHM_HYBRID};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::thread;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 const TEST_RUN_DIR: &str = r"C:\Temp\nipc_cgroups_rust_test";
 const AUTH_TOKEN: u64 = 0xDEADBEEFCAFEBABE;
@@ -104,63 +102,22 @@ fn snapshot_handler() -> Handler {
     }
 }
 
+/// The server listens before tests connect, so one refresh must succeed.
 fn connect_ready(client: &mut CgroupsClient) {
-    for _ in 0..200 {
-        client.refresh();
-        if client.ready() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-
-    panic!("client did not reach READY state");
+    client.refresh();
+    assert!(client.ready(), "client did not reach READY state");
 }
 
 struct TestServer {
-    service: String,
-    wake_config: ClientConfig,
-    stop_flag: Arc<std::sync::atomic::AtomicBool>,
-    thread: Option<thread::JoinHandle<()>>,
+    _inner: raw::RunningTestServer,
 }
 
 impl TestServer {
     fn start(service: &str, config: ServerConfig) -> Self {
         ensure_run_dir();
-
-        let svc = service.to_string();
-        let wake_config = ClientConfig {
-            supported_profiles: config.supported_profiles,
-            preferred_profiles: config.preferred_profiles,
-            max_request_batch_items: config.max_request_batch_items,
-            max_response_payload_bytes: config.max_response_payload_bytes,
-            auth_token: config.auth_token,
-            ..ClientConfig::default()
-        };
-        let mut server = ManagedServer::new(TEST_RUN_DIR, service, config, snapshot_handler());
-        let stop_flag = server.running_flag();
-        let thread = thread::spawn(move || {
-            let _ = server.run();
-        });
-
-        thread::sleep(Duration::from_millis(200));
-
+        let server = ManagedServer::new(TEST_RUN_DIR, service, config, snapshot_handler());
         Self {
-            service: svc,
-            wake_config,
-            stop_flag,
-            thread: Some(thread),
-        }
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.stop_flag
-            .store(false, std::sync::atomic::Ordering::Release);
-        let mut wake = CgroupsClient::new(TEST_RUN_DIR, &self.service, self.wake_config.clone());
-        let _ = wake.refresh();
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
+            _inner: server.inner.spawn_for_test(),
         }
     }
 }
@@ -198,15 +155,7 @@ fn test_cache_round_trip_windows() {
     let _server = TestServer::start(&service, server_config());
 
     let cache = CgroupsCache::new(TEST_RUN_DIR, &service, client_config());
-    let mut updated = false;
-    for _ in 0..200 {
-        if cache.refresh() {
-            updated = true;
-            break;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-    assert!(updated);
+    assert!(cache.refresh());
     assert!(cache.ready());
 
     let item = {
@@ -242,7 +191,7 @@ fn test_client_not_ready_returns_error_windows() {
     let service = unique_service("not_ready");
     let mut client = CgroupsClient::new(TEST_RUN_DIR, &service, client_config());
     match client.call_snapshot() {
-        Err(NipcError::BadLayout) => {}
+        Err(NipcError::NotReady) => {}
         other => panic!("unexpected result: {other:?}"),
     }
 }
@@ -265,7 +214,7 @@ fn test_client_facade_controls_windows() {
     let abort = client.abort_handle();
     abort.abort();
     match client.call_snapshot_with_timeout(1) {
-        Err(NipcError::BadLayout) => {}
+        Err(NipcError::NotReady) => {}
         other => panic!("unexpected result: {other:?}"),
     }
 

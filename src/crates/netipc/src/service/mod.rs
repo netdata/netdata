@@ -10,3 +10,5 @@ pub mod cgroups_lookup;
 pub mod cgroups_snapshot;
 #[doc(hidden)]
 pub mod raw;
+
+pub use raw::ListeningSignal;

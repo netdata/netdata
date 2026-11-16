@@ -169,6 +169,12 @@
           "snmp"
         ]
       },
+      "trust_discovered_targets": {
+        "title": "Trust discovered targets",
+        "description": "Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.",
+        "type": "boolean",
+        "default": false
+      },
       "services": {
         "title": "Service rules",
         "description": "Rules that turn discovered SNMP devices into data collection jobs.",
@@ -191,9 +197,9 @@
             },
             "config_template": {
               "title": "Config template",
-              "description": "**Uses the same fields as match expression**. Go template that generates the data collection job configuration in YAML format. **Must include 'module' and 'name' fields**, plus any module-specific settings.",
+              "description": "Go template that creates jobs with the job helper. Pass key/value pairs or a prepared map; call job once per job. The module defaults to the rule ID when omitted.",
               "type": "string",
-              "default": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+              "default": "{{ $job := dict\n  \"name\" (printf \"ip-%s\" .IPAddress)\n  \"hostname\" .IPAddress\n  \"options\" (dict \"version\" .Credential.Version)\n}}\n{{ if .SysInfo.Name }}\n{{ $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) }}\n{{ end }}\n{{ if eq .Credential.Version \"1\" \"2\" \"2c\" }}\n{{ $_ := set $job \"community\" .Credential.Community }}\n{{ else }}\n{{ $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) }}\n{{ end }}\n{{ job $job }}\n"
             }
           },
           "required": [
@@ -215,7 +221,8 @@
         {
           "title": "Base",
           "fields": [
-            "discoverer"
+            "discoverer",
+            "trust_discovered_targets"
           ]
         },
         {
@@ -276,10 +283,13 @@
         },
         "config_template": {
           "ui:widget": "textarea",
-          "ui:placeholder": "{{- if .SysInfo.Name }}\nname: {{ .SysInfo.Name }}-ip-{{ .IPAddress }}\n{{- else }}\nname: ip-{{ .IPAddress }}\n{{- end }}\nhostname: {{ .IPAddress }}\noptions:\n  version: {{ .Credential.Version }}\n{{- if eq .Credential.Version \"1\" \"2\" \"2c\" }}\ncommunity: {{ .Credential.Community }}\n{{- else }}\nuser:\n  name: {{ .Credential.UserName }}\n  level: {{ .Credential.SecurityLevel }}\n  auth_proto: {{ .Credential.AuthProtocol }}\n  auth_key: {{ .Credential.AuthPassphrase }}\n  priv_proto: {{ .Credential.PrivacyProtocol }}\n  priv_key: {{ .Credential.PrivacyPassphrase }}\n{{- end }}"
+          "ui:placeholder": "{{ $job := dict\n  \"name\" (printf \"ip-%s\" .IPAddress)\n  \"hostname\" .IPAddress\n  \"options\" (dict \"version\" .Credential.Version)\n}}\n{{ if .SysInfo.Name }}\n{{ $_ := set $job \"name\" (printf \"%s-ip-%s\" .SysInfo.Name .IPAddress) }}\n{{ end }}\n{{ if eq .Credential.Version \"1\" \"2\" \"2c\" }}\n{{ $_ := set $job \"community\" .Credential.Community }}\n{{ else }}\n{{ $_ := set $job \"user\" (dict\n  \"name\" .Credential.UserName\n  \"level\" .Credential.SecurityLevel\n  \"auth_proto\" .Credential.AuthProtocol\n  \"auth_key\" .Credential.AuthPassphrase\n  \"priv_proto\" .Credential.PrivacyProtocol\n  \"priv_key\" .Credential.PrivacyPassphrase\n) }}\n{{ end }}\n{{ job $job }}\n"
         }
       },
       "ui:help": "- Match discovered SNMP devices and generate collector configurations.\n- Each rule specifies match criteria and a config template.\n- When a device matches, a data collection job is created.\n- The **default service rule** is sufficient for most cases. It creates an SNMP data collection job for each discovered device and handles both SNMPv2 and SNMPv3."
+    },
+    "trust_discovered_targets": {
+      "ui:help": "Service rules can copy `${env:...}`, `${file:...}`, `${cmd:...}` or `${store:...}` from target-controlled inputs into job fields. Netdata resolves those references with the secret providers' permissions, and a collector may send the resulting value to the target as a credential or other request field. One untrusted target can abuse this; enabling the option accepts that risk for the whole pipeline.\n\nWith stock SNMP rules, device-reported system information is used only in the job name; it does not supply credential fields. To use references in generated-job credentials, write them explicitly in your service rules. Enabling this option alone does not replace the literal credentials copied by stock rules.\n\nDevices control system information exposed to service rules. Review custom rules as well as the devices you scan. Discovery still requires literal SNMP credentials.\n\nDisabled by default: references remain literal. This option does not resolve the discoverer's own connection credentials."
     }
   }
 }

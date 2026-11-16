@@ -88,7 +88,11 @@ func readW1sensorTemperature(filename string) (int64, error) {
 
 	v, err := strconv.ParseInt(tempStr, 10, 64)
 	if err != nil {
-		return 0, err
+		reason := strconv.ErrSyntax
+		if errors.Is(err, strconv.ErrRange) {
+			reason = strconv.ErrRange
+		}
+		return 0, fmt.Errorf("invalid temperature: %w", reason)
 	}
 
 	return int64(float64(v) / 1000 * precision), nil

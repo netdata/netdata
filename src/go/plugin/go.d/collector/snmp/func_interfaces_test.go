@@ -90,7 +90,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 		"has required columns": {
 			validate: func(t *testing.T) {
 				requiredKeys := []string{
-					"Interface", "Type", "Type Group",
+					"Interface", "Alias", "Type", "Type Group",
 					"Admin Status", "Oper Status",
 					"Traffic In", "Traffic Out",
 					"Unicast In", "Unicast Out",
@@ -107,6 +107,16 @@ func TestFuncIfacesColumns(t *testing.T) {
 				}
 			},
 		},
+		"alias is visible next to interface": {
+			validate: func(t *testing.T) {
+				require.GreaterOrEqual(t, len(snmpAllColumns), 2)
+				assert.Equal(t, "Interface", snmpAllColumns[0].Name)
+				alias := snmpAllColumns[1]
+				assert.Equal(t, "Alias", alias.Name)
+				assert.Equal(t, funcapi.FieldTypeString, alias.Type)
+				assert.True(t, alias.Visible)
+			},
+		},
 		"has valid metadata": {
 			validate: func(t *testing.T) {
 				for _, col := range snmpAllColumns {
@@ -121,6 +131,7 @@ func TestFuncIfacesColumns(t *testing.T) {
 				rate := 100.0
 				entry := &ifaceEntry{
 					name:        "eth0",
+					ifAlias:     "uplink-core",
 					ifType:      "ethernetCsmacd",
 					ifTypeGroup: "ethernet",
 					adminStatus: "up",
@@ -144,6 +155,8 @@ func TestFuncIfacesColumns(t *testing.T) {
 					switch col.Name {
 					case "Interface":
 						assert.Equal(t, "eth0", col.Value(entry))
+					case "Alias":
+						assert.Equal(t, "uplink-core", col.Value(entry))
 					case "Type":
 						assert.Equal(t, "ethernetCsmacd", col.Value(entry))
 					case "Type Group":

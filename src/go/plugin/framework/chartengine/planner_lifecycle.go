@@ -74,12 +74,13 @@ func enforceLifecycleCapsWithObserver(
 	chartsByID map[string]*chartState,
 	state *materializedState,
 	observe func(PlanRouteDiagnostic),
+	j *planJournal,
 ) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if len(chartsByID) == 0 || state == nil {
 		return nil, nil
 	}
-	removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
-	removeDims := enforceDimensionCapsWithObserver(currentSuccessSeq, chartsByID, state, observe)
+	removeCharts := enforceChartInstanceCapsWithObserver(currentSuccessSeq, chartsByID, state, observe, j)
+	removeDims := enforceDimensionCapsWithObserver(currentSuccessSeq, chartsByID, state, observe, j)
 	return removeDims, removeCharts
 }
 
@@ -88,6 +89,7 @@ func enforceChartInstanceCapsWithObserver(
 	chartsByID map[string]*chartState,
 	state *materializedState,
 	observe func(PlanRouteDiagnostic),
+	j *planJournal,
 ) []RemoveChartAction {
 	var observedByTemplate map[string][]string
 	for chartID, cs := range chartsByID {
@@ -189,7 +191,7 @@ func enforceChartInstanceCapsWithObserver(
 				ChartID: chartID,
 				Meta:    matChart.meta,
 			})
-			delete(state.charts, chartID)
+			j.deleteChart(state.charts, chartID)
 			overflow--
 		}
 
@@ -224,6 +226,7 @@ func enforceDimensionCapsWithObserver(
 	chartsByID map[string]*chartState,
 	state *materializedState,
 	observe func(PlanRouteDiagnostic),
+	j *planJournal,
 ) []RemoveDimensionAction {
 	// Per-chart dimension caps: evict least-recently-seen inactive dims first, then drop new dims.
 	var chartIDs []string
@@ -246,6 +249,10 @@ func enforceDimensionCapsWithObserver(
 		cs := chartsByID[chartID]
 		maxDims := cs.lifecycle.Dimensions.MaxDims
 		matChart := state.charts[chartID]
+		if matChart != nil && matChart.templateID != cs.templateID {
+			// The outgoing owner cannot supply incumbents to the replacement's cap.
+			matChart = nil
+		}
 		existingCount := 0
 		if matChart != nil {
 			existingCount = len(matChart.dimensions)
@@ -307,7 +314,7 @@ func enforceDimensionCapsWithObserver(
 					Multiplier: dim.multiplier,
 					Divisor:    dim.divisor,
 				})
-				matChart.removeDimension(name)
+				matChart.removeDimension(j, name)
 				overflow--
 			}
 		}
@@ -329,7 +336,10 @@ func enforceDimensionCapsWithObserver(
 						DimensionName:   name,
 					})
 				}
-				delete(cs.entries, name)
+				j.deleteEntry(cs.entriesOwner, cs.entries, name)
+				if cs.entriesOwner == nil {
+					cs.unownedDeletes++
+				}
 				cs.observedCount--
 				overflow--
 			}
@@ -338,7 +348,11 @@ func enforceDimensionCapsWithObserver(
 	return removeDims
 }
 
-func collectExpiryRemovals(currentSuccessSeq uint64, state *materializedState) ([]RemoveDimensionAction, []RemoveChartAction) {
+func collectExpiryRemovals(
+	currentSuccessSeq uint64,
+	state *materializedState,
+	j *planJournal,
+) ([]RemoveDimensionAction, []RemoveChartAction) {
 	if state == nil || len(state.charts) == 0 {
 		return nil, nil
 	}
@@ -393,7 +407,7 @@ func collectExpiryRemovals(currentSuccessSeq uint64, state *materializedState) (
 				ChartID: chartID,
 				Meta:    chart.meta,
 			})
-			delete(state.charts, chartID)
+			j.deleteChart(state.charts, chartID)
 			continue
 		}
 		sort.Strings(candidate.dimensions)
@@ -409,7 +423,7 @@ func collectExpiryRemovals(currentSuccessSeq uint64, state *materializedState) (
 				Multiplier: dim.multiplier,
 				Divisor:    dim.divisor,
 			})
-			chart.removeDimension(name)
+			chart.removeDimension(j, name)
 		}
 	}
 	return removeDims, removeCharts

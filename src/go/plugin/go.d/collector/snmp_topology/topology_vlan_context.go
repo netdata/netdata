@@ -45,7 +45,7 @@ func (c *Collector) collectTopologyVTPVLANContexts(
 		contextOrdinal := uint32(i + 1)
 		observer := recorder.beginContext(contextOrdinal, context.vlanID, context.vlanName)
 
-		pms, progress, err := collectTopologyVLANContext(ctx, c, dev, context.vlanID, profiles, observer)
+		pms, progress, err := collectTopologyVLANContext(ctx, c, recorder.attemptID.RegistrationID, dev, context.vlanID, profiles, observer)
 		if captured := recorder.contextByOrdinal(contextOrdinal); captured != nil {
 			captured.Sources = progress.sources
 			captured.Client, captured.Connect = progress.client, progress.connect

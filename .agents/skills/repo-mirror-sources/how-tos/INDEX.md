@@ -19,7 +19,7 @@ not-yet-documented questions)
 
 1. Create `how-tos/<slug>.md` with:
    - One-line summary at the top (the question being answered).
-   - The answer with file/line citations into the script if
+   - The answer with file and symbol citations into the script if
      relevant.
    - A "How I figured this out" footer naming the files read
      and the commands run.

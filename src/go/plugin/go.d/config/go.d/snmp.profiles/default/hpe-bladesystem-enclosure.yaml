@@ -315,7 +315,7 @@ metrics:
       - tag: cpq_rack_power_enclosure_index
         symbol:
           OID: 1.3.6.1.4.1.232.22.2.3.3.1.1.2
-          name: cpqRackPowerEnclosureRack
+          name: cpqRackPowerEnclosureIndex
       - tag: _cpq_rack_power_enclosure_name
         symbol:
           OID: 1.3.6.1.4.1.232.22.2.3.3.1.1.3

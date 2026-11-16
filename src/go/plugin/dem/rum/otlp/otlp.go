@@ -1,0 +1,150 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Package otlp exports RUM observations (document activations, vital updates, JS errors,
+// custom events, console logs) and browser spans to independent OTLP/gRPC
+// receivers. It talks the wire protocol directly via
+// generated go.opentelemetry.io/proto/otlp types — no OTel SDK, so there
+// is no global tracer/meter state to fight with a host process.
+package otlp
+
+import (
+	"context"
+	"slices"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	logspb "go.opentelemetry.io/proto/otlp/logs/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	"google.golang.org/grpc/metadata"
+)
+
+var exportLog = logger.New()
+
+// service.name resource attribute used by RUM exports.
+const serviceName = "netdata-rum"
+
+// Batching bounds: flush at 100 records or 1s, whichever
+// comes first; a bounded queue drops on overflow rather than blocking
+// the collector.
+const (
+	maxBatch      = 100
+	batchPeriod   = time.Second
+	queueCap      = 10000
+	exportTimeout = 5 * time.Second
+)
+
+// Counters receives export accounting; the owning site job publishes it.
+type Counters interface {
+	Add(counter string, n uint64)
+}
+
+// Counter names reported through Counters: the rum.otlp and rum.spans chart
+// dimensions.
+const (
+	CounterLogsSent     = "otlp_sent"
+	CounterLogsDropped  = "otlp_dropped"
+	CounterLogsErrors   = "otlp_errors"
+	CounterSpansSent    = "spans_sent"
+	CounterSpansDropped = "spans_dropped"
+	CounterSpansErrors  = "spans_errors"
+)
+
+// Logs owns one site's enabled event-log destination and queue.
+type Logs struct {
+	*transport
+	client collogspb.LogsServiceClient
+	now    func() time.Time
+	ch     chan *logspb.LogRecord
+}
+
+func NewLogs(
+	ctx context.Context,
+	cfg config.Destination,
+	siteName string,
+	counters Counters,
+) (*Logs, error) {
+	t, err := newTransport(ctx, cfg, siteName, counters)
+	if err != nil {
+		return nil, err
+	}
+	return &Logs{
+		transport: t,
+		client:    collogspb.NewLogsServiceClient(t.conn),
+		now:       time.Now,
+		ch:        make(chan *logspb.LogRecord, queueCap),
+	}, nil
+}
+
+// Run exports queued records until ctx is done, then drains them once with the
+// owner's shared, bounded final context (see runQueue). Callers run it in its own
+// goroutine; Close releases the gRPC connection afterwards.
+func (e *Logs) Run(ctx context.Context, final func() context.Context) {
+	e.conn.Connect()
+	runQueue(
+		ctx,
+		final,
+		e.ch,
+		maxBatch,
+		func(ctx context.Context, batch []*logspb.LogRecord) bool { return e.export(ctx, batch, exportTimeout) },
+		func(batch []*logspb.LogRecord) { e.counters.Add(CounterLogsDropped, uint64(len(batch))) },
+	)
+}
+
+// Ingest consumes an aggregation result, builds records and enqueues them,
+// counting queue overflow as dropped. Only enabled exporters are constructed.
+func (e *Logs) Ingest(result aggregate.Result) {
+	if !result.Investigated {
+		return // measured, but its session is not investigated
+	}
+	recs := e.build(result.Observation, result.PageView)
+	for _, rec := range recs {
+		select {
+		case e.ch <- rec:
+		default:
+			e.counters.Add(CounterLogsDropped, 1)
+		}
+	}
+}
+
+// export reports whether a send was attempted, including failed attempts.
+// The request copies the record pointers because the queue reuses batch.
+func (e *Logs) export(parent context.Context, batch []*logspb.LogRecord, timeout time.Duration) bool {
+	if parent.Err() != nil {
+		return false
+	}
+	recs := slices.Clone(batch)
+	req := &collogspb.ExportLogsServiceRequest{
+		ResourceLogs: []*logspb.ResourceLogs{{
+			Resource: &resourcepb.Resource{
+				Attributes: []*commonpb.KeyValue{strAttr("service.name", serviceName), strAttr("rum.site", e.siteName)},
+			},
+			ScopeLogs: []*logspb.ScopeLogs{
+				{Scope: &commonpb.InstrumentationScope{
+					Name: "digital-experience-rum",
+				}, LogRecords: recs},
+			},
+		}},
+	}
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+	if e.authMD != nil {
+		ctx = metadata.NewOutgoingContext(ctx, e.authMD)
+	}
+	resp, err := e.client.Export(ctx, req)
+	if err != nil {
+		e.failed("logs", err)
+		e.counters.Add(CounterLogsErrors, uint64(len(batch)))
+		return true
+	}
+	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedLogRecords(), uint64(len(batch)))
+	if rejected > 0 {
+		e.rejected("logs", rejected)
+	}
+	e.counters.Add(CounterLogsErrors, rejected)
+	e.counters.Add(CounterLogsSent, uint64(len(batch))-rejected)
+	return true
+}

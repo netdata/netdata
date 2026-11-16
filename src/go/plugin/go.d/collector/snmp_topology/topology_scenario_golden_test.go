@@ -166,6 +166,10 @@ func TestSNMPTopologyScenarioGoldens(t *testing.T) {
 			payload := tc.scenario.render(t)
 			normalized := topologyv1test.NormalizeData(t, payload)
 
+			// The Agent-owned focus golden covers the new supporting plane; keep
+			// the shared testdata graph/presentation contract independently stable.
+			delete(normalized.Tables.Actor, topologyoptions.ManagedFocusBindingsTable)
+			delete(normalized.Types.TableTypes, topologyoptions.ManagedFocusBindingsType)
 			actual := topologyv1test.CanonicalJSON(t, normalized)
 			if *updateSNMPTopologyScenarioGoldens {
 				topologyScenarioWriteGolden(t, dir, name, actual)

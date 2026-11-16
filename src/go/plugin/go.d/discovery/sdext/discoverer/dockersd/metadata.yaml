@@ -15,7 +15,7 @@ keywords:
   - 'discovery'
 overview:
   description: |
-    Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to render collector job YAML — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
+    Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to create collector jobs — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
 
     This page covers Docker-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md).
   how_it_works: |
@@ -46,13 +46,32 @@ setup:
       name: 'go.d/sd/docker.conf'
     options:
       description: |
-        The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
+        The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
 
         After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
       folding:
         title: 'Discoverer options'
         enabled: false
       list:
+        - name: 'trust_discovered_targets'
+          description: 'Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it.'
+          default_value: 'no'
+          required: false
+          group: 'Base'
+          detailed_description: |
+            Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+            It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+            If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+            makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+            permissions. The collector may send the result to that target as a credential or other request field.
+            Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+            this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+            Container owners can control command arguments, labels and other values used by service rules.
+
+            The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+            credentials. See [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
         - name: 'address'
           description: 'Docker daemon address.'
           default_value: 'unix:///var/run/docker.sock'
@@ -85,8 +104,7 @@ setup:
               - id: nginx
                 match: '{{ match "sp" .Image "nginx nginx:*" }}'
                 config_template: |
-                  name: docker_{{.Name}}
-                  url: http://{{.Address}}/stub_status
+                  {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
         - name: 'Remote daemon over TCP'
           description: 'Point the discoverer at a remote Docker daemon. TLS is not yet wired into the discoverer; either expose the daemon on a trusted internal network or use a stunnel/socat proxy.'
           config: |
@@ -101,13 +119,12 @@ setup:
               - id: redis
                 match: '{{ match "sp" .Image "redis redis:* */redis */redis:*" }}'
                 config_template: |
-                  name: docker_{{.Name}}
-                  address: redis://@{{.Address}}
+                  {{ job "name" (printf "docker_%s" .Name) "address" (printf "redis://@%s" .Address) }}
 services:
   description: |
     A `services:` rule turns each discovered container target into one or more collector jobs. Most rules match on `.Image` (using the `match "sp"` simple-pattern helper for the typical `image image:* */image */image:*` family), some also gate on `.PrivatePort`, and a few use `.Labels` to honor user intent.
 
-    The shared rule model — function reference (`match`, `glob`, sprig, `toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
+    The shared rule model — function reference (`match`, `glob`, sprig, `job`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
   evaluation:
     description: |
       Quick reference — see [Rule evaluation semantics](/src/collectors/SERVICE-DISCOVERY.md#rule-evaluation-semantics) on the hub page for the full model.
@@ -181,14 +198,10 @@ services:
           - id: nginx
             match: '{{ match "sp" .Image "nginx nginx:*" }}'
             config_template: |
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/stub_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/basic_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/nginx_status
-              - name: docker_{{.Name}}
-                url: http://{{.Address}}/status
+              {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
+              {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/basic_status" .Address) }}
+              {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/nginx_status" .Address) }}
+              {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/status" .Address) }}
       - name: 'Postgres — explicit module override'
         description: |
           When the rule `id` is something other than the target module name, set `module:` explicitly inside the rendered job.
@@ -196,9 +209,11 @@ services:
           - id: postgres
             match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
             config_template: |
-              module: postgres
-              name: docker_{{.Name}}
-              dsn: postgres://netdata:postgres@{{.Address}}/postgres
+              {{ job
+                "module" "postgres"
+                "name" (printf "docker_%s" .Name)
+                "dsn" (printf "postgres://netdata:postgres@%s/postgres" .Address)
+              }}
       - name: 'Label-driven custom matching'
         description: |
           Use container labels to override behaviour without changing rules — e.g. opt a container in or out of monitoring, or pick a non-default endpoint. The example below requires the operator to set the label `netdata.go.d/module=mymodule` on the container.
@@ -206,9 +221,11 @@ services:
           - id: label-routed
             match: '{{ and (hasKey .Labels "netdata.go.d/module") (eq (index .Labels "netdata.go.d/module") "mymodule") }}'
             config_template: |
-              module: mymodule
-              name: docker_{{.Name}}
-              url: http://{{.Address}}/metrics
+              {{ job
+                "module" "mymodule"
+                "name" (printf "docker_%s" .Name)
+                "url" (printf "http://%s/metrics" .Address)
+              }}
 verify:
   description: 'After enabling the discoverer, confirm it is finding containers and producing jobs.'
   checks:

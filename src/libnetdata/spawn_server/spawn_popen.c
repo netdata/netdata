@@ -4,6 +4,7 @@
 
 struct popen_instance {
     SPAWN_INSTANCE *si;
+    bool strict_status;
     FILE *child_stdin_fp;
     FILE *child_stdout_fp;
 };
@@ -57,17 +58,26 @@ FILE *spawn_popen_stdout(POPEN_INSTANCE *pi) {
     return pi->child_stdout_fp;
 }
 
-POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
+static POPEN_INSTANCE *spawn_popen_run_argv_type(const char **argv, SPAWN_INSTANCE_TYPE type) {
     netdata_main_spawn_server_init(NULL, 0, NULL);
 
     SPAWN_INSTANCE *si = spawn_server_exec(netdata_main_spawn_server, nd_log_collectors_fd(),
-        0, argv, NULL, 0, SPAWN_INSTANCE_TYPE_EXEC);
+        0, argv, NULL, 0, type);
 
     if(si == NULL) return NULL;
 
     POPEN_INSTANCE *pi = callocz(1, sizeof(*pi));
     pi->si = si;
+    pi->strict_status = type == SPAWN_INSTANCE_TYPE_EXEC_GROUP;
     return pi;
+}
+
+POPEN_INSTANCE *spawn_popen_run_argv(const char **argv) {
+    return spawn_popen_run_argv_type(argv, SPAWN_INSTANCE_TYPE_EXEC);
+}
+
+POPEN_INSTANCE *spawn_popen_run_argv_group(const char **argv) {
+    return spawn_popen_run_argv_type(argv, SPAWN_INSTANCE_TYPE_EXEC_GROUP);
 }
 
 POPEN_INSTANCE *spawn_popen_run_variadic(const char *cmd, ...) {
@@ -141,11 +151,15 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     return spawn_popen_run_argv(argv);
 }
 
-static int spawn_popen_status_rc(int status) {
+static int spawn_popen_status_rc(int status, bool strict_status) {
+    if(status == -1)
+        return -1;
     if(WIFEXITED(status))
         return WEXITSTATUS(status);
 
     if(WIFSIGNALED(status)) {
+        if(strict_status)
+            return -1;
         int sig = WTERMSIG(status);
         switch(sig) {
             case SIGTERM:
@@ -179,8 +193,9 @@ int spawn_popen_wait(POPEN_INSTANCE *pi) {
 
     spawn_popen_close_files(pi);
     int status = spawn_server_exec_wait(netdata_main_spawn_server, pi->si);
+    int rc = spawn_popen_status_rc(status, pi->strict_status);
     freez(pi);
-    return spawn_popen_status_rc(status);
+    return rc;
 }
 
 SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms, int *code) {
@@ -198,8 +213,8 @@ SPAWN_TIMEDWAIT_RESULT spawn_popen_timedwait(POPEN_INSTANCE *pi, int timeout_ms,
         return rc;
 
     // EXITED: spawn_server_exec_timedwait() has freed pi->si; free the wrapper too
+    if(code) *code = spawn_popen_status_rc(status, pi->strict_status);
     freez(pi);
-    if(code) *code = spawn_popen_status_rc(status);
     return SPAWN_TIMEDWAIT_EXITED;
 }
 
@@ -208,8 +223,9 @@ int spawn_popen_kill(POPEN_INSTANCE *pi, int timeout_ms) {
 
     spawn_popen_close_files(pi);
     int status = spawn_server_exec_kill(netdata_main_spawn_server, pi->si, timeout_ms);
+    int rc = spawn_popen_status_rc(status, pi->strict_status);
     freez(pi);
-    return spawn_popen_status_rc(status);
+    return rc;
 }
 
 pid_t spawn_popen_pid(POPEN_INSTANCE *pi) {

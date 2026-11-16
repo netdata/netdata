@@ -88,7 +88,7 @@ type Collector struct {
 
 func (c *Collector) Configuration() any { return c.Config }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	c.Config.applyDefaults()
 	if err := c.Config.validate(); err != nil {
 		return fmt.Errorf("config validation: %w", err)
@@ -96,7 +96,7 @@ func (c *Collector) Init(context.Context) error {
 	if err := c.initSiteSelector(); err != nil {
 		return err
 	}
-	if err := c.initClient(); err != nil {
+	if err := c.initClient(ctx); err != nil {
 		return err
 	}
 

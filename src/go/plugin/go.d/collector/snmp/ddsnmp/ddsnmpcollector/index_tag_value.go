@@ -49,6 +49,8 @@ func formatIndexTagValue(raw string, format string) (string, error) {
 	switch format {
 	case "", "string":
 		return raw, nil
+	case "octet_string":
+		return formatIndexOctetString(raw)
 	case "ip_address":
 		return formatIndexIPAddress(raw)
 	case "mac_address":

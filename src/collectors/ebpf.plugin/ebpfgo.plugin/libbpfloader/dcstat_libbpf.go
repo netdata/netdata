@@ -4,8 +4,10 @@ package libbpfloader
 
 /*
 #include <stdlib.h>
+#include <stdint.h>
 
 struct netdata_ebpf_dcstat_runtime;
+uint64_t netdata_dcstat_runtime_arena_drops(struct netdata_ebpf_dcstat_runtime *rt);
 struct netdata_ebpf_dcstat_snapshot {
     unsigned long long reference;
     unsigned long long slow;
@@ -275,4 +277,10 @@ func (r *DCStatRuntime) Close() {
 	C.netdata_dcstat_runtime_close(r.ptr)
 	r.ptr = nil
 	r.appsBuf = nil
+}
+func (r *DCStatRuntime) ArenaDropped() uint64 {
+	if r == nil || r.ptr == nil {
+		return 0
+	}
+	return uint64(C.netdata_dcstat_runtime_arena_drops(r.ptr))
 }

@@ -1,29 +1,32 @@
-use super::common::{ensure_client_scratch, SERVER_POLL_TIMEOUT_MS};
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+use super::common::ensure_client_scratch;
 use super::dispatch::{
-    dispatch_single_internal, method_supported_internal, server_note_payload_capacity,
-    DispatchError, DispatchHandler,
+    DispatchError, DispatchHandler, dispatch_single_internal, method_supported_internal,
+    server_note_payload_capacity,
 };
 use crate::protocol::{
-    self, batch_item_get, BatchBuilder, Header, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_MSG, STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED,
-    STATUS_OK, VERSION,
+    self, BatchBuilder, FLAG_BATCH, HEADER_SIZE, Header, KIND_REQUEST, KIND_RESPONSE,
+    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK, batch_item_get,
 };
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+use crate::protocol::{MAGIC_MSG, VERSION};
 use crate::transport::posix::UdsSession;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use crate::transport::shm::ShmContext;
 
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// POSIX: Handle one client session in its own thread.
 pub(super) fn handle_session_threaded(
-    mut session: UdsSession,
-    #[cfg(target_os = "linux")] mut shm: Option<ShmContext>,
-    #[cfg(not(target_os = "linux"))] _shm: Option<()>,
+    session: &mut UdsSession,
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))] mut shm: Option<ShmContext>,
+    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))] _shm: Option<()>,
     expected_method_code: u16,
     handler: Option<DispatchHandler>,
     running: Arc<AtomicBool>,
+    poll_ms: u32,
     learned_request_payload_bytes: Arc<AtomicU32>,
     learned_response_payload_bytes: Arc<AtomicU32>,
     request_payload_growth_ceiling: u32,
@@ -32,14 +35,15 @@ pub(super) fn handle_session_threaded(
     let mut recv_buf = vec![0u8; HEADER_SIZE + session.max_request_payload_bytes as usize];
     let mut resp_buf = vec![0u8; session.max_response_payload_bytes as usize];
     let mut item_resp_buf = vec![0u8; session.max_response_payload_bytes as usize];
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     let mut msg_buf = vec![0u8; HEADER_SIZE + session.max_response_payload_bytes as usize];
 
     while running.load(Ordering::Acquire) {
         let (hdr, payload) = {
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             {
                 if let Some(ref mut shm_ctx) = shm {
-                    match shm_ctx.receive(&mut recv_buf, SERVER_POLL_TIMEOUT_MS) {
+                    match shm_ctx.receive(&mut recv_buf, poll_ms) {
                         Ok(mlen) => {
                             if mlen < HEADER_SIZE {
                                 break;
@@ -51,11 +55,18 @@ pub(super) fn handle_session_threaded(
                             let payload = &recv_buf[HEADER_SIZE..mlen];
                             (hdr, payload)
                         }
-                        Err(crate::transport::shm::ShmError::Timeout) => continue,
+                        Err(crate::transport::shm::ShmError::Timeout) => {
+                            // A client that left (cleanly or by crashing)
+                            // never sends again; its socket is the only sign.
+                            if peer_disconnected(session.fd()) {
+                                break;
+                            }
+                            continue;
+                        }
                         Err(_) => break,
                     }
                 } else {
-                    let ready = poll_fd(session.fd(), SERVER_POLL_TIMEOUT_MS as i32);
+                    let ready = poll_fd(session.fd(), poll_ms as i32);
                     if ready < 0 {
                         break;
                     }
@@ -70,9 +81,9 @@ pub(super) fn handle_session_threaded(
                 }
             }
 
-            #[cfg(not(target_os = "linux"))]
+            #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
             {
-                let ready = poll_fd(session.fd(), SERVER_POLL_TIMEOUT_MS as i32);
+                let ready = poll_fd(session.fd(), poll_ms as i32);
                 if ready < 0 {
                     break;
                 }
@@ -109,7 +120,7 @@ pub(super) fn handle_session_threaded(
                 ..Header::default()
             };
 
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             {
                 if let Some(ref mut shm_ctx) = shm {
                     let msg = ensure_client_scratch(&mut msg_buf, HEADER_SIZE);
@@ -238,7 +249,7 @@ pub(super) fn handle_session_threaded(
             }
         }
 
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             if let Some(ref mut shm_ctx) = shm {
                 let msg_len = HEADER_SIZE + response_len;
@@ -275,13 +286,74 @@ pub(super) fn handle_session_threaded(
         }
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         if let Some(mut shm_ctx) = shm {
             shm_ctx.destroy();
         }
     }
-    drop(session);
+}
+
+/// Zero-wait probe of a session socket. SHM sessions keep the socket open for
+/// their whole life and the kernel closes it when the peer exits, so
+/// HUP/ERR/EOF here is the dead-peer signal for both directions.
+pub(super) fn peer_disconnected(fd: i32) -> bool {
+    if fd < 0 {
+        return true;
+    }
+
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let rdhup = libc::POLLRDHUP;
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    let rdhup = 0;
+
+    let mut pfd = libc::pollfd {
+        fd,
+        events: libc::POLLIN | libc::POLLHUP | libc::POLLERR | rdhup,
+        revents: 0,
+    };
+    let ret = loop {
+        let ret = unsafe { libc::poll(&mut pfd, 1, 0) };
+        if ret < 0 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
+            continue;
+        }
+        break ret;
+    };
+
+    if ret < 0 {
+        return true;
+    }
+    if ret == 0 {
+        return false;
+    }
+    if pfd.revents & (libc::POLLHUP | libc::POLLERR | libc::POLLNVAL | rdhup) != 0 {
+        return true;
+    }
+    if pfd.revents & libc::POLLIN != 0 {
+        let mut ch = 0u8;
+        let n = loop {
+            let n = unsafe {
+                libc::recv(
+                    fd,
+                    (&mut ch as *mut u8).cast(),
+                    1,
+                    libc::MSG_PEEK | libc::MSG_DONTWAIT,
+                )
+            };
+            if n < 0 && std::io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
+                continue;
+            }
+            break n;
+        };
+        if n == 0 {
+            return true;
+        }
+        if n < 0 {
+            let errno = std::io::Error::last_os_error().raw_os_error();
+            return errno != Some(libc::EAGAIN) && errno != Some(libc::EWOULDBLOCK);
+        }
+    }
+    false
 }
 
 /// Poll a file descriptor for readability with a timeout in milliseconds.
@@ -296,7 +368,7 @@ pub(super) fn poll_fd(fd: i32, timeout_ms: i32) -> i32 {
     let ret = unsafe { libc::poll(&mut pfd, 1, timeout_ms) };
 
     if ret < 0 {
-        let errno = unsafe { *libc::__errno_location() };
+        let errno = std::io::Error::last_os_error().raw_os_error().unwrap_or(0);
         if errno == libc::EINTR {
             return 0;
         }

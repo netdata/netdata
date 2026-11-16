@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package rum
+
+import (
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/stretchr/testify/require"
+)
+
+// Collection covers fixed instruments and a bounded set of active breakdowns.
+// Cost follows the site's active series; timings are local trends, not CI gates.
+func BenchmarkCollect(b *testing.B) {
+	for _, measured := range []bool{false, true} {
+		name := "quiet"
+		if measured {
+			name = "measured"
+		}
+		b.Run(name, func(b *testing.B) {
+			ctx := context.Background()
+			db, err := journalstore.Open(ctx, "", "")
+			require.NoError(b, err)
+			defer db.Close()
+			hub := rumregistry.New()
+			revoke := hub.PublishReceiver(rumregistry.Availability{
+				Serving: true,
+			})
+			defer revoke.Close()
+			c := New(Dependencies{
+				Registry: hub,
+				History:  rumhistory.NewStore(db),
+			})
+			require.NoError(
+				b,
+				json.Unmarshal(
+					[]byte(
+						`{"vnode":"storefront","name":"shop","display_name":"Shop","allowed_origins":["https://example.org"]}`,
+					),
+					&c.Config,
+				),
+			)
+			require.NoError(b, c.Init(ctx))
+			defer c.Cleanup(ctx)
+			if measured {
+				c.aggregator.Ingest(&beacon.Beacon{
+					Site:         "shop",
+					SessionID:    "browser",
+					ExperienceID: "document",
+					Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+					PageGroup:    "/products",
+					Path:         "/products",
+					Browser:      "Chrome",
+					Device:       "desktop",
+					Country:      "GR",
+					Received:     time.Now(),
+					Vitals: []beacon.Vital{
+						{Name: beacon.LCP, ID: "lcp", Revision: 2, Value: 1200},
+						{Name: beacon.CLS, ID: "cls", Revision: 3, Value: 0},
+					},
+				})
+			}
+			if measured {
+				snapshot := c.aggregator.Snapshot()
+				require.Equal(b, 1, snapshot.Vitals[beacon.LCP].N)
+				require.Equal(b, 1, snapshot.Vitals[beacon.CLS].N)
+			}
+			managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
+			require.True(b, ok)
+			cycle := managed.CycleController()
+			collect := func() {
+				cycle.BeginCycle()
+				if err := c.Collect(ctx); err != nil {
+					b.Fatal(err)
+				}
+				if err := cycle.CommitCycleSuccess(); err != nil {
+					b.Fatal(err)
+				}
+			}
+			// Early cycles create the site's series, and series and descriptors left
+			// idle expire within the store's retention window; warm past it so the
+			// timer covers only steady-state cycles.
+			retention, ok := c.MetricStore().(metrix.DescriptorRetention)
+			require.True(b, ok)
+			window := retention.DescriptorRetentionWindow()
+			require.NotEqual(b, metrix.DescriptorRetentionUnbounded, window)
+			for range window + 1 {
+				collect()
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				collect()
+			}
+			b.StopTimer()
+			// The aggregator runs on the wall clock; a run long enough to expire
+			// the measured beacon would silently measure the quiet path.
+			if measured {
+				snapshot := c.aggregator.Snapshot()
+				require.Equal(b, 1, snapshot.Vitals[beacon.LCP].N)
+			}
+		})
+	}
+}
+
+func BenchmarkReceiverCollect(b *testing.B) {
+	c := receiver.New(receiver.Dependencies{
+		Registry: rumregistry.New(),
+	})
+	managed, ok := metrix.AsCycleManagedStore(c.MetricStore())
+	require.True(b, ok)
+	cycle := managed.CycleController()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		cycle.BeginCycle()
+		if err := c.Collect(context.Background()); err != nil {
+			b.Fatal(err)
+		}
+		if err := cycle.CommitCycleSuccess(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

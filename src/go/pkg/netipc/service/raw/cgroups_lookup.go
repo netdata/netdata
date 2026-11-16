@@ -7,7 +7,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
-// CgroupsLookupHandler serves a single CGROUPS_LOOKUP service kind.
+// CgroupsLookupHandler serves a single CGROUPS_LOOKUP service kind. The request
+// borrows the receive buffer and the builder writes into the response
+// buffer; both are valid only during the call, so copy what you keep.
 type CgroupsLookupHandler func(*protocol.CgroupsLookupRequestView, *protocol.CgroupsLookupBuilder) bool
 
 func cgroupsLookupRequestSize(paths [][]byte) (int, error) {
@@ -155,10 +157,14 @@ func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) 
 		if err != nil {
 			if err == protocol.ErrOverflow && start < len(paths) {
 				oneItemSize, serr := cgroupsLookupRequestSize(paths[start : start+1])
-				if serr == nil {
-					if c.ensureLookupRequestCapacity(oneItemSize) == nil {
-						continue
+				if serr == nil && c.lookupRequestCapacityCanReconnect(oneItemSize) {
+					// The reconnect's own error ends the lookup, as in C and
+					// Rust; only an item over the client's limit is sent
+					// as oversized.
+					if cerr := c.ensureLookupRequestCapacity(oneItemSize, deadline); cerr != nil {
+						return nil, cerr
 					}
+					continue
 				}
 				rawItem, serr := cgroupsLookupOversizedRequestItem(paths[start])
 				if serr != nil {
@@ -186,7 +192,7 @@ func (c *Client) CallCgroupsLookupWithTimeout(paths [][]byte, timeoutMs uint32) 
 			return nil, protocol.ErrOverflow
 		}
 		var payload []byte
-		if err := c.callWithRetry(func() error {
+		if err := c.callWithRetry(remainingTimeout, func() error {
 			_, callPayload, rerr := c.doRawCallWithTimeout(protocol.MethodCgroupsLookup, reqBuf[:reqLen], remainingTimeout)
 			if rerr != nil {
 				return rerr

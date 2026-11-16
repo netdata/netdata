@@ -281,6 +281,7 @@ func bgpPeerEntryTagsFromRow(row ddsnmp.BGPRow) map[string]string {
 			tags[key] = value
 		}
 	}
+	add("process_id", row.Identity.ProcessID)
 	add("routing_instance", bgpRoutingInstance(row))
 	add("neighbor", row.Identity.Neighbor)
 	add("remote_as", row.Identity.RemoteAS)
@@ -522,6 +523,9 @@ func bgpPeerEntryKey(scope string, tags map[string]string) string {
 	}
 
 	for _, key := range requiredTags {
+		if key == "remote_as" && tags["process_id"] != "" && tags["routing_instance"] != "" {
+			continue
+		}
 		if tags[key] == "" {
 			return ""
 		}
@@ -529,6 +533,10 @@ func bgpPeerEntryKey(scope string, tags map[string]string) string {
 
 	var sb strings.Builder
 	bgpWritePeerKeyPart(&sb, scope)
+	if tags["process_id"] != "" {
+		bgpWritePeerKeyPart(&sb, "process_id")
+		bgpWritePeerKeyPart(&sb, tags["process_id"])
+	}
 	for _, key := range identityTags {
 		bgpWritePeerKeyPart(&sb, key)
 		bgpWritePeerKeyPart(&sb, tags[key])

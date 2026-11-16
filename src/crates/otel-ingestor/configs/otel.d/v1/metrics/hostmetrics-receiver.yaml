@@ -1,4 +1,31 @@
+# Per-metric chart configuration for the metrics that the OpenTelemetry
+# hostmetrics receiver reports. This mapping is compiled into the plugin as
+# the fallback; YAML files in the chart configs directory (otel.yaml's
+# metrics.chart_configs_dir, default /etc/netdata/otel.d/v1/metrics) take
+# precedence for the metric names they configure.
+#
+# Collection timing (interval, grace, expiry) is not set here; it comes from
+# the metrics section of otel.yaml. Entries may override interval and grace
+# per metric with interval_secs and grace_period_secs (grace defaults to
+# 5x the interval when omitted).
 metrics:
+  # Keys are exact metric names (no wildcards); each maps to one or more
+  # entries, tried in order - the first entry whose instrumentation_scope
+  # matches the metric's OTel scope wins. Metrics not listed here have their
+  # dimensions named "value".
+  #
+  # instrumentation_scope fields (name, version) are regular expressions; all
+  # set fields must match, unset fields are ignored. The name patterns below
+  # pin each metric to the hostmetrics receiver scraper that reports it.
+  #
+  # dimension_attribute_key names the data-point attribute whose value becomes
+  # the chart dimension (state on system.network.connections, for example,
+  # yields one dimension per connection state). When unset, when the attribute
+  # is missing, or when its value is not a string, the dimension is named
+  # "value".
+  #
+  # Unknown keys inside an entry are ignored; an unknown top-level key (a
+  # misspelled metrics:, for example) makes the whole file fail to load.
   "system.network.connections":
     - instrumentation_scope:
         name: .*hostmetricsreceiver.*networkscraper$

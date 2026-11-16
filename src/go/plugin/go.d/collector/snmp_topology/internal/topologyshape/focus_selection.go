@@ -4,7 +4,9 @@ package topologyshape
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"strings"
 )
 
 func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[topologymodel.ActorHandle]struct{} {
@@ -16,15 +18,12 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 		}
 	}
 	for actorHandle, actor := range graph.actorByHandle {
-		if _, ok := graph.nonSegmentSet[actorHandle]; !ok {
-			continue
-		}
-		if !topologymodel.IsManagedSNMPDeviceActor(actor) {
+		if !managedFocusEligible(actor) {
 			continue
 		}
 		actorIPs := topologyActorIPs(actor)
-		for focusIP := range normalizedFocusIPs {
-			if _, ok := actorIPs[focusIP]; !ok {
+		for actorIP := range actorIPs {
+			if _, ok := normalizedFocusIPs[actorIP]; !ok {
 				continue
 			}
 			roots[actorHandle] = struct{}{}
@@ -32,6 +31,39 @@ func collectTopologyFocusRoots(graph topologyFocusGraph, focusIPs []string) map[
 		}
 	}
 	return roots
+}
+
+func managedFocusEligible(actor topologymodel.Actor) bool {
+	return !actor.ActorHandle.IsZero() && !topologymodel.ActorIsSegment(actor) && topologymodel.IsManagedSNMPDeviceActor(actor)
+}
+
+// BuildManagedFocusBindings uses the same reconciled address authority as local focus.
+func BuildManagedFocusBindings(actors []topologymodel.Actor, targets []topologyoptions.ManagedFocusTarget) []topologymodel.FocusRootBinding {
+	byIP := make(map[string][]topologymodel.ActorHandle)
+	for _, actor := range actors {
+		if !managedFocusEligible(actor) {
+			continue
+		}
+		for ip := range topologyActorIPs(actor) {
+			byIP[ip] = append(byIP[ip], actor.ActorHandle)
+		}
+	}
+	seen := make(map[string]struct{}, len(targets))
+	var bindings []topologymodel.FocusRootBinding
+	for _, target := range targets {
+		if _, ok := seen[target.Value]; ok {
+			continue
+		}
+		seen[target.Value] = struct{}{}
+		if !strings.HasPrefix(target.Value, topologyoptions.ManagedFocusIPPrefix) {
+			continue
+		}
+		ip := topologyutil.NormalizeIPAddress(strings.TrimPrefix(target.Value, topologyoptions.ManagedFocusIPPrefix))
+		for _, handle := range byIP[ip] {
+			bindings = append(bindings, topologymodel.FocusRootBinding{OptionID: target.Value, ActorHandle: handle})
+		}
+	}
+	return bindings
 }
 
 func topologyActorHasIP(actor topologymodel.Actor, ip string) bool {

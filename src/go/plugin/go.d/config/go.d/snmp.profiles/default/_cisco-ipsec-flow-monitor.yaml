@@ -55,15 +55,6 @@ metrics:
         mapping:
           1: active
           2: destroy
-      - OID: .3.6.1.4.1.9.9.171.1.3.2.1.3
-        name: cipSecTunIkeTunnelAlive
-        chart_meta:
-          description: The existence status of the IPsec Phase-1 IKE Tunnel
-          family: 'Network/VPN/IPSec/Phase1/Tunnel/Existence'
-          unit: "{status}"
-        mapping:
-          1: exists
-          2: not_exists
     metric_tags:
       - index: 1
         tag: phase_1_tunnel_index
@@ -155,6 +146,15 @@ metrics:
         mapping:
           1: active
           2: destroy
+      - OID: 1.3.6.1.4.1.9.9.171.1.3.2.1.3
+        name: cipSecTunIkeTunnelAlive
+        chart_meta:
+          description: Whether the Phase-1 IKE Tunnel of this IPsec Phase-2 Tunnel currently exists
+          family: 'Network/VPN/IPSec/Phase2/Tunnel/Status'
+          unit: "{status}"
+        mapping:
+          1: exists
+          2: not_exists
     metric_tags:
       - index: 1
         tag: phase_2_tunnel_index

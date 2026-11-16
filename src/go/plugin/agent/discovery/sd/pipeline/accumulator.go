@@ -30,13 +30,11 @@ type accumulator struct {
 }
 
 func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
-	updates := make(chan []model.TargetGroup)
-
 	var wg sync.WaitGroup
 	for _, d := range a.discoverers {
 		wg.Add(1)
 		d := d
-		go func() { defer wg.Done(); a.runDiscoverer(ctx, d, updates) }()
+		go func() { defer wg.Done(); a.runDiscoverer(ctx, d) }()
 	}
 
 	done := make(chan struct{})
@@ -48,12 +46,8 @@ func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 	for {
 		select {
 		case <-ctx.Done():
-			select {
-			case <-done:
-				a.Info("all discoverers exited")
-			case <-time.After(time.Second * 10):
-				a.Warning("not all discoverers exited")
-			}
+			<-done
+			a.Info("all discoverers exited")
 			a.finalSend(ctx, in)
 			return
 		case <-done:
@@ -74,30 +68,20 @@ func (a *accumulator) run(ctx context.Context, in chan []model.TargetGroup) {
 	}
 }
 
-func (a *accumulator) runDiscoverer(ctx context.Context, d model.Discoverer, updates chan []model.TargetGroup) {
-	done := make(chan struct{})
-	go func() { defer close(done); d.Discover(ctx, updates) }()
+func (a *accumulator) runDiscoverer(ctx context.Context, d model.Discoverer) {
+	updates := make(chan []model.TargetGroup)
+	go func() { defer close(updates); d.Discover(ctx, updates) }()
 
-	for {
-		select {
-		case <-ctx.Done():
-			select {
-			case <-done:
-			case <-time.After(time.Second * 10):
-				a.Warningf("discoverer '%v' didn't exit on ctx done", d)
-			}
-			return
-		case <-done:
-			if !isDone(ctx) {
-				a.Infof("discoverer '%v' exited before ctx done", d)
-			}
-			return
-		case tggs := <-updates:
-			a.mux.Lock()
-			a.groupsUpdate(tggs)
-			a.mux.Unlock()
-			a.triggerSend()
-		}
+	// Keep receiving through cancellation: a child may finish with a final send.
+	// Closing updates proves Discover has returned, including for finite discovery.
+	for tggs := range updates {
+		a.mux.Lock()
+		a.groupsUpdate(tggs)
+		a.mux.Unlock()
+		a.triggerSend()
+	}
+	if !isDone(ctx) {
+		a.Infof("discoverer '%v' exited before ctx done", d)
 	}
 }
 

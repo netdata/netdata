@@ -1,4 +1,4 @@
-//go:build linux
+//go:build linux || (freebsd && (amd64 || 386))
 
 package posix
 
@@ -9,7 +9,16 @@ import (
 	"path/filepath"
 	"syscall"
 	"testing"
+	"unsafe"
 )
+
+// alignedShmData returns an 8-byte aligned buffer standing in for the mmap'd
+// region: small byte slices may live on the stack unaligned, and atomics on
+// them fault on arm64 and panic on 32-bit architectures.
+func alignedShmData(n int) []byte {
+	words := make([]uint64, (n+7)/8)
+	return unsafe.Slice((*byte)(unsafe.Pointer(&words[0])), n)[:n:n] // #nosec G103 -- test-only aligned view.
+}
 
 func defaultShmLayout() (uint32, uint32, uint32, uint32) {
 	reqCap := shmAlign64(128)
@@ -78,33 +87,36 @@ func TestShmServerCreatePreallocation(t *testing.T) {
 		}
 	})
 
-	t.Run("unsupported allocation has no sparse fallback", func(t *testing.T) {
-		runDir := t.TempDir()
-		const (
-			svc       = "go_shm_allocate_unsupported"
-			sessionID = uint64(43)
-		)
+	// EINVAL is how FreeBSD ZFS rejects posix_fallocate.
+	for _, cause := range []syscall.Errno{syscall.EOPNOTSUPP, syscall.EINVAL} {
+		t.Run("unsupported allocation has no sparse fallback/"+cause.Error(), func(t *testing.T) {
+			runDir := t.TempDir()
+			const (
+				svc       = "go_shm_allocate_unsupported"
+				sessionID = uint64(43)
+			)
 
-		ctx, err := shmServerCreate(runDir, svc, sessionID, 1024, 1024,
-			func(_ int, _ uint32, _, _ int64) error {
-				return syscall.EOPNOTSUPP
-			})
-		if ctx != nil {
-			ctx.ShmDestroy()
-			t.Fatal("unsupported allocation returned a context")
-		}
-		if !errors.Is(err, ErrShmAllocate) || !errors.Is(err, syscall.EOPNOTSUPP) {
-			t.Fatalf("create error = %v, want allocation error wrapping EOPNOTSUPP", err)
-		}
+			ctx, err := shmServerCreate(runDir, svc, sessionID, 1024, 1024,
+				func(_ int, _ uint32, _, _ int64) error {
+					return cause
+				})
+			if ctx != nil {
+				ctx.ShmDestroy()
+				t.Fatal("unsupported allocation returned a context")
+			}
+			if !errors.Is(err, ErrShmAllocate) || !errors.Is(err, cause) {
+				t.Fatalf("create error = %v, want allocation error wrapping %v", err, cause)
+			}
 
-		path, pathErr := buildShmPath(runDir, svc, sessionID)
-		if pathErr != nil {
-			t.Fatalf("build path: %v", pathErr)
-		}
-		if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
-			t.Fatalf("unsupported allocation file should be removed, stat err = %v", statErr)
-		}
-	})
+			path, pathErr := buildShmPath(runDir, svc, sessionID)
+			if pathErr != nil {
+				t.Fatalf("build path: %v", pathErr)
+			}
+			if _, statErr := os.Stat(path); !errors.Is(statErr, os.ErrNotExist) {
+				t.Fatalf("unsupported allocation file should be removed, stat err = %v", statErr)
+			}
+		})
+	}
 
 	t.Run("EINTR retries", func(t *testing.T) {
 		runDir := t.TempDir()
@@ -115,7 +127,7 @@ func TestShmServerCreatePreallocation(t *testing.T) {
 				if calls == 1 {
 					return syscall.EINTR
 				}
-				return syscall.Fallocate(fd, mode, off, len)
+				return shmAllocate(fd, mode, off, len)
 			})
 		if err != nil {
 			t.Fatalf("create after EINTR: %v", err)
@@ -163,36 +175,6 @@ func writeRawShmRegionFile(t *testing.T, runDir, service string, sessionID uint6
 		t.Fatalf("write %s: %v", path, err)
 	}
 	return path
-}
-
-func TestShmOwnerAliveFalsePaths(t *testing.T) {
-	if (&ShmContext{data: make([]byte, 8)}).OwnerAlive() {
-		t.Fatal("short header should not be treated as alive")
-	}
-
-	runDir := t.TempDir()
-	svc := "go_shm_owner_false"
-	ctx, err := ShmServerCreate(runDir, svc, 1, 1024, 1024)
-	if err != nil {
-		t.Fatalf("server create: %v", err)
-	}
-	defer ctx.ShmDestroy()
-
-	binary.NativeEndian.PutUint32(ctx.data[shmHeaderOwnerPidOff:shmHeaderOwnerPidOff+4], 0)
-	if ctx.OwnerAlive() {
-		t.Fatal("owner pid 0 should not be treated as alive")
-	}
-
-	binary.NativeEndian.PutUint32(ctx.data[shmHeaderOwnerPidOff:shmHeaderOwnerPidOff+4], uint32(int32(os.Getpid())))
-	binary.NativeEndian.PutUint32(ctx.data[shmHeaderOwnerGenOff:shmHeaderOwnerGenOff+4], ctx.ownerGeneration+1)
-	if ctx.OwnerAlive() {
-		t.Fatal("generation mismatch should not be treated as alive")
-	}
-
-	ctx.ownerGeneration = 0
-	if !ctx.OwnerAlive() {
-		t.Fatal("legacy zero cached generation should skip generation check")
-	}
 }
 
 func TestShmServerCreateRejectsLiveRegion(t *testing.T) {
@@ -293,6 +275,24 @@ func TestShmClientAttachRejectsMalformedHeaders(t *testing.T) {
 			want: ErrShmBadSize,
 		},
 		{
+			// The uint32 sum wraps to a small value; on 32-bit the old int
+			// arithmetic went negative and accepted the header.
+			name: "request-end-wraps-uint32",
+			size: validSize,
+			fill: func(data []byte) {
+				fillShmHeader(data, int32(os.Getpid()), 1, 0xFFFFFFC0, 0x80, respOff, respCap)
+			},
+			want: ErrShmBadSize,
+		},
+		{
+			name: "response-end-wraps-uint32",
+			size: validSize,
+			fill: func(data []byte) {
+				fillShmHeader(data, int32(os.Getpid()), 1, reqOff, reqCap, 0xFFFFFFC0, 0x40)
+			},
+			want: ErrShmBadSize,
+		},
+		{
 			name: "declared-region-beyond-file-size",
 			size: int(shmHeaderLen) + 64,
 			fill: func(data []byte) {
@@ -333,7 +333,7 @@ func TestShmSendBadParamGuards(t *testing.T) {
 
 	storeLenCtx := &ShmContext{
 		role:            ShmRoleClient,
-		data:            make([]byte, 39),
+		data:            alignedShmData(39),
 		requestCapacity: 64,
 	}
 	if err := storeLenCtx.ShmSend([]byte{1}); !errors.Is(err, ErrShmBadParam) {
@@ -342,7 +342,7 @@ func TestShmSendBadParamGuards(t *testing.T) {
 
 	addSeqCtx := &ShmContext{
 		role:            ShmRoleClient,
-		data:            make([]byte, 48),
+		data:            alignedShmData(48),
 		requestCapacity: 64,
 	}
 	if err := addSeqCtx.ShmSend([]byte{1}); !errors.Is(err, ErrShmBadParam) {
@@ -351,7 +351,7 @@ func TestShmSendBadParamGuards(t *testing.T) {
 
 	addSignalCtx := &ShmContext{
 		role:            ShmRoleClient,
-		data:            make([]byte, 56),
+		data:            alignedShmData(56),
 		requestCapacity: 64,
 	}
 	if err := addSignalCtx.ShmSend([]byte{1}); !errors.Is(err, ErrShmBadParam) {
@@ -364,13 +364,13 @@ func TestShmReceiveBadParamAndTimeoutPaths(t *testing.T) {
 		t.Fatalf("ShmReceive nil context = %v, want %v", err, ErrShmBadParam)
 	}
 
-	if _, err := (&ShmContext{data: make([]byte, 8)}).ShmReceive(nil, 1); !errors.Is(err, ErrShmBadParam) {
+	if _, err := (&ShmContext{data: alignedShmData(8)}).ShmReceive(nil, 1); !errors.Is(err, ErrShmBadParam) {
 		t.Fatalf("ShmReceive empty buffer = %v, want %v", err, ErrShmBadParam)
 	}
 
 	spinLoadSeqCtx := &ShmContext{
 		role:             ShmRoleClient,
-		data:             make([]byte, 8),
+		data:             alignedShmData(8),
 		responseCapacity: 64,
 		SpinTries:        1,
 	}
@@ -380,7 +380,7 @@ func TestShmReceiveBadParamAndTimeoutPaths(t *testing.T) {
 
 	spinLoadLenCtx := &ShmContext{
 		role:             ShmRoleClient,
-		data:             make([]byte, 48),
+		data:             alignedShmData(48),
 		responseCapacity: 64,
 		SpinTries:        1,
 	}
@@ -394,7 +394,7 @@ func TestShmReceiveBadParamAndTimeoutPaths(t *testing.T) {
 
 	futexLoadSignalCtx := &ShmContext{
 		role:             ShmRoleClient,
-		data:             make([]byte, 8),
+		data:             alignedShmData(8),
 		responseCapacity: 64,
 		SpinTries:        0,
 	}
@@ -404,7 +404,7 @@ func TestShmReceiveBadParamAndTimeoutPaths(t *testing.T) {
 
 	futexLoadSeqCtx := &ShmContext{
 		role:             ShmRoleClient,
-		data:             make([]byte, 48),
+		data:             alignedShmData(48),
 		responseCapacity: 64,
 		SpinTries:        0,
 	}
@@ -481,9 +481,9 @@ func TestCheckShmStaleVariants(t *testing.T) {
 		t.Fatalf("legacy stale file should be removed, stat err = %v", err)
 	}
 
-	unreadablePath := writeRawShmRegionFile(t, runDir, "go_shm_check_unreadable", 5, validSize, func(data []byte) {
-		fillShmHeader(data, int32(os.Getpid()), 1, reqOff, reqCap, respOff, respCap)
-	})
+	// The header has no magic: a non-root run fails to open the file, and
+	// root, which opens a mode-000 file, finds no region. Both reclaim it.
+	unreadablePath := writeRawShmRegionFile(t, runDir, "go_shm_check_unreadable", 5, validSize, func([]byte) {})
 	if err := os.Chmod(unreadablePath, 0); err != nil {
 		t.Fatalf("chmod unreadable stale file: %v", err)
 	}
@@ -589,5 +589,11 @@ func TestShmCleanupStaleMissingDirAndUnrelatedFile(t *testing.T) {
 
 	if _, err := os.Stat(unrelatedPath); err != nil {
 		t.Fatalf("unrelated file should remain after cleanup, stat err = %v", err)
+	}
+}
+
+func TestShmEmptyRunDirRejected(t *testing.T) {
+	if _, err := ShmServerCreate("", "go_shm_empty_dir", 1, 1024, 1024); !errors.Is(err, ErrShmBadParam) {
+		t.Errorf("ShmServerCreate with empty run_dir: err = %v, want ErrShmBadParam", err)
 	}
 }

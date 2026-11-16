@@ -21,7 +21,7 @@ Kind: `docker`
 
 ## Overview
 
-Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to render collector job YAML — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
+Netdata can automatically discover running Docker containers on the local Docker daemon and generate collector jobs for the services running inside them. The discoverer queries the Docker API on a fixed interval, builds one target per container port, and applies your `services:` rules to create collector jobs — typically picking the right go.d module from the container image (nginx, postgres, redis, …).
 
 This page covers Docker-specific setup. For the broader Service Discovery model and the shared template-helper reference, see [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md).
 
@@ -71,7 +71,7 @@ The stock conf at `/etc/netdata/go.d/sd/docker.conf` ships with `disabled: no` a
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered containers into collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -79,8 +79,27 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | [address](#option-address) | Docker daemon address. | unix:///var/run/docker.sock | no |
 | timeout | Maximum time to wait for a Docker API response (per request). | 2s | no |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+Container owners can control command arguments, labels and other values used by service rules.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 <a id="option-address"></a>
 ##### address
@@ -104,7 +123,7 @@ If unset, Netdata also honors the `DOCKER_HOST` environment variable when presen
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/docker.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -127,8 +146,7 @@ services:
   - id: nginx
     match: '{{ match "sp" .Image "nginx nginx:*" }}'
     config_template: |
-      name: docker_{{.Name}}
-      url: http://{{.Address}}/stub_status
+      {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
 
 ```
 ###### Remote daemon over TCP
@@ -147,8 +165,7 @@ services:
   - id: redis
     match: '{{ match "sp" .Image "redis redis:* */redis */redis:*" }}'
     config_template: |
-      name: docker_{{.Name}}
-      address: redis://@{{.Address}}
+      {{ job "name" (printf "docker_%s" .Name) "address" (printf "redis://@%s" .Address) }}
 
 ```
 
@@ -157,7 +174,7 @@ services:
 
 A `services:` rule turns each discovered container target into one or more collector jobs. Most rules match on `.Image` (using the `match "sp"` simple-pattern helper for the typical `image image:* */image */image:*` family), some also gate on `.PrivatePort`, and a few use `.Labels` to honor user intent.
 
-The shared rule model — function reference (`match`, `glob`, sprig, `toYaml`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
+The shared rule model — function reference (`match`, `glob`, sprig, `job`), `config_template` rendering rules, and the `missingkey=error` failure semantics — lives on the [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md) hub page. The notes below are Docker-specific.
 
 
 ### How rules are evaluated
@@ -219,14 +236,10 @@ Match the four common image-name forms with `match "sp"`. `id: nginx` makes the 
 - id: nginx
   match: '{{ match "sp" .Image "nginx nginx:*" }}'
   config_template: |
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/stub_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/basic_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/nginx_status
-    - name: docker_{{.Name}}
-      url: http://{{.Address}}/status
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/stub_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/basic_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/nginx_status" .Address) }}
+    {{ job "name" (printf "docker_%s" .Name) "url" (printf "http://%s/status" .Address) }}
 
 ```
 
@@ -239,9 +252,11 @@ When the rule `id` is something other than the target module name, set `module:`
 - id: postgres
   match: '{{ or (eq .PrivatePort "5432") (match "sp" .Image "postgres postgres:* */postgres */postgres:* */postgresql */postgresql:*") }}'
   config_template: |
-    module: postgres
-    name: docker_{{.Name}}
-    dsn: postgres://netdata:postgres@{{.Address}}/postgres
+    {{ job
+      "module" "postgres"
+      "name" (printf "docker_%s" .Name)
+      "dsn" (printf "postgres://netdata:postgres@%s/postgres" .Address)
+    }}
 
 ```
 
@@ -254,9 +269,11 @@ Use container labels to override behaviour without changing rules — e.g. opt a
 - id: label-routed
   match: '{{ and (hasKey .Labels "netdata.go.d/module") (eq (index .Labels "netdata.go.d/module") "mymodule") }}'
   config_template: |
-    module: mymodule
-    name: docker_{{.Name}}
-    url: http://{{.Address}}/metrics
+    {{ job
+      "module" "mymodule"
+      "name" (printf "docker_%s" .Name)
+      "url" (printf "http://%s/metrics" .Address)
+    }}
 
 ```
 

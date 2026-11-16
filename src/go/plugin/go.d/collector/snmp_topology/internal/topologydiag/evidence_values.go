@@ -80,6 +80,7 @@ type AcquisitionBGPRowValue struct {
 	StructuralID    string
 	Kind            ddprofiledefinition.BGPRowKind
 
+	ProcessID       string
 	RoutingInstance string
 	Neighbor        string
 	RemoteAS        string

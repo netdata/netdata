@@ -426,3 +426,32 @@ func TestDurationString_UnmarshalYAML(t *testing.T) {
 		})
 	}
 }
+
+func TestLongDuration_JSONRoundTripKeepsTheValue(t *testing.T) {
+	// Collector configs carrying a LongDuration are serialised with
+	// json.Marshal and read back with json.Unmarshal, so the pair has to agree.
+	type config struct {
+		RefreshEvery LongDuration `json:"refresh_every"`
+	}
+
+	tests := map[string]time.Duration{
+		"whole seconds":                time.Minute,
+		"fractional, below 1000s":      1500 * time.Millisecond,
+		"fractional, many digits":      1234567890 * time.Nanosecond,
+		"fractional, above 1000s":      1000*time.Second + 500*time.Millisecond,
+		"fractional, above an hour":    90*time.Minute + 500*time.Millisecond,
+		"negative, fractional, >1000s": -(90*time.Minute + 500*time.Millisecond),
+	}
+
+	for name, want := range tests {
+		t.Run(name, func(t *testing.T) {
+			encoded, err := json.Marshal(config{RefreshEvery: LongDuration(want)})
+			require.NoError(t, err)
+
+			var got config
+			require.NoError(t, json.Unmarshal(encoded, &got))
+			assert.Equal(t, want, got.RefreshEvery.Duration(),
+				"round trip through %s", encoded)
+		})
+	}
+}

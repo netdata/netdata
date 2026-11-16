@@ -16,12 +16,20 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/stretchr/testify/require"
 )
 
 // stopFunctionAssembly runs the same shutdown sequence the kernel drives in
 // production: shutdown barrier, catalog drain, then run finalization.
 func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
+	if err := closeFunctionAssemblyCatalog(fa, epoch); err != nil {
+		return err
+	}
+	return fa.FinalizeRun(context.Background(), epoch)
+}
+
+func closeFunctionAssemblyCatalog(fa *FunctionAssembly, epoch uint64) error {
 	if fa == nil {
 		return nil
 	}
@@ -56,7 +64,7 @@ func stopFunctionAssembly(fa *FunctionAssembly, epoch uint64) error {
 	if !catalog.LifecycleDrained() {
 		return errors.New("Function catalog did not drain")
 	}
-	return fa.FinalizeRun(context.Background(), epoch)
+	return nil
 }
 
 func newTestFunctionAssembly(
@@ -73,6 +81,7 @@ func newTestFunctionAssembly(
 		t.Context(),
 		epoch,
 		attempts,
+		nil,
 		modules,
 		frames,
 		initial...,
@@ -486,8 +495,8 @@ func (*assemblyTestJob) CleanupRejected()                           {}
 func (*assemblyTestJob) Tick(int)                                   {}
 func (*assemblyTestJob) Cleanup()                                   {}
 func (*assemblyTestJob) Stop()                                      {}
-func (*assemblyTestJob) StartManaged(ready chan<- struct{}) {
-	close(ready)
+func (*assemblyTestJob) StartManaged(run *jobruntime.ManagedRun) {
+	run.Ready()
 }
 
 type shutdownFunctionReadyResource struct {

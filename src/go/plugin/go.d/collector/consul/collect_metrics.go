@@ -8,12 +8,15 @@ import (
 	"strconv"
 	"strings"
 
+	"context"
 	"github.com/netdata/netdata/go/plugins/pkg/prometheus"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-func (c *Collector) collectMetricsPrometheus(mx map[string]int64) error {
-	mfs, err := c.prom.Scrape()
+func (c *Collector) collectMetricsPrometheus(ctx context.Context,
+
+	mx map[string]int64) error {
+	mfs, err := c.prom.ScrapeContext(ctx)
 	if err != nil {
 		return err
 	}

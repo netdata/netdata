@@ -10,12 +10,20 @@ type snapshotGaugeInstrument struct {
 	base    []LabelSet
 }
 
+func (i *snapshotGaugeInstrument) hostScope() HostScope {
+	return i.scope
+}
+
 // statefulGaugeInstrument writes maintained gauge values.
 type statefulGaugeInstrument struct {
 	backend meterBackend
 	desc    *instrumentDescriptor
 	scope   HostScope
 	base    []LabelSet
+}
+
+func (i *statefulGaugeInstrument) hostScope() HostScope {
+	return i.scope
 }
 
 // stagedGauge holds one in-cycle gauge sample for a single series identity.
@@ -112,7 +120,7 @@ func (c *storeCore) recordGaugeSet(desc *instrumentDescriptor, scope HostScope, 
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.gauges[key] = entry
+		stageEntry(&c.active.gauges, key, entry)
 	}
 	entry.value = value
 }
@@ -161,7 +169,7 @@ func (c *storeCore) recordGaugeAdd(desc *instrumentDescriptor, scope HostScope, 
 			desc:         desc,
 			value:        baseline,
 		}
-		c.active.gauges[key] = entry
+		stageEntry(&c.active.gauges, key, entry)
 	}
 	entry.value += delta
 }

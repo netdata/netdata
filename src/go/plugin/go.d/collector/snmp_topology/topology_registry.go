@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyshape"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/reversedns"
 )
 
@@ -58,15 +59,28 @@ func (r *topologyRegistry) snapshotWithEnvironment(
 	options topologyoptions.QueryOptions,
 	environment topologyGraphBuildEnvironment,
 ) (topologymodel.Data, bool, error) {
+	result, ok, err := r.snapshotResultWithEnvironment(options, environment)
+	return result.Data, ok, err
+}
+
+type topologySnapshotResult struct {
+	Data         topologymodel.Data
+	FocusTargets []topologyoptions.ManagedFocusTarget
+}
+
+func (r *topologyRegistry) snapshotResultWithEnvironment(
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologySnapshotResult, bool, error) {
 	if r == nil {
-		return topologymodel.Data{}, false, nil
+		return topologySnapshotResult{}, false, nil
 	}
 	generation := r.acquireGeneration()
 	producerScopeID := ""
 	if generation != nil {
 		producerScopeID = generation.producerScopeID
 	}
-	return buildTopologyObservationSnapshot(
+	return buildTopologyObservationSnapshotResult(
 		topologyObservationSnapshots(generation),
 		producerScopeID,
 		options,
@@ -80,13 +94,29 @@ func buildTopologyObservationSnapshot(
 	options topologyoptions.QueryOptions,
 	environment topologyGraphBuildEnvironment,
 ) (topologymodel.Data, bool, error) {
+	result, ok, err := buildTopologyObservationSnapshotResult(snapshots, producerScopeID, options, environment)
+	return result.Data, ok, err
+}
+
+func buildTopologyObservationSnapshotResult(
+	snapshots []topologymodel.ObservationSnapshot,
+	producerScopeID string,
+	options topologyoptions.QueryOptions,
+	environment topologyGraphBuildEnvironment,
+) (topologySnapshotResult, bool, error) {
 	options = topologyoptions.NormalizeQueryOptions(options)
 	aggregate, ok := aggregateTopologyObservationSnapshots(snapshots)
 	if !ok {
-		return topologymodel.Data{}, false, nil
+		return topologySnapshotResult{}, false, nil
 	}
 	aggregate.ProducerScopeID = strings.TrimSpace(producerScopeID)
-	return buildSNMPTopologySnapshot(aggregate, options, environment)
+	data, ok, err := buildSNMPTopologySnapshot(aggregate, options, environment)
+	if err != nil || !ok {
+		return topologySnapshotResult{}, ok, err
+	}
+	targets := buildTopologyManagedFocusTargets(aggregate.Snapshots)
+	data.FocusRootBindings = topologyshape.BuildManagedFocusBindings(data.Actors, targets)
+	return topologySnapshotResult{Data: data, FocusTargets: targets}, true, nil
 }
 
 func (r *topologyRegistry) hasRenderableObservations() bool {

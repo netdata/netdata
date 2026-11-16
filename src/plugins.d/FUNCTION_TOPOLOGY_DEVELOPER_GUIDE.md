@@ -147,6 +147,115 @@ may advertise `accepted_params`, `required_params`, and help text without a
 Graph presentation is part of the production payload and is never carried in
 an `info` response.
 
+### Cached Selector Discovery
+
+SNMP topology `info` includes managed-device focus choices from its current
+collector cache when the running job is available. It does not poll devices or
+render a topology. Without a running available job, the bound Function retains
+static bootstrap metadata until its publication is reconciled; this is not a
+guarantee that a data request can succeed.
+
+Go structured Functions opt into bound discovery with
+`funcapi.FunctionConfig.DynamicInfo`. Other bound Functions retain static info
+by default. Unselected multi-job info remains static so an unavailable default
+job cannot hide healthy siblings; explicit-job info discovers that job's
+parameters. Raw methods retain their separate `ManagedInfo` contract. See the
+[Function API guide](/src/go/pkg/funcapi/README.md#info-for-structured-methods)
+for containment, cancellation and error behavior. These metadata additions do
+not change direct per-node topology requests or selector defaults.
+
+### Aggregate-First Focus
+
+Status: the Agent declares this optional contract. Cloud consumers must implement
+the following behavior before enabling aggregate-first focus; the metadata alone
+does not change direct Agent filtering or the deployed CTS implementation.
+
+A selector's optional `focus` object distinguishes a graph operation from an
+ordinary source-side filter. At most one selector declares `role: "roots"` and
+one declares `role: "depth"`; depth requires roots. Names such as `focus`, `depth`
+or a topology Function name have no implicit meaning. Selectors without this
+metadata retain their source-side semantics.
+
+- Roots declare `unfocused_option`, `bindings` and `traversal`. The unfocused ID
+  must be a canonical default option. Selecting it, even together with other choices,
+  bypasses focus, depth and post-focus pruning.
+- Depth is single-select and declares a canonical `unlimited_option`. Every other
+  option ID is a non-negative integer hop count. Without a depth selector,
+  traversal is unlimited.
+- `bindings` names an actor-owned detail table and its `option_column` and
+  `actor_column`. The table type has role `actor_detail`, owner `actor` and
+  aggregation `append`. The option column is `string` or `string_ref`; each value
+  is a canonical root option, never the unfocused ID or an alias. The actor column
+  is a non-null `actor_ref` into this response's actor rows. Normal compact-table
+  codecs and dictionary resolution apply.
+- Bindings may be one-to-many or many-to-one. A zero-row table is valid; an option
+  without bindings is unresolved, not an instruction to select everything.
+  Bindings describe actors surviving ordinary source-side controls in this map.
+- The binding table is supporting data, not graph structure or a modal section.
+  Producers should mark its default visibility `hidden` and not include it in
+  modal sections. Info responses describe the binding table but do not contain it.
+
+An aggregator discovers controls from each source's Function metadata, omits the
+declared roots/depth controls from fan-out requests, and obtains complete maps for
+the remaining selections. Producers declaring focus must therefore default to
+unfocused operation when those controls are omitted. The aggregator resolves
+bindings against source actor occurrences, correlates the maps, remaps the bound
+actors, then applies focus to the merged graph. It must also remap declared table,
+actor-type and link-type references if registries are namespaced. Never match a
+choice by its display label or guess its identity from an IP-like ID.
+
+The data response's focus metadata is authoritative for that map, including its
+available choices and resolved traversal policy after other selectors. Info may
+advertise the default policy; it must not render or query devices just to populate
+bindings. Conflicting policies or unresolved selected choices must be reported
+through topology notifications, not silently treated as successful focus or as
+the unfocused choice. In particular, a missing choice is not proof that another
+source's equal-looking label or local ID identifies the same entity.
+
+`traversal` defines this undirected graph operation, independently of layout or
+link arrow direction:
+
+1. Actor types in `connector_types` are single-hop connectors; types in
+   `boundary_types` are boundaries. These disjoint sets and `prune_leaf_types`
+   reference declared actor types. All other actors are ordinary vertices.
+2. From each bound ordinary root at distance zero, a direct ordinary-to-ordinary
+   edge costs one hop. Crossing one connector to an ordinary neighbor also costs
+   one hop. Connector-to-connector chains do not propagate traversal. Boundaries
+   never propagate depth, including at unlimited depth.
+3. Include ordinary actors within the selected depth. For positive or unlimited
+   depth, also include every connector or boundary incident to one of those
+   actors, even when that actor is at the depth limit. At depth zero, do not add
+   those incident actors automatically.
+4. If `connect_roots` is true, also include all actors and edges on every equal
+   shortest path between each pair of roots. This separate operation counts raw
+   graph edges, permits connectors and boundaries, and is not limited by depth.
+   Disconnected roots stay separate; no edge is invented.
+5. Retain links whose endpoints both belong to the depth-selected set, plus links
+   whose endpoint pair belongs to a connecting path. Do not retain every link
+   induced by the final union: that would add unrelated cross-links between paths.
+6. Iteratively remove actors of `prune_leaf_types` with at most one distinct
+   retained neighbor, together with their incident links, until stable. A declared
+   `protected_memberships` actor-type/link-type pair exempts an actor of that type
+   while it has a retained incident link of the specified type. Parallel links do
+   not count as distinct neighbors. Empty pruning declarations disable this step.
+
+A response that reports applied focus uses optional `data.view.focus`:
+`roots` contains distinct zero-based actor row references in the **returned** map,
+after filtering and remapping. `depth` is a non-negative integer; omit it for
+unlimited traversal. An empty `roots` array is valid when no selected roots
+survive. Omit `focus` entirely when no focus was applied. This describes the
+applied operation; it does not replace selector declarations or source bindings.
+Consumers that do not use this metadata may ignore it. Existing producers are
+not required to add it to their direct per-node responses.
+
+SNMP emits bindings as `data.tables.actor.focus_roots`, with columns `option` and
+`actor`. Choices and bindings use the same reconciled managed-device addresses as
+direct focus, not raw SNMP aliases. Its `segment` type is a connector and
+`l3_subnet_segment` is a boundary. IP mode prunes both types, protecting retained
+`l3_subnet_membership` links; MAC mode does not prune after focus. These are producer
+declarations, not names CTS may hardcode. Existing per-node focus remains local;
+omitting focus/depth produces the complete contribution used for aggregation.
+
 ## Notifications
 
 Status: implemented in the Agent JSON Schema, Go payload model, and validation.
@@ -253,6 +362,42 @@ For string-heavy columns, prefer `string_ref` with `dictionary: "strings"` and
 integer values. This is how production socket evidence reached about 22 raw
 bytes per socket evidence row in the measured corpus.
 
+For direct scalar columns with `aggregation: "set"`, `type` describes each
+member: `bool`, `int`, `uint`, `float`, `string`, `timestamp`, `duration`, `ip`,
+or `mac`. A cell may contain a scalar or a one-dimensional array of that type,
+including an empty array. The same column can contain scalar identity cells
+and set-valued attributes for different actor types; aggregators preserve key
+values rather than wrapping them into sets. Keep the column type, role, unit,
+and presentation metadata when emitting an aggregate.
+
+Every set member follows the ordinary scalar type and `nullable` checks. Null
+cells and null members require `nullable: true`; nested arrays, objects, and
+wrong-typed members are rejected without coercion. In Go builders, use `[]any`
+for sets. A nil slice serializes as null and follows nullability; a non-nil
+empty slice represents an empty set. These rules apply after decoding any of
+the three column codecs.
+
+Numeric cells and set members must be finite. Types `int` and `uint` require
+integral values, and `uint` also requires a nonnegative value. Go validation
+accepts `int`, `int64`, `uint64`, `float64`, and `json.Number`, including the
+full native `uint64` range; numeric cells are not narrowed to machine-sized
+row or dictionary indexes. Validation preserves the supplied value.
+
+`json.Number` must contain a valid JSON numeric literal. For `int` and `uint`,
+it must use integer-form syntax (no fraction or exponent), fitting `int64`
+when negative or `uint64` when nonnegative. For `float` and `duration`, it must
+parse as a finite `float64`. Callers using the default JSON decoder retain its
+`float64` precision limits; validation does not recover digits already rounded
+during decoding.
+
+Set aggregation does not turn reference cells into arrays of references:
+`string_ref`, `ip_ref`, and `mac_ref` still carry one global dictionary index,
+and row-reference columns still carry one row index. A global dictionary entry
+may contain a set where its existing dictionary contract permits arrays.
+Non-set scalar columns and explicit `array`/`json` columns retain their existing
+validation rules. JSON Schema checks the generic wire shape; the topology Go
+builder and semantic validator also check the typed-set member contract.
+
 Use column type `json` only for actor/custom detail cells that must preserve
 nested producer-owned data, such as SNMP port `neighbors` or `vlans`. Do not
 use `json` for high-cardinality relationship evidence when a typed scalar,
@@ -292,7 +437,10 @@ Common actor identity columns:
 - `vsphere_moid`
 - `vsphere_inventory_path`
 
-Actor types define source-local identity and cross-source merge identity:
+Actor types define source-local identity and cross-source merge identity. The
+following actor-type excerpt is not a complete payload. The enclosing payload
+must declare the listed scope IDs in `types.aggregation_scopes`, provide the
+referenced actor columns, and define the referenced label and port tables:
 
 ```json
 {
@@ -347,6 +495,14 @@ Actor types define source-local identity and cross-source merge identity:
 `merge_identity` is what the Cloud aggregator may use across payloads.
 `parent_identity` expresses containment or "lives on" relationships.
 
+An absent or empty `merge_identity` authorizes no identity-based cross-source
+matching. Keep those actors scoped to their original contribution, including
+the source Agent and job. Do not fall back to `identity`, a display field, or a
+tuple containing an invented global namespace. Local identity still supports
+the map within that contribution. Separately declared correlation rules retain
+their explicit matching semantics; absence of a merge key does not invent a
+new correlation rule.
+
 Do not use display names as identity. Identity is canonical matching data, not
 UI text. If an identity column is not explicitly listed in the actor type
 `presentation.label_policy.columns`, the UI must not use it as a label
@@ -355,7 +511,10 @@ fallback.
 Actor type `search` declares exactly what the graph search bar may index for
 that actor type. `search.columns[]` references actor-table scalar columns.
 `search.label_keys[]` references values in the actor label table, normally
-`actor_labels.key`. Set `search.enabled: false` for helper actors that should
+`actor_labels.key`. These keys are unique non-empty strings, not registry IDs;
+built-in keys such as `_hostname` and `_os` are valid. Search validation does not
+depend on the presence of optional actor presentation settings.
+Set `search.enabled: false` for helper actors that should
 not appear in graph search, such as synthetic segment or grouping actors. The
 UI must not traverse producer-specific `details`, `match`, `attributes`, or
 labels paths when rendering a v1 payload.
@@ -365,6 +524,10 @@ generic `segment` type. Each such type must declare its own identity, merge
 identity, presentation, modal sections, legend entry, and aggregation behavior.
 Consumers must use the declared type metadata and must not infer semantics from
 a type id that happens to contain `segment`, `subnet`, or `network`.
+
+Every actor-type `aggregation_scopes[]` entry must name a scope declared in
+`types.aggregation_scopes`. Omit the list or emit an empty list when the actor
+does not participate in a grouping scope; this does not remove it from the graph.
 
 ## Required Link Semantics
 
@@ -642,6 +805,15 @@ sockets on the same process port. `default_type` must reference
 `name_column` must reference a scalar display column, not raw actor/link/
 evidence references, arrays, or JSON cells. For evidence sources, `evidence`
 names an evidence type id.
+
+`name_column` is the bullet key: the UI merges rows with the same value into
+one bullet and resolves link endpoint port names against it, so it must carry
+the same port identity the links use, and consumers always display it.
+Optional `label_column` names a scalar display column with an operator-facing
+label, such as an SNMP interface alias. Consumers show it together with the
+name (for example `Gi0/1/0 · Uplink to core`) and show the name alone when the
+label is null or empty. Never put such a label in `name_column`: ports sharing
+it would merge and links would stop resolving to their port.
 
 `hover.fields` is intentionally lightweight graph hover metadata. Full modal
 and table composition lives in `types.actor_types.<id>.presentation.modal`,
@@ -1164,7 +1336,10 @@ Two parents retaining data for the same node are two meaningful rows in
 `retention` and must not collapse into one, whatever the merge policy.
 Actors from different payloads must merge only by the `merge_identity` their
 type declares; a merged actor combines its labels, attributes, links, evidence,
-and detail tables by table policy. Streaming declares `machine_guid` plus
+and detail tables by table policy. With no declared merge key, identity-based
+matching stays source-local, not a fallback to the local `identity`. Preserve
+source scope while remapping the contribution's graph and detail references.
+Streaming declares `machine_guid` plus
 `node_id`; the table-level merge keys the streaming design wants are not
 expressible with the shipped declarations (`append`, and `set` for
 `actor_labels`) and are recorded in the implementation scope document as design
@@ -1604,10 +1779,15 @@ Managed SNMP device actor modals are port-centric:
   device name, management IP, vendor, model, port counts, and LLDP/CDP counts
   in the modal identification area;
 - use `actor_ports` as the primary `Ports` section;
+- port bullets key on `actor_ports.name` (the port identity link endpoints
+  use) and set `label_column: if_alias`, so bullets show the interface alias
+  next to the port name when the device reports one;
 - expose real port identity columns, including SNMP `if_index` as the visible
-  numeric port ID when known, source `port_id`, display `name`, `if_name`,
-  `if_descr`, `if_alias`, MAC, speed, status, mode, role, VLAN, FDB, link, and
-  neighbor counts;
+  numeric port ID when known, display `name` with a visible `if_alias` (Alias)
+  column next to it, source `port_id`, `if_name`, `if_descr`, MAC, speed,
+  status, mode, role, VLAN, FDB, link, and neighbor counts; the expanded row
+  repeats `if_alias` as `ifAlias` next to `ifName` and `ifDescr`, so the full
+  value is visible when the grid cell is truncated;
 - never invent numeric port IDs. Do not use row order or any generated sequence;
   `if_index` must come from the device/SNMP facts and must align with
   `actor_port_links.if_index`, so local port identity never contradicts the
@@ -1682,6 +1862,12 @@ actor:
   endpoint IPs stay evidence and display fields because vendor profiles expose
   them asymmetrically, and parallel sessions of one pair in one routing
   instance remain `actor_bgp_peers` detail rows under one graph relationship.
+  The optional device-local `process_id` is retained in those detail rows and does
+  not change graph identity. Process-scoped source rows with explicit process,
+  routing instance and neighbor may omit an unproved remote AS; a row without
+  established state contributes inventory only. Preserve nonblank process and routing-instance
+  identifiers byte-for-byte in inventory and relationship evidence. Absence/default handling
+  must not trim an otherwise nonblank identifier; IP/ASN normalization is a separate rule.
 
 Every logical-L3 and control-plane type (`l3_subnet`, `l3_subnet_membership`,
 `ospf_adjacency`, `bgp_adjacency`) is excluded from `actor_port_links`, which
@@ -1699,9 +1885,19 @@ creating loose router or IP actors; polished UI must not depend on raw
 
 For vSphere:
 
-- actors should use stable vSphere managed object ids when available;
-- inventory path can be an additional merge identity but should not be the
-  only identity when a stable object id exists;
+- qualified actors use `vsphere_instance_uuid`, `object_type`, and
+  `vsphere_moid` as identity and merge identity; MoRefs are unique only inside
+  their vCenter, not across unrelated vCenters;
+- containment uses the same namespace plus `parent_object_type` and
+  `parent_moid`; raw MoRefs and integer graph references are unchanged;
+- the namespace comes from the client's existing vCenter `InstanceUUID()` and
+  is captured with cached inventory, never fetched by a topology request;
+- if that UUID is unavailable, keep the existing source-local identity and
+  containment, omit merge identity, and return the usable map with a
+  `vsphere.identity_unqualified` warning; do not invent a provider identity from
+  the Agent, job, endpoint, or a random value;
+- inventory paths and names are display data, not a substitute for a qualified
+  provider identity;
 - containment links such as datacenter -> cluster -> host -> VM are
   `hierarchical` with `direction_role: "ownership"`;
 - VM-to-host relationships are topology facts, not metric overlays;
@@ -1713,6 +1909,60 @@ The vSphere producer is `src/go/plugin/go.d/collector/vsphere/func_topology*.go`
 in `func_readiness.go`, which also passes `job.Name()` as the `collect_job`
 overlay selector and `job.FullName()` only as the agent id; it uses the
 `src/go/pkg/topology/v1` helpers.
+
+Consumers must implement the source-only rule for absent/empty merge identity
+before this missing-UUID fallback can be used for infrastructure-wide views.
+Older CTS implementations that fall back to local identity do not satisfy this
+contract. Per-node views do not depend on this CTS change. Metrics, overlays,
+modal fields and VM actor `power_state` remain unchanged.
+
+## Tracing Shape
+
+`topology:tracing` is the service map of the OpenTelemetry spans one
+otel-plugin receives (single node: no correlation, no overlays, no
+notifications).
+
+- Actors, all on layer `service`:
+  - `service`: one per (`service.namespace`, `service.name`); identity
+    `svc:<namespace>:<name>` with `:` and `%` escaped; `merge_identity`
+    `service_namespace`, `service_name`;
+  - `peer_database`, `peer_messaging`, `peer_external` (RPC and HTTP) and
+    `peer_other`: uninstrumented callees, named from the client span's peer
+    attributes; identity `peer:<kind>:<name>`; `role: endpoint`;
+  - `unknown_caller`: one actor for calls whose caller is not instrumented or
+    whose client span never arrived; `role: endpoint`.
+- Links are directed `dependency` links from caller to callee, one per
+  caller → callee pair in the window:
+  - `call` (service → service), `call_to_peer` (dashed) and
+    `call_from_unknown` (dotted);
+  - the client side (the caller's span) and the server side (the callee's
+    span) are separate column groups: calls, errors, error %, p50/p95/p99 and
+    max ms. A side that was never seen is null, not zero;
+  - `calls`/`errors` are the client side when it exists, else the server side;
+    `weight` is calls per minute and drives link width;
+  - percentiles and percentages are not aggregatable (`aggregation: none`).
+- "Calls to" and "Called by" are modal sections over the links table, not
+  copies of link rows in actor tables.
+- Totals (calls in, calls out, error % in) are also `actor_labels` rows, so
+  hover and the modal header show them.
+- `stats` carries the map size and the loss counters (`loss_*`: hand-off
+  drops, capacity drops, late, future, duplicates, invalid ids, unpaired
+  server halves, spans lost at shutdown, minutes that could not be written,
+  unreadable stored files) and the overflow bucket's calls. Counters cover
+  the requested window, rounded out to whole minutes.
+- The Function accepts `after`/`before` (default: the last 15 minutes) and
+  `tenant`; `has_history` stays `false`. Errors answer
+  `{"status","errorMessage"}`: 400 for a bad window or body (including a
+  `before` more than a day ahead), 413 for an answer over the producer's
+  8 MiB budget, 503 when the service map's engine failed.
+
+The producer is the `otel-service-map` crate
+(`src/crates/otel-service-map/`): the payload's static part is
+`src/topology_template.json`, rows are filled by `src/payload.rs`, the handler
+is `src/function.rs`. The ingestor worker declares and serves it. The builder's
+output for a sample with every actor and link type is the cross-producer
+fixture `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json`,
+kept in sync by a Rust golden test (`UPDATE_GOLDEN=1` regenerates it).
 
 ## Test Reconstruction
 
@@ -1730,6 +1980,118 @@ The acceptance check is:
 3. compare against sanitized fixtures or expected compatibility behavior.
 
 Do not add fields to production payloads solely to make this projection easier.
+
+## Cato Networks Shape
+
+Cato topology has account-qualified site, device, PoP and remote BGP peer
+identities. A `bgp_peer` with a known account and remote address declares
+`merge_identity: ["account_id", "remote_ip", "remote_asn"]`. The same tuple across
+sites names one shared remote object; different accounts do not share its key.
+The existing source-local `id` remains site-qualified and is not a cross-source
+key. Consumers must use the actor type's declared merge tuple, not every column
+marked as identity or merge identity in the shared actor table.
+
+Peers with both an empty remote address and an empty remote ASN are skipped.
+Of the remaining peers, one without a remote address or account is emitted as
+`bgp_peer_observation` with the same label policy, modal and visual appearance,
+but no merge identity. It remains source-local under the ordinary identity
+contract. An ASN alone does not identify a router. One warning,
+`cato.bgp_peer_identity_unqualified`, reports incomplete identity without
+discarding the map. Such observations may already group multiple peers in the
+collector's existing normalization; source isolation prevents further false
+cross-source matching, not reconstruction of missing provider identity.
+
+Neither peer type declares a singleton site parent. Incident `bgp_session` links
+retain site association, session state, route counts and related session facts.
+The peer's Links modal presents those independent sessions. Existing scalar
+`site_id`, `pop_name`, `connectivity_status` and local `id` are retained as source
+report attributes for direct-view compatibility, not as authoritative global
+peer placement or a global session state. No blanket `first` or `set` reducer is
+added to these columns: aggregation must retain one coherent representative
+report, preserve alternatives and warn when reports conflict. That requires the
+corresponding generic CTS conflict handling; the producer correction alone does
+not make older strict aggregators compatible.
+
+Both peer types share one visual-family legend entry. Overlapping IP/ASN tuples
+in independent domains inside one account remain the deferred domain-identity
+problem; an account qualifier does not establish a universal network namespace.
+
+`topology:cato_networks` emits sites, devices, PoPs and BGP peers. A site has an
+explicit `ownership` link to each device, including disconnected devices.
+`parent_identity` metadata complements these edges; it does not replace them.
+Ownership links are structural and carry no traffic measurements.
+
+Each interface with a reported PoP contributes an observed link from its device,
+or from its site when the device cannot be resolved. `cato_tunnel` means connected,
+`cato_tunnel_disconnected` means disconnected, and `cato_tunnel_unknown` means
+unknown. Their legend and line styles distinguish these states. Physical `link_up`
+does not establish tunnel connectivity. Parallel interfaces retain their own
+`interface_id` and `interface_name`, both declared `role: group_key` so CTS keeps
+ID-bearing and name-only interfaces distinct.
+
+A device's last reported PoP, falling back to the site's PoP, supplies a
+`cato_pop_association` only when that device has no interface PoP observations.
+A device-free site uses its summary PoP only when it has no interface PoP
+observations. These are associations, not observed tunnels: state is unknown,
+interface identifiers are null, and `observation` explains the source. Device
+connectivity is not evidence that a particular fallback tunnel is connected.
+No PoP-to-PoP fabric or end-to-end reachability is inferred.
+
+The actor-owned `interfaces` table retains actual ownership in `actor`, and
+references its site, observed PoP and tunnel with `site_actor`, nullable
+`pop_actor` and nullable `link`. Site modals filter by `site_actor` to show WANs
+across all devices; device modals filter by `actor`. PoP modals show attached
+WANs and connections with clickable site context. Site device summaries reuse
+ownership links and device labels, including HA role. Miniature graphs retain
+the schema's one-hop depth; the site-wide table provides the full WAN overview.
+
+Interface details distinguish physical and tunnel states, configured capacity
+and observed performance. Configured limits use Cato's supported
+`upstreamBandwidthMbpsPrecision` / `downstreamBandwidthMbpsPrecision` fields
+as nullable floating-point Mbps; absent capacity is not zero. RTT, directional
+loss and jitter, and last-mile measurements honor their presence flags and
+show units. Less frequently used details appear in expandable rows. Site
+aggregate measurements are not copied onto interface tunnels. The existing
+`connected` availability column is retained for compatibility: it is true when
+either the tunnel or physical link is up. Explicit
+`tunnel_connected`, `link_up`, and human-readable state columns carry their
+separate meanings. Human-readable state columns use title case; machine link
+state tokens remain lowercase. Consumers should use references and explicit
+state fields, not compare display strings. BGP details show local IP/ASN, incoming/outgoing states and
+route counts alongside the peer identity.
+
+All actor types expose known metadata through `actor_labels`, modal
+identification and a one-hop miniature. Device captions preserve configured names
+unless they merely repeat a device identity. Missing or identity-only names use
+the site, HA role (or `device`) and labeled full serial/ID. Other numeric
+configured names remain valid. The source name is retained as `source_name`;
+full identifiers remain separate labels. This policy applies only to topology,
+not metric `device_name` labels. Repeated device identities select the first
+record in stable display-name/ID order consistently for actors, labels and
+fallback links. Label values are trimmed before publication. Canonical actor columns remain the
+identity and search source. Shared PoPs have account/name labels without
+invented geography. Empty labels are omitted; known false/zero values survive.
+Site identification includes inventory, metrics and BGP observation status. Missing
+selected sites in a snapshot are explicitly unavailable, and failed discovery
+refreshes are identified as cached inventory. Site-wide aggregate metric rows
+are excluded from WAN details; they are not interfaces. A successful
+empty BGP response, cached empty response, partial normalization and failed
+collection are distinct. Missing peers after a failed observation must not be
+read as configuration removal.
+
+`data.notifications` explains access-topology scope and incomplete inventory/metrics/BGP
+coverage without raw errors or tenant identifiers. CTS must accept and preserve
+notifications, and the frontend must display them; site coverage also remains
+available in actor identification. The companion frontend notice control and
+faithful dotted/dashed legend samples are required for the complete operator
+experience. Collection time is not a claim that every source query succeeded.
+
+Producer and consumer validation MUST exercise a site with multiple devices
+and WANs, disconnected and unknown tunnels, fallback associations, PoP site
+context, BGP failure/recovery/empty observations, fractional and absent capacity,
+and zero/absent measurements. Validate actual modal projections and collection
+notices through the consumers, not only schema conformance. The operator must
+be able to identify the affected WAN and understand the limits of the evidence.
 
 ## Producer Checklist
 

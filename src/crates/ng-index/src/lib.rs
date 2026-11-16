@@ -1,32 +1,32 @@
-//! `ng-index`: build a standard SFST index file from a flattened-frame WAL.
+//! `ng-index`: index a flattened-frame WAL into a standard SFST index file.
 //!
-//! The WAL of flattened frames is produced by `ng-ingest` (flatten-at-ingest). This
-//! crate reads it and feeds the typed, array-collapsed entries into an
-//! `sfst::RowIndex` to emit a standard SFST file — the augment-SFST path (see
-//! [`build_sfst`]). The flattened-frame format itself (types, rendering, bincode
-//! encode/decode) lives in `ng-flatten`.
+//! The WAL of flattened frames is written by the OTel receivers — `otel-ingestor`
+//! in production, `ng-ingest` standalone — in the frame format owned by `ng-flatten`.
+//! This crate decodes it, feeds the typed, array-collapsed entries into an
+//! [`sfst::RowIndex`], and writes a standard SFST file: logs via [`index_logs_dir`],
+//! traces via [`index_traces_file`]. Consumers: `otel-ledger` and `sfsq`.
 
 use std::path::{Path, PathBuf};
 
+mod indexing;
 mod perf;
-mod sfst_build;
-pub use perf::{Metrics, Rss, read_rss};
-pub use sfst_build::{
-    SfstStats, build_sfst, build_sfst_file, build_sfst_range, build_sfst_traces_file,
-    build_sfst_traces_range, to_sfst_tree,
+pub use indexing::{
+    SfstStats, index_logs_dir, index_logs_file, index_logs_range, index_traces_file,
+    index_traces_range, to_sfst_tree,
 };
+pub use perf::{Metrics, Rss, read_rss};
 
-// Re-export the flattening + frame vocabulary so the binary (and any consumer) gets
-// it from `ng-index` without depending on `ng-flatten` directly.
+// Re-export the flattening + frame vocabulary so consumers get it from `ng-index`
+// alone rather than adding `ng-flatten`; in-tree, `indexing` reads it via `crate::`.
 pub use ng_flatten::{
     Entry, FlattenedLogRequest, NodeId, SchemaTree, Value, build_kv, decode_log_frame,
 };
 
-/// Errors reading a flattened WAL or building an SFST from it.
+/// Errors reading a flattened WAL or indexing it into an SFST.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    // Wrapper variants are transparent: embedding the source in the message
-    // while also chaining it would print it twice in anyhow chains.
+    // Wrapper variants (`Wal`, `Io`, `Sfst`) are `transparent` — `#[from]` already
+    // chains the source, so embedding it in the message too would print it twice.
     #[error(transparent)]
     Wal(#[from] wal::Error),
     #[error(transparent)]
@@ -40,10 +40,10 @@ pub enum Error {
          refusing to decode frames written by a different codec"
     )]
     PayloadFormat { found: u16, expected: u16 },
-    // The decode error is embedded in the message, NOT chained (a field
-    // named `source` would be auto-chained by thiserror and then print
-    // twice in anyhow chains). Display-only consumers (the ledger indexer
-    // logs `{e}`) need the decode reason in the message itself.
+    // The decode error is embedded in the message, NOT chained: a field named
+    // `source` would be auto-chained by thiserror and then print twice in anyhow
+    // chains. Display-only consumers (the ledger indexer logs `{e}`) need the
+    // decode reason in the message itself. `frame` is 1-based within the WAL.
     #[error("frame {frame}: bincode decode failed: {err}")]
     BincodeDecode {
         frame: u64,
@@ -53,7 +53,7 @@ pub enum Error {
     Sfst(#[from] sfst::Error),
 }
 
-/// The single `.wal` file inside `dir` (the flattened WAL).
+/// The single `.wal` file inside `dir`; `NoWal` if none, `MultipleWal` if several.
 fn sole_wal_file(dir: &Path) -> Result<PathBuf, Error> {
     let mut found = None;
     for entry in std::fs::read_dir(dir)? {

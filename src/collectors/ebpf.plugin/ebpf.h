@@ -42,8 +42,10 @@ extern size_t ebpf_hash_table_pids_count;
 #include "hardirq.skel.h"
 #include "mdflush.skel.h"
 #include "mount.skel.h"
+#include "oomkill.skel.h"
 #include "process.skel.h"
 #include "shm.skel.h"
+#include "softirq.skel.h"
 #include "sync.skel.h"
 #include "swap.skel.h"
 #include "vfs.skel.h"
@@ -54,11 +56,16 @@ extern struct fd_bpf *fd_bpf_obj;
 extern struct hardirq_bpf *hardirq_bpf_obj;
 extern struct mount_bpf *mount_bpf_obj;
 extern struct mdflush_bpf *mdflush_bpf_obj;
+extern struct oomkill_bpf *oomkill_bpf_obj;
+extern struct softirq_bpf *softirq_bpf_obj;
 extern struct shm_bpf *shm_bpf_obj;
 extern struct swap_bpf *swap_bpf_obj;
 extern struct vfs_bpf *vfs_bpf_obj;
 extern struct process_bpf *process_bpf_obj;
 #endif
+
+void ebpf_oomkill_unload_bpf(ebpf_module_t *em);
+void ebpf_softirq_unload_bpf(ebpf_module_t *em);
 
 typedef struct netdata_syscall_stat {
     unsigned long bytes;               // total number of bytes
@@ -285,7 +292,7 @@ extern const char *btf_path;
 void ebpf_process_create_apps_charts(struct ebpf_module *em, void *ptr);
 
 // BPF teardown callbacks — called by main thread after all module threads have been joined
-void ebpf_unload_legacy_bpf(ebpf_module_t *em); // legacy-only modules: process, disk, softirq, oomkill, mdflush
+void ebpf_unload_legacy_bpf(ebpf_module_t *em); // generic legacy unload helper
 void ebpf_swap_unload_bpf(ebpf_module_t *em);
 void ebpf_vfs_unload_bpf(ebpf_module_t *em);
 void ebpf_filesystem_unload_bpf(ebpf_module_t *em);

@@ -123,9 +123,20 @@ GET /api/v3/function?function=systemd-journal info after:1234567890 before:12345
 **Parameter shapes (wire format):**
 - `accepted_params`: array of **strings** (parameter IDs). Example: `["sockets"]`, `["group"]`.
 - `required_params`: array of **objects** that define UI selectors.
-  - Required fields: `id`, `name`, `type`, `options`
-  - Common fields: `help`, `unique_view`
-  - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`
+  - Required fields: `id`, `name`, `type`; `select` and `multiselect` also require `options`
+  - A free-form `text` selector does not require `options`
+  - Common fields: `help`, `unique_view`, optional `value_separator` for an accepted joined-value encoding
+  - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`, `aliases`
+  - Optional `focus` declares topology roots/depth controls; see
+    [Topology focus controls](FUNCTION_UI_DEVELOPER_GUIDE.md#topology-focus-controls).
+
+When normalizing values against selector metadata, option IDs are opaque. Match an exact ID before considering
+declared aliases or splitting a joined value; `beta rack,1` can be one ID, and `prod-a` differs from `prod_a`.
+An alias advertised by several options is ambiguous and does not identify an option. These declarations describe
+accepted producer input; they do not change parsing.
+Go structured Function command arguments split commas before resolution regardless of this metadata. Use structured
+JSON `selections` to preserve IDs containing commas.
+See [Accepted option forms](FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
 
 **Cloud-frontend UI notes (verified):**
 - `type: "select"` renders as a **single-select**.
@@ -284,8 +295,8 @@ Row 3: message="error info", category="testing"
   "data": [
     [value1, value2, value3, ...],  // Row 1
     [value1, value2, value3, ...],  // Row 2
-    // Special rowOptions as last element
-    [..., {"rowOptions": {"severity": "warning|error|notice|normal"}}]
+    // Optional row styling: a plain object at the "rowOptions" column's index
+    [..., {"severity": "normal|debug|notice|warning|critical"}]
   ],
   "columns": {
     "column_name": {
@@ -355,14 +366,21 @@ Row 3: message="error info", category="testing"
 
 ### Row Options
 
-Special last element in data array for row styling:
+Optional row styling. Declare a hidden column under the exact key `rowOptions` (`type: "none"`,
+`visualization: "rowOptions"`) and put a plain `{"severity": ...}` object at that column's index in every row.
+The severity styles the text of the row's cells; it does not color the row background:
 
 ```json
-[..., {"rowOptions": {"severity": "error"}}]  // Red background
-[..., {"rowOptions": {"severity": "warning"}}] // Yellow background
-[..., {"rowOptions": {"severity": "notice"}}]  // Blue background
-[..., {"rowOptions": {"severity": "normal"}}]  // Default appearance
+[..., {"severity": "critical"}] // Emphasized error text
+[..., {"severity": "warning"}]  // Emphasized warning text
+[..., {"severity": "notice"}]   // Emphasized text
+[..., {"severity": "debug"}]    // Emphasized muted text
+[..., {"severity": "normal"}]   // Default text
 ```
+
+Any other value, including `error`, renders as `normal`. A different column key or an extra `rowOptions` wrapper
+around the object disables the styling. See
+[Row Coloring by Severity](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#row-coloring-by-severity).
 
 ## Log Explorer Format
 
@@ -413,8 +431,16 @@ Special last element in data array for row styling:
       "sortable": false,
       "sticky": true
     },
+    "rowOptions": {
+      "index": 1,              // Data index of the {"severity": ...} object
+      "name": "rowOptions",
+      "type": "none",
+      "visualization": "rowOptions",
+      "visible": false,
+      "dummy": true
+    },
     "level": {
-      "index": 1,
+      "index": 2,
       "id": "priority",        // Links to facet
       "name": "Level",
       "type": "string",
@@ -422,8 +448,15 @@ Special last element in data array for row styling:
       "filter": "facet",       // Not multiselect!
       "options": ["facet", "visible", "sticky"]
     },
-    "message": {
+    "source": {
       "index": 3,
+      "id": "source",
+      "name": "Source",
+      "type": "string",
+      "filter": "facet"
+    },
+    "message": {
+      "index": 4,
       "id": "message",
       "name": "Message",
       "type": "string",
@@ -443,7 +476,7 @@ Special last element in data array for row styling:
   "data": [
     [
       1697644320000000,        // Microseconds
-      {"severity": "error"},   // rowOptions
+      {"severity": "critical"}, // rowOptions
       "ERROR",                 // level
       "nginx",                 // source
       "Connection failed"      // message
@@ -830,16 +863,16 @@ Using an incompatible transform will result in unexpected behavior or errors.
 
 #### `rowOptions` Dummy Column
 
-To add `rowOptions` for row-level severity styling, a special "dummy" column must be added to the `columns` definition. This column is not displayed in the UI but provides the necessary metadata. It must be created with this specific combination of values:
+To add `rowOptions` for row-level severity styling, a special "dummy" column must be added to the `columns` definition. This column is not displayed in the UI but provides the necessary metadata. Its key must be exactly `rowOptions`, because the UI looks the styling up under that key, and it must be created with this specific combination of values:
 
 *   **type**: `none` (`RRDF_FIELD_TYPE_NONE`)
-*   **visualization**: `rowOptions` (`RRDF_FIELD_VISUAL_ROW_OPTIONS`)
+*   **visualization**: `rowOptions` (`RRDR_FIELD_VISUAL_ROW_OPTIONS`)
 *   **options flag**: `dummy` (`RRDF_FIELD_OPTS_DUMMY`)
 
 **Example C code:**
 ```c
-buffer_rrdf_table_add_field(wb, field_id++, "row_options", "Row Options",
-                            RRDF_FIELD_TYPE_NONE, RRDF_FIELD_VISUAL_ROW_OPTIONS, RRDF_FIELD_TRANSFORM_NONE,
+buffer_rrdf_table_add_field(wb, field_id++, "rowOptions", "rowOptions",
+                            RRDF_FIELD_TYPE_NONE, RRDR_FIELD_VISUAL_ROW_OPTIONS, RRDF_FIELD_TRANSFORM_NONE,
                             0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
                             RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_NONE, RRDF_FIELD_OPTS_DUMMY, NULL);
 ``` 
@@ -988,11 +1021,9 @@ buffer_rrdf_table_add_field(
     NULL
 );
 
-// Row options in data
+// Row options in data, at the rowOptions column's index
 buffer_json_add_array_item_object(wb);
-buffer_json_member_add_object(wb, "rowOptions");
-buffer_json_member_add_string(wb, "severity", "error");
-buffer_json_object_close(wb);
+buffer_json_member_add_string(wb, "severity", "critical");
 buffer_json_object_close(wb);
 ```
 
@@ -1026,8 +1057,8 @@ buffer_json_object_close(wb);
 - Use appropriate transform
 
 ### For Status/Severity
-- Include `rowOptions` as last array element
-- Use standard severity levels: error, warning, notice, normal
+- Put a `{"severity": ...}` object at the `rowOptions` column's index in every row
+- Use the styling severity levels: critical, warning, notice, debug, normal
 
 ### For Filtering
 - `multiselect` (default) for categories
@@ -1397,7 +1428,8 @@ Frontend handles 304 responses gracefully without showing errors to users.
 
 **Common Optional Fields:**
 - `has_history`: Default false
-- `help`: Documentation text
+- `help`: Documentation text. The Cloud Functions UI shows it as plain text (no Markdown) in the tooltip of the
+  information icon next to the Function title, so keep it short.
 - `update_every`: Default 1
 - `expires`: Cache control
 - `default_sort_column`: Initial sort

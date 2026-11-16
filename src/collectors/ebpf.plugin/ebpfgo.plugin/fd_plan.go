@@ -9,10 +9,10 @@ import (
 // fdKernelMask offers every selector index, as the other migrated collectors do.
 // It is deliberately wider than the C module's `.kernels`
 // (V3_10|V4_14|V4_16|V4_18|V5_4|V5_11|V5_14): the buffer and arena objects ship
-// for kernels up to 6.12, so SelectIndex has to be able to reach selector 11.
+// for kernels up to 7.0, so SelectIndex has to be able to reach selector 12.
 // The base flavor is bounded by fdMaxBaseSelector instead, which is where the
 // real object-availability limit lives.
-const fdKernelMask uint32 = (1 << 12) - 1
+const fdKernelMask uint32 = (1 << 14) - 1
 
 const fdDefaultPIDTableSize uint32 = 32768
 
@@ -167,15 +167,18 @@ func BuildFDLegacyPlan(cfg FDLegacyConfig) LoadPlan {
 		IsReturn: true,
 	})
 	if cfg.LoadMethod == LoadLegacy {
-		plan.Flavor = ObjectFlavorBase
-		plan.Selector = SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(plan.Selector) > fdMaxBaseSelector {
-			plan.Selector = uint32(fdMaxBaseSelector)
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(
-			cfg.PluginsDir, plan.Selector, "fd", plan.IsReturn, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
+		plan = forceFDBaseFlavor(plan, cfg.PluginsDir, cfg.IsRHF)
 	}
+	return plan
+}
+
+func forceFDBaseFlavor(plan LoadPlan, pluginsDir string, isRHF int) LoadPlan {
+	plan.Flavor = ObjectFlavorBase
+	if selectorCap := effectiveMaxBaseSelector(fdMaxBaseSelector, isRHF, plan.KernelVersion); selectorCap > 0 {
+		plan.Selector = selectHighestIndexAtOrBelow(plan.Kernels, isRHF, plan.KernelVersion, selectorCap, "fd")
+	}
+	plan.ObjectPath = BuildObjectPathWithFlavor(pluginsDir, plan.Selector, "fd", true, isRHF, ObjectFlavorBase)
 	return plan
 }
 

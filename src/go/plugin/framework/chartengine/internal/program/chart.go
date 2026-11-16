@@ -33,6 +33,14 @@ const (
 type Chart struct {
 	// TemplateID is compiler-assigned stable ID inside one Program revision.
 	TemplateID string
+	// EntryID and LocalTemplateID identify a chart in a named template set.
+	// They are empty for legacy document programs.
+	EntryID         string
+	LocalTemplateID string
+	// RoutingRank orders unowned collisions in a named template set by compile
+	// order, independently of ownership. Legacy document programs compare
+	// TemplateID instead.
+	RoutingRank int
 
 	Meta      ChartMeta
 	Identity  ChartIdentity

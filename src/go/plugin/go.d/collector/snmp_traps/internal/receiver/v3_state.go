@@ -5,14 +5,16 @@ package receiver
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 )
 
 const (
@@ -36,11 +38,14 @@ func newEngineStatePaths(root, jobName string) engineStatePaths {
 }
 
 func engineStatePathExistsChecked(path string) (bool, error) {
-	_, err := os.Stat(path)
+	info, err := os.Lstat(path)
 	if err == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return false, fmt.Errorf("%s is a symbolic link", path)
+		}
 		return true, nil
 	}
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		parent := filepath.Dir(path)
 		info, parentErr := os.Stat(parent)
 		if parentErr != nil {
@@ -60,11 +65,9 @@ func engineStatePathExistsChecked(path string) (bool, error) {
 func cleanupCreatedEngineState(paths engineStatePaths, removeEngineBoots, removeLocalEngineID, removeDir bool) {
 	if removeEngineBoots {
 		_ = os.Remove(paths.engineBoots)
-		_ = os.Remove(paths.engineBoots + ".tmp")
 	}
 	if removeLocalEngineID {
 		_ = os.Remove(paths.localEngineID)
-		_ = os.Remove(paths.localEngineID + ".tmp")
 	}
 	if removeDir {
 		_ = os.Remove(paths.dir)
@@ -80,11 +83,16 @@ type engineBoots struct {
 }
 
 func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+	if err := safefile.EnsureDir(paths.dir, safefile.Mode{
+		Perm: 0750,
+	}); err != nil {
 		return nil, fmt.Errorf("engine-boots: create directory %s: %w", paths.dir, err)
 	}
 
-	eb := &engineBoots{path: paths.engineBoots, startedAt: time.Now()}
+	eb := &engineBoots{
+		path:      paths.engineBoots,
+		startedAt: time.Now(),
+	}
 	if err := eb.init(); err != nil {
 		return nil, err
 	}
@@ -92,9 +100,9 @@ func newEngineBoots(paths engineStatePaths) (*engineBoots, error) {
 }
 
 func (eb *engineBoots) init() error {
-	data, err := os.ReadFile(eb.path)
+	data, err := safefile.ReadNoFollow(eb.path, safefile.MaxSize)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			eb.value = 1
 			eb.valid = true
 			return eb.persist()
@@ -105,13 +113,13 @@ func (eb *engineBoots) init() error {
 	s := strings.TrimSpace(string(data))
 	v, err := strconv.ParseInt(s, 10, 64)
 	if err != nil {
-		return fmt.Errorf("engine-boots: parse value in %s: %w", eb.path, err)
+		return fmt.Errorf("engine-boots: invalid value in %s", eb.path)
 	}
 	if v < 1 {
-		return fmt.Errorf("engine-boots: value %d in %s must be >= 1", v, eb.path)
+		return fmt.Errorf("engine-boots: invalid value in %s: must be >= 1", eb.path)
 	}
 	if v >= maxSnmpEngineBoots {
-		return fmt.Errorf("engine-boots: value %d in %s reached RFC3414 maximum %d", v, eb.path, maxSnmpEngineBoots)
+		return fmt.Errorf("engine-boots: invalid value in %s: reached RFC3414 maximum", eb.path)
 	}
 
 	eb.value = v + 1
@@ -163,11 +171,15 @@ type localEngineID struct {
 }
 
 func newLocalEngineID(paths engineStatePaths, configuredHex string) (*localEngineID, error) {
-	if err := os.MkdirAll(paths.dir, 0750); err != nil {
+	if err := safefile.EnsureDir(paths.dir, safefile.Mode{
+		Perm: 0750,
+	}); err != nil {
 		return nil, fmt.Errorf("local-engine-id: create directory %s: %w", paths.dir, err)
 	}
 
-	lid := &localEngineID{path: paths.localEngineID}
+	lid := &localEngineID{
+		path: paths.localEngineID,
+	}
 	if err := lid.init(configuredHex); err != nil {
 		return nil, err
 	}
@@ -186,9 +198,9 @@ func (lid *localEngineID) init(configuredHex string) error {
 		return lid.persist()
 	}
 
-	data, err := os.ReadFile(lid.path)
+	data, err := safefile.ReadNoFollow(lid.path, safefile.MaxSize)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if errors.Is(err, os.ErrNotExist) {
 			return lid.generate()
 		}
 		return fmt.Errorf("local-engine-id: read %s: %w", lid.path, err)
@@ -197,7 +209,7 @@ func (lid *localEngineID) init(configuredHex string) error {
 	hexStr := strings.TrimSpace(string(data))
 	raw, err := parseEngineIDHex(hexStr)
 	if err != nil {
-		return fmt.Errorf("local-engine-id: persisted value in %s: %w", lid.path, err)
+		return fmt.Errorf("local-engine-id: invalid value in %s", lid.path)
 	}
 	lid.value = raw
 	lid.valid = true
@@ -233,44 +245,13 @@ func (lid *localEngineID) persist() error {
 }
 
 func persistEngineStateFile(label, path string, data []byte) error {
-	tmpPath := path + ".tmp"
-
-	if err := os.WriteFile(tmpPath, data, 0640); err != nil {
-		return fmt.Errorf("%s: write %s: %w", label, tmpPath, err)
+	if err := safefile.Replace(path, data, safefile.Mode{
+		Perm: 0640,
+	}); err != nil {
+		return fmt.Errorf("%s: persist %s: %w", label, path, err)
 	}
-
-	f, err := os.OpenFile(tmpPath, os.O_RDWR, 0)
-	if err != nil {
-		return fmt.Errorf("%s: open temp for fsync %s: %w", label, tmpPath, err)
-	}
-	syncErr := f.Sync()
-	closeErr := f.Close()
-	if syncErr != nil {
-		return fmt.Errorf("%s: fsync %s: %w", label, tmpPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("%s: close %s after fsync: %w", label, tmpPath, closeErr)
-	}
-
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("%s: rename %s -> %s: %w", label, tmpPath, path, err)
-	}
-	// Windows does not support opening directories for fsync.
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	dirPath := filepath.Dir(path)
-	dir, err := os.Open(dirPath)
-	if err != nil {
-		return fmt.Errorf("%s: open directory for fsync %s: %w", label, dirPath, err)
-	}
-	syncErr = dir.Sync()
-	closeErr = dir.Close()
-	if syncErr != nil {
-		return fmt.Errorf("%s: fsync directory %s: %w", label, dirPath, syncErr)
-	}
-	if closeErr != nil {
-		return fmt.Errorf("%s: close directory %s after fsync: %w", label, dirPath, closeErr)
+	if err := safefile.SyncDir(filepath.Dir(path)); err != nil {
+		return fmt.Errorf("%s: sync directory: %w", label, err)
 	}
 	return nil
 }

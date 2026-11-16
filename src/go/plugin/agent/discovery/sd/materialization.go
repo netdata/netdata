@@ -41,7 +41,10 @@ func newResourceError(phase resourceErrorPhase, cause error) error {
 	if cause == nil {
 		return nil
 	}
-	return &resourceError{cause: cause, phase: phase}
+	return &resourceError{
+		cause: cause,
+		phase: phase,
+	}
 }
 
 func (err *resourceError) Error() string {
@@ -129,14 +132,25 @@ func runMaterialization[T any](
 			_ jobmgr.ProcessAttemptAdmission,
 		) error {
 			value, workErr := work(attemptCtx)
-			resultCh <- materializationResult[T]{value: value, err: workErr}
+			resultCh <- materializationResult[T]{
+				value: value,
+				err:   workErr,
+			}
 			return workErr
 		},
 	})
 	if err != nil {
 		return zero, classifyMaterializationError(err, identity)
 	}
-	if err := attempt.Await(ctx); err != nil {
+	// Preserve the owner's retirement cause when cutting this exact attempt.
+	// Await's generic caller cancellation would otherwise turn it into an error.
+	stopCancellation := context.AfterFunc(ctx, func() { attempt.Cut(context.Cause(ctx)) })
+	defer stopCancellation()
+	err = attempt.Await(context.WithoutCancel(ctx))
+	if cause := context.Cause(ctx); cause != nil {
+		return zero, cause
+	}
+	if err != nil {
 		return zero, classifyMaterializationError(err, identity)
 	}
 	select {
@@ -155,7 +169,10 @@ func classifyMaterializationError(
 		errors.Is(err, jobmgr.ErrProcessAttemptDeadline) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptSuperseded) ||
 		errors.Is(err, jobmgr.ErrProcessAttemptQuarantined) {
-		return &materializationError{cause: err, identity: identity}
+		return &materializationError{
+			cause:    err,
+			identity: identity,
+		}
 	}
 	return err
 }
@@ -218,6 +235,7 @@ func (d *ServiceDiscovery) testDyncfgConfig(
 				return false, err
 			}
 			pipelineConfig.Name = naming.Sanitize(name)
+			pipelineConfig.PipelineID = pipelineID
 			pipelineConfig.Source = "dyncfg=" + fn.Source()
 			prepared, err := d.constructPipeline(pipelineConfig)
 			if err != nil {
@@ -274,11 +292,13 @@ func (d *ServiceDiscovery) preparePipeline(
 		return nil, errors.New("service discovery: invalid pipeline materialization")
 	}
 	identity := pipelineMaterializationIdentity(config)
+	// Different constructor inputs can prepare independently without revoking an
+	// incumbent. Repeated identical work remains excluded until physical return.
 	return runMaterialization(
 		ctx,
 		d,
 		identity.Key,
-		true,
+		false,
 		func(context.Context) (sdPipeline, error) {
 			pipelineConfig, err := config.ToPipelineConfig(d.configDefaults)
 			if err != nil {
@@ -292,7 +312,9 @@ func (d *ServiceDiscovery) preparePipeline(
 func pipelineMaterializationIdentity(config sdConfig) jobmgr.ProcessAttemptIdentity {
 	key := ""
 	if config != nil {
-		key = materializationIdentity("pipeline", []byte(config.ExposedKey()))
+		key = materializationIdentity("pipeline",
+			[]byte(config.ExposedKey()), []byte(config.PipelineKey()),
+			[]byte(config.SourceType()), []byte(config.Source()), config.DataJSON())
 	}
 	return jobmgr.ProcessAttemptIdentity{
 		Namespace: jobmgr.ProcessAttemptServiceDiscovery,

@@ -1,0 +1,37 @@
+[package]
+name = "otel-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+# Local crates
+netdata-plugin-error = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+netdata-plugin-schema = { workspace = true }
+netdata-plugin-types = { workspace = true }
+
+# Async runtime and tokio utilities
+tokio = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
+
+async-trait = { workspace = true }
+bytesize = { workspace = true }
+futures = { workspace = true }
+humantime-serde = { workspace = true }
+tracing = { workspace = true }
+schemars = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+uuid = { workspace = true, features = ["serde"] }
+file-registry = { workspace = true }
+
+[dev-dependencies]
+bincode = { workspace = true }
+console-subscriber = { workspace = true }
+serde_yaml = { workspace = true }
+

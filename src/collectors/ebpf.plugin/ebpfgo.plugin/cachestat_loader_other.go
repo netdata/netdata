@@ -5,7 +5,9 @@ package main
 import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 
 func LoadCachestatLegacy(cfg CachestatLegacyConfig) (*CachestatLegacyHandle, error) {
-	_ = cfg
+	if cfg.TargetResolutionErr != nil {
+		return nil, cfg.TargetResolutionErr
+	}
 	return nil, libbpfloader.ErrDisabled
 }
 

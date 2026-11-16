@@ -10,8 +10,11 @@
 [ -d "${NETDATA_INSTALL_PATH}.old" ] && run rm -rf "${NETDATA_INSTALL_PATH}.old"
 [ -d "${NETDATA_INSTALL_PATH}" ] && run mv -f "${NETDATA_INSTALL_PATH}" "${NETDATA_INSTALL_PATH}.old"
 
-run mkdir -p "${NETDATA_INSTALL_PATH}/bin"
-run mkdir -p "${NETDATA_INSTALL_PATH}/usr"
+# Scope the executable tree's creation policy; later build jobs retain their mask.
+(
+    umask 022
+    run mkdir -p "${NETDATA_INSTALL_PATH}/bin" "${NETDATA_INSTALL_PATH}/usr"
+)
 run cd "${NETDATA_INSTALL_PATH}" || exit 1
 run ln -s bin sbin
 run cd "${NETDATA_INSTALL_PATH}/usr" || exit 1

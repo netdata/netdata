@@ -5,6 +5,7 @@ package ddsnmp
 import (
 	"errors"
 	"maps"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -53,6 +54,19 @@ func AcquireDeviceIdentity(
 			return nil, err
 		}
 	}
+	return ComposeDeviceIdentity(si, metadata, opts)
+}
+
+// ComposeDeviceIdentity combines acquired observations with authored overrides
+// without issuing SNMP requests or modifying its inputs.
+func ComposeDeviceIdentity(
+	si *snmputils.SysInfo,
+	metadata map[string]MetaTag,
+	opts DeviceIdentityOptions,
+) (*DeviceIdentity, error) {
+	if si == nil {
+		return nil, errors.New("SNMP system identity is required")
+	}
 
 	guid := opts.GUID
 	if guid == "" {
@@ -60,7 +74,7 @@ func AcquireDeviceIdentity(
 	}
 	hostname := opts.Hostname
 	if hostname == "" {
-		hostname = si.Name
+		hostname = strings.TrimSpace(si.Name)
 	}
 	if hostname == "" {
 		hostname = "snmp-device"

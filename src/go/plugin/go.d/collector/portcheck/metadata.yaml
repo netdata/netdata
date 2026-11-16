@@ -168,19 +168,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: portcheck_service_reachable
-        metric: portcheck.status
-        info: "TCP host ${label:host} port ${label:port} liveness status"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
-      - name: portcheck_connection_timeouts
-        metric: portcheck.status
-        info: "percentage of timed-out TCP connections to host ${label:host} port ${label:port} in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
-      - name: portcheck_connection_fails
-        metric: portcheck.status
-        info: "percentage of failed TCP connections to host ${label:host} port ${label:port} in the last 5 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/portcheck.conf
     metrics:
       folding:
         title: Metrics

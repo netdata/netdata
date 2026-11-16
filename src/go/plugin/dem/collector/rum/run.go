@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package rum
+
+import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
+	"sync"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+)
+
+// finalDrainTimeout bounds the history and export drains of one site shutdown
+// together. The Agent sends SIGKILL 2 s after SIGTERM, and a stalled journal or
+// a black-holed export endpoint must not consume that grace.
+const finalDrainTimeout = time.Second
+
+// Run admits an independent site without waiting for receiver startup. Worker
+// cancellation occurs only after exact route/read leases have drained.
+func (c *Collector) Run(ctx context.Context, ready func()) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if c.aggregator == nil {
+		return errors.New("site is not initialized")
+	}
+	p := &processor{
+		aggregator: c.aggregator,
+	}
+	if c.EventLogsOn() {
+		logs, err := otlp.NewLogs(ctx, c.EventLogs.Destination, c.Name, c.transport)
+		if err != nil {
+			return err
+		}
+		p.logs = logs
+		defer logs.Close()
+	}
+	if c.TracingOn() {
+		traces, err := otlp.NewTraces(ctx, c.Tracing.Destination, c.Name, c.transport)
+		if err != nil {
+			return err
+		}
+		p.traces = traces
+		defer traces.Close()
+	}
+	writer := history.NewWriter(c.deps.History, c.transport)
+	c.aggregator.SetHistorySink(writer)
+	route := httpapi.NewRoute(c.Site, p, c.redactor)
+	var id [16]byte
+	if _, err := rand.Read(id[:]); err != nil {
+		return err
+	}
+	retire, err := c.deps.Registry.Register(
+		c.Name,
+		&rumregistry.Site{
+			Route:      route,
+			Aggregator: c.aggregator,
+			Generation: hex.EncodeToString(id[:]),
+		},
+	)
+	if err != nil {
+		return err
+	}
+	workersCtx, stopWorkers := context.WithCancel(context.Background())
+	// The history writer and enabled exports share one absolute final-drain
+	// budget, started by the first drain after route leases drain.
+	var finalOnce sync.Once
+	var finalCtx context.Context
+	var finalCancel context.CancelFunc
+	final := func() context.Context {
+		finalOnce.Do(func() {
+			finalCtx, finalCancel = context.WithTimeout(context.Background(), finalDrainTimeout)
+		})
+		return finalCtx
+	}
+	defer func() {
+		if finalCancel != nil {
+			finalCancel()
+		}
+	}()
+	var workers sync.WaitGroup
+	workers.Go(func() { writer.Run(workersCtx, final) })
+	if p.logs != nil {
+		workers.Go(func() { p.logs.Run(workersCtx, final) })
+	}
+	if p.traces != nil {
+		workers.Go(func() { p.traces.Run(workersCtx, final) })
+	}
+	ready()
+	<-ctx.Done()
+	retire()
+	stopWorkers()
+	workers.Wait()
+	return nil
+}

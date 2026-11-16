@@ -15,11 +15,16 @@ Which security-category SNMP traps did one device send recently?
 
 ## Steps
 
+Run from the repository root in one Bash session. The private run directory retains raw responses for local
+inspection; token-safe request logging does not sanitize their contents. Start a new run for another execution.
+
 1. Load the token-safe wrappers:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
    ```
 
 2. Query by source IP:
@@ -44,14 +49,14 @@ Which security-category SNMP traps did one device send recently?
      facets: ["TRAP_NAME", "TRAP_SEVERITY", "TRAP_SOURCE_IP", "_HOSTNAME"]
    }')"
 
-   mkdir -p .local/audits/query-snmp-traps
+   RESPONSE="$TRAP_QUERY_DIR/security-traps-ip.json"
 
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
      --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
-     > .local/audits/query-snmp-traps/security-traps-device.json
+     > "$RESPONSE"
    ```
 
 3. If the trap source is known by hostname instead of IP, replace the
@@ -77,36 +82,34 @@ Which security-category SNMP traps did one device send recently?
      facets: ["TRAP_NAME", "TRAP_SEVERITY", "TRAP_SOURCE_IP", "_HOSTNAME"]
    }')"
 
+   RESPONSE="$TRAP_QUERY_DIR/security-traps-hostname.json"
+
    agents_call_function \
      --via cloud \
      --node "$NODE_UUID" \
      --function "$SNMP_TRAPS_FUNCTION" \
      --body "$BODY" \
-     > .local/audits/query-snmp-traps/security-traps-device.json
+     > "$RESPONSE"
    ```
 
-4. Print a sanitized summary:
+4. Print a bounded severity summary of returned rows:
 
    ```bash
-   jq '.columns as $c
-       | .data[]? as $row
-       | $c | to_entries | sort_by(.value.index)
-       | map({(.key): $row[.value.index]}) | add
-       | {
-           host: (._HOSTNAME // ""),
-           source_ip_present: ((.TRAP_SOURCE_IP // "") | length > 0),
-           severity: (.TRAP_SEVERITY // ""),
-           trap: (.TRAP_NAME // .TRAP_OID // ""),
-           message: (.MESSAGE // "")
-         }' \
-     .local/audits/query-snmp-traps/security-traps-device.json
+   jq -e 'if type == "object" and .status == 200
+        and (.columns | type == "object") and (.data | type == "array")
+     then . else error("Expected a successful trap query response") end
+     | .columns as $c
+       | [ .data[]? as $row
+           | $row[$c.TRAP_SEVERITY.index] // "unknown"
+         ]
+       | group_by(.) | map({severity: .[0], returned_rows: length})' "$RESPONSE"
    ```
 
 ## Output
 
-Return counts and sanitized rows: trap name/OID, severity, hostname
-or source-present flag, and message. Do not paste public IPs, MACs,
-usernames, or full varbind payloads into durable artifacts.
+Return severity counts for the returned rows (at most 200). The private response retains trap names/OIDs, hostnames,
+source addresses, messages and varbinds for local inspection. These fields can identify devices or users; selecting
+fields alone does not sanitize them. Review and redact any details before copying them into durable artifacts.
 
 ## Notes / gotchas
 

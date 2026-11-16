@@ -252,10 +252,11 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
         }
     }
 
-    if(!rc->summary)
+    // without config text there is nothing to fall back to: skip the write lock that would store NULL over NULL
+    if(!rc->summary && rc->config.summary)
         rrdcalc_runtime_string_replace(rc, &rc->summary, string_dup(rc->config.summary));
 
-    if(!rc->info)
+    if(!rc->info && rc->config.info)
         rrdcalc_runtime_string_replace(rc, &rc->info, string_dup(rc->config.info));
 }
 
@@ -308,15 +309,6 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(st->alerts.base, rc, prev, next);
     rw_spinlock_write_unlock(&st->alerts.spinlock);
 
-    char buf[RRDVAR_MAX_LENGTH + 1];
-    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_name(st), rrdcalc_name(rc));
-    STRING *rrdset_name_rrdcalc_name = string_strdupz(buf);
-    snprintfz(buf, RRDVAR_MAX_LENGTH, "%s.%s", rrdset_id(st), rrdcalc_name(rc));
-    STRING *rrdset_id_rrdcalc_name = string_strdupz(buf);
-
-    string_freez(rrdset_id_rrdcalc_name);
-    string_freez(rrdset_name_rrdcalc_name);
-
     time_t now = now_realtime_sec();
     ALARM_ENTRY *ae = health_create_alarm_entry(
         host,
@@ -330,9 +322,13 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
-    health_alarm_log_add_entry(host, ae, true);
-    health_log_alert(host, ae);
-    rrdcalc_runtime_snapshot_publish(rc, ae->global_id, &ae->transition_id);
+    // set when the entry is created; ae must not be used after health_alarm_log_add_entry()
+    usec_t global_id = ae->global_id;
+    nd_uuid_t transition_id;
+    uuid_copy(transition_id, ae->transition_id);
+
+    health_alarm_log_add_entry(host, ae);
+    rrdcalc_runtime_snapshot_publish(rc, global_id, &transition_id);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
@@ -357,8 +353,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
                     0,
                     0);
 
-            health_alarm_log_add_entry(host, ae, true);
-            health_log_alert(host, ae);
+            health_alarm_log_add_entry(host, ae);
         }
     }
 
@@ -496,9 +491,8 @@ static void rrdcalc_rrdhost_delete_callback(const DICTIONARY_ITEM *item __maybe_
 // so the key is stable for the lifetime of the RRDCALC.
 //
 // Locking: this index has its own spinlock rather than relying on the alert
-// dictionary lock, because rrdcalc_unlink_and_delete() is reached with only the
-// dictionary READ lock held from health_prototype_apply_to_all_hosts(), which
-// iterates reentrantly.
+// dictionary lock, because its lookups (rrdcalc_by_name_snapshot(), from
+// expression evaluation) run under the dictionary READ lock or none at all.
 
 static void rrdcalc_name_index_add(RRDHOST *host, RRDCALC *rc, const DICTIONARY_ITEM *item) {
     if(unlikely(!rc->config.name || !item))
@@ -709,8 +703,16 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 
     bool ret = true;
 
-    dictionary_set_advanced(host->rrdcalc_root_index, key, (ssize_t)key_len,
-                            NULL, sizeof(RRDCALC), &tmp);
+    // archiving the host destroys this index and leaves NULL behind
+    DICTIONARY *dict = host->rrdcalc_root_index;
+    if(unlikely(!dict))
+        return false;
+
+    // the react callback links the new alert to its chart after the dictionary has released its own locks;
+    // hold the write lock across the whole set, so that no walker can find and unlink the alert half-linked
+    dictionary_write_lock(dict);
+    dictionary_set_advanced(dict, key, (ssize_t)key_len, NULL, sizeof(RRDCALC), &tmp);
+    dictionary_write_unlock(dict);
 
     if(tmp.react_action != RRDCALC_REACT_NEW)
         ret = false;
@@ -719,6 +721,17 @@ bool rrdcalc_add_from_prototype(RRDHOST *host, RRDSET *st, RRD_ALERT_PROTOTYPE *
 }
 
 void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock) {
+    // archiving the host destroys this index and leaves NULL behind, after rrdcalc_delete_all() has already
+    // unlinked every alert; a reentrant walker still holding one of them has nothing left to do
+    DICTIONARY *dict = host->rrdcalc_root_index;
+    if(unlikely(!dict))
+        return;
+
+    // alerts are linked and unlinked only under this write lock: it serializes with rrdcalc_add_from_prototype()
+    // and keeps out the health thread, which reads rc->rrdset under the read lock. The lock is recursive:
+    // chart and host cleanup already hold it; reentrant prototype walkers acquire it here.
+    dictionary_write_lock(dict);
+
     // remove from the name index first, while rc and host are both in hand and
     // the caller's lock state is known; the delete callback repeats this
     // defensively for any path that does not come through here
@@ -727,8 +740,10 @@ void rrdcalc_unlink_and_delete(RRDHOST *host, RRDCALC *rc, bool having_ll_wrlock
     rrdcalc_unlink_from_rrdset(rc, having_ll_wrlock);
 
     thread_having_ll_wrlock = having_ll_wrlock;
-    dictionary_del_advanced(host->rrdcalc_root_index, string2str(rc->key), (ssize_t)string_strlen(rc->key));
+    dictionary_del_advanced(dict, string2str(rc->key), (ssize_t)string_strlen(rc->key));
     thread_having_ll_wrlock = false;
+
+    dictionary_write_unlock(dict);
 }
 
 // ----------------------------------------------------------------------------
@@ -814,6 +829,7 @@ void rrd_alert_match_cleanup(struct rrd_alert_match *am) {
 
 void rrd_alert_config_cleanup(struct rrd_alert_config *ac) {
     string_freez(ac->name);
+    string_freez(ac->time_group_options);
 
     string_freez(ac->exec);
     string_freez(ac->recipient);

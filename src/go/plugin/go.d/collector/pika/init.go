@@ -7,6 +7,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/pkg/tlscfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
@@ -18,13 +20,13 @@ func (c *Collector) validateConfig() error {
 	return nil
 }
 
-func (c *Collector) initRedisClient() (*redis.Client, error) {
+func (c *Collector) initRedisClient(ctx context.Context) (*redis.Client, error) {
 	opts, err := redis.ParseURL(c.Address)
 	if err != nil {
 		return nil, err
 	}
 
-	tlsConfig, err := tlscfg.NewTLSConfig(c.TLSConfig)
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, c.TLSConfig)
 	if err != nil {
 		return nil, err
 	}

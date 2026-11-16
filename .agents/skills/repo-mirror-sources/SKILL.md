@@ -1,244 +1,74 @@
 ---
 name: repo-mirror-sources
-description: Maintains a local mirror of Netdata-org source repositories at `${NETDATA_REPOS_DIR}` so AI assistants and developers can do cross-repo grep / code review locally without GitHub API round-trips and rate limits. Ships a vendored sync script (`scripts/sync-netdata-repos.sh`) that updates ~150 repos in two phases (resync existing on default branch, discover and clone new). Safety -- skips repos that have staged or modified changes; otherwise switches to the default branch and recursively updates submodules. Reset-to-default is intentional -- it prevents stale-feature-branch "black hole" repos that confuse cross-repo reasoning. Supports `--repo NAME` (repeatable) to scope to specific repos. Independent from any other repo mirrors this workstation may have. Use when the local mirror is out of date, before a cross-repo grep / review session, when adding a new netdata-org repo (auto-discovered), when an assistant needs cross-repo cognition without `gh` API turnaround.
+description: Inspect Netdata-org source checkouts under NETDATA_REPOS_DIR, or set up and synchronize that mirror when requested. Use for cross-repo lookup, review, missing sources, mirror freshness, or scoped sync. Source inspection does not require syncing; maintenance can switch branches, pull, clone, and force-update submodules.
 ---
 
-# repo-mirror-sources
+# Netdata source mirrors
 
-A local mirror of every active Netdata-org source repository,
-synced by a vendored bash script. Built for AI assistants
-(and humans) that need cross-repo grep, code review, and
-pattern lookup without paying GitHub API costs.
+Use existing local source checkouts for cross-repo search and review. This Netdata-org mirror is independent of other
+research mirrors. Its path is `${NETDATA_REPOS_DIR}`; configuration is documented in `.agents/ENV.md`.
 
-## Why this skill exists
+## Choose the task
 
-Netdata maintains ~150 active source repos across the
-`netdata` GitHub org (the agent monorepo, cloud-* services,
-ai-agent, charts, helmchart, blogs, dashboards, ...). Routine
-work (cross-repo grep, "how does service X handle this?",
-pattern lookup, build) needs all of them locally.
+| Task | Read / do |
+|---|---|
+| Inspect, compare, or review source | Use the read-only route below; load relevant domain skills for the assigned lens |
+| Establish whether local evidence is current enough | Record checkout revision/state and the question's required revision; do not assume local means latest |
+| Set up, refresh, or troubleshoot the mirror | Read [maintenance.md](maintenance.md) before any sync; apply the scope already authorized by the task |
+| Understand helper behavior | Read [scripts/sync-netdata-repos.sh](scripts/sync-netdata-repos.sh); its checks are not a general preservation guarantee |
+| Capture a reusable mirror procedure | Follow [how-tos/INDEX.md](how-tos/INDEX.md) and `AGENTS.md#knowledge-capture` |
 
-Without a local mirror:
-- Each cross-repo question hits the GitHub API.
-- Searches are paginated and rate-limited.
-- An AI assistant cannot pipeline grep results across repos.
-- Iteration speed and reasoning depth fall through the floor.
+A request for cross-repo grep or review does not authorize sync, checkout, fetch, pull, clone, stash, commit, or push.
+A task that already authorizes maintenance needs no repeated permission for the same scope. Prefer named repository
+updates for a narrow maintenance request; full organization discovery is a distinct scope.
 
-With a local mirror at `${NETDATA_REPOS_DIR}`, all of that is
-fast local I/O.
+## Inspect existing source
 
-This is a **netdata repos mirror, independent from any other
-repo mirrors this workstation may have**. It exists for this
-project's cross-repo work; it is not a generic research mirror.
+Resolve only the required configured path; do not print unrelated environment values or load credentials to grep
+local files. The helper reads an exported `NETDATA_REPOS_DIR` and does not source `.env` itself. Set it explicitly
+from the trusted project configuration when needed; maintenance setup is in `maintenance.md`.
 
-## How it works
-
-The vendored script `scripts/sync-netdata-repos.sh` does two
-phases:
-
-### Phase 1 -- update existing repos
-
-For each `.git`-bearing subdirectory under `${NETDATA_REPOS_DIR}`,
-sorted by recent activity (cached in `.repo-activity-cache`):
-
-- If staged OR modified files exist -> **skip** with details.
-- Else: detect default branch (master / main / develop),
-  switch to it (committed feature-branch state survives in
-  the branch ref), `git pull`, and `git submodule update
-  --init --force --recursive`.
-
-### Phase 2 -- discover and clone new repos
-
-Runs only when:
-- no `--repo` flag was given (full sync), AND
-- `gh` is available AND authenticated.
-
-Lists `gh repo list netdata --source --no-archived` and clones
-any that are not yet in the mirror. The `--source --no-archived`
-filter excludes forks and dead repos -- they add no value for
-cross-repo grep.
-
-If `gh` is missing or not authenticated, Phase 2 is skipped
-with a clear warning. Phase 1 still runs (it uses local `git`
-only, no GitHub API).
-
-## Reset-to-default-branch is the feature, not a hazard
-
-Sub-repos in a mirror tend to drift onto stale feature
-branches that no one remembers. A repo whose `HEAD` is on
-`fix/something-from-six-months-ago` is a **black hole** for
-cross-repo reasoning -- the assistant grepping it sees
-out-of-date code and reasons wrong.
-
-The only viable fix: always reset to the default branch when
-it's safe to do so. The script's safety conditions:
-
-- **Untracked files**: OK; they survive checkout.
-- **Staged or modified files**: NOT safe; script skips the
-  repo and prints what was found.
-- **Unpushed feature-branch commits**: SAFE; the branch ref
-  preserves them, no data is lost. Script switches to default
-  with a warning summarizing the unpushed commits.
-
-So the rule is: if you have working changes you want to keep,
-commit them or stash them before running this. Anything else
-the script handles correctly.
-
-## When to run
-
-- **Before any cross-repo grep / review** session.
-- **After a long absence** from the workstation (catches up to
-  upstream on every repo).
-- **When you've just added a new netdata-org repo**: nothing
-  to do manually; the next full run picks it up via Phase 2.
-- **Periodically** (daily / weekly) to keep the mirror fresh.
-
-There's no automation here; the script is interactive (colored
-output, end-of-run summary). Run it on demand.
-
-## Setup
-
-### One-time
-
-1. Pick a directory for the mirror (large; expect 30-50 GB).
-2. Set `NETDATA_REPOS_DIR` in `<repo>/.env`:
-   ```
-   NETDATA_REPOS_DIR="/path/to/your/mirror"
-   ```
-3. `mkdir -p "$NETDATA_REPOS_DIR"`.
-4. Required tools: `git` and `jq`. Install via your package
-   manager.
-5. For Phase 2 (auto-discovery): install `gh` (the GitHub CLI)
-   and run `gh auth login`. SSH clone access to GitHub for the
-   `netdata` organization must work for clones.
-
-### First sync
+For a known checkout such as `learn`, inspect its state before using it as evidence:
 
 ```bash
-# Export the variable (the script is a child process and reads the environment;
-# it does not source .env itself), then run the script.
-set -a; source <(grep -E '^NETDATA_REPOS_DIR=' <repo>/.env); set +a
-.agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh
+: "${NETDATA_REPOS_DIR:?Set the configured mirror directory}"
+mirror_repo="$NETDATA_REPOS_DIR/learn"
+git --no-optional-locks -C "$mirror_repo" rev-parse HEAD
+git --no-optional-locks -C "$mirror_repo" symbolic-ref --quiet --short HEAD || true
+git --no-optional-locks -C "$mirror_repo" status --short --untracked-files=all --ignore-submodules=none
+rg --files "$mirror_repo"
 ```
 
-Or with the variable inline:
+Use `rg` on the relevant files after locating them. A blank branch result may mean detached HEAD; a failed Git
+command is not a clean-state result. An available source checkout can be nested or use a `.git` file even though the
+sync helper only recognizes immediate repositories with `.git` directories.
 
-```bash
-NETDATA_REPOS_DIR="/path/to/mirror" \
-  .agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh
-```
+Record the upstream owner/repository and exact checked commit under `AGENTS.md#open-source-reference-evidence`.
+Distinguish working-tree edits from committed source; do not attribute edited contents to an unmodified commit.
+Existing sources can answer questions about their recorded revision without a refresh. Check the requested revision
+when reviewing a PR or historical behavior; switching to default would discard the intended review context.
 
-The first run clones every netdata-org source repo. Expect it
-to take several minutes; subsequent runs are fast (only
-fetch+pull on each repo).
+If required sources are absent or freshness cannot be established, report that limit and determine whether the task
+already authorizes a scoped refresh or acquisition. Do not silently run the full sync to resolve one missing checkout.
+A current local timestamp, branch name, or old `origin/HEAD` reference does not prove live upstream freshness.
 
-## Common usage
+## Maintenance boundary
 
-### Sync everything (default)
+The vendored helper performs existing-repository updates and optional organization discovery. It switches branches,
+fetches/pulls, force-updates recursive submodules, and writes the mirror activity cache. `--repo` selects existing
+repositories and disables discovery; it does not confine every side effect to those repositories.
 
-```bash
-.agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh
-```
-
-### Sync just one or two repos
-
-```bash
-.agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh \
-    --repo netdata \
-    --repo cloud-frontend
-```
-
-`--repo` is repeatable. When any `--repo` is given, Phase 2
-(discovery) is skipped -- you asked for specific repos, the
-script does not go looking for new ones.
-
-### See help
+Read `maintenance.md` for prerequisites, exact selection behavior, safety limits, and post-run checks. Help alone
+requires neither configuration nor installed Git tooling:
 
 ```bash
 .agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh --help
 ```
 
-Works without `NETDATA_REPOS_DIR` set.
-
-## Reading the output
-
-The script prints colored per-repo progress and ends with a
-summary covering:
-
-- **Branches switched to default**: every repo that was on a
-  non-default branch and got switched. Inspect this list if
-  you had work in progress.
-- **Repositories with uncommitted changes (skipped)**: these
-  weren't synced. Commit / stash / revert and re-run.
-- **Repositories with unpushed commits**: switched to default,
-  but you have feature-branch commits that haven't been
-  pushed. The branch ref preserves them; push when you're
-  ready.
-- **Repositories on wrong branch**: tried to switch but
-  failed (rare). Manual intervention needed.
-- **Repositories that failed to update**: fetch or pull
-  failure. Inspect manually.
-
-## Adding a new netdata-org repo
-
-Nothing to do in this skill or its script. Phase 2's
-`gh repo list netdata --source --no-archived` discovers any
-new netdata-org repo on the next full sync run. The repo
-must be:
-
-- Owned by the `netdata` org (not a fork).
-- Not archived.
-
-Otherwise it's skipped intentionally.
-
-If you want to mirror a fork or an archived repo (rare),
-clone it manually into `${NETDATA_REPOS_DIR}/<name>` and the
-next run's Phase 1 will start syncing it.
-
-## Sanitization (what the script checks)
-
-The script refuses to run unsafely. Hard errors (exit 2):
-
-- `NETDATA_REPOS_DIR` not set.
-- `NETDATA_REPOS_DIR` set but the directory doesn't exist.
-- `git` not in `PATH`.
-- `jq` not in `PATH`.
-
-Soft warnings (Phase 2 skipped, Phase 1 still runs):
-
-- `gh` not installed.
-- `gh` installed but not authenticated.
-
-## Limitations
-
-- **Org is hardcoded** (`netdata`). This skill is
-  netdata-org-specific.
-- **Filter is hardcoded** (`--source --no-archived`). To
-  mirror forks or archived repos, clone them manually -- the
-  script will then sync them in Phase 1.
-- **`gh` rate limit**: Phase 2 calls `gh repo list netdata
-  --limit 1000` once per run. On a properly-authed `gh` this
-  is well within the limit.
-- **Submodule `--force --recursive`**: intentional. Cross-repo
-  review and most build steps depend on accurate, up-to-date
-  submodule state. Local submodule modifications are
-  overwritten -- if you have work-in-progress inside a
-  submodule, commit it before running.
+No scheduling automation is installed by this skill. A long absence, new repository, or periodic freshness requirement
+can justify an authorized maintenance task; none makes maintenance a prerequisite to every source read.
 
 ## Path discipline
 
-This skill follows
-`<repo>/.agents/sensitive-data-discipline.md`:
-
-- All references to the mirror directory go through
-  `${NETDATA_REPOS_DIR}` (the env key from `.env`).
-- The script itself contains no hardcoded user paths.
-- The skill content contains no workstation paths.
-
-## See also
-
-- `<repo>/.agents/skills/repo-mirror-sources/scripts/sync-netdata-repos.sh`
-  -- the vendored script.
-- `<repo>/.agents/skills/repo-mirror-sources/how-tos/INDEX.md`
-  -- live catalog of how-tos.
-- `<repo>/.env` -- where `NETDATA_REPOS_DIR` lives.
+`.agents/sensitive-data-discipline.md#allowed-alternatives` owns path notation. Use `${NETDATA_REPOS_DIR}` for mirror
+paths in skills and evidence; do not embed personal workstation paths in this skill or its helper.

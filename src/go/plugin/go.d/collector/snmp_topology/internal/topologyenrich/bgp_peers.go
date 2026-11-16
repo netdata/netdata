@@ -22,6 +22,7 @@ func sortTopologyBGPPeerDetailRows(rows []topologymodel.BGPPeerDetailRow) {
 
 func topologyBGPPeerActorRowSortKey(row topologymodel.BGPPeerDetailRow) string {
 	return strings.Join([]string{
+		row.ProcessID,
 		row.RoutingInstance,
 		row.RemoteAS,
 		topologyutil.NormalizeBGPPeerAddress(row.NeighborIP),

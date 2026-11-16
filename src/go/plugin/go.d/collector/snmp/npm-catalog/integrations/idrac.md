@@ -88,7 +88,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -242,10 +242,10 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_drsAmpsReading` | `A` | per chassis_index, drs_psu_index | Instantaneous chassis current usage in amperes |
-| `snmp.device_prof_drsKWhCumulative` | `kWh` | per chassis_index, drs_psu_index | Cumulative chassis power usage in kilowatt hours since last reset |
+| `snmp.device_prof_drsAmpsReading` | `A` | per chassis_index | Instantaneous chassis current usage in amperes |
+| `snmp.device_prof_drsKWhCumulative` | `kWh` | per chassis_index | Cumulative chassis power usage in kilowatt hours since last reset |
 | `snmp.device_prof_drsPowerCurrStatus` | `{status}` | device | Power subsystem health status being monitored by the chassis management card |
-| `snmp.device_prof_drsWattsReading` | `W` | per chassis_index, drs_psu_index | Instantaneous chassis power usage in watts |
+| `snmp.device_prof_drsWattsReading` | `W` | per chassis_index | Instantaneous chassis power usage in watts |
 | `snmp.device_prof_systemStatePowerSupplyStatusCombined` | `{state}` | per chassis_index | Combined power supply status of the system state |
 | `snmp.device_prof_systemStatePowerUnitStatusCombined` | `{status}` | per chassis_index | Combined power unit status of the system state |
 | `snmp.device_prof_systemStatePowerUnitStatusRedundancy` | `{status}` | per chassis_index | Power unit status redundancy of the system state |

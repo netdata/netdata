@@ -41,9 +41,17 @@ static void json_parser_format_error(char *dst, size_t dst_size, const char *err
 }
 
 int nrpc_call_error(BUFFER *wb, const char *msg, int code) {
+    return nrpc_call_error_with_key(wb, msg, NULL, code);
+}
+
+// msg_key is a stable machine-readable identifier, so clients can react to
+// specific denials without matching on the human-readable message
+int nrpc_call_error_with_key(BUFFER *wb, const char *msg, const char *msg_key, int code) {
     buffer_reset(wb);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
     buffer_json_member_add_int64(wb, "status", code);
+    if(msg_key && *msg_key)
+        buffer_json_member_add_string(wb, "errorMsgKey", msg_key);
     buffer_json_member_add_string(wb, "errorMessage", msg);
     buffer_json_finalize(wb);
     wb->date = now_realtime_sec();

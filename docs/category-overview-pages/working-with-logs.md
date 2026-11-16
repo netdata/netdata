@@ -18,7 +18,7 @@ need it.
 | **In place, on each node** | The OS log store: systemd journal files on Linux, event channels on Windows, the unified log on macOS | Field filters with live counters, full-text search across every field, histograms, live tail, and one interface across all nodes | Install Netdata |
 | **On the OS-native centralization points you already run** | Journals aggregated by `systemd-journal-remote`; forwarded-events channels on a Windows Event Collector | The same, over every sender the point aggregates, with the logs still in native format for `journalctl`, Event Viewer, and SIEM agents | Install Netdata on the centralization point |
 | **Journals written by Netdata** | Journal-compatible files that Netdata itself writes for SNMP traps and network flows, on the node that receives them; no `systemd-journald` involved | The same indexing and querying as any journal; readable with `journalctl` and by SIEM agents on Linux | Configure the SNMP trap or network flow collector |
-| **Centralized with OpenTelemetry** | Netdata's own indexed log store on the receiving node: retention per tenant, optional offloading to S3-compatible object storage with transparent read-back | Storage that outlives the sending nodes, retention beyond a node's disk, and the same interface | Point an OpenTelemetry Collector at Netdata's OTLP endpoint |
+| **Centralized with OpenTelemetry** | Netdata's own indexed log store on the receiving node: size and age retention, optional offloading to S3-compatible object storage with transparent read-back | Storage that outlives the sending nodes, retention beyond a node's disk, and the same interface | Point an OpenTelemetry Collector at Netdata's OTLP endpoint |
 
 The OS-native tiers add no storage and no pipeline: Netdata reads the logs where the operating system writes them, and
 the operating system's own tools keep working on the same data. The journals Netdata writes for SNMP traps and network
@@ -66,8 +66,18 @@ reading production logs does not require shell access to production systems. See
 [Managing Logs](/docs/dashboards-and-charts/logs-tab.md).
 
 Log content stays in your infrastructure. Viewing logs requires signing in with Netdata Cloud, which is free for
-community use; the content is transmitted encrypted to your browser and is not stored in Netdata Cloud. For full data
-sovereignty, [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
+community use. Viewing OpenTelemetry logs (`otel-logs`, and `legacy-otel-logs` for logs kept by the former experimental
+plugin) and SNMP trap logs (`snmp:traps`) requires a signed-in member of the node's Space with permission to view
+sensitive data, on a paid plan or an active trial.
+
+The Agent receives OpenTelemetry logs and SNMP traps on all plans. OpenTelemetry logs are stored on the Agent; SNMP
+traps are stored locally when journal output is enabled (the default). An OTLP-only trap job forwards events without
+local storage or a local `snmp:traps` source. See [SNMP Traps](/docs/npm/snmp-traps/README.md).
+The read-only `legacy-otel-logs` source is available only where journals from the former plugin remain; see the
+[legacy logs guidance](/src/crates/otel-plugin/README.md#logs-from-the-former-experimental-plugin-are-not-visible).
+
+The content is transmitted encrypted to your browser and is not stored in Netdata Cloud. For full data sovereignty,
+[Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
 runs the same service inside your own infrastructure.
 
 ## Current limitations
@@ -76,7 +86,6 @@ runs the same service inside your own infrastructure.
   which one to query.
 - **Alerts are evaluated on metrics, not on log content.** To alert on a log pattern, derive a metric from it, for
   example with [logs-to-metrics](/docs/opentelemetry/logs-to-metrics.md), and alert on that metric.
-- **The OTLP endpoint accepts OTLP/gRPC only** (port 4317). OTLP/HTTP is not supported.
 - **macOS has no OS-native log forwarding.** Centralize macOS logs through the OpenTelemetry Collector.
 
 ## In this section

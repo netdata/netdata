@@ -80,7 +80,7 @@ static void apps_plugin_function_processes_help(const char *transaction) {
 
 // Holds per-field maximums computed during the data collection loop.
 // Passed to fp_emit_columns() so that section can live in its own function,
-// keeping function_processes() below GCC's -fvar-tracking-assignments limit.
+// keeping function_processes_locked() below GCC's -fvar-tracking-assignments limit.
 struct fp_maxvals {
     NETDATA_DOUBLE UserCPU_max;
     NETDATA_DOUBLE SysCPU_max;
@@ -894,10 +894,7 @@ static void fp_emit_groupby(BUFFER *wb) {
     buffer_json_object_close(wb); // group_by
 }
 
-void function_processes(const char *transaction, char *function,
-                               usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-                               BUFFER *payload __maybe_unused, HTTP_ACCESS access,
-                               const char *source __maybe_unused, void *data __maybe_unused) {
+static void function_processes_locked(const char *transaction, char *function, HTTP_ACCESS access) {
     time_t now_s = now_realtime_sec();
     struct pid_stat *p;
 
@@ -1082,8 +1079,6 @@ void function_processes(const char *transaction, char *function,
         , Handles_max = 0
 #endif
         ;
-
-    netdata_mutex_lock(&apps_and_stdout_mutex);
 
     int rows= 0;
     for(p = root_of_pids(); p ; p = p->next) {
@@ -1396,8 +1391,6 @@ void function_processes(const char *transaction, char *function,
 
     fp_emit_groupby(wb);
 
-    netdata_mutex_unlock(&apps_and_stdout_mutex);
-
 close_and_send:
     buffer_json_member_add_time_t(wb, "expires", now_s + update_every);
     buffer_json_finalize(wb);
@@ -1408,4 +1401,16 @@ close_and_send:
     pluginsd_function_result_to_stdout(transaction, wb);
 
     buffer_free(wb);
+}
+
+void function_processes(const char *transaction, char *function,
+                               usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+                               BUFFER *payload __maybe_unused, HTTP_ACCESS access,
+                               const char *source __maybe_unused, void *data __maybe_unused) {
+    // The whole call runs under the collection lock: it guards the targets and
+    // pids read here, and it keeps every response (help and errors included) from
+    // interleaving with the chart output the main loop writes under the same lock.
+    netdata_mutex_lock(&apps_and_stdout_mutex);
+    function_processes_locked(transaction, function, access);
+    netdata_mutex_unlock(&apps_and_stdout_mutex);
 }

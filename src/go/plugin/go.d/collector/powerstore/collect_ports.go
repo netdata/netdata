@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectFcPorts() {
+func (c *Collector) collectFcPorts(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, port := range c.discovered.fcPorts {
@@ -20,15 +23,15 @@ func (c *Collector) collectFcPorts() {
 			}
 			c.mx.fcPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
-			pm, err := c.client.PerformanceMetricsByFcPort(id)
+			pm, err := c.client.PerformanceMetricsByFcPort(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting FC port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				c.mx.fcPort.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
-				c.mx.fcPort.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
-				c.mx.fcPort.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
-				c.mx.fcPort.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.fcPort.perf.readIops.WithLabelValues(name).Observe(last.AvgReadIops)
+				c.mx.fcPort.perf.writeIops.WithLabelValues(name).Observe(last.AvgWriteIops)
+				c.mx.fcPort.perf.readBandwidth.WithLabelValues(name).Observe(last.AvgReadBandwidth)
+				c.mx.fcPort.perf.writeBandwidth.WithLabelValues(name).Observe(last.AvgWriteBandwidth)
 				c.mx.fcPort.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
 				c.mx.fcPort.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
 				c.mx.fcPort.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
@@ -39,7 +42,7 @@ func (c *Collector) collectFcPorts() {
 	wg.Wait()
 }
 
-func (c *Collector) collectEthPorts() {
+func (c *Collector) collectEthPorts(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, port := range c.discovered.ethPorts {
@@ -55,7 +58,7 @@ func (c *Collector) collectEthPorts() {
 			}
 			c.mx.ethPort.linkUp.WithLabelValues(name).Observe(linkVal)
 
-			pm, err := c.client.EthPortPerformanceMetrics(id)
+			pm, err := c.client.EthPortPerformanceMetrics(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting ETH port %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {

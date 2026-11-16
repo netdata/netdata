@@ -1,17 +1,25 @@
 # Mutating And Stateful Collectors
 
-Load this when a collector writes or deletes remote objects, or persists state across cycles or restarts. A collector
-that does neither records "no durable remote ownership, no durable local state" in its design note and stops here; it
-needs no journal, queue, lock, or recovery analysis. A collector with durable local state but no remote mutation (for
-example a receiver that persists its own protocol state) reads §3 and §5 only. Rules use the format When / Do / Don't /
-Evidence / Boundary.
+Use these design/review criteria for collectors that mutate remote objects or persist durable local state.
+Rules use When / Do / Don't / Evidence / Boundary.
+
+- **Transient state:** ordinary in-memory state across cycles does not by itself require journals, queues, locks or
+  crash-recovery machinery.
+- **Neither:** when an implementation design note is required, a collector with neither records "no durable remote
+  ownership, no durable local state" and does not perform unrelated recovery analysis.
+- **Durable local state only:** a receiver persisting protocol state, for example, reads §3 and §5 only for applicable
+  persistence/identity rules; the general V2 test contract still applies.
+- **Remote mutation:** use all applicable sections.
+- **Review:** use existing evidence under `AGENTS.md#skill-selection`, without performing mutations or creating
+  implementation artifacts.
 
 ## 1. Mutation Ownership
 
 **When:** the collector creates, modifies, or deletes anything outside its process. **Do:** name every remote object
 the collector owns and the identity that owns it: the stable job identity (`pluginconfig.RegistryUniqueID()` plus the
-job name), never display labels, credentials, or endpoints. Decide which concurrent owners exist: the same job's old
-and new runtime (protect with a per-owner lock) versus different jobs (independent by default). State what a renamed
+job name), never display labels, credentials, or endpoints. Establish which writers can actually overlap from the
+runtime ownership contract before adding a per-owner lock; candidate probes can overlap even when active collection
+is serialized. Different jobs are independent by default. State what a renamed
 job inherits: nothing automatically; draining old work requires restoring the old identity and configuration.
 **Don't:** let mutable labels join the durable identity or safety fingerprint (correcting a display label must not
 strand owned state); scan other owners' state to decide whether this owner may run (Architecture Gate). **Evidence:**
@@ -44,6 +52,18 @@ defect as data loss when remote mutations are already stopped. **Evidence:** tes
 call and the next call. **Boundary:** host or power-loss durability on a platform without the needed primitives is an
 accepted, documented limitation, not something to claim silently.
 
+A replacement candidate's `Init`/`Check` can run before the previous active job stops. A collector that reuses the
+same persistent state MUST load or revalidate it after acquiring active ownership, for example on its first active
+`Collect`; an Init-time snapshot can miss the predecessor's final commit. Verify the ordering in
+`src/go/plugin/agent/jobmgr/joboutput/candidate_stage.go` and cover a predecessor commit between candidate probe and
+activation. This applies to durable local state even without remote mutation.
+
+A `go.d.plugin` debug run from a terminal shares the Agent's varlib directory with the running job that owns a state
+file there. A collector that writes under varlib MUST detect that run with `pkg/terminal.IsTerminal()` (the same
+check `src/go/cmd/godplugin/main.go` and `src/go/plugin/agent/policy/runmode.go` use) and keep the file read-only:
+load, compare and apply transitions in memory, never write. Inject the check so tests are deterministic, and cover a
+terminal run with and without an existing file asserting the file is untouched (`smbios_memory` is the reference).
+
 ## 4. Cleanup Versus Measurement
 
 **When:** the collector must clean up what it created. **Do:** separate active probing from unfinished cleanup so
@@ -65,6 +85,12 @@ take runtime paths from the runtime configuration (the varlib path), not from as
 precondition forever because the endpoint did not change; approximate an authorization input and tighten the
 approximation repeatedly. **Evidence:** the precondition list in the note with "checked at" for each. **Boundary:**
 re-checking everything every cycle is not required; only what authorizes mutation.
+
+**When:** a new state format adds a field to a persisted identity (a bank joining a memory slot locator). **Do:**
+upgrade older files on read, then take the added field from the first current observation that the old identity
+matches unambiguously; the old writer may have kept a stale copy of a field it treated as descriptive. **Evidence:** a
+test that loads an old file whose stored copy is stale. **Boundary:** an observation the old identity cannot match
+unambiguously keeps the stored value.
 
 ## 6. Tests Specific To Mutating Collectors
 

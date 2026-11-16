@@ -513,14 +513,14 @@ func normalizeProfileMetricChart(chart *profileMetricChart) error {
 	if chart.Lifecycle == nil {
 		chart.Lifecycle = &charttpl.Lifecycle{
 			MaxInstances:      DefaultMetricChartMaxInstances,
-			ExpireAfterCycles: DefaultMetricExpireAfterCycles,
+			ExpireAfterCycles: new(DefaultMetricExpireAfterCycles),
 		}
 	}
 	if chart.Lifecycle.MaxInstances <= 0 {
 		chart.Lifecycle.MaxInstances = DefaultMetricChartMaxInstances
 	}
-	if chart.Lifecycle.ExpireAfterCycles <= 0 {
-		chart.Lifecycle.ExpireAfterCycles = DefaultMetricExpireAfterCycles
+	if chart.Lifecycle.ExpireAfterCycles == nil || *chart.Lifecycle.ExpireAfterCycles <= 0 {
+		chart.Lifecycle.ExpireAfterCycles = new(DefaultMetricExpireAfterCycles)
 	}
 	return nil
 }

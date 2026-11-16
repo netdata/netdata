@@ -1,6 +1,6 @@
 ---
 name: integrations-lifecycle
-description: Netdata integrations pipeline reference. Use when editing metadata.yaml and needing to validate, regenerate, or deliver it; modifying integrations generators, schemas, templates, generated integration docs, integrations.js, integrations.json, COLLECTORS.md, SECRETS.md, or SERVICE-DISCOVERY.md; changing collector consistency artifacts; working with ibm.d contexts.yaml to metadata.yaml generation or the NPM catalog generator; or asked what the collector taxonomy.yaml files are.
+description: Change or review the Netdata integrations pipeline, collector artifact consistency, metadata validation, generated docs/catalogs and source-versus-runtime delivery. Covers ibm.d and NPM producers, schemas, generators and dormant taxonomy. Metadata field prose uses collectors-metadata-yaml.
 ---
 
 # integrations-lifecycle
@@ -10,7 +10,11 @@ skill owns the mechanics and the delivery rules; what a collector `metadata.yaml
 `.agents/skills/collectors-metadata-yaml/`, and `config_schema.json` is
 `.agents/skills/collectors-go-design/config-schema.md`.
 
-Facts every reader needs:
+Apply `AGENTS.md#skill-selection`. For review, select the affected pipeline or artifact contract below and inspect
+source plus existing validation evidence. Loading recipes does not require regeneration, dependency installation,
+commits or publication. Authorized validation uses current inputs and preserves existing outputs through isolation.
+
+Shared delivery facts:
 
 - `metadata.yaml` is the input. Hand-authored for most integrations; generated for ibm.d modules (from `contexts.yaml`,
   `config.go`, `module.yaml`) and for the NPM catalog (from SNMP profiles by `integrations/gen_npm_catalog.py`). Edit
@@ -20,7 +24,8 @@ Facts every reader needs:
   too), and the umbrella pages `src/collectors/COLLECTORS.md`, `SECRETS.md`, `SERVICE-DISCOVERY.md` (no banner) are
   generated. Do not edit them.
 - Source PRs carry sources; generated documentation arrives through the post-merge `integrations-regen` PR. Validate
-  with `gen_integrations.py` and the tests; do not regenerate pages for the PR, and undo generated changes if you did.
+  with `gen_integrations.py` and the tests during authorized changes; preview pages in isolation using
+  `how-tos/preview-collector-page.md` (selected collectors or its non-collector route). Preserve existing generated-file edits and keep them out of the source commit.
   The one place this boundary is written out, with its ibm.d runtime-output exception, is `consistency.md`.
 - The collector taxonomy (`taxonomy.yaml`, `gen_taxonomy.py`) is a dormant early implementation kept for later work;
   nothing runs it. Do not author, extend, or seed taxonomy content (`consistency.md`, "The dormant collector taxonomy").
@@ -31,6 +36,7 @@ Facts every reader needs:
 |---|---|
 | `consistency.md` | which artifacts move together, the delivery boundary, what CI enforces, the review checklist, the dormant taxonomy |
 | `integrations/README.md` | dependencies and the command list for a local run |
+| `how-tos/preview-collector-page.md` | selected collector prose; its non-collector route covers flows and other types in an isolated source copy |
 | `description-authoring.md` | the catalog sentence and the generated page meta description (the two cross-type description contracts) |
 | `recipes/add-go-collector.md`, `recipes/update-collector.md` | step-by-step for a new or changed go.d collector |
 | `ibm-d.md` | the ibm.d generation chain |

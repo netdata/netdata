@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Validate map.yaml against JSON Schema with additional custom rules.
+"""
+Validate map.yaml against JSON Schema with additional custom rules.
 
 This validator uses JSON Schema for structure validation and adds custom
-checks for rules that can't be expressed in JSON Schema, such as:
-- Nodes with integration_placeholder children can omit edit_url
+checks for rules that can't be expressed in JSON Schema:
+- Nodes without children (leaves) must have an edit_url
 - No duplicate edit_urls
+- A netdata/netdata edit_url must name a file in this repository
 
 Path reconstruction rule (for ingest):
 - Nodes WITH items array → label is the path segment (they define hierarchy)
@@ -15,10 +17,11 @@ Exit codes:
   1 - Validation failed
 """
 
+import re
 import sys
 import json
 from pathlib import Path
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Iterator, Tuple
 
 try:
     from ruamel.yaml import YAML
@@ -93,54 +96,58 @@ def format_schema_error(error: jsonschema.ValidationError) -> str:
     return f"[{path}] {error.message}"
 
 
-def check_has_integration_placeholder(items: List[Any]) -> bool:
-    """Check if a node's items contain an integration_placeholder."""
-    if not isinstance(items, list):
-        return False
-    return any(
-        isinstance(item, dict) and item.get("type") == "integration_placeholder"
-        for item in items
-    )
+# Only this repository's rows can be checked for a file; other repositories
+# are not part of this checkout.
+NETDATA_EDIT_URL = re.compile(
+    r"^https://github\.com/netdata/netdata/edit/[^/]+/(?P<path>.+)$"
+)
+
+
+def iter_sidebar_nodes(
+    nodes: Any, path: str = ""
+) -> Iterator[Tuple[str, Dict[str, Any], Dict[str, Any]]]:
+    """
+    Yield (node_path, node, meta) for every sidebar node, depth-first.
+
+    node_path joins the labels from the root. Integration placeholders and
+    nodes whose meta is not a mapping are skipped together with their children.
+    """
+    if not isinstance(nodes, list):
+        return
+    for node in nodes:
+        if not isinstance(node, dict) or node.get("type") == "integration_placeholder":
+            continue
+        meta = node.get("meta", {})
+        if not isinstance(meta, dict):
+            continue
+        label = meta.get("label", "???")
+        node_path = f"{path}/{label}" if path else label
+        yield node_path, node, meta
+        yield from iter_sidebar_nodes(node.get("items", []), node_path)
 
 
 def check_duplicate_edit_urls(
-    node: Any, path: str, edit_urls: Dict[str, str], errors: List[MapValidationError]
+    sidebar: List[Any], errors: List[MapValidationError]
 ) -> None:
-    """Recursively check for duplicate edit_urls."""
-    if not isinstance(node, dict):
-        return
-
-    # Skip integration placeholders
-    if node.get("type") == "integration_placeholder":
-        return
-
-    # Check meta
-    meta = node.get("meta", {})
-    if isinstance(meta, dict):
-        label = meta.get("label", "???")
-        node_path = f"{path}/{label}" if path else label
+    """Check that no two nodes share an edit_url."""
+    first_seen: Dict[str, str] = {}
+    for node_path, _, meta in iter_sidebar_nodes(sidebar):
         edit_url = meta.get("edit_url")
-
-        if edit_url and isinstance(edit_url, str):
-            if edit_url in edit_urls:
-                errors.append(
-                    MapValidationError(
-                        node_path,
-                        f"Duplicate edit_url: '{edit_url}' (first seen at {edit_urls[edit_url]})",
-                    )
+        if not edit_url or not isinstance(edit_url, str):
+            continue
+        if edit_url in first_seen:
+            errors.append(
+                MapValidationError(
+                    node_path,
+                    f"Duplicate edit_url: '{edit_url}' (first seen at {first_seen[edit_url]})",
                 )
-            else:
-                edit_urls[edit_url] = node_path
-
-        # Recurse into children
-        items = node.get("items", [])
-        if isinstance(items, list):
-            for item in items:
-                check_duplicate_edit_urls(item, node_path, edit_urls, errors)
+            )
+        else:
+            first_seen[edit_url] = node_path
 
 
 def check_integration_placeholder_rule(
-    node: Any, path: str, errors: List[MapValidationError]
+    sidebar: List[Any], errors: List[MapValidationError]
 ) -> None:
     """
     Check that leaf nodes have edit_url.
@@ -149,27 +156,10 @@ def check_integration_placeholder_rule(
     - Structural nodes (with children) may omit edit_url.
     - Leaf nodes (without children) must provide edit_url.
     """
-    if not isinstance(node, dict):
-        return
-
-    # Skip integration placeholders themselves
-    if node.get("type") == "integration_placeholder":
-        return
-
-    meta = node.get("meta", {})
-    if not isinstance(meta, dict):
-        return
-
-    label = meta.get("label", "???")
-    node_path = f"{path}/{label}" if path else label
-    edit_url = meta.get("edit_url")
-    items = node.get("items", [])
-
-    has_items = isinstance(items, list) and len(items) > 0
-
-    # If edit_url is missing, only structural category nodes are allowed.
-    if edit_url is None:
-        if not has_items:
+    for node_path, node, meta in iter_sidebar_nodes(sidebar):
+        items = node.get("items", [])
+        has_items = isinstance(items, list) and len(items) > 0
+        if meta.get("edit_url") is None and not has_items:
             errors.append(
                 MapValidationError(
                     node_path,
@@ -177,10 +167,34 @@ def check_integration_placeholder_rule(
                 )
             )
 
-    # Recurse into children
-    if isinstance(items, list):
-        for item in items:
-            check_integration_placeholder_rule(item, node_path, errors)
+
+def check_edit_url_files_exist(
+    sidebar: List[Any], repo_root: Path, errors: List[MapValidationError]
+) -> None:
+    """
+    Check that every netdata/netdata edit_url names a file in this repository.
+
+    Ingest publishes a row only when a source file matches its edit_url and
+    drops the row silently otherwise, so a deleted or renamed page would
+    vanish from Learn without an error.
+    """
+    root = repo_root.resolve()
+    for node_path, _, meta in iter_sidebar_nodes(sidebar):
+        edit_url = meta.get("edit_url")
+        match = NETDATA_EDIT_URL.match(edit_url) if isinstance(edit_url, str) else None
+        if not match:
+            continue
+        relative_path = match.group("path")
+        target = (root / relative_path).resolve()
+        if not (target.is_relative_to(root) and target.is_file()):
+            errors.append(
+                MapValidationError(
+                    node_path,
+                    f"edit_url names no file in this repository: {relative_path} "
+                    "(update edit_url to the file's current path, or remove the row of a "
+                    "retired page: docs/.map/README.md#unpublishing-files)",
+                )
+            )
 
 
 def validate_with_schema(data: dict, schema: dict) -> Tuple[bool, List[str]]:
@@ -194,10 +208,11 @@ def validate_with_schema(data: dict, schema: dict) -> Tuple[bool, List[str]]:
     return len(errors) == 0, errors
 
 
-def validate_custom_rules(data: dict) -> Tuple[bool, List[MapValidationError]]:
+def validate_custom_rules(
+    data: dict, repo_root: Path
+) -> Tuple[bool, List[MapValidationError]]:
     """Apply custom validation rules not expressible in JSON Schema."""
     errors: List[MapValidationError] = []
-    edit_urls: Dict[str, str] = {}
 
     # Guard against non-dict YAML root
     if not isinstance(data, dict):
@@ -211,20 +226,17 @@ def validate_custom_rules(data: dict) -> Tuple[bool, List[MapValidationError]]:
     if not isinstance(sidebar, list):
         return False, [MapValidationError("root", "sidebar must be a list")]
 
-    # Check for duplicate edit_urls
-    for node in sidebar:
-        check_duplicate_edit_urls(node, "", edit_urls, errors)
-
-    # Check integration placeholder rule
-    for node in sidebar:
-        check_integration_placeholder_rule(node, "", errors)
+    check_duplicate_edit_urls(sidebar, errors)
+    check_integration_placeholder_rule(sidebar, errors)
+    check_edit_url_files_exist(sidebar, repo_root, errors)
 
     return len(errors) == 0, errors
 
 
 def main():
     """Main validation routine."""
-    script_dir = Path(__file__).parent
+    script_dir = Path(__file__).resolve().parent
+    repo_root = script_dir.parents[1]
     yaml_path = script_dir / "map.yaml"
     schema_path = script_dir / "map.schema.json"
 
@@ -262,7 +274,7 @@ def main():
         all_errors.extend(f"  • {err}" for err in schema_errors)
 
     # Apply custom rules
-    custom_valid, custom_errors = validate_custom_rules(data)
+    custom_valid, custom_errors = validate_custom_rules(data, repo_root)
     if not custom_valid:
         if all_errors:
             all_errors.append("")

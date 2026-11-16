@@ -13,20 +13,22 @@ func TestDiscoverer_Discover(t *testing.T) {
 	tests := map[string]discoverySim{
 		"add listeners": {
 			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
-				cli.addListener("UDP|127.0.0.1|323|/usr/sbin/chronyd")
-				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP6|::|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP6|2001:DB8::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP|0.0.0.0|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP|192.0.2.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
-				cli.addListener("TCP46|*|80|/usr/sbin/httpd -k start")
-				cli.addListener("TCP6|::|80|/usr/sbin/apache2 -k start")
-				cli.addListener("TCP|0.0.0.0|80|/usr/sbin/apache2 -k start")
-				cli.addListener("TCP|0.0.0.0|8080|/usr/sbin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8080 -container-ip 172.17.0.4 -container-port 80")
-				cli.addListener("TCP6|::|8080|/usr/sbin/docker-proxy -proto tcp -host-ip :: -host-port 8080 -container-ip 172.17.0.4 -container-port 80")
+				cli.addListeners(
+					"UDP|127.0.0.1|323|/usr/sbin/chronyd",
+					"UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP6|::|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP6|2001:DB8::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP|0.0.0.0|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP|192.0.2.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+					"TCP46|*|80|/usr/sbin/httpd -k start",
+					"TCP6|::|80|/usr/sbin/apache2 -k start",
+					"TCP|0.0.0.0|80|/usr/sbin/apache2 -k start",
+					"TCP|0.0.0.0|8080|/usr/sbin/docker-proxy -proto tcp -host-ip 0.0.0.0 -host-port 8080 -container-ip 172.17.0.4 -container-port 80",
+					"TCP6|::|8080|/usr/sbin/docker-proxy -proto tcp -host-ip :: -host-port 8080 -container-ip 172.17.0.4 -container-port 80",
+				)
 				time.Sleep(interval * 2)
 			},
 			wantGroups: []model.TargetGroup{&targetGroup{
@@ -86,13 +88,17 @@ func TestDiscoverer_Discover(t *testing.T) {
 		},
 		"remove listeners; not expired": {
 			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
-				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				cli.addListeners(
+					"UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+				)
 				time.Sleep(interval * 2)
-				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				cli.removeListeners(
+					"UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+				)
 				time.Sleep(interval * 2)
 			},
 			wantGroups: []model.TargetGroup{&targetGroup{
@@ -128,13 +134,17 @@ func TestDiscoverer_Discover(t *testing.T) {
 		},
 		"remove listeners; expired": {
 			listenersCli: func(cli listenersCli, interval, expiry time.Duration) {
-				cli.addListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.addListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				cli.addListeners(
+					"UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"TCP|127.0.0.1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+				)
 				time.Sleep(interval * 2)
-				cli.removeListener("UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D")
-				cli.removeListener("UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1")
+				cli.removeListeners(
+					"UDP6|::1|8125|/opt/netdata/usr/sbin/netdata -P /run/netdata/netdata.pid -D",
+					"UDP|127.0.0.1|53768|/opt/netdata/usr/libexec/netdata/plugins.d/go.d.plugin 1",
+				)
 				time.Sleep(expiry * 2)
 			},
 			wantGroups: []model.TargetGroup{&targetGroup{

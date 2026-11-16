@@ -1,0 +1,16 @@
+{
+  "username": "netdata on node",
+  "allowed_mentions": {"parse": []},
+  "embeds": [
+    {
+      "title": "WARNING: summary",
+      "color": 16426522,
+      "timestamp": "2026-09-14T12:00:00Z",
+      "fields": [
+        {"name": "Node", "value": "node", "inline": true},
+        {"name": "Alert", "value": "alert", "inline": true},
+        {"name": "Status", "value": "WARNING", "inline": true}
+      ]
+    }
+  ]
+}

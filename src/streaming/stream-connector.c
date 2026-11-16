@@ -126,93 +126,6 @@ static struct {
     }
 };
 
-#define CONN_UPGRADE_VAL "upgrade"
-static int stream_connect_upgrade_prelude(RRDHOST *host __maybe_unused, struct sender_state *s) {
-
-    char http[HTTP_HEADER_SIZE + 1];
-    snprintfz(http, HTTP_HEADER_SIZE,
-              "GET " NETDATA_STREAM_URL HTTP_1_1 HTTP_ENDL
-              "Upgrade: " NETDATA_STREAM_PROTO_NAME HTTP_ENDL
-              "Connection: Upgrade"
-              HTTP_HDR_END);
-
-    ssize_t bytes;
-    bytes = nd_sock_send_timeout(&s->sock, http, strlen(http), 0, 1000);
-    if (bytes <= 0) {
-        error_report("Error writing to remote");
-        return 1;
-    }
-
-    bytes = nd_sock_recv_timeout(&s->sock, http, HTTP_HEADER_SIZE, 0, 1000);
-    if (bytes <= 0) {
-        error_report("Error reading from remote");
-        return 1;
-    }
-
-    rbuf_t buf = rbuf_create(bytes, bytes);
-    rbuf_push(buf, http, bytes);
-
-    http_parse_ctx ctx;
-    http_parse_ctx_create(&ctx, HTTP_PARSE_INITIAL);
-    ctx.flags |= HTTP_PARSE_FLAG_DONT_WAIT_FOR_CONTENT;
-
-    int rc;
-    //    while((rc = parse_http_response(buf, &ctx)) == HTTP_PARSE_NEED_MORE_DATA);
-    rc = parse_http_response(buf, &ctx);
-
-    if (rc != HTTP_PARSE_SUCCESS) {
-        error_report("Failed to parse HTTP response sent. (%d)", rc);
-        goto err_cleanup;
-    }
-    if (ctx.http_code == HTTP_RESP_MOVED_PERM) {
-        const char *hdr = get_http_header_by_name(&ctx, "location");
-        if (hdr)
-            error_report("HTTP response is %d Moved Permanently (location: \"%s\") instead of expected %d Switching Protocols.", ctx.http_code, hdr, HTTP_RESP_SWITCH_PROTO);
-        else
-            error_report("HTTP response is %d instead of expected %d Switching Protocols.", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
-        goto err_cleanup;
-    }
-    if (ctx.http_code == HTTP_RESP_NOT_FOUND) {
-        error_report("HTTP response is %d instead of expected %d Switching Protocols. Parent version too old.", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
-        // TODO set some flag here that will signify parent is older version
-        // and to try connection without rrdpush_http_upgrade_prelude next time
-        goto err_cleanup;
-    }
-    if (ctx.http_code != HTTP_RESP_SWITCH_PROTO) {
-        error_report("HTTP response is %d instead of expected %d Switching Protocols", ctx.http_code, HTTP_RESP_SWITCH_PROTO);
-        goto err_cleanup;
-    }
-
-    const char *hdr = get_http_header_by_name(&ctx, "connection");
-    if (!hdr) {
-        error_report("Missing \"connection\" header in reply");
-        goto err_cleanup;
-    }
-    if (strncmp(hdr, CONN_UPGRADE_VAL, strlen(CONN_UPGRADE_VAL)) != 0) {
-        error_report("Expected \"connection: " CONN_UPGRADE_VAL "\"");
-        goto err_cleanup;
-    }
-
-    hdr = get_http_header_by_name(&ctx, "upgrade");
-    if (!hdr) {
-        error_report("Missing \"upgrade\" header in reply");
-        goto err_cleanup;
-    }
-    if (strncmp(hdr, NETDATA_STREAM_PROTO_NAME, strlen(NETDATA_STREAM_PROTO_NAME)) != 0) {
-        error_report("Expected \"upgrade: " NETDATA_STREAM_PROTO_NAME "\"");
-        goto err_cleanup;
-    }
-
-    netdata_log_debug(D_STREAM, "STREAM SNDer upgrade to \"" NETDATA_STREAM_PROTO_NAME "\" successful");
-    rbuf_free(buf);
-    http_parse_ctx_destroy(&ctx);
-    return 0;
-err_cleanup:
-    rbuf_free(buf);
-    http_parse_ctx_destroy(&ctx);
-    return 1;
-}
-
 static bool
 stream_connect_validate_first_response(RRDHOST *host, struct sender_state *s, char *http, size_t http_length) {
     int32_t version = STREAM_HANDSHAKE_CONNECT_HANDSHAKE_FAILED;
@@ -326,13 +239,6 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     buffer_strcat(wb, HTTP_1_1 HTTP_ENDL);
     buffer_sprintf(wb, "User-Agent: %s/%s" HTTP_ENDL, rrdhost_program_name(host), rrdhost_program_version(host));
     buffer_strcat(wb, "Accept: */*" HTTP_HDR_END);
-
-    if (s->parent_using_h2o && stream_connect_upgrade_prelude(host, s)) {
-        worker_is_busy(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION);
-        nd_sock_close(&s->sock);
-        stream_parent_set_host_connect_failure_reason(host, STREAM_HANDSHAKE_SND_DISCONNECT_HTTP_UPGRADE_FAILED, 60);
-        return false;
-    }
 
     ssize_t len = (ssize_t)buffer_strlen(wb);
     ssize_t bytes = nd_sock_send_timeout(&s->sock, (void *)buffer_tostring(wb), len, 0, timeout);
@@ -508,7 +414,6 @@ void stream_connector_add(struct sender_state *s) {
     stream_sender_unlock(s);
 
     nd_sock_close(&s->sock);
-    s->parent_using_h2o = stream_send.parents.h2o;
 
     stream_parents_host_reset(s->host, 0);
 
@@ -541,7 +446,6 @@ static void stream_connector_thread(void *ptr) {
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_REMOVED, "removed");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_BAD_HANDSHAKE, "bad handshake");
     worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_TIMEOUT, "timeout");
-    worker_register_job_name(WORKER_SENDER_CONNECTOR_JOB_DISCONNECT_CANT_UPGRADE_CONNECTION, "cant upgrade");
 
     worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_QUEUED_NODES, "queued nodes", "nodes", WORKER_METRIC_ABSOLUTE);
     worker_register_job_custom_metric(WORKER_SENDER_CONNECTOR_JOB_CONNECTED_NODES, "connected nodes", "nodes", WORKER_METRIC_ABSOLUTE);

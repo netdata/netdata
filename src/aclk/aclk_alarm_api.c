@@ -8,17 +8,27 @@
 
 #include "aclk.h"
 
-void aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
+#include "mqtt_websockets/mqtt_wss_client.h"
+
+ACLK_ALARM_LOG_SEND_RESULT aclk_send_alarm_log_entry(struct alarm_log_entry *log_entry)
 {
     size_t payload_size;
     char *payload = generate_alarm_log_entry(&payload_size, log_entry);
 
     if (!payload) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to generate payload");
-        return;
+        return ACLK_ALARM_LOG_DROPPED;
     }
 
-    aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry");
+    int rc = aclk_send_bin_msg(payload, payload_size, ACLK_TOPICID_ALARM_LOG, "AlarmLogEntry");
+    if (rc == MQTT_WSS_ERR_MSG_TOO_BIG) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "Alert log entry of %zu bytes is too big for the server; dropping it", payload_size);
+        return ACLK_ALARM_LOG_DROPPED;
+    }
+    if (rc)
+        return ACLK_ALARM_LOG_SEND_FAILED;
+
+    return ACLK_ALARM_LOG_SENT;
 }
 
 void aclk_send_provide_alarm_cfg(struct provide_alarm_configuration *cfg)

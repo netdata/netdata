@@ -9,8 +9,10 @@ package protocol
 const StringReverseHdrSize = 8
 
 // StringReverseView is the decoded result of a STRING_REVERSE payload.
+// Str borrows the decoded buffer (excluding the NUL), so it is valid only
+// while that buffer is not reused.
 type StringReverseView struct {
-	Str    string
+	Str    []byte
 	StrLen uint32
 }
 
@@ -48,7 +50,8 @@ func stringReverseEncodedLen(strLen int) (int, bool) {
 	return total, ok
 }
 
-// StringReverseDecode decodes a STRING_REVERSE payload from buf.
+// StringReverseDecode decodes a STRING_REVERSE payload from buf without
+// copying: Str borrows buf.
 func StringReverseDecode(buf []byte) (StringReverseView, error) {
 	if len(buf) < StringReverseHdrSize {
 		return StringReverseView{}, ErrTruncated
@@ -77,13 +80,14 @@ func StringReverseDecode(buf []byte) (StringReverseView, error) {
 		return StringReverseView{}, ErrMissingNul
 	}
 	return StringReverseView{
-		Str:    string(buf[strOffset:strEnd]),
+		Str:    buf[strOffset:strEnd:strEnd],
 		StrLen: strLength32,
 	}, nil
 }
 
 // DispatchStringReverse decodes request, calls handler, encodes response.
-func DispatchStringReverse(req []byte, resp []byte, handler func(string) (string, bool)) (int, bool) {
+// The handler's argument borrows req and is valid only during the call.
+func DispatchStringReverse(req []byte, resp []byte, handler func([]byte) (string, bool)) (int, bool) {
 	view, err := StringReverseDecode(req)
 	if err != nil {
 		return 0, false

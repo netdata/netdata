@@ -177,6 +177,15 @@ airdrop-sharing: sharingd
 > `apps.plugin` attempts to obtain the full process name by searching for it in the **cmdline**.
 > If successful, the entire process name is used; otherwise, the shortened version is used.
 
+On Linux, FreeBSD and macOS, command lines are read when a process is first observed, when its
+operating-system process name changes, and every 30 collection iterations. Periodic reads are staggered across processes and also retry failed reads. Changes that
+leave the process name unchanged can take up to 30 iterations to appear (30 seconds at the default
+one-second collection interval). Changed command lines refresh process matching and any groups
+inherited by descendants. A failed read keeps the command line already known for the process, unless
+its process name has just changed. Matching falls back to the process name when no command line is
+known, when a read after a process name change fails, or when a read returns an empty command line
+(for example, a zombie process on Linux). Windows reads the command line once, when it first sees the process.
+
 #### Windows process fields
 
 | Field   | Description                                                      | Example                                                                   |
@@ -214,6 +223,7 @@ You can use asterisks (`*`) to create patterns:
 - On Unix-like systems: Searches within the full command line including arguments
 - On Windows: Searches within the full command line including arguments (e.g., `"C:\Program Files\Mozilla Firefox\firefox.exe" -ProfileManager`)
 
+- Process names are matched exactly as the operating system reports them, including parentheses. For example, systemd names its PAM helper `(sd-pam)`, and its service processes show names like `(nginx)` for a moment before they start the service binary. The patterns `sd-pam` and `*pam` do not match `(sd-pam)`; `(sd-pam)` and `(sd-pam*` do. Substring patterns such as `*pam*` search the command line instead.
 - Asterisks can be placed anywhere within pattern (e.g., `fi*fox`) without affecting the matching criteria (**comm** or **cmdline**).
 - To include process names with spaces, enclose them in quotes (single or double), like this: `'Plex Media Serv'` or `"my other process"`.
 - **Substring patterns that contain spaces** — such as a pattern matching part of a command line including arguments — must be enclosed in quotes too; otherwise the spaces split the pattern into separate entries. For example, `'*my_app.exe --mode production*'` is one substring pattern, while the unquoted `*my_app.exe --mode production*` is read as three separate patterns (`*my_app.exe`, `--mode`, `production*`).
@@ -297,6 +307,41 @@ For example, to disable user and user group charts you would set:
 [plugin:apps]
   command options = without-users without-groups
 ```
+
+### Lifetime and limits of dynamic groups
+
+Process groups found automatically in the process tree, users, user groups, and (on Windows) users by SID and
+services are created when their first process appears. Two command options bound how many of them have charts:
+
+- `retire-targets-after SECONDS` (default `3600`): when no process has belonged to such a group for this long, its
+  charts are marked obsolete and removed. If the group comes back later, its charts are created again, normally under
+  the same name (a `_2`, `_3`, ... suffix is added only if another group took that chart name meanwhile). The minimum
+  is 2 data collection iterations.
+- `max-targets N` (default `500`, minimum `1`): the maximum number of these groups, per family (application groups,
+  users, user groups, SIDs, services), that get their own charts. New groups beyond the limit are aggregated into an
+  `other` instance of their family (`app.other_*`, `user.other_*`, ...), and an info message is logged once per
+  family. If a real group is also called `other`, whichever of the two is created second gets the `_2` suffix
+  (`other_2_*`). A process placed into `other` moves to its own group again once retirement frees a slot.
+
+Groups defined in `apps_groups.conf` are never retired and do not count against the limit, so define the processes
+that must always have their own charts there.
+
+```text
+[plugin:apps]
+  command options = retire-targets-after 7200 max-targets 1000
+```
+
+Both values must be whole numbers: `retire-targets-after` from `0` and `max-targets` from `1`, up to `2147483647`.
+apps.plugin exits with an error otherwise.
+
+The chart `netdata.apps_targets` shows the number of these groups per family, and `netdata.apps_targets_retired`
+the rate at which they are retired (targets/s).
+
+Two names can sanitize to the same chart ID (for example `a.b` and `a_b`); the later one gets a numeric suffix
+(`a_b_2`) so that each group keeps its own charts.
+
+The eBPF page cache hit ratio of a group is computed from the totals of its current processes, so it is less precise
+for groups whose processes come and go often, including `other`.
 
 ### Memory Estimation with PSS Sampling
 

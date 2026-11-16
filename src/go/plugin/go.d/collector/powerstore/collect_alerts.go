@@ -2,11 +2,13 @@
 
 package powerstore
 
-func (c *Collector) collectAlerts() {
+import "context"
+
+func (c *Collector) collectAlerts(ctx context.Context) {
 	c.sem <- struct{}{}
 	defer func() { <-c.sem }()
 
-	alerts, err := c.client.Alerts("ACTIVE")
+	alerts, err := c.client.Alerts(ctx, "ACTIVE")
 	if err != nil {
 		c.Warningf("error collecting alerts: %v", err)
 		return

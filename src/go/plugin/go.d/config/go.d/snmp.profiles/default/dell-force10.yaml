@@ -19,18 +19,22 @@ metadata:
 
 metrics:
   - MIB: F10-S-SERIES-CHASSIS-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.2 # chStackUnitCpuUtil5Sec
-      name: cpu.usage
-      chart_meta:
-        family: 'System/CPU/Usage'
-        description: The current CPU utilization
-        unit: "%"
-  - MIB: F10-S-SERIES-CHASSIS-MIB
-    symbol:
-      OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.5
-      name: memory.usage
-      chart_meta:
-        family: 'System/Memory/Usage'
-        description: Total memory usage in percentage.
-        unit: "%"
+    table:
+      OID: 1.3.6.1.4.1.6027.3.10.1.2.9
+      name: chStackUnitUtilTable
+    symbols:
+      - OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.2 # chStackUnitCpuUtil5Sec
+        name: cpu.usage
+        chart_meta:
+          family: 'System/CPU/Usage'
+          description: The current CPU utilization
+          unit: "%"
+      - OID: 1.3.6.1.4.1.6027.3.10.1.2.9.1.5 # chStackUnitMemUsageUtil
+        name: memory.usage
+        chart_meta:
+          family: 'System/Memory/Usage'
+          description: Total memory usage in percentage.
+          unit: "%"
+    metric_tags:
+      - tag: stack_unit_index
+        index: 1 # chStackUnitNumber

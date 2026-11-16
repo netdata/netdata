@@ -24,15 +24,11 @@ configuration.
 
 ## Mandatory Requirements (READ FIRST)
 
-1. **Provide actionable instructions.** Each answer ends in a
-   runnable curl command.
-2. **Never request credentials.** Use `YOUR_API_TOKEN`,
-   `YOUR_NODE_UUID`, etc. placeholders.
-3. **Read actions are GET; write actions are POST.** Cloud's
-   permission gate is `PermissionFunctionExecPrivileged` for the
-   write paths. A read-only token cannot mutate configuration.
-4. **The `action=tree` listing is the entry point.** Always start
-   there; the IDs returned are the inputs to all other actions.
+Follow [Choose The Task](./SKILL.md#choose-the-task) for explain, review and execution requests, and
+[Safe Execution](./SKILL.md#safe-execution) for local setup, credentials and response handling.
+
+- Read actions use GET; write actions use POST. Mutations require authorization for the specific action and target.
+- Use `action=tree` to discover configuration IDs when they are not already known; returned IDs feed other actions.
 
 ---
 
@@ -40,14 +36,15 @@ configuration.
 
 ### Cloud-proxied (preferred)
 
-| Method | Path | Purpose | Permission |
+| Method | Path | Purpose | Historical permission guidance |
 |---|---|---|---|
 | `GET` | `/api/v2/nodes/{nodeID}/config?action=tree&path=/` | List configuration objects | `nodeAuth()` |
 | `GET` | `/api/v2/nodes/{nodeID}/config?action=<read-action>&id=<id>` | Read one configuration | `nodeAuth()` |
 | `POST` | `/api/v2/nodes/{nodeID}/config?action=<write-action>&id=<id>[&name=<name>]` | Mutate configuration (body = the configuration JSON) | `PermissionFunctionExecPrivileged` |
 
-Cloud-side route registration:
-`cloud-charts-service/http/http.go:150-151`.
+The route and permission annotations above are historical Cloud guidance, not a verified current server contract.
+`nodeAuth()` and `PermissionFunctionExecPrivileged` were associated with `cloud-charts-service/http/http.go`;
+confirm current endpoint restrictions and target-space access before relying on those exact gates.
 
 ### Direct-agent (fallback)
 
@@ -109,13 +106,16 @@ DynCfg uses HTTP-like codes verified against
 | Code | Meaning |
 |---|---|
 | 200 | Running -- accepted and active |
-| 202 | Accepted -- queued, not yet running |
+| 202 | Accepted -- configuration accepted; check `status` for current health |
 | 298 | Accepted but disabled |
 | 299 | Accepted but restart required |
 | 400 | Bad request / invalid configuration |
 | 404 | Configuration id not found |
 | 500 | Internal error |
 | 501 | Action not implemented for this object |
+
+For mutation replies, rejection versus indeterminate transport outcomes, and Go collector acceptance before runtime
+readiness, use `src/plugins.d/DYNCFG.md#3-process-commands-and-respond`.
 
 ---
 
@@ -160,12 +160,12 @@ Each tree entry contains configuration objects with their own ids
 ### Example 1: list every configuration object on a node
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=tree&path=/"
+agents_query_cloud GET \
+  "/api/v2/nodes/$NODE/config?action=tree&path=/"
 ```
 
 Response top level (verified live): `{agent, attention, tree,
@@ -176,13 +176,13 @@ sources.
 ### Example 2: get the JSON Schema for an alert prototype
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ID="health:alert:prototype:ram_usage"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=schema&id=$(printf %s "$ID" | jq -sRr @uri)"
+agents_query_cloud GET \
+  "/api/v2/nodes/$NODE/config?action=schema&id=$(printf %s "$ID" | jq -sRr @uri)"
 ```
 
 The schema describes which fields the configuration accepts and is
@@ -192,58 +192,58 @@ the basis for any UI form. Use this before constructing an
 ### Example 3: read the current value of a configuration
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ID="health:alert:prototype:ram_usage"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=get&id=$(printf %s "$ID" | jq -sRr @uri)"
+agents_query_cloud GET \
+  "/api/v2/nodes/$NODE/config?action=get&id=$(printf %s "$ID" | jq -sRr @uri)"
 ```
 
 ### Example 4: add a new go.d.plugin job to a template
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 TPL_ID="go.d:nginx"
 JOB_NAME="local_server"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "url":             "http://127.0.0.1:80/stub_status",
   "update_every":    5,
   "timeout":         2
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=add&id=$(printf %s "$TPL_ID" | jq -sRr @uri)&name=$JOB_NAME" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/config?action=add&id=$(printf %s "$TPL_ID" | jq -sRr @uri)&name=$JOB_NAME" \
+  "$PAYLOAD"
 ```
 
 ### Example 5: test a configuration without applying it
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 TPL_ID="go.d:nginx"
 JOB_NAME="local_server"
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "url":          "http://127.0.0.1:80/stub_status",
   "update_every": 5
 }
 EOF
+)"
 
-curl -sS -X POST \
-  -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=test&id=$(printf %s "$TPL_ID" | jq -sRr @uri)&name=$JOB_NAME" \
-  -d "$PAYLOAD"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/config?action=test&id=$(printf %s "$TPL_ID" | jq -sRr @uri)&name=$JOB_NAME" \
+  "$PAYLOAD"
 ```
 
 A successful response means the resource accepted its supported test, not
@@ -257,31 +257,30 @@ test does NOT make the change persistent.
 ### Example 6: enable / disable a configuration
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ID="go.d:nginx:local_server"
 
 # Enable
-curl -sS -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=enable&id=$(printf %s "$ID" | jq -sRr @uri)"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/config?action=enable&id=$(printf %s "$ID" | jq -sRr @uri)"
 
 # Disable
-curl -sS -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=disable&id=$(printf %s "$ID" | jq -sRr @uri)"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/config?action=disable&id=$(printf %s "$ID" | jq -sRr @uri)"
 ```
 
 ### Example 7: remove a dyncfg-created job
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ID="go.d:nginx:local_server"
 
-curl -sS -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=remove&id=$(printf %s "$ID" | jq -sRr @uri)"
+agents_query_cloud POST \
+  "/api/v2/nodes/$NODE/config?action=remove&id=$(printf %s "$ID" | jq -sRr @uri)"
 ```
 
 Only objects whose `source_type == DYNCFG_SOURCE_TYPE_DYNCFG` (i.e.
@@ -291,14 +290,14 @@ removed.
 ### Example 8: get a job's user-friendly configuration (for conf-file export)
 
 ```bash
-TOKEN="YOUR_API_TOKEN"
+source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
+agents_load_env
 NODE="YOUR_NODE_UUID"
 ID="go.d:nginx"
 JOB_NAME="local_server"
 
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  "https://app.netdata.cloud/api/v2/nodes/$NODE/config?action=userconfig&id=$(printf %s "$ID" | jq -sRr @uri)&name=$JOB_NAME"
+agents_query_cloud GET \
+  "/api/v2/nodes/$NODE/config?action=userconfig&id=$(printf %s "$ID" | jq -sRr @uri)&name=$JOB_NAME"
 ```
 
 ---

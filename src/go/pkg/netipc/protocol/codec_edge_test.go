@@ -544,7 +544,7 @@ func TestStringReverseRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if view.Str != s {
+	if string(view.Str) != s {
 		t.Fatalf("expected %q, got %q", s, view.Str)
 	}
 	if view.StrLen != uint32(len(s)) {
@@ -563,7 +563,7 @@ func TestStringReverseEncodeEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if view.Str != "" {
+	if len(view.Str) != 0 {
 		t.Fatalf("expected empty, got %q", view.Str)
 	}
 }
@@ -630,9 +630,9 @@ func TestDispatchStringReverseSuccess(t *testing.T) {
 	StringReverseEncode(input, reqBuf)
 
 	respBuf := make([]byte, 128)
-	n, ok := DispatchStringReverse(reqBuf, respBuf, func(s string) (string, bool) {
-		// Reverse the string
-		b := []byte(s)
+	n, ok := DispatchStringReverse(reqBuf, respBuf, func(s []byte) (string, bool) {
+		// Reverse a copy: s borrows the request buffer.
+		b := append([]byte(nil), s...)
 		for i, j := 0, len(b)-1; i < j; i, j = i+1, j-1 {
 			b[i], b[j] = b[j], b[i]
 		}
@@ -649,14 +649,14 @@ func TestDispatchStringReverseSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	if view.Str != "olleh" {
+	if string(view.Str) != "olleh" {
 		t.Fatalf("expected 'olleh', got %q", view.Str)
 	}
 }
 
 func TestDispatchStringReverseBadRequest(t *testing.T) {
-	_, ok := DispatchStringReverse([]byte{0}, make([]byte, 128), func(s string) (string, bool) {
-		return s, true
+	_, ok := DispatchStringReverse([]byte{0}, make([]byte, 128), func(s []byte) (string, bool) {
+		return string(s), true
 	})
 	if ok {
 		t.Fatal("expected failure for bad request")
@@ -668,7 +668,7 @@ func TestDispatchStringReverseHandlerFails(t *testing.T) {
 	reqBuf := make([]byte, StringReverseHdrSize+len(input)+1)
 	StringReverseEncode(input, reqBuf)
 
-	_, ok := DispatchStringReverse(reqBuf, make([]byte, 128), func(s string) (string, bool) {
+	_, ok := DispatchStringReverse(reqBuf, make([]byte, 128), func([]byte) (string, bool) {
 		return "", false
 	})
 	if ok {
@@ -682,7 +682,7 @@ func TestDispatchStringReverseRespTooSmall(t *testing.T) {
 	StringReverseEncode(input, reqBuf)
 
 	// Response buffer too small for result
-	n, ok := DispatchStringReverse(reqBuf, make([]byte, 2), func(s string) (string, bool) {
+	n, ok := DispatchStringReverse(reqBuf, make([]byte, 2), func([]byte) (string, bool) {
 		return "very long response string", true
 	})
 	if ok {

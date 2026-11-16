@@ -22,3 +22,16 @@ def test_github_params_rejected_off_github():
 def test_url_rejected_on_github():
     err = validate_source_params("github", url="http://x", collections=None, start=None, rate=None)
     assert err is not None and "url" in err
+
+
+def test_ris_params_accepted_on_ris():
+    assert validate_source_params(
+        "ris", url="wss://z", collections=None, start=None, rate=None, host="rrc00", msg_type="UPDATE",
+    ) is None
+
+
+def test_ris_params_rejected_off_ris():
+    err = validate_source_params(
+        "jetstream", url=None, collections=None, start=None, rate=None, host="rrc00", msg_type="UPDATE",
+    )
+    assert err is not None and "host (ris only)" in err and "msg_type (ris only)" in err

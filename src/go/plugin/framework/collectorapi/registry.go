@@ -60,8 +60,19 @@ type (
 		Config             func() any
 		JobConfigLifecycle JobConfigLifecycle
 
+		// ActivationDependencies selects named prerequisites without acquiring
+		// them. Changed enabled bindings are structurally validated before admission
+		// so unavailable prerequisites cannot hide malformed configuration.
+		// The borrowed raw configuration must not be retained or mutated.
+		ActivationDependencies func(map[string]any) ([]ActivationDependency, error)
+
 		// InstancePolicy defaults to InstancePolicyPerJob when omitted.
 		InstancePolicy InstancePolicy
+
+		// StoreFirst enables the Agent's store_first option for all collector-produced
+		// V2 charts. It is fixed for all jobs of this collector and defaults to false.
+		// V1 charts and framework self-metrics retain their own options.
+		StoreFirst bool
 
 		// Optional: SharedFunctions declares static job-backed Functions shared
 		// by all jobs of this module. InstancePolicy controls whether they are

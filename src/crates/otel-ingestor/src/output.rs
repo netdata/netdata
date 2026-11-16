@@ -1,64 +1,58 @@
-//! Output formatting for Netdata plugin protocol emission.
+//! The OTLP metrics charts as chart-protocol text: a chart's definition
+//! (`CHART`, `CLABEL`, `CLABEL_COMMIT`, `DIMENSION`), its data slots
+//! (`BEGIN`, `SET`, `END`) and its obsolete mark.
+//!
+//! The lines are written by `netdata_plugin_protocol`, the owner of the rules
+//! that keep a line parseable by the agent; this module only decides what goes
+//! into them. Everything here comes from a sender (metric names, descriptions,
+//! units, attribute keys and values), so nothing is written verbatim: text
+//! fields go through the protocol crate's quoting, and chart.rs makes the ids
+//! valid with its `sanitize_*` functions before they come here. A malformed
+//! command stops the agent's parser, and the agent then restarts or disables
+//! the whole plugin (`src/plugins.d/plugins_d.c`), logs and traces included.
+//!
+//! These bytes are the ingestor's agent-facing output: chart.rs writes each
+//! definition, data slot and obsolete mark as one block, the lib.rs tick loop
+//! sends the blocks in chunks as `IngestorResponse::ChartData`, and the
+//! otel-plugin supervisor writes each chunk to stdout as it is. Line order
+//! here is wire order.
+//!
+//! Consumers: chart.rs uses everything here; metrics_service.rs only
+//! [`ChartType`].
 
-use std::fmt::{self, Write as _};
+use netdata_plugin_protocol::{
+    ChartLine, ChartOptions, DimensionAlgorithm, DimensionLine, DimensionOptions, LabelSource,
+    write_begin, write_chart, write_clabel, write_clabel_commit, write_dimension, write_end,
+    write_set_empty, write_set_int,
+};
 
-/// The Netdata chart type.
-#[derive(Debug, Clone, Copy, Default)]
-pub enum ChartType {
-    #[default]
-    Line,
-    Heatmap,
-}
+/// The chart rendering type. This ingestor emits only `Line` and `Heatmap`:
+/// line for every chart except the histogram bucket charts
+/// (metrics_service.rs).
+pub use netdata_plugin_protocol::ChartType;
 
-impl fmt::Display for ChartType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ChartType::Line => f.write_str("line"),
-            ChartType::Heatmap => f.write_str("heatmap"),
-        }
-    }
-}
-
-/// Fixed precision divisor for float-to-integer scaling.
+/// Fixed-point divisor shared by SET and DIMENSION.
 ///
-/// Netdata SET values are integers. To preserve decimal precision,
-/// we multiply the float value by this divisor before truncating to i64,
-/// and declare the same divisor in the DIMENSION line so Netdata divides
-/// it back out for display: `displayed = SET_value * 1 / DIVISOR`.
-pub const PRECISION_DIVISOR: i64 = 1000;
+/// SET values on the wire are integers, so float values are multiplied by
+/// this divisor and truncated to i64; every DIMENSION declares it as its
+/// divisor (multiplier 1), and the agent scales back when storing:
+/// `value = SET_value * 1 / 1000` (src/database/rrdset-collection.c). This
+/// preserves three decimal digits of the original float.
+const PRECISION_DIVISOR: i64 = 1000;
 
-/// Wrapper that sanitizes a string for use inside single-quoted plugin protocol fields.
-///
-/// The Netdata plugin protocol uses single quotes to delimit fields in CHART
-/// and CLABEL lines, and is line-based (`\n`-delimited). Two characters can
-/// break the agent's parser:
-///
-/// - `'` — breaks the quote-delimited field boundaries.
-/// - `\n` / `\r` — breaks line-based parsing; the agent's buffered reader
-///   splits on `\n`, so an embedded newline turns one command into two
-///   malformed lines, causing the agent to kill the plugin.
-///
-/// There is no escape mechanism, so we replace `'` with `"` and newlines
-/// with their escaped representation (`\n`, `\r`).
-struct SanitizedQuote<'a>(&'a str);
+/// Dashboard order of every OTLP metrics chart.
+const PRIORITY: i32 = 1;
 
-impl fmt::Display for SanitizedQuote<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for ch in self.0.chars() {
-            match ch {
-                '\'' => f.write_char('"')?,
-                '\n' => f.write_str("\\n")?,
-                '\r' => f.write_str("\\r")?,
-                _ => f.write_char(ch)?,
-            }
-        }
-        Ok(())
-    }
-}
-
-/// A Netdata chart definition (CHART + CLABEL + DIMENSION block).
+/// A chart definition: one `CHART` line, then the labels and a
+/// `CLABEL_COMMIT` when there are labels, then one `DIMENSION` line per entry
+/// in `dimensions`, in that order.
+///
+/// The agent requires this block before the first `BEGIN` for the chart, so
+/// chart.rs emits it once per (re)definition and only then streams data
+/// slots via [`write_data_slot`].
 pub struct ChartDefinition {
-    pub chart_name: String,
+    /// A valid chart id (`netdata_plugin_protocol::sanitize_chart_id`).
+    pub chart_id: String,
     pub title: String,
     pub units: String,
     pub family: String,
@@ -66,52 +60,81 @@ pub struct ChartDefinition {
     pub chart_type: ChartType,
     pub update_every: u64,
     pub labels: Vec<(String, String)>,
+    /// The dimensions' ids, valid ones
+    /// (`netdata_plugin_protocol::sanitize_dimension_id`); a dimension's
+    /// display name is its id.
     pub dimensions: Vec<String>,
 }
 
-impl fmt::Display for ChartDefinition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(
-            f,
-            "CHART {} '' '{}' '{}' '{}' '{}' {} 1 {} 'store_first'",
-            self.chart_name,
-            SanitizedQuote(&self.title),
-            SanitizedQuote(&self.units),
-            SanitizedQuote(&self.family),
-            SanitizedQuote(&self.context),
-            self.chart_type,
-            self.update_every,
-        )?;
+impl ChartDefinition {
+    /// Write the chart's obsolete mark into `buf`: its `CHART` line with the
+    /// `obsolete` option. The agent then stops expecting updates and frees
+    /// the chart after its cleanup delay; a later definition revives it.
+    pub fn write_obsolete(&self, buf: &mut Vec<u8>) {
+        self.write_chart_line(buf, true);
+    }
 
+    fn write_chart_line(&self, buf: &mut Vec<u8>, obsolete: bool) {
+        // The alternate name stays empty: the agent keys the chart by id
+        // alone. `store_first` keeps the first collected point instead of
+        // dropping it during interpolation (src/database/rrdset.h).
+        write_chart(
+            buf,
+            &ChartLine {
+                id: &self.chart_id,
+                name: "",
+                title: &self.title,
+                units: &self.units,
+                family: &self.family,
+                context: &self.context,
+                chart_type: self.chart_type,
+                priority: PRIORITY,
+                update_every: self.update_every,
+                options: ChartOptions {
+                    obsolete,
+                    store_first: true,
+                    hidden: false,
+                },
+            },
+        );
+    }
+
+    /// Write the definition block into `buf`.
+    pub fn write(&self, buf: &mut Vec<u8>) {
+        self.write_chart_line(buf, false);
+
+        // The commit applies the set: labels not re-sent since the last
+        // commit are removed.
         if !self.labels.is_empty() {
             for (key, value) in &self.labels {
-                writeln!(
-                    f,
-                    "CLABEL '{}' '{}' 1",
-                    SanitizedQuote(key),
-                    SanitizedQuote(value),
-                )?;
+                write_clabel(buf, key, value, LabelSource::Auto);
             }
-            writeln!(f, "CLABEL_COMMIT")?;
+            write_clabel_commit(buf);
         }
 
-        for dim_name in &self.dimensions {
-            writeln!(
-                f,
-                "DIMENSION {} {} absolute 1 {}",
-                dim_name, dim_name, PRECISION_DIVISOR,
-            )?;
+        // `absolute` stores each SET value as it is, scaled by multiplier /
+        // divisor.
+        for id in &self.dimensions {
+            write_dimension(
+                buf,
+                &DimensionLine {
+                    id,
+                    name: id,
+                    algorithm: DimensionAlgorithm::Absolute,
+                    multiplier: 1,
+                    divisor: PRECISION_DIVISOR,
+                    options: DimensionOptions::default(),
+                },
+            );
         }
-
-        Ok(())
     }
-}
 
-impl ChartDefinition {
-    /// Sort dimensions numerically (ascending), treating "+Inf" as infinity.
+    /// Sort `dimensions` numerically ascending, with `+Inf` last.
     ///
-    /// Used for heatmap charts where Netdata preserves the plugin-defined
-    /// dimension order and the dashboard renders buckets in that order.
+    /// Names that fail to parse are also treated as `+Inf`. Used for heatmap
+    /// charts: the agent preserves DIMENSION order, so this is what puts
+    /// histogram buckets in ascending order on the dashboard. chart.rs sorts
+    /// before emitting a heatmap definition.
     pub fn sort_dimensions_numerically(&mut self) {
         self.dimensions.sort_by(|a, b| {
             let a_val = if a == "+Inf" {
@@ -131,41 +154,41 @@ impl ChartDefinition {
     }
 }
 
-/// A dimension value ready for output.
+/// One dimension value in a data slot. `None` renders as `SET <id> =`, which
+/// stores no value for that dimension in this update.
 #[derive(Debug)]
 pub struct DimensionValue {
-    pub name: String,
+    /// The dimension's id, as in [`ChartDefinition::dimensions`].
+    pub id: String,
     pub value: Option<f64>,
 }
 
-/// Write a data slot (BEGIN + SET for each dimension + END).
+/// Write one data slot: BEGIN, one SET per dimension in slice order, END.
 ///
-/// `update_every` is the collection interval in seconds.
-/// `slot_timestamp` is the slot-start boundary (floored to `update_every`).
+/// `update_every` is the collection interval in seconds; `slot_timestamp`
+/// is the slot's start boundary, already floored to `update_every` by
+/// chart.rs.
 ///
-/// BEGIN receives the interval converted to microseconds.
-/// END receives `slot_timestamp + update_every` — the slot-end boundary —
-/// because Netdata interprets a data point at time T as covering
-/// `[T - update_every, T]`.
+/// BEGIN carries the interval in microseconds: the agent uses it as the
+/// time since the previous update. END carries `slot_timestamp +
+/// update_every` — the slot's end boundary — because the agent timestamps
+/// the point at END: a point at time T covers `[T - update_every, T]`.
 pub fn write_data_slot(
-    f: &mut impl fmt::Write,
-    chart_name: &str,
+    buf: &mut Vec<u8>,
+    chart_id: &str,
     update_every: u64,
     slot_timestamp: u64,
     dimensions: &[DimensionValue],
-) -> fmt::Result {
-    writeln!(f, "BEGIN {} {}", chart_name, update_every * 1_000_000)?;
+) {
+    write_begin(buf, chart_id, update_every * 1_000_000);
 
-    for dim in dimensions {
-        match dim.value {
-            Some(v) => {
-                let scaled = (v * PRECISION_DIVISOR as f64) as i64;
-                writeln!(f, "SET {} = {}", dim.name, scaled)?;
-            }
-            None => writeln!(f, "SET {} =", dim.name)?,
+    for dimension in dimensions {
+        let id = &dimension.id;
+        match dimension.value {
+            Some(value) => write_set_int(buf, id, (value * PRECISION_DIVISOR as f64) as i64),
+            None => write_set_empty(buf, id),
         }
     }
 
-    writeln!(f, "END {}", slot_timestamp + update_every)?;
-    Ok(())
+    write_end(buf, slot_timestamp + update_every);
 }

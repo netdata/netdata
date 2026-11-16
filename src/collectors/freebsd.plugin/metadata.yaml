@@ -59,27 +59,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: load_cpu_number
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
-        metric: system.load
-        info: number of active CPU cores in the system
-        os: "linux"
-      - name: load_average_15
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
-        metric: system.load
-        info: system fifteen-minute load average
-        os: "linux"
-      - name: load_average_5
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
-        metric: system.load
-        info: system five-minute load average
-        os: "linux"
-      - name: load_average_1
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/load.conf
-        metric: system.load
-        info: system one-minute load average
-        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -166,11 +145,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: active_processes
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/processes.conf
-        metric: system.active_processes
-        info: system process IDs (PID) space utilization
     metrics:
       folding:
         title: Metrics
@@ -259,27 +233,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding iowait, nice and steal)
-        os: "linux"
-      - name: 10min_cpu_iowait
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU iowait time over the last 10 minutes
-        os: "linux"
-      - name: 20min_steal_cpu
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU steal time over the last 20 minutes
-        os: "linux"
-      - name: 10min_cpu_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cpu.conf
-        metric: system.cpu
-        info: average CPU utilization over the last 10 minutes (excluding nice)
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -374,7 +327,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -451,7 +403,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -469,6 +420,86 @@ modules:
               chart_type: line
               dimensions:
                 - name: frequency
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: hw.acpi.battery
+      monitored_instance:
+        name: hw.acpi.battery
+        description: "Monitor the remaining capacity of FreeBSD ACPI batteries through sysctl."
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - battery
+        - power supply
+    overview:
+      data_collection:
+        metrics_description: "Read the remaining battery capacity that the ACPI battery driver reports for all batteries combined."
+        method_description: "The plugin reads the `hw.acpi.battery.units` and `hw.acpi.battery.life` sysctls. When the host has several batteries, the kernel combines them into one capacity percentage."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: "The module stops on hosts without the ACPI battery driver, where the `hw.acpi.battery` sysctls do not exist. When the driver reports no batteries, the chart is removed; when it cannot read a valid capacity, the chart shows a gap."
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: hw.acpi.battery
+              description: Enable or disable the battery capacity metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: power device
+          description: "All ACPI batteries combined into one device."
+          labels:
+            - name: device
+              description: "Always `acpi_battery`, because the kernel combines every battery into one reading."
+          metrics:
+            - name: powersupply.capacity
+              description: Battery Capacity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: capacity
   - meta:
       plugin_name: freebsd.plugin
       module_name: hw.intrcnt
@@ -528,7 +559,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -611,7 +641,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -688,7 +717,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -765,7 +793,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -848,12 +875,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: used_swap
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf
-        metric: mem.swap
-        info: swap memory utilization
-        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -872,6 +893,84 @@ modules:
               dimensions:
                 - name: free
                 - name: used
+  - meta:
+      plugin_name: freebsd.plugin
+      module_name: vm.swap_reserved
+      monitored_instance:
+        name: vm.swap_reserved
+        description: "Monitor FreeBSD committed (allocated) anonymous memory through sysctl."
+        link: "https://www.freebsd.org/"
+        categories:
+          - data-collection.operating-systems
+        icon_filename: "freebsd.svg"
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ""
+      keywords:
+        - committed memory
+        - overcommit
+    overview:
+      data_collection:
+        metrics_description: "Read how much anonymous memory the kernel has reserved for running processes. This is the amount of swap that would be needed to back all allocated anonymous memory, the same accounting Linux reports as Committed_AS."
+        method_description: "The plugin reads the `vm.swap_reserved` sysctl. The kernel tracks it whatever the `vm.overcommit` setting is."
+      supported_platforms:
+        include: []
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: ""
+      default_behavior:
+        auto_detection:
+          description: ""
+        limits:
+          description: ""
+        performance_impact:
+          description: ""
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: "netdata.conf"
+          section_name: "[plugin:freebsd]"
+          description: "The netdata main configuration file"
+        options:
+          description: ""
+          folding:
+            title: ""
+            enabled: true
+          list:
+            - name: vm.swap_reserved
+              description: Enable or disable the committed memory metric.
+              default_value: yes
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ""
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: ""
+      availability: []
+      scopes:
+        - name: global
+          description: "Committed memory for the whole system."
+          labels: []
+          metrics:
+            - name: mem.committed
+              description: Committed (Allocated) Memory
+              unit: "MiB"
+              chart_type: area
+              dimensions:
+                - name: Committed_AS
   - meta:
       plugin_name: freebsd.plugin
       module_name: system.ram
@@ -931,27 +1030,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
-        metric: system.ram
-        info: system memory utilization
-        os: "linux"
-      - name: ram_in_use
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
-        metric: system.ram
-        info: system memory utilization
-        os: "freebsd"
-      - name: ram_available
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
-        metric: mem.available
-        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
-        os: "linux"
-      - name: ram_available
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf
-        metric: mem.available
-        info: percentage of estimated amount of RAM available for userspace processes, without causing swapping
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1039,12 +1117,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 30min_ram_swapped_out
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf
-        metric: mem.swapio
-        info: percentage of the system RAM swapped in the last 30 minutes
-        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1122,7 +1194,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1131,7 +1202,7 @@ modules:
       availability: []
       scopes:
         - name: global
-          description: "The number of page faults happened on host."
+          description: "The number of page faults happened on host. Linux and Windows chart the same context with `minor` and `major` dimensions: FreeBSD `memory` counts every fault (as Linux `minor` does) and `io_requiring` counts major faults that needed I/O."
           labels: []
           metrics:
             - name: mem.pgfaults
@@ -1203,17 +1274,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: semaphores_used
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf
-        metric: system.ipc_semaphores
-        info: IPC semaphore utilization
-        os: "linux"
-      - name: semaphore_arrays_used
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ipc.conf
-        metric: system.ipc_semaphore_arrays
-        info: IPC semaphore arrays utilization
-        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -1296,7 +1356,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1379,7 +1438,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1469,7 +1527,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -1550,24 +1607,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 1min_netdev_backlog_exceeded
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf
-        metric: system.softnet_stat
-        info: average number of dropped packets in the last minute due to exceeded net.core.netdev_max_backlog
-        os: "linux"
-      - name: 1min_netdev_budget_ran_outs
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf
-        metric: system.softnet_stat
-        info:
-          average number of times ksoftirq ran out of sysctl net.core.netdev_budget or net.core.netdev_budget_usecs with work remaining over the last
-          minute (this can be a cause for dropped packets)
-        os: "linux"
-      - name: 10min_netisr_backlog_exceeded
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/softnet.conf
-        metric: system.softnet_stat
-        info: average number of drops in the last minute due to exceeded sysctl net.route.netisr_maxqlen (this can be a cause for dropped packets)
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1672,7 +1711,11 @@ modules:
               default_value: auto
               required: false
             - name: utilization percentage for all disks
-              description: Enable or disable utilization percentage for all disks metric.
+              description: Enable or disable utilization percentage and busy time for all disks metrics.
+              default_value: auto
+              required: false
+            - name: backlog for all disks
+              description: Enable or disable backlog for all disks metric.
               default_value: auto
               required: false
             - name: i/o time for all disks
@@ -1703,12 +1746,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 10min_disk_utilization
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
-        metric: disk.util
-        info: average percentage of time ${label:device} disk was busy over the last 10 minutes
-        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -1728,8 +1765,10 @@ modules:
                 - name: io
                 - name: out
         - name: disk
-          description: ""
-          labels: []
+          description: "A disk or storage array reported by devstat."
+          labels:
+            - name: device
+              description: "devstat device name and unit number (for example ada0, da1, or nvd0)."
           metrics:
             - name: disk.io
               description: Disk I/O Bandwidth
@@ -1754,6 +1793,18 @@ modules:
               chart_type: line
               dimensions:
                 - name: operations
+            - name: disk.backlog
+              description: Disk Backlog
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: backlog
+            - name: disk.busy
+              description: Disk Busy Time
+              unit: "milliseconds"
+              chart_type: area
+              dimensions:
+                - name: busy
             - name: disk.util
               description: Disk Utilization Time
               unit: "% of time working"
@@ -1851,12 +1902,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: tcp_connections
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_conn.conf
-        metric: ipv4.tcpsock
-        info: IPv4 TCP connections utilization
-        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -1960,31 +2005,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 1m_ipv4_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of sent TCP RESETS over the last minute
-        os: "linux"
-      - name: 10s_ipv4_tcp_resets_sent
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info:
-          average number of sent TCP RESETS over the last 10 seconds. This can indicate a port scan, or that a service running on this host has
-          crashed. Netdata will not send a clear notification for this alarm.
-        os: "linux"
-      - name: 1m_ipv4_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info: average number of received TCP RESETS over the last minute
-        os: "linux freebsd"
-      - name: 10s_ipv4_tcp_resets_received
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf
-        metric: ipv4.tcphandshake
-        info:
-          average number of received TCP RESETS over the last 10 seconds. This can be an indication that a service this host needs has crashed.
-          Netdata will not send a clear notification for this alarm.
-        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -2123,17 +2143,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: 1m_ipv4_udp_receive_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf
-        metric: ipv4.udperrors
-        info: average number of UDP receive buffer errors over the last minute
-        os: "linux freebsd"
-      - name: 1m_ipv4_udp_send_buffer_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/udp_errors.conf
-        metric: ipv4.udperrors
-        info: average number of UDP send buffer errors over the last minute
-        os: "linux"
     metrics:
       folding:
         title: Metrics
@@ -2229,7 +2238,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2336,7 +2344,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2455,7 +2462,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2588,7 +2594,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2738,7 +2743,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts: []
     metrics:
       folding:
         title: Metrics
@@ -2786,7 +2790,7 @@ modules:
       module_name: getifaddrs
       monitored_instance:
         name: getifaddrs
-        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, and collision events."
+        description: "Monitor FreeBSD network interface traffic, packets, errors, drops, collision events, link state, speed, duplex, and MTU."
         link: "https://www.freebsd.org/"
         categories:
           - data-collection.networking
@@ -2799,8 +2803,8 @@ modules:
       keywords: []
     overview:
       data_collection:
-        metrics_description: "Collect traffic per network interface."
-        method_description: "The plugin calls `getifaddrs` function to collect necessary data."
+        metrics_description: "Collect traffic and link information per network interface and expose the `network-interfaces` Function table. Unavailable link readings appear as unknown or null."
+        method_description: "The plugin uses `getifaddrs` for interface and address counters and `SIOCGIFMEDIA` for validated media state. Media fields may be unavailable for some interfaces."
       supported_platforms:
         include: []
         exclude: []
@@ -2868,12 +2872,32 @@ modules:
               description: Enable or disable collisions for all interface metric.
               default_value: auto
               required: false
+            - name: speed for all interfaces
+              description: Enable speed charts where the active media and line rate are available.
+              default_value: auto
+              required: false
+            - name: duplex for all interfaces
+              description: Enable duplex state charts. Unknown is shown when the media does not report duplex.
+              default_value: auto
+              required: false
+            - name: operstate for all interfaces
+              description: Enable operational state charts derived from administrative and link state.
+              default_value: auto
+              required: false
+            - name: carrier for all interfaces
+              description: Enable physical link state charts where the kernel reports a known link state.
+              default_value: auto
+              required: false
+            - name: mtu for all interfaces
+              description: Enable interface MTU charts where the kernel reports an MTU.
+              default_value: auto
+              required: false
             - name: disable by default interfaces matching
               description: Do not display data for intterfaces listed.
               default_value: lo*
               required: false
             - name: set physical interfaces for system.net
-              description: Do not show network traffic for listed interfaces.
+              description: Include matching interfaces in the physical-interface aggregates and classify them as physical in the network-interfaces Function.
               default_value: igb* ix* cxl* em* ixl* ixlv* bge* ixgbe* vtnet* vmx* re* igc* dwc*
               required: false
         examples:
@@ -2884,42 +2908,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: interface_speed
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.net
-        info: network interface ${label:device} current speed
-        os: "*"
-      - name: inbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.drops
-        info: ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "*"
-      - name: outbound_packets_dropped_ratio
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.drops
-        info: ratio of outbound dropped packets for the network interface ${label:device} over the last 10 minutes
-        os: "*"
-      - name: 1m_received_packets_rate
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.packets
-        info: average number of packets received by the network interface ${label:device} over the last minute
-        os: "linux freebsd"
-      - name: 10s_received_packets_storm
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.packets
-        info: ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute
-        os: "linux freebsd"
-      - name: interface_inbound_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.errors
-        info: number of inbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
-      - name: interface_outbound_errors
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf
-        metric: net.errors
-        info: number of outbound errors for the network interface ${label:device} in the last 10 minutes
-        os: "freebsd"
     metrics:
       folding:
         title: Metrics
@@ -2963,7 +2951,11 @@ modules:
                 - name: sent
         - name: network device
           description: ""
-          labels: []
+          labels:
+            - name: interface_type
+              description: "`real` when the interface matches the configured physical-interface pattern; otherwise `unknown`."
+            - name: device
+              description: "The network interface name."
           metrics:
             - name: net.net
               description: Bandwidth
@@ -3001,6 +2993,41 @@ modules:
               chart_type: line
               dimensions:
                 - name: collisions
+            - name: net.speed
+              description: Interface Speed, available only with valid active media and a reported line rate
+              unit: "kilobits/s"
+              chart_type: line
+              dimensions:
+                - name: speed
+            - name: net.duplex
+              description: Interface Duplex State
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: full
+                - name: half
+                - name: unknown
+            - name: net.operstate
+              description: Interface Operational State. FreeBSD reports only up, down, or unknown; the additional Linux states are not emitted
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+                - name: unknown
+            - name: net.carrier
+              description: Interface Physical Link State, available only for a known kernel link state
+              unit: "state"
+              chart_type: line
+              dimensions:
+                - name: up
+                - name: down
+            - name: net.mtu
+              description: Interface MTU
+              unit: "octets"
+              chart_type: line
+              dimensions:
+                - name: mtu
   - meta:
       plugin_name: freebsd.plugin
       module_name: getmntinfo
@@ -3076,17 +3103,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: disk_space_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
-        metric: disk.space
-        info: disk ${label:mount_point} space utilization
-        os: "linux freebsd"
-      - name: disk_inode_usage
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf
-        metric: disk.inodes
-        info: disk ${label:mount_point} inode utilization
-        os: "linux freebsd"
     metrics:
       folding:
         title: Metrics
@@ -3173,11 +3189,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: zfs_memory_throttle
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/zfs.conf
-        metric: zfs.memory_ops
-        info: number of times ZFS had to limit the ARC growth in the last 10 minutes
     metrics:
       folding:
         title: Metrics

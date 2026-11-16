@@ -3,6 +3,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -74,8 +75,8 @@ Relationships:
 */
 
 // New creates new ScaleIO client.
-func New(client web.ClientConfig, request web.RequestConfig) (*Client, error) {
-	httpClient, err := web.NewHTTPClient(client)
+func New(ctx context.Context, client web.ClientConfig, request web.RequestConfig) (*Client, error) {
+	httpClient, err := web.NewHTTPClient(ctx, client)
 	if err != nil {
 		return nil, err
 	}
@@ -99,12 +100,12 @@ func (c *Client) LoggedIn() bool {
 }
 
 // Login connects to FxFlex Gateway to get the token that is used for later authentication for other requests.
-func (c *Client) Login() error {
+func (c *Client) Login(ctx context.Context) error {
 	if c.LoggedIn() {
-		_ = c.Logout()
+		_ = c.Logout(ctx)
 	}
 	req := c.createLoginRequest()
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return err
@@ -120,22 +121,22 @@ func (c *Client) Login() error {
 }
 
 // Logout sends logout request and unsets token.
-func (c *Client) Logout() error {
+func (c *Client) Logout(ctx context.Context) error {
 	if !c.LoggedIn() {
 		return nil
 	}
 	req := c.createLogoutRequest()
 	c.token.unset()
 
-	resp, err := c.do(req)
+	resp, err := c.do(ctx, req)
 	defer web.CloseBody(resp)
 	return err
 }
 
 // APIVersion returns FxFlex Gateway API version.
-func (c *Client) APIVersion() (Version, error) {
+func (c *Client) APIVersion(ctx context.Context) (Version, error) {
 	req := c.createAPIVersionRequest()
-	resp, err := c.doOK(req)
+	resp, err := c.doOK(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return Version{}, err
@@ -144,19 +145,19 @@ func (c *Client) APIVersion() (Version, error) {
 }
 
 // SelectedStatistics returns selected statistics.
-func (c *Client) SelectedStatistics(query SelectedStatisticsQuery) (SelectedStatistics, error) {
+func (c *Client) SelectedStatistics(ctx context.Context, query SelectedStatisticsQuery) (SelectedStatistics, error) {
 	b, _ := json.Marshal(query)
 	req := c.createSelectedStatisticsRequest(b)
 	var stats SelectedStatistics
-	err := c.doJSONWithRetry(&stats, req)
+	err := c.doJSONWithRetry(ctx, &stats, req)
 	return stats, err
 }
 
 // Instances returns all instances.
-func (c *Client) Instances() (Instances, error) {
+func (c *Client) Instances(ctx context.Context) (Instances, error) {
 	req := c.createInstancesRequest()
 	var instances Instances
-	err := c.doJSONWithRetry(&instances, req)
+	err := c.doJSONWithRetry(ctx, &instances, req)
 	return instances, err
 }
 
@@ -209,16 +210,16 @@ func (c *Client) createInstancesRequest() web.RequestConfig {
 	return req
 }
 
-func (c *Client) do(req web.RequestConfig) (*http.Response, error) {
-	httpReq, err := web.NewHTTPRequest(req)
+func (c *Client) do(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	httpReq, err := web.NewHTTPRequest(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating http request to %s: %v", req.URL, err)
 	}
 	return c.httpClient.Do(httpReq)
 }
 
-func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
-	resp, err := c.do(req)
+func (c *Client) doOK(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	resp, err := c.do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -228,17 +229,17 @@ func (c *Client) doOK(req web.RequestConfig) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
-	resp, err := c.do(req)
+func (c *Client) doOKWithRetry(ctx context.Context, req web.RequestConfig) (*http.Response, error) {
+	resp, err := c.do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	if resp.StatusCode == http.StatusUnauthorized {
-		if err = c.Login(); err != nil {
+		if err = c.Login(ctx); err != nil {
 			return resp, err
 		}
 		req.Password = c.token.get()
-		return c.doOK(req)
+		return c.doOK(ctx, req)
 	}
 	if err = checkStatusCode(resp); err != nil {
 		err = fmt.Errorf("%s returned %v", req.URL, err)
@@ -246,8 +247,8 @@ func (c *Client) doOKWithRetry(req web.RequestConfig) (*http.Response, error) {
 	return resp, err
 }
 
-func (c *Client) doJSONWithRetry(dst any, req web.RequestConfig) error {
-	resp, err := c.doOKWithRetry(req)
+func (c *Client) doJSONWithRetry(ctx context.Context, dst any, req web.RequestConfig) error {
+	resp, err := c.doOKWithRetry(ctx, req)
 	defer web.CloseBody(resp)
 	if err != nil {
 		return err

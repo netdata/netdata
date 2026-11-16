@@ -82,7 +82,7 @@ func TestTopologyDiagnosticsReplayMatchesLiveTypedPayload(t *testing.T) {
 			replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 			require.NoError(t, err)
 			require.Equal(t,
-				topologyv1test.NormalizeData(t, live),
+				topologyv1test.NormalizeData(t, live.Data),
 				topologyv1test.NormalizeData(t, replayed),
 			)
 			require.NoError(t, topologyv1test.ValidateData(replayed))
@@ -102,7 +102,7 @@ func TestTopologyDiagnosticsReplayExcludesOnlyPTRDerivedPresentation(t *testing.
 	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
 
-	liveNormalized := topologyv1test.NormalizeData(t, live)
+	liveNormalized := topologyv1test.NormalizeData(t, live.Data)
 	replayedNormalized := topologyv1test.NormalizeData(t, replayed)
 	require.NotEqual(t, liveNormalized, replayedNormalized)
 	liveActorID := topologyNormalizedActorIDByManagementIP(t, liveNormalized, "192.0.2.71")
@@ -127,7 +127,7 @@ func TestTopologyDiagnosticsReplayUsesCompiledOUIKernel(t *testing.T) {
 	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
 
-	liveNormalized := topologyv1test.NormalizeData(t, live)
+	liveNormalized := topologyv1test.NormalizeData(t, live.Data)
 	replayedNormalized := topologyv1test.NormalizeData(t, replayed)
 	require.Equal(t, liveNormalized, replayedNormalized)
 	require.Equal(t,
@@ -161,7 +161,7 @@ func TestTopologyGenerationOwnsProducerScope(t *testing.T) {
 	replayed, err := openTestDiagnosticCut(t, diagnostics).Replay(testDiagnosticQuery(scenario.opts))
 	require.NoError(t, err)
 	require.Equal(t,
-		topologyv1test.NormalizeData(t, live),
+		topologyv1test.NormalizeData(t, live.Data),
 		topologyv1test.NormalizeData(t, replayed),
 	)
 }

@@ -1,17 +1,17 @@
-use super::common::{ensure_client_scratch, SERVER_POLL_TIMEOUT_MS};
+use super::common::ensure_client_scratch;
 use super::dispatch::{
-    dispatch_single_internal, method_supported_internal, server_note_payload_capacity,
-    DispatchError, DispatchHandler,
+    DispatchError, DispatchHandler, dispatch_single_internal, method_supported_internal,
+    server_note_payload_capacity,
 };
 use crate::protocol::{
-    self, batch_item_get, BatchBuilder, Header, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_MSG, STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED,
-    STATUS_OK, VERSION,
+    self, BatchBuilder, FLAG_BATCH, HEADER_SIZE, Header, KIND_REQUEST, KIND_RESPONSE, MAGIC_MSG,
+    STATUS_BAD_ENVELOPE, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK, VERSION,
+    batch_item_get,
 };
 use crate::transport::win_shm::WinShmContext;
 use crate::transport::windows::NpSession;
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
 /// Windows: handle one client session over Named Pipe + optional Win SHM.
 /// Standalone function for use in per-session threads.
@@ -21,6 +21,7 @@ pub(super) fn handle_session_win_threaded(
     expected_method_code: u16,
     handler: Option<DispatchHandler>,
     running: Arc<AtomicBool>,
+    poll_ms: u32,
     learned_request_payload_bytes: Arc<AtomicU32>,
     learned_response_payload_bytes: Arc<AtomicU32>,
     request_payload_growth_ceiling: u32,
@@ -34,7 +35,7 @@ pub(super) fn handle_session_win_threaded(
     while running.load(Ordering::Acquire) {
         let (hdr, payload) = {
             if let Some(ref mut shm_ctx) = shm {
-                match shm_ctx.receive(&mut recv_buf, SERVER_POLL_TIMEOUT_MS) {
+                match shm_ctx.receive(&mut recv_buf, poll_ms) {
                     Ok(mlen) => {
                         if mlen < HEADER_SIZE {
                             break;
@@ -46,11 +47,18 @@ pub(super) fn handle_session_win_threaded(
                         let payload = &recv_buf[HEADER_SIZE..mlen];
                         (hdr, payload)
                     }
-                    Err(crate::transport::win_shm::WinShmError::Timeout) => continue,
+                    Err(crate::transport::win_shm::WinShmError::Timeout) => {
+                        // A crashed client never sets the close flag; its
+                        // broken pipe is the only sign it left.
+                        if peer_disconnected(&session) {
+                            break;
+                        }
+                        continue;
+                    }
                     Err(_) => break,
                 }
             } else {
-                match session.wait_readable(SERVER_POLL_TIMEOUT_MS) {
+                match session.wait_readable(poll_ms) {
                     Ok(true) => {}
                     Ok(false) => continue,
                     Err(_) => break,
@@ -245,4 +253,14 @@ pub(super) fn handle_session_win_threaded(
         shm_ctx.destroy();
     }
     session.close();
+}
+
+/// Zero-wait probe of a session pipe. WinSHM sessions keep the pipe open for
+/// their whole life and the kernel breaks it when the peer exits, so a broken
+/// pipe is the dead-peer signal for both directions.
+pub(super) fn peer_disconnected(session: &crate::transport::windows::NpSession) -> bool {
+    matches!(
+        session.wait_readable(0),
+        Err(crate::transport::windows::NpError::Disconnected)
+    )
 }

@@ -41,4 +41,6 @@ chunk-file = { workspace = true }
 treight = { workspace = true }
 opentelemetry-proto = { workspace = true }
 tempfile = { workspace = true }
+# The gate suite counts warnings to pin once-per-file failure reports.
+tracing-subscriber = { workspace = true }
 uuid = { workspace = true }

@@ -428,7 +428,7 @@ func TestV1FencedCollectionPreservesCommittedState(t *testing.T) {
 			require.NoError(t, job.AutoDetectionManaged(context.Background()))
 			done := make(chan struct{})
 			go func() {
-				job.StartManaged(make(chan struct{}))
+				job.StartManaged(jobruntime.NewManagedRun(context.Background(), nil))
 				close(done)
 			}()
 			tickUntil := func(ch <-chan struct{}) {

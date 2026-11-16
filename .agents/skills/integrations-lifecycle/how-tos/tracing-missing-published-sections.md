@@ -21,7 +21,8 @@ python3 integrations/gen_integrations.py
 Inspect the matching object in `integrations/integrations.json` or `integrations/integrations.js`. The alerts template
 (`integrations/templates/alerts.md`) produces either the alert table or the explicit empty-state sentence.
 
-If the generated JSON has no alert table, investigate the Agent metadata, schema, filter, or template. Do not inspect
+If the generated JSON has no alert table, investigate the alert derivation (the declared contexts, the alert's filters,
+the integration's `excluded_alerts`, `integrations/health_alerts.py`), the schema, or the template. Do not inspect
 Website or Learn templates yet.
 
 ### 2. Verify the tracked Agent Markdown used by Learn
@@ -61,7 +62,9 @@ integration object contains a non-empty `alerts` value. Therefore:
 
 For an alerts omission, verify all of these independently:
 
-1. The source `metadata.yaml` contains the intended operator-facing alerts.
+1. The stock alert targets a context the source `metadata.yaml` declares (or is listed there by name), its filters admit
+   the integration, and the integration does not exclude it in `excluded_alerts`
+   (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1).
 2. Generated `integrations.json` contains the rendered alert table.
 3. Generated Agent Markdown contains the same alert table.
 4. The Agent regeneration pull request is based on the current source revision.

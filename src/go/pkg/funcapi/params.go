@@ -2,7 +2,10 @@
 
 package funcapi
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"slices"
+)
 
 // ParamSelection defines whether a required param allows single or multiple selections.
 type ParamSelection uint8
@@ -42,6 +45,8 @@ type ParamOption struct {
 	Disabled bool
 	// Sort includes a sort directive with the option.
 	Sort *FieldSort
+	// Aliases advertises alternate IDs accepted by the producer's parser.
+	Aliases []string
 	// Column is not serialized and can be used for safe SQL mapping.
 	Column string
 }
@@ -60,6 +65,10 @@ type ParamConfig struct {
 	Options []ParamOption
 	// UniqueView requests unique view behavior for the param in the UI.
 	UniqueView bool
+	// ValueSeparator advertises a joined-value encoding accepted by the producer.
+	ValueSeparator string
+	// Focus declares aggregate-first graph controls; absence retains ordinary source-side semantics.
+	Focus *FocusConfig
 }
 
 // RequiredParam converts ParamConfig to the wire format used by required_params.
@@ -75,6 +84,12 @@ func (p ParamConfig) RequiredParam() map[string]any {
 	}
 	if p.UniqueView {
 		out["unique_view"] = true
+	}
+	if p.ValueSeparator != "" {
+		out["value_separator"] = p.ValueSeparator
+	}
+	if p.Focus != nil {
+		out["focus"] = p.Focus.clone()
 	}
 	return out
 }
@@ -103,6 +118,9 @@ func buildParamOptions(opts []ParamOption) []map[string]any {
 		}
 		if opt.Sort != nil {
 			o["sort"] = opt.Sort.String()
+		}
+		if len(opt.Aliases) > 0 {
+			o["aliases"] = slices.Clone(opt.Aliases)
 		}
 		if opt.Default || (!hasDefault && i == 0) {
 			o["defaultSelected"] = true

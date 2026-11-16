@@ -345,6 +345,6 @@ func TestPrivateLinkEndpointProfiles_ResourceTagsJoinParentEndpoint(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, queries, 21, "one endpoint and two subnet children each export seven selected series")
 	for _, query := range queries {
-		assert.Equal(t, "platform", labelValue(query.tagLabels, "owner"), query.seriesName)
+		assert.Equal(t, "platform", labelValue(query.enrichmentLabels, "owner"), query.seriesName)
 	}
 }

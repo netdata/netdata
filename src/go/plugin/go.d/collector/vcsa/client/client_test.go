@@ -8,6 +8,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"context"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +30,7 @@ func TestClient_Login(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	assert.NoError(t, cl.Login())
+	assert.NoError(t, cl.Login(context.Background()))
 	assert.Equal(t, testSessToken, cl.token.get())
 }
 
@@ -38,7 +40,7 @@ func TestClient_LoginWrongCredentials(t *testing.T) {
 	cl := newTestClient(ts.URL)
 	cl.username += "!"
 
-	assert.Error(t, cl.Login())
+	assert.Error(t, cl.Login(context.Background()))
 }
 
 func TestClient_Logout(t *testing.T) {
@@ -46,8 +48,8 @@ func TestClient_Logout(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	assert.NoError(t, cl.Login())
-	assert.NoError(t, cl.Logout())
+	assert.NoError(t, cl.Login(context.Background()))
+	assert.NoError(t, cl.Logout(context.Background()))
 	assert.Zero(t, cl.token.get())
 }
 
@@ -56,8 +58,8 @@ func TestClient_Ping(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	assert.NoError(t, cl.Ping())
+	require.NoError(t, cl.Login(context.Background()))
+	assert.NoError(t, cl.Ping(context.Background()))
 }
 
 func TestClient_PingWithReAuthentication(t *testing.T) {
@@ -65,9 +67,9 @@ func TestClient_PingWithReAuthentication(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
+	require.NoError(t, cl.Login(context.Background()))
 	cl.token.set("")
-	assert.NoError(t, cl.Ping())
+	assert.NoError(t, cl.Ping(context.Background()))
 	assert.Equal(t, testSessToken, cl.token.get())
 }
 
@@ -76,8 +78,8 @@ func TestClient_ApplMgmt(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.ApplMgmt()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.ApplMgmt(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -87,8 +89,8 @@ func TestClient_DatabaseStorage(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.DatabaseStorage()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.DatabaseStorage(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -98,8 +100,8 @@ func TestClient_Load(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.Load()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.Load(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -109,8 +111,8 @@ func TestClient_Mem(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.Mem()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.Mem(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -120,8 +122,8 @@ func TestClient_SoftwarePackages(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.SoftwarePackages()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.SoftwarePackages(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -131,8 +133,8 @@ func TestClient_Storage(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.Storage()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.Storage(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -142,8 +144,8 @@ func TestClient_Swap(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.Swap()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.Swap(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -153,8 +155,8 @@ func TestClient_System(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	require.NoError(t, cl.Login())
-	v, err := cl.System()
+	require.NoError(t, cl.Login(context.Background()))
+	v, err := cl.System(context.Background())
 	assert.NoError(t, err)
 	assert.Equal(t, testHealthValue, v)
 }
@@ -166,7 +168,7 @@ func TestClient_InvalidDataOnLogin(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	assert.Error(t, cl.Login())
+	assert.Error(t, cl.Login(context.Background()))
 }
 
 func TestClient_404OnLogin(t *testing.T) {
@@ -176,7 +178,7 @@ func TestClient_404OnLogin(t *testing.T) {
 	defer ts.Close()
 	cl := newTestClient(ts.URL)
 
-	assert.Error(t, cl.Login())
+	assert.Error(t, cl.Login(context.Background()))
 }
 
 func newTestHTTPServer() *httptest.Server {

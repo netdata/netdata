@@ -13,6 +13,10 @@ static const char *lookup_status_name(uint16_t status)
             return "UNKNOWN_RETRY_LATER";
         case NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT:
             return "UNKNOWN_PERMANENT";
+        case NIPC_CGROUP_LOOKUP_PAYLOAD_EXCEEDED:
+            return "PAYLOAD_EXCEEDED";
+        case NIPC_CGROUP_LOOKUP_OVERSIZED_ITEM:
+            return "OVERSIZED_ITEM";
         default:
             return "INVALID";
     }

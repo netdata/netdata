@@ -14,13 +14,12 @@ Capture timing, authorization, and audience boundaries follow
 ## How-to authoring template
 
 Filename: `<slug>.md`. Sections: Question, Inputs, Steps (each
-calling one wrapper), Output, Notes / gotchas, Source guides.
+using the appropriate request or local-processing command), Output, Notes / gotchas, Source guides.
 
-Every code example must use the token-safe wrappers from
-`scripts/_lib.sh` (`agents_query_cloud`, `agents_query_agent`,
-`agents_call_function`). No raw curl with `Authorization: Bearer
-$TOKEN` or `X-Netdata-Auth: Bearer <uuid>` literals -- that
-defeats the no-token-leak guarantee.
+Credential-bearing requests MUST use `agents_query_cloud`, `agents_query_agent` or `agents_call_function` from
+`../scripts/_lib.sh`. Do not embed live auth headers in raw curl examples. Unauthenticated probes and local processing
+MAY use ordinary commands, as in the local flow validation recipe. Wrappers forward response bodies unchanged:
+capture or project sensitive fields before display; follow [Safe Execution](../SKILL.md#safe-execution).
 
 ## Index
 

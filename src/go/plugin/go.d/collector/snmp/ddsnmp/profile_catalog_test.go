@@ -575,6 +575,7 @@ func bgpValueSourceTables(row ddprofiledefinition.BGPConfig) []string {
 			tables[value.Table] = struct{}{}
 		}
 	}
+	add(row.Identity.ProcessID)
 	add(row.Identity.RoutingInstance)
 	add(row.Identity.Neighbor)
 	add(row.Identity.RemoteAS)

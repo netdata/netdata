@@ -7,6 +7,50 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 - Self-contained installation (no system dependencies required, no interference with system libraries)
 - Installed under `/opt/netdata`
 
+Pass `--preview-channel` after the archive's `--` separator to select preview releases for future updates:
+
+```sh
+sh netdata-x86_64-latest.gz.run -- --preview-channel
+```
+
+The installer also accepts `--stable-channel` and `--nightly-channel`; the default is nightly.
+
+## State permissions during updates
+
+Installation makes package directories traversable and initializes the service's library, cache and log roots.
+A build-generated inventory identifies the exact shipped paths; updates never discover directories by walking
+the installed tree. Application state directories outside shipped package paths retain their modes, including custom
+state paths outside the standard roots and execution-completion records. Paths occupied by shipped content remain
+installer-owned, including when a package directory is relocated through a symlink. Shared root initialization does
+not recursively change file owners. The eBPF ownership adjustment also targets exact shipped entries. Fleet preparation
+filters the inventory to match retained package content. The source installer's fallback directory setup uses the same
+ownership boundary.
+
+New root source installations create implicit executable directories without group/world write access. Existing shared
+source-install parents keep their administrator-selected permissions. Static installation and updates remove
+group/world write only from shipped executable directories identified by the package inventory, including parents
+recreated during extraction. This includes the private prefix, `bin`, `usr`, `usr/libexec` and
+`system` paths, not external parents or unlisted application descendants. This directory repair preserves plugin
+file modes, setuid bits and capabilities; the installer's existing per-plugin ownership and permission rules still apply.
+Explicit systemd-tmpfiles policies for database/claiming files and the historical static OTEL ownership repair still
+apply; an update is not a general recursive permission repair. Modes or owners changed by earlier updates are not
+automatically restored: recovery requires the affected application's intended permissions, which the installer cannot
+infer from the current state.
+
+The isolated regression suite exercises both directory-setup paths and actual makeself archive overlays:
+
+```sh
+python3 packaging/installer/tests/test_install_state.py -v
+sudo python3 packaging/installer/tests/test_install_state.py -v
+sudo python3 packaging/installer/tests/test_source_install_permissions.py -v
+```
+
+The Linux root run additionally verifies distinct state owners and the historical ownership repair. It tests
+systemd-tmpfiles only when that command is available; otherwise that case is reported as skipped.
+The source creation tests require CMake and make and exercise a real minimal install through the source installer's
+installation function, including preservation of existing shared directories and nonroot creation behavior.
+All fixtures live in temporary directories; the tests do not install services or change host Netdata directories.
+
 ## Supported Architectures
 
 | Architecture | Identifier | Notes                            |
@@ -17,6 +61,14 @@ Netdata provides pre-built static binaries for Linux systems where native packag
 | AArch64      | `aarch64`  | ARM 64-bit (Pi 4, newer devices) |
 
 ---
+
+## Prepare Packages for Edge Device Monitoring
+
+Reduce the installed size of Netdata on robots and other edge devices with the [fleet preparation script](https://github.com/netdata/netdata/blob/master/packaging/makeself/prepare-fleet.py). Run it on your build host to strip symbols and keep the optional capabilities your devices use, then include the reduced package in your device image.
+
+Preparation requires Python 3.9 or newer, a GNU binutils or LLVM strip tool supporting the target's Linux ELF files, and a build filesystem supporting Unix permissions, symbolic links and hard links. The guide includes Linux and macOS tool setup.
+
+See [Minimize the Disk Footprint of Fleet Devices](/docs/fleet-management/minimize-disk-footprint.md) for the capability policy, tools, validation and image-controlled updates. The standard static updater downloads the full package again, so reduced images need a fleet-managed release workflow.
 
 ## Build Process
 

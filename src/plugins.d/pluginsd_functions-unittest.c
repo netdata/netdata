@@ -67,6 +67,7 @@ struct c6ut_sends {
     size_t total;
     size_t cancels;
     size_t progresses;
+    size_t json_payloads;   // payload calls labelled application/json
     bool fail;              // simulate a plugin whose pipe is already gone
 };
 
@@ -77,6 +78,9 @@ static ssize_t c6ut_send_cb(const char *txt, void *data, STREAM_TRAFFIC_TYPE typ
         s->cancels++;
     if(strstr(txt, PLUGINSD_CALL_FUNCTION_PROGRESS))
         s->progresses++;
+    if(strncmp(txt, PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " ", strlen(PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN " ")) == 0 &&
+       strstr(txt, "\"application/json\"\n"))
+        s->json_payloads++;
     if(s->fail)
         return -1;
     return (ssize_t)strlen(txt);
@@ -1479,6 +1483,121 @@ int pluginsd_functions_unittest(void) {
 
         if(errors == before)
             fprintf(stderr, "  OK deadline/sync: the registered timeout is the fallback; a sync call leaves no transaction\n");
+    }
+
+    // 8. only strict JSON payloads are sent to plugins, so none can be read as protocol commands
+    {
+        int before = errors;
+
+        static const struct {
+            const char *name;
+            const char *payload;
+            size_t len;             // 0 = strlen(payload)
+            bool rejected;
+        } cases[] = {
+            { "object", "{\"url\":\"http://127.0.0.1/\",\"update_every\":1}", 0, false },
+            { "pretty object", "{\n  \"a\": 1,\r\n  \"b\": [\"x\", -0.5e+3, true, false, null]\n}\n", 0, false },
+            { "keyword value not at line start", "{\n  \"a\": \"FUNCTION QUIT\"\n}", 0, false },
+            { "quoted keyword key at line start", "{\n  \"FUNCTION_PAYLOAD\": 1\n}", 0, true },
+            { "quoted FUNCTION element (go.d tokenizes it as a call)", "[\"x\",\n\"FUNCTION\" ,0, 30 ,\"a\" ,\"b\" ,\"c\" ]", 0, true },
+            { "indented quoted QUIT element", "[\n\t\"QUIT\"\n]", 0, true },
+            { "quoted keyword prefix at line start", "{\n  \"FUNCTIONS_ENABLED\": true,\n  \"QUITE\": 1\n}", 0, false },
+            { "escapes", "{\"a\":\"x\\ny\\n\\u00e9\\\"\\/\"}", 0, false },
+            { "escaped end marker", "{\"a\":\"x\\nFUNCTION_PAYLOAD_END\\n\"}", 0, true },
+            { "end marker as a key", "{\"FUNCTION_PAYLOAD_END\":1}", 0, true },
+            { "top-level array", "[]", 0, false },
+            { "top-level string", "\"x\"", 0, false },
+            { "top-level number", "0", 0, false },
+            { "trailing data", "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"", 0, true },
+            { "plugins.d command", "FUNCTION_PAYLOAD x 30 \"config a test b\" \"0x0\" \"s\" application/json\n{}", 0, true },
+            { "raw newline in string", "{\"a\":\"x\nFUNCTION_PAYLOAD_END\n\"}", 0, true },
+            { "single-quoted string", "{'a':'x\nFUNCTION_PAYLOAD_END\n'}", 0, true },
+            { "raw tab in string", "{\"a\":\"x\ty\"}", 0, true },
+            { "comment", "{/*\nFUNCTION_PAYLOAD_END\n*/}", 0, true },
+            { "trailing comma", "{\"a\":1,}", 0, true },
+            { "NaN", "{\"a\":NaN}", 0, true },
+            { "leading zero", "{\"a\":01}", 0, true },
+            { "bad escape", "{\"a\":\"\\x\"}", 0, true },
+            { "short unicode escape", "{\"a\":\"\\u12\"}", 0, true },
+            { "unterminated", "{\"a\":[1,2", 0, true },
+            { "whitespace only", " \n", 0, true },
+            { "YAML", "url: http://127.0.0.1/\nupdate_every: 1\n", 0, true },
+            { "NUL byte", "{}\0", 3, true },
+        };
+
+        for(size_t i = 0; i < _countof(cases); i++) {
+            size_t len = cases[i].len ? cases[i].len : strlen(cases[i].payload);
+            const char *reason = functions_payload_validate(cases[i].payload, len);
+            if((reason != NULL) != cases[i].rejected) {
+                fprintf(stderr, "  FAILED payload: '%s' was %s\n",
+                        cases[i].name, reason ? "rejected" : "accepted");
+                errors++;
+            }
+        }
+
+        // nesting is bounded
+        {
+            char deep[600];
+            memset(deep, '[', 300);
+            memset(&deep[300], ']', 300);
+            if(!functions_payload_validate(deep, sizeof(deep))) {
+                fprintf(stderr, "  FAILED payload: 300 levels of nesting were accepted\n");
+                errors++;
+            }
+            if(functions_payload_validate(&deep[100], 400)) {
+                fprintf(stderr, "  FAILED payload: 200 levels of nesting were rejected\n");
+                errors++;
+            }
+        }
+
+        // the transport refuses an injecting payload with 400 and sends nothing
+        struct c6ut_sends sends = { 0 };
+        struct c6ut_result res = { 0 };
+        PARSER *parser = c6ut_parser_create(&sends);
+        usec_t stop_ut = now_monotonic_usec() + 60 * USEC_PER_SEC;
+        CLEAN_BUFFER *wb = buffer_create(0, NULL);
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        buffer_strcat(payload, "{}\nFUNCTION_PAYLOAD_END\nFUNCTION x 30 \"config a test b\" \"0x0\" \"s\"");
+
+        nd_uuid_t uuid;
+        uuid_generate_random(uuid);
+        struct nrpc_request req = {
+            .call_id = &uuid,
+            .function = "c8-payload-fn",
+            .payload = payload,
+            .source = "unittest",
+            .user_access = HTTP_ACCESS_ALL,
+            .stop_monotonic_ut = &stop_ut,
+            .result = { .wb = wb, .cb = c6ut_result_cb, .data = &res },
+        };
+
+        int code = pluginsd_nrpc_handler(&req, parser->inflight.transport);
+        if(code != HTTP_RESP_BAD_REQUEST || res.calls != 1 || res.code != HTTP_RESP_BAD_REQUEST) {
+            fprintf(stderr, "  FAILED payload: injecting payload returned %d, delivered %zu times with %d, expected 400 once\n",
+                    code, res.calls, res.code);
+            errors++;
+        }
+        if(sends.total != 0) {
+            fprintf(stderr, "  FAILED payload: injecting payload reached the plugin (%zu sends)\n", sends.total);
+            errors++;
+        }
+
+        // a clean payload is still sent
+        buffer_flush(payload);
+        buffer_strcat(payload, "{\"url\":\"http://127.0.0.1/\"}");
+        payload->content_type = CT_TEXT_PLAIN;
+        uuid_generate_random(uuid);
+        code = pluginsd_nrpc_handler(&req, parser->inflight.transport);
+        if(code != HTTP_RESP_OK || sends.total != 1 || sends.json_payloads != 1) {
+            fprintf(stderr, "  FAILED payload: clean payload returned %d with %zu sends (%zu as JSON), expected 200 and 1 JSON send\n",
+                    code, sends.total, sends.json_payloads);
+            errors++;
+        }
+
+        parser_destroy(parser);
+
+        if(errors == before)
+            fprintf(stderr, "  OK payload: only strict JSON payloads reach the plugin, labelled application/json\n");
     }
 
     fprintf(stderr, "%s() %s (%d error%s)\n\n",

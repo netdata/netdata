@@ -48,6 +48,10 @@ pub const STATUS_INTERNAL_ERROR: u16 = 6;
 pub const CODE_HELLO: u16 = 1;
 pub const CODE_HELLO_ACK: u16 = 2;
 
+/// How long an accepted connection may take to send HELLO before the server
+/// drops it. Bounds what a stalled client can hold on the server.
+pub const SERVER_HANDSHAKE_TIMEOUT_MS: u32 = 5000;
+
 // Method codes
 pub const METHOD_INCREMENT: u16 = 1;
 pub const METHOD_CGROUPS_SNAPSHOT: u16 = 2;
@@ -110,6 +114,13 @@ pub enum NipcError {
     Timeout,
     /// Synchronous call was aborted by the caller.
     Aborted,
+    /// The peer closed the session or its process exited.
+    Disconnected,
+    /// The client is not connected; refresh it first.
+    NotReady,
+    /// The transport failed to send or receive (an I/O error that is not a
+    /// peer disconnect).
+    Transport,
 }
 
 impl core::fmt::Display for NipcError {
@@ -129,6 +140,9 @@ impl core::fmt::Display for NipcError {
             NipcError::HandlerFailed => write!(f, "dispatch handler failed"),
             NipcError::Timeout => write!(f, "synchronous call timed out"),
             NipcError::Aborted => write!(f, "synchronous call aborted"),
+            NipcError::Disconnected => write!(f, "peer disconnected"),
+            NipcError::NotReady => write!(f, "client not ready"),
+            NipcError::Transport => write!(f, "transport I/O failed"),
         }
     }
 }
@@ -408,7 +422,7 @@ pub fn batch_item_get(
 //  Batch builder
 // ---------------------------------------------------------------------------
 
-/// Builds a batch payload: [directory] [align-pad] [packed items].
+/// Builds a batch payload: `directory` [align-pad] [packed items].
 pub struct BatchBuilder<'a> {
     buf: &'a mut [u8],
     item_count: u32,

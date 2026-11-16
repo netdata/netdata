@@ -35,13 +35,13 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string           `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int              `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	Address            string           `yaml:"address" json:"address"`
-	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
+	Address            string           `yaml:"address"                       json:"address"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty"             json:"timeout"`
 	tlscfg.TLSConfig   `yaml:",inline" json:""`
-	UseTLS             bool `yaml:"use_tls,omitempty" json:"use_tls"`
+	UseTLS             bool `yaml:"use_tls,omitempty"             json:"use_tls"`
 }
 
 type Collector struct {
@@ -55,12 +55,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.verifyConfig(); err != nil {
 		return fmt.Errorf("invalid config: %v", err)
 	}
 
-	f, err := c.initZookeeperFetcher()
+	f, err := c.initZookeeperFetcher(ctx)
 	if err != nil {
 		return fmt.Errorf("init zookeeper fetcher: %v", err)
 	}

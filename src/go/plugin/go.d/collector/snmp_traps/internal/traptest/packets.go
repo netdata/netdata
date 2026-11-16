@@ -164,7 +164,7 @@ func newV3PacketParts(t testing.TB, spec V3Spec) (*gosnmp.GoSNMP, []gosnmp.SnmpP
 	client := &gosnmp.GoSNMP{
 		Version:            gosnmp.Version3,
 		SecurityModel:      gosnmp.UserSecurityModel,
-		MsgFlags:           securityLevel(authProto, privProto),
+		MsgFlags:           snmputils.SNMPv3SecurityLevel(authProto, privProto),
 		SecurityParameters: security,
 		Logger:             logger,
 	}
@@ -174,15 +174,4 @@ func newV3PacketParts(t testing.TB, spec V3Spec) (*gosnmp.GoSNMP, []gosnmp.SnmpP
 	}
 	pdus = append(pdus, spec.Extra...)
 	return client, pdus, engineID
-}
-
-func securityLevel(authProto gosnmp.SnmpV3AuthProtocol, privProto gosnmp.SnmpV3PrivProtocol) gosnmp.SnmpV3MsgFlags {
-	switch {
-	case authProto == gosnmp.NoAuth:
-		return gosnmp.NoAuthNoPriv
-	case privProto == gosnmp.NoPriv:
-		return gosnmp.AuthNoPriv
-	default:
-		return gosnmp.AuthPriv
-	}
 }

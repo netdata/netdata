@@ -112,8 +112,8 @@ func compileProfileMetricRule(rule *profileMetricRule, cat profileMetricCatalog,
 	}
 	compiled.chart = chart
 	compiled.expireAfterCycles = catalog.DefaultMetricExpireAfterCycles
-	if chart.Lifecycle != nil && chart.Lifecycle.ExpireAfterCycles > 0 {
-		compiled.expireAfterCycles = chart.Lifecycle.ExpireAfterCycles
+	if chart.Lifecycle != nil && chart.Lifecycle.ExpireAfterCycles != nil && *chart.Lifecycle.ExpireAfterCycles > 0 {
+		compiled.expireAfterCycles = *chart.Lifecycle.ExpireAfterCycles
 	}
 
 	addTrap := func(dst map[string]*catalog.TrapDef, ref, field string) error {

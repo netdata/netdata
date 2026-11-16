@@ -55,6 +55,8 @@ ml_worker_result_to_string(enum ml_worker_result tr)
             return "missing-values";
         case ML_WORKER_RESULT_NULL_ACQUIRED_DIMENSION:
             return "null-acquired-dim";
+        case ML_WORKER_RESULT_DIMENSION_UNAVAILABLE:
+            return "dimension-unavailable";
         case ML_WORKER_RESULT_CHART_UNDER_REPLICATION:
             return "chart-under-replication";
         case ML_WORKER_RESULT_DOWNSTREAM_MODEL_SUPPLIED:

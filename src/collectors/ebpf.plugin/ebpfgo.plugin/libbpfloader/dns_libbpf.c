@@ -868,8 +868,6 @@ struct netdata_dns_runtime *netdata_dns_runtime_open_mode(const char *path, int 
 
     struct bpf_object *obj = bpf_object__open_file(path, NULL);
     if (!obj || libbpf_get_error(obj)) {
-        if (obj && libbpf_get_error(obj))
-            bpf_object__close(obj);
         freez(rt);
         return NULL;
     }

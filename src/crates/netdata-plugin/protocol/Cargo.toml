@@ -6,6 +6,10 @@ edition.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Exposes `validate_chart_stream` for other crates' tests.
+test-support = []
+
 [dependencies]
 netdata-plugin-error = { workspace = true }
 netdata-plugin-types = { workspace = true }
@@ -14,6 +18,7 @@ phf = { workspace = true }
 atoi = { workspace = true }
 tokio-util = { workspace = true }
 bytes = { workspace = true }
+itoa = { workspace = true }
 futures = { workspace = true }
 tokio = { workspace = true, features = ["io-std", "io-util"] }
 serde = { workspace = true }

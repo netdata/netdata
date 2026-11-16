@@ -1,5 +1,7 @@
-//! Build a neutral [`sfsq::logs::LogsQuery`] from CLI inputs: filter grammar,
-//! time window, direction, and limit.
+//! The CLI's logs-query side: parse the `--filter` grammar and time specs,
+//! assemble the engine's neutral [`sfsq::logs::LogsQuery`] (window, filter,
+//! free-text query, limit) for [`run_query`](crate::run_query). Traces have
+//! their own CLI surface in `traces.rs`.
 
 use std::ops::Range;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,10 +15,10 @@ const NS_PER_S: i64 = 1_000_000_000;
 /// Parse a comma-separated filter expression into a [`Filter`].
 ///
 /// Each term is `field=value` (exact) or `field~regex` (full-value-anchored
-/// regex); the operator is whichever of `~` / `=` appears first, so a value may
-/// contain the other character. Repeating a field ORs its terms; different
-/// fields AND. A bare term (no `=`/`~`) is rejected — there is no field-less
-/// search (use `--query` for that).
+/// regex); the operator is whichever of `~` / `=` appears first, so a value
+/// may contain the other character. Repeating a field ORs its terms;
+/// different fields AND. A bare term (no `=`/`~`) is rejected — free-text
+/// search is `--query`, not a filter term.
 pub fn parse_filter(expr: &str) -> Result<Filter> {
     let mut filter = Filter::new();
     for term in expr.split(',').map(str::trim).filter(|t| !t.is_empty()) {
@@ -45,9 +47,9 @@ pub fn parse_filter(expr: &str) -> Result<Filter> {
     Ok(filter)
 }
 
-/// Parse the duration part of a relative time spec (the text after `-`/`+`) into
-/// whole seconds. Errors on a duration exceeding `u32` rather than truncating —
-/// matching the absolute-datetime overflow check, not silently wrapping.
+/// Parse the duration part of a relative time spec (the text after `-`/`+`)
+/// into whole seconds. A duration beyond `u32` seconds errors rather than
+/// truncating, matching the absolute-datetime overflow check.
 fn relative_secs(rest: &str, sign: char) -> Result<u32> {
     let d = humantime::parse_duration(rest.trim())
         .map_err(|e| anyhow!("invalid relative time '{sign}{rest}': {e}"))?;
@@ -55,10 +57,8 @@ fn relative_secs(rest: &str, sign: char) -> Result<u32> {
         .map_err(|_| anyhow!("relative time '{sign}{rest}' overflows u32 epoch seconds"))
 }
 
-/// Current wall-clock time in epoch seconds.
-///
-/// Saturates to `u32::MAX` past 2106 (rather than wrapping) and to `0` for a
-/// clock before the epoch — both are degenerate clock states, not normal input.
+/// Current wall-clock time in epoch seconds: saturates to `u32::MAX` past
+/// 2106 and to `0` for a clock before the epoch.
 pub fn now_secs() -> u32 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -68,17 +68,15 @@ pub fn now_secs() -> u32 {
 
 /// Parse a time spec into epoch seconds, relative to `now_s`.
 ///
-/// Accepts: `now`; a relative offset `-<dur>` / `+<dur>` (e.g. `-1h`, `+30m`)
-/// using humantime duration syntax; a bare epoch-seconds integer; or an
-/// absolute UTC datetime `YYYY-MM-DD HH:MM:SS` (a `T` separator, and a trailing
-/// `Z` or `+00:00`, are accepted — all interpreted as UTC). A non-UTC timezone
-/// offset (e.g. `+03:00`) is rejected; use epoch seconds for a non-UTC instant.
-/// Sub-second precision is truncated to whole seconds (the window is
-/// second-granular). Relative-duration units are lowercase (`-1h`, `+30m`).
+/// Accepts: `now`; a relative offset `-<dur>` / `+<dur>` with lowercase
+/// humantime units (e.g. `-1h`, `+30m`); a bare epoch-seconds integer; or an
+/// absolute UTC datetime `YYYY-MM-DD HH:MM:SS` (a `T` separator and a
+/// trailing `Z` / `+00:00` are fine; a non-UTC offset like `+03:00` is
+/// rejected — use epoch seconds for a non-UTC instant). Sub-second precision
+/// is truncated to whole seconds.
 pub fn parse_time(spec: &str, now_s: u32) -> Result<u32> {
     let spec = spec.trim();
-    // Exact lowercase `now`, consistent with the lowercase-only duration units
-    // (`-1h`/`+30m`) — no case-insensitive special case for one keyword.
+    // Exact lowercase `now`, matching the lowercase-only duration units.
     if spec == "now" {
         return Ok(now_s);
     }
@@ -102,20 +100,21 @@ pub fn parse_time(spec: &str, now_s: u32) -> Result<u32> {
         .duration_since(UNIX_EPOCH)
         .map_err(|e| anyhow!("time '{spec}' is before the epoch: {e}"))?
         .as_secs();
-    // Window seconds are u32 (matching the engine's Query/Summary). Error on
-    // overflow rather than silently truncating a post-2106 datetime.
+    // Windows are u32 epoch seconds, matching the file-registry Query window
+    // and per-file Summary bounds that prune candidates. Error on a post-2106
+    // datetime rather than truncating.
     u32::try_from(secs)
         .map_err(|_| anyhow!("time '{spec}' overflows u32 epoch seconds (post-2106)"))
 }
 
 /// Assemble the engine query. The grid is a single bucket spanning the window
-/// (we emit rows, not the histogram).
+/// (rows are the output, not the histogram).
 ///
-/// Direction is always the engine default (`Backward`): the returned page is
-/// the newest `limit` rows, presented newest-first. The engine's `Forward` is a
-/// pagination concept (which rows relative to an anchor), not an output-order
-/// flip — `finalize_page` always presents newest-first — so oldest-first
-/// display is handled by the caller reversing the page, not here.
+/// Direction stays at the engine default (`Backward`), so the page is the
+/// newest `limit` rows, newest-first. The engine's `Forward` is pagination
+/// relative to an anchor, not an output-order flip (`finalize_page` presents
+/// newest-first either way) — oldest-first display is the caller reversing
+/// the page (`--reverse` in `lib.rs`), not a query knob.
 pub fn build_query(
     window: Range<u32>,
     filter: Filter,

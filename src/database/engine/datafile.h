@@ -58,7 +58,18 @@ struct rrdengine_datafile {
     struct {
         SPINLOCK spinlock;
         bool populated;
+        bool v1_replayed;           // journalfile_load() replayed its journal v1; a rejected v2 is then not rebuilt
+                                    // (written only at load, before any reader runs)
     } populate_mrg;
+
+    // its loaded journal v2 was rejected or could not be mapped: the size it is charged
+    // for, discharged when it is rebuilt, removed or deleted (atomic)
+    size_t rejected_v2_size;
+
+    // the startup rebuild replayed the journal v1 of its rejected v2 but published no new one:
+    // the replayed pages are still hot, so the journal indexer retries it (other rejected
+    // journals v2 have nothing to index until the next start)
+    bool rebuild_unpublished;
 
     struct {
         SPINLOCK spinlock;
@@ -83,8 +94,20 @@ struct rrdengine_datafile {
         Pvoid_t epdl_per_extent;
     } extent_epdl;
 
+    // The stored slots (samples) charged to this datafile - the tier's samples
+    // counter is the sum of these. See rrdeng_datafile_samples_charge().
+    struct {
+        uint64_t charged;
+        bool estimated;             // part of the charge is an estimate (a journal v2 without a samples section)
+    } samples;
+
     uint32_t magic2;
 };
+
+// samples accounting of a datafile, see datafile.c
+void rrdeng_datafile_samples_charge(struct rrdengine_datafile *datafile, uint64_t samples);
+void rrdeng_datafile_samples_set(struct rrdengine_datafile *datafile, uint64_t samples, bool estimated);
+void rrdeng_datafile_samples_uncharge(struct rrdengine_datafile *datafile);
 
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
@@ -94,6 +117,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_t maxlen);
+bool datafile_name_parse(const char *name, unsigned *fileno);
 int close_data_file(struct rrdengine_datafile *datafile);
 int unlink_data_file(struct rrdengine_datafile *datafile);
 int destroy_data_file_unsafe(struct rrdengine_datafile *datafile);

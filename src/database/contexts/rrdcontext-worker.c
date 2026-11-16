@@ -200,7 +200,7 @@ bool rrdmetric_update_retention(RRDMETRIC *rm) {
         min_first_time_t = 0;
 
     if(min_first_time_t > max_last_time_t) {
-        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %ld, last_time_t = %ld", string2str(rm->id), min_first_time_t, max_last_time_t);
+        internal_error(true, "RRDMETRIC: retention of '%s' is flipped, first_time_t = %" PRId64 ", last_time_t = %" PRId64, string2str(rm->id), (int64_t)min_first_time_t, (int64_t)max_last_time_t);
         SWAP(min_first_time_t, max_last_time_t);
     }
 
@@ -248,7 +248,7 @@ static inline bool rrdinstance_should_be_deleted(RRDINSTANCE *ri) {
     if(likely(rrd_flag_check(ri, RRD_FLAGS_PREVENTING_DELETIONS)))
         return false;
 
-    if(likely(ri->rrdset))
+    if(likely(rrdinstance_rrdset_atomic_load(ri)))
         return false;
 
     if(unlikely(dictionary_referenced_items(ri->rrdmetrics) != 0))
@@ -285,10 +285,7 @@ bool rrdcontext_should_be_deleted(RRDCONTEXT *rc) {
 void rrdcontext_delete_from_sql_unsafe(RRDCONTEXT *rc) {
     // we need to refresh the string pointers in rc->hub
     // in case the context changed values
-    rc->hub.id = string2str(rc->id);
-    rc->hub.title = string2str(rc->title);
-    rc->hub.units = string2str(rc->units);
-    rc->hub.family = string2str(rc->family);
+    rrdcontext_hub_strings_update_unsafe(rc);
 
     if (rc->rrdhost->rrd_memory_mode != RRD_DB_MODE_DBENGINE)
         return;
@@ -428,7 +425,7 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
         worker_is_busy(WORKER_JOB_PP_INSTANCE);
 
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t metrics_active = 0, metrics_deleted = 0, metrics_no_tier0 = 0;
+    size_t metrics_active = 0, metrics_no_tier0 = 0;
     bool live_retention = true, currently_collected = false;
     if(dictionary_entries(ri->rrdmetrics) > 0) {
         RRDMETRIC *rm;
@@ -448,7 +445,6 @@ static void rrdinstance_post_process_updates(RRDINSTANCE *ri, bool force, RRD_FL
                         metrics_no_tier0++;
 
                     if (unlikely((rrdmetric_should_be_deleted(rm)))) {
-                        metrics_deleted++;
                         continue;
                     }
 
@@ -546,7 +542,7 @@ static bool rrdinstance_forcefully_clear_retention(RRDCONTEXT *rc, size_t count,
     size_t metrics_deleted = 0;
     RRDINSTANCE *ri;
     dfe_start_read(rc->rrdinstances, ri) {
-        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || ri->rrdset)
+        if(!rrd_flag_check(ri, RRD_FLAG_NO_TIER0_RETENTION) || rrd_flag_is_collected(ri) || rrdinstance_rrdset_atomic_load(ri))
             continue;
 
         size_t metrics_cleared = 0;
@@ -636,7 +632,7 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
     size_t min_priority_not_collected = LONG_MAX;
     size_t min_priority = LONG_MAX;
     time_t min_first_time_t = LONG_MAX, max_last_time_t = 0;
-    size_t instances_active = 0, instances_deleted = 0, instances_no_tier0 = 0;
+    size_t instances_active = 0, instances_no_tier0 = 0;
     bool live_retention = true, currently_collected = false, hidden = true;
     if(dictionary_entries(rc->rrdinstances) > 0) {
         RRDINSTANCE *ri;
@@ -656,7 +652,6 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
                         live_retention = false;
 
                     if (unlikely(rrdinstance_should_be_deleted(ri))) {
-                        instances_deleted++;
                         continue;
                     }
 
@@ -673,10 +668,23 @@ bool rrdcontext_post_process_updates(RRDCONTEXT *rc, bool force, RRD_FLAGS reaso
                     if(unlikely(!currently_collected && rrd_flag_is_collected(ri) && ri->first_time_s))
                         currently_collected = true;
 
-                    internal_error(rc->units != ri->units,
-                                   "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
-                                   string2str(rc->id), string2str(ri->id),
-                                   string2str(rc->units), string2str(ri->units));
+#ifdef NETDATA_INTERNAL_CHECKS
+                    {
+                        // both are replaced while we use them: compare our own references
+                        STRING *ri_units = rrdinstance_acquired_units_dup((RRDINSTANCE_ACQUIRED *)ri_dfe.item);
+                        rrdcontext_lock(rc);
+                        STRING *rc_units = string_dup(rc->units);
+                        rrdcontext_unlock(rc);
+
+                        internal_error(rc_units != ri_units,
+                                       "RRDCONTEXT: '%s' rrdinstance '%s' has different units, context '%s', instance '%s'",
+                                       string2str(rc->id), string2str(ri->id),
+                                       string2str(rc_units), string2str(ri_units));
+
+                        string_freez(rc_units);
+                        string_freez(ri_units);
+                    }
+#endif
 
                     instances_active++;
 
@@ -866,10 +874,7 @@ void rrdcontext_message_send_unsafe(RRDCONTEXT *rc, bool snapshot __maybe_unused
 
     // save it, so that we know the last version we sent to hub
     rc->version = rc->hub.version = rrdcontext_get_next_version(rc);
-    rc->hub.id = string2str(rc->id);
-    rc->hub.title = string2str(rc->title);
-    rc->hub.units = string2str(rc->units);
-    rc->hub.family = string2str(rc->family);
+    rrdcontext_hub_strings_update_unsafe(rc);
     rc->hub.chart_type = rrdset_type_name(rc->chart_type);
     rc->hub.priority = rc->priority;
     rc->hub.first_time_s = rc->first_time_s;
@@ -955,7 +960,7 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
     if(unlikely(id_changed || title_changed || units_changed || family_changed || chart_type_changed || priority_changed || first_time_changed || last_time_changed || deleted_changed)) {
 
         internal_error(LOG_TRANSITIONS,
-                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %ld%s, last_time_t %ld%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
+                       "RRDCONTEXT: %s NEW VERSION '%s'%s of host '%s', version %"PRIu64", title '%s'%s, units '%s'%s, family '%s'%s, chart type '%s'%s, priority %u%s, first_time_t %" PRId64 "%s, last_time_t %" PRId64 "%s, deleted '%s'%s, (queued for %llu ms, expected %llu ms)",
                        sending?"SENDING":"QUEUE",
                        string2str(rc->id), id_changed ? " (CHANGED)" : "",
                        rrdhost_hostname(rc->rrdhost),
@@ -965,8 +970,8 @@ bool check_if_cloud_version_changed_unsafe(RRDCONTEXT *rc, bool sending __maybe_
                        string2str(rc->family), family_changed ? " (CHANGED)" : "",
                        rrdset_type_name(rc->chart_type), chart_type_changed ? " (CHANGED)" : "",
                        rc->priority, priority_changed ? " (CHANGED)" : "",
-                       rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
-                       (flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s, last_time_changed ? " (CHANGED)" : "",
+                       (int64_t)rc->first_time_s, first_time_changed ? " (CHANGED)" : "",
+                       (int64_t)((flags & RRD_FLAG_COLLECTED) ? 0 : rc->last_time_s), last_time_changed ? " (CHANGED)" : "",
                        (flags & RRD_FLAG_DELETED) ? "true" : "false", deleted_changed ? " (CHANGED)" : "",
                        sending ? (now_realtime_usec() - rc->queue.queued_ut) / USEC_PER_MS : 0,
                        sending ? (rc->queue.scheduled_dispatch_ut - rc->queue.queued_ut) / USEC_PER_MS : 0

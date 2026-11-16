@@ -1,12 +1,15 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Handling for libbpf (used by the eBPF plugin)
 
+include_guard()
+
 include(ExternalProject)
 include(NetdataUtil)
 
 set(libbpf_SOURCE_DIR "${CMAKE_BINARY_DIR}/libbpf")
 
-# Check if the kernel is old enough that we need to use a legacy copy of eBPF.
+# True when FORCE_LEGACY_LIBBPF is set or the host kernel predates 4.14; either
+# way the eBPF plugin needs the legacy libbpf.
 function(_need_legacy_libbpf _var)
     if(FORCE_LEGACY_LIBBPF)
         set(${_var} TRUE PARENT_SCOPE)
@@ -22,14 +25,14 @@ function(_need_legacy_libbpf _var)
     endif()
 endfunction()
 
-# Prepare a vendored copy of libbpf
+# Prepare the bundled copy of libbpf
 function(netdata_bundle_libbpf)
     _need_legacy_libbpf(USE_LEGACY_LIBBPF)
 
     if(USE_LEGACY_LIBBPF)
         set(_libbpf_tag 673424c56127bb556e64095f41fd60c26f9083ec) # v0.0.9_netdata-1
     else()
-        set(_libbpf_tag f5dcbae736e5d7f83a35718e01be1a8e3010fa39) # v1.7.0.0p_netdata
+        set(_libbpf_tag 85c0d575a447651bbeb8e2376eacd64c30dce9a6) # v1.8.0.0p_netdata
     endif()
 
     if(STATIC_BUILD)
@@ -51,9 +54,6 @@ function(netdata_bundle_libbpf)
     if(MAKE_COMMAND STREQUAL MAKE_COMMAND-NOTFOUND)
         message(FATAL_ERROR "GNU Make is required when building the eBPF plugin, but could not be found.")
     endif()
-
-    pkg_check_modules(ELF REQUIRED libelf)
-    pkg_check_modules(ZLIB REQUIRED zlib)
 
     set(_libbpf_lib_dir lib)
 
@@ -85,7 +85,7 @@ function(netdata_bundle_libbpf)
         TARGET libbpf_library
         PROPERTY INTERFACE_LINK_LIBRARIES "${ELF_LIBRARIES};${ZLIB_LIBRARIES}"
     )
-    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRECTORIES};${ZLIB_INCLUDE_DIRECTORIES}" PARENT_SCOPE)
+    set(NETDATA_LIBBPF_INCLUDE_DIRECTORIES "${libbpf_SOURCE_DIR}/usr/include;${libbpf_SOURCE_DIR}/include;${ELF_INCLUDE_DIRS};${ZLIB_INCLUDE_DIRS}" PARENT_SCOPE)
     set(NETDATA_LIBBPF_COMPILE_OPTIONS "${ELF_CFLAGS_OTHER};${ZLIB_CFLAGS_OTHER}" PARENT_SCOPE)
 endfunction()
 

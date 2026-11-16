@@ -22,7 +22,9 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
     char *machine_guid = NULL;
     char *claim_id = NULL;
     char *node_id = NULL;
-    bool protection = netdata_bearer_protection_is_enabled();
+    bool protection_given = false;
+    bool protection = false;
+    bool protection_invalid = false;
 
     while (url) {
         char *value = strsep_skip_consecutive_separators(&url, "&");
@@ -33,10 +35,16 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
         if (!value || !*value) continue;
 
         if(!strcmp(name, "bearer_protection")) {
-            if(!strcmp(value, "on") || !strcmp(value, "true") || !strcmp(value, "yes"))
+            if(!strcasecmp(value, "on") || !strcasecmp(value, "true") || !strcasecmp(value, "yes")) {
+                protection_given = true;
                 protection = true;
-            else
+            }
+            else if(!strcasecmp(value, "off") || !strcasecmp(value, "false") || !strcasecmp(value, "no")) {
+                protection_given = true;
                 protection = false;
+            }
+            else
+                protection_invalid = true;
         }
         else if(!strcmp(name, "machine_guid"))
             machine_guid = value;
@@ -58,7 +66,14 @@ int api_v2_bearer_protection(RRDHOST *host __maybe_unused, struct web_client *w 
         return HTTP_RESP_BAD_REQUEST;
     }
 
-    netdata_bearer_protection_set_enabled(protection);
+    if(protection_invalid) {
+        buffer_reset(w->response.data);
+        buffer_strcat(w->response.data, "Invalid bearer_protection value; use on/off, true/false or yes/no");
+        return HTTP_RESP_BAD_REQUEST;
+    }
+
+    if(protection_given)
+        netdata_bearer_protection_set_enabled(protection);
 
     BUFFER *wb = w->response.data;
     buffer_reset(wb);

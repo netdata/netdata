@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package query
+
+import (
+	"context"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+)
+
+type CataloguePage struct {
+	artifacts.Page
+	PolicyError string
+}
+
+// Catalogue exposes current manifest metadata and global storage observations.
+func (s *Service) Catalogue(ctx context.Context, filter artifacts.Filter) (CataloguePage, error) {
+	if err := ctx.Err(); err != nil {
+		return CataloguePage{}, err
+	}
+	page, err := s.artifacts.Catalogue(ctx, filter)
+	result := CataloguePage{
+		Page:        page,
+		PolicyError: s.policyError(),
+	}
+	return result, artifactError(err)
+}

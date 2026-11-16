@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 )
 
@@ -128,7 +129,7 @@ groups:
 	}
 
 	reader := store.Read(metrix.ReadRaw(), metrix.ReadFlatten())
-	planned, err := prepareRoutePlan(reader, templateYAML, "prometheus_test")
+	planned, err := prepareRoutePlan(reader, templateYAML, "prometheus_test", chartengine.EnginePolicy{})
 	if err != nil {
 		t.Fatal(err)
 	}

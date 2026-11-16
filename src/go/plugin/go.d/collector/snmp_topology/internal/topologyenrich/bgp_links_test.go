@@ -242,8 +242,8 @@ func TestApplyTopologyBGPAdjacencyEnrichmentBuildsManagedLinks(t *testing.T) {
 				require.Len(t, data.Links, 2)
 				require.Equal(t, 2, topologyStatsToV1ForTest(t, data.Stats)["bgp_adjacency_visible_links"])
 				require.ElementsMatch(t, []string{"blue", "red"}, []string{
-					topologyBGPLinkRoutingInstance(data.Links[0]),
-					topologyBGPLinkRoutingInstance(data.Links[1]),
+					topologymodel.LinkBGPRoutingInstance(data.Links[0]),
+					topologymodel.LinkBGPRoutingInstance(data.Links[1]),
 				})
 			},
 		},
@@ -354,5 +354,83 @@ func bgpPeerForTest(deviceID, routingInstance, localIP, neighborIP, localAS, rem
 		LocalIdentifier: localIdentifier,
 		PeerIdentifier:  peerIdentifier,
 		State:           state,
+	}
+}
+
+func TestBGPAdjacencySemanticRoutingIdentityAcrossReverseAndRepeatedObservations(t *testing.T) {
+	for name, tc := range map[string]struct {
+		instances     []string
+		wantInstances []string
+	}{
+		"exact nonblank instances": {
+			instances:     []string{"edge", " edge ", "\tedge\r\n"},
+			wantInstances: []string{"edge", " edge ", "\tedge\r\n"},
+		},
+		"blank defaults without rewriting nonblank": {
+			instances:     []string{"", " \t\r\n", "default", " default "},
+			wantInstances: []string{"default", " default "},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			data := topologymodel.Data{
+				Actors: []topologymodel.Actor{
+					topologyBGPManagedActorForTest("router-a", "device-a", nil, "198.51.100.1"),
+					topologyBGPManagedActorForTest("router-b", "device-b", nil, "198.51.100.2"),
+				},
+			}
+			assignTopologyEnrichTestHandles(t, &data)
+			var peers []topologymodel.BGPPeer
+			for _, instance := range tc.instances {
+				forward := bgpPeerForTest(
+					"device-a",
+					instance,
+					"198.51.100.1",
+					"198.51.100.2",
+					"65001",
+					"65002",
+					"1.1.1.1",
+					"2.2.2.2",
+					"established",
+				)
+				forward.ProcessID = " edge "
+				reverse := bgpPeerForTest(
+					"device-b",
+					instance,
+					"198.51.100.2",
+					"198.51.100.1",
+					"65002",
+					"65001",
+					"2.2.2.2",
+					"1.1.1.1",
+					"established",
+				)
+				reverse.ProcessID = "100"
+				peers = append(peers, forward, reverse)
+			}
+			aggregate := topologymodel.ObservationAggregate{
+				BGPPeers: peers,
+			}
+			for pass := range 2 {
+				stats := ApplyBGPAdjacency(&data, aggregate)
+				wantEmitted := len(tc.wantInstances)
+				if pass > 0 {
+					wantEmitted = 0
+				}
+				require.Equal(t, wantEmitted, stats.EmittedLinks)
+				require.Equal(t, len(peers)-wantEmitted, stats.SuppressedDuplicateLink)
+				require.Len(t, data.Links, len(tc.wantInstances))
+				var actual []string
+				for _, link := range data.Links {
+					actual = append(actual, topologymodel.LinkBGPRoutingInstance(link))
+				}
+				require.ElementsMatch(t, tc.wantInstances, actual)
+				for i, process := range []string{" edge ", "100"} {
+					require.Len(t, data.Actors[i].Detail.BGP, len(tc.instances))
+					for _, row := range data.Actors[i].Detail.BGP {
+						require.Equal(t, process, row.ProcessID)
+					}
+				}
+			}
+		})
 	}
 }

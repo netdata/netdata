@@ -159,7 +159,7 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
-RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete);
+RRDSET_ACQUIRED *rrdset_acquire(RRDHOST *host, const char *id);
 void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
 RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
 
@@ -177,6 +177,10 @@ static inline bool rrdcalc_rrdset_read_lock_if_matches(RRDCALC *rc, RRDSET *st) 
     return true;
 }
 
+// rc->rrdset holds no reference on the chart, and this and rrdcalc_rrdset_read_lock_if_matches() dereference it
+// (to take its alerts lock) before they can check it. The caller MUST keep the chart alive across the call: either
+// run inside a foreach_rrdcalc_in_rrdhost_*() traversal of the chart's host (chart teardown unlinks its alerts under
+// the write lock of that index before freeing anything), or hold an acquired reference on the chart.
 static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
     RRDSET *st = rc->rrdset;
     if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st)))
@@ -192,7 +196,9 @@ static inline void rrdcalc_rrdset_read_unlock(RRDSET *st) {
 static inline RRDSET_ACQUIRED *rrdcalc_rrdset_acquire_linked(RRDHOST *host, RRDCALC *rc, RRDSET **rrdset) {
     *rrdset = NULL;
 
-    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, rrdcalc_chart_name(rc), true);
+    // not rrdset_find_and_acquire(): health is not a reader, and touching last_accessed
+    // on every pass keeps obsolete charts with alerts from ever being freed
+    RRDSET_ACQUIRED *rsa = rrdset_acquire(host, rrdcalc_chart_name(rc));
     if(unlikely(!rsa))
         return NULL;
 

@@ -71,6 +71,13 @@ func (p *LTSVParser) Parse(row []byte, line LogLine) error {
 		return line.Assign(s, string(value))
 	})
 	if err != nil {
+		// Non-strict syntax wrappers contain the source line; keep only their safe category.
+		switch {
+		case errors.Is(err, ltsv.ErrMissingLabel):
+			err = ltsv.ErrMissingLabel
+		case errors.Is(err, ltsv.ErrEmptyLabel):
+			err = ltsv.ErrEmptyLabel
+		}
 		return &ParseError{msg: fmt.Sprintf("ltsv parse: %v", err), err: err}
 	}
 	return nil

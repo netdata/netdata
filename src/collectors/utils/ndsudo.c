@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <errno.h>
 #include "exec-signals.h"
+#include "ndsudo-supervisor.h"
 
 #define MAX_SEARCH 3
 #define MAX_PARAMETERS 128
@@ -613,7 +614,10 @@ void show_help() {
         fprintf(stdout, "  Parameters : %s\n\n", allowed_commands[i].params);
     }
 
-    fprintf(stdout, "The program searches for executables in the system path.\n");
+#ifdef __linux__
+    fprintf(stdout, "Linux private supervised command: tegrastats (fixed /usr/bin/tegrastats --interval 1000; requires control/status pipes).\n\n");
+#endif
+    fprintf(stdout, "The commands listed above use the system path except private supervised commands.\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "Variables given as {{variable}} are expected on the command line as:\n");
     fprintf(stdout, "  --variable VALUE\n");
@@ -626,6 +630,12 @@ void show_help() {
 }
 
 int main(int argc, char *argv[]) {
+#ifdef __linux__
+    // This command never enters the legacy exec/PATH path, including --test.
+    if (argc >= 2 && strcmp(argv[1], "tegrastats") == 0)
+        return ndsudo_supervise_tegrastats(argc);
+#endif
+
     char error_buffer[ERROR_BUFFER_SIZE] = "";
 
     if (argc < 2) {

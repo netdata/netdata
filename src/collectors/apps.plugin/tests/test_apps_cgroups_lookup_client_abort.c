@@ -116,6 +116,51 @@ static bool test_retry_later_generation_reset(void)
     return ok;
 }
 
+// OVERSIZED_ITEM is final: it must be cached and counted as a permanent miss,
+// not as a retry miss.
+static bool test_oversized_item_is_permanent(void)
+{
+    bool ok = true;
+
+    cgroups_lookup_cache_create();
+
+    const char *path_str = "/kubepods.slice/oversized.scope";
+    STRING *path = string_strdupz(path_str);
+    struct cgroup_lookup_entry *entry = cgroups_lookup_cache_get_or_create(path);
+    entry->refcount = 1;
+    entry->cgroup_status = NIPC_CGROUP_LOOKUP_UNKNOWN_RETRY_LATER;
+    entry->pending = true;
+
+    nipc_cgroups_lookup_item_view_t item = {
+        .status = NIPC_CGROUP_LOOKUP_OVERSIZED_ITEM,
+        .path = { .ptr = path_str, .len = (uint32_t)strlen(path_str) },
+    };
+    uint64_t permanent_before = cgroups_lookup_counter_get(&cgroups_lookup_cache_misses_permanent);
+    uint64_t retry_before = cgroups_lookup_counter_get(&cgroups_lookup_cache_misses_retry);
+
+    struct cgroups_lookup_staged_item staged;
+    cgroups_lookup_stage_item(&item, &staged);
+    netdata_mutex_lock(&apps_pids_mutex);
+    cgroups_lookup_commit_staged(&item, &staged, 7);
+    netdata_mutex_unlock(&apps_pids_mutex);
+    cgroups_lookup_free_staged_item(&staged);
+
+    ok =
+        expect_ok(entry->cgroup_status == NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT,
+                  "OVERSIZED_ITEM was not cached as a permanent miss") &&
+        expect_ok(!entry->pending, "OVERSIZED_ITEM entry stayed pending") &&
+        expect_ok(cgroups_lookup_counter_get(&cgroups_lookup_cache_misses_permanent) == permanent_before + 1,
+                  "OVERSIZED_ITEM was not counted as a permanent miss") &&
+        expect_ok(cgroups_lookup_counter_get(&cgroups_lookup_cache_misses_retry) == retry_before,
+                  "OVERSIZED_ITEM was counted as a retry miss") &&
+        ok;
+
+    entry->refcount = 0;
+    string_freez(path);
+    cgroups_lookup_cache_destroy();
+    return ok;
+}
+
 static bool test_retry_later_same_generation_not_requeued(void)
 {
     bool ok = true;
@@ -244,6 +289,8 @@ int main(void)
         goto cleanup_fixture;
     if (!expect_ok(test_retry_later_generation_reset(), "retry-later generation reset test failed"))
         goto cleanup_fixture;
+    if (!expect_ok(test_oversized_item_is_permanent(), "oversized item status test failed"))
+        goto cleanup_fixture;
     if (!expect_ok(
             test_retry_later_same_generation_not_requeued(),
             "retry-later same-generation requeue test failed"))
@@ -322,6 +369,12 @@ cleanup_fixture:
     if (mutex_initialized)
         netdata_mutex_destroy(&apps_pids_mutex);
 cleanup_dir:
+    {
+        // NetIPC keeps the endpoint lock file after the server stops.
+        char lock_path[FILENAME_MAX + 1];
+        snprintfz(lock_path, sizeof(lock_path) - 1, "%s/%s.lock", temp_dir, APPS_CGROUPS_LOOKUP_SERVICE_NAME);
+        (void)unlink(lock_path);
+    }
     (void)rmdir(temp_dir);
     return ok ? 0 : 1;
 }

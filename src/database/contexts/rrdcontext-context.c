@@ -15,11 +15,32 @@ inline bool rrdcontext_acquired_belongs_to_host(RRDCONTEXT_ACQUIRED *rca, RRDHOS
 // ----------------------------------------------------------------------------
 // RRDCONTEXT
 
+void rrdcontext_hub_strings_update_unsafe(RRDCONTEXT *rc) {
+    rc->hub.id = string2str(rc->id);
+
+    string_freez(rc->hub_strings.title);
+    rc->hub_strings.title = string_dup(rc->title);
+    rc->hub.title = string2str(rc->hub_strings.title);
+
+    string_freez(rc->hub_strings.units);
+    rc->hub_strings.units = string_dup(rc->units);
+    rc->hub.units = string2str(rc->hub_strings.units);
+
+    string_freez(rc->hub_strings.family);
+    rc->hub_strings.family = string_dup(rc->family);
+    rc->hub.family = string2str(rc->hub_strings.family);
+}
+
 static void rrdcontext_freez(RRDCONTEXT *rc) {
     string_freez(rc->id);
     string_freez(rc->title);
     string_freez(rc->units);
     string_freez(rc->family);
+
+    string_freez(rc->hub_strings.title);
+    string_freez(rc->hub_strings.units);
+    string_freez(rc->hub_strings.family);
+    memset(&rc->hub_strings, 0, sizeof(rc->hub_strings));
 }
 
 static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *rrdhost) {
@@ -44,19 +65,17 @@ static void rrdcontext_insert_callback(const DICTIONARY_ITEM *item __maybe_unuse
 
         string_freez(rc->id);
         rc->id = string_strdupz(rc->hub.id);
-        rc->hub.id = string2str(rc->id);
 
         string_freez(rc->title);
         rc->title = string_strdupz(rc->hub.title);
-        rc->hub.title = string2str(rc->title);
 
         string_freez(rc->units);
         rc->units = string_strdupz(rc->hub.units);
-        rc->hub.units = string2str(rc->units);
 
         string_freez(rc->family);
         rc->family = string_strdupz(rc->hub.family);
-        rc->hub.family = string2str(rc->family);
+
+        rrdcontext_hub_strings_update_unsafe(rc);
 
         rc->chart_type = rrdset_type_id(rc->hub.chart_type);
         rc->hub.chart_type = rrdset_type_name(rc->chart_type);
@@ -137,6 +156,7 @@ static inline void string_merge(STRING **stringpp, STRING *new_string) {
     string_freez(old);
 }
 
+// the caller MUST hold rrdcontext_lock(rc): this replaces and frees the context's metadata strings
 static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, STRING *family, STRING *units, RRDSET_TYPE chart_type, uint32_t priority) {
     OLDNEW oldnew = oldnew_decide(rrd_flag_is_archived(rc), archived);
 
@@ -192,8 +212,25 @@ static void rrdcontext_merge_with(RRDCONTEXT *rc, bool archived, STRING *title, 
 }
 
 void rrdcontext_update_from_collected_rrdinstance(RRDINSTANCE *ri) {
-    rrdcontext_merge_with(ri->rc, rrd_flag_is_archived(ri),
-                          ri->title, ri->family, ri->units, ri->chart_type, ri->priority);
+    // rrdinstance_conflict_callback() swaps the instance's strings under its spinlock;
+    // take our own references before the old strings are freed after that lock is released
+    spinlock_lock(&ri->spinlock);
+    STRING *title = string_dup(ri->title);
+    STRING *family = string_dup(ri->family);
+    STRING *units = string_dup(ri->units);
+    RRDSET_TYPE chart_type = ri->chart_type;
+    uint32_t priority = ri->priority;
+    spinlock_unlock(&ri->spinlock);
+
+    // collectors merge into the same context from rrdcontext_conflict_callback(), under the context lock
+    RRDCONTEXT *rc = ri->rc;
+    rrdcontext_lock(rc);
+    rrdcontext_merge_with(rc, rrd_flag_is_archived(ri), title, family, units, chart_type, priority);
+    rrdcontext_unlock(rc);
+
+    string_freez(title);
+    string_freez(family);
+    string_freez(units);
 }
 
 static bool rrdcontext_conflict_callback(const DICTIONARY_ITEM *item __maybe_unused, void *old_value, void *new_value, void *rrdhost __maybe_unused) {

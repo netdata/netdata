@@ -130,23 +130,6 @@ modules:
           - name: Connection, TLS, or proxy failures
             description: |
               Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the collector logs.
-    alerts:
-      - name: cato_networks_site_disconnected
-        metric: cato_networks.site_connectivity_status
-        info: "Cato site ${label:site_name} reports disconnected connectivity status"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
-      - name: cato_networks_site_degraded
-        metric: cato_networks.site_connectivity_status
-        info: "Cato site ${label:site_name} reports degraded connectivity status"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
-      - name: cato_networks_site_packet_loss
-        metric: cato_networks.site_packet_loss
-        info: "Cato site ${label:site_name} packet loss over the last 10 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
-      - name: cato_networks_bgp_session_down
-        metric: cato_networks.bgp_session_status
-        info: "Cato BGP session to peer ${label:peer_ip} (${label:peer_asn}) is down"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cato_networks.conf
     metrics:
       folding:
         title: Metrics

@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/safefile"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -37,7 +36,7 @@ func (s *publishedStore) resolve(ctx context.Context, req secretstore.ResolveReq
 		return "", fmt.Errorf("resolving secret '%s': store '%s': %w", req.Original, req.StoreKey, err)
 	}
 
-	token, err := s.token()
+	token, err := s.token(ctx)
 	if err != nil {
 		return "", fmt.Errorf("resolving secret '%s': store '%s': %w", req.Original, req.StoreKey, err)
 	}
@@ -121,7 +120,7 @@ func (s *publishedStore) skipVerify() bool {
 	return s.tlsSkipVerify
 }
 
-func (s *publishedStore) token() (string, error) {
+func (s *publishedStore) token(ctx context.Context) (string, error) {
 	switch s.mode {
 	case "token":
 		if s.tokenValue == "" {
@@ -133,7 +132,7 @@ func (s *publishedStore) token() (string, error) {
 		if path == "" {
 			return "", fmt.Errorf("mode_token_file.path is required")
 		}
-		data, err := safefile.Read(path)
+		data, err := s.runtime.readFile(ctx, path)
 		if err != nil {
 			return "", fmt.Errorf("cannot read token file '%s': %w", path, err)
 		}

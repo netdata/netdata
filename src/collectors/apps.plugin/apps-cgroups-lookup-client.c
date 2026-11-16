@@ -343,6 +343,10 @@ static void cgroups_lookup_stage_item(
 {
     *staged = (struct cgroups_lookup_staged_item){ .status = item->status, .labels_ok = true };
 
+    // OVERSIZED_ITEM is final: cache it as the existing permanent negative state.
+    if (item->status == NIPC_CGROUP_LOOKUP_OVERSIZED_ITEM)
+        staged->status = NIPC_CGROUP_LOOKUP_UNKNOWN_PERMANENT;
+
     if (item->status != NIPC_CGROUP_LOOKUP_KNOWN)
         return;
 
@@ -553,7 +557,10 @@ static void cgroups_lookup_worker(void *arg __maybe_unused)
             nipc_cgroups_lookup_item_view_t items[APPS_CGROUPS_LOOKUP_BATCH_MAX];
             bool malformed = false;
             for (uint32_t i = 0; i < response.item_count; i++) {
-                if (nipc_cgroups_lookup_resp_item(&response, i, &items[i]) != NIPC_OK) {
+                // Level 2 resolves PAYLOAD_EXCEEDED with follow-up calls; one
+                // that reaches here is a contract failure.
+                if (nipc_cgroups_lookup_resp_item(&response, i, &items[i]) != NIPC_OK ||
+                    items[i].status == NIPC_CGROUP_LOOKUP_PAYLOAD_EXCEEDED) {
                     malformed = true;
                     break;
                 }

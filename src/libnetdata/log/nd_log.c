@@ -154,12 +154,14 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
     if(!fatal_hook_cb)
         return;
 
-    const char *filename = log_field_strdupz(&fields[NDF_FILE]);
-    const char *message = log_field_strdupz(&fields[NDF_MESSAGE]);
-    const char *function = log_field_strdupz(&fields[NDF_FUNC]);
-    const char *stack_trace = log_field_strdupz(&fields[NDF_STACK_TRACE]);
-    const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
-    long line = log_field_to_int64(&fields[NDF_LINE]);
+    // only fields set for this event: an unset field still holds the value of an earlier log line on this thread
+    // (e.g. the errno of the previous error), and the annotators format it regardless
+    const char *filename = fields[NDF_FILE].entry.set ? log_field_strdupz(&fields[NDF_FILE]) : NULL;
+    const char *message = fields[NDF_MESSAGE].entry.set ? log_field_strdupz(&fields[NDF_MESSAGE]) : NULL;
+    const char *function = fields[NDF_FUNC].entry.set ? log_field_strdupz(&fields[NDF_FUNC]) : NULL;
+    const char *stack_trace = fields[NDF_STACK_TRACE].entry.set ? log_field_strdupz(&fields[NDF_STACK_TRACE]) : NULL;
+    const char *errno_str = fields[NDF_ERRNO].entry.set ? log_field_strdupz(&fields[NDF_ERRNO]) : NULL;
+    long line = fields[NDF_LINE].entry.set ? log_field_to_int64(&fields[NDF_LINE]) : 0;
 
     fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
 }
@@ -344,15 +346,25 @@ static void nd_logger(const char *file, const char *function, const unsigned lon
     if(saved_winerror != 0 && !thread_log_fields[NDF_WINERROR].entry.set)
         thread_log_fields[NDF_WINERROR].entry = ND_LOG_FIELD_U64(NDF_WINERROR, saved_winerror);
 
-    CLEAN_BUFFER *wb = NULL;
-    if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
-        wb = buffer_create(1024, NULL);
-        buffer_vsprintf(wb, fmt, ap);
-        thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+    // check the flood protection before formatting, so that dropped messages are not formatted; a fatal event keeps
+    // the limit for nd_logger_log_fields(), because the fatal hook there needs the message and runs before the limit
+    bool dropped = false;
+    if(limit && !nd_log_fatal_event) {
+        dropped = nd_log_limit_reached(&nd_log.sources[source]);
+        limit = false;
     }
 
-    nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
-                         thread_log_fields, THREAD_FIELDS_MAX);
+    CLEAN_BUFFER *wb = NULL;
+    if(!dropped) {
+        if(fmt && !thread_log_fields[NDF_MESSAGE].entry.set) {
+            wb = buffer_create(1024, NULL);
+            buffer_vsprintf(wb, fmt, ap);
+            thread_log_fields[NDF_MESSAGE].entry = ND_LOG_FIELD_TXT(NDF_MESSAGE, buffer_tostring(wb));
+        }
+
+        nd_logger_log_fields(fp, fd, mutex, limit, priority, output, &nd_log.sources[source],
+                             thread_log_fields, THREAD_FIELDS_MAX);
+    }
 
     const char *pending_msg = NULL;
 
@@ -474,6 +486,10 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
         return;
     }
 
+    // reserve the window before unlocking, so that concurrent callers see it taken
+    erl->last_logged = now;
+    erl->count = 0;
+
     if(!nd_log.single_threaded_child)
         spinlock_unlock(&erl->spinlock);
 
@@ -483,8 +499,6 @@ void netdata_logger_with_limit(ERROR_LIMIT *erl, ND_LOG_SOURCES source, ND_LOG_F
             source == NDLS_DAEMON || source == NDLS_COLLECTORS,
             saved_errno, saved_winerror, fmt, args);
     va_end(args);
-    erl->last_logged = now;
-    erl->count = 0;
 }
 
 NEVER_INLINE NORETURN

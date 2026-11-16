@@ -30,39 +30,39 @@ static void rrd2rrdr_log_request_response_metadata(RRDR *r
 
     internal_error(
     true,
-    "rrd2rrdr() on %s update every %ld with %s grouping %s (group: %zu, resampling_time: %ld, resampling_group: %zu), "
-         "after (got: %ld, want: %ld, req: %ld, db: %ld), "
-         "before (got: %ld, want: %ld, req: %ld, db: %ld), "
-         "duration (got: %ld, want: %ld, req: %ld, db: %ld), "
+    "rrd2rrdr() on %s update every %" PRId64 " with %s grouping %s (group: %zu, resampling_time: %" PRId64 ", resampling_group: %zu), "
+         "after (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
+         "before (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
+         "duration (got: %" PRId64 ", want: %" PRId64 ", req: %" PRId64 ", db: %" PRId64 "), "
          "points (got: %zu, want: %zu, req: %zu), "
          "%s"
          , qt->id
-         , qt->window.query_granularity
+         , (int64_t)qt->window.query_granularity
 
          // grouping
          , (aligned) ? "aligned" : "unaligned"
          , time_grouping_id2txt(group_method)
          , group
-         , resampling_time
+         , (int64_t)resampling_time
          , resampling_group
 
          // after
-         , r->view.after
-         , after_wanted
-         , after_requested
-         , first_entry_s
+         , (int64_t)r->view.after
+         , (int64_t)after_wanted
+         , (int64_t)after_requested
+         , (int64_t)first_entry_s
 
          // before
-         , r->view.before
-         , before_wanted
-         , before_requested
-         , last_entry_s
+         , (int64_t)r->view.before
+         , (int64_t)before_wanted
+         , (int64_t)before_requested
+         , (int64_t)last_entry_s
 
          // duration
-         , (long)(r->view.before - r->view.after + qt->window.query_granularity)
-         , (long)(before_wanted - after_wanted + qt->window.query_granularity)
-         , (long)before_requested - after_requested
-         , (long)((last_entry_s - first_entry_s) + qt->window.query_granularity)
+         , (int64_t)(r->view.before - r->view.after + qt->window.query_granularity)
+         , (int64_t)(before_wanted - after_wanted + qt->window.query_granularity)
+         , (int64_t)(before_requested - after_requested)
+         , (int64_t)((last_entry_s - first_entry_s) + qt->window.query_granularity)
 
          // points
          , r->rows
@@ -116,6 +116,17 @@ RRDR *rrd2rrdr_legacy(
 RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
     if(!qt || !owa)
         return NULL;
+
+    if(unlikely(qt->internal.cancelled)) {
+        // the target build stopped early: never execute an incomplete target
+        RRDR *r = rrdr_create(owa, qt, 0, 0);
+        r->view.after = r->view.before = 0;
+        r->view.flags |= RRDR_RESULT_FLAG_CANCEL;
+        if(qt->internal.cancelled == QUERY_TARGET_CANCEL_TIMEOUT)
+            r->view.flags |= RRDR_RESULT_FLAG_TIMEOUT;
+        qt->timings.executed_ut = now_monotonic_usec();
+        return r;
+    }
 
     // qt.window members are the WANTED ones.
     // qt.request members are the REQUESTED ones.
@@ -312,6 +323,7 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         if (qt->request.timeout_ms && ((NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0) > (NETDATA_DOUBLE)qt->request.timeout_ms) {
             cancel = true;
+            r->view.flags |= RRDR_RESULT_FLAG_TIMEOUT;
             nd_log(NDLS_ACCESS, NDLP_WARNING, "QUERY CANCELED RUNTIME EXCEEDED %0.2f ms (LIMIT %lld ms)",
                        (NETDATA_DOUBLE)(now_ut - qt->timings.received_ut) / 1000.0, (long long)qt->request.timeout_ms);
         }
@@ -332,6 +344,10 @@ RRDR *rrd2rrdr(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         else
             query_progress_done_step(qt->request.transaction, 1);
     }
+
+    // the loop closes a node only when the next one starts
+    if(last_qn)
+        last_qn->duration_ut = last_ut - last_qn_ut;
 
     // free all resources used by the grouping method
     r_tmp->time_grouping.free(r_tmp);

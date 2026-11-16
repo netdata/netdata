@@ -63,6 +63,14 @@ func TestResolveTagPlan(t *testing.T) {
 			wantPlan:  nil,
 			wantWarn:  1,
 		},
+		"explicit resource attribute name is kept": {
+			tags:     []ResourceTagLabelConfig{{Key: "engine"}, {Key: "owner"}},
+			wantPlan: []resolvedTag{{"engine", "engine"}, {"owner", "owner"}},
+		},
+		"resource attribute collision renamed -> kept": {
+			tags:     []ResourceTagLabelConfig{{Key: "engine", Label: "engine_tag"}},
+			wantPlan: []resolvedTag{{"engine", "engine_tag"}},
+		},
 		"survivors kept when mixed with skips": {
 			tags:      []ResourceTagLabelConfig{{Key: "owner"}, {Key: "region"}, {Key: "project"}},
 			dimLabels: []string{"instance_id"},

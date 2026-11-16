@@ -8,19 +8,23 @@ on:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
   pull_request:
     paths:
       - '.github/workflows/topology-container-tests.yml'
       - 'src/collectors/cgroups.plugin/**'
       - 'src/collectors/apps.plugin/**'
+      - 'packaging/cmake/Modules/NetdataTests.cmake'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
       - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
+      - 'src/plugins.d/FUNCTION_UI_SCHEMA.json'
 
 concurrency:
   group: topology-container-tests-${{ github.ref }}
@@ -31,11 +35,14 @@ permissions:
 
 env:
   TEST_TARGETS: >-
+    apps-stat-test
+    apps-identity-test
     apps-cgroups-path-test
     apps-cgroups-enrichment-test
     apps-lookup-protocol-test
     apps-lookup-netipc-lock-test
     apps-cgroups-lookup-client-abort-test
+    apps-target-lifecycle-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
     cgroup-name-config-test
@@ -51,12 +58,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
       - name: Install Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
 
@@ -67,7 +74,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema libcap-dev \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
@@ -80,7 +87,6 @@ jobs:
             -DENABLE_PLUGIN_CUPS=Off \
             -DENABLE_PLUGIN_NFACCT=Off \
             -DENABLE_PLUGIN_OTEL=Off \
-            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
             -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
             -DENABLE_EXPORTER_MONGODB=Off \
             -DENABLE_BUNDLED_PROTOBUF=Off
@@ -105,6 +111,13 @@ jobs:
 
       - name: Validate topology fixtures
         run: python3 src/collectors/network-viewer.plugin/tests/validate_topology_container_fixtures.py
+
+      - name: Validate topology selector metadata
+        run: |
+          set -euo pipefail
+          selector_runtime_dir="$(mktemp -d "${RUNNER_TEMP:?}/topology-selector.XXXXXX")"
+          python3 src/collectors/network-viewer.plugin/tests/validate_topology_selector_metadata.py \
+            build/network-viewer.plugin --run-dir "$selector_runtime_dir"
 
       - name: Validate network-viewer topology payload (live)
         run: |
@@ -145,21 +158,25 @@ jobs:
             fi
             python3 src/collectors/network-viewer.plugin/tests/validate_topology_payload.py "$out" "$@"
           }
-          validate aggregated '{}' --mode aggregated --group-by process_name
-          validate pid '{"selections":{"group_by":"pid"}}' --mode aggregated --group-by pid
-          validate detailed '{"selections":{"__topology_mode":"detailed","mode":"detailed"}}' --mode detailed
+          validate default '{}' --mode aggregated --group-by process_name
+          validate aggregated-process-name '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"process_name"}}' --mode aggregated --group-by process_name
+          validate aggregated-pid '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"pid"}}' --mode aggregated --group-by pid
+          validate aggregated-container '{"selections":{"__topology_mode":"aggregated","mode":"aggregated","group_by":"container"}}' --mode aggregated --group-by container
+          validate detailed-process-name '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"process_name"}}' --mode detailed --group-by process_name
+          validate detailed-pid '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"pid"}}' --mode detailed --group-by pid
+          validate detailed-container '{"selections":{"__topology_mode":"detailed","mode":"detailed","group_by":"container"}}' --mode detailed --group-by container
 
   asan-tests:
     name: Unit Tests (ASAN)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
       - name: Install Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
 
@@ -170,7 +187,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev libcap-dev \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
@@ -190,7 +207,6 @@ jobs:
             -DENABLE_PLUGIN_CUPS=Off \
             -DENABLE_PLUGIN_NFACCT=Off \
             -DENABLE_PLUGIN_OTEL=Off \
-            -DENABLE_PLUGIN_OTEL_SIGNAL_VIEWER=Off \
             -DENABLE_EXPORTER_PROMETHEUS_REMOTE_WRITE=Off \
             -DENABLE_EXPORTER_MONGODB=Off \
             -DENABLE_BUNDLED_PROTOBUF=Off

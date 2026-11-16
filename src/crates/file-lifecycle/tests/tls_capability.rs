@@ -1,15 +1,16 @@
 //! Guards the HTTPS capability of the shared reqwest build.
 //!
-//! opendal is declared with `default-features = false`, which once silently
-//! dropped its `reqwest-rustls-tls` feature — reqwest then resolved with no
-//! TLS backend and rejected every `https://` URL in-process ("scheme is not
-//! http"), making S3/STS unreachable in production while all plain-HTTP dev
-//! setups kept working.
+//! opendal is declared `default-features = false` in the workspace manifest
+//! (`src/crates/Cargo.toml`), and this crate's own reqwest dev-dependency
+//! enables no TLS feature, so the only TLS backend reqwest can pick up here is
+//! opendal's `reqwest-rustls-tls`, via cargo feature unification. If a
+//! manifest edit drops that feature, reqwest still compiles and keeps serving
+//! plain HTTP, but rejects every `https://` URL in-process with a scheme
+//! error — S3/STS become unreachable with no network-level hint of why. This
+//! test fails loudly in that case instead.
 //!
-//! This crate's own reqwest dev-dependency enables NO TLS feature, so the
-//! capability can only arrive via cargo feature unification from opendal's
-//! `reqwest-rustls-tls`. If that feature is ever dropped again, this test
-//! fails with the scheme error instead of a network-level error.
+//! The manifests' own comments point back here: the workspace `opendal`
+//! entry and this crate's `[dev-dependencies]` reqwest entry.
 
 use std::time::Duration;
 
@@ -27,9 +28,12 @@ async fn https_requests_reach_the_network_instead_of_failing_in_process() {
         .send()
         .await
         .expect_err("unroutable address must not succeed");
-    // The guard keys on reqwest's TLS-less rejection wording ("invalid URL,
-    // scheme is not http"). If a reqwest upgrade ever rephrases it, this
-    // assertion stops catching the regression — re-check the wording then.
+    // The guard keys on the TLS-less rejection wording ("invalid URL, scheme
+    // is not http"), raised by the plain HTTP connector reqwest falls back to
+    // without a TLS backend (hyper-util's `enforce_http`), so it only shows up
+    // in the error chain that `{err:?}` — not Display — renders. If a
+    // reqwest/hyper-util upgrade rephrases it, this assertion passes
+    // vacuously — re-check the wording then.
     let rendered = format!("{err:?}");
     assert!(
         !rendered.contains("scheme"),

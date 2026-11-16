@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"time"
@@ -94,6 +95,7 @@ func (c *Collector) fetchDiscovery(ctx context.Context) (discoveryFetchResult, e
 			c.resourceGraph,
 			c.Discovery.ModeQuery.KQL,
 			c.supportedResourceTypes,
+			c.profileCatalog.ResourceProperties(),
 		)
 	default:
 		resources, byType, err := discoverResources(
@@ -103,6 +105,7 @@ func (c *Collector) fetchDiscovery(ctx context.Context) (discoveryFetchResult, e
 			c.resourceGraph,
 			runtimeResourceTypes(c.runtime),
 			c.Discovery.ModeFilters,
+			c.profileCatalog.ResourceProperties(runtimeResourceTypes(c.runtime)...),
 		)
 		if err != nil {
 			return discoveryFetchResult{}, err
@@ -133,12 +136,12 @@ func runtimeResourceTypes(runtime *collectorRuntime) []string {
 	return resourceTypes
 }
 
-func discoverResources(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, resourceTypes []string, filters *ResourceFiltersConfig) ([]resourceInfo, map[string][]resourceInfo, error) {
+func discoverResources(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, resourceTypes []string, filters *ResourceFiltersConfig, properties []string) ([]resourceInfo, map[string][]resourceInfo, error) {
 	if len(resourceTypes) == 0 {
 		return nil, map[string][]resourceInfo{}, nil
 	}
 
-	query := buildDiscoveryQuery(resourceTypes, filters)
+	query := buildDiscoveryQuery(resourceTypes, filters, properties)
 	if query == "" {
 		return nil, nil, fmt.Errorf("failed to build resource discovery query")
 	}
@@ -211,6 +214,7 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 				ResourceGroup:  rg,
 				Region:         region,
 				Tags:           normalizeResourceTags(row["tags"]),
+				Properties:     resourcePropertyValues(row, properties),
 			})
 		}
 
@@ -225,7 +229,7 @@ func discoverResources(ctx context.Context, subscriptionIDs []string, timeout ti
 	return result, indexResourcesByType(result), nil
 }
 
-func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, kql string, supportedTypes map[string]struct{}) (discoveryFetchResult, error) {
+func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, timeout time.Duration, resourceGraph resourceGraphClient, kql string, supportedTypes map[string]struct{}, properties []string) (discoveryFetchResult, error) {
 	query := stringsTrim(kql)
 	if query == "" {
 		return discoveryFetchResult{}, errors.New("custom discovery query is empty")
@@ -256,6 +260,7 @@ func discoverResourcesFromQuery(ctx context.Context, subscriptionIDs []string, t
 			if err != nil {
 				return discoveryFetchResult{}, fmt.Errorf("query result row %d: %w", i, err)
 			}
+			resource.Properties = resourcePropertyValues(row, properties)
 			switch tagsShape {
 			case queryTagsShapeAbsent:
 				resultMissingTagsColumn = true
@@ -359,7 +364,7 @@ func parseARMResourceID(resourceID string) (string, bool) {
 	return stringsTrim(parts[1]), true
 }
 
-func buildDiscoveryQuery(resourceTypes []string, filters *ResourceFiltersConfig) string {
+func buildDiscoveryQuery(resourceTypes []string, filters *ResourceFiltersConfig, properties []string) string {
 	if len(resourceTypes) == 0 {
 		return ""
 	}
@@ -380,9 +385,11 @@ func buildDiscoveryQuery(resourceTypes []string, filters *ResourceFiltersConfig)
 	}
 
 	query := "resources | where type in~ (" + strings.Join(quotedTypes, ", ") + ")"
+	query += propertyExtends(properties)
+	project := " | project id, name, type, resourceGroup, location, tags" + propertyColumnList(properties)
 
 	if filters == nil {
-		return query + " | project id, name, type, resourceGroup, location, tags"
+		return query + project
 	}
 
 	if groups := normalizeFilterValues(filters.ResourceGroups); len(groups) > 0 {
@@ -407,11 +414,64 @@ func buildDiscoveryQuery(resourceTypes []string, filters *ResourceFiltersConfig)
 		query += " | where isnotempty(tags)"
 		query += " | extend tagKey = tostring(tags[0]), tagValue = tostring(tags[1])"
 		query += " | where " + buildTagPredicate(tagFilters)
-		query += " | summarize tags = take_any(tagsBag), matchedTagKeys = dcount(tolower(tagKey)) by id, name, type, resourceGroup, location"
+		query += " | summarize tags = take_any(tagsBag), matchedTagKeys = dcount(tolower(tagKey))" + propertyTakeAny(properties) + " by id, name, type, resourceGroup, location"
 		query += fmt.Sprintf(" | where matchedTagKeys == %d", len(tagFilters))
 	}
 
-	return query + " | project id, name, type, resourceGroup, location, tags"
+	return query + project
+}
+
+func validResourceProperties(properties []string) []string {
+	valid := make([]string, 0, len(properties))
+	for _, property := range properties {
+		if azureprofiles.IsValidResourceProperty(property) {
+			valid = append(valid, stringsTrim(property))
+		}
+	}
+	return valid
+}
+
+func propertyExtends(properties []string) string {
+	var b strings.Builder
+	for _, property := range validResourceProperties(properties) {
+		b.WriteString(" | extend " + azureprofiles.ResourcePropertyColumn(property) + " = tostring(" + property + ")")
+	}
+	return b.String()
+}
+
+func propertyColumnList(properties []string) string {
+	var b strings.Builder
+	for _, property := range validResourceProperties(properties) {
+		b.WriteString(", " + azureprofiles.ResourcePropertyColumn(property))
+	}
+	return b.String()
+}
+
+func propertyTakeAny(properties []string) string {
+	var b strings.Builder
+	for _, property := range validResourceProperties(properties) {
+		column := azureprofiles.ResourcePropertyColumn(property)
+		b.WriteString(", " + column + " = take_any(" + column + ")")
+	}
+	return b.String()
+}
+
+// resourcePropertyValues reads the property columns of a discovery row; a missing column
+// (for example in a custom KQL query) leaves the property empty.
+func resourcePropertyValues(row map[string]any, properties []string) map[string]string {
+	if len(properties) == 0 {
+		return nil
+	}
+	values := make(map[string]string, len(properties))
+	for _, property := range validResourceProperties(properties) {
+		if value := stringsTrim(asString(row[azureprofiles.ResourcePropertyColumn(property)])); value != "" {
+			values[property] = value
+		}
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	return values
 }
 
 func normalizeFilterValues(values []string) []string {
@@ -826,7 +886,8 @@ func equalResourceInfo(a, b resourceInfo) bool {
 		a.ResourceGroup == b.ResourceGroup &&
 		a.Region == b.Region &&
 		a.HostScope.ScopeKey == b.HostScope.ScopeKey &&
-		equalResourceTags(a.Tags, b.Tags)
+		equalResourceTags(a.Tags, b.Tags) &&
+		maps.Equal(a.Properties, b.Properties)
 }
 
 func equalResourceTags(a, b []resourceTag) bool {

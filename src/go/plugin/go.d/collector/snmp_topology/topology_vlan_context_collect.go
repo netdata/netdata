@@ -5,6 +5,7 @@ package snmptopology
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -48,6 +49,7 @@ func newTopologyVLANProgress() topologyVLANProgress {
 func collectTopologyVLANContext(
 	ctx context.Context,
 	c *Collector,
+	registrationID ddsnmp.DeviceRegistrationID,
 	dev ddsnmp.DeviceConnectionInfo,
 	vlanID string,
 	profiles []*ddsnmp.Profile,
@@ -80,7 +82,14 @@ func collectTopologyVLANContext(
 	sourceRecorder := &ddsnmpcollector.SourceRecorder{}
 	client = sourceRecorder.Wrap(client)
 	collector := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient: client, Profiles: profiles, Log: c.Logger, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, AcquisitionObserver: observer,
+		SnmpClient: client, Profiles: profiles, SysObjectID: dev.SysObjectID, DisableBulkWalk: dev.DisableBulkWalk, AcquisitionObserver: observer,
+		Log: c.Logger.With(
+			slog.String("device", dev.Hostname),
+			slog.String("registration", registrationID.String()),
+			slog.String("context", "vlan"),
+			slog.String("vlan", vlanID),
+		),
+		LogKeyPrefix: "snmp_topology:registration:" + registrationID.String() + ":vlan:" + vlanID + ":",
 	})
 	pms, err := collector.Collect()
 	progress.sources = sourceRecorder.Finish()

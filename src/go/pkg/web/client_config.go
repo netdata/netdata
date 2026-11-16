@@ -24,6 +24,10 @@ var ErrRedirectAttempted = errors.New("redirect")
 // This structure is not intended to be used directly as part of a module's configuration.
 // Supported configuration file formats: YAML.
 type ClientConfig struct {
+	// ResponseBodyLimit sets the consumed-byte limit per response. Nonpositive
+	// values use DefaultResponseBodyLimit. This is a library-only setting.
+	ResponseBodyLimit confopt.ByteSize `yaml:"-" json:"-"`
+
 	// Timeout specifies a time limit for requests made by this ClientConfig.
 	// Default (zero value) is no timeout. Must be set before http.Client creation.
 	Timeout confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
@@ -42,31 +46,51 @@ type ClientConfig struct {
 	ForceHTTP2 bool `yaml:"force_http2,omitempty" json:"force_http2"`
 }
 
-// NewHTTPClient returns a new *http.Client given a ClientConfig configuration and an error if any.
-func NewHTTPClient(cfg ClientConfig) (*http.Client, error) {
+// NewHTTPClient returns a configured client with bounded response bodies. TLS
+// credential reads are scoped to construction and require no caller-owned reader.
+func NewHTTPClient(ctx context.Context, cfg ClientConfig) (*http.Client, error) {
 	var transport http.RoundTripper
 	var err error
 
 	if cfg.ForceHTTP2 {
-		transport, err = newHTTP2Transport(cfg)
+		transport, err = newHTTP2Transport(ctx, cfg)
 	} else {
-		transport, err = newHTTPTransport(cfg)
+		transport, err = NewHTTPTransport(ctx, cfg)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	client := &http.Client{
-		Timeout:       cfg.Timeout.Duration(),
-		Transport:     transport,
-		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
-	}
-
-	return client, nil
+	return NewHTTPClientWithTransport(cfg, transport), nil
 }
 
-func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
+// NewHTTPClientWithTransport applies the client policies and response-body bound
+// to a supplied transport. Configure its dialing/TLS before calling this function.
+// A nil transport uses http.DefaultTransport, as with a standard http.Client.
+func NewHTTPClientWithTransport(cfg ClientConfig, transport http.RoundTripper) *http.Client {
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	limit := responseBodyLimit(cfg.ResponseBodyLimit.Bytes())
+	if policy, ok := transport.(interface{ ResponseBodyLimit() int64 }); ok {
+		limit = min(limit, responseBodyLimit(policy.ResponseBodyLimit()))
+	}
+	return &http.Client{
+		Timeout: cfg.Timeout.Duration(),
+		Transport: &responseLimitTransport{
+			base:  transport,
+			limit: limit,
+		},
+		CheckRedirect: redirectFunc(cfg.NotFollowRedirect),
+	}
+}
+
+// NewHTTPTransport builds a raw HTTP/1 transport with the shared TLS, proxy and
+// timeout configuration. It does not limit bodies. Use NewHTTPClient normally;
+// this builder supports pre-wrap customization and SDKs requiring *http.Transport.
+// ForceHTTP2 is selected by NewHTTPClient and is not applied by this builder.
+func NewHTTPTransport(ctx context.Context, cfg ClientConfig) (*http.Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
@@ -77,7 +101,9 @@ func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
 		}
 	}
 
-	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}
+	d := &net.Dialer{
+		Timeout: cfg.Timeout.Duration(),
+	}
 
 	transport := &http.Transport{
 		TLSClientConfig:     tlsConfig,
@@ -89,13 +115,15 @@ func newHTTPTransport(cfg ClientConfig) (*http.Transport, error) {
 	return transport, nil
 }
 
-func newHTTP2Transport(cfg ClientConfig) (*http2Transport, error) {
-	tlsConfig, err := tlscfg.NewTLSConfig(cfg.TLSConfig)
+func newHTTP2Transport(ctx context.Context, cfg ClientConfig) (*http2Transport, error) {
+	tlsConfig, err := tlscfg.NewTLSConfig(ctx, cfg.TLSConfig)
 	if err != nil {
 		return nil, fmt.Errorf("error on creating TLS config: %w", err)
 	}
 
-	d := &net.Dialer{Timeout: cfg.Timeout.Duration()}
+	d := &net.Dialer{
+		Timeout: cfg.Timeout.Duration(),
+	}
 
 	transport := &http2Transport{
 		t2: &http2.Transport{

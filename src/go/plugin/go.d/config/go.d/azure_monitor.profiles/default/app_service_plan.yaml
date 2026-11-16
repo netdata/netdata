@@ -1,0 +1,163 @@
+---
+display_name: Azure App Service Plan
+resource_type: Microsoft.Web/serverfarms
+metrics:
+  - id: cpu_percentage
+    azure_name: CpuPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: memory_percentage
+    azure_name: MemoryPercentage
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+      - aggregation: maximum
+        kind: gauge
+  - id: http_queue_length
+    azure_name: HttpQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: disk_queue_length
+    azure_name: DiskQueueLength
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: bytes_received
+    azure_name: BytesReceived
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: bytes_sent
+    azure_name: BytesSent
+    time_grain: PT1M
+    series:
+      - aggregation: total
+        kind: counter
+  - id: socket_inbound_all
+    azure_name: SocketInboundAll
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: socket_outbound_all
+    azure_name: SocketOutboundAll
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: socket_outbound_established
+    azure_name: SocketOutboundEstablished
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+  - id: socket_outbound_time_wait
+    azure_name: SocketOutboundTimeWait
+    time_grain: PT1M
+    series:
+      - aggregation: average
+        kind: gauge
+template:
+  family: Azure App Service Plan
+  context_namespace: app_service_plan
+  chart_defaults:
+    label_promotion:
+      - resource_name
+      - resource_group
+      - region
+      - resource_type
+      - profile
+      - subscription_id
+    instances:
+      by_labels:
+        - resource_uid
+  charts:
+    - id: am_azure_app_service_plan__cpu
+      title: Azure App Service Plan CPU Utilization
+      context: cpu
+      family: CPU
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_percentage_average
+          name: average
+        - selector: cpu_percentage_maximum
+          name: maximum
+    - id: am_azure_app_service_plan__memory
+      title: Azure App Service Plan Memory Utilization
+      context: memory
+      family: Memory
+      type: line
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: memory_percentage_average
+          name: average
+        - selector: memory_percentage_maximum
+          name: maximum
+    - id: am_azure_app_service_plan__http_queue
+      title: Azure App Service Plan HTTP Queue Length
+      context: http_queue
+      family: Queues
+      type: line
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: http_queue_length_average
+          name: queued
+    - id: am_azure_app_service_plan__disk_queue
+      title: Azure App Service Plan Disk Queue Length
+      context: disk_queue
+      family: Queues
+      type: line
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: disk_queue_length_average
+          name: queued
+    - id: am_azure_app_service_plan__network_traffic
+      title: Azure App Service Plan Network Traffic
+      context: network_traffic
+      family: Network
+      type: line
+      units: bytes/s
+      algorithm: incremental
+      dimensions:
+        - selector: bytes_received_total
+          name: received
+        - selector: bytes_sent_total
+          name: sent
+    - id: am_azure_app_service_plan__sockets
+      title: Azure App Service Plan Sockets
+      context: sockets
+      family: Network
+      type: line
+      units: sockets
+      algorithm: absolute
+      dimensions:
+        - selector: socket_inbound_all_average
+          name: inbound
+        - selector: socket_outbound_all_average
+          name: outbound
+    - id: am_azure_app_service_plan__outbound_socket_states
+      title: Azure App Service Plan Outbound Socket States
+      context: outbound_socket_states
+      family: Network
+      type: line
+      units: sockets
+      algorithm: absolute
+      dimensions:
+        - selector: socket_outbound_established_average
+          name: established
+        - selector: socket_outbound_time_wait_average
+          name: time_wait

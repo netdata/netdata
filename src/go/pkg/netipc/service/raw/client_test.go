@@ -5,7 +5,6 @@ package raw
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/transport/posix"
@@ -26,46 +25,6 @@ func cleanupAll(service string) {
 	posix.ShmCleanupStale(testRunDir, service)
 }
 
-func waitUnixSocketReady(service string) {
-	path := testRunDir + "/" + service + ".sock"
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		if _, err := os.Stat(path); err == nil {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-}
-
-func waitUnixServerReady(service string) {
-	waitUnixSocketReady(service)
-
-	cfg := testClientConfig()
-	deadline := time.Now().Add(2 * time.Second)
-	for time.Now().Before(deadline) {
-		session, err := posix.Connect(testRunDir, service, &cfg)
-		if err == nil {
-			session.Close()
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-}
-
-func waitUnixRawSessionConnect(service string, cfg posix.ClientConfig) (*posix.Session, error) {
-	deadline := time.Now().Add(2 * time.Second)
-	var lastErr error
-	for time.Now().Before(deadline) {
-		session, err := posix.Connect(testRunDir, service, &cfg)
-		if err == nil {
-			return session, nil
-		}
-		lastErr = err
-		time.Sleep(10 * time.Millisecond)
-	}
-	return nil, lastErr
-}
-
 func testServerConfig() posix.ServerConfig {
 	return posix.ServerConfig{
 		SupportedProfiles:       protocol.ProfileBaseline,
@@ -74,7 +33,9 @@ func testServerConfig() posix.ServerConfig {
 		MaxResponsePayloadBytes: responseBufSize,
 		MaxResponseBatchItems:   1,
 		AuthToken:               authToken,
-		Backlog:                 4,
+		// Above every test's connect burst: macOS and FreeBSD refuse a
+		// connect to a full backlog at once, where Linux waits.
+		Backlog: 64,
 	}
 }
 
@@ -138,22 +99,12 @@ func startTestServer(service string, handler DispatchHandler) *testServer {
 	cleanupAll(service)
 
 	s := NewServer(testRunDir, service, testServerConfig(), protocol.MethodCgroupsSnapshot, handler)
-	doneCh := make(chan struct{})
-
-	go func() {
-		defer close(doneCh)
-		s.Run()
-	}()
-
-	// Wait until the server is actually accepting sessions.
-	waitUnixServerReady(service)
-
-	return &testServer{server: s, doneCh: doneCh}
+	return &testServer{server: s, doneCh: runServerForTest(s)}
 }
 
 func (ts *testServer) stop() {
 	ts.server.Stop()
-	<-ts.doneCh
+	waitClosed(ts.doneCh, "server "+ts.server.serviceName+" Run")
 }
 
 func TestClientLifecycle(t *testing.T) {
@@ -316,7 +267,6 @@ func TestRetryOnFailure(t *testing.T) {
 	// Kill server
 	ts1.stop()
 	cleanupAll(svc)
-	time.Sleep(50 * time.Millisecond)
 
 	// Restart server
 	ts2 := startTestServer(svc, testSnapshotDispatch())
@@ -408,14 +358,7 @@ func TestConcurrentClients(t *testing.T) {
 			client := NewSnapshotClient(testRunDir, svc, testClientConfig())
 			defer client.Close()
 
-			for range 100 {
-				client.Refresh()
-				if client.Ready() {
-					break
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
-
+			client.Refresh()
 			if !client.Ready() {
 				r.failures = requestsPerClient
 				results <- r
@@ -553,7 +496,7 @@ func TestNonRequestTerminatesSession(t *testing.T) {
 	defer ts.stop()
 
 	// Connect via raw UDS session (transport level)
-	session, err := waitUnixRawSessionConnect(svc, posix.ClientConfig{
+	session, err := posix.Connect(testRunDir, svc, &posix.ClientConfig{
 		SupportedProfiles:       protocol.ProfileBaseline,
 		MaxRequestPayloadBytes:  4096,
 		MaxRequestBatchItems:    1,
@@ -579,10 +522,8 @@ func TestNonRequestTerminatesSession(t *testing.T) {
 		// Send might fail immediately; that's acceptable
 		t.Logf("send non-request failed immediately: %v", sendErr)
 	} else {
-		// Wait for server to process and terminate the session
-		time.Sleep(200 * time.Millisecond)
-
-		// Try to send a valid request and receive - should fail
+		// The server terminates the session on the bad message, so the
+		// receive below ends with an error instead of a response.
 		reqHdr := &protocol.Header{
 			Kind:            protocol.KindRequest,
 			Code:            protocol.MethodCgroupsSnapshot,

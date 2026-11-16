@@ -8,10 +8,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"io"
+	"time"
 	"unicode/utf8"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
+
+// DefaultProcessAttemptFuse bounds logical preparation and runtime startup.
+const DefaultProcessAttemptFuse = 2 * time.Minute
 
 var (
 	ErrProcessAttemptBusy        = errors.New("jobmgr containment: identity busy")

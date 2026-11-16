@@ -22,6 +22,7 @@ mod query;
 #[cfg(test)]
 mod rollup;
 mod routing;
+mod startup_keepalive;
 #[cfg(test)]
 mod startup_memory_tests;
 mod test_cli;
@@ -34,7 +35,7 @@ pub(crate) use api::{
     flows_required_params,
 };
 
-use rt::PluginRuntime;
+use netdata_plugin_rt::PluginRuntime;
 use std::io::{IsTerminal, Write};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -77,7 +78,7 @@ fn main() {
     let glibc_arena_max = memory_allocator::limit_glibc_arenas_for_process();
 
     println!("TRUST_DURATIONS 1");
-    rt::init_tracing_with_identifier("netflow-plugin");
+    netdata_plugin_rt::init_tracing_with_identifier("netflow-plugin");
 
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     match glibc_arena_max {
@@ -115,12 +116,40 @@ fn main() {
     };
 
     let exit_code = runtime.block_on(async_main());
-    if exit_code != 0 {
-        std::process::exit(exit_code);
-    }
+
+    // Not a return: dropping the runtime would wait for its read of stdin,
+    // which tokio cannot cancel. That read ends only when the agent closes the
+    // pipe, and after a SIGTERM the agent does so two minutes later.
+    std::process::exit(exit_code);
 }
 
 async fn async_main() -> i32 {
+    let shutdown = CancellationToken::new();
+    let mut keepalive = if std::io::stdout().is_terminal() {
+        None
+    } else {
+        match startup_keepalive::StartupKeepalive::start(shutdown.clone()) {
+            Ok(keepalive) => Some(keepalive),
+            Err(err) => {
+                tracing::error!("failed to start initialization keepalive worker: {err}");
+                return 1;
+            }
+        }
+    };
+    let exit_code = async_main_with_keepalive(&mut keepalive, shutdown).await;
+    if let Some(keepalive) = &mut keepalive
+        && let Err(err) = keepalive.stop()
+    {
+        tracing::error!("startup keepalive failed while initializing NetFlow: {err}");
+        return 1;
+    }
+    exit_code
+}
+
+async fn async_main_with_keepalive(
+    keepalive: &mut Option<startup_keepalive::StartupKeepalive>,
+    shutdown: CancellationToken,
+) -> i32 {
     let config = match plugin_config::PluginConfig::new() {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -128,6 +157,10 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
+
+    if shutdown.is_cancelled() {
+        return 1;
+    }
 
     if !config.enabled {
         tracing::info!("netflow plugin disabled by config (enabled=false)");
@@ -139,11 +172,13 @@ async fn async_main() -> i32 {
         return 0;
     }
 
-    let shutdown = CancellationToken::new();
     let metrics = Arc::new(ingest::IngestMetrics::default());
     let open_tiers = Arc::new(RwLock::new(tiering::OpenTierState::default()));
     let tier_flow_indexes = Arc::new(RwLock::new(tiering::TierFlowIndexStore::default()));
     let facet_runtime = Arc::new(facet_runtime::FacetRuntime::new(&config.journal.base_dir()));
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let (query_service, notify_rx) =
         match query::FlowQueryService::new_with_facet_runtime(&config, Arc::clone(&facet_runtime))
             .await
@@ -154,6 +189,9 @@ async fn async_main() -> i32 {
                 return 1;
             }
         };
+    if shutdown.is_cancelled() {
+        return 1;
+    }
     let query_service = Arc::new(query_service);
     let ingest_service = match ingest::IngestService::new_with_facet_runtime(
         config.clone(),
@@ -168,8 +206,21 @@ async fn async_main() -> i32 {
             return 1;
         }
     };
-    if let Err(err) = query_service.initialize_facets_before_ingest().await {
-        tracing::error!("failed to initialize facet runtime: {err:#}");
+    if shutdown.is_cancelled() {
+        return 1;
+    }
+    match query_service
+        .initialize_facets_before_ingest_cancellable(shutdown.clone())
+        .await
+    {
+        Ok(true) => {}
+        Ok(false) => return 1,
+        Err(err) => {
+            tracing::error!("failed to initialize facet runtime: {err:#}");
+            return 1;
+        }
+    }
+    if shutdown.is_cancelled() {
         return 1;
     }
     let routing_runtime = ingest_service.routing_runtime();
@@ -188,13 +239,23 @@ async fn async_main() -> i32 {
         &config.enrichment.geoip.asn_database,
         &config.enrichment.geoip.geo_database,
     );
-    let _charts_task = charts::NetflowCharts::new(&mut runtime, &config.charts).spawn_sampler(
+    let charts = match charts::NetflowCharts::new(&config.charts) {
+        Ok(charts) => charts,
+        Err(err) => {
+            tracing::error!("failed to declare the netflow charts: {err}");
+            return 1;
+        }
+    };
+    let publish_charts = CancellationToken::new();
+    let _charts_task = charts.spawn_sampler(
         Arc::clone(&metrics),
         Arc::clone(&open_tiers),
         Arc::clone(&tier_flow_indexes),
         Arc::clone(&facet_runtime),
         resident_mapping_paths,
         config.charts.clone(),
+        runtime.writer(),
+        publish_charts.clone(),
         shutdown.clone(),
     );
 
@@ -244,6 +305,7 @@ async fn async_main() -> i32 {
 
     let ingest_shutdown = shutdown.clone();
     let ingest_listener_ready = listener_ready.clone();
+    let publish_listener_ready = listener_ready.clone();
     let ingest_task = tokio::spawn(async move {
         ingest_service
             .run_with_listener_ready_signal(ingest_shutdown, ingest_listener_ready)
@@ -350,53 +412,69 @@ async fn async_main() -> i32 {
     }
 
     let mut exit_code = 0;
-    let keepalive_required = !std::io::stdout().is_terminal();
     let mut ingest_task = ingest_task;
     let mut ingest_task_finished = false;
 
-    tokio::select! {
-        result = async {
-            if keepalive_required {
-                let writer = runtime.writer();
-                let keepalive = async move {
-                    let mut interval = tokio::time::interval(Duration::from_secs(60));
-                    loop {
-                        interval.tick().await;
-                        if let Ok(mut w) = writer.try_lock() {
-                            let _ = w.write_raw(b"PLUGIN_KEEPALIVE\n").await;
-                        }
-                    }
-                };
-
-                tokio::select! {
-                    result = runtime.run() => result,
-                    _ = keepalive => Ok(()),
-                }
-            } else {
-                runtime.run().await
-            }
-        } => {
-            if let Err(err) = result {
-                tracing::error!("plugin runtime error: {err:#}");
-                exit_code = 1;
-            }
-        }
+    // `runtime.run()` publishes the Function, and `publish_charts` starts the
+    // chart updates. The Agent counts either as collected data. A plugin that
+    // exits with an error before collecting anything is disabled; one that
+    // collected something is restarted every 10 * update_every seconds, and a
+    // startup failure that follows publication collects something on every
+    // run, so the restarts never stop. So nothing is published until the ingest
+    // service has finished its fallible startup (tier rebuild, every listener
+    // bound). The startup worker covers this wait and all earlier blocking
+    // initialization; stop and join it before handing publication to runtime.
+    let mut ingest_started = tokio::select! {
+        biased;
+        _ = publish_listener_ready.cancelled() => true,
         result = &mut ingest_task => {
             ingest_task_finished = true;
-            match result {
-                Ok(Ok(())) => {
-                    tracing::error!("ingestion task exited unexpectedly");
+            exit_code = ingest_task_exit_code(result, false);
+            false
+        }
+        err = async {
+            match keepalive.as_mut() {
+                Some(keepalive) => keepalive.failure().await,
+                None => std::future::pending().await,
+            }
+        } => {
+            tracing::error!(
+                "startup keepalive worker failed during NetFlow initialization: {err}"
+            );
+            exit_code = 1;
+            false
+        }
+    };
+
+    if ingest_started
+        && let Some(keepalive) = keepalive.as_mut()
+        && let Err(err) = keepalive.stop()
+    {
+        tracing::error!("startup keepalive failed before publishing NetFlow: {err}");
+        exit_code = 1;
+        ingest_started = false;
+    }
+
+    // A failed keepalive leaves the ingest task neither published nor
+    // finished. Its tier rebuild does not observe `shutdown`, so abort it
+    // rather than let an Agent that is already gone wait for the rebuild to
+    // finish.
+    if !ingest_started && !ingest_task_finished {
+        ingest_task.abort();
+    }
+
+    if ingest_started {
+        publish_charts.cancel();
+        tokio::select! {
+            result = runtime.run() => {
+                if let Err(err) = result {
+                    tracing::error!("plugin runtime error: {err:#}");
                     exit_code = 1;
                 }
-                Ok(Err(err)) => {
-                    tracing::error!("ingestion task error: {err:#}");
-                    exit_code = 1;
-                }
-                Err(err) if !err.is_cancelled() => {
-                    tracing::error!("ingestion task join error: {err}");
-                    exit_code = 1;
-                }
-                Err(_) => {}
+            }
+            result = &mut ingest_task => {
+                ingest_task_finished = true;
+                exit_code = ingest_task_exit_code(result, false);
             }
         }
     }
@@ -404,69 +482,62 @@ async fn async_main() -> i32 {
     shutdown.cancel();
 
     if !ingest_task_finished {
-        match ingest_task.await {
-            Ok(Ok(())) => {}
-            Ok(Err(err)) => {
-                tracing::error!("ingestion task error: {err:#}");
-                exit_code = 1;
-            }
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("ingestion task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(ingest_task_exit_code(ingest_task.await, true));
     }
     if let Some(task) = direction_migration_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("DIRECTION migration task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "DIRECTION migration task"));
     }
-    match notify_task.await {
-        Ok(()) => {}
-        Err(err) if !err.is_cancelled() => {
-            tracing::error!("journal notify event task join error: {err}");
-            exit_code = 1;
-        }
-        Err(_) => {}
-    }
+    exit_code = exit_code.max(task_join_exit_code(
+        notify_task.await,
+        "journal notify event task",
+    ));
     if let Some(task) = bmp_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BMP listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BMP listener task"));
     }
     if let Some(task) = bioris_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("BioRIS listener task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "BioRIS listener task"));
     }
     if let Some(task) = network_sources_task {
-        match task.await {
-            Ok(()) => {}
-            Err(err) if !err.is_cancelled() => {
-                tracing::error!("network-sources task join error: {err}");
-                exit_code = 1;
-            }
-            Err(_) => {}
-        }
+        exit_code = exit_code.max(task_join_exit_code(task.await, "network-sources task"));
     }
 
     exit_code
+}
+
+/// Log the ingestion task's outcome and map it to the process exit code.
+/// `shutdown_requested` says whether the task was asked to stop; if not, even a
+/// clean return is a failure, because ingestion only ends on shutdown.
+fn ingest_task_exit_code(
+    result: Result<anyhow::Result<()>, tokio::task::JoinError>,
+    shutdown_requested: bool,
+) -> i32 {
+    match result {
+        Ok(Ok(())) if shutdown_requested => 0,
+        Ok(Ok(())) => {
+            tracing::error!("ingestion task exited unexpectedly");
+            1
+        }
+        Ok(Err(err)) => {
+            tracing::error!("ingestion task error: {err:#}");
+            1
+        }
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("ingestion task join error: {err}");
+            1
+        }
+        Err(_) => 0,
+    }
+}
+
+/// Log a background task that ended in a panic and map it to the exit code.
+fn task_join_exit_code(result: Result<(), tokio::task::JoinError>, task: &str) -> i32 {
+    match result {
+        Err(err) if !err.is_cancelled() => {
+            tracing::error!("{task} join error: {err}");
+            1
+        }
+        _ => 0,
+    }
 }
 
 async fn wait_for_listener_ready(

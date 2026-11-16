@@ -65,6 +65,8 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
         string_freez(r->di[d]);
         string_freez(r->dn[d]);
         string_freez(r->du[d]);
+        if(r->result_units)
+            string_freez(r->result_units[d]);
     }
 
     query_target_release(r->internal.release_with_rrdr_qt);
@@ -77,6 +79,7 @@ inline void rrdr_free(ONEWAYALLOC *owa, RRDR *r) {
     onewayalloc_freez(owa, r->di);
     onewayalloc_freez(owa, r->dn);
     onewayalloc_freez(owa, r->du);
+    onewayalloc_freez(owa, r->result_units);
     onewayalloc_freez(owa, r->dp);
     onewayalloc_freez(owa, r->dview);
     onewayalloc_freez(owa, r->dqp);

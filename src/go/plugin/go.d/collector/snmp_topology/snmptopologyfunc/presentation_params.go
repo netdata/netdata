@@ -102,6 +102,7 @@ func managedFocusParamConfig(extraOptions []funcapi.ParamOption) funcapi.ParamCo
 		Help:      "Choose focus root set for depth filtering",
 		Selection: funcapi.ParamMultiSelect,
 		Options:   options,
+		Focus:     rootFocusConfig(true),
 	}
 }
 
@@ -123,6 +124,7 @@ func depthParamConfig() funcapi.ParamConfig {
 	return funcapi.ParamConfig{
 		ID:        ParamDepth,
 		Name:      "Focus Depth",
+		Focus:     &funcapi.FocusConfig{Role: funcapi.FocusRoleDepth, UnlimitedOption: topologyoptions.DepthAll},
 		Help:      "Limit topology expansion hops from focus roots",
 		Selection: funcapi.ParamSelect,
 		Options:   options,

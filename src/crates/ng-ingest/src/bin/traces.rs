@@ -11,7 +11,7 @@
 //! # then point the server's OTLP trace exporter at http://<this-host>:21999
 //! ```
 //!
-//! Single fixed stream (`PART_KEY = 0`, empty `content_meta`) → one WAL file,
+//! Single fixed stream (`PARTITION_KEY = 0`, empty `content_meta`) → one WAL file,
 //! stamped `pipeline_id = 1` (traces). Plaintext h2c (no TLS): the exporter must
 //! be insecure.
 

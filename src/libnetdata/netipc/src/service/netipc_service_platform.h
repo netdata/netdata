@@ -39,9 +39,9 @@ nipc_error_t nipc_service_platform_do_raw_call(
 nipc_error_t
 nipc_service_platform_call_with_retry(nipc_client_ctx_t *ctx,
                                       nipc_service_platform_attempt_fn attempt,
-                                      void *state);
+                                      void *state, uint32_t timeout_ms);
 nipc_error_t nipc_service_platform_ensure_request_capacity(
-    nipc_client_ctx_t *ctx, size_t required_payload_bytes);
+    nipc_client_ctx_t *ctx, size_t required_payload_bytes, uint32_t timeout_ms);
 
 void nipc_service_platform_server_config_from_service(
     nipc_service_platform_server_config_t *transport,

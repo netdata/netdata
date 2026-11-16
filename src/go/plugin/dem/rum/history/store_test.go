@@ -1,0 +1,558 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package history
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strconv"
+	"testing"
+	"testing/synctest"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journalhost"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func newTestStore(t *testing.T) (*Store, string) {
+	t.Helper()
+	root := t.TempDir()
+	owner, err := journalstore.Open(context.Background(), root, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, owner.Close()) })
+	return NewStore(owner), root
+}
+
+func activeJournal(t *testing.T, root string) string {
+	t.Helper()
+	files, err := filepath.Glob(filepath.Join(root, "*", "dem.journal"))
+	require.NoError(t, err)
+	require.Len(t, files, 1, "active journal missing")
+	latest := files[0]
+	return latest
+}
+
+func appendEvent(t *testing.T, s *Store, r EventRecord) {
+	t.Helper()
+	attempted, err := s.AppendEvent(context.Background(), r)
+	require.True(t, attempted)
+	require.NoError(t, err)
+}
+
+// Seed an actual old journal through the SDK's lazy writer. An eager file's
+// name uses creation time even when its first event is backdated.
+func seedOldJournal(t *testing.T, root string, event EventRecord, saved time.Time) {
+	t.Helper()
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
+	require.NoError(t, err)
+	log, err := journal.NewLog(
+		root,
+		journal.LogConfig{
+			Source:              "dem",
+			StrictSystemdNaming: true,
+			Options: journal.Options{
+				MachineID: host.MachineID(),
+				BootID:    host.BootID(),
+				Compact:   true,
+			},
+		},
+	)
+	require.NoError(t, err)
+	opts := host.EntryOptions()
+	opts.RealtimeUsec = uint64(saved.UnixMicro())
+	require.NoError(t, log.Append(storedEventFields(event), opts))
+	require.NoError(t, log.Close())
+}
+
+// SDK fixtures independently encode the documented envelope; production appends derive it.
+func storedEventFields(r EventRecord) []journal.Field {
+	return append(eventFields(r), journal.StringField("DEM_SCHEMA", "1"),
+		journal.StringField("DEM_RUM_MINUTE", strconv.FormatInt(r.ObservedUS/60_000_000, 10)))
+}
+
+func TestJournalReopen(t *testing.T) {
+	ctx := context.Background()
+	path := filepath.Join(t.TempDir(), "history")
+	owner, err := journalstore.Open(ctx, path, "")
+	s := NewStore(owner)
+	require.NoError(t, err)
+	event := EventRecord{
+		Site:        "shop",
+		SessionID:   "session",
+		ObservedUS:  time.Now().UnixMicro(),
+		Type:        "error",
+		Fingerprint: "fp",
+		ErrorType:   "TypeError",
+		Message:     "broken",
+		SampleStack: "stack",
+		Text:        "TypeError: broken",
+		Browser:     "browser",
+		Page:        "/cart",
+		TraceID:     "trace",
+	}
+	appendEvent(t, s, event)
+	require.NoError(t, s.Sync(ctx))
+	require.NoError(t, s.store.Close())
+	owner, err = journalstore.Open(ctx, path, "")
+	s = NewStore(owner)
+	require.NoError(t, err)
+	defer s.store.Close()
+	events, err := s.QuerySessionEvents(ctx, "shop", "session", "")
+	require.NoError(t, err)
+	require.Len(t, events, 1)
+	assert.Equal(t, event.ObservedUS, events[0].ObservedUS)
+	assert.Equal(t, "trace", events[0].TraceID)
+	groups, err := s.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 1,
+			},
+			Fingerprint: "fp",
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, groups, 1)
+	assert.Equal(t, "stack", groups[0].SampleStack)
+	assert.Equal(t, "broken", groups[0].Message)
+	assert.Equal(t, 1, groups[0].CountWindow)
+	_, err = os.Stat(path)
+	assert.NoError(t, err)
+}
+
+func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
+	root := t.TempDir()
+	ctx := context.Background()
+	host, err := journalhost.Load(journalhost.LoadOptions{
+		StateDir: filepath.Join(root, "identity"),
+	})
+	require.NoError(t, err)
+	oldBoot, err := journal.NewUUID()
+	require.NoError(t, err)
+	log, err := journal.NewLog(
+		root,
+		journal.LogConfig{
+			Source:              "dem",
+			StrictSystemdNaming: true,
+			Options: journal.Options{
+				MachineID: host.MachineID(),
+				BootID:    oldBoot,
+				Compact:   true,
+			},
+		},
+	)
+	require.NoError(t, err)
+	opts := host.EntryOptions()
+	opts.BootID = oldBoot
+	require.NoError(
+		t,
+		log.Append(
+			storedEventFields(
+				EventRecord{
+					Site:       "shop",
+					SessionID:  "s",
+					Type:       "pageview",
+					ObservedUS: time.Now().UnixMicro(),
+				},
+			),
+			opts,
+		),
+	)
+	require.NoError(t, log.Close())
+	archives, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+	require.Len(t, archives, 1)
+	firstPath := archives[0]
+	first, err := journal.OpenFile(firstPath)
+	require.NoError(t, err)
+	sequenceID, sequence := first.Header().SeqnumID(), first.Header().TailEntrySeqnum()
+	require.NoError(t, first.Close())
+	owner, err := journalstore.Open(ctx, root, "")
+	s := NewStore(owner)
+	require.NoError(t, err)
+	appendEvent(t, s, EventRecord{
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	second, err := journal.OpenFile(activeJournal(t, root))
+	require.NoError(t, err)
+	defer second.Close()
+	assert.Equal(t, sequenceID, second.Header().SeqnumID())
+	assert.Equal(t, sequence+1, second.Header().HeadEntrySeqnum())
+	assert.Equal(t, host.BootID(), second.Header().TailEntryBootID())
+	require.NoError(t, s.store.Close())
+	owner, err = journalstore.Open(ctx, root, "")
+	s = NewStore(owner)
+	require.NoError(t, err)
+	defer s.store.Close()
+	sessions, err := s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: time.Now().Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, int64(2), sessions[0].Pageviews)
+}
+
+func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	old := time.Now().Add(-48 * time.Hour)
+	seedOldJournal(
+		t,
+		root,
+		EventRecord{
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: old.UnixMicro(),
+			Page:       "/expired",
+		},
+		old,
+	)
+	owner, err := journalstore.Open(ctx, root, "")
+	s := NewStore(owner)
+	require.NoError(t, err)
+	defer s.store.Close()
+	sessions, err := s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: time.Now().Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
+	sessions, err = s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: time.Now().Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	assert.Empty(t, sessions, "expiry must run without a new event or enabled site")
+	fresh := time.Now()
+	appendEvent(
+		t,
+		s,
+		EventRecord{
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: fresh.UnixMicro(),
+			Page:       "/retained",
+		},
+	)
+	sessions, err = s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: fresh.Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, int64(1), sessions[0].Pageviews)
+	assert.Equal(t, fresh.Unix(), sessions[0].StartedAt)
+	assert.Equal(t, "/retained", sessions[0].EntryPage)
+}
+
+func TestRetentionWholeFilesAndLiveWriter(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		s, root := newTestStore(t)
+		ctx := context.Background()
+		appendEvent(t, s, EventRecord{
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: time.Now().UnixMicro(),
+		})
+		reader, release, err := s.store.OpenReader(ctx)
+		require.NoError(t, err)
+		defer release()
+		time.Sleep(48 * time.Hour)
+		require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
+		files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+		require.NoError(t, err)
+		assert.Empty(t, files, "expired idle history is unlinked")
+		var retained int
+		require.NoError(
+			t,
+			reader.VisitMatch("DEM_SESSION_ID", "s", func(*journal.SnapshotEntry) error { retained++; return nil }),
+		)
+		assert.Equal(t, 1, retained, "opened snapshot survives archive unlink")
+		sessions, err := s.QuerySessions(ctx, SessionFilter{
+			Filter: Filter{
+				Before: time.Now().Unix() + 5,
+			},
+		})
+		require.NoError(t, err)
+		assert.Empty(t, sessions)
+		appendEvent(
+			t,
+			s,
+			EventRecord{
+				Site:       "shop",
+				SessionID:  "fresh",
+				Type:       "activity",
+				ObservedUS: time.Now().UnixMicro(),
+			},
+		)
+		require.NoError(t, s.Sync(ctx))
+		files, err = filepath.Glob(filepath.Join(root, "*", "dem.journal"))
+		require.NoError(t, err)
+		require.Len(t, files, 1, "a new append creates a protected active file")
+		info, err := os.Stat(files[0])
+		require.NoError(t, err)
+		assert.GreaterOrEqual(
+			t,
+			info.Size(),
+			int64(journalstore.MinHistoryBytes),
+			"file lengths include allocation space",
+		)
+		sessions, err = s.QuerySessions(ctx, SessionFilter{
+			Filter: Filter{
+				Before: time.Now().Unix() + 5,
+			},
+		})
+		require.NoError(t, err)
+		require.Len(t, sessions, 1)
+		assert.Equal(t, "fresh", sessions[0].SessionID)
+	})
+}
+
+func TestIdleRetentionDoesNotCreateActiveJournals(t *testing.T) {
+	s, root := newTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
+	appendEvent(t, s, EventRecord{
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	active := activeJournal(t, root)
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
+	files, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
+	after, err := filepath.Glob(filepath.Join(root, "*", "dem@*.journal"))
+	require.NoError(t, err)
+	assert.Empty(t, files, "healthy idle maintenance must not force an archive")
+	assert.Equal(t, files, after, "repeated idle sweeps must not manufacture empty archives")
+	assert.Equal(t, active, activeJournal(t, root), "healthy maintenance keeps the same writer file")
+}
+
+func TestRetentionRetriesAfterInventoryDirectoryFailure(t *testing.T) {
+	s, root := newTestStore(t)
+	ctx := context.Background()
+	appendEvent(t, s, EventRecord{
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	machineDir := filepath.Dir(activeJournal(t, root))
+	moved := filepath.Join(t.TempDir(), "moved-machine")
+	require.NoError(t, os.Rename(machineDir, moved))
+	require.NoError(t, os.WriteFile(machineDir, []byte("obstruction"), 0600))
+	cleanupErr := s.store.EnforceHistoryRetention(ctx, 30, 1<<30)
+	attempted, appendErr := s.AppendEvent(ctx, EventRecord{
+		Site:       "shop",
+		SessionID:  "s",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	status, statusErr := s.store.Status(ctx)
+	require.NoError(t, os.Remove(machineDir))
+	require.NoError(t, os.Rename(moved, machineDir))
+	require.Error(t, cleanupErr)
+	require.NoError(t, appendErr)
+	assert.True(t, attempted)
+	require.NoError(t, statusErr)
+	assert.Empty(t, status.WriterError)
+	assert.NotEmpty(t, status.Cleanup.Error)
+	assert.NotEmpty(t, status.InventoryError)
+	assert.Nil(t, status.Inventory)
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 30, 1<<30))
+	status, err := s.store.Status(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, status.Cleanup.Error)
+	rows, err := s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: time.Now().Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.EqualValues(t, 2, rows[0].Pageviews, "inventory recovery preserves both appends without reopening")
+}
+
+func TestAppendReportsAttemptedOnFilesystemFailure(t *testing.T) {
+	s, root := newTestStore(t)
+	ctx := context.Background()
+	require.NoError(t, s.store.EnforceHistoryRetention(ctx, 1, journalstore.MinHistoryBytes))
+	// Obstruct creation of the first lazy file, before any writer mutation.
+	moved := filepath.Join(t.TempDir(), "moved-root")
+	require.NoError(t, os.Rename(root, moved))
+	require.NoError(t, os.WriteFile(root, []byte("obstruction"), 0600))
+	attempted, appendErr := s.AppendEvent(ctx, EventRecord{
+		Site:       "shop",
+		SessionID:  "failed",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	require.NoError(t, os.Remove(root))
+	require.NoError(t, os.Rename(moved, root))
+	assert.True(t, attempted, "the SDK was called even though lazy file creation failed")
+	require.Error(t, appendErr)
+	appendEvent(t, s, EventRecord{
+		Site:       "shop",
+		SessionID:  "fresh",
+		Type:       "pageview",
+		ObservedUS: time.Now().UnixMicro(),
+	})
+	require.NoError(t, s.Sync(ctx))
+	sessions, err := s.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "shop",
+			Before: time.Now().Unix() + 5,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	assert.Equal(t, "fresh", sessions[0].SessionID)
+}
+
+func TestCorruptArchiveReturnsErrorInsteadOfPartialCounts(t *testing.T) {
+	s, root := newTestStore(t)
+	appendEvent(t, s, EventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+	})
+	// This filename is in the owned journal namespace but contains no journal.
+	path := filepath.Join(
+		filepath.Dir(activeJournal(t, root)),
+		"dem@ffffffffffffffffffffffffffffffff-0000000000000001-0000000000000001.journal",
+	)
+	require.NoError(t, os.WriteFile(path, []byte("invalid journal"), 0600))
+	_, err := s.QuerySessions(
+		context.Background(),
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 5,
+			},
+		},
+	)
+	assert.Error(t, err)
+	// Keep corrupt files out of retention's SDK chain parser on test shutdown.
+	require.NoError(t, os.Rename(path, path+".test-invalid"))
+}
+
+func TestDamagedJournalIsReportedAndUnrelatedSourcesAreIgnored(t *testing.T) {
+	s, root := newTestStore(t)
+	appendEvent(t, s, EventRecord{
+		Site:      "shop",
+		SessionID: "s",
+		Type:      "pageview",
+	})
+	dir := filepath.Dir(activeJournal(t, root))
+	require.NoError(t, os.WriteFile(filepath.Join(dir, "unrelated@broken.journal"), []byte("invalid"), 0600))
+	sessions, err := s.QuerySessions(
+		context.Background(),
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 5,
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	damaged := filepath.Join(dir, "dem@damaged.journal~")
+	require.NoError(t, os.WriteFile(damaged, []byte("quarantined"), 0600))
+	_, err = s.QuerySessions(
+		context.Background(),
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 5,
+			},
+		},
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Base(damaged))
+	appendEvent(t, s, EventRecord{
+		Site:      "shop",
+		SessionID: "fresh",
+		Type:      "activity",
+	})
+	require.Error(t, s.store.EnforceHistoryRetention(context.Background(), 1, 100000000))
+	status, statusErr := s.store.Status(context.Background())
+	require.NoError(t, statusErr)
+	assert.NotEmpty(t, status.Cleanup.Error)
+	assert.Empty(t, status.WriterError)
+	appendEvent(t, s, EventRecord{
+		Site:      "shop",
+		SessionID: "after-cleanup-error",
+		Type:      "activity",
+	})
+	data, err := os.ReadFile(damaged)
+	require.NoError(t, err)
+	assert.Equal(t, "quarantined", string(data))
+}
+
+func TestMissingJournalDirectoryReturnsErrorInsteadOfEmptyHistory(t *testing.T) {
+	for _, scope := range []string{"root", "machine"} {
+		t.Run(scope, func(t *testing.T) {
+			s, root := newTestStore(t)
+			appendEvent(t, s, EventRecord{
+				Site:      "shop",
+				SessionID: "s",
+				Type:      "pageview",
+			})
+			path := root
+			if scope == "machine" {
+				path = filepath.Dir(activeJournal(t, root))
+			}
+			moved := filepath.Join(t.TempDir(), "temporarily-moved")
+			require.NoError(t, os.Rename(path, moved))
+			_, err := s.QuerySessions(
+				context.Background(),
+				SessionFilter{
+					Filter: Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 5,
+					},
+				},
+			)
+			require.NoError(t, os.Rename(moved, path))
+			assert.ErrorIs(t, err, os.ErrNotExist)
+			sessions, err := s.QuerySessions(
+				context.Background(),
+				SessionFilter{
+					Filter: Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 5,
+					},
+				},
+			)
+			require.NoError(t, err)
+			require.Len(t, sessions, 1)
+		})
+	}
+}

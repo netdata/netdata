@@ -74,6 +74,9 @@ func newDynCfgJobInitialRoute(
 		return functionadapter.InitialRoute{}, errors.New("jobmgr composition: invalid DynCfg job route")
 	}
 	permit := lifecycle.NewJobLongLivedPlan()
+	resource := functionadapter.DynCfgJobResource(0, prefix)
+	resource.CommandArgument = 1
+	resource.IndependentCommand = string(dyncfg.CommandRestart)
 	return functionadapter.InitialRoute{
 		Declaration: functionadapter.Declaration{
 			ID: "dyncfg/jobs",
@@ -91,14 +94,13 @@ func newDynCfgJobInitialRoute(
 					{Name: string(dyncfg.CommandAdd)},
 					{Name: string(dyncfg.CommandUpdate), AllocateSuccessor: true},
 					{Name: string(dyncfg.CommandEnable), AllocateSuccessor: true},
-					{Name: string(dyncfg.CommandRestart), AllocateSuccessor: true},
 					{Name: string(dyncfg.CommandDisable)},
 					{Name: string(dyncfg.CommandRemove)},
 				},
 			},
 			PublicName:          joboutput.DynCfgFunctionName,
 			Prefix:              prefix,
-			Resource:            functionadapter.DynCfgJobResource(0, prefix),
+			Resource:            resource,
 			CooperativeCancel:   true,
 			CooperativeDeadline: true,
 			RawPayload:          true,

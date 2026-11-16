@@ -9,6 +9,11 @@ pub(crate) fn normalize_direction_value(value: &str) -> &str {
     }
 }
 
+/// ICMP port fallback: when SRC_PORT is absent or zero and DST_PORT is present,
+/// DST_PORT carries a combined ICMP type+code value (type in the high byte);
+/// split it into ICMPV4 (protocol 1) or ICMPV6 (protocol 58) type/code fields.
+/// Akvorado's decoder uses the same heuristic and calls it safe because the only
+/// valid code for ICMP type 0 (echo reply) is 0.
 #[cfg(test)]
 pub(crate) fn apply_icmp_port_fallback(fields: &mut FlowFields) {
     let protocol = fields
@@ -65,6 +70,10 @@ pub(crate) fn should_skip_zero_ip(canonical: &str, value: &str) -> bool {
     ) && is_zero_ip_value(value)
 }
 
+/// Append an MPLS label to `MPLS_LABELS`, trying decimal first (digit-only
+/// text is never hex), then `0x`/`0X`-prefixed or bare hex text. The value is
+/// shifted right by 4 to drop the EXP and bottom-of-stack bits; zero labels
+/// are skipped, as in Akvorado's decoder.
 pub(crate) fn append_mpls_label(fields: &mut FlowFields, value: &str) {
     let raw = if let Ok(v) = value.parse::<u64>() {
         v
@@ -127,6 +136,8 @@ pub(crate) fn infer_etype_from_endpoints(fields: &FlowFields) -> Option<&'static
     }
 }
 
+/// Split an IPFIX ICMP type/code pair (type in the high byte, code in the low
+/// byte) into its two parts.
 pub(crate) fn decode_type_code(value: &str) -> Option<(String, String)> {
     let type_code = value.parse::<u64>().ok()?;
     let icmp_type = ((type_code >> 8) & 0xff).to_string();

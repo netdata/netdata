@@ -4,6 +4,7 @@ package collecttest
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -29,28 +30,48 @@ import (
 // documented option the schema does not declare is drift too: the doc promises a field the form
 // does not have.
 //
+// A form without uiSchema tabs is a flat form: the tab and group checks do not apply, and no
+// documented option may set `group`, because the doc would then point at a tab that does not exist.
+//
 // Neither artifact is asserted against itself: each supplies the other's expected value.
 //
 // This is opt-in per collector because most collectors still author the two artifacts independently.
 // Call it from a collector whose artifacts agree, to keep them that way.
 func AssertConfigSchemaMatchesMetadata(t testing.TB, schemaPath, metadataPath string) {
 	t.Helper()
+	AssertConfigSchemaMatchesMetadataWith(t, schemaPath, metadataPath, ConfigSchemaCheck{})
+}
+
+// ConfigSchemaCheck selects optional comparisons for AssertConfigSchemaMatchesMetadataWith.
+type ConfigSchemaCheck struct {
+	// Defaults also requires every documented default_value to equal the schema default, compared
+	// as the operator writes them: booleans as yes/no, numbers and strings verbatim, an absent
+	// schema default as an empty default_value.
+	Defaults bool
+}
+
+// AssertConfigSchemaMatchesMetadataWith is AssertConfigSchemaMatchesMetadata selected by opts.
+func AssertConfigSchemaMatchesMetadataWith(t testing.TB, schemaPath, metadataPath string, opts ConfigSchemaCheck) {
+	t.Helper()
 
 	schema := readConfigSchema(t, schemaPath)
+	tabbed := len(schema.tabs) > 0
 	tabOfProperty, tabs := schema.tabOwners(t)
-	options := readMetadataOptions(t, metadataPath)
+	options := readMetadataOptions(t, metadataPath, tabbed)
 
 	for _, option := range options {
-		root := rootProperty(option.Name)
-		tab, ok := tabOfProperty[root]
-		if !assert.Truef(t, ok, "%s: option %q has group %q, but no tab lists its %q property",
-			metadataPath, option.Name, option.Group, root) {
-			continue
+		if tabbed {
+			root := rootProperty(option.Name)
+			tab, ok := tabOfProperty[root]
+			if !assert.Truef(t, ok, "%s: option %q has group %q, but no tab lists its %q property",
+				metadataPath, option.Name, option.Group, root) {
+				continue
+			}
+			group, _, _ := strings.Cut(option.Group, " / ")
+			assert.Equalf(t, tab, group, "%s: option %q is in group %q, but %q is on the %q tab",
+				metadataPath, option.Name, option.Group, root, tab)
+			tabs[tab] = true
 		}
-		group, _, _ := strings.Cut(option.Group, " / ")
-		assert.Equalf(t, tab, group, "%s: option %q is in group %q, but %q is on the %q tab",
-			metadataPath, option.Name, option.Group, root, tab)
-		tabs[tab] = true
 
 		node, ok := schema.Node(option.Name)
 		if !assert.Truef(t, ok, "%s: option %q is documented, but %s declares no such property",
@@ -61,6 +82,11 @@ func AssertConfigSchemaMatchesMetadata(t testing.TB, schemaPath, metadataPath st
 		assert.Equalf(t, strings.TrimSpace(option.Description), strings.TrimSpace(description),
 			"%s: option %q is described differently in the doc (%s) and the form (%s)",
 			metadataPath, option.Name, metadataPath, schemaPath)
+		if opts.Defaults {
+			assert.Equalf(t, defaultString(node["default"]), defaultString(option.DefaultValue),
+				"%s: option %q default_value differs from the form default in %s",
+				metadataPath, option.Name, schemaPath)
+		}
 	}
 
 	for tab, named := range tabs {
@@ -120,7 +146,6 @@ func readConfigSchema(t testing.TB, schemaPath string) configSchemaDocument {
 		require.NoError(t, err)
 		require.NoError(t, json.Unmarshal(raw, &tabs))
 	}
-	require.NotEmptyf(t, tabs, "%s declares no uiSchema tabs", schemaPath)
 	return configSchemaDocument{SchemaResolver: NewSchemaResolver(doc.JSONSchema), path: schemaPath, tabs: tabs, ui: doc.UISchema}
 }
 
@@ -143,12 +168,36 @@ func (d configSchemaDocument) tabOwners(t testing.TB) (map[string]string, map[st
 }
 
 type metadataOption struct {
-	Name        string `yaml:"name"`
-	Group       string `yaml:"group"`
-	Description string `yaml:"description"`
+	Name         string `yaml:"name"`
+	Group        string `yaml:"group"`
+	Description  string `yaml:"description"`
+	DefaultValue any    `yaml:"default_value"`
 }
 
-func readMetadataOptions(t testing.TB, metadataPath string) []metadataOption {
+// defaultString renders a schema default or a documented default_value the way an operator
+// writes it in the config file, so the two can be compared.
+func defaultString(v any) string {
+	switch v := v.(type) {
+	case nil:
+		return ""
+	case bool:
+		if v {
+			return "yes"
+		}
+		return "no"
+	case string:
+		return strings.TrimSpace(v)
+	case []any, map[string]any:
+		data, _ := json.Marshal(v)
+		return string(data)
+	default:
+		return fmt.Sprint(v)
+	}
+}
+
+// readMetadataOptions returns the documented options; with a tabbed form every option needs a
+// group, with a flat form none may have one.
+func readMetadataOptions(t testing.TB, metadataPath string, tabbed bool) []metadataOption {
 	t.Helper()
 
 	data, err := os.ReadFile(metadataPath)
@@ -175,7 +224,11 @@ func readMetadataOptions(t testing.TB, metadataPath string) []metadataOption {
 	}
 	require.NotEmptyf(t, options, "%s documents no config options", metadataPath)
 	for _, option := range options {
-		require.NotEmptyf(t, option.Group, "%s: option %q has no group", metadataPath, option.Name)
+		if tabbed {
+			require.NotEmptyf(t, option.Group, "%s: option %q has no group", metadataPath, option.Name)
+		} else {
+			require.Emptyf(t, option.Group, "%s: option %q has group %q, but the form has no tabs", metadataPath, option.Name, option.Group)
+		}
 	}
 	return options
 }

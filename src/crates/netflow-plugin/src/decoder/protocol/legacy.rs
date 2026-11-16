@@ -22,6 +22,8 @@ pub(crate) fn append_v5_records(
         packet.header.unix_nsecs as u64,
     );
     let sampling = decode_sampling_interval(packet.header.sampling_interval);
+    // first/last are ms since exporter boot; recover the boot epoch so flow times
+    // land on the wall clock. Saturates to 0 when uptime exceeds the export time.
     let boot_millis = (packet.header.unix_secs as u64)
         .saturating_mul(1000)
         .saturating_sub(packet.header.sys_up_time as u64);
@@ -88,6 +90,8 @@ pub(crate) fn append_v7_records(
         packet.header.unix_secs as u64,
         packet.header.unix_nsecs as u64,
     );
+    // first/last are ms since exporter boot; recover the boot epoch so flow times
+    // land on the wall clock. Saturates to 0 when uptime exceeds the export time.
     let boot_millis = (packet.header.unix_secs as u64)
         .saturating_mul(1000)
         .saturating_sub(packet.header.sys_up_time as u64);

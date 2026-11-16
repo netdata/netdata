@@ -68,4 +68,8 @@ void impl_stacktrace_init(void);
 int impl_stacktrace_get_frames(void **frames, int max_frames, int skip_frames);
 void impl_stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb);
 
+#if defined(USE_LIBBACKTRACE)
+void stacktrace_capture_frames_unittest(BUFFER *wb, const uintptr_t *pcs, const char *const *functions, size_t count);
+#endif
+
 #endif /* NETDATA_STACKTRACE_COMMON_H */

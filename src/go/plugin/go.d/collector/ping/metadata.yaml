@@ -182,19 +182,6 @@ modules:
                 - Raise `update_every` (for example from `1` to `2` or `5`). This widens the window each host has to reply and helps with slow or temporarily unreachable hosts.
                 - Reduce `packets`. Each host must fit all of its packets within the window, so fewer packets means it finishes sooner and is less likely to exceed the timeout.
                 - Reduce the number of `hosts` per job, or split them across multiple jobs, so fewer hosts are probed concurrently. This lowers local network and CPU pressure when a large host list is saturating the probe cycle.
-    alerts:
-      - name: ping_host_reachable
-        metric: ping.host_packet_loss
-        info: "network host ${label:host} reachability status"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf
-      - name: ping_packet_loss
-        metric: ping.host_packet_loss
-        info: "packet loss percentage to the network host ${label:host} over the last 10 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf
-      - name: ping_host_latency
-        metric: ping.host_rtt
-        info: "average latency to the network host ${label:host} over the last 10 seconds"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/ping.conf
     metrics:
       folding:
         title: Metrics

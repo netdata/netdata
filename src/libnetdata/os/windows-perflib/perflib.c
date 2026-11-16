@@ -12,31 +12,43 @@
 // and the RegQueryValueEx will set your size variable to the required buffer size. However,
 // if the source is "Global" or one or more object index values, you will need to increment
 // the buffer size in a loop until RegQueryValueEx does not return ERROR_MORE_DATA.
-static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
-    static __thread DWORD size = 0;
+static RW_SPINLOCK performance_data_lock = RW_SPINLOCK_INITIALIZER;
+
+static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used)
+{
+    static __thread DWORD capacity = 0;
     static __thread LPBYTE buffer = NULL;
 
-    if(bytes_used)
+    if (bytes_used)
         *bytes_used = 0;
 
-    if(pwszSource == (const char *)0x01) {
+    if (pwszSource == (const char *)0x01) {
         freez(buffer);
         buffer = NULL;
-        size = 0;
+        capacity = 0;
         return NULL;
     }
 
-    if(!size) {
-        size = 32 * 1024;
-        buffer = mallocz(size);
+    if (!capacity) {
+        capacity = 32 * 1024;
+        buffer = mallocz(capacity);
     }
 
+    rw_spinlock_read_lock(&performance_data_lock);
+
     LONG status = ERROR_SUCCESS;
-    while ((status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource,
-                                     NULL, NULL, buffer, &size)) == ERROR_MORE_DATA) {
-        size *= 2;
-        buffer = reallocz(buffer, size);
+    DWORD query_size;
+    while (true) {
+        query_size = capacity;
+        status = RegQueryValueEx(HKEY_PERFORMANCE_DATA, pwszSource, NULL, NULL, buffer, &query_size);
+        if (status != ERROR_MORE_DATA)
+            break;
+
+        capacity *= 2;
+        buffer = reallocz(buffer, capacity);
     }
+
+    rw_spinlock_read_unlock(&performance_data_lock);
 
     if (status != ERROR_SUCCESS) {
         nd_log_limit_static_global_var(erl, 60, 0);
@@ -44,14 +56,33 @@ static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
         return NULL;
     }
 
-    if(bytes_used)
-        *bytes_used = size;
+    if (bytes_used)
+        *bytes_used = query_size;
 
     return buffer;
 }
 
 void perflibFreePerformanceData(void) {
     getPerformanceData((const char *)0x01, NULL);
+}
+
+bool perflibRefreshPerformanceDataCache(void)
+{
+    rw_spinlock_write_lock(&performance_data_lock);
+    LONG status = RegCloseKey(HKEY_PERFORMANCE_DATA);
+    rw_spinlock_write_unlock(&performance_data_lock);
+
+    if (status != ERROR_SUCCESS) {
+        nd_log_limit_static_global_var(erl_refresh, 60, 0);
+        nd_log_limit(
+            &erl_refresh,
+            NDLS_COLLECTORS,
+            NDLP_WARNING,
+            "RegCloseKey(HKEY_PERFORMANCE_DATA) failed with 0x%x.\n",
+            status);
+    }
+
+    return status == ERROR_SUCCESS;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -739,16 +770,146 @@ BOOL ObjectTypeHasInstances(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObje
     return pObjectType && pObjectType->NumInstances != PERF_NO_INSTANCES && pObjectType->NumInstances > 0 ? TRUE : FALSE;
 }
 
+// ----------------------------------------------------------------------------
+// Counter layout check.
+//
+// Windows gives several counters the same data on purpose in some objects (PhysicalDisk "% Disk Time" and
+// "Avg. Disk Queue Length", Processor Information "% Processor Time" and "% Idle Time"), but the registry view of
+// some manifest-based (V2) counter sets does it by mistake, so values read by name belong to other counters
+// (issue #24660, "SMB Server Shares"; PDH is not affected). Layout alone cannot tell the two apart, so this is a
+// debug aid, logged once per object.
+
+// Marks key in *dict; returns true only for the first caller. Used for once-per-key logging.
+static bool perflib_key_mark_once(SPINLOCK *spinlock, DICTIONARY **dict, const char *key) {
+    // dictionary_get() cannot tell a NULL value from an absent key, so a non-NULL marker is stored.
+    static const uint8_t marker = 1;
+    bool first = false;
+    spinlock_lock(spinlock);
+    if(unlikely(!*dict))
+        *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(!dictionary_get(*dict, key)) {
+        dictionary_set(*dict, key, (void *)&marker, sizeof(marker));
+        first = true;
+    }
+    spinlock_unlock(spinlock);
+    return first;
+}
+
+static SPINLOCK perflib_layout_spinlock = SPINLOCK_INITIALIZER;
+static DICTIONARY *perflib_layout_checked = NULL;
+
+struct perflib_counter_span {
+    DWORD offset;
+    DWORD size;
+    DWORD name_id;
+};
+
+static int perflib_counter_span_compare(const void *a, const void *b) {
+    const struct perflib_counter_span *x = a, *y = b;
+    if(x->offset != y->offset)
+        return x->offset < y->offset ? -1 : 1;
+    return 0;
+}
+
+static void perflib_check_counter_layout(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, const char *object) {
+    if(pObjectType->NumCounters < 2 ||
+       !perflib_key_mark_once(&perflib_layout_spinlock, &perflib_layout_checked, object))
+        return;
+
+    // NumCounters comes from the provider; bound it by the definitions that fit in the definition area.
+    size_t max_counters = pObjectType->DefinitionLength > pObjectType->HeaderLength ?
+        (pObjectType->DefinitionLength - pObjectType->HeaderLength) / sizeof(PERF_COUNTER_DEFINITION) : 0;
+    size_t counters = MIN((size_t)pObjectType->NumCounters, max_counters);
+    if(counters < 2)
+        return;
+
+    struct perflib_counter_span *spans = mallocz(counters * sizeof(*spans));
+    size_t used = 0;
+
+    PERF_COUNTER_DEFINITION *pCounter = NULL;
+    for(size_t c = 0; c < counters; c++) {
+        pCounter = getCounterDefinition(pDataBlock, pObjectType, pCounter);
+        if(!pCounter)
+            break;
+
+        // Base counters are read as denominators (getCounterData), at these widths; unsupported types are not read.
+        size_t size = getCounterDataSize(pCounter);
+        if(!size) {
+            switch(pCounter->CounterType) {
+                case PERF_SAMPLE_BASE:
+                case PERF_AVERAGE_BASE:
+                case PERF_RAW_BASE:
+                    size = sizeof(DWORD);
+                    break;
+
+                case PERF_LARGE_RAW_BASE:
+                    size = sizeof(ULONGLONG);
+                    break;
+
+                default:
+                    break;
+            }
+        }
+        if(!size)
+            continue;
+
+        spans[used++] = (struct perflib_counter_span){
+            .offset = pCounter->CounterOffset,
+            .size = (DWORD)size,
+            .name_id = pCounter->CounterNameTitleIndex,
+        };
+    }
+
+    qsort(spans, used, sizeof(*spans), perflib_counter_span_compare);
+
+    size_t overlaps = 0;
+    struct perflib_counter_span first_a = { 0 }, first_b = { 0 };
+    ULONGLONG end = 0;
+    size_t end_index = 0;
+    for(size_t i = 0; i < used; i++) {
+        if(i && spans[i].offset < end) {
+            if(!overlaps) {
+                first_a = spans[end_index];
+                first_b = spans[i];
+            }
+            overlaps++;
+        }
+
+        ULONGLONG span_end = (ULONGLONG)spans[i].offset + spans[i].size;
+        if(span_end > end) {
+            end = span_end;
+            end_index = i;
+        }
+    }
+
+    if(overlaps)
+        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+               "WINDOWS: PERFLIB: object '%s' has %zu counter(s) that share data with another counter "
+               "(first: '%s' at offset %u and '%s' at offset %u). Windows does this on purpose for some objects; "
+               "if these values disagree with Get-Counter, which reads through PDH, the registry view is wrong.",
+               object, overlaps,
+               RegistryFindNameByID(first_a.name_id), (unsigned)first_a.offset,
+               RegistryFindNameByID(first_b.name_id), (unsigned)first_b.offset);
+
+    freez(spans);
+}
+
 PERF_OBJECT_TYPE *perflibFindObjectTypeByName(PERF_DATA_BLOCK *pDataBlock, const char *name) {
     PERF_OBJECT_TYPE* pObjectType = NULL;
     for(DWORD o = 0; o < pDataBlock->NumObjectTypes; o++) {
         pObjectType = getObjectType(pDataBlock, pObjectType);
         if(!pObjectType) break;
-        if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0)
+        if(strcmp(name, RegistryFindNameByID(pObjectType->ObjectNameTitleIndex)) == 0) {
+            perflib_check_counter_layout(pDataBlock, pObjectType, name);
             return pObjectType;
+        }
     }
 
     return NULL;
+}
+
+PERF_COUNTER_DEFINITION *perflibForEachCounterDefinition(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_COUNTER_DEFINITION *lastCounterDefinition) {
+    return getCounterDefinition(pDataBlock, pObjectType, lastCounterDefinition);
 }
 
 PERF_INSTANCE_DEFINITION *perflibForEachInstance(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *lastInstance) {
@@ -769,19 +930,7 @@ static SPINLOCK perflib_giveup_spinlock = SPINLOCK_INITIALIZER;
 static DICTIONARY *perflib_giveup_logged = NULL;
 
 static bool perflib_giveup_log_should(const char *key) {
-    // A non-NULL marker value is required: dictionary_set(..., NULL, 0) stores a
-    // NULL value, which dictionary_get() cannot distinguish from "absent".
-    static const uint8_t marker = 1;
-    bool should = false;
-    spinlock_lock(&perflib_giveup_spinlock);
-    if(unlikely(!perflib_giveup_logged))
-        perflib_giveup_logged = dictionary_create(DICT_OPTION_SINGLE_THREADED);
-    if(!dictionary_get(perflib_giveup_logged, key)) {
-        dictionary_set(perflib_giveup_logged, key, (void *)&marker, sizeof(marker));
-        should = true;
-    }
-    spinlock_unlock(&perflib_giveup_spinlock);
-    return should;
+    return perflib_key_mark_once(&perflib_giveup_spinlock, &perflib_giveup_logged, key);
 }
 
 // Returns true only for the first caller that clears the key, so the recovery
@@ -886,13 +1035,19 @@ static bool perflib_get_counter(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *p
             cd->id = pCounterDefinition->CounterNameTitleIndex;
         }
 
+        // Copy before stamping the type, so an empty or failed previous sample keeps CounterType 0.
+        cd->previous = cd->current;
         cd->current.CounterType = cd->OverwriteCounterType ? cd->OverwriteCounterType : pCounterDefinition->CounterType;
         PERF_COUNTER_BLOCK *pCounterBlock = object_scope ?
             getObjectTypeCounterBlock(pDataBlock, pObjectType) :
             getInstanceCounterBlock(pDataBlock, pObjectType, pInstance);
 
-        cd->previous = cd->current;
         if(likely(getCounterData(pDataBlock, pObjectType, pCounterDefinition, pCounterBlock, &cd->current))) {
+            if (cd->elapsed_time_uses_wall_clock && pCounterDefinition->CounterType == PERF_ELAPSED_TIME) {
+                // APP_POOL_WAS stores these start stamps in the 100-ns wall-clock domain.
+                cd->current.Time = pDataBlock->PerfTime100nSec.QuadPart;
+                cd->current.Frequency = 10000000;
+            }
             perflib_counter_record_success(cd, parked);
             return true;
         }

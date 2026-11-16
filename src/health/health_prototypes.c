@@ -594,6 +594,7 @@ void health_prototype_copy_config(struct rrd_alert_config *dst, struct rrd_alert
     dst->time_group = src->time_group;
     dst->time_group_condition = src->time_group_condition;
     dst->time_group_value = src->time_group_value;
+    dst->time_group_options = string_dup(src->time_group_options);
     dst->dims_group = src->dims_group;
     dst->data_source = src->data_source;
     dst->before = src->before;
@@ -634,10 +635,13 @@ static void health_prototype_apply_to_rrdset(RRDSET *st, RRD_ALERT_PROTOTYPE *ap
             if (is_template != want_template)
                 continue;
 
-            if (!prototype_matches_host(st->rrdhost, t))
+            // the chart selector rejects almost every prototype with pointer compares, before any chart
+            // label match, so it runs before the host checks, which pattern-match the name and, when
+            // configured, the host labels
+            if (!health_prototype_matches_rrdset(st, t))
                 continue;
 
-            if (!health_prototype_matches_rrdset(st, t))
+            if (!prototype_matches_host(st->rrdhost, t))
                 continue;
 
             rrdcalc_add_from_prototype(st->rrdhost, st, t);
@@ -715,7 +719,7 @@ void health_apply_prototypes_to_host(RRDHOST *host) {
     ALARM_ENTRY *t;
     for(t = host->health_log.alarms ; t ; t = t->next) {
         if(t->new_status != RRDCALC_STATUS_REMOVED)
-            t->flags |= HEALTH_ENTRY_FLAG_UPDATED;
+            atomic_flags_set(&t->flags, HEALTH_ENTRY_FLAG_UPDATED); // read lock only: other threads change flags too
     }
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 

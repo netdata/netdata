@@ -1,8 +1,8 @@
 use super::client::{ClientConfig, RawCallKind, RawClient};
 use super::dispatch::{DispatchError, DispatchHandler};
 use crate::protocol::{
-    self, string_reverse_decode, string_reverse_encode, NipcError, METHOD_STRING_REVERSE,
-    STRING_REVERSE_HDR_SIZE,
+    self, METHOD_STRING_REVERSE, NipcError, STRING_REVERSE_HDR_SIZE, string_reverse_decode,
+    string_reverse_encode,
 };
 use std::sync::Arc;
 

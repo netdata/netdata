@@ -39,8 +39,10 @@ char *generate_node_instance_connection(size_t *len, const node_instance_connect
 
     *len = PROTO_COMPAT_MSG_SIZE(msg);
     char *bin = (char*)mallocz(*len);
-    if (bin)
-        msg.SerializeToArray(bin, *len);
+    if (!msg.SerializeToArray(bin, *len)) {
+        freez(bin);
+        return NULL;
+    }
 
     return bin;
 }

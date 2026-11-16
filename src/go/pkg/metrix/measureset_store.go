@@ -3,7 +3,12 @@
 package metrix
 
 func (c *storeCore) recordMeasureSetGaugeObservePoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
-	c.recordMeasureSetGaugeSetPoint(desc, scope, point, sets)
+	schema := desc.measureSet
+	if schema == nil || schema.semantics != MeasureSetSemanticsGauge {
+		panic(errMeasureSetSchema)
+	}
+	validateMeasureSetPoint(point, schema, true)
+	c.stageMeasureSetGaugePoint(desc, scope, point, sets)
 }
 
 func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
@@ -12,8 +17,11 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, sc
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetPoint(point, schema)
+	validateMeasureSetPoint(point, schema, false)
+	c.stageMeasureSetGaugePoint(desc, scope, point, sets)
+}
 
+func (c *storeCore) stageMeasureSetGaugePoint(desc *instrumentDescriptor, scope HostScope, point MeasureSetPoint, sets []LabelSet) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -52,9 +60,9 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, sc
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.measureSetGauges[key] = entry
+		stageEntry(&c.active.measureSetGauges, key, entry)
 	}
-	entry.values = append(entry.values[:0], values...)
+	entry.values = append(entry.values[:0], point.Values...)
 }
 
 func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
@@ -63,7 +71,7 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, sc
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetPoint(delta, schema)
+	validateMeasureSetPoint(delta, schema, false)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -111,9 +119,9 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, sc
 			desc:         desc,
 			values:       baseline,
 		}
-		c.active.measureSetGauges[key] = entry
+		stageEntry(&c.active.measureSetGauges, key, entry)
 	}
-	for i, deltaValue := range values {
+	for i, deltaValue := range delta.Values {
 		entry.values[i] += deltaValue
 	}
 }
@@ -173,7 +181,7 @@ func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, sc
 			desc:         desc,
 			values:       baseline,
 		}
-		c.active.measureSetGauges[key] = entry
+		stageEntry(&c.active.measureSetGauges, key, entry)
 	} else if len(entry.values) == 0 {
 		entry.values = make([]SampleValue, len(schema.fields))
 	}
@@ -186,7 +194,7 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetPoint(point, schema)
+	validateMeasureSetPoint(point, schema, false)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -226,9 +234,9 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 			labelsKey:    labelsKey,
 			desc:         desc,
 		}
-		c.active.measureSetCounters[key] = entry
+		stageEntry(&c.active.measureSetCounters, key, entry)
 	}
-	entry.values = append(entry.values[:0], values...)
+	entry.values = append(entry.values[:0], point.Values...)
 }
 
 func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, scope HostScope, delta MeasureSetPoint, sets []LabelSet) {
@@ -237,7 +245,7 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 		panic(errMeasureSetSchema)
 	}
 
-	values := normalizeMeasureSetCounterDelta(delta, schema)
+	validateMeasureSetCounterDelta(delta, schema)
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -285,9 +293,9 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 			desc:         desc,
 			values:       baseline,
 		}
-		c.active.measureSetCounters[key] = entry
+		stageEntry(&c.active.measureSetCounters, key, entry)
 	}
-	for i, deltaValue := range values {
+	for i, deltaValue := range delta.Values {
 		entry.values[i] += deltaValue
 	}
 }

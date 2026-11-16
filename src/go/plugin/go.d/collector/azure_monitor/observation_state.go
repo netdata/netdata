@@ -3,41 +3,65 @@
 package azure_monitor
 
 import (
+	"maps"
+	"strings"
+
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/azure_monitor/azureprofiles"
 )
 
-type observationLabelIdentity [7]string
-
-type scopedLabelIdentity struct {
+type resourceIdentity struct {
 	ScopeKey string
-	Labels   observationLabelIdentity
+	Profile  string
+	UID      string
 }
 
-type observationKey struct {
-	Instrument string
-	ScopeKey   string
-	Labels     observationLabelIdentity
+func resourceIdentityFor(resource resourceInfo, profile string) resourceIdentity {
+	return resourceIdentity{ScopeKey: resource.HostScope.ScopeKey, Profile: profile, UID: resource.UID}
 }
 
 type observationState struct {
-	instruments  map[string]*instrumentRuntime
-	accumulators map[observationKey]float64
-	lastObserved map[observationKey]lastObservation
+	meter     metrix.SnapshotMeter
+	profiles  map[string]*profileRuntime
+	kinds     map[string]string
+	resources map[resourceIdentity]*resourceObservations
 }
 
-func newObservationState(instruments map[string]*instrumentRuntime) *observationState {
-	return &observationState{
-		instruments:  instruments,
-		accumulators: make(map[observationKey]float64),
-		lastObserved: make(map[observationKey]lastObservation),
+// One current membership owns its metadata-bound handles and numeric history.
+// Direct handles avoid retaining historical label tuples in a long-lived Vec.
+type resourceObservations struct {
+	scope   metrix.HostScope
+	labels  metrix.Labels
+	meter   metrix.SnapshotMeter
+	metrics map[string]*metricObservation
+	states  map[string]metrix.StateSetInstrument
+}
+
+type metricObservation struct {
+	kind    string
+	value   float64
+	gauge   metrix.SnapshotGauge
+	counter metrix.SnapshotCounter
+}
+
+func newObservationState(runtime *collectorRuntime, meter metrix.SnapshotMeter) *observationState {
+	s := &observationState{
+		meter:    meter,
+		profiles: make(map[string]*profileRuntime, len(runtime.Profiles)),
+		kinds:    make(map[string]string),
 	}
+	for _, profile := range runtime.Profiles {
+		s.profiles[profile.Name] = profile
+		for _, metric := range profile.Metrics {
+			for _, series := range metric.Series {
+				s.kinds[series.Instrument] = series.Kind
+			}
+		}
+	}
+	return s
 }
 
-func (s *observationState) reset() {
-	s.accumulators = make(map[observationKey]float64)
-	s.lastObserved = make(map[observationKey]lastObservation)
-}
+func (s *observationState) reset() { s.resources = nil }
 
 func dueInstrumentsForBatches(batches []queryBatch) map[string]bool {
 	dueInstruments := make(map[string]bool)
@@ -51,113 +75,130 @@ func dueInstrumentsForBatches(batches []queryBatch) map[string]bool {
 	return dueInstruments
 }
 
-func (s *observationState) observeSamples(samples []metricSample) map[observationKey]bool {
-	observedThisCycle := make(map[observationKey]bool, len(s.lastObserved))
+func (s *observationState) observeSamples(samples []metricSample) {
 	for _, sample := range samples {
-		key, ok := s.observeSample(sample)
+		resource, ok := s.resources[sample.Resource]
 		if !ok {
 			continue
 		}
-		observedThisCycle[key] = true
-	}
-	return observedThisCycle
-}
-
-func (s *observationState) observeSample(sample metricSample) (observationKey, bool) {
-	inst, ok := s.instruments[sample.Instrument]
-	if !ok {
-		return observationKey{}, false
-	}
-
-	values := labelValues(sample.Labels)
-	key := sampleObservationKey(sample.Instrument, sample.Scope, values)
-	value := sample.Value
-
-	if sample.Kind == azureprofiles.SeriesKindCounter {
-		s.accumulators[key] += value
-		value = s.accumulators[key]
-	}
-
-	inst.observe(sample.Scope, values, value)
-	s.lastObserved[key] = lastObservation{
-		instrument:  sample.Instrument,
-		scope:       sample.Scope,
-		labelValues: append([]string(nil), values...),
-		value:       value,
-	}
-
-	return key, true
-}
-
-func (s *observationState) reobserveCachedObservations(dueInstruments map[string]bool, observedThisCycle map[observationKey]bool) {
-	for key, obs := range s.lastObserved {
-		if observedThisCycle[key] {
-			continue
-		}
-		if dueInstruments[obs.instrument] {
-			continue
-		}
-		inst, ok := s.instruments[obs.instrument]
+		kind, ok := s.kinds[sample.Instrument]
 		if !ok {
 			continue
 		}
-		inst.observe(obs.scope, obs.labelValues, obs.value)
+		obs := resource.metrics[sample.Instrument]
+		if obs == nil {
+			obs = &metricObservation{kind: kind}
+			obs.bind(resource.meter, sample.Instrument)
+			if resource.metrics == nil {
+				resource.metrics = make(map[string]*metricObservation)
+			}
+			resource.metrics[sample.Instrument] = obs
+		}
+		value := sample.Value
+		if kind == azureprofiles.SeriesKindCounter {
+			value += obs.value
+		}
+		obs.value = value
+		obs.observe()
 	}
 }
 
-// pruneStaleResources removes cache entries for resources that are no longer
-// active for a specific profile/label identity.
-func (s *observationState) pruneStaleResources(current map[string][]resourceInfo) {
-	activeLabels := make(map[scopedLabelIdentity]struct{})
+func (s *observationState) reobserveCachedObservations(due map[string]bool) {
+	for _, resource := range s.resources {
+		for name, obs := range resource.metrics {
+			if due[name] {
+				continue
+			}
+			obs.observe()
+		}
+	}
+}
+
+// Reconcile at the discovery boundary: discard departed memberships and replace
+// metadata-bound handles without resetting cumulative values or held samples.
+func (s *observationState) reconcileResources(current map[string][]resourceInfo) {
+	next := make(map[resourceIdentity]*resourceObservations, len(s.resources))
 	for profileName, resources := range current {
-		for _, resource := range resources {
-			activeLabels[scopedLabelIdentity{
-				ScopeKey: resource.HostScope.ScopeKey,
-				Labels:   labelIdentity(labelValues(resourceLabels(resource, profileName))),
-			}] = struct{}{}
+		profile := s.profiles[profileName]
+		for _, info := range resources {
+			identity := resourceIdentityFor(info, profileName)
+			labels := profileResourceLabels(info, profile)
+			resource := s.resources[identity]
+			if resource == nil {
+				resource = &resourceObservations{}
+			}
+			if resource.meter == nil || !maps.Equal(resource.labels, labels) ||
+				resource.scope.GUID != info.HostScope.GUID || resource.scope.Hostname != info.HostScope.Hostname ||
+				!maps.Equal(resource.scope.Labels, info.HostScope.Labels) {
+				resource.bind(s.meter, info.HostScope, labels)
+			}
+			next[identity] = resource
 		}
 	}
+	s.resources = next
+}
 
-	for key, obs := range s.lastObserved {
-		if len(obs.labelValues) == 0 {
-			continue
-		}
-		if _, ok := activeLabels[scopedLabelIdentity{ScopeKey: obs.scope.ScopeKey, Labels: labelIdentity(obs.labelValues)}]; ok {
-			continue
-		}
-		delete(s.lastObserved, key)
+func (r *resourceObservations) bind(meter metrix.SnapshotMeter, scope metrix.HostScope, labels metrix.Labels) {
+	r.scope, r.labels = scope, labels
+	pairs := make([]metrix.Label, 0, len(labels))
+	for key, value := range labels {
+		pairs = append(pairs, metrix.Label{Key: key, Value: value})
 	}
+	r.meter = meter.WithHostScope(scope).WithLabels(pairs...)
+	for name, obs := range r.metrics {
+		obs.bind(r.meter, name)
+	}
+	r.states = nil
+}
 
-	for key := range s.accumulators {
-		if _, ok := activeLabels[scopedLabelIdentity{ScopeKey: key.ScopeKey, Labels: key.Labels}]; ok {
-			continue
-		}
-		delete(s.accumulators, key)
+func (o *metricObservation) bind(meter metrix.SnapshotMeter, name string) {
+	if o.kind == azureprofiles.SeriesKindCounter {
+		o.counter = meter.Counter(name)
+	} else {
+		o.gauge = meter.Gauge(name)
 	}
 }
 
-func sampleObservationKey(instrument string, scope metrix.HostScope, values []string) observationKey {
-	return observationKey{
-		Instrument: instrument,
-		ScopeKey:   scope.ScopeKey,
-		Labels:     labelIdentity(values),
+func (o *metricObservation) observe() {
+	if o.kind == azureprofiles.SeriesKindCounter {
+		o.counter.ObserveTotal(o.value)
+	} else {
+		o.gauge.Observe(o.value)
 	}
 }
 
-func labelIdentity(values []string) observationLabelIdentity {
-	var out observationLabelIdentity
-	copy(out[:], values)
-	return out
+func (r *resourceObservations) observeState(state *resourceStateRuntime, active string) {
+	instrument := r.states[state.Name]
+	if instrument == nil {
+		instrument = r.meter.StateSet(state.Name, metrix.WithStateSetStates(state.States...), metrix.WithStateSetMode(metrix.ModeEnum))
+		if r.states == nil {
+			r.states = make(map[string]metrix.StateSetInstrument)
+		}
+		r.states[state.Name] = instrument
+	}
+	instrument.Enable(active)
 }
 
-func labelValues(labels metrix.Labels) []string {
-	return []string{
-		labels["resource_uid"],
-		labels["subscription_id"],
-		labels["resource_name"],
-		labels["resource_group"],
-		labels["region"],
-		labels["resource_type"],
-		labels["profile"],
+func profileResourceLabels(resource resourceInfo, profile *profileRuntime) metrix.Labels {
+	labels := metrix.Labels{
+		"resource_uid":    resource.UID,
+		"subscription_id": resource.SubscriptionID,
+		"resource_name":   resource.Name,
+		"resource_group":  resource.ResourceGroup,
+		"region":          resource.Region,
+		"resource_type":   resource.Type,
+		"profile":         profile.Name,
 	}
+	for _, label := range profile.ResourceLabels {
+		labels[label.Name] = resourceLabelValue(resource.Properties[label.Property], label.Value)
+	}
+	return labels
+}
+
+func resourceLabelValue(value, format string) string {
+	if format != azureprofiles.ResourceLabelValueARMName {
+		return value
+	}
+	parts := strings.Split(strings.Trim(value, "/"), "/")
+	return parts[len(parts)-1]
 }

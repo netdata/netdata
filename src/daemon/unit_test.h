@@ -22,7 +22,7 @@ void dbengine_stress_test(unsigned TEST_DURATION_SEC, unsigned DSET_CHARTS, unsi
 
 #endif
 
-bool command_argument_sanitization_tests();
+int command_argument_sanitization_tests(void);
 
 #ifdef OS_WINDOWS
 int perflibnamestest_main(void);

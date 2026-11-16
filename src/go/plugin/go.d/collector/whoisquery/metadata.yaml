@@ -112,11 +112,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: whoisquery_days_until_expiration
-        metric: whoisquery.time_until_expiration
-        info: time until the domain name registration expires
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/whoisquery.conf
     metrics:
       folding:
         title: Metrics

@@ -75,7 +75,7 @@ static nipc_error_t apps_lookup_do_raw_call_with_retry(
       .timeout_ms = timeout_ms,
   };
   return nipc_service_platform_call_with_retry(ctx, apps_lookup_raw_call_attempt,
-                                               &state);
+                                               &state, timeout_ms);
 }
 
 static bool apps_lookup_request_capacity_can_reconnect(nipc_client_ctx_t *ctx,
@@ -209,8 +209,12 @@ static nipc_error_t do_apps_lookup_attempt(nipc_client_ctx_t *ctx,
       if (err == NIPC_ERR_OVERFLOW && start < s->pid_count &&
           apps_lookup_request_size(1, &one_item_size) &&
           apps_lookup_request_capacity_can_reconnect(ctx, one_item_size)) {
-        err = nipc_service_platform_ensure_request_capacity(ctx,
-                                                            one_item_size);
+        uint32_t capacity_timeout;
+        err = apps_lookup_remaining_timeout(ctx, s->deadline_ms,
+                                            &capacity_timeout);
+        if (err == NIPC_OK)
+          err = nipc_service_platform_ensure_request_capacity(
+              ctx, one_item_size, capacity_timeout);
         if (err == NIPC_OK)
           continue;
       }

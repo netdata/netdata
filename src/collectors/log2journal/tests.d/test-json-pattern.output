@@ -6,5 +6,7 @@ TAGS_0=authentication
 TAGS_1=security
 TAGS_2=login
 TIMESTAMP=2024-01-15 10:30:25
+USER_ID=12345
+USER_NAME=john_doe
 VERSION=1.0
 

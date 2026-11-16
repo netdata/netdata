@@ -42,7 +42,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -166,6 +166,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -184,7 +197,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -376,7 +389,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -631,11 +644,17 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | ExpressRoute GW CPU on ${label:resource_name} |
-| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | ExpressRoute GW active flows on ${label:resource_name} |
-| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | ExpressRoute GW route churn on ${label:resource_name} |
-| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | ExpressRoute GW routes advertised on ${label:resource_name} |
-| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | ExpressRoute GW routes learned on ${label:resource_name} |
+| [ am_express_route_gateway_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.cpu_utilization | Average CPU utilization of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). High CPU may cause degraded forwarding performance |
+| [ am_express_route_gateway_throughput ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.gateway_throughput | Average throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_connection_in ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.connection_throughput | Average inbound connection throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_connection_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.connection_throughput | Average outbound connection throughput of ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.packets | Average packet rate through ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_active_flows ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.active_flows | Average number of active flows on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). High flow counts may indicate approaching scalability limits |
+| [ am_express_route_gateway_route_changes ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.route_changes | Rate of BGP route changes on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Frequent route changes may indicate BGP instability |
+| [ am_express_route_gateway_routes_advertised ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_advertised | Number of routes advertised to peer by ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limits advertised routes to 1000 per peering |
+| [ am_express_route_gateway_routes_learned ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.routes_learned | Number of routes learned from peer by ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}). Azure limits learned routes to 4000 per peering |
+| [ am_express_route_gateway_flow_creation_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.max_flows_creation_rate | Maximum flow creation rate on ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_express_route_gateway_vm_count ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_express_route_gateway.conf) | azure_monitor.express_route_gateway.vm_count | Number of VMs in the VNet behind ExpressRoute Gateway ${label:resource_name} in ${label:resource_group} (${label:region}) |
 
 
 

@@ -154,9 +154,8 @@ void query_target_summary_labels_v12(BUFFER *wb, QUERY_TARGET *qt, const char *k
     };
     for (long c = 0; c < (long) qt->instances.used; c++) {
         QUERY_INSTANCE *qi = query_instance(qt, c);
-        RRDINSTANCE_ACQUIRED *ria = qi->ria;
         t.qi = qi;
-        rrdlabels_walkthrough_read(rrdinstance_acquired_labels(ria), rrdlabels_formatting_v2, &t);
+        rrdlabels_walkthrough_read(query_instance_labels(qi), rrdlabels_formatting_v2, &t);
     }
 
     size_t cardinality_limit = query_target_summary_cardinality_limit(qt);

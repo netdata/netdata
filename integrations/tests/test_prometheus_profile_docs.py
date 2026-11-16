@@ -98,7 +98,10 @@ class PrometheusProfileCatalogTest(unittest.TestCase):
         collectors = load_collectors([('netdata/netdata', PROMETHEUS_METADATA, False)])
         generic = next(item for item in collectors if item['meta']['id'].endswith('-generic'))
         aws = next(item for item in collectors if item['meta']['id'].endswith('-aws_ec2'))
-        self.assertIs(generic['metrics'], aws['metrics'])
+        # Each module owns its copy of inherited YAML mappings (load_collectors
+        # deep-copies per module), so projection cannot leak between modules.
+        self.assertIsNot(generic['metrics'], aws['metrics'])
+        self.assertEqual(generic['metrics'], aws['metrics'])
 
         project_prometheus_profile_coverage(collectors, self.catalog)
         covered = {

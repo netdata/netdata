@@ -1,4 +1,4 @@
-//go:build linux && amd64
+//go:build (linux || freebsd) && amd64
 
 #include "textflag.h"
 

@@ -132,6 +132,8 @@ type MeasureFieldSpec struct {
 	Float bool
 }
 
+// MeasureSetPoint holds values in declared field order. Snapshot gauge fields may
+// be NaN to represent unavailable observations; other MeasureSet writes require finite values.
 type MeasureSetPoint struct {
 	Values []SampleValue
 }

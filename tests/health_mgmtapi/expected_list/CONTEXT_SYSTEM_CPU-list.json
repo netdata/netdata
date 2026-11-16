@@ -1,1 +1,1 @@
-{ "all": false, "type": "DISABLE", "silencers": [ { "context": "system.cpu" }, { "chart": "system.load" } ] }
+{ "all":false, "type":"DISABLE", "silencers":[{ "context":"system.cpu" },{ "chart":"system.load" }] }

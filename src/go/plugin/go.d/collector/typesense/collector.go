@@ -45,11 +45,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	web.HTTPConfig     `yaml:",inline" json:""`
-	APIKey             string `yaml:"api_key,omitempty" json:"api_key"`
+	web.HTTPConfig     `       yaml:",inline"                       json:""`
+	APIKey             string `yaml:"api_key,omitempty"             json:"api_key"`
 }
 
 type Collector struct {
@@ -68,12 +68,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if c.URL == "" {
 		return errors.New("configL: url not configured")
 	}
 
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}
@@ -89,8 +89,8 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+func (c *Collector) Check(ctx context.Context) error {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		return err
 	}
@@ -105,8 +105,8 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
+	mx, err := c.collect(ctx)
 	if err != nil {
 		c.Error(err)
 	}

@@ -1312,6 +1312,7 @@ packages() {
     suitable_package libmnl-dev
     suitable_package json-c-dev
     suitable_package libyaml-dev
+    # No system protobuf: netdata-installer.sh bundles it by default.
     suitable_package libsystemd-dev
     suitable_package pcre2
     suitable_package flex

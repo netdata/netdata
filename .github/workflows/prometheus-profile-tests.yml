@@ -26,7 +26,7 @@ jobs:
     steps:
       - name: Check modified files
         id: check-files
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           result-encoding: string
           retries: 3
@@ -58,13 +58,13 @@ jobs:
 
       - name: Checkout
         if: steps.check-files.outputs.result == 'true'
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           submodules: recursive
 
       - name: Install Go
         if: steps.check-files.outputs.result == 'true'
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
 

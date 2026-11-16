@@ -1,0 +1,60 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package journalstore
+
+import (
+	"context"
+	"fmt"
+	"path/filepath"
+
+	"github.com/netdata/systemd-journal-sdk/go/journal"
+)
+
+// verifyStartup precedes SDK NewLog, which may archive/reuse an existing active
+// file. Only finalized current-schema archives from this writer lifecycle are
+// trusted without a whole-graph check. External modification is not supported.
+func (s *Store) verifyStartup(ctx context.Context) error {
+	paths, err := s.journalPaths(ctx)
+	if err != nil {
+		return err
+	}
+	for _, path := range paths {
+		active := filepath.Base(path) == "dem.journal"
+		if active {
+			if err := journal.VerifyIndex(ctx, path); err != nil {
+				return fmt.Errorf("verify active history %q: %w", path, err)
+			}
+		}
+		file, err := openSnapshot(
+			ctx,
+			path,
+			journal.StringField(FieldKind, string(KindRUM)),
+			journal.StringField(FieldKind, string(KindSynthetic)),
+		)
+		if err != nil {
+			return err
+		}
+		empty := file.EntryCount() == 0
+		for _, kind := range []Kind{KindRUM, KindSynthetic} {
+			value, err := file.CapturedValue([]byte(FieldKind), []byte(kind))
+			if err != nil {
+				_ = file.Close()
+				return err
+			}
+			if value.EntryCount != 0 {
+				s.observeKind(kind)
+			}
+		}
+		if err := file.Close(); err != nil {
+			return err
+		}
+		// No schema postings means an empty archive cannot establish encoder
+		// provenance. Strict verification can establish that nothing was omitted.
+		if !active && empty {
+			if err := journal.VerifyIndex(ctx, path); err != nil {
+				return fmt.Errorf("verify empty history archive %q: %w", path, err)
+			}
+		}
+	}
+	return ctx.Err()
+}

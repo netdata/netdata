@@ -7,13 +7,45 @@
 //! module owns the partitioning rule, next to the
 //! [`scan_frame_boundaries`](crate::scan_frame_boundaries) scan whose
 //! output it folds; it is pure framing math — nothing here knows what
-//! the frames contain or what the consumer builds from a chunk.
+//! the frames contain or what the consumer indexes from a chunk.
+//!
+//! The fold's input is one scan over the WAL's durable bound:
+//! `FrameRange::new(HEADER_SIZE, valid_up_to)` — `valid_up_to` is the
+//! registry-tracked end of the last fsynced frame
+//! (`registry::File::valid_up_to`, updated by `Synced` events,
+//! frame-aligned by construction). The scan's soundness rules live in
+//! `reader.rs`: the bound must be physically present, and a frame
+//! crossing it is a torn tail that ends the scan — so every boundary
+//! this module sees is a whole frame's end `<= valid_up_to`.
+//!
+//! Both parts are read back with
+//! [`Reader::open_range`](crate::Reader::open_range), the bounded mode
+//! of `reader.rs`. A chunk's range is one window: the ledger indexes
+//! it into an SFST with `ng_index::index_logs_range` /
+//! `index_traces_range` (record count cross-checked against
+//! [`ChunkBoundary::entry_count`]) and memoizes the image
+//! (file-lifecycle's `ChunkCache`). The tail from [`tail_start`] to
+//! `valid_up_to` is row-scanned per query by sfsq's WAL scans; a frame
+//! crossing the bound stops the read cleanly.
 //!
 //! Chunk boundaries are **append-only and immutable**: a boundary is
 //! fixed by the frame entry counts up to it, so a durable bound
 //! advancing only ever appends new higher-index chunks — it never
 //! moves or invalidates an existing one. That is what lets consumers
 //! memoize per-chunk artifacts keyed `(wal_seq, chunk_index)`.
+//!
+//! # Consumers (grep-verified)
+//!
+//! `otel-ledger` (`rpc/logs/handler.rs`, `rpc/traces/sources.rs`):
+//! per-query chunk + tail planning, `min_entries` wired from its
+//! `CHUNK_MIN_ENTRIES` (16_384, logs) and `TRACES_CHUNK_MIN_ENTRIES`
+//! (4_096, traces) — fixed defaults today. `sfsq`
+//! (`tests/ng_wal_equivalence.rs`): partitions fixtures with this rule
+//! — `u64::MAX` for the all-tail shape, small thresholds for the
+//! chunk + tail merge path — and asserts chunk + tail serving equals
+//! whole-file indexing. `file-lifecycle` (`chunk.rs`): its `ChunkCache`
+//! keying rests on the append-only rule; it cites this module rather
+//! than calling it.
 
 use crate::FrameBoundary;
 
@@ -22,11 +54,25 @@ use crate::FrameBoundary;
 /// log records (the last frame can push it over).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ChunkBoundary {
-    /// 0-based index within the WAL, dense and stable across queries.
+    /// 0-based ordinal in the fold from `start`, dense. Production
+    /// callers always fold from `crate::HEADER_SIZE`, making this the
+    /// WAL-wide chunk index, stable as the prefix grows (boundaries are
+    /// append-only) — the `chunk_index` half of the
+    /// `(wal_seq, chunk_index)` memoization key. A sub-window fold from
+    /// a later offset restarts numbering.
     pub index: u32,
-    /// The chunk's frame-aligned byte range, `[first frame, last frame end)`.
+    /// The chunk's frame-aligned byte range, `[first frame, last frame
+    /// end)`: both offsets are frame boundaries (the end is a frame end
+    /// recorded by the scan; the start is the fold's `start` or the prior
+    /// chunk's end), i.e. a valid
+    /// [`Reader::open_range`](crate::Reader::open_range) window the
+    /// ledger passes straight to `ng_index::index_logs_range` /
+    /// `index_traces_range`.
     pub range: crate::FrameRange,
-    /// Log records in the chunk (>= `min_entries`).
+    /// Log records in the chunk — the sum of the frames' entry counts,
+    /// at least `min_entries`. The ledger passes this as the expected
+    /// count its chunk indexing cross-checks the indexed chunk against
+    /// (the shortfall check `reader.rs` defers to its callers).
     pub entry_count: u64,
 }
 
@@ -37,12 +83,18 @@ pub struct ChunkBoundary {
 /// [`scan_frame_boundaries`](crate::scan_frame_boundaries) over
 /// `[start, valid_up_to)`, in file order; `start` is the offset of the
 /// first frame (`crate::HEADER_SIZE` for a whole-prefix scan, or a prior
-/// chunk's `end`). Each chunk extends to the first frame boundary at or
-/// past the running `min_entries`, then a new chunk begins. Frames after
-/// the last complete chunk (cumulative `< min_entries`) are **not**
-/// returned — they are the *tail*, beginning at
-/// `chunks.last().map_or(start, |c| c.range.end())`, and are evaluated per query
-/// by the row scan rather than indexed.
+/// chunk's `end`). They must be contiguous whole-frame ends — exactly
+/// what one scan over one window produces; the fold does no I/O and no
+/// validation (it cannot fail) and would silently mis-split anything
+/// else.
+///
+/// Each chunk extends to the first frame boundary at or past the
+/// running `min_entries`, then a new chunk begins. A threshold above
+/// the scan's total entry count completes no chunk — the whole prefix
+/// stays tail. Frames after the last complete chunk (cumulative
+/// `< min_entries`) are **not** returned — they are the *tail*,
+/// beginning at [`tail_start`], and are evaluated per query by the row
+/// scan rather than indexed.
 ///
 /// Boundaries are a deterministic function of the entry counts, so a
 /// longer prefix yields the same chunks plus possibly more — never a
@@ -53,9 +105,10 @@ pub fn chunk_boundaries(
     min_entries: u64,
 ) -> Vec<ChunkBoundary> {
     // `min_entries == 0` would make every frame its own chunk —
-    // degenerate, and contrary to the >=16K design intent. The caller's
-    // threshold is a config knob, so guard it in debug rather than at
-    // runtime cost.
+    // degenerate, and contrary to the design intent (the ledger wires
+    // thousands: 16_384 for logs, 4_096 for traces). The threshold is
+    // caller-supplied, so guard it in debug rather than at runtime
+    // cost.
     debug_assert!(min_entries > 0, "min_entries must be positive");
 
     let mut chunks = Vec::new();
@@ -79,8 +132,49 @@ pub fn chunk_boundaries(
 /// The byte offset where the tail begins for a chunk list produced by
 /// [`chunk_boundaries`] over the same `start`: the end of the last
 /// complete chunk, or `start` when there are none.
+///
+/// Consumers form the query's tail range as `[tail_start, end)` — the
+/// ledger's `[tail_start, valid_up_to)` — and skip it when the offsets
+/// meet: the prefix divided evenly into chunks, nothing left to
+/// row-scan.
 pub fn tail_start(chunks: &[ChunkBoundary], start: u64) -> u64 {
     chunks.last().map_or(start, |c| c.range.end())
+}
+
+/// A [`chunk_boundaries`] fold kept current as the durable prefix grows:
+/// it holds the complete chunks so far and the frames after the last of
+/// them (the tail's frames), and [`extend`](Self::extend) folds only the
+/// newly scanned frames. Because boundaries are append-only, the result
+/// always equals one fold over the whole scan.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ChunkFold {
+    chunks: Vec<ChunkBoundary>,
+    tail_frames: Vec<FrameBoundary>,
+}
+
+impl ChunkFold {
+    /// Fold `frames` — the scan of the bytes that follow everything folded
+    /// so far — into the chunks. `start` and `min_entries` must be the same
+    /// on every call (the fold's origin and threshold).
+    pub fn extend(&mut self, frames: &[FrameBoundary], start: u64, min_entries: u64) {
+        self.tail_frames.extend_from_slice(frames);
+        let base = tail_start(&self.chunks, start);
+        let first_index = self.chunks.len() as u32;
+        let added = chunk_boundaries(&self.tail_frames, base, min_entries);
+        if let Some(last) = added.last() {
+            let end = last.range.end();
+            self.tail_frames.retain(|f| f.end_offset > end);
+        }
+        self.chunks.extend(added.into_iter().map(|c| ChunkBoundary {
+            index: first_index + c.index,
+            ..c
+        }));
+    }
+
+    /// The complete chunks so far, in index order.
+    pub fn chunks(&self) -> &[ChunkBoundary] {
+        &self.chunks
+    }
 }
 
 #[cfg(test)]
@@ -93,6 +187,7 @@ mod tests {
         FrameBoundary {
             end_offset,
             entry_count,
+            decoded_len: 0,
         }
     }
 
@@ -155,6 +250,24 @@ mod tests {
         let chunks = chunk_boundaries(&[], 64, 10);
         assert!(chunks.is_empty());
         assert_eq!(tail_start(&chunks, 64), 64);
+    }
+
+    #[test]
+    fn an_extended_fold_equals_one_fold_over_the_whole_scan() {
+        // Frames of varied sizes, split into every pair of increments.
+        let frames: Vec<FrameBoundary> = (1..=12u64)
+            .map(|i| fb(100 * i, (i % 5 + 2) as u32))
+            .collect();
+        let whole = chunk_boundaries(&frames, 64, 10);
+        for a in 0..=frames.len() {
+            for b in a..=frames.len() {
+                let mut fold = ChunkFold::default();
+                fold.extend(&frames[..a], 64, 10);
+                fold.extend(&frames[a..b], 64, 10);
+                fold.extend(&frames[b..], 64, 10);
+                assert_eq!(fold.chunks(), &whole[..], "split at {a}, {b}");
+            }
+        }
     }
 
     #[test]

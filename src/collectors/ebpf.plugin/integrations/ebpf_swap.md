@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -45,9 +45,6 @@ eBPF SWAP can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT) and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -158,8 +155,8 @@ Metrics:
 |:------|:------------|:----------|:----|
 | cgroup.swap_read | Calls to function swap_readpage. | read | calls/s |
 | cgroup.swap_write | Calls to function swap_writepage. | write | calls/s |
-| services.swap_read | Calls to swap_readpage. | a dimension per systemd service | calls/s |
-| services.swap_write | Calls to function swap_writepage. | a dimension per systemd service | calls/s |
+| systemd.service.swap_read | Calls to swap_readpage. | a dimension per systemd service | calls/s |
+| systemd.service.swap_write | Calls to function swap_writepage. | a dimension per systemd service | calls/s |
 
 
 ### Per apps

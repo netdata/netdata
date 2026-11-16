@@ -170,40 +170,51 @@ func appsLookupRequestLayoutForCount(count int) (packedStart, total int, ok bool
 }
 
 func DecodeAppsLookupRequest(buf []byte) (*AppsLookupRequestView, error) {
+	view := &AppsLookupRequestView{}
+	if err := decodeAppsLookupRequestInto(buf, view); err != nil {
+		return nil, err
+	}
+	return view, nil
+}
+
+// decodeAppsLookupRequestInto decodes into a caller-owned view, so the
+// dispatch path can reuse one.
+func decodeAppsLookupRequestInto(buf []byte, view *AppsLookupRequestView) error {
 	if len(buf) < AppsLookupReqHdr {
-		return nil, ErrTruncated
+		return ErrTruncated
 	}
 	if ne.Uint16(buf[0:2]) != 1 || ne.Uint16(buf[2:4]) != 0 ||
 		ne.Uint32(buf[8:12]) != 0 || ne.Uint32(buf[12:16]) != 0 {
-		return nil, ErrBadLayout
+		return ErrBadLayout
 	}
 	itemCount := ne.Uint32(buf[4:8])
 	dirSize64 := uint64(itemCount) * uint64(LookupDirEntrySize)
 	dirEnd, ok := checkedInt(uint64(AppsLookupReqHdr) + dirSize64)
 	if !ok {
-		return nil, ErrBadItemCount
+		return ErrBadItemCount
 	}
 	if dirEnd > len(buf) {
-		return nil, ErrTruncated
+		return ErrTruncated
 	}
 	if err := validateLookupDir(buf, AppsLookupReqHdr, itemCount, len(buf)-dirEnd, 0, AppsLookupKeySize); err != nil {
-		return nil, err
+		return err
 	}
 	for i := range itemCount {
 		base := AppsLookupReqHdr + int(i)*LookupDirEntrySize
 		off, _, err := lookupDirEntry(buf, base)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		key, err := lookupPayloadSlice(buf, dirEnd, off, AppsLookupKeySize)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if ne.Uint32(key[4:8]) != 0 {
-			return nil, ErrBadLayout
+			return ErrBadLayout
 		}
 	}
-	return &AppsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}, nil
+	*view = AppsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}
+	return nil
 }
 
 func (v *AppsLookupRequestView) Item(index uint32) (uint32, error) {
@@ -571,6 +582,12 @@ type AppsLookupBuilder struct {
 }
 
 func NewAppsLookupBuilder(buf []byte, maxItems uint32, generation uint64) *AppsLookupBuilder {
+	b := &AppsLookupBuilder{}
+	b.reset(buf, maxItems, generation)
+	return b
+}
+
+func (b *AppsLookupBuilder) reset(buf []byte, maxItems uint32, generation uint64) {
 	minRequired, ok := lookupBuilderDataOffset(AppsLookupRespHdr, maxItems)
 	if !ok {
 		panic("AppsLookupBuilder buffer too small")
@@ -578,7 +595,7 @@ func NewAppsLookupBuilder(buf []byte, maxItems uint32, generation uint64) *AppsL
 	if len(buf) < minRequired {
 		panic("AppsLookupBuilder buffer too small")
 	}
-	return &AppsLookupBuilder{buf: buf, generation: generation, maxItems: maxItems, dataOffset: minRequired}
+	*b = AppsLookupBuilder{buf: buf, generation: generation, maxItems: maxItems, dataOffset: minRequired}
 }
 
 func (b *AppsLookupBuilder) SetGeneration(generation uint64) {
@@ -837,15 +854,18 @@ func (b *AppsLookupBuilder) ItemCount() uint32 {
 }
 
 func DispatchAppsLookup(req []byte, resp []byte, handler func(*AppsLookupRequestView, *AppsLookupBuilder) bool) (int, error) {
-	request, err := DecodeAppsLookupRequest(req)
-	if err != nil {
+	scratch := appsLookupScratchPool.Get().(*appsLookupScratch)
+	defer scratch.release()
+	request := &scratch.view
+	if err := decodeAppsLookupRequestInto(req, request); err != nil {
 		return 0, err
 	}
 	minRequired, ok := lookupBuilderDataOffset(AppsLookupRespHdr, request.ItemCount)
 	if !ok || len(resp) < minRequired {
 		return 0, ErrOverflow
 	}
-	builder := NewAppsLookupBuilder(resp, request.ItemCount, 0)
+	builder := &scratch.builder
+	builder.reset(resp, request.ItemCount, 0)
 	if request.ItemCount > 0 {
 		builder.payloadExceededFixed = appsLookupUnknownItemSize
 	}

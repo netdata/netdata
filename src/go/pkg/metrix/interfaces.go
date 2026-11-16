@@ -16,6 +16,18 @@ type RuntimeStore interface {
 	Write() RuntimeWriter
 }
 
+// RuntimeBatchWriter is an OPTIONAL RuntimeStore capability (type assertion; not part of
+// RuntimeStore, so existing implementations and fakes keep compiling). Writes made while
+// fn runs are published together as one snapshot when fn returns (or panics); readers do
+// not see any of them earlier. A store has one batch at a time and it belongs to the
+// goroutine that opened it: writes from anywhere join it while it is open, and a
+// WriteBatch that starts meanwhile (nested, or from another goroutine) just runs its fn,
+// so that fn's writes after the open batch ends commit immediately. Outside a batch,
+// writes still commit immediately.
+type RuntimeBatchWriter interface {
+	WriteBatch(fn func())
+}
+
 // DescriptorRetention is an OPTIONAL interface a CollectorStore may implement to expose how
 // long it keeps a descriptor and the clock that lifetime is measured in. A consumer that
 // caches per-name state keyed off metrix descriptors (e.g. the prometheus writer) obtains it
@@ -56,6 +68,8 @@ type Reader interface {
 	Histogram(name string, labels Labels) (HistogramPoint, bool)
 	Summary(name string, labels Labels) (SummaryPoint, bool)
 	StateSet(name string, labels Labels) (StateSetPoint, bool)
+	// MeasureSet returns the full declared point. For snapshot gauges, NaN marks
+	// unavailable fields; the bool reports family presence, including all-NaN points.
 	MeasureSet(name string, labels Labels) (MeasureSetPoint, bool)
 	SeriesMeta(name string, labels Labels) (SeriesMeta, bool)
 	// MetricMeta resolves metadata by metric name in the active reader view and
@@ -275,7 +289,11 @@ type StateSetInstrument interface {
 }
 
 type SnapshotMeasureSetGauge interface {
+	// ObservePoint replaces the full snapshot in declared field order. NaN means
+	// unavailable; infinity and a mismatched field count panic.
 	ObservePoint(p MeasureSetPoint, labels ...LabelSet)
+	// ObserveFields requires exactly the declared keys, including unavailable
+	// fields with NaN values. Missing/unknown keys and infinity panic.
 	ObserveFields(fields map[string]SampleValue, labels ...LabelSet)
 }
 

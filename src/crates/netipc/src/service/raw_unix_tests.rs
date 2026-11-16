@@ -1,16 +1,16 @@
 use super::*;
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use crate::protocol::PROFILE_SHM_FUTEX;
 use crate::protocol::{
-    increment_encode, AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView,
-    BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder, CgroupsLookupRequestView,
-    CgroupsLookupResponseView, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE,
-    CGROUPS_LOOKUP_RESP_HDR_SIZE, CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_OVERSIZED_ITEM,
-    CGROUP_LOOKUP_PAYLOAD_EXCEEDED, CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, KIND_RESPONSE,
+    APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE, AppsLookupBuilder,
+    AppsLookupRequestView, AppsLookupResponseView, BatchBuilder, CGROUP_LOOKUP_KNOWN,
+    CGROUP_LOOKUP_OVERSIZED_ITEM, CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CGROUPS_LOOKUP_RESP_HDR_SIZE, CgroupsBuilder,
+    CgroupsLookupBuilder, CgroupsLookupRequestView, CgroupsLookupResponseView, KIND_RESPONSE,
     MAX_PAYLOAD_CAP, METHOD_APPS_LOOKUP, METHOD_CGROUPS_LOOKUP, NIPC_UID_UNSET,
     ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN, PID_LOOKUP_OVERSIZED_ITEM,
     PID_LOOKUP_PAYLOAD_EXCEEDED, PID_LOOKUP_UNKNOWN, PROFILE_BASELINE, STATUS_LIMIT_EXCEEDED,
-    STATUS_OK,
+    STATUS_OK, increment_encode,
 };
 use std::os::fd::RawFd;
 use std::os::unix::ffi::OsStrExt;
@@ -39,7 +39,7 @@ fn ensure_run_dir() {
 
 fn cleanup_all(service: &str) {
     let _ = std::fs::remove_file(format!("{TEST_RUN_DIR}/{service}.sock"));
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     crate::transport::shm::cleanup_stale(TEST_RUN_DIR, service);
 }
 
@@ -48,24 +48,14 @@ fn socket_path(service: &str) -> PathBuf {
 }
 
 fn unique_service(prefix: &str) -> String {
-    format!(
+    let service = format!(
         "{}_{}_{}",
         prefix,
         std::process::id(),
         RAW_SERVICE_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1
-    )
-}
-
-fn wait_for_listener_bind(service: &str) {
-    let sock = socket_path(service);
-    for _ in 0..2000 {
-        if sock.exists() {
-            return;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-
-    panic!("listener did not bind for service {service}");
+    );
+    crate::test_locks::track(TEST_RUN_DIR, &service);
+    service
 }
 
 fn server_config() -> ServerConfig {
@@ -76,7 +66,9 @@ fn server_config() -> ServerConfig {
         max_response_payload_bytes: RESPONSE_BUF_SIZE as u32,
         max_response_batch_items: 1,
         auth_token: AUTH_TOKEN,
-        backlog: 4,
+        // Above every test's connect burst: macOS and FreeBSD refuse a
+        // connect to a full backlog at once, where Linux waits.
+        backlog: 64,
         ..ServerConfig::default()
     }
 }
@@ -93,7 +85,7 @@ fn client_config() -> ClientConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 fn shm_server_config() -> ServerConfig {
     ServerConfig {
         supported_profiles: PROFILE_BASELINE | PROFILE_SHM_FUTEX,
@@ -108,7 +100,7 @@ fn shm_server_config() -> ServerConfig {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 fn shm_client_config() -> ClientConfig {
     ClientConfig {
         supported_profiles: PROFILE_BASELINE | PROFILE_SHM_FUTEX,
@@ -148,43 +140,49 @@ fn batch_client_config() -> ClientConfig {
 }
 
 fn snapshot_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_snapshot(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_snapshot(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn cgroups_lookup_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn apps_lookup_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_apps_lookup(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_apps_lookup(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn increment_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_increment(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_increment(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn string_reverse_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_string_reverse(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_string_reverse(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
+/// The server listens before tests connect, so one refresh must succeed.
 fn connect_ready(client: &mut RawClient) {
-    for _ in 0..200 {
-        client.refresh();
-        if client.ready() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-
-    panic!("client did not reach READY state");
+    client.refresh();
+    assert!(client.ready(), "client did not reach READY state");
 }
 
 #[test]
 fn test_client_call_timeout_on_wedged_peer() {
     let svc = unique_service("rs_call_timeout");
+    let (release_tx, release_rx) = mpsc::channel::<()>();
     let mut server =
         start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
-            thread::sleep(Duration::from_millis(150));
+            // Never answer; the test releases the peer once the call timed out.
+            let _ = release_rx.recv_timeout(server::TEST_WAIT_LIMIT);
             Ok(())
         });
 
@@ -203,6 +201,7 @@ fn test_client_call_timeout_on_wedged_peer() {
     );
 
     client.close();
+    drop(release_tx);
     server.wait();
     cleanup_all(&svc);
 }
@@ -276,6 +275,7 @@ fn fill_test_cgroups_snapshot(builder: &mut CgroupsBuilder<'_>) -> bool {
     true
 }
 
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 fn panic_payload_to_string(payload: Box<dyn std::any::Any + Send>) -> String {
     match payload.downcast::<String>() {
         Ok(msg) => *msg,
@@ -470,8 +470,7 @@ fn string_reverse_dispatch_handler() -> DispatchHandler {
 }
 
 struct TestServer {
-    stop_flag: Arc<AtomicBool>,
-    thread: Option<thread::JoinHandle<()>>,
+    inner: server::RunningTestServer,
 }
 
 impl TestServer {
@@ -479,7 +478,7 @@ impl TestServer {
         Self::start_with(service, server_config(), expected_method_code, handler, 8)
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     fn start_shm(
         service: &str,
         expected_method_code: u16,
@@ -518,41 +517,16 @@ impl TestServer {
     ) -> Self {
         ensure_run_dir();
         cleanup_all(service);
-
-        let svc = service.to_string();
-        let ready_flag = Arc::new(AtomicBool::new(false));
-        let ready_clone = ready_flag.clone();
-
-        let mut server = ManagedServer::with_workers(
+        let server = ManagedServer::with_workers(
             TEST_RUN_DIR,
-            &svc,
+            service,
             config,
             expected_method_code,
             handler,
             worker_count,
         );
-        let stop_flag = server.running_flag();
-
-        let thread = thread::spawn(move || {
-            // We need to signal readiness after bind but before accept loop.
-            // The run() method binds internally, so we signal immediately
-            // after it starts (it blocks on accept).
-            ready_clone.store(true, Ordering::Release);
-            let _ = server.run();
-        });
-
-        // Wait for server to be ready
-        for _ in 0..2000 {
-            if ready_flag.load(Ordering::Acquire) {
-                break;
-            }
-            thread::sleep(Duration::from_micros(500));
-        }
-        wait_for_listener_bind(service);
-
         TestServer {
-            stop_flag,
-            thread: Some(thread),
+            inner: server.spawn_for_test(),
         }
     }
 
@@ -562,50 +536,17 @@ impl TestServer {
         handler: Option<DispatchHandler>,
         resp_buf_size: usize,
     ) -> Self {
-        ensure_run_dir();
-        cleanup_all(service);
-
-        let svc = service.to_string();
-        let ready_flag = Arc::new(AtomicBool::new(false));
-        let ready_clone = ready_flag.clone();
-
         let mut scfg = server_config();
         scfg.max_response_payload_bytes = resp_buf_size as u32;
+        Self::start_with(service, scfg, expected_method_code, handler, 8)
+    }
 
-        let mut server =
-            ManagedServer::new(TEST_RUN_DIR, &svc, scfg, expected_method_code, handler);
-        let stop_flag = server.running_flag();
-
-        let thread = thread::spawn(move || {
-            ready_clone.store(true, Ordering::Release);
-            let _ = server.run();
-        });
-
-        for _ in 0..2000 {
-            if ready_flag.load(Ordering::Acquire) {
-                break;
-            }
-            thread::sleep(Duration::from_micros(500));
-        }
-        wait_for_listener_bind(service);
-
-        TestServer {
-            stop_flag,
-            thread: Some(thread),
-        }
+    fn events(&self) -> &server::TestEvents {
+        &self.inner.events
     }
 
     fn stop(&mut self) {
-        self.stop_flag.store(false, Ordering::Release);
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
-        }
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.stop();
+        self.inner.stop();
     }
 }
 
@@ -625,7 +566,7 @@ fn raw_listener_fd_for_service(service: &str) -> RawFd {
         "socket path too long"
     );
 
-    let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0) };
+    let fd = unsafe { libc::socket(libc::AF_UNIX, crate::transport::posix::SOCK_TYPE, 0) };
     assert!(
         fd >= 0,
         "socket failed: {}",
@@ -694,30 +635,48 @@ fn start_raw_hello_ack_server(service: &str, packet: Vec<u8>) -> RawHelloAckServ
     ensure_run_dir();
     cleanup_all(service);
 
-    let svc = service.to_string();
+    // Listen before returning so the client's first connect cannot race it.
+    let fd = raw_listener_fd_for_service(service);
     let thread = thread::spawn(move || {
-        let fd = raw_listener_fd_for_service(&svc);
         let client_fd = unsafe { libc::accept(fd, std::ptr::null_mut(), std::ptr::null_mut()) };
         if client_fd < 0 {
             unsafe { libc::close(fd) };
             return Err(format!("accept: {}", std::io::Error::last_os_error()));
         }
 
+        // A stream socket may return the HELLO in parts: read all of it.
+        let hello_len =
+            crate::protocol::HEADER_SIZE + crate::transport::framing::HELLO_PAYLOAD_SIZE;
         let mut hello_buf = [0u8; crate::protocol::HEADER_SIZE + 128];
-        let n = unsafe {
-            libc::recv(
-                client_fd,
-                hello_buf.as_mut_ptr() as *mut libc::c_void,
-                hello_buf.len(),
-                0,
-            )
-        };
+        let mut got = 0usize;
+        let mut n: isize = 0;
+        while got < hello_len {
+            n = unsafe {
+                libc::recv(
+                    client_fd,
+                    hello_buf[got..].as_mut_ptr() as *mut libc::c_void,
+                    hello_len - got,
+                    0,
+                )
+            };
+            if n <= 0 {
+                break;
+            }
+            got += n as usize;
+        }
         if n < 0 {
             unsafe {
                 libc::close(client_fd);
                 libc::close(fd);
             }
             return Err(format!("recv: {}", std::io::Error::last_os_error()));
+        }
+        if got < hello_len {
+            unsafe {
+                libc::close(client_fd);
+                libc::close(fd);
+            }
+            return Err(format!("truncated HELLO: {got} of {hello_len} bytes"));
         }
 
         let wrote = unsafe {
@@ -742,7 +701,6 @@ fn start_raw_hello_ack_server(service: &str, packet: Vec<u8>) -> RawHelloAckServ
         Ok(())
     });
 
-    thread::sleep(Duration::from_millis(50));
     RawHelloAckServer {
         thread: Some(thread),
     }
@@ -768,13 +726,9 @@ where
     cleanup_all(service);
 
     let svc = service.to_string();
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc, cfg).expect("bind");
     let thread = thread::spawn(move || {
-        let listener =
-            UdsListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
         let mut session = listener.accept().map_err(|e| format!("accept: {e}"))?;
 
         let (hdr, payload) = {
@@ -787,14 +741,6 @@ where
 
         handler(&mut session, hdr, &payload)
     });
-
-    for _ in 0..2000 {
-        if ready.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    thread::sleep(Duration::from_millis(50));
 
     RawSessionServer {
         thread: Some(thread),
@@ -818,14 +764,9 @@ fn start_raw_overflow_no_growth_server(service: &str, cfg: ServerConfig) -> RawS
     cleanup_all(service);
 
     let svc = service.to_string();
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc, cfg).expect("bind");
     let thread = thread::spawn(move || {
-        let listener =
-            UdsListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
-
         let mut first = listener
             .accept()
             .map_err(|e| format!("first accept: {e}"))?;
@@ -858,25 +799,17 @@ fn start_raw_overflow_no_growth_server(service: &str, cfg: ServerConfig) -> RawS
         Ok(())
     });
 
-    for _ in 0..2000 {
-        if ready.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    thread::sleep(Duration::from_millis(50));
-
     RawSessionServer {
         thread: Some(thread),
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 struct RawShmSessionServer {
     thread: Option<thread::JoinHandle<Result<(), String>>>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 fn start_raw_shm_session_server<F>(
     service: &str,
     cfg: ServerConfig,
@@ -889,13 +822,9 @@ where
     cleanup_all(service);
 
     let svc = service.to_string();
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc, cfg).expect("bind");
     let thread = thread::spawn(move || {
-        let listener =
-            UdsListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
         let session = listener.accept().map_err(|e| format!("accept: {e}"))?;
         if session.selected_profile != PROFILE_SHM_FUTEX {
             return Err(format!("unexpected profile {}", session.selected_profile));
@@ -923,20 +852,12 @@ where
         handler(&mut shm, hdr, &payload)
     });
 
-    for _ in 0..2000 {
-        if ready.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    thread::sleep(Duration::from_millis(50));
-
     RawShmSessionServer {
         thread: Some(thread),
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 impl RawShmSessionServer {
     fn wait(&mut self) {
         if let Some(thread) = self.thread.take() {
@@ -949,7 +870,7 @@ impl RawShmSessionServer {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 fn encode_raw_message(hdr: &Header, payload: &[u8]) -> Vec<u8> {
     let mut msg = vec![0u8; HEADER_SIZE + payload.len()];
     hdr.encode(&mut msg[..HEADER_SIZE]);
@@ -1360,9 +1281,14 @@ fn test_lookup_timeout_during_followup_subcall() {
     cfg.max_response_payload_bytes = 320;
     let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let handler_calls = calls.clone();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
-            thread::sleep(Duration::from_millis(150));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(9);
         for i in 0..req.item_count {
@@ -1401,13 +1327,16 @@ fn test_lookup_timeout_during_followup_subcall() {
     let mut server = TestServer::start_with(&svc, cfg, METHOD_APPS_LOOKUP, Some(handler), 8);
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    let err = match client.call_apps_lookup_with_timeout(&[11, 22, 33], 30) {
+    // The budget leaves slow or emulated runners room for the first subcall;
+    // only the much slower second subcall can expire it.
+    let err = match client.call_apps_lookup_with_timeout(&[11, 22, 33], 500) {
         Ok(_) => panic!("apps follow-up timeout should fail"),
         Err(err) => err,
     };
     assert_eq!(err, NipcError::Timeout);
     assert!(calls.load(Ordering::SeqCst) >= 2);
     client.close();
+    drop(release_tx);
     server.stop();
     cleanup_all(&svc);
 
@@ -1416,9 +1345,14 @@ fn test_lookup_timeout_during_followup_subcall() {
     cfg.max_response_payload_bytes = 160;
     let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let handler_calls = calls.clone();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
-            thread::sleep(Duration::from_millis(150));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(7);
         for i in 0..req.item_count {
@@ -1452,13 +1386,16 @@ fn test_lookup_timeout_during_followup_subcall() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     let paths: [&[u8]; 3] = [b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()];
-    let err = match client.call_cgroups_lookup_with_timeout(&paths, 30) {
+    // The budget leaves slow or emulated runners room for the first subcall;
+    // only the much slower second subcall can expire it.
+    let err = match client.call_cgroups_lookup_with_timeout(&paths, 500) {
         Ok(_) => panic!("cgroups follow-up timeout should fail"),
         Err(err) => err,
     };
     assert_eq!(err, NipcError::Timeout);
     assert!(calls.load(Ordering::SeqCst) >= 2);
     client.close();
+    drop(release_tx);
     server.stop();
     cleanup_all(&svc);
 }
@@ -1471,10 +1408,15 @@ fn test_lookup_abort_during_followup_subcall() {
     let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let handler_calls = calls.clone();
     let (second_tx, second_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
             let _ = second_tx.send(());
-            thread::sleep(Duration::from_millis(250));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(9);
         for i in 0..req.item_count {
@@ -1530,6 +1472,7 @@ fn test_lookup_abort_during_followup_subcall() {
             .expect("apps abort result"),
         Err(NipcError::Aborted)
     );
+    drop(release_tx);
     server.stop();
     cleanup_all(&svc);
 
@@ -1539,10 +1482,15 @@ fn test_lookup_abort_during_followup_subcall() {
     let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
     let handler_calls = calls.clone();
     let (second_tx, second_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
             let _ = second_tx.send(());
-            thread::sleep(Duration::from_millis(250));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(7);
         for i in 0..req.item_count {
@@ -1593,6 +1541,7 @@ fn test_lookup_abort_during_followup_subcall() {
             .expect("cgroups abort result"),
         Err(NipcError::Aborted)
     );
+    drop(release_tx);
     server.stop();
     cleanup_all(&svc);
 }
@@ -2492,9 +2441,11 @@ fn test_lookup_logical_limits() {
         max_subcalls: 0,
         max_response_bytes: 0,
     });
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
 
     let svc = unique_service("rs_svc_apps_lookup_response_limit");
     let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, Some(test_apps_lookup_dispatch()));
@@ -2571,7 +2522,7 @@ fn test_lookup_logical_limits() {
         client
             .call_cgroups_lookup(&[b"/request-key-too-large-for-configured-cap".as_slice()])
             .unwrap_err(),
-        crate::protocol::NipcError::BadLayout
+        crate::protocol::NipcError::NotReady
     );
 }
 
@@ -2617,9 +2568,11 @@ fn test_cgroups_lookup_rejects_mixed_generation_retry() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
 
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
     assert!(
         calls.load(Ordering::SeqCst) >= 2,
         "handler should be called for at least two subrequests"
@@ -2892,9 +2845,11 @@ fn test_lookup_endpoint_gone_after_partial_progress_unix() {
     });
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
+            .is_err()
+    );
     client.close();
     server.wait();
     cleanup_all(&svc);
@@ -2920,12 +2875,14 @@ fn test_lookup_endpoint_gone_after_partial_progress_unix() {
     });
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_cgroups_lookup_with_timeout(
-            &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
-            1_000,
-        )
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(
+                &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
+                1_000,
+            )
+            .is_err()
+    );
     client.close();
     server.wait();
     cleanup_all(&svc);
@@ -2938,9 +2895,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_unix() {
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22], 1_000)
+            .is_err()
+    );
     client.close();
     cleanup_all(&svc);
 
@@ -2953,9 +2912,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_unix() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
+            .is_err()
+    );
     client.close();
     cleanup_all(&svc);
 }
@@ -2970,7 +2931,7 @@ fn test_lookup_endpoint_absent_before_call_unix() {
     let err = client
         .call_apps_lookup_with_timeout(&[11, 22], 1_000)
         .expect_err("apps absent lookup should fail");
-    assert_eq!(err, NipcError::BadLayout);
+    assert_eq!(err, NipcError::NotReady);
     client.close();
     cleanup_all(&svc);
 
@@ -2985,7 +2946,7 @@ fn test_lookup_endpoint_absent_before_call_unix() {
     let err = client
         .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
         .expect_err("cgroups absent lookup should fail");
-    assert_eq!(err, NipcError::BadLayout);
+    assert_eq!(err, NipcError::NotReady);
     client.close();
     cleanup_all(&svc);
 }
@@ -3129,7 +3090,7 @@ fn test_lookup_rejects_malformed_typed_responses_unix() {
     );
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_cgroups_call_shm() {
     let svc = "rs_svc_cgroups_shm";
@@ -3157,7 +3118,7 @@ fn test_cgroups_call_shm() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_client_call_string_reverse_shm_success() {
     let svc = "rs_svc_strrev_shm";
@@ -3184,7 +3145,7 @@ fn test_client_call_string_reverse_shm_success() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_increment_batch_shm() {
     let svc = "rs_pp_batch_shm";
@@ -3209,21 +3170,18 @@ fn test_increment_batch_shm() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_refresh_shm_attach_failure_falls_back_to_baseline() {
     let svc = "rs_svc_shm_attach_fail";
     ensure_run_dir();
     cleanup_all(svc);
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
     let svc_clone = svc.to_string();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config())
+        .expect("bind shm listener");
     let server_thread = thread::spawn(move || {
-        let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config())
-            .expect("bind shm listener");
-        ready_clone.store(true, Ordering::Release);
         let mut first = listener.accept().expect("accept negotiated shm session");
         assert_eq!(first.selected_profile, PROFILE_SHM_FUTEX);
 
@@ -3243,10 +3201,6 @@ fn test_refresh_shm_attach_failure_falls_back_to_baseline() {
             "second baseline session should close cleanly when client closes"
         );
     });
-
-    while !ready.load(Ordering::Acquire) {
-        thread::sleep(Duration::from_millis(1));
-    }
 
     let mut client = snapshot_client(svc, shm_client_config());
     assert!(
@@ -3275,7 +3229,131 @@ fn test_refresh_shm_attach_failure_falls_back_to_baseline() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+/// Accepts `n` sessions on `listener`, one after the other, serves each
+/// until the client closes it, and returns their selected profiles.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+fn serve_sessions_until_closed(
+    listener: UdsListener,
+    n: usize,
+) -> std::sync::mpsc::Receiver<Vec<u32>> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let mut selected = Vec::new();
+        let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
+        for _ in 0..n {
+            let Ok(mut session) = listener.accept() else {
+                break;
+            };
+            selected.push(session.selected_profile);
+            let _ = session.receive(&mut recv_buf);
+        }
+        let _ = tx.send(selected);
+    });
+    rx
+}
+
+/// A region that never becomes attachable, with a call timeout below the
+/// SHM attach timeout: every attach wait ends at the call deadline. The
+/// first one keeps SHM; the second in a row drops it, so the third connect
+/// runs on the baseline instead of every call ending at its deadline.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[test]
+fn test_refresh_persistent_call_bound_attach_failure_falls_back() {
+    let svc = "rs_svc_shm_call_bound";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let listener =
+        UdsListener::bind(TEST_RUN_DIR, svc, shm_server_config()).expect("bind shm listener");
+    let server = serve_sessions_until_closed(listener, 3);
+
+    let mut client = snapshot_client(svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 100;
+
+    assert!(
+        !client.refresh() && !client.ready(),
+        "first refresh ends at the call deadline"
+    );
+    assert_ne!(
+        client.transport_config.supported_profiles & PROFILE_SHM_FUTEX,
+        0,
+        "one call-bound attach failure keeps SHM"
+    );
+    assert!(
+        !client.refresh() && !client.ready(),
+        "second refresh ends at the call deadline"
+    );
+    assert_eq!(
+        client.transport_config.supported_profiles & PROFILE_SHM_FUTEX,
+        0,
+        "a second call-bound attach failure in a row drops SHM"
+    );
+    assert!(
+        client.refresh() && client.ready(),
+        "third refresh connects over the baseline"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
+        vec![PROFILE_SHM_FUTEX, PROFILE_SHM_FUTEX, PROFILE_BASELINE]
+    );
+    cleanup_all(svc);
+}
+
+/// An attach error that waiting cannot fix (a region of another version)
+/// drops SHM at once, even when the call deadline would end the wait first.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[test]
+fn test_refresh_permanent_attach_error_falls_back_at_once() {
+    let svc = "rs_svc_shm_bad_ver";
+    ensure_run_dir();
+    cleanup_all(svc);
+
+    let listener =
+        UdsListener::bind(TEST_RUN_DIR, svc, shm_server_config()).expect("bind shm listener");
+    // The first session gets id 1; its region carries a foreign version.
+    let region_path = format!("{TEST_RUN_DIR}/{svc}-{:016x}.ipcshm", 1u64);
+    let mut region = vec![0u8; 64];
+    region[0..4].copy_from_slice(&crate::transport::shm::REGION_MAGIC.to_ne_bytes());
+    region[4..6].copy_from_slice(&0xffffu16.to_ne_bytes());
+    std::fs::write(&region_path, &region).expect("write region");
+    let server = serve_sessions_until_closed(listener, 2);
+
+    let mut client = snapshot_client(svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 2000;
+
+    assert!(
+        client.refresh() && client.ready(),
+        "refresh falls back to the baseline in the same call"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
+        vec![PROFILE_SHM_FUTEX, PROFILE_BASELINE]
+    );
+    let _ = std::fs::remove_file(&region_path);
+    cleanup_all(svc);
+}
+
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_server_falls_back_to_baseline_when_linux_shm_prepare_fails() {
     let svc = "rs_svc_shm_upgrade_fail";
@@ -3313,21 +3391,17 @@ fn test_server_falls_back_to_baseline_when_linux_shm_prepare_fails() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_increment_shm_short_response_truncated() {
     let svc = "rs_svc_shm_short_resp";
     ensure_run_dir();
     cleanup_all(svc);
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
     let svc_clone = svc.to_string();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config()).expect("bind");
     let server_thread = thread::spawn(move || -> Result<(), String> {
-        let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config())
-            .map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
         let session = listener.accept().map_err(|e| format!("accept: {e}"))?;
         if session.selected_profile != PROFILE_SHM_FUTEX {
             return Err(format!("unexpected profile {}", session.selected_profile));
@@ -3355,10 +3429,6 @@ fn test_call_increment_shm_short_response_truncated() {
         Ok(())
     });
 
-    while !ready.load(Ordering::Acquire) {
-        thread::sleep(Duration::from_millis(1));
-    }
-
     let mut client = increment_client(svc, shm_client_config());
     connect_ready(&mut client);
     assert!(client.shm.is_some(), "expected SHM to be negotiated");
@@ -3377,7 +3447,7 @@ fn test_call_increment_shm_short_response_truncated() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_raw_shm_session_server_wait_panics_on_baseline_profile() {
     let svc = "rs_svc_shm_helper_bad_profile";
@@ -3401,7 +3471,7 @@ fn test_raw_shm_session_server_wait_panics_on_baseline_profile() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_raw_shm_session_server_wait_panics_on_short_request() {
     let svc = "rs_svc_shm_helper_short_req";
@@ -3436,31 +3506,23 @@ fn test_raw_shm_session_server_wait_panics_on_short_request() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_increment_shm_server_thread_rejects_baseline_profile() {
     let svc = "rs_svc_shm_short_resp_bad_profile";
     ensure_run_dir();
     cleanup_all(svc);
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
     let svc_clone = svc.to_string();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config()).expect("bind");
     let server_thread = thread::spawn(move || -> Result<(), String> {
-        let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config())
-            .map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
         let session = listener.accept().map_err(|e| format!("accept: {e}"))?;
         if session.selected_profile != PROFILE_SHM_FUTEX {
             return Err(format!("unexpected profile {}", session.selected_profile));
         }
         Ok(())
     });
-
-    while !ready.load(Ordering::Acquire) {
-        thread::sleep(Duration::from_millis(1));
-    }
 
     let mut client = increment_client(svc, client_config());
     connect_ready(&mut client);
@@ -3478,21 +3540,17 @@ fn test_call_increment_shm_server_thread_rejects_baseline_profile() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_increment_shm_server_thread_rejects_short_request() {
     let svc = "rs_svc_shm_short_resp_short_req";
     ensure_run_dir();
     cleanup_all(svc);
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
     let svc_clone = svc.to_string();
 
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config()).expect("bind");
     let server_thread = thread::spawn(move || -> Result<(), String> {
-        let listener = UdsListener::bind(TEST_RUN_DIR, &svc_clone, shm_server_config())
-            .map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
         let session = listener.accept().map_err(|e| format!("accept: {e}"))?;
         if session.selected_profile != PROFILE_SHM_FUTEX {
             return Err(format!("unexpected profile {}", session.selected_profile));
@@ -3518,10 +3576,6 @@ fn test_call_increment_shm_server_thread_rejects_short_request() {
         Ok(())
     });
 
-    while !ready.load(Ordering::Acquire) {
-        thread::sleep(Duration::from_millis(1));
-    }
-
     let mut client = increment_client(svc, shm_client_config());
     connect_ready(&mut client);
     assert!(client.shm.is_some(), "expected SHM to be negotiated");
@@ -3542,7 +3596,7 @@ fn test_call_increment_shm_server_thread_rejects_short_request() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_increment_shm_rejects_bad_message_id() {
     let svc = "rs_svc_shm_inc_bad_mid";
@@ -3587,7 +3641,7 @@ fn test_call_increment_shm_rejects_bad_message_id() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_string_reverse_shm_rejects_bad_message_id() {
     let svc = "rs_svc_shm_str_bad_mid";
@@ -3632,7 +3686,7 @@ fn test_call_string_reverse_shm_rejects_bad_message_id() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_call_increment_batch_shm_rejects_bad_message_id() {
     let svc = "rs_svc_shm_batch_bad_mid";
@@ -3710,7 +3764,6 @@ fn test_retry_on_failure() {
     // Kill server
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     // Restart server
     let mut server2 =
@@ -3754,7 +3807,6 @@ fn test_string_reverse_retry_on_failure() {
 
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     let mut server2 = TestServer::start(
         svc,
@@ -3797,7 +3849,6 @@ fn test_increment_batch_retry_on_failure() {
 
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     let mut server2 = TestServer::start_with(
         svc,
@@ -3845,7 +3896,6 @@ fn test_string_reverse_retry_second_failure() {
 
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     let mut server2 =
         start_raw_session_server(svc, server_config(), move |session, req_hdr, payload| {
@@ -3910,7 +3960,6 @@ fn test_increment_batch_retry_second_failure() {
 
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     let mut server2 = start_raw_session_server(
         svc,
@@ -3993,21 +4042,28 @@ fn test_server_rejects_session_at_worker_capacity() {
     cleanup_all(svc);
 
     let handler_calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
-    let release = Arc::new(AtomicBool::new(false));
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
 
     let handler = {
         let handler_calls = handler_calls.clone();
-        let release = release.clone();
+        let entered_tx = std::sync::Mutex::new(entered_tx);
+        let release_rx = std::sync::Mutex::new(release_rx);
         increment_dispatch(Arc::new(move |value| {
             handler_calls.fetch_add(1, Ordering::AcqRel);
-            while !release.load(Ordering::Acquire) {
-                thread::sleep(Duration::from_millis(1));
-            }
+            let _ = entered_tx.lock().unwrap().send(());
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
             Some(value + 1)
         }))
     };
 
     let mut server = TestServer::start_with_workers(svc, METHOD_INCREMENT, Some(handler), 1);
+    // Rebound after `server` so it drops first: a failed assertion must
+    // release the blocked handler before dropping the server joins it.
+    let release_tx = release_tx;
 
     let (call_tx, call_rx) = std::sync::mpsc::channel();
     let svc_name = svc.to_string();
@@ -4019,67 +4075,39 @@ fn test_server_rejects_session_at_worker_capacity() {
         call_tx.send(result).expect("send first call result");
     });
 
-    for _ in 0..500 {
-        if handler_calls.load(Ordering::Acquire) >= 1 {
-            break;
-        }
-        thread::sleep(Duration::from_millis(1));
-    }
-    assert_eq!(
-        handler_calls.load(Ordering::Acquire),
-        1,
-        "first client should occupy the only worker slot"
-    );
+    entered_rx
+        .recv_timeout(server::TEST_WAIT_LIMIT)
+        .expect("first client should occupy the only worker slot");
 
-    let mut session2 =
-        UdsSession::connect(TEST_RUN_DIR, svc, &client_config()).expect("second connect");
-    let mut req_hdr = Header {
-        kind: KIND_REQUEST,
-        code: METHOD_INCREMENT,
-        item_count: 1,
-        message_id: 1,
-        ..Header::default()
-    };
-    let mut req_payload = [0u8; INCREMENT_PAYLOAD_SIZE];
-    assert_eq!(
-        increment_encode(9, &mut req_payload),
-        INCREMENT_PAYLOAD_SIZE,
-        "IncrementEncode should fill the request buffer"
-    );
-
-    let send_err = session2.send(&mut req_hdr, &req_payload).err();
-    let recv_ok = if send_err.is_none() {
-        let mut recv_buf = [0u8; HEADER_SIZE + 64];
-        session2.receive(&mut recv_buf).is_ok()
-    } else {
-        false
-    };
+    // Over-capacity connections are refused before HELLO_ACK, so the
+    // connect itself fails instead of the first call.
+    let second = UdsSession::connect(TEST_RUN_DIR, svc, &client_config());
     assert!(
-        !(send_err.is_none() && recv_ok),
-        "second session should be rejected while the server is at worker capacity"
+        second.is_err(),
+        "second connect should be refused while the server is at worker capacity"
     );
     assert_eq!(
         handler_calls.load(Ordering::Acquire),
         1,
         "second session should not enter the handler while the first session is active"
     );
-    drop(session2);
 
-    release.store(true, Ordering::Release);
+    drop(release_tx);
     let first_result = call_rx.recv().expect("first call result");
     assert_eq!(first_result.expect("first call should succeed"), 42);
     caller.join().expect("caller join");
 
-    thread::sleep(Duration::from_millis(100));
-
+    // The worker slot frees once the first session thread exits.
+    server.events().wait_session_exits(1);
     let mut verify = increment_client(svc, client_config());
     connect_ready(&mut verify);
+    let verified = verify.call_increment(1);
+    verify.close();
     assert_eq!(
-        verify.call_increment(1).expect("verification call"),
+        verified.expect("verification call"),
         2,
         "server should remain healthy after rejecting a session at capacity"
     );
-    verify.close();
 
     server.stop();
     cleanup_all(svc);
@@ -4087,21 +4115,9 @@ fn test_server_rejects_session_at_worker_capacity() {
 
 #[test]
 fn test_poll_fd_invalid_fd_returns_error() {
-    let mut fds = [0; 2];
-    let rc = unsafe { libc::pipe(fds.as_mut_ptr()) };
-    assert_eq!(rc, 0, "pipe failed");
-
-    let read_fd = fds[0];
-    let write_fd = fds[1];
-    unsafe {
-        libc::close(read_fd);
-    }
-
-    let rc = poll_fd(read_fd, 0);
-    unsafe {
-        libc::close(write_fd);
-    }
-
+    // A just-closed fd can be reused by a parallel test thread before the
+    // poll; a number far above any open fd always reports POLLNVAL.
+    let rc = poll_fd(1 << 30, 0);
     assert_eq!(rc, -1);
 }
 
@@ -4147,10 +4163,14 @@ fn test_poll_fd_eintr_returns_timeout() {
         0
     );
 
-    let tid = unsafe { libc::pthread_self() };
+    // pthread_t is a pointer on musl and not Send; carry it as an integer.
+    let tid = unsafe { libc::pthread_self() } as usize;
     let signaler = thread::spawn(move || {
         thread::sleep(Duration::from_millis(50));
-        assert_eq!(unsafe { libc::pthread_kill(tid, libc::SIGUSR1) }, 0);
+        assert_eq!(
+            unsafe { libc::pthread_kill(tid as libc::pthread_t, libc::SIGUSR1) },
+            0
+        );
     });
 
     let rc = poll_fd(read_fd, 5000);
@@ -4174,7 +4194,7 @@ fn test_managed_server_recovers_after_short_uds_request() {
     let session = UdsSession::connect(TEST_RUN_DIR, svc, &client_config()).expect("connect");
     send_raw_packet(session.fd(), &[0xAB]);
     drop(session);
-    thread::sleep(Duration::from_millis(50));
+    server.events().wait_session_exits(1);
 
     verify_increment_service_ok(svc, client_config());
 
@@ -4193,7 +4213,7 @@ fn test_managed_server_recovers_after_bad_uds_header() {
     let bad_header = [0u8; HEADER_SIZE];
     send_raw_packet(session.fd(), &bad_header);
     drop(session);
-    thread::sleep(Duration::from_millis(50));
+    server.events().wait_session_exits(1);
 
     verify_increment_service_ok(svc, client_config());
 
@@ -4207,17 +4227,32 @@ fn test_managed_server_recovers_after_uds_peer_closes_before_response() {
     ensure_run_dir();
     cleanup_all(svc);
 
-    let handler = increment_dispatch(Arc::new(|value| {
-        thread::sleep(Duration::from_millis(50));
+    // The handler holds the response until the peer is gone, so the worker
+    // sends into a closed socket.
+    let (entered_tx, entered_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let entered_tx = std::sync::Mutex::new(entered_tx);
+    let release_rx = std::sync::Mutex::new(release_rx);
+    let handler = increment_dispatch(Arc::new(move |value| {
+        let _ = entered_tx.lock().unwrap().send(());
+        let _ = release_rx
+            .lock()
+            .unwrap()
+            .recv_timeout(server::TEST_WAIT_LIMIT);
         Some(value + 1)
     }));
     let mut server = TestServer::start(svc, METHOD_INCREMENT, Some(handler));
+    let release_tx = release_tx;
     let session = UdsSession::connect(TEST_RUN_DIR, svc, &client_config()).expect("connect");
     let request = build_increment_request_message(77, 41);
     send_raw_packet(session.fd(), &request);
+    entered_rx
+        .recv_timeout(server::TEST_WAIT_LIMIT)
+        .expect("handler entered");
     assert_eq!(unsafe { libc::shutdown(session.fd(), libc::SHUT_RDWR) }, 0);
     drop(session);
-    thread::sleep(Duration::from_millis(100));
+    drop(release_tx);
+    server.events().wait_session_exits(1);
 
     verify_increment_service_ok(svc, client_config());
 
@@ -4225,7 +4260,7 @@ fn test_managed_server_recovers_after_uds_peer_closes_before_response() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_managed_server_recovers_after_short_shm_request() {
     let svc = "rs_svc_short_shm_req";
@@ -4248,7 +4283,7 @@ fn test_managed_server_recovers_after_short_shm_request() {
         .send(&[0xAB])
         .expect("send short SHM request");
     client.close();
-    thread::sleep(Duration::from_millis(50));
+    server.events().wait_session_exits(1);
 
     verify_increment_service_ok(svc, shm_client_config());
 
@@ -4256,7 +4291,7 @@ fn test_managed_server_recovers_after_short_shm_request() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_managed_server_recovers_after_bad_shm_header() {
     let svc = "rs_svc_bad_shm_hdr";
@@ -4280,7 +4315,7 @@ fn test_managed_server_recovers_after_bad_shm_header() {
         .send(&bad_header)
         .expect("send bad SHM header");
     client.close();
-    thread::sleep(Duration::from_millis(50));
+    server.events().wait_session_exits(1);
 
     verify_increment_service_ok(svc, shm_client_config());
 
@@ -4306,16 +4341,7 @@ fn test_concurrent_clients() {
         let handle = thread::spawn(move || {
             let mut client = snapshot_client(&svc_name, client_config());
 
-            // Connect with retry
-            for _ in 0..100 {
-                client.refresh();
-                if client.ready() {
-                    break;
-                }
-                thread::sleep(Duration::from_millis(10));
-            }
-
-            assert!(client.ready(), "client must be ready");
+            connect_ready(&mut client);
 
             let mut successes = 0usize;
             for _ in 0..REQUESTS_PER {
@@ -4445,7 +4471,7 @@ fn test_non_request_terminates_session() {
     if send_result.is_ok() {
         // But subsequent communication should fail because the
         // server terminated the session
-        thread::sleep(Duration::from_millis(100));
+        server.events().wait_session_exits(1);
         let mut recv_buf = vec![0u8; 4096];
         // Try to send a valid request and receive - should fail
         let mut hdr2 = Header {
@@ -4565,7 +4591,6 @@ fn test_cache_refresh_failure_preserves() {
     // Kill server
     server.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     // Refresh fails, but old cache is preserved
     let updated = cache.refresh();
@@ -4657,7 +4682,6 @@ fn test_cache_reconnect_rebuilds() {
     // Kill and restart server
     server1.stop();
     cleanup_all(svc);
-    thread::sleep(Duration::from_millis(50));
 
     let mut server2 =
         TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, Some(test_cgroups_dispatch()));
@@ -4933,8 +4957,7 @@ fn cache_dup(cache: &CgroupsCache, hash: u32, name: &str) -> Option<CgroupsCache
 }
 
 struct StressTestServer {
-    stop_flag: Arc<AtomicBool>,
-    thread: Option<thread::JoinHandle<()>>,
+    inner: server::RunningTestServer,
 }
 
 impl StressTestServer {
@@ -4943,8 +4966,6 @@ impl StressTestServer {
         cleanup_all(service);
 
         let svc = service.to_string();
-        let ready_flag = Arc::new(AtomicBool::new(false));
-        let ready_clone = ready_flag.clone();
 
         let mut scfg = server_config();
         scfg.max_response_payload_bytes = resp_buf_size as u32;
@@ -4975,49 +4996,25 @@ impl StressTestServer {
             n,
         );
 
-        let mut server = ManagedServer::new(
+        let server = ManagedServer::new(
             TEST_RUN_DIR,
             &svc,
             scfg,
             METHOD_CGROUPS_SNAPSHOT,
             Some(handler),
         );
-        let stop_flag = server.running_flag();
-
-        let thread = thread::spawn(move || {
-            ready_clone.store(true, Ordering::Release);
-            let _ = server.run();
-        });
-
-        for _ in 0..2000 {
-            if ready_flag.load(Ordering::Acquire) {
-                break;
-            }
-            thread::sleep(Duration::from_micros(500));
-        }
-        thread::sleep(Duration::from_millis(50));
-
         StressTestServer {
-            stop_flag,
-            thread: Some(thread),
+            inner: server.spawn_for_test(),
         }
     }
 
     fn stop(&mut self) {
-        self.stop_flag.store(false, Ordering::Release);
-        if let Some(t) = self.thread.take() {
-            let _ = t.join();
-        }
-    }
-}
-
-impl Drop for StressTestServer {
-    fn drop(&mut self) {
-        self.stop();
+        self.inner.stop();
     }
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_1000_items() {
     let svc = "rs_stress_1k";
 
@@ -5075,6 +5072,7 @@ fn test_stress_1000_items() {
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_5000_items() {
     let svc = "rs_stress_5k";
 
@@ -5117,6 +5115,7 @@ fn test_stress_5000_items() {
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_concurrent_clients() {
     let svc = "rs_stress_concurrent";
     ensure_run_dir();
@@ -5194,6 +5193,7 @@ fn test_stress_concurrent_clients() {
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_rapid_connect_disconnect() {
     let svc = "rs_stress_rapid";
     ensure_run_dir();
@@ -5256,6 +5256,7 @@ fn test_stress_rapid_connect_disconnect() {
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_cache_concurrent() {
     let svc = "rs_stress_cache";
     ensure_run_dir();
@@ -5318,6 +5319,7 @@ fn test_stress_cache_concurrent() {
 }
 
 #[test]
+#[ignore = "stress: run by tests/run-extended-stress.sh"]
 fn test_stress_long_running() {
     let svc = "rs_stress_long";
     ensure_run_dir();
@@ -5508,31 +5510,15 @@ fn test_increment_batch() {
 
     // Start server with batch-capable config
     let svc_name = svc.to_string();
-    let ready_flag = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready_flag.clone();
-
-    let mut server_obj = ManagedServer::with_workers(
+    let mut server = ManagedServer::with_workers(
         TEST_RUN_DIR,
         &svc_name,
         batch_server_config(),
         METHOD_INCREMENT,
         Some(increment_dispatch_handler()),
         8,
-    );
-    let stop_flag = server_obj.running_flag();
-
-    let thread_handle = thread::spawn(move || {
-        ready_clone.store(true, Ordering::Release);
-        let _ = server_obj.run();
-    });
-
-    for _ in 0..2000 {
-        if ready_flag.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    thread::sleep(Duration::from_millis(50));
+    )
+    .spawn_for_test();
 
     let mut client = increment_client(svc, batch_client_config());
     client.refresh();
@@ -5563,8 +5549,7 @@ fn test_increment_batch() {
     assert!(empty.is_empty());
 
     client.close();
-    stop_flag.store(false, Ordering::Release);
-    let _ = thread_handle.join();
+    server.stop();
     cleanup_all(svc);
 }
 
@@ -5613,11 +5598,11 @@ fn test_client_incompatible() {
 
     // Client requires SHM_FUTEX only (no baseline)
     let mut bad_cfg = client_config();
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     {
         bad_cfg.supported_profiles = crate::protocol::PROFILE_SHM_FUTEX;
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
     {
         // On non-Linux, use a profile bit that won't match
         bad_cfg.supported_profiles = 0x80000000;
@@ -6408,31 +6393,15 @@ fn test_batch_dispatch_handler_failure() {
     }
 
     let svc_name = svc.to_string();
-    let ready_flag = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready_flag.clone();
-
-    let mut server_obj = ManagedServer::with_workers(
+    let mut server = ManagedServer::with_workers(
         TEST_RUN_DIR,
         &svc_name,
         batch_server_config(),
         METHOD_INCREMENT,
         Some(increment_dispatch(fail_second_increment_handler())),
         8,
-    );
-    let stop_flag = server_obj.running_flag();
-
-    let thread_handle = thread::spawn(move || {
-        ready_clone.store(true, Ordering::Release);
-        let _ = server_obj.run();
-    });
-
-    for _ in 0..2000 {
-        if ready_flag.load(Ordering::Acquire) {
-            break;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    thread::sleep(Duration::from_millis(50));
+    )
+    .spawn_for_test();
 
     let mut client = increment_client(svc, batch_client_config());
     client.refresh();
@@ -6445,8 +6414,7 @@ fn test_batch_dispatch_handler_failure() {
     assert!(result.is_err());
 
     client.close();
-    stop_flag.store(false, Ordering::Release);
-    let _ = thread_handle.join();
+    server.stop();
     cleanup_all(svc);
 }
 
@@ -6487,7 +6455,7 @@ fn test_batch_dispatch_builder_overflow_respects_configured_ceiling() {
     cleanup_all(svc);
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 #[test]
 fn test_shm_batch_request_item_decode_failure_returns_bad_envelope() {
     let svc = "rs_svc_shm_batch_bad_item";
@@ -6553,4 +6521,125 @@ fn test_shm_batch_request_item_decode_failure_returns_bad_envelope() {
     client.close();
     server.stop();
     cleanup_all(svc);
+}
+
+#[path = "raw_robustness_unix_tests.rs"]
+mod robustness;
+
+#[test]
+fn test_send_failure_with_live_peer_is_transport_unix() {
+    ensure_run_dir();
+    let svc = unique_service("rs_unix_send_live_peer");
+    cleanup_all(&svc);
+
+    // The server accepts one session, then removes the endpoint so the
+    // client cannot reconnect, and keeps the session open until released.
+    let listener = UdsListener::bind(TEST_RUN_DIR, &svc, server_config()).expect("bind");
+    let (accepted_tx, accepted_rx) = mpsc::channel::<()>();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let server = thread::spawn(move || {
+        let session = listener.accept().expect("accept");
+        drop(listener);
+        accepted_tx.send(()).expect("signal accepted");
+        let _ = release_rx.recv();
+        drop(session);
+    });
+
+    let mut client = increment_client(&svc, client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    accepted_rx.recv().expect("server accepted");
+
+    // Our own write shutdown makes send fail with EPIPE while the server
+    // still holds the session open.
+    let fd = client.session.as_ref().expect("session").fd();
+    assert_eq!(unsafe { libc::shutdown(fd, libc::SHUT_WR) }, 0);
+    assert_eq!(client.call_increment(1), Err(NipcError::Transport));
+
+    release_tx.send(()).expect("release server");
+    client.close();
+    server.join().expect("server thread");
+    cleanup_all(&svc);
+}
+
+#[test]
+fn test_transport_without_session_unix() {
+    let svc = unique_service("rs_unix_transport");
+    let mut client = increment_client(&svc, client_config());
+
+    let mut hdr = Header {
+        kind: KIND_REQUEST,
+        code: METHOD_INCREMENT,
+        flags: 0,
+        item_count: 1,
+        message_id: 1,
+        transport_status: STATUS_OK,
+        ..Header::default()
+    };
+
+    assert_eq!(
+        client.transport_send(&mut hdr, &[]),
+        Err(NipcError::Transport)
+    );
+    assert!(matches!(
+        client.transport_receive(0),
+        Err(NipcError::Transport)
+    ));
+    client.close();
+}
+
+/// The server creates a session's SHM region only when the handshake selects
+/// SHM, and falls back to baseline in the same handshake when the region
+/// cannot be created.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+#[test]
+fn test_shm_region_only_for_shm_sessions_unix() {
+    let svc = unique_service("rs_unix_shm_after_negotiation");
+    let mut server = TestServer::start_with(
+        &svc,
+        shm_server_config(),
+        METHOD_INCREMENT,
+        Some(increment_dispatch_handler()),
+        8,
+    );
+
+    let mut client = increment_client(&svc, client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_none());
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 0, "baseline session");
+    client.close();
+
+    let mut bad_auth = shm_client_config();
+    bad_auth.auth_token = AUTH_TOKEN + 1;
+    let mut client = increment_client(&svc, bad_auth);
+    client.refresh();
+    assert_eq!(client.state, ClientState::AuthFailed);
+    assert_eq!(server.events().take_shm_created(), 0, "rejected client");
+    client.close();
+
+    let mut client = increment_client(&svc, shm_client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_some(), "expected SHM to be negotiated");
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 1, "SHM session");
+    client.close();
+
+    server.events().set_fail_shm_create(true);
+    let mut client = increment_client(&svc, shm_client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_none(), "expected the baseline fallback");
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+    server.events().set_fail_shm_create(false);
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 0, "failed creation");
+    client.close();
+
+    server.stop();
 }

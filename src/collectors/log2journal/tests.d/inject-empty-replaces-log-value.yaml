@@ -1,0 +1,6 @@
+# an injection that resolves to an empty value removes the value from the log
+pattern: json
+
+inject:
+  - key: X
+    value: '${UNDEFINED}'

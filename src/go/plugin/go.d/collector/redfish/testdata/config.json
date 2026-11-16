@@ -1,0 +1,17 @@
+{
+  "vnode": "existing-bmc",
+  "update_every": 60,
+  "autodetection_retry": 30,
+  "url": "https://bmc.example.test/redfish/v1/",
+  "auth_method": "auto",
+  "username": "monitoring",
+  "password": "test-password",
+  "timeout": 15,
+  "max_concurrent_requests": 3,
+  "proxy_url": "http://proxy.example.test:8080",
+  "tls_ca": "/etc/netdata/bmc-ca.pem",
+  "tls_cert": "/etc/netdata/bmc-client.pem",
+  "tls_key": "/etc/netdata/bmc-client-key.pem",
+  "tls_skip_verify": true,
+  "collect": "!firmware *"
+}

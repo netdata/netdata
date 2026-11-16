@@ -42,9 +42,6 @@ This integration requires read access to files under `/sys/kernel/debug/extfrag`
 Assuming that debugfs is mounted and the required permissions are available, this integration will automatically run by default.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -1,0 +1,16 @@
+[package]
+name = "netdata-plugin-metrics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+indexmap = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }

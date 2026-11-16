@@ -139,7 +139,11 @@ func (ck *CommandKernel) admitSubmission(
 		)
 	}
 	lane := ck.lanes[laneID]
-	if plan.Transaction != nil && lane != nil && (lane.currentStopping || lane.retiringIdentity.Valid()) {
+	// An active transaction temporarily owns the current resource. Its lane
+	// serializes queued work until acknowledgment restores the current slot.
+	transactionOwnsCurrent := lane != nil && lane.active != nil && lane.active.plan.Transaction != nil
+	if plan.Transaction != nil && lane != nil &&
+		(lane.currentStopping && !transactionOwnsCurrent || lane.retiringIdentity.Valid()) {
 		return errors.Join(
 			errors.New("jobmgr kernel: resource transaction overlaps retiring resource authority"),
 			ck.uids.Complete(request.UID, false, now),

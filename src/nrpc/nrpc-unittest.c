@@ -110,6 +110,21 @@ int nrpc_access_unittest(void) {
         .handler = nrpc_unittest_noop_cb,
     });
 
+    // A commercial-only function mirroring flows:netflow and otel-traces.
+    nrpc_method_register(&(struct nrpc_method_desc) {
+        .owner = rrdhost_nrpc_owner(host),
+        .name = "commercial-fn",
+        .help = "commercial",
+        .tags = "flows",
+        .timeout_s = 10,
+        .priority = 0,
+        .version = 1,
+        .access = HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_COMMERCIAL_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+        .sync = true,
+        .source = NRPC_SOURCE_DAEMON,
+        .handler = nrpc_unittest_noop_cb,
+    });
+
     // A restricted function: name starting with "__" flags NRPC_METHOD_FLAG_RESTRICTED.
     nrpc_method_register(&(struct nrpc_method_desc) {
         .owner = rrdhost_nrpc_owner(host),
@@ -147,6 +162,7 @@ int nrpc_access_unittest(void) {
         bool allow_restricted;
         int expect_code;
         bool expect_item;
+        bool expect_commercial_key;
     } cases[] = {
         // GHSA-6628-vxm3-4g8g: anonymous caller denied on the protected function.
         // (~SIGNED_ID -> 412, exactly what /api/v3/function returned in the report.)
@@ -165,6 +181,18 @@ int nrpc_access_unittest(void) {
 
         // ... unless the internal caller explicitly allows restricted functions.
         { rrdhost_nrpc_owner(host), "__restricted-fn", HTTP_ACCESS_ANONYMOUS_DATA, true, HTTP_RESP_OK, true },
+
+        // Commercial function, anonymous caller -> sign-in denial (412), not the commercial one.
+        { rrdhost_nrpc_owner(host), "commercial-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_PRECOND_FAIL, false },
+
+        // Commercial function, free-space member -> 403 carrying the commercial errorMsgKey.
+        { rrdhost_nrpc_owner(host), "commercial-fn", HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+          false, HTTP_RESP_FORBIDDEN, false, true },
+
+        // Commercial function, paid-space member -> allowed.
+        { rrdhost_nrpc_owner(host), "commercial-fn",
+          HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_COMMERCIAL_SPACE | HTTP_ACCESS_SENSITIVE_DATA,
+          false, HTTP_RESP_OK, true },
 
         // Public function stays reachable anonymously — the gate must not over-block.
         { rrdhost_nrpc_owner(host), "public-fn", HTTP_ACCESS_ANONYMOUS_DATA, false, HTTP_RESP_OK, true },
@@ -224,6 +252,15 @@ int nrpc_access_unittest(void) {
         else
             body_ok = true;
 
+        // The commercial errorMsgKey is a dashboard contract: present exactly on the commercial denial.
+        bool has_key = buffer_strlen(wb) && strstr(buffer_tostring(wb), "\"errorMsgKey\":\"" NRPC_ERROR_KEY_COMMERCIAL_REQUIRED "\"");
+        if(has_key != cases[i].expect_commercial_key) {
+            fprintf(stderr, "  FAILED case %zu (%s): commercial errorMsgKey %s, expected %s\n",
+                    i, cases[i].fn, has_key ? "present" : "absent", cases[i].expect_commercial_key ? "present" : "absent");
+            errors++;
+            body_ok = false;
+        }
+
         if(item)
             nrpc_method_acquired_release(item);
 
@@ -233,6 +270,7 @@ int nrpc_access_unittest(void) {
     }
 
     nrpc_method_unregister(rrdhost_nrpc_owner(host), "protected-fn", NRPC_SOURCE_DAEMON);
+    nrpc_method_unregister(rrdhost_nrpc_owner(host), "commercial-fn", NRPC_SOURCE_DAEMON);
     nrpc_method_unregister(rrdhost_nrpc_owner(host), "__restricted-fn", NRPC_SOURCE_DAEMON);
     nrpc_method_unregister(rrdhost_nrpc_owner(host), "public-fn", NRPC_SOURCE_DAEMON);
 

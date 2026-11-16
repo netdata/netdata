@@ -23,6 +23,17 @@ void win_plugin_main(void *ptr);
 
 extern __thread char windows_shared_buffer[8192];
 
+// Shared helpers
+char *windows_plugin_normalize_patterns(const char *input);
+void windows_plugin_instance_chart_id(
+    char *dst,
+    size_t size,
+    size_t chart_type_length,
+    const char *prefix,
+    const char *instance,
+    const char *suffix,
+    size_t suffix_length);
+
 // Windows API
 int do_GetSystemUptime(int update_every, usec_t dt);
 int do_GetSystemRAM(int update_every, usec_t dt);
@@ -31,6 +42,7 @@ int do_GetPowerSupply(int update_every, usec_t dt);
 int do_GetServicesStatus(int update_every, usec_t dt);
 int do_GetHardwareInfo(int update_every, usec_t dt);
 int do_GetSensors(int update_every, usec_t dt);
+int do_GetPrinters(int update_every, usec_t dt);
 
 // Perflib
 int do_PerflibStorage(int update_every, usec_t dt);
@@ -41,16 +53,34 @@ int do_PerflibMemory(int update_every, usec_t dt);
 int do_PerflibObjects(int update_every, usec_t dt);
 int do_PerflibThermalZone(int update_every, usec_t dt);
 int do_PerflibWebService(int update_every, usec_t dt);
+int do_PerflibHttpService(int update_every, usec_t dt);
+void do_PerflibWebServiceExtraWeb(PERF_DATA_BLOCK *data, int update_every);
+bool do_PerflibWebServiceExtraWorker(PERF_DATA_BLOCK *data, int update_every, DICTIONARY *current_worker_instances);
+void do_PerflibWebServiceExtraCache(PERF_DATA_BLOCK *data, int update_every);
+const char *iis_worker_app_name(
+    const char *name,
+    const char *pid,
+    DICTIONARY *current_worker_instances,
+    char *buffer,
+    size_t buffer_size);
 int do_PerflibNetFramework(int update_every, usec_t dt);
 int do_PerflibAD(int update_every, usec_t dt);
 int do_PerflibADCS(int update_every, usec_t dt);
 int do_PerflibADFS(int update_every, usec_t dt);
 int do_PerflibHyperV(int update_every, usec_t dt);
 int do_PerflibExchange(int update_every, usec_t dt __maybe_unused);
+int do_PerflibMSMQ(int update_every, usec_t dt __maybe_unused);
+void do_PerflibMSMQ_cleanup(void);
 int do_PerflibNUMA(int update_every, usec_t dt __maybe_unused);
 int do_PerflibASP(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
+int do_PerflibSMBClient(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
+int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
+int do_PerflibPagingFile(int update_every, usec_t dt __maybe_unused);
+
+// WMI
+int do_GetFSRMQuota(int update_every, usec_t dt);
 
 // Cleanup
 void do_GetHardwareInfo_cleanup();
@@ -59,6 +89,12 @@ void do_GetServicesStatus_cleanup();
 void do_GetSystemCPU_cleanup();
 void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
+void do_PerflibSMBClient_cleanup(void);
+void do_PerflibStorage_cleanup();
+void do_PerflibPagingFile_cleanup(void);
+void do_GetPrinters_cleanup(void);
+void do_GetFSRMQuota_cleanup(void);
+void do_GetFSRMQuota_interrupt(void);
 
 enum PERFLIB_PRIO {
     PRIO_WEBSITE_IIS_REQUESTS_RATE = 21000, // PRIO selected, because APPS is using 20YYY
@@ -115,11 +151,27 @@ enum PERFLIB_PRIO {
     PRIO_NETFRAMEWORK_CLR_JIT_IL_BYTES,
 
     PRIO_NETFRAMEWORK_CLR_LOADING_HEAP_SIZE,
+    PRIO_NETFRAMEWORK_CLR_LOADING_CURRENT_APP_DOMAINS,
+    PRIO_NETFRAMEWORK_CLR_LOADING_CURRENT_ASSEMBLIES,
+    PRIO_NETFRAMEWORK_CLR_LOADING_CURRENT_CLASSES_LOADED,
     PRIO_NETFRAMEWORK_CLR_LOADING_APP_DOMAINS_LOADED,
     PRIO_NETFRAMEWORK_CLR_LOADING_APP_DOMAINS_UNLOADED,
     PRIO_NETFRAMEWORK_CLR_LOADING_ASSEMBLIES_LOADED,
     PRIO_NETFRAMEWORK_CLR_LOADING_CLASSES_LOADED,
     PRIO_NETFRAMEWORK_CLR_LOADING_CLASS_LOAD_FAILURE,
+
+    PRIO_NETFRAMEWORK_CLR_MEMORY_ALLOCATED_BYTES,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_FINALIZATION_SURVIVORS,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_HEAP_SIZE,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_PROMOTED_BYTES,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_GC_HANDLES,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_COLLECTIONS,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_INDUCED_GC,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_PINNED_OBJECTS,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_SINK_BLOCKS_IN_USE,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_COMMITTED_BYTES,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_RESERVED_BYTES,
+    PRIO_NETFRAMEWORK_CLR_MEMORY_GC_TIME,
 
     PRIO_NETFRAMEWORK_CLR_REMOTING_CHANNELS,
     PRIO_NETFRAMEWORK_CLR_REMOTING_CONTEXT_BOUND_CLASSES_LOADED,
@@ -133,9 +185,11 @@ enum PERFLIB_PRIO {
     PRIO_NETFRAMEWORK_CLR_SECURITY_STACK_WALK_DEPTH,
     PRIO_NETFRAMEWORK_CLR_SECURITY_RUNTIME_CHECKS,
 
+    PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_QUEUE_LENGTH,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_QUEUE_LENGTH,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_LOGICAL_THREADS,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_PHYSICAL_THREADS,
+    PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CURRENT_RECOGNIZED_THREADS,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_RECOGNIZED_THREADS,
     PRIO_NETFRAMEWORK_CLR_LOCKS_AND_THREADS_CONTENTIONS,
 
@@ -321,6 +375,31 @@ enum PERFLIB_PRIO {
     PRIO_EXCHANGE_PROXY_REQUESTS_TOTAL,
     PRIO_EXCHANGE_AUTO_DISCOVER_REQUESTS,
     PRIO_EXCHANGE_AUTO_AVAILABILITY_SERVICES,
+    PRIO_EXCHANGE_LDAP_READ_TIME,
+    PRIO_EXCHANGE_LDAP_SEARCH_TIME,
+    PRIO_EXCHANGE_LDAP_WRITE_TIME,
+    PRIO_EXCHANGE_LDAP_READ_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_SEARCH_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_WRITE_OPERATIONS,
+    PRIO_EXCHANGE_LDAP_TIMEOUT_ERRORS,
+    PRIO_EXCHANGE_LDAP_LONG_RUNNING_OPS,
+    PRIO_EXCHANGE_MAPIHTTP_ACTIVE_USER_COUNT,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_QUEUED_FOR_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_SUBMITTED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_DELAYED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_MESSAGES_COMPLETED_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_AGGREGATE_SHADOW_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_SUBMISSION_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_DELAY_QUEUE_LENGTH,
+    PRIO_EXCHANGE_QUEUE_ITEMS_COMPLETED_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_EXPIRED_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_QUEUED_FOR_DELIVERY_TOTAL,
+    PRIO_EXCHANGE_QUEUE_ITEMS_RESUBMITTED_TOTAL,
+
+    PRIO_MSMQ_QUEUE_MESSAGES,
+    PRIO_MSMQ_QUEUE_BYTES,
+    PRIO_MSMQ_JOURNAL_MESSAGES,
+    PRIO_MSMQ_JOURNAL_BYTES,
 
     PRIO_ASPNET_APPLICATION_RESTART,
     PRIO_ASPNET_WORKER_PROCESS_RESTART,
@@ -359,8 +438,57 @@ enum PERFLIB_PRIO {
     PRIO_SMB_SERVER_SHARES_READ_REQUESTS,
     PRIO_SMB_SERVER_SHARES_METADATA_REQUESTS,
     PRIO_SMB_SERVER_SHARES_FILES_OPENED,
+    PRIO_SMB_SERVER_SHARES_TREE_CONNECTS,
+    PRIO_SMB_SERVER_SHARES_TRAFFIC,
 
-    PRIO_TERMINAL_SERVICES_SESSIONS
+    PRIO_SMB_CLIENT_SHARE_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_TRAFFIC,
+    PRIO_SMB_CLIENT_SHARE_SMBDIRECT_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_TURBO_IO,
+    PRIO_SMB_CLIENT_SHARE_CREDIT_STALLS,
+    PRIO_SMB_CLIENT_SHARE_OUTSTANDING_REQUESTS,
+    PRIO_SMB_CLIENT_SHARE_AVG_QUEUE_LENGTH,
+    PRIO_SMB_CLIENT_SHARE_LATENCY,
+
+    PRIO_TERMINAL_SERVICES_SESSIONS,
+    PRIO_DNS_QUERIES,
+    PRIO_DNS_RESPONSES,
+    PRIO_DNS_QUERY_HANDLING,
+    PRIO_DNS_SUPPRESSED_RESPONSES,
+    PRIO_DNS_REMOTE_QUERIES,
+    PRIO_DNS_RECURSIVE_QUERIES,
+    PRIO_DNS_RECURSIVE_SEND_TIMEOUTS,
+    PRIO_DNS_ZONE_REQUESTS_RECEIVED,
+    PRIO_DNS_ZONE_REQUESTS_SENT,
+    PRIO_DNS_ZONE_RESPONSES_RECEIVED,
+    PRIO_DNS_ZONE_SUCCESS_RECEIVED,
+    PRIO_DNS_ZONE_SUCCESS_SENT,
+    PRIO_DNS_ZONE_FAILURES,
+    PRIO_DNS_NOTIFY_RECEIVED,
+    PRIO_DNS_NOTIFY_SENT,
+    PRIO_DNS_DYNAMIC_UPDATES,
+    PRIO_DNS_DYNAMIC_UPDATES_QUEUED,
+    PRIO_DNS_MEMORY_USED,
+    PRIO_DNS_UNMATCHED_RESPONSES,
+    PRIO_DNS_WINS_LOOKUPS,
+    PRIO_DNS_WINS_RESPONSES,
+
+    PRIO_FSRM_QUOTAS,
+    PRIO_FSRM_QUOTA_SPACE,
+    PRIO_FSRM_QUOTA_STATE,
+
+    PRIO_IIS_EXTRA_WEBSITE = 25000,
+    PRIO_IIS_EXTRA_WORKER = 25100,
+    PRIO_HTTP_SERVICE_QUEUE = 25200,
+    PRIO_IIS_EXTRA_CACHE = 25300,
+    PRIO_IIS_APP_POOL_CURRENT_UPTIME = 25400,
+    PRIO_IIS_APP_POOL_TIME_SINCE_FAILURE = 25401,
+
+    PRIO_PRINTER_JOBS = 25500,
+    PRIO_PRINTER_STATUS,
+    PRIO_PRINTER_PROBLEMS,
+    PRIO_PRINTER_JOB_STATUS,
 };
 
 #endif //NETDATA_WINDOWS_PLUGIN_H

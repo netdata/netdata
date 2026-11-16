@@ -50,12 +50,34 @@ metrics:
           description: The measured temperature value
           family: 'Environment/Temperature/Value'
           unit: "degF"
+    metric_tags:
+      - tag: lgp_env_temperature_descr_deg_f
+        symbol:
+          OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3.1.2 # OID index
+          name: lgpEnvTemperatureDescrDegF
+
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.1.3.3
+      name: lgpEnvTemperatureTableDegC
+    symbols:
       - OID: 1.3.6.1.4.1.476.1.42.3.4.1.3.3.1.3
         name: lgpEnvTemperatureMeasurementDegC
         chart_meta:
           description: The measured temperature value
           family: 'Environment/Temperature/Value'
           unit: "Cel"
+    metric_tags:
+      - tag: lgp_env_temperature_descr_deg_c
+        symbol:
+          OID: 1.3.6.1.4.1.476.1.42.3.4.1.3.3.1.2 # OID index
+          name: lgpEnvTemperatureDescrDegC
+
+  - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
+    table:
+      OID: 1.3.6.1.4.1.476.1.42.3.4.2.2.3
+      name: lgpEnvHumidityTableRel
+    symbols:
       - OID: 1.3.6.1.4.1.476.1.42.3.4.2.2.3.1.3
         name: lgpEnvHumidityMeasurementRel
         chart_meta:
@@ -63,10 +85,10 @@ metrics:
           family: 'Environment/Humidity/Value'
           unit: "%"
     metric_tags:
-      - tag: lgp_env_temperature_descr_deg_f
+      - tag: lgp_env_humidity_descr_rel
         symbol:
-          OID: 1.3.6.1.4.1.476.1.42.3.4.1.2.3.1.2 # OID index
-          name: lgpEnvTemperatureDescrDegF
+          OID: 1.3.6.1.4.1.476.1.42.3.4.2.2.3.1.2 # OID index
+          name: lgpEnvHumidityDescrRel
 
   - MIB: LIEBERT-GP-ENVIRONMENTAL-MIB
     symbol:

@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectAppliances() {
+func (c *Collector) collectAppliances(ctx context.Context) {
 	var wg sync.WaitGroup
 
 	for id, app := range c.discovered.appliances {
@@ -14,22 +17,22 @@ func (c *Collector) collectAppliances() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			pm, err := c.client.PerformanceMetricsByAppliance(id)
+			pm, err := c.client.PerformanceMetricsByAppliance(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s perf metrics: %v", id, err)
 			} else if len(pm) > 0 {
 				last := pm[len(pm)-1]
-				c.mx.appliance.perf.readIops.WithLabelValues(name).Observe(last.ReadIops)
-				c.mx.appliance.perf.writeIops.WithLabelValues(name).Observe(last.WriteIops)
-				c.mx.appliance.perf.readBandwidth.WithLabelValues(name).Observe(last.ReadBandwidth)
-				c.mx.appliance.perf.writeBandwidth.WithLabelValues(name).Observe(last.WriteBandwidth)
+				c.mx.appliance.perf.readIops.WithLabelValues(name).Observe(last.AvgReadIops)
+				c.mx.appliance.perf.writeIops.WithLabelValues(name).Observe(last.AvgWriteIops)
+				c.mx.appliance.perf.readBandwidth.WithLabelValues(name).Observe(last.AvgReadBandwidth)
+				c.mx.appliance.perf.writeBandwidth.WithLabelValues(name).Observe(last.AvgWriteBandwidth)
 				c.mx.appliance.perf.avgReadLatency.WithLabelValues(name).Observe(last.AvgReadLatency)
 				c.mx.appliance.perf.avgWriteLatency.WithLabelValues(name).Observe(last.AvgWriteLatency)
 				c.mx.appliance.perf.avgLatency.WithLabelValues(name).Observe(last.AvgLatency)
-				c.mx.appliance.cpu.WithLabelValues(name).Observe(last.IoWorkloadCPUUtilization)
+				c.mx.appliance.cpu.WithLabelValues(name).Observe(last.MaxIoWorkloadCPUUtilization * 100)
 			}
 
-			sm, err := c.client.SpaceMetricsByAppliance(id)
+			sm, err := c.client.SpaceMetricsByAppliance(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s space metrics: %v", id, err)
 			} else if len(sm) > 0 {

@@ -89,6 +89,14 @@ func TestReconcileProductionChartPoliciesRejectsStaticDebt(t *testing.T) {
 			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.WildcardIdentity = true },
 			want:   "wildcard all-label identity",
 		},
+		"disabled expiry": {
+			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.ExpireAfterCycles = new(0) },
+			want:   "lifecycle caps/expiry",
+		},
+		"positive expiry": {
+			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.ExpireAfterCycles = new(5) },
+			want:   "lifecycle caps/expiry",
+		},
 		"lifecycle cap": {
 			mutate: func(policy *promreplay.SemanticChartPolicy) { policy.MaxInstances = 10 },
 			want:   "lifecycle caps/expiry",

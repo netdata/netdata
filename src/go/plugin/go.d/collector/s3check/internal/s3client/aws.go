@@ -33,7 +33,7 @@ type Config struct {
 }
 
 func New(ctx context.Context, cfg Config) (Client, error) {
-	httpClient, err := web.NewHTTPClient(web.ClientConfig{
+	httpClient, err := web.NewHTTPClient(ctx, web.ClientConfig{
 		Timeout:           confopt.Duration(cfg.Timeout),
 		NotFollowRedirect: true,
 		ProxyURL:          cfg.ProxyURL,

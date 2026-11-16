@@ -5,6 +5,7 @@ package prometheus
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -41,7 +42,7 @@ func TestPrometheus404(t *testing.T) {
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
-	res, err := prom.ScrapeSeries()
+	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.Error(t, err)
 	assert.Nil(t, res)
@@ -57,7 +58,7 @@ func TestPrometheusPlain(t *testing.T) {
 
 	req := web.RequestConfig{URL: ts.URL + "/metrics"}
 	prom := New(http.DefaultClient, req)
-	res, err := prom.ScrapeSeries()
+	res, err := prom.ScrapeSeries(context.Background())
 
 	assert.NoError(t, err)
 	verifyTestData(t, res)
@@ -76,7 +77,7 @@ func TestPrometheusPlainWithSelector(t *testing.T) {
 	require.NoError(t, err)
 	prom := NewWithSelector(http.DefaultClient, req, sr)
 
-	res, err := prom.ScrapeSeries()
+	res, err := prom.ScrapeSeries(context.Background())
 	require.NoError(t, err)
 
 	for _, v := range res {
@@ -105,7 +106,7 @@ func TestPrometheusGzip(t *testing.T) {
 	prom := New(http.DefaultClient, req)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}
@@ -117,7 +118,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 	prom := NewWithSelector(http.DefaultClient, req, nil)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}
@@ -125,7 +126,7 @@ func TestPrometheusReadFromFile(t *testing.T) {
 	prom = New(http.DefaultClient, req)
 
 	for range 2 {
-		res, err := prom.ScrapeSeries()
+		res, err := prom.ScrapeSeries(context.Background())
 		assert.NoError(t, err)
 		verifyTestData(t, res)
 	}

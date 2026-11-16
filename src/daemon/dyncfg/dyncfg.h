@@ -77,6 +77,10 @@ bool dyncfg_add(const struct dyncfg_add_inline_spec *spec);
 void dyncfg_del(RRDHOST *host, const char *id);
 void dyncfg_status(RRDHOST *host, const char *id, DYNCFG_STATUS status);
 
+// true when an inline callback is running for a saved configuration that dyncfg replays itself
+// (at startup or when a node registers again), false for a request sent by a user
+bool dyncfg_transaction_is_echo(const char *transaction);
+
 void dyncfg_init(bool load_saved);
 void dyncfg_shutdown(void);
 

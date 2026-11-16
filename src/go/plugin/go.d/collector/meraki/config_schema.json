@@ -1,0 +1,215 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Meraki collector configuration",
+    "type": "object",
+    "properties": {
+      "url": {
+        "title": "URL",
+        "description": "URL of the Meraki Dashboard API endpoint.",
+        "type": "string",
+        "default": "https://api.meraki.com/api/v1",
+        "format": "uri"
+      },
+      "organization_id": {
+        "title": "Organization ID",
+        "description": "Meraki organization ID to monitor.",
+        "type": "string",
+        "minLength": 1
+      },
+      "api_key": {
+        "title": "API key",
+        "description": "Meraki API key. Set either this or bearer_token_file.",
+        "type": "string",
+        "default": ""
+      },
+      "bearer_token_file": {
+        "title": "Bearer token file",
+        "description": "Path to a file containing the Meraki API key, reread for every request. Set either this or api_key.",
+        "type": "string",
+        "default": ""
+      },
+      "collect_switch_port_traffic": {
+        "title": "Collect switch port traffic",
+        "description": "Collect the average traffic of every switch port, shown on its switch's node.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_switch_port_packets": {
+        "title": "Collect switch port packets",
+        "description": "Collect the packet rates of every switch port, at one API request per switch per collection.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_appliance_uplink_traffic": {
+        "title": "Collect appliance uplink traffic",
+        "description": "Collect the average traffic of each uplink of every MX and Z network, shown on the job's node or its virtual node.",
+        "type": "boolean",
+        "default": false
+      },
+      "collect_appliance_uplink_health": {
+        "title": "Collect appliance uplink health",
+        "description": "Collect appliance uplink status and MX ICMP loss and latency, shown on each appliance's node.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, in seconds.",
+        "type": "integer",
+        "default": 300,
+        "minimum": 1
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "How often to retry the initial connection when the job fails to start, in seconds. Zero disables retries.",
+        "type": "integer",
+        "default": 0,
+        "minimum": 0
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Complete collection or connection-check timeout, in seconds, including all pages and request pacing.",
+        "type": "number",
+        "default": 60,
+        "exclusiveMinimum": 0
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates the organization and appliance uplink traffic charts with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). Device nodes are created separately.",
+        "type": "string",
+        "default": ""
+      },
+      "proxy_url": {
+        "title": "Proxy URL",
+        "description": "HTTP proxy URL. Empty value uses environment proxy variables.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_ca": {
+        "title": "TLS CA",
+        "description": "Path to a CA certificate file used to verify the server certificate.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_cert": {
+        "title": "TLS certificate",
+        "description": "Path to a client certificate file. Requires tls_key.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_key": {
+        "title": "TLS key",
+        "description": "Path to the client certificate key file. Requires tls_cert.",
+        "type": "string",
+        "default": ""
+      },
+      "tls_skip_verify": {
+        "title": "Skip TLS verification",
+        "description": "Skip verification of the server certificate and hostname.",
+        "type": "boolean",
+        "default": false
+      }
+    },
+    "required": [
+      "organization_id"
+    ],
+    "allOf": [
+      {
+        "not": {
+          "properties": {
+            "api_key": {
+              "maxLength": 0
+            },
+            "bearer_token_file": {
+              "maxLength": 0
+            }
+          }
+        }
+      },
+      {
+        "not": {
+          "required": [
+            "api_key",
+            "bearer_token_file"
+          ],
+          "properties": {
+            "api_key": {
+              "minLength": 1
+            },
+            "bearer_token_file": {
+              "minLength": 1
+            }
+          }
+        }
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "url",
+            "organization_id"
+          ]
+        },
+        {
+          "title": "Authentication",
+          "fields": [
+            "api_key",
+            "bearer_token_file"
+          ]
+        },
+        {
+          "title": "Optional metrics",
+          "fields": [
+            "collect_switch_port_traffic",
+            "collect_switch_port_packets",
+            "collect_appliance_uplink_traffic",
+            "collect_appliance_uplink_health"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "update_every",
+            "autodetection_retry",
+            "timeout",
+            "vnode"
+          ]
+        },
+        {
+          "title": "Transport",
+          "fields": [
+            "proxy_url",
+            "tls_ca",
+            "tls_cert",
+            "tls_key",
+            "tls_skip_verify"
+          ]
+        }
+      ]
+    },
+    "api_key": {
+      "ui:widget": "password"
+    },
+    "timeout": {
+      "ui:help": "This budget covers a whole collection, including authentication-file reads, pagination and pacing. Increase it if a large organization cannot finish within the budget. Collecting switch port packets adds one request per switch."
+    },
+    "collect_switch_port_traffic": {
+      "ui:help": "Uses the latest interval Meraki has reported within the last 15 minutes, usually five minutes long; a port without a usable interval in that time has a gap. A second chart shows how old the interval is. Costs one API request per 50 switches."
+    },
+    "collect_switch_port_packets": {
+      "ui:help": "Requests are paced at 10 per second, so 1,000 switches add about 100 seconds to every collection, more than the default Timeout of 60 seconds. A collection that runs past Timeout updates no chart, availability included. Increase Timeout with it, or leave it off for large fleets.\n\nRates cover the last five minutes, which Meraki may not have finished reporting."
+    },
+    "collect_appliance_uplink_traffic": {
+      "ui:help": "Shows the bytes each uplink moved in the five minutes that ended five minutes ago, leaving Meraki time to count them, as average kilobits per second. When more than one appliance of a network was active, such as a warm spare pair, Meraki adds up their bytes per interface, so the charts belong to the network, not to an appliance."
+    },
+    "collect_appliance_uplink_health": {
+      "ui:help": "Status covers every assigned device of product type appliance, such as MX and Z. Meraki documents ICMP loss and latency for MX only; each uplink and destination IP shows the latest sample of the five minutes that ended two minutes ago. Adds one status request per 1,000 appliances plus one organization-wide probe request, both skipped when no appliance is assigned.\n\nA ready uplink is standby. Blocked ICMP can report 100% loss while internet access works, and missing cellular samples do not establish an outage."
+    }
+  }
+}

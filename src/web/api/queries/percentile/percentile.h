@@ -15,13 +15,8 @@ struct tg_percentile {
 };
 
 static inline void tg_percentile_create_internal(RRDR *r, const char *options, NETDATA_DOUBLE def) {
-    size_t entries = r->view.group;
-    if(entries < 10) entries = 10;
-
     struct tg_percentile *g = (struct tg_percentile *)onewayalloc_callocz(r->internal.owa, 1, sizeof(struct tg_percentile));
-    g->series = onewayalloc_mallocz(
-        r->internal.owa, onewayalloc_mul_or_fatal(entries, sizeof(*g->series), "percentile series"));
-    g->series_size = entries;
+    g->series = query_time_grouping_series_create(r->view.group, &g->series_size, "percentile series");
 
     g->percent = def;
     if(options && *options) {
@@ -72,7 +67,7 @@ static inline void tg_percentile_reset(RRDR *r) {
 
 static inline void tg_percentile_free(RRDR *r) {
     struct tg_percentile *g = (struct tg_percentile *)r->time_grouping.data;
-    if(g) onewayalloc_freez(r->internal.owa, g->series);
+    if(g) freez(g->series);
 
     onewayalloc_freez(r->internal.owa, r->time_grouping.data);
     r->time_grouping.data = NULL;
@@ -82,11 +77,7 @@ static inline void tg_percentile_add(RRDR *r, NETDATA_DOUBLE value) {
     struct tg_percentile *g = (struct tg_percentile *)r->time_grouping.data;
 
     if(unlikely(g->next_pos >= g->series_size)) {
-        g->series = onewayalloc_doublesize(
-            r->internal.owa,
-            g->series,
-            onewayalloc_mul_or_fatal(g->series_size, sizeof(*g->series), "percentile series"));
-        g->series_size *= 2;
+        g->series = query_time_grouping_series_grow(g->series, &g->series_size, "percentile series");
     }
 
     g->series[g->next_pos++] = value;

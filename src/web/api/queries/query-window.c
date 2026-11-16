@@ -108,7 +108,7 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
         time_t last_entry_s = qt->db.last_time_s;
 
         if (first_entry_s == 0 || last_entry_s == 0) {
-            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %ld, last_entry_t = %ld)", qt->id, first_entry_s, last_entry_s);
+            internal_error(true, "QUERY: no data detected on query '%s' (db first_entry_t = %" PRId64 ", last_entry_t = %" PRId64 ")", qt->id, (int64_t)first_entry_s, (int64_t)last_entry_s);
             after_wanted = qt->window.after;
             before_wanted = qt->window.before;
 

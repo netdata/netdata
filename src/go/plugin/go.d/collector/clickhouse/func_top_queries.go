@@ -147,11 +147,10 @@ FROM system.columns
 WHERE database = 'system' AND table = 'query_log'
 FORMAT JSON`
 
-	req, err := web.NewHTTPRequest(f.router.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, f.router.collector.RequestConfig)
 	if err != nil {
 		return nil, err
 	}
-	req = req.WithContext(ctx)
 	req.URL.RawQuery = makeURLQuery(query)
 
 	var resp topQueriesJSONResponse
@@ -207,11 +206,10 @@ LIMIT %d
 FORMAT JSON
 `, strings.Join(selectParts, ", "), groupKey, sortColumn, limit)
 
-	req, err := web.NewHTTPRequest(f.router.collector.RequestConfig)
+	req, err := web.NewHTTPRequest(ctx, f.router.collector.RequestConfig)
 	if err != nil {
 		return funcapi.ErrorResponse(500, "%v", err)
 	}
-	req = req.WithContext(ctx)
 	req.URL.RawQuery = makeURLQuery(query)
 
 	var resp topQueriesJSONResponse

@@ -237,9 +237,21 @@ bool mrg_metric_release(MRG *mrg, METRIC *metric) {
     return metric_release(mrg, metric);
 }
 
+// The PGC main/open cache key for a metric.
+//
+// This is the metric's UUIDMAP_ID, NOT its address. A bare METRIC pointer is not a
+// reference (see mrg-internals.h): the metric can be freed while cache pages still carry
+// the key, and ARAL then writes its free-list header over uuid and refcount, so any
+// consumer that dereferenced such a key read freed memory. An id cannot be dereferenced,
+// and it is never reused while the uuidmap lives.
+//
+// The id is the same for every tier - the tier is the cache SECTION ((Word_t)ctx) - so
+// (section, metric_id) is what identifies a metric's pages. Callers must always pass the
+// correct section; the pointer used to provide accidental tier discrimination, the id does
+// not.
 ALWAYS_INLINE
 Word_t mrg_metric_id(MRG *mrg __maybe_unused, METRIC *metric) {
-    return (Word_t)metric;
+    return (Word_t)metric->uuid;
 }
 
 ALWAYS_INLINE
@@ -357,26 +369,60 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
     size_t countdown = 5;
 
     do {
+        // the collector may flush while the caches are scanned (it sets the clean time, then makes the page dirty,
+        // then clears the hot time): the fields are replaced below only if nobody changed them meanwhile
+        time_t first_time_s_before = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
+        time_t clean_time_s_before = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
+
         time_t min_first_time_s = LONG_MAX;
         time_t max_end_time_s = 0;
         PGC_PAGE *page;
         PGC_SEARCH method = PGC_SEARCH_FIRST;
         time_t page_first_time_s = 0;
-        while ((page = pgc_page_get_and_acquire(main_cache, section, (Word_t)metric, page_first_time_s, method))) {
+        while ((page = pgc_page_get_and_acquire(main_cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
             method = PGC_SEARCH_NEXT;
 
             bool is_hot = pgc_is_page_hot(page);
-            bool is_dirty = pgc_is_page_dirty(page);
+            // dirty, or with no status: the flusher takes a page off the dirty list before its save callback reads
+            // the page's metric, so a page being saved still needs it (a page also has no status briefly while it
+            // is added to the cache or changes queue; counting those too only keeps the metric for another rotation)
+            bool is_unsaved = !is_hot && !pgc_is_page_clean(page);
+            // a hot page with gaps only is discarded by the flush, so it is no retention; if it gets a real value
+            // after this scan, its flush sets the clean time and the conditional updates below keep it
+            bool has_data = !pgd_is_empty(pgc_page_data(page));
+            bool counts = (is_hot || is_unsaved) && has_data;
             page_first_time_s = pgc_page_start_time_s(page);
             time_t page_end_time_s = pgc_page_end_time_s(page);
 
-            if ((is_hot || is_dirty) && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+            if (counts && page_first_time_s > 0 && page_first_time_s < min_first_time_s)
                 min_first_time_s = page_first_time_s;
 
-            if (is_dirty && page_end_time_s > max_end_time_s)
+            // a hot page counts too: if the collector flushes it after this scan, a clean time of 0 would leave the
+            // metric without retention while its page is dirty, and its last release would free it under the page
+            if (counts && page_end_time_s > max_end_time_s)
                 max_end_time_s = page_end_time_s;
 
             pgc_page_release(main_cache, page);
+        }
+
+        // pages already written to a datafile whose journal is not indexed yet: they are on disk. Scanned after
+        // the main cache, because a saved page enters the open cache before it turns clean in the main cache, so
+        // one of the two scans sees it
+        method = PGC_SEARCH_FIRST;
+        page_first_time_s = 0;
+        while ((page = pgc_page_get_and_acquire(open_cache, section, mrg_metric_id(mrg, metric), page_first_time_s, method))) {
+            method = PGC_SEARCH_NEXT;
+
+            page_first_time_s = pgc_page_start_time_s(page);
+            time_t page_end_time_s = pgc_page_end_time_s(page);
+
+            if (page_first_time_s > 0 && page_first_time_s < min_first_time_s)
+                min_first_time_s = page_first_time_s;
+
+            if (page_end_time_s > max_end_time_s)
+                max_end_time_s = page_end_time_s;
+
+            pgc_page_release(open_cache, page);
         }
 
         if (min_first_time_s == LONG_MAX)
@@ -388,29 +434,14 @@ bool mrg_metric_has_zero_disk_retention(MRG *mrg __maybe_unused, METRIC *metric)
             internal_error(!countdown, "METRIC: giving up on updating the retention of metric without disk retention");
 
             do_again = false;
-            set_metric_field_with_condition(metric->first_time_s, min_first_time_s, true);
-            set_metric_field_with_condition(metric->latest_time_s_clean, max_end_time_s, true);
+            set_metric_field_with_condition(metric->first_time_s, min_first_time_s, _current == first_time_s_before);
+            set_metric_field_with_condition(metric->latest_time_s_clean, max_end_time_s, _current == clean_time_s_before);
         }
     } while(do_again);
 
     time_t first, last;
     mrg_metric_get_retention(mrg, metric, &first, &last, NULL);
     return (first && last && first < last);
-}
-
-static inline bool mrg_metric_clean_samples_from_snapshot(
-    time_t first_time_s,
-    time_t latest_time_s_clean,
-    uint32_t update_every_s,
-    uint64_t *samples)
-{
-    *samples = 0;
-
-    if (!update_every_s || first_time_s <= 0 || latest_time_s_clean <= 0 || first_time_s >= latest_time_s_clean)
-        return false;
-
-    *samples = (uint64_t)(latest_time_s_clean - first_time_s) / update_every_s;
-    return *samples > 0;
 }
 
 ALWAYS_INLINE_HOT
@@ -426,6 +457,14 @@ bool mrg_metric_set_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, t
     }
 
     return false;
+}
+
+// the collector that stored latest_time_s has no hot page any more: nothing it collected is waiting to be stored.
+// Cleared only if it is still that collector's time - a duplicate writer of the metric may have stored another one
+// (two writers storing the same second cannot be told apart: the other one's next store sets it again)
+ALWAYS_INLINE
+void mrg_metric_clear_hot_latest_time_s(MRG *mrg __maybe_unused, METRIC *metric, time_t latest_time_s) {
+    __atomic_compare_exchange_n(&metric->latest_time_s_hot, &latest_time_s, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 }
 
 ALWAYS_INLINE
@@ -512,24 +551,23 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
-    time_t now_s,
-    uint64_t *journal_samples)
+    time_t now_s)
 {
     if(unlikely(last_time_s > now_s)) {
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: wrong last time on-disk (%ld - %ld, now %ld), "
+                     "DBENGINE JV2: wrong last time on-disk (%" PRId64 " - %" PRId64 ", now %" PRId64 "), "
                      "fixing last time to now",
-                     first_time_s, last_time_s, now_s);
+                     (int64_t)first_time_s, (int64_t)last_time_s, (int64_t)now_s);
         last_time_s = now_s;
     }
 
     if (unlikely(first_time_s > last_time_s)) {
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: wrong first time on-disk (%ld - %ld, now %ld), "
+                     "DBENGINE JV2: wrong first time on-disk (%" PRId64 " - %" PRId64 ", now %" PRId64 "), "
                      "fixing first time to last time",
-                     first_time_s, last_time_s, now_s);
+                     (int64_t)first_time_s, (int64_t)last_time_s, (int64_t)now_s);
 
         first_time_s = last_time_s;
     }
@@ -537,9 +575,9 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
     if (unlikely(first_time_s == 0 || last_time_s == 0)) {
         nd_log_limit_static_global_var(erl, 1, 0);
         nd_log_limit(&erl, NDLS_DAEMON, NDLP_WARNING,
-                     "DBENGINE JV2: zero on-disk timestamps (%ld - %ld, now %ld), "
+                     "DBENGINE JV2: zero on-disk timestamps (%" PRId64 " - %" PRId64 ", now %" PRId64 "), "
                      "using them as-is",
-                     first_time_s, last_time_s, now_s);
+                     (int64_t)first_time_s, (int64_t)last_time_s, (int64_t)now_s);
     }
 
     bool added = false;
@@ -555,43 +593,10 @@ inline void mrg_update_metric_retention_and_granularity_by_uuid(
         metric = mrg_metric_add_and_acquire(mrg, entry, &added);
     }
 
-    if (likely(!added)) {
-        uint64_t old_samples = 0;
-
-        uint32_t latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
-        time_t latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
-        time_t metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
-        if (update_every_s)
-            mrg_metric_clean_samples_from_snapshot(
-                metric_first_time_s,
-                latest_time_s_clean,
-                latest_update_every_s,
-                &old_samples);
-
+    // samples are not derived from retention: the journal v2 loader charges
+    // them to the datafile (see rrdeng_datafile_samples_charge())
+    if (likely(!added))
         mrg_metric_expand_retention(mrg, metric, first_time_s, last_time_s, update_every_s);
-
-        uint64_t new_samples = 0;
-        latest_update_every_s = __atomic_load_n(&metric->latest_update_every_s, __ATOMIC_RELAXED);
-        latest_time_s_clean = __atomic_load_n(&metric->latest_time_s_clean, __ATOMIC_RELAXED);
-        metric_first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
-        if (update_every_s)
-            mrg_metric_clean_samples_from_snapshot(
-                metric_first_time_s,
-                latest_time_s_clean,
-                latest_update_every_s,
-                &new_samples);
-
-        if (journal_samples && new_samples > old_samples)
-            *journal_samples += (new_samples - old_samples);
-    }
-    else {
-        // Newly added
-        if (update_every_s) {
-            uint64_t samples = (last_time_s - first_time_s) / update_every_s;
-            if (journal_samples)
-                *journal_samples += samples;
-        }
-    }
 
     mrg_metric_release(mrg, metric);
 }

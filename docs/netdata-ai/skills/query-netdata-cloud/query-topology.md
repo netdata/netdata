@@ -24,10 +24,30 @@ Known producer families:
 | `topology:network-connections` | Network Viewer plugin | process, endpoint, socket evidence |
 | `topology:streaming` | Netdata streaming subsystem | parent/child streaming graph |
 | `topology:snmp` | SNMP topology collector | L2 devices, interfaces, endpoints, adjacencies |
-| `topology:vsphere` | vSphere collector (planned) | inventory and virtualization relationships |
+| `topology:vsphere` | vSphere collector | inventory and virtualization relationships |
+| `topology:cato_networks` | Cato Networks collector | sites, devices, interface tunnels, PoPs and BGP peers |
+
+Every topology Function requires a signed-in member of the node's Space with sensitive-data permission. All except
+`topology:streaming` also require a Space on a paid plan or trial. The Agent answers a free Space with 403 and
+`errorMsgKey: "ErrCommercialRequired"`; a Cloud proxy that does not forward Agent keys reports `AgentError` with the
+same `errorMessage`, so check the message too.
 
 Always start with an info request to discover the parameters supported by the
 Agent version you are querying.
+
+## Cato Networks instances and labels
+
+Query `topology:cato_networks` with `info:true` first. When `required_params`
+contains `__job`, select an advertised instance through
+`selections.__job: ["INSTANCE_ID"]` for the data request. Do not assume a site
+vnode hosts the Function; discover the collector's reachable Agent.
+
+In payloads with actor-label support, `data.tables.actor.actor_labels` contains
+the metadata and each actor type's `presentation.modal.labels` declares its
+display recipe. Graph names instead come from actor columns selected by
+`presentation.label_policy`; missing metadata labels and missing graph names
+are different symptoms. Count incident graph links to investigate isolated
+actors: `parent_identity` alone is not an explicit edge in `data.links`.
 
 ## Network-connections grouping
 
@@ -81,7 +101,7 @@ NODE="YOUR_NODE_UUID"
 source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
 agents_load_env
 
-read -r -d '' PAYLOAD <<'EOF'
+PAYLOAD="$(cat <<'EOF'
 {
   "selections": {
     "mode": ["aggregated"]
@@ -89,6 +109,7 @@ read -r -d '' PAYLOAD <<'EOF'
   "timeout": 60000
 }
 EOF
+)"
 
 agents_call_function \
   --via cloud \

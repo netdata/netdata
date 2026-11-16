@@ -22,17 +22,25 @@ typedef struct netdata_windows_os_info {
     NETDATA_WINDOWS_OS_LABELS labels;
 } NETDATA_WINDOWS_OS_INFO;
 
-static void netdata_windows_ip(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_runtime_set(struct rrdhost_system_info *si, const char *key, const char *value, bool runtime) {
+    if (runtime)
+        rrdhost_system_info_detected_set(si, key, value);
+    else if (value)
+        rrdhost_system_info_set_by_name(si, key, value);
+}
+
+static void netdata_windows_ip(struct rrdhost_system_info *systemInfo, bool runtime)
 {
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION", "WINAPI");
-
-    char *ptr = netdata_win_local_interface();
-    if (ptr)
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", ptr);
-
-    ptr = netdata_win_local_ip();
-    if (ptr)
-        (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", ptr);
+    char *iface = NULL, *address = NULL;
+    int result = netdata_win_default_network(&iface, &address);
+    if (result >= 0) {
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_NAME", iface, runtime);
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_IP", address, runtime);
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DEFAULT_INTERFACE_DETECTION",
+                                   result ? "WINAPI" : NULL, runtime);
+    }
+    free(iface);
+    free(address);
 }
 
 // Hardware
@@ -54,35 +62,37 @@ static char *netdata_windows_arch(DWORD value)
     }
 }
 
-static DWORD netdata_windows_cpu_frequency(HKEY lKey)
+static ULONGLONG netdata_windows_cpu_frequency(HKEY lKey)
 {
     DWORD freq = 0;
     long ret = netdata_registry_get_dword_from_open_key(&freq, lKey, "~MHz");
     if (ret != ERROR_SUCCESS)
         return freq;
 
-    freq *= 1000000;
-    return freq;
+    return (ULONGLONG)freq * 1000000;
 }
 
-static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *systemInfo, bool runtime)
 {
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);
 
     char cpuData[256];
     (void)snprintf(cpuData, 255, "%d", sysInfo.dwNumberOfProcessors);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData);
+    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_CPU_LOGICAL_CPU_COUNT", cpuData, runtime);
+
+    if (runtime)
+        return;
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
+    rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
 
     // GetSystemInfo() cannot fail, so CPU info (arch, logical count) is always gathered here.
     // Record the detection method unconditionally, independent of the optional registry probe
     // (freq/vendor/model) that may fail. Not stored in the struct; consumed from the environment
     // by anonymous-statistics.sh (mirrors the Linux system-info.sh dispatch, and the RAM/disk
     // detection pattern in this file).
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
     nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
@@ -93,7 +103,7 @@ static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemI
 {
     char cpuData[256];
     long ret = netdata_registry_get_string_from_open_key(cpuData, 255, lKey, key);
-    (void)rrdhost_system_info_set_by_name(systemInfo,
+    rrdhost_system_info_set_by_name(systemInfo,
                                            variable,
                                            (ret == ERROR_SUCCESS) ? cpuData : NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN);
 }
@@ -112,24 +122,26 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
     ULONGLONG cpuFreq = netdata_windows_cpu_frequency(lKey);
     char cpuData[256];
     if (cpuFreq)
-        (void)snprintf(cpuData, 255, "%lu", (unsigned long)cpuFreq);
+        (void)snprintf(cpuData, 255, "%llu", cpuFreq);
 
-    (void)rrdhost_system_info_set_by_name(systemInfo,
+    rrdhost_system_info_set_by_name(systemInfo,
                                            "NETDATA_SYSTEM_CPU_FREQ",
                                            (!cpuFreq) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : cpuData);
 
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
+    RegCloseKey(lKey);
 }
 
-static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo, bool runtime)
 {
-    netdata_windows_cpu_from_system_info(systemInfo);
+    netdata_windows_cpu_from_system_info(systemInfo, runtime);
 
-    netdata_windows_cpu_from_registry(systemInfo);
+    if (!runtime)
+        netdata_windows_cpu_from_registry(systemInfo);
 }
 
-static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo, bool runtime)
 {
     ULONGLONG size;
     char memSize[256];
@@ -139,12 +151,14 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
     else
         (void)snprintf(memSize, 255, "%llu", size * 1024); // to bytes
 
-    (void)rrdhost_system_info_set_by_name(systemInfo,
+    netdata_windows_runtime_set(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",
-                                           (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
+                                           (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize, runtime);
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    if (!runtime) {
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, false);
+        nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    }
 }
 
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -166,9 +180,10 @@ static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
     return length.Length.QuadPart;
 }
 
-static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo)
+static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *systemInfo, bool runtime)
 {
     ULONGLONG total = 0;
+    char root[] = "C:\\";
     char cVolume[8];
     snprintf(cVolume, 7, "\\\\.\\C:");
 
@@ -183,17 +198,30 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
         if (!(lDrives & 1 << i))
             continue;
 
+        root[0] = 'A' + i;
+        UINT drive_type = GetDriveTypeA(root);
+        if (runtime && drive_type == DRIVE_UNKNOWN)
+            return;
+        if (drive_type != DRIVE_FIXED)
+            continue;
+
         cVolume[4] = 'A' + i;
-        total += netdata_windows_get_disk_size(cVolume);
+        ULONGLONG size = netdata_windows_get_disk_size(cVolume);
+        // A partial sum is not the host's disk capacity.
+        if (!size && runtime)
+            return;
+        total += size;
     }
 
     char diskSize[256];
     (void)snprintf(diskSize, 255, "%llu", total);
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize);
+    netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize, runtime);
 
     // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    if (!runtime) {
+        netdata_windows_runtime_set(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, false);
+        nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
+    }
 }
 
 // Host
@@ -816,18 +844,28 @@ static const char *netdata_windows_detect_container_state(struct rrdhost_system_
     return container;
 }
 
+void netdata_windows_get_runtime_system_info(struct rrdhost_system_info *systemInfo) {
+    netdata_windows_get_cpu(systemInfo, true);
+    if (nd_thread_signaled_to_cancel() || exit_initiated_get()) return;
+    netdata_windows_get_mem(systemInfo, true);
+    if (nd_thread_signaled_to_cancel() || exit_initiated_get()) return;
+    netdata_windows_get_total_disk_size(systemInfo, true);
+    if (nd_thread_signaled_to_cancel() || exit_initiated_get()) return;
+    netdata_windows_ip(systemInfo, true);
+}
+
 void netdata_windows_get_system_info(struct rrdhost_system_info *systemInfo)
 {
     const char *container;
 
     netdata_windows_cloud(systemInfo);
-    netdata_windows_get_cpu(systemInfo);
+    netdata_windows_get_cpu(systemInfo, false);
     netdata_windows_detect_virtualization(systemInfo);
     container = netdata_windows_detect_container_state(systemInfo);
     netdata_windows_container(systemInfo, container);
-    netdata_windows_get_mem(systemInfo);
-    netdata_windows_get_total_disk_size(systemInfo);
+    netdata_windows_get_mem(systemInfo, false);
+    netdata_windows_get_total_disk_size(systemInfo, false);
     netdata_windows_install_type(systemInfo);
-    netdata_windows_ip(systemInfo);
+    netdata_windows_ip(systemInfo, false);
 }
 #endif

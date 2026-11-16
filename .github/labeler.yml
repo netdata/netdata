@@ -262,7 +262,6 @@ area/packaging:
               - system/**
               - Dockerfile*
               - netdata-installer.sh
-              - netdata.spec.in
 
 area/registry:
   - any:

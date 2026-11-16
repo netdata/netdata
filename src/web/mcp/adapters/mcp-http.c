@@ -167,49 +167,26 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
         bool has_response = false;
 
         if (json_object_is_type(root, json_type_array)) {
-            size_t len = json_object_array_length(root);
-            BUFFER **responses = NULL;
-            size_t responses_used = 0;
-            size_t responses_size = 0;
+            // the responses are appended straight into the HTTP response, as one JSON array
+            buffer_flush(w->response.data);
+            w->response.data->content_type = CT_APPLICATION_JSON;
 
-            for (size_t i = 0; i < len; i++) {
-                struct json_object *req_item = json_object_array_get_idx(root, i);
-                BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
-                if (!resp_item)
-                    continue;
-
-                if (responses_used == responses_size) {
-                    size_t new_size = responses_size ? responses_size * 2 : 4;
-                    BUFFER **tmp = reallocz(responses, new_size * sizeof(*tmp));
-                    if (!tmp) {
-                        buffer_free(resp_item);
-                        continue;
-                    }
-                    responses = tmp;
-                    responses_size = new_size;
-                }
-                responses[responses_used++] = resp_item;
+            response_payload = mcp_jsonrpc_process_batch(mcpc, root, mcp_jsonrpc_batch_emit_array, w->response.data);
+            if (!response_payload && buffer_strlen(w->response.data)) {
+                buffer_fast_strcat(w->response.data, "]", 1);
+                has_response = true;
             }
-
-            if (responses_used) {
-                response_payload = mcp_jsonrpc_build_batch_response(responses, responses_used);
-                has_response = response_payload && buffer_strlen(response_payload);
-            } else if (!len) {
-                response_payload = mcp_jsonrpc_process_single_request(mcpc, NULL, NULL);
-                has_response = response_payload && buffer_strlen(response_payload);
-            }
-
-            for (size_t i = 0; i < responses_used; i++)
-                buffer_free(responses[i]);
-            freez(responses);
         } else {
             response_payload = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
-            has_response = response_payload && buffer_strlen(response_payload);
         }
 
         if (response_payload) {
+            has_response = buffer_strlen(response_payload) > 0;
             mcp_http_write_json_payload(w, response_payload);
-        } else {
+            buffer_free(response_payload);
+        }
+
+        if (!has_response) {
             buffer_flush(w->response.data);
             mcp_http_disable_compression(w);
             w->response.data->content_type = CT_APPLICATION_JSON;
@@ -217,10 +194,6 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
         }
 
         w->response.code = has_response ? HTTP_RESP_OK : HTTP_RESP_ACCEPTED;
-
-        if (response_payload)
-            buffer_free(response_payload);
-
         result_code = w->response.code;
     }
 

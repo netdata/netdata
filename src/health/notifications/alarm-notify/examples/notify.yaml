@@ -1,0 +1,129 @@
+version: 1
+destinations:
+  local:
+    type: webhook
+    url: http://127.0.0.1:18080/notify
+  audit:
+    type: webhook
+    url: http://127.0.0.1:18080/audit
+  authenticated:
+    type: webhook
+    url: ${env:NOTIFY_WEBHOOK_URL}
+    bearer_token: ${env:NOTIFY_WEBHOOK_TOKEN}
+  slack:
+    type: slack
+    url: ${env:NOTIFY_SLACK_URL}
+  discord:
+    type: discord
+    url: ${env:NOTIFY_DISCORD_URL}
+  telegram:
+    type: telegram
+    bot_token: ${env:NOTIFY_TELEGRAM_TOKEN}
+    chat_id: '-100123'
+    message_thread_id: 7
+    retries_on_limit: 0
+  pushover:
+    type: pushover
+    app_token: ${env:NOTIFY_PUSHOVER_APP_TOKEN}
+    user_key: ${env:NOTIFY_PUSHOVER_USER_KEY}
+  pushbullet:
+    type: pushbullet
+    access_token: ${env:NOTIFY_PUSHBULLET_TOKEN}
+    channel_tag: test-alerts
+  twilio:
+    type: twilio
+    account_sid: ${env:NOTIFY_TWILIO_ACCOUNT_SID}
+    auth_token: ${env:NOTIFY_TWILIO_AUTH_TOKEN}
+    from: '+15005550006'
+    to: '+15005550009'
+  messagebird:
+    type: messagebird
+    access_key: ${env:NOTIFY_MESSAGEBIRD_ACCESS_KEY}
+    originator: Netdata
+    recipient: '+15005550009'
+  gotify:
+    type: gotify
+    api_url: ${env:NOTIFY_GOTIFY_API_URL}
+    app_token: ${env:NOTIFY_GOTIFY_APP_TOKEN}
+  ntfy:
+    type: ntfy
+    url: ${env:NOTIFY_NTFY_URL}
+    access_token: ${env:NOTIFY_NTFY_ACCESS_TOKEN}
+  rocketchat:
+    type: rocketchat
+    url: ${env:NOTIFY_ROCKETCHAT_URL}
+    channel: '#alerts'
+  flock:
+    type: flock
+    url: ${env:NOTIFY_FLOCK_URL}
+  fleep:
+    type: fleep
+    url: ${env:NOTIFY_FLEEP_URL}
+    sender: Netdata
+  ilert:
+    type: ilert
+    integration_key: ${env:NOTIFY_ILERT_INTEGRATION_KEY}
+  signl4:
+    type: signl4
+    url: ${env:NOTIFY_SIGNL4_URL}
+  alerta:
+    type: alerta
+    api_url: ${env:NOTIFY_ALERTA_API_URL}
+    api_key: ${env:NOTIFY_ALERTA_API_KEY}
+    environment: Production
+  dynatrace:
+    type: dynatrace
+    api_url: ${env:NOTIFY_DYNATRACE_API_URL}
+    api_token: ${env:NOTIFY_DYNATRACE_API_TOKEN}
+    entity_selector: 'type(HOST),tag("netdata")'
+  prowl:
+    type: prowl
+    api_key: ${env:NOTIFY_PROWL_API_KEY}
+  kavenegar:
+    type: kavenegar
+    api_key: ${env:NOTIFY_KAVENEGAR_API_KEY}
+    sender: '+15005550006'
+    recipient: '+15005550009'
+  smseagle:
+    type: smseagle
+    api_url: ${env:NOTIFY_SMSEAGLE_API_URL}
+    access_token: ${env:NOTIFY_SMSEAGLE_ACCESS_TOKEN}
+    recipients: ['+15005550009', '05005550009']
+    message_type: sms
+  pagerduty:
+    type: pagerduty
+    api_version: 2
+    integration_key: ${env:NOTIFY_PAGERDUTY_INTEGRATION_KEY}
+  opsgenie:
+    type: opsgenie
+    api_key: ${env:NOTIFY_OPSGENIE_API_KEY}
+  teams:
+    type: msteams
+    url: ${env:NOTIFY_TEAMS_WORKFLOW_URL}
+  matrix:
+    type: matrix
+    api_url: ${env:NOTIFY_MATRIX_API_URL}
+    access_token: ${env:NOTIFY_MATRIX_ACCESS_TOKEN}
+    room_id: '!room:example.org'
+routing:
+  default: [local]
+  roles:
+    sysadmin: [local, audit]
+    dba: [audit]
+    muted: []
+    chatops: [slack]
+    discord_ops: [discord]
+    telegram_ops: [telegram]
+    pushover_ops: [pushover]
+    pushbullet_ops: [pushbullet]
+    twilio_ops: [twilio]
+    messagebird_ops: [messagebird]
+    push_ops: [gotify, ntfy]
+    chat_webhooks: [rocketchat, flock, fleep]
+    incident_ops: [ilert, signl4]
+    monitoring_ops: [alerta, dynatrace]
+    form_ops: [prowl, kavenegar]
+    appliance_ops: [smseagle]
+    pagerduty_ops: [pagerduty]
+    opsgenie_ops: [opsgenie]
+    room_chat_ops: [teams, matrix]

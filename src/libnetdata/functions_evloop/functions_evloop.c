@@ -181,7 +181,17 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     .cb = we->cb,
                     .cb_data = we->cb_data,
                 };
-                struct functions_evloop_worker_job *j = dictionary_set(wg->worker_queue, transaction, &t, sizeof(t));
+                // Keep the job acquired while using it: once queued, a worker can run, delete and free it
+                const DICTIONARY_ITEM *item =
+                    dictionary_set_and_acquire_item(wg->worker_queue, transaction, &t, sizeof(t));
+                if(!item) {
+                    // nothing was queued, so t still owns its allocations
+                    worker_job_cleanup(&t);
+                    msg = "Cannot queue this function transaction.";
+                    continue;
+                }
+
+                struct functions_evloop_worker_job *j = dictionary_acquired_item_value(item);
                 if(j->used) {
                     nd_log(NDLS_COLLECTORS, NDLP_WARNING, "Received duplicate function transaction '%s'. Ignoring it.", transaction);
                     worker_job_cleanup(&t);
@@ -194,6 +204,7 @@ static void worker_add_job(struct functions_evloop_globals *wg, const char *keyw
                     netdata_cond_signal(&wg->worker_cond_var);
                     netdata_mutex_unlock(&wg->worker_mutex);
                 }
+                dictionary_acquired_item_release(wg->worker_queue, item);
             }
         }
 
@@ -502,4 +513,60 @@ void functions_evloop_dyncfg_status(struct functions_evloop_globals *wg, const c
     fflush(stdout);
 
     netdata_mutex_unlock(wg->stdout_mutex);
+}
+
+// ----------------------------------------------------------------------------
+// payload validation
+
+const char *functions_payload_validate(const char *payload, size_t len) {
+    if(!payload || !len)
+        return NULL;
+
+    // in strict JSON a raw newline can only separate tokens, so no payload line can be the end
+    // marker or a bare protocol command, and no NUL byte can truncate the call when it is sent
+    const char *reason = json_strict_validate(payload, len);
+    if(reason)
+        return reason;
+
+    // redundant with the above, but makes the guarantee obvious: the end marker never appears, even escaped
+    const size_t marker_len = sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_END) - 1;
+    const char *end = payload + len;
+    for(const char *s = memchr(payload, 'F', len); s; s = memchr(s + 1, 'F', end - s - 1)) {
+        if((size_t)(end - s) >= marker_len && memcmp(s, PLUGINSD_CALL_FUNCTION_PAYLOAD_END, marker_len) == 0)
+            return "the payload contains the plugins.d payload end marker";
+    }
+
+    // plugin tokenizers unquote fields, so a JSON line starting with a quoted keyword can be read as
+    // a command by older go.d versions (e.g. children behind this agent) - refuse it
+    static const struct {
+        const char *keyword;
+        size_t len;
+    } quoted_keywords[] = {
+        { "\"" PLUGINSD_CALL_FUNCTION "\"",               sizeof(PLUGINSD_CALL_FUNCTION) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN "\"", sizeof(PLUGINSD_CALL_FUNCTION_PAYLOAD_BEGIN) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_CANCEL "\"",        sizeof(PLUGINSD_CALL_FUNCTION_CANCEL) + 1 },
+        { "\"" PLUGINSD_CALL_FUNCTION_PROGRESS "\"",      sizeof(PLUGINSD_CALL_FUNCTION_PROGRESS) + 1 },
+        { "\"" PLUGINSD_CALL_QUIT "\"",                   sizeof(PLUGINSD_CALL_QUIT) + 1 },
+    };
+    for(const char *line = payload; line < end; ) {
+        const char *s = line;
+        while(s < end && (*s == ' ' || *s == '\t' || *s == '\r'))
+            s++;
+
+        if(s < end && *s == '"') {
+            for(size_t i = 0; i < _countof(quoted_keywords); i++) {
+                if((size_t)(end - s) >= quoted_keywords[i].len &&
+                   memcmp(s, quoted_keywords[i].keyword, quoted_keywords[i].len) == 0)
+                    return "the payload has a line starting with a quoted plugins.d keyword";
+            }
+        }
+
+        const char *nl = memchr(s, '\n', end - s);
+        if(!nl)
+            break;
+
+        line = nl + 1;
+    }
+
+    return NULL;
 }

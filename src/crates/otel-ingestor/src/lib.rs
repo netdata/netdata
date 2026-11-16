@@ -1,31 +1,79 @@
-//! OTel ingestor worker — receives metrics, logs, and traces via gRPC and emits
-//! Netdata chart data over ferryboat IPC to the otel-plugin supervisor.
+//! OTel ingestor worker: the production OTLP receiver of the otel-plugin
+//! pipeline. It serves the three OpenTelemetry Collector services —
+//! metrics, logs, traces — on TWO transports with one shared set of
+//! ingestion cores, and splits them by signal:
+//!
+//! - **Logs + traces** — each export request is normalized, flattened, and
+//!   encoded into a WAL frame by `ng_flatten` (`prepare_log_frame` /
+//!   `prepare_trace_frame`), then appended to a per-tenant WAL; file events
+//!   stream to the ledger over a dedicated writer socket (`ledger_sender`)
+//!   for sealing into SFSTs by `ng-index`.
+//! - **Metrics** — aggregated into Netdata charts and emitted once per second
+//!   as chart data over ferryboat IPC to the supervisor (`aggregation` →
+//!   `chart` → `output`).
+//!
+//! The supervisor spawns this crate as a worker process; [`run_worker`] is
+//! the entry point (Configure → bind → build services → `Ready` → serve).
+//!
+//! # Modules
+//!
+//! - Services: `logs_service` and `trace_service` (WAL writers),
+//!   `metrics_service` (chart emission); `tenant_writers` (the WAL writers
+//!   of one signal, one per tenant: the wait for durable frames and the
+//!   lifecycle events to the ledger, shared by logs and traces); `tenant`
+//!   (tenant extraction from the `X-Scope-OrgID` header). Each service
+//!   exposes a transport-agnostic core that the gRPC wrappers and the
+//!   OTLP/HTTP front end both call.
+//! - Transports: `http_service` (OTLP/HTTP, `POST /v1/{logs,traces,metrics}`
+//!   with protobuf + JSON codecs on `receivers.otlp.protocols.http`) and
+//!   `otlp_json` (its OTLP/JSON decoding over the `opentelemetry-proto`
+//!   derives); gRPC serving (`receivers.otlp.protocols.grpc`) is `bind_grpc`
+//!   plus `grpc_server`, driven by `run_ingestor`.
+//! - Metrics support: `aggregation` (per-slot accumulation + cross-slot
+//!   contexts), `chart` (per-chart dimension state), `chart_config` (stock +
+//!   user chart config), `iter` (OTLP metric traversal), `otel` (proto
+//!   normalize/compare/hash extensions), `output` (plugin-protocol
+//!   formatting).
+//! - Ledger wiring: `ledger_sender` (writer→ledger IPC events).
+//! - Observers: `observer` (features that see accepted trace exports without
+//!   taking part in storing them). The service map (`otel-service-map`) is
+//!   one; it also serves the ingestor's one Function, `topology:tracing`,
+//!   through `otel_bridge::driver::CallDriver`.
 
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use bridge::config::{AuthConfig, LifecycleConfig, PluginConfig};
-use bridge::signals::Signal;
-use bridge::{IngestorRequest, IngestorResponse};
 use ferryboat::{Connection, Endpoint};
+use netdata_plugin_protocol::Chunker;
 use opentelemetry_proto::tonic::collector::logs::v1::logs_service_server::LogsServiceServer;
 use opentelemetry_proto::tonic::collector::metrics::v1::metrics_service_server::MetricsServiceServer;
 use opentelemetry_proto::tonic::collector::trace::v1::trace_service_server::TraceServiceServer;
+use otel_bridge::config::{AuthConfig, LifecycleConfig, PluginConfig, ProtocolConfig};
+use otel_bridge::driver::{CallDriver, CallResponse, oversized_result};
+use otel_bridge::function::RawFunctionHandler;
+use otel_bridge::signals::Signal;
+use otel_bridge::{IngestorRequest, IngestorResponse};
+use otel_derived_metrics::DerivedMetrics;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use tonic::transport::server::TcpIncoming;
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 
 mod aggregation;
 mod chart;
 mod chart_config;
+mod http_service;
 mod iter;
 mod ledger_sender;
 mod logs_service;
 mod metrics_service;
+mod observer;
 mod otel;
+mod otlp_json;
 mod output;
 mod tenant;
+mod tenant_writers;
 mod trace_service;
 
 use chart_config::ChartConfigManager;
@@ -33,17 +81,27 @@ use logs_service::NetdataLogsService;
 use metrics_service::{ChartManager, NetdataMetricsService};
 use trace_service::NetdataTracesService;
 
-/// How often the idle-rotation sweep runs (P4/I2). Fixed, no config knob: it
-/// bounds only the *idle*-stream rotation latency — active streams still rotate
-/// precisely on the next write. 30s mirrors Loki's flush-sweep cadence; a no-op
-/// tick is cheap (one lock + arithmetic per tenant, no I/O).
+/// The largest export request that the plugin accepts, in bytes, after
+/// decompression: one limit for both transports. The gRPC services get it as
+/// their decoding limit (it is also tonic's default, which a new version of
+/// tonic could change), and the OTLP/HTTP front end reads at most this much
+/// (`http_service.rs`). What a request can make the plugin hold or write is
+/// sized against it, for example a chart's definition (`chart.rs`).
+pub(crate) const MAX_REQUEST_BYTES: usize = 4 * 1024 * 1024;
+
+/// How often the idle-rotation sweep runs. Fixed, no config knob: it bounds
+/// only the *idle*-stream rotation latency — active streams still rotate
+/// precisely on the next write. A no-op tick is cheap (one lock + arithmetic
+/// per tenant, no I/O).
 const WAL_SWEEP_INTERVAL: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Ingestor worker entry point.
 ///
 /// Connects to the supervisor's IPC socket, receives Configure, then runs the
-/// gRPC server and chart emission loop. `Ready` is sent from inside
-/// `run_ingestor`, only after the endpoint is bound and every startup step has
+/// enabled OTLP listeners (`receivers.otlp.protocols.{grpc,http}`; config
+/// validation requires at least one) and the chart emission loop. `Ready` is
+/// sent from inside `run_ingestor`, only after every enabled listener is
+/// bound and every startup step has
 /// succeeded: the supervisor forwards the ledger's Function declarations to the
 /// agent only once it sees this worker's Ready, so a startup failure here (a
 /// port already in use, an unreadable TLS key) leaves the plugin un-advertised
@@ -53,7 +111,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
 
     let mut conn: Connection<IngestorResponse, IngestorRequest> =
         Connection::connect(Endpoint::ipc(socket_path))
-            .max_message_size(bridge::IPC_MAX_MESSAGE_SIZE)
+            .max_message_size(otel_bridge::IPC_MAX_MESSAGE_SIZE)
             .open()
             .await?;
 
@@ -69,8 +127,9 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     };
 
     // Best-effort: log immediately on return, before the supervisor (which
-    // SIGKILLs workers the moment the connection closes) can react to the
-    // dropped connection. `conn` is owned by `run_ingestor`, so unlike the
+    // stops every worker when one of them closes its connection, and kills
+    // one that is still there after its wait) can react to the dropped
+    // connection. `conn` is owned by `run_ingestor`, so unlike the
     // ledger we can't log strictly before the drop.
     run_ingestor(config, conn)
         .await
@@ -81,22 +140,16 @@ async fn run_ingestor(
     config: PluginConfig,
     mut conn: Connection<IngestorResponse, IngestorRequest>,
 ) -> Result<()> {
-    // Bind the gRPC endpoint FIRST, before this worker's disk setup: a port
+    // Bind the enabled listeners FIRST, before this worker's disk setup: a port
     // conflict is the most likely startup failure (another listener, or another
-    // agent in a shared network namespace), and detecting it here fails fast
-    // before the ingestor touches its WAL directories or the seq high-water
-    // file (the ledger has already done its own disk startup by now). tonic's
-    // `serve(addr)` would bind lazily, only when the server future is polled.
-    let addr: std::net::SocketAddr =
-        config.endpoint.path.parse().with_context(|| {
-            format!("failed to parse endpoint address: {}", config.endpoint.path)
-        })?;
-    // `serve_with_incoming` discards the builder's TCP options, so restore the
-    // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
-    let incoming = TcpIncoming::bind(addr)
-        .with_context(|| format!("failed to bind gRPC endpoint {}", config.endpoint.path))?
-        .with_nodelay(Some(true));
-    tracing::info!(endpoint = %config.endpoint.path, "gRPC endpoint bound");
+    // agent in a shared network namespace), and binding here fails fast
+    // (strict, for both transports), before the ingestor touches its WAL
+    // directories or the seq high-water file and before `Ready`, instead of
+    // advertising an endpoint that cannot receive. Config validation
+    // guarantees at least one listener is enabled.
+    let grpc = &config.receivers.otlp.protocols.grpc;
+    let grpc_incoming = bind_grpc(grpc)?;
+    let http_listener = http_service::bind_http(&config.receivers.otlp.protocols.http).await?;
 
     // Set up metrics pipeline
     let mut ccm = ChartConfigManager::with_default_configs();
@@ -124,20 +177,40 @@ async fn run_ingestor(
 
     let ccm = Arc::new(RwLock::new(ccm));
     let chart_manager = Arc::new(RwLock::new(ChartManager::new()));
-    let metrics_service = NetdataMetricsService::new(
+
+    // Charts derived from ingested logs and traces, plus the plugin's own
+    // ingest outcomes. The export services record into it; the tick loop
+    // renders it. Its stores have their own locks, apart from the
+    // ChartManager's.
+    let derived_settings = otel_derived_metrics::Settings::from_environment()?;
+    if derived_settings != otel_derived_metrics::Settings::default() {
+        tracing::info!(
+            "the environment replaces the settings of the derived metrics: enabled {}, at most {} services",
+            derived_settings.enabled,
+            derived_settings.max_services
+        );
+    }
+
+    let derived_metrics =
+        Arc::new(DerivedMetrics::new(derived_settings).context("declaring the derived metrics")?);
+
+    // Arc-shared: the gRPC server and the OTLP/HTTP router both hold the
+    // metrics service (chart emission is transport-agnostic).
+    let metrics_service = Arc::new(NetdataMetricsService::new(
         Arc::clone(&ccm),
         Arc::clone(&chart_manager),
         config.metrics.max_new_charts_per_request,
-    );
+        Arc::clone(&derived_metrics),
+    ));
 
     // Channel for tick loop → main loop chart data forwarding
     let (chart_tx, mut chart_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(64);
 
-    // Tick loop: periodically emit chart data
+    // Tick loop: wakes on each second boundary and emits the chart data for
+    // that slot.
     let tick_chart_manager = Arc::clone(&chart_manager);
+    let tick_derived_metrics = Arc::clone(&derived_metrics);
     let tick_handle = tokio::spawn(async move {
-        let mut buf = String::new();
-
         // Wait until the next second boundary.
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -151,16 +224,31 @@ async fn run_ingestor(
                 .expect("system clock before UNIX epoch");
             let slot_timestamp = now.as_secs();
 
-            buf.clear();
-            {
-                let mut manager = tick_chart_manager.write().await;
-                manager.emit(slot_timestamp, &mut buf);
-            }
+            // Both kinds of charts come in chunks of whole blocks. A chunk
+            // stays under `otel_derived_metrics::MAX_CHUNK_BYTES`, unless
+            // one block is larger: that block is a chunk of its own, and
+            // the limits of an OTLP metrics chart keep it under the IPC
+            // frame limit (`chart::MAX_DIMENSIONS`). The chart registry is
+            // locked only while the text is written, not while it is sent.
+            let mut otlp_charts = Chunker::new(otel_derived_metrics::MAX_CHUNK_BYTES);
+            tick_chart_manager
+                .write()
+                .await
+                .emit(slot_timestamp, &mut otlp_charts);
 
-            if !buf.is_empty() {
-                if chart_tx.send(buf.as_bytes().to_vec()).await.is_err() {
+            let mut closed = false;
+            let chunks = otlp_charts
+                .finish()
+                .into_iter()
+                .chain(tick_derived_metrics.emit(slot_timestamp));
+            for chunk in chunks {
+                if chart_tx.send(chunk).await.is_err() {
+                    closed = true;
                     break;
                 }
+            }
+            if closed {
+                break;
             }
 
             // Sleep until the next second boundary.
@@ -174,9 +262,18 @@ async fn run_ingestor(
 
     // Set up the logs + traces pipelines. They SHARE one writer→ledger sender
     // and one global seq allocator: the ledger accepts a single writer
-    // connection (and gap-checks the frame sequence per signal), and file
-    // `seq` must be globally unique across signals.
-    let (sender, seq) = create_shared_writer_state(&config, &config.writer_socket_path)?;
+    // connection, and file `seq` must be globally unique across signals.
+    //
+    // `stop` is cancelled when this worker stops: both servers then take no
+    // new request and end when the requests in progress have their answers,
+    // and the sender knows that the ledger's leaving is expected.
+    let stop = CancellationToken::new();
+    let (ledger_sender, seq_allocator) = create_shared_writer_state(
+        &config,
+        &config.writer_socket_path,
+        derived_metrics.wal_events_queued(),
+        stop.clone(),
+    )?;
     // One process-wide monotonic clock, shared across signals — the WAL writer's
     // contract is that all per-frame `ingestion_ns` come from a single clock so
     // frame-level ordering is consistent across every stream/signal.
@@ -185,26 +282,45 @@ async fn run_ingestor(
     let traces_lifecycle = config.lifecycle_for(Signal::Traces);
     // The supervisor always resolves the identity before configuring a worker;
     // its absence here is a supervisor bug, not a runtime condition.
-    let identity = config
+    let instance_identity = config
         .identity
         .context("plugin config reached the ingestor without a resolved identity")?;
-    let logs_service = Arc::new(create_logs_service(
+    let mut logs_service = create_logs_service(
         &logs_lifecycle,
         &config.auth,
-        Arc::clone(&sender),
-        Arc::clone(&seq),
+        Arc::clone(&ledger_sender),
+        Arc::clone(&seq_allocator),
         Arc::clone(&clock),
-        identity,
-    ));
+        instance_identity,
+    );
+    logs_service.set_derived_metrics(Arc::clone(&derived_metrics));
+    let logs_service = Arc::new(logs_service);
 
-    let traces_service = Arc::new(create_traces_service(
+    let mut traces_service = create_traces_service(
         &traces_lifecycle,
         &config.auth,
-        sender,
-        seq,
+        ledger_sender,
+        seq_allocator,
         clock,
-        identity,
-    ));
+        instance_identity,
+    );
+    traces_service.set_derived_metrics(Arc::clone(&derived_metrics));
+    // The service map sees accepted trace exports through the observer seam
+    // and serves `topology:tracing`. It is optional: when it cannot start,
+    // ingestion goes on without it.
+    let service_map = start_service_map(&config.base_dir);
+    if let Some(map) = &service_map {
+        traces_service.add_observer(Arc::new(observer::ServiceMapObserver(Arc::clone(map))));
+    }
+    let traces_service = Arc::new(traces_service);
+    let mut handlers: Vec<Arc<dyn RawFunctionHandler>> = Vec::new();
+    if let Some(map) = &service_map {
+        handlers.push(Arc::new(otel_service_map::function::TopologyFunction::new(
+            Arc::clone(map),
+        )));
+    }
+    let (call_tx, mut call_rx) = tokio::sync::mpsc::unbounded_channel::<IngestorResponse>();
+    let mut calls = CallDriver::new(handlers, call_tx);
 
     // Startup config warnings, per signal (each signal resolves its own
     // rotation + ingestion window).
@@ -221,15 +337,11 @@ async fn run_ingestor(
         traces_service.ingest_max_age(),
     );
 
-    // Idle-rotation sweeps (P4/I2): a periodic task per signal closes WAL
-    // streams that have passed their duration threshold with no new frames, so
-    // quiet streams still get indexed (and, with remote storage, uploaded).
-    // The sweep interval is a floor on idle-stream latency only; if an
-    // operator sets a default rotation shorter than it, idle files rotate at
-    // sweep granularity (active files are unaffected — they rotate on write;
-    // `warn_signal_config` flags that case). Each signal gets its OWN task:
-    // the sweeps do serial fsyncs, so sharing one task would let a slow
-    // traces sweep delay the next logs sweep tick (and vice versa) — the
+    // Idle-rotation sweeps: a periodic task per signal closes WAL streams that
+    // have passed their duration threshold with no new frames, so quiet streams
+    // still get indexed (and, with remote storage, uploaded). Each signal gets
+    // its OWN task: the sweeps do serial fsyncs, so sharing one task would let
+    // a slow traces sweep delay the next logs sweep tick (and vice versa) — the
     // signals' writer registries are independent, so nothing is shared.
     let logs_sweep_handle = spawn_sweep("logs", Arc::clone(&logs_service), |s| {
         s.sweep_expired_rotations()
@@ -238,66 +350,74 @@ async fn run_ingestor(
         s.sweep_expired_rotations()
     });
 
-    // Build gRPC server (with TLS if configured)
-    let mut server_builder = Server::builder();
+    let grpc_server = match grpc_incoming {
+        Some(incoming) => Some(grpc_server(
+            grpc,
+            incoming,
+            &metrics_service,
+            &logs_service,
+            &traces_service,
+            stop.clone(),
+        )?),
+        None => None,
+    };
 
-    if let (Some(cert_path), Some(key_path)) = (
-        &config.endpoint.tls_cert_path,
-        &config.endpoint.tls_key_path,
-    ) {
-        let cert = std::fs::read(cert_path)
-            .with_context(|| format!("failed to read TLS certificate from: {}", cert_path))?;
-        let key = std::fs::read(key_path)
-            .with_context(|| format!("failed to read TLS private key from: {}", key_path))?;
-        let identity = Identity::from_pem(cert, key);
-
-        let mut tls_config = ServerTlsConfig::new().identity(identity);
-
-        if let Some(ref ca_cert_path) = config.endpoint.tls_ca_cert_path {
-            let ca_cert = std::fs::read(ca_cert_path)
-                .with_context(|| format!("failed to read CA certificate from: {}", ca_cert_path))?;
-            tls_config =
-                tls_config.client_ca_root(tonic::transport::Certificate::from_pem(ca_cert));
-        }
-
-        server_builder = server_builder
-            .tls_config(tls_config)
-            .context("failed to configure TLS")?;
-    } else {
-        tracing::warn!(
-            "TLS disabled, using insecure connection on endpoint: {}",
-            config.endpoint.path
-        );
-    }
-
-    // Build gRPC router with metrics + logs + traces
-    let metrics_svc = MetricsServiceServer::new(metrics_service)
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let logs_svc = LogsServiceServer::from_arc(logs_service)
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-    let traces_svc = TraceServiceServer::from_arc(traces_service)
-        .accept_compressed(tonic::codec::CompressionEncoding::Gzip);
-
-    tracing::info!(endpoint = %config.endpoint.path, "gRPC server starting (metrics + logs + traces)");
-    let grpc_server = server_builder
-        .add_service(metrics_svc)
-        .add_service(logs_svc)
-        .add_service(traces_svc)
-        .serve_with_incoming(incoming);
+    // The OTLP/HTTP front end over the SAME service cores. `None` means the
+    // receiver is disabled; the pending future keeps the select! arm shape
+    // uniform either way.
+    let http_server = http_listener.map(|listener| {
+        let router = http_service::router(http_service::HttpState {
+            logs: Arc::clone(&logs_service),
+            traces: Arc::clone(&traces_service),
+            metrics: Arc::clone(&metrics_service),
+            auth: config.auth.clone(),
+        });
+        http_service::serve(listener, router, stop.clone())
+    });
 
     // Every fallible startup step is behind us and the listener is bound, so
     // this is the point at which the supervisor may advertise the plugin. The
-    // ingestor declares no Functions of its own; its Ready gates the ledger's.
+    // ingestor's Ready also gates the ledger's declarations.
     conn.send(IngestorResponse::Ready {
-        declarations: vec![],
+        declarations: calls.declarations(),
     })
     .await?;
     tracing::info!("signaled ready to supervisor");
 
-    // Main loop: forward chart data to supervisor, handle incoming requests, run gRPC
+    // A receiver that is disabled has no server: its future waits for the
+    // stop and ends with it, so the select! arms and the stop below have one
+    // shape either way.
+    let grpc_server = async {
+        match grpc_server {
+            Some(server) => server.await,
+            None => {
+                stop.cancelled().await;
+                Ok(())
+            }
+        }
+    };
+    let http_server = async {
+        match http_server {
+            Some(server) => server.await,
+            None => {
+                stop.cancelled().await;
+                Ok(())
+            }
+        }
+    };
+    tokio::pin!(grpc_server, http_server);
+
+    // Main loop: forward chart data to supervisor, handle incoming requests,
+    // run both transport servers. A server ends only after the stop below, so
+    // one that ends here failed (`serve` names the transport).
     tokio::select! {
-        result = grpc_server => {
-            result.with_context(|| format!("gRPC server error on {}", config.endpoint.path))?;
+        result = &mut grpc_server => {
+            result?;
+            anyhow::bail!("the OTLP/gRPC server ended with no stop request");
+        }
+        result = &mut http_server => {
+            result?;
+            anyhow::bail!("the OTLP/HTTP server ended with no stop request");
         }
         _ = async {
             loop {
@@ -309,23 +429,36 @@ async fn run_ingestor(
                             break;
                         }
                     }
-                    req = conn.recv() => {
-                        match req {
-                            Ok(IngestorRequest::Call { transaction, .. }) => {
-                                // No function handlers yet — return 404
-                                let resp = IngestorResponse::Result(netdata_plugin_types::FunctionResult {
-                                    transaction,
-                                    status: 404,
-                                    format: "text/plain".to_string(),
-                                    expires: 0,
-                                    payload: b"no functions registered".to_vec(),
-                                });
-                                if let Err(e) = conn.send(resp).await {
-                                    tracing::error!(%e, "failed to send result to supervisor");
-                                    break;
+                    Some(resp) = call_rx.recv() => {
+                        calls.finish(&resp);
+                        let transaction = resp.result().map(|r| r.transaction.clone());
+                        match conn.send(resp).await {
+                            // ferryboat checks the size before writing, so the
+                            // link is intact: answer with a small error instead
+                            // of tearing down the ingestor.
+                            Err(ferryboat::Error::MessageTooLarge { size, max }) => {
+                                tracing::error!("function response too large: {size} bytes exceeds {max} byte limit");
+                                if let Some(transaction) = transaction {
+                                    let resp = IngestorResponse::Result(oversized_result(transaction, size, max));
+                                    if let Err(e) = conn.send(resp).await {
+                                        tracing::error!(%e, "failed to send result to supervisor");
+                                        break;
+                                    }
                                 }
                             }
-                            Ok(IngestorRequest::Cancel { .. }) => {}
+                            Err(e) => {
+                                tracing::error!(%e, "failed to send result to supervisor");
+                                break;
+                            }
+                            Ok(()) => {}
+                        }
+                    }
+                    req = conn.recv() => {
+                        match req {
+                            Ok(IngestorRequest::Call { transaction, timeout, name, args, payload }) => {
+                                calls.call(transaction, timeout, name, args, payload);
+                            }
+                            Ok(IngestorRequest::Cancel { transaction }) => calls.cancel(&transaction),
                             Ok(IngestorRequest::Shutdown) => {
                                 tracing::info!("received Shutdown from supervisor");
                                 break;
@@ -347,13 +480,67 @@ async fn run_ingestor(
     tick_handle.abort();
     logs_sweep_handle.abort();
     traces_sweep_handle.abort();
+
+    // The stop work, all of it inside one budget (`otel_bridge::shutdown`).
+    //
+    // First the exports in progress get their answer: an export that is cut
+    // gets none, and its sender sends again records that are on the disk
+    // already. A server ends when its connections are closed: it tells each
+    // client that it stops and closes a connection after its answers. A peer
+    // that sent nothing yet, or that ignores the notice, holds its
+    // connection open: the exports get half of the budget at most, so that
+    // such a peer leaves the service map its time.
+    //
+    // Then the service map writes its open minutes. It comes second because
+    // its stop closes its queue: the spans of an export that ends after that
+    // would be answered and stored, and missing from the map.
+    stop.cancel();
+    let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+    let deadline = tokio::time::Instant::now() + budget;
+    let exports = async {
+        let (grpc, http) = tokio::join!(&mut grpc_server, &mut http_server);
+        for result in [grpc, http] {
+            if let Err(e) = result {
+                tracing::warn!("a server ended its stop with an error: {e:#}");
+            }
+        }
+    };
+    if tokio::time::timeout(budget / 2, exports).await.is_err() {
+        tracing::info!(
+            "connections were still open {} ms after the stop request: an export in progress \
+             on one of them gets no answer",
+            (budget / 2).as_millis()
+        );
+    }
+    if let Some(map) = service_map {
+        if tokio::time::timeout_at(deadline, map.shutdown())
+            .await
+            .is_err()
+        {
+            tracing::warn!("service map: shutdown took too long; its open minutes are lost");
+        }
+    }
     Ok(())
 }
 
+/// Starts the service map under `{base_dir}/service-map`, or logs why it
+/// cannot and returns `None`.
+fn start_service_map(
+    base_dir: &std::path::Path,
+) -> Option<Arc<otel_service_map::service::ServiceMap>> {
+    let config = otel_service_map::service::Config::new(base_dir.join("service-map"));
+    match otel_service_map::service::ServiceMap::start(config) {
+        Ok(map) => Some(Arc::new(map)),
+        Err(e) => {
+            tracing::error!(%e, "service map: cannot start; topology:tracing is not available");
+            None
+        }
+    }
+}
+
 /// Build the writer→ledger state shared by every ingestion signal: one
-/// `LedgerSender` (the ledger accepts a single writer connection; the frame
-/// sequence is kept per signal inside the sender) and one global `SeqAllocator`
-/// (file `seq` is globally unique across signals).
+/// `LedgerSender` (the ledger accepts a single writer connection) and one
+/// global `SeqAllocator` (file `seq` is globally unique across signals).
 ///
 /// The seq is GLOBAL across signals (one allocator → one highwater file), so the
 /// seed scans BOTH signals' dirs and takes the max. Seeding from one signal alone
@@ -364,6 +551,8 @@ async fn run_ingestor(
 fn create_shared_writer_state(
     config: &PluginConfig,
     writer_socket_path: &str,
+    wal_events_queued: Arc<std::sync::atomic::AtomicU64>,
+    stop: CancellationToken,
 ) -> Result<(Arc<ledger_sender::LedgerSender>, Arc<wal::SeqAllocator>)> {
     let logs_lc = config.lifecycle_for(Signal::Logs);
     let traces_lc = config.lifecycle_for(Signal::Traces);
@@ -381,12 +570,16 @@ fn create_shared_writer_state(
         .max(traces_scan.max())
         .max(highwater.unwrap_or(0));
 
-    let seq = Arc::new(
+    let seq_allocator = Arc::new(
         wal::SeqAllocator::durable(highwater_path, seed, wal::DEFAULT_RESERVE_BATCH)
             .context("initializing seq high-water allocator")?,
     );
 
-    let sender = Arc::new(ledger_sender::LedgerSender::new(writer_socket_path));
+    let ledger_sender = Arc::new(ledger_sender::LedgerSender::new(
+        writer_socket_path,
+        wal_events_queued,
+        stop,
+    ));
 
     tracing::info!(
         logs_wal = logs_scan.wal_max,
@@ -400,26 +593,27 @@ fn create_shared_writer_state(
         "ingestion enabled (multi-tenant WAL); seq allocator + ledger sender shared across logs + traces"
     );
 
-    Ok((sender, seq))
+    Ok((ledger_sender, seq_allocator))
 }
 
+/// The logs ingestion service, built from the derived logs lifecycle the same
+/// way as [`create_traces_service`].
 fn create_logs_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,
-    sender: Arc<ledger_sender::LedgerSender>,
-    seq: Arc<wal::SeqAllocator>,
+    ledger_sender: Arc<ledger_sender::LedgerSender>,
+    seq_allocator: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    identity: file_registry::Identity,
+    instance_identity: file_registry::Identity,
 ) -> NetdataLogsService {
     NetdataLogsService::new(
-        sender,
-        lifecycle.wal.dir.clone(),
+        ledger_sender,
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
-        seq,
+        seq_allocator,
         clock,
         auth.clone(),
-        identity,
+        instance_identity,
     )
 }
 
@@ -429,25 +623,106 @@ fn create_logs_service(
 fn create_traces_service(
     lifecycle: &LifecycleConfig,
     auth: &AuthConfig,
-    sender: Arc<ledger_sender::LedgerSender>,
-    seq: Arc<wal::SeqAllocator>,
+    ledger_sender: Arc<ledger_sender::LedgerSender>,
+    seq_allocator: Arc<wal::SeqAllocator>,
     clock: Arc<std::sync::Mutex<file_registry::MonotonicClock>>,
-    identity: file_registry::Identity,
+    instance_identity: file_registry::Identity,
 ) -> NetdataTracesService {
     tracing::info!(
         wal_dir = %lifecycle.wal.dir.display(),
         "traces ingestion enabled"
     );
     NetdataTracesService::new(
-        sender,
-        lifecycle.wal.dir.clone(),
+        ledger_sender,
         lifecycle.wal.clone(),
         lifecycle.ingest.clone(),
-        seq,
+        seq_allocator,
         clock,
         auth.clone(),
-        identity,
+        instance_identity,
     )
+}
+
+/// Bind the OTLP/gRPC listener, or return `None` when it is disabled.
+/// tonic's `serve(addr)` would bind lazily, only when the server future is
+/// polled, so the socket is bound here to fail fast (see `run_ingestor`).
+fn bind_grpc(listener: &ProtocolConfig) -> Result<Option<TcpIncoming>> {
+    if !listener.enabled {
+        tracing::info!(
+            "OTLP/gRPC receiver disabled (receivers.otlp.protocols.grpc.enabled is false)"
+        );
+        return Ok(None);
+    }
+    let endpoint = &listener.endpoint;
+    let addr: std::net::SocketAddr = endpoint
+        .parse()
+        .with_context(|| format!("failed to parse OTLP/gRPC endpoint address: {endpoint}"))?;
+    // `serve_with_incoming` discards the builder's TCP options, so restore the
+    // TCP_NODELAY default that `serve(addr)` used to apply to accepted sockets.
+    let incoming = TcpIncoming::bind(addr)
+        .with_context(|| format!("failed to bind OTLP/gRPC endpoint {endpoint}"))?
+        .with_nodelay(Some(true));
+    tracing::info!(%endpoint, "OTLP/gRPC endpoint bound");
+    Ok(Some(incoming))
+}
+
+/// Build the OTLP/gRPC server (with TLS if configured) for metrics, logs and
+/// traces over the bound `incoming` socket.
+fn grpc_server(
+    listener: &ProtocolConfig,
+    incoming: TcpIncoming,
+    metrics_service: &Arc<NetdataMetricsService>,
+    logs_service: &Arc<NetdataLogsService>,
+    traces_service: &Arc<NetdataTracesService>,
+    stop: CancellationToken,
+) -> Result<impl std::future::Future<Output = Result<()>> + use<>> {
+    let endpoint = listener.endpoint.clone();
+    let mut server_builder = Server::builder();
+
+    if let (Some(cert_path), Some(key_path)) = (&listener.tls.cert_file, &listener.tls.key_file) {
+        let cert = std::fs::read(cert_path)
+            .with_context(|| format!("failed to read TLS certificate from: {}", cert_path))?;
+        let key = std::fs::read(key_path)
+            .with_context(|| format!("failed to read TLS private key from: {}", key_path))?;
+        let identity = Identity::from_pem(cert, key);
+
+        let mut tls_config = ServerTlsConfig::new().identity(identity);
+
+        if let Some(ca_cert_path) = &listener.tls.client_ca_file {
+            let ca_cert = std::fs::read(ca_cert_path)
+                .with_context(|| format!("failed to read CA certificate from: {}", ca_cert_path))?;
+            tls_config =
+                tls_config.client_ca_root(tonic::transport::Certificate::from_pem(ca_cert));
+        }
+
+        server_builder = server_builder
+            .tls_config(tls_config)
+            .context("failed to configure TLS")?;
+    } else {
+        tracing::warn!("TLS disabled, using insecure connection on OTLP/gRPC endpoint: {endpoint}");
+    }
+
+    let metrics_svc = MetricsServiceServer::from_arc(Arc::clone(metrics_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
+    let logs_svc = LogsServiceServer::from_arc(Arc::clone(logs_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
+    let traces_svc = TraceServiceServer::from_arc(Arc::clone(traces_service))
+        .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .max_decoding_message_size(MAX_REQUEST_BYTES);
+
+    tracing::info!(%endpoint, "OTLP/gRPC server starting (metrics + logs + traces)");
+    let server = server_builder
+        .add_service(metrics_svc)
+        .add_service(logs_svc)
+        .add_service(traces_svc)
+        .serve_with_incoming_shutdown(incoming, stop.cancelled_owned());
+    Ok(async move {
+        server
+            .await
+            .with_context(|| format!("OTLP/gRPC server error on {endpoint}"))
+    })
 }
 
 /// Spawn one signal's idle-rotation sweep loop: every [`WAL_SWEEP_INTERVAL`],
@@ -563,7 +838,10 @@ mod seed_tests {
     /// real `FileId` codec so it can never drift from the on-disk format.
     fn data_filename(seq: u64, ext: &str) -> String {
         file_registry::FileId::new(
-            file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+            file_registry::Identity::new(
+                file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+            ),
             0,
             seq,
             0xabcd,
@@ -599,7 +877,10 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+                file_registry::Identity::new(
+                    file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                    file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+                ),
                 25,
                 100,
                 200,
@@ -638,7 +919,10 @@ mod seed_tests {
         std::fs::create_dir_all(&cat_dir).unwrap();
         std::fs::write(
             cat_dir.join(otel_catalog::filename(
-                file_registry::Identity::new(file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(), file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap()),
+                file_registry::Identity::new(
+                    file_registry::MachineId::new(uuid::Uuid::from_u128(1)).unwrap(),
+                    file_registry::InstanceId::new(uuid::Uuid::from_u128(2)).unwrap(),
+                ),
                 7,
                 100,
                 200,
@@ -653,5 +937,45 @@ mod seed_tests {
         let highwater = wal::read_seq_highwater(&highwater_path);
         assert_eq!(highwater, None);
         assert_eq!(combined_seed(&scan, highwater), 7);
+    }
+}
+
+#[cfg(test)]
+mod grpc_listener_tests {
+    use otel_bridge::config::TlsServerConfig;
+
+    use super::*;
+
+    fn grpc(enabled: bool, endpoint: &str) -> ProtocolConfig {
+        ProtocolConfig {
+            enabled,
+            endpoint: endpoint.to_string(),
+            tls: TlsServerConfig::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn disabled_grpc_listener_binds_nothing() {
+        // Even an address that cannot bind is never touched when disabled.
+        assert!(bind_grpc(&grpc(false, "not-an-address")).unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn enabled_grpc_listener_binds_or_fails_fast() {
+        assert!(bind_grpc(&grpc(true, "127.0.0.1:0")).unwrap().is_some());
+
+        let err = bind_grpc(&grpc(true, "not-an-address")).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("failed to parse OTLP/gRPC endpoint address"),
+            "{err:#}"
+        );
+
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = taken.local_addr().unwrap().to_string();
+        let err = bind_grpc(&grpc(true, &addr)).unwrap_err();
+        assert!(
+            format!("{err:#}").contains("failed to bind OTLP/gRPC endpoint"),
+            "{err:#}"
+        );
     }
 }

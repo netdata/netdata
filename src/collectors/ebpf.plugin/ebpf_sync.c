@@ -10,6 +10,7 @@ static netdata_syscall_stat_t sync_counter_aggregated_data[NETDATA_SYNC_IDX_END]
 static netdata_publish_syscall_t sync_counter_publish_aggregated[NETDATA_SYNC_IDX_END];
 
 static netdata_idx_t sync_hash_values[NETDATA_SYNC_IDX_END];
+static netdata_idx_t *sync_percpu_values;
 
 static ebpf_local_maps_t sync_maps[NETDATA_SYNC_IDX_END][2];
 
@@ -206,6 +207,9 @@ void ebpf_sync_cleanup_objects()
             w->probe_links = NULL;
         }
     }
+
+    freez(sync_percpu_values);
+    sync_percpu_values = NULL;
 }
 
 
@@ -284,16 +288,19 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
 
     int i;
     const char *saved_name = em->info.thread_name;
-    int errors = 0;
+    bool loaded_legacy = (em->load & EBPF_LOAD_LEGACY) != 0;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
         w->sync_maps = local_syscalls[i].sync_maps;
         em->maps = local_syscalls[i].sync_maps;
         if (w->enabled) {
+            em->info.thread_name = w->syscall;
             if (em->load & EBPF_LOAD_LEGACY) {
                 if (ebpf_sync_load_legacy(w, em))
-                    errors++;
+                    w->enabled = false;
                 else
+                    loaded_legacy = true;
+                if (w->probe_links)
                     ebpf_mark_program_loaded();
 
                 em->info.thread_name = saved_name;
@@ -305,21 +312,40 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
                 if (ebpf_is_function_inside_btf(default_btf, syscall)) {
                     w->sync_obj = sync_bpf__open();
                     if (!w->sync_obj) {
-                        w->enabled = false;
-                        errors++;
+                        w->probe_links = ebpf_load_program(
+                            ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                        if (!w->probe_links) {
+                            w->enabled = false;
+                        } else {
+                            loaded_legacy = true;
+                            ebpf_mark_program_loaded();
+                        }
                     } else {
                         if (ebpf_sync_load_and_attach(w->sync_obj, em, syscall, i)) {
                             sync_bpf__destroy(w->sync_obj);
                             w->sync_obj = NULL;
-                            w->enabled = false;
-                            errors++;
+                            w->probe_links = ebpf_load_program(
+                                ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                            if (!w->probe_links) {
+                                w->enabled = false;
+                            } else {
+                                loaded_legacy = true;
+                                ebpf_mark_program_loaded();
+                            }
                         } else {
                             ebpf_mark_program_loaded();
                         }
                     }
                 } else {
-                    netdata_log_info("Cannot find syscall %s we are not going to monitor it.", syscall);
-                    w->enabled = false;
+                    w->probe_links = ebpf_load_program(
+                        ebpf_plugin_dir, em, running_on_kernel, isrh, &w->objects);
+                    if (!w->probe_links) {
+                        netdata_log_info("Cannot find syscall %s; no compatible legacy object is available.", syscall);
+                        w->enabled = false;
+                    } else {
+                        loaded_legacy = true;
+                        ebpf_mark_program_loaded();
+                    }
                 }
 
                 em->info.thread_name = saved_name;
@@ -329,11 +355,22 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
     }
     em->info.thread_name = saved_name;
 
+    // Keep CORE set for the per-syscall load decisions above. Mark the module
+    // as legacy too only after initialization so aggregate stats do not claim
+    // a mixed CORE/legacy module is entirely CORE.
+    if (loaded_legacy && (em->load & EBPF_LOAD_CORE))
+        em->load |= EBPF_LOAD_LEGACY;
+
     memset(sync_counter_aggregated_data, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_syscall_stat_t));
     memset(sync_counter_publish_aggregated, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_publish_syscall_t));
     memset(sync_hash_values, 0, NETDATA_SYNC_IDX_END * sizeof(netdata_idx_t));
 
-    return (errors) ? -1 : 0;
+    for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
+        if (local_syscalls[i].enabled)
+            return 0;
+    }
+
+    return -1;
 }
 
 /*****************************************************************
@@ -351,21 +388,31 @@ static int ebpf_sync_initialize_syscall(ebpf_module_t *em)
  */
 static void ebpf_sync_read_global_table(int maps_per_core)
 {
-    netdata_idx_t stored[NETDATA_MAX_PROCESSOR];
     uint32_t idx = NETDATA_SYNC_CALL;
     int i;
     for (i = 0; i < NETDATA_SYNC_IDX_END; i++) {
         ebpf_sync_syscalls_t *w = &local_syscalls[i];
-        if (w->enabled) {
-            int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
-            if (!bpf_map_lookup_elem(fd, &idx, &stored)) {
-                int j, end = (maps_per_core) ? ebpf_nprocs : 1;
-                netdata_idx_t total = 0;
-                for (j = 0; j < end; j++)
-                    total += stored[j];
+        if (!w->enabled)
+            continue;
 
-                sync_hash_values[i] = total;
-            }
+        netdata_idx_t single_value;
+        netdata_idx_t *stored = &single_value;
+        if (maps_per_core) {
+            if (!sync_percpu_values)
+                sync_percpu_values = callocz((size_t)ebpf_nprocs, sizeof(*sync_percpu_values));
+            if (!sync_percpu_values)
+                continue;
+            stored = sync_percpu_values;
+        }
+
+        int fd = w->sync_maps[NETDATA_SYNC_GLOBAL_TABLE].map_fd;
+        if (!bpf_map_lookup_elem(fd, &idx, stored)) {
+            int j, end = maps_per_core ? ebpf_nprocs : 1;
+            netdata_idx_t total = 0;
+            for (j = 0; j < end; j++)
+                total += stored[j];
+
+            sync_hash_values[i] = total;
         }
     }
 }

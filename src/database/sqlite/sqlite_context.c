@@ -317,14 +317,17 @@ done:
     return (rc_stored != SQLITE_DONE);
 }
 
+// returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
 int sql_context_cache_stats(int op)
 {
-    int count, dummy;
+    int count = 0, dummy;
 
     if (unlikely(!db_context_meta))
-        return 0;
+        return -1;
 
-    sqlite3_db_status(db_context_meta, op, &count, &dummy, 0);
+    if (sqlite3_db_status(db_context_meta, op, &count, &dummy, 0) != SQLITE_OK)
+        return -1;
+
     return count;
 }
 

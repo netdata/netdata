@@ -3,6 +3,7 @@ package raw
 import (
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/netipc/internal/monotime"
 	"github.com/netdata/netdata/go/plugins/pkg/netipc/protocol"
 )
 
@@ -41,7 +42,7 @@ func (c *Client) SetLookupLogicalConfig(config LookupLogicalConfig) {
 func (c *Client) ensureReadyForLogicalLookup() error {
 	if c.state != StateReady {
 		c.errorCount++
-		return protocol.ErrBadLayout
+		return protocol.ErrNotReady
 	}
 	if c.abortRequested.Load() {
 		c.disconnect()
@@ -52,7 +53,19 @@ func (c *Client) ensureReadyForLogicalLookup() error {
 	return nil
 }
 
-func (c *Client) ensureLookupRequestCapacity(required int) error {
+// lookupRequestCapacityCanReconnect reports whether a reconnect can give the
+// session room for required request bytes: they fit the client's limit.
+func (c *Client) lookupRequestCapacityCanReconnect(required int) bool {
+	maxRequestPayloadBytes := c.config.MaxRequestPayloadBytes
+	if maxRequestPayloadBytes == 0 {
+		maxRequestPayloadBytes = protocol.MaxPayloadDefault
+	}
+	return required >= 0 && uint64(required) <= uint64(maxRequestPayloadBytes)
+}
+
+// ensureLookupRequestCapacity reconnects for a larger request capacity when
+// needed, bounded by the lookup deadline.
+func (c *Client) ensureLookupRequestCapacity(required int, deadline int64) error {
 	if c.abortRequested.Load() {
 		c.disconnect()
 		c.state = StateBroken
@@ -73,12 +86,14 @@ func (c *Client) ensureLookupRequestCapacity(required int) error {
 		return nil
 	}
 	prevReq := c.sessionMaxRequestPayloadBytes()
+	c.opDeadline = deadline
+	defer c.endOp()
 	c.disconnect()
 	c.state = StateBroken
 	c.state = c.tryConnect()
 	if c.state != StateReady {
 		c.errorCount++
-		return protocol.ErrOverflow
+		return c.callReconnectFailure(protocol.ErrOverflow)
 	}
 	c.reconnectCount++
 	if c.sessionMaxRequestPayloadBytes() <= prevReq ||
@@ -91,15 +106,16 @@ func (c *Client) ensureLookupRequestCapacity(required int) error {
 	return nil
 }
 
-func (c *Client) newLookupDeadline(timeoutMs uint32) time.Time {
-	return time.Now().Add(time.Duration(c.resolvedCallTimeout(timeoutMs)) * time.Millisecond)
+// newLookupDeadline returns the lookup deadline in monotime nanoseconds.
+func (c *Client) newLookupDeadline(timeoutMs uint32) int64 {
+	return monotime.After(time.Duration(c.resolvedCallTimeout(timeoutMs)) * time.Millisecond)
 }
 
-func (c *Client) lookupRemainingTimeout(deadline time.Time) (uint32, error) {
+func (c *Client) lookupRemainingTimeout(deadline int64) (uint32, error) {
 	if c.abortRequested.Load() {
 		return 0, protocol.ErrAborted
 	}
-	remaining := time.Until(deadline)
+	remaining := time.Duration(deadline - monotime.Now())
 	if remaining <= 0 {
 		return 0, protocol.ErrTimeout
 	}

@@ -1,8 +1,11 @@
-//! Output formatting for query results.
+//! NDJSON rendering of logs-query results for the CLI's stdout.
 //!
-//! Format selection goes through [`OutputFormat`] so additional formats
-//! (e.g. `key=value` lines, bare message) are a new enum variant plus a match
-//! arm — no change to callers. v1 ships NDJSON only.
+//! This is the output half of the default logs path ([`write_rows`], driven by
+//! `run`): rows go to stdout, while the matched/returned summary and warnings
+//! go to stderr at the call site. The `traces` subcommands render their own
+//! line-based output and do not pass through here. Format selection goes
+//! through [`OutputFormat`] so a new format is an enum variant plus a match
+//! arm; v1 ships NDJSON only.
 
 use std::io::{self, Write};
 
@@ -18,8 +21,14 @@ pub enum OutputFormat {
     Ndjson,
 }
 
-/// Write each row in `rows` to `out` in the selected format. `fields`, when
-/// `Some`, restricts emitted fields to that set (journalctl `--output-fields`).
+/// Write each row in `rows` to `out` in the selected format.
+///
+/// Rows are emitted in the order given — the caller orders the page
+/// (`--reverse` flips it before calling). The `Cursor` half of each pair is
+/// ignored: it is the engine's pagination anchor, not part of this output.
+/// `fields`, when `Some`, projects the emitted fields to that set (journalctl
+/// `--output-fields`): exact key match, stored order and duplicates kept, and
+/// it never touches `timestamp_ns`.
 pub fn write_rows(
     out: &mut impl Write,
     rows: &[(Cursor, MaterializedRow)],
@@ -39,10 +48,10 @@ pub fn write_rows(
 /// Serialize one record as a compact JSON object:
 /// `{"timestamp_ns": <i64>, "fields": [[key, value], ...]}`.
 ///
-/// `fields` is always an array of `[key, value]` pairs. Records permit
-/// non-unique field keys (a multi-valued attribute flattens to repeated keys),
-/// which a JSON object cannot represent; an array keeps the shape stable and
-/// lossless across every record so `jq` consumers never see it shift mid stream
+/// `fields` is an array of `[key, value]` pairs, not a JSON object: attribute
+/// keys may repeat (a multi-valued attribute flattens to duplicate keys) and
+/// an object cannot hold those losslessly. Keeping the shape identical for
+/// every record lets `jq` pipelines rely on it mid stream
 /// (`jq '.fields[] | select(.[0]=="severity_text") | .[1]'`).
 fn ndjson_record(row: &MaterializedRow, fields: Option<&[String]>) -> String {
     let pairs = row

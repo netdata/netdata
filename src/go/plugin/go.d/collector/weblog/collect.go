@@ -379,7 +379,7 @@ func (c *Collector) addDimToVhostChart(vhost string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -397,7 +397,7 @@ func (c *Collector) addDimToPortChart(port string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -415,7 +415,7 @@ func (c *Collector) addDimToReqMethodChart(method string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -433,7 +433,7 @@ func (c *Collector) addDimToReqVersionChart(version string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -444,7 +444,7 @@ func (c *Collector) addDimToSSLProtoChart(proto string) {
 	if chart == nil {
 		chart = reqBySSLProto.Copy()
 		if err := c.Charts().Add(chart); err != nil {
-			c.Warning(err)
+			c.Warningf("add '%s' chart: invalid or duplicate chart", chart.ID)
 			return
 		}
 	}
@@ -454,7 +454,7 @@ func (c *Collector) addDimToSSLProtoChart(proto string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -465,7 +465,7 @@ func (c *Collector) addDimToSSLCipherSuiteChart(cipher string) {
 	if chart == nil {
 		chart = reqBySSLCipherSuite.Copy()
 		if err := c.Charts().Add(chart); err != nil {
-			c.Warning(err)
+			c.Warningf("add '%s' chart: invalid or duplicate chart", chart.ID)
 			return
 		}
 	}
@@ -475,7 +475,7 @@ func (c *Collector) addDimToSSLCipherSuiteChart(cipher string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -493,7 +493,7 @@ func (c *Collector) addDimToRespCodesChart(code string) {
 		Algo: collectorapi.Incremental,
 	}
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -513,7 +513,7 @@ func (c *Collector) addDimToURLPatternRespCodesChart(name, code string) {
 	}
 
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()
@@ -533,7 +533,7 @@ func (c *Collector) addDimToURLPatternReqMethodsChart(name, method string) {
 	}
 
 	if err := chart.AddDim(dim); err != nil {
-		c.Warning(err)
+		c.Warningf("add dimension to '%s' chart: invalid or duplicate dimension", chart.ID)
 		return
 	}
 	chart.MarkNotCreated()

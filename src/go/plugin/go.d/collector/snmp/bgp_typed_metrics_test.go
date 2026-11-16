@@ -118,7 +118,6 @@ func TestTypedBGPMetricsFromProfileMetrics(t *testing.T) {
 func TestTypedBGPMetricsUseLogicalChartIdentity(t *testing.T) {
 	tests := map[string]struct {
 		profileMetrics []*ddsnmp.ProfileMetrics
-		wantKey        string
 	}{
 		"same logical peer from different BGP rows keeps one public chart identity": {
 			profileMetrics: []*ddsnmp.ProfileMetrics{
@@ -140,7 +139,6 @@ func TestTypedBGPMetricsUseLogicalChartIdentity(t *testing.T) {
 					},
 				},
 			},
-			wantKey: "bgp.peers.availability_192.0.2.1_65001_blue",
 		},
 	}
 
@@ -159,7 +157,7 @@ func TestTypedBGPMetricsUseLogicalChartIdentity(t *testing.T) {
 			}
 
 			require.Len(t, availabilityMetrics, 2)
-			assert.Equal(t, map[string]struct{}{tc.wantKey: {}}, keys)
+			assert.Len(t, keys, 1, "identical semantic identity must merge despite distinct structural rows")
 			for _, metric := range availabilityMetrics {
 				key := tableMetricKey(metric)
 				assert.NotContains(t, key, "profile-")

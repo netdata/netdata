@@ -74,12 +74,15 @@ type Collector struct {
 
 	apiClient panosAPIClient
 
+	ipsecTunnelInventory  map[[2]string]metrix.LabelSet
+	ipsecGatewayInventory map[[2]string]metrix.LabelSet
+
 	routingEngine  routingEngine
 	bgpCommand     string
 	noBGPProbedAt  time.Time
 	bgpRouterNames map[string]string
 
-	newAPIClient        func(Config) (panosAPIClient, error)
+	newAPIClient        func(context.Context, Config) (panosAPIClient, error)
 	advancedBGPCommands []string
 	now                 func() time.Time
 }
@@ -88,12 +91,12 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	if err := c.validateConfig(); err != nil {
 		return err
 	}
 
-	client, err := c.newAPIClient(c.Config)
+	client, err := c.newAPIClient(ctx, c.Config)
 	if err != nil {
 		return fmt.Errorf("init PAN-OS API client: %w", err)
 	}

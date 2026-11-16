@@ -103,7 +103,9 @@ pub struct WindowManager<M: MemoryMap> {
 
 impl<M: MemoryMap> WindowManager<M> {
     pub fn new(file: File, chunk_size: u64, max_windows: usize) -> Result<Self> {
-        debug_assert!(chunk_size != 0 && (chunk_size % PAGE_SIZE) == 0);
+        // Window offsets are chunk-aligned; chunk_size must be a multiple of
+        // the page size so mmap offsets stay page-aligned.
+        debug_assert!(chunk_size != 0 && chunk_size.is_multiple_of(PAGE_SIZE));
         debug_assert!(max_windows != 0);
 
         let _file_size = file.metadata()?.len();
@@ -138,6 +140,9 @@ impl<M: MemoryMap> WindowManager<M> {
         })
     }
 
+    // Evict the oldest window. If the oldest is the active window (the one
+    // most recently created) and another window exists, evict the
+    // second-oldest instead so the active window survives.
     fn find_window_to_evict(&self) -> usize {
         if self.active_window_idx == Some(0) && self.windows.len() > 1 {
             1
@@ -147,10 +152,10 @@ impl<M: MemoryMap> WindowManager<M> {
     }
 
     fn lookup_window_by_range(&self, position: u64, size_needed: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains_range(position, size_needed) {
-                return Some(idx);
-            }
+        if let Some(idx) = self.active_window_idx
+            && self.windows[idx].contains_range(position, size_needed)
+        {
+            return Some(idx);
         }
 
         for (idx, window) in self.windows.iter().enumerate() {
@@ -163,10 +168,10 @@ impl<M: MemoryMap> WindowManager<M> {
     }
 
     fn lookup_window_by_position(&self, position: u64) -> Option<usize> {
-        if let Some(idx) = self.active_window_idx {
-            if self.windows[idx].contains(position) {
-                return Some(idx);
-            }
+        if let Some(idx) = self.active_window_idx
+            && self.windows[idx].contains(position)
+        {
+            return Some(idx);
         }
 
         for (idx, window) in self.windows.iter().enumerate() {
@@ -180,10 +185,10 @@ impl<M: MemoryMap> WindowManager<M> {
 
     fn get_window(&mut self, position: u64, size_needed: u64) -> Result<&mut Window<M>> {
         if let Some(idx) = self.lookup_window_by_range(position, size_needed) {
-            // Use the existing window
             Ok(&mut self.windows[idx])
         } else if let Some(idx) = self.lookup_window_by_position(position) {
-            // Remap the window
+            // The window covering the position is too small for the range:
+            // replace it with a larger window that keeps its start.
 
             let window = self.windows.remove(idx);
 
@@ -206,7 +211,6 @@ impl<M: MemoryMap> WindowManager<M> {
             // NOTE: the active window index might have been invalidated. In
             // the scope that follows, we should not use code that relies on it.
             {
-                // Calculate window start for this position
                 let window_start = self.get_chunk_aligned_start(position);
                 let window_end = self.get_chunk_aligned_end(position + size_needed);
                 let num_chunks = (window_end - window_start) / self.chunk_size;

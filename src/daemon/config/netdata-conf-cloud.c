@@ -8,11 +8,8 @@ size_t netdata_conf_cloud_query_threads(void) {
     size_t threads = MIN(cpus * (netdata_conf_is_parent() ? 2 : 1), (size_t)libuv_worker_threads / 2);
     threads = MAX(threads, 6);
 
-    threads = inicfg_get_number(&netdata_config, CONFIG_SECTION_CLOUD, "query threads", threads);
-    if(threads < 1) {
-        netdata_log_error("[" CONFIG_SECTION_CLOUD "].query threads in netdata.conf needs to be at least 1. Overwriting it.");
-        threads = 1;
-        inicfg_set_number(&netdata_config, CONFIG_SECTION_CLOUD, "query threads", threads);
-    }
-    return threads;
+    // each one is a dedicated thread; more than the libuv threadpool could never run in parallel
+    // when Cloud queries ran as pool jobs, so that stays the ceiling
+    return (size_t)inicfg_get_number_range(&netdata_config, CONFIG_SECTION_CLOUD, "query threads",
+                                           (long long)threads, 1, libuv_worker_threads);
 }

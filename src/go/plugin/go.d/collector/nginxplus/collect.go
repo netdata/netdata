@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
 	if c.apiVersion == 0 {
-		v, err := c.queryAPIVersion()
+		v, err := c.queryAPIVersion(ctx)
 		if err != nil {
 			return nil, err
 		}
@@ -22,12 +24,12 @@ func (c *Collector) collect() (map[string]int64, error) {
 	now := time.Now()
 	if now.Sub(c.queryEndpointsTime) > c.queryEndpointsEvery {
 		c.queryEndpointsTime = now
-		if err := c.queryAvailableEndpoints(); err != nil {
+		if err := c.queryAvailableEndpoints(ctx); err != nil {
 			return nil, err
 		}
 	}
 
-	ms := c.queryMetrics()
+	ms := c.queryMetrics(ctx)
 	if ms.empty() {
 		return nil, errors.New("no metrics collected")
 	}

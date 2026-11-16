@@ -5,7 +5,7 @@
 //! validation, not for public multi-method dispatch.
 
 use super::raw;
-use crate::protocol::{CgroupsResponseView, NipcError, METHOD_CGROUPS_SNAPSHOT, PROFILE_BASELINE};
+use crate::protocol::{CgroupsResponseView, METHOD_CGROUPS_SNAPSHOT, NipcError, PROFILE_BASELINE};
 
 #[cfg(unix)]
 use crate::transport::posix::{
@@ -17,8 +17,8 @@ use crate::transport::windows::{
     ClientConfig as TransportClientConfig, ServerConfig as TransportServerConfig,
 };
 
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 pub use raw::{
     CgroupsCacheItem, CgroupsCacheItemView, CgroupsCacheReadGuard, CgroupsCacheStatus,
@@ -242,6 +242,11 @@ impl ManagedServer {
     ///
     /// For reliable shutdown, call `stop()`. On Windows, changing this flag
     /// alone does not wake a blocking listener accept.
+    /// Returns a signal that is set once `run()` accepts connections.
+    pub fn listening_signal(&self) -> raw::ListeningSignal {
+        self.inner.listening_signal()
+    }
+
     pub fn running_flag(&self) -> Arc<AtomicBool> {
         self.inner.running_flag()
     }

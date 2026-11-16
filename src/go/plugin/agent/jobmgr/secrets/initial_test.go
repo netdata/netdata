@@ -24,7 +24,10 @@ import (
 
 func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T) {
 	resourceID := secretResourceID("vault:replay")
-	successor := lifecycle.ResourceIdentity{ID: resourceID, Generation: 1}
+	successor := lifecycle.ResourceIdentity{
+		ID:         resourceID,
+		Generation: 1,
+	}
 	var controller *Controller
 	var owned lifecycle.ReadyResource
 	status := 0
@@ -69,7 +72,7 @@ func TestTemplatePublicationAcceptsReplayBeforeFrameBecomesVisible(t *testing.T)
 		require.NoError(t, owned.Finalize())
 	}
 	require.NoError(t, store.Close(t.Context()))
-	require.Equal(t, 200, status)
+	require.Equal(t, 202, status)
 }
 
 func TestConfigPublicationPreservesWindowsSourcePath(t *testing.T) {
@@ -98,8 +101,10 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 	t.Cleanup(func() {
 		_ = store.Close(context.Background())
 	})
+	accepted, target := stageAdoptionEdit(t, controller, "add", "initial")
+	applyAdoptionEdit(t, controller, accepted, target, 202)
 	input := CommandInput{
-		Args:        []string{"go.d:secretstore:vault", string(dyncfg.CommandAdd), "main"},
+		Args:        []string{"go.d:secretstore:vault:main", string(dyncfg.CommandUpdate)},
 		Payload:     []byte(`{"value":"replacement"}`),
 		ContentType: "application/json",
 		HasPayload:  true,
@@ -109,6 +114,7 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 	defer stage.Release()
 	stage.Start()
 	requireStoreOperationReady(t, stage)
+	require.EqualValues(t, 1, store.Census().Preparations)
 	resourceID := secretResourceID("vault:main")
 
 	_, err = controller.PrepareStaged(
@@ -116,8 +122,11 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 		input,
 		nil,
 		lifecycle.ResourceTransactionScope{
-			ID:      resourceID,
-			Current: lifecycle.ResourceIdentity{ID: resourceID, Generation: 1},
+			ID: resourceID,
+			Current: lifecycle.ResourceIdentity{
+				ID:         resourceID,
+				Generation: 1,
+			},
 			Successor: lifecycle.ResourceIdentity{
 				ID:         resourceID,
 				Generation: 2,
@@ -131,7 +140,7 @@ func TestTakenStoreMutationIsAbortedWhenCommandResourceDiffers(t *testing.T) {
 	require.Zero(t, store.Census().Preparations)
 }
 
-func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *testing.T) {
+func TestDisposedInitialPublicationDoesNotAcquire(t *testing.T) {
 	gate := newInitialStoreMaterializationGate()
 	t.Cleanup(gate.release)
 	resolver, err := secretresolver.NewAtomicResolver(nil)
@@ -142,7 +151,9 @@ func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *tes
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &initialStoreMaterializationStore{gate: gate}
+			return &initialStoreMaterializationStore{
+				gate: gate,
+			}
 		},
 	}})
 	require.NoError(t, err)
@@ -164,7 +175,7 @@ func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *tes
 		Store:        store,
 		Operations:   operations,
 		Creators:     catalog,
-		Dependencies: NewSecretDependencyIndex(),
+		Dependencies: NewSecretDependencyIndex(testDependencyConfigResolver(t)),
 		Initial: []secretstore.Config{
 			secretInitialMaterializationConfig("a-blocked", "blocked"),
 			secretInitialMaterializationConfig("z-fast", "fast"),
@@ -181,25 +192,19 @@ func TestInitialStoreMaterializationStartsDifferentIdentitiesConcurrently(t *tes
 	}()
 
 	select {
-	case <-gate.blocked:
-	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "blocking initial Store did not enter Init")
-	}
-	fastBeforeRelease := false
-	select {
-	case <-gate.fast:
-		fastBeforeRelease = true
-	case <-time.After(300 * time.Millisecond):
-	}
-
-	gate.release()
-	select {
 	case err := <-published:
 		require.NoError(t, err)
 	case <-time.After(time.Second):
-		require.FailNow(t, "test failed", "initial Store publication did not complete")
+		t.Fatal("initial publication waited for provider acquisition")
 	}
-	require.True(t, fastBeforeRelease, "initial Store identities did not materialize concurrently")
+	select {
+	case <-gate.blocked:
+		t.Fatal("disposed initial publication started acquisition")
+	case <-gate.fast:
+		t.Fatal("disposed initial publication started acquisition")
+	default:
+	}
+
 	require.NoError(t, controller.CloseProjection())
 	attempts.BeginShutdown()
 	require.NoError(t, attempts.Shutdown(t.Context()))
@@ -227,7 +232,9 @@ func TestPreparedStoreOperationRetainsIdentityUntilStageRelease(t *testing.T) {
 		Kind:   secretstore.KindVault,
 		Schema: `{}`,
 		Create: func() secretstore.Store {
-			return &countingStoreOperationProvider{initializations: &initializations}
+			return &countingStoreOperationProvider{
+				initializations: &initializations,
+			}
 		},
 	}})
 	require.NoError(t, err)
@@ -248,17 +255,15 @@ func TestPreparedStoreOperationRetainsIdentityUntilStageRelease(t *testing.T) {
 		name:    "main",
 	}
 	first, err := operations.prepare(storeOperationSpec{
-		target:    target,
-		config:    secretTestConfig(confgroup.TypeUser, "first"),
-		mode:      storeOperationMutation,
-		supersede: true,
+		target: target,
+		config: secretTestConfig(confgroup.TypeUser, "first"),
+		mode:   storeOperationMutation,
 	})
 	require.NoError(t, err)
 	second, err := operations.prepare(storeOperationSpec{
-		target:    target,
-		config:    secretTestConfig(confgroup.TypeUser, "second"),
-		mode:      storeOperationMutation,
-		supersede: true,
+		target: target,
+		config: secretTestConfig(confgroup.TypeUser, "second"),
+		mode:   storeOperationMutation,
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() {
@@ -281,12 +286,34 @@ func TestPreparedStoreOperationRetainsIdentityUntilStageRelease(t *testing.T) {
 	require.EqualValues(t, 1, initializations.Load())
 
 	second.Start()
+	requireStoreOperationReady(t, second)
+	busy, err := second.take()
+	require.NoError(t, err)
+	require.True(t, busy.retryable)
+	require.ErrorIs(t, busy.err, jobmgr.ErrProcessAttemptBusy)
+	require.NotNil(t, busy.release)
 	select {
-	case <-second.Ready():
-		require.FailNow(t, "test failed", "successor Store operation started before predecessor stage release")
-	case <-time.After(200 * time.Millisecond):
+	case <-busy.release:
+		t.Fatal("physical identity released while its prepared result is owned")
+	default:
 	}
 	require.EqualValues(t, 1, initializations.Load())
+	first.Release()
+	select {
+	case <-busy.release:
+	case <-time.After(time.Second):
+		t.Fatal("physical identity did not release after its stage")
+	}
+	third, err := operations.prepare(storeOperationSpec{
+		target: target,
+		config: secretTestConfig(confgroup.TypeUser, "third"),
+		mode:   storeOperationMutation,
+	})
+	require.NoError(t, err)
+	defer third.Release()
+	third.Start()
+	requireStoreOperationReady(t, third)
+	require.EqualValues(t, 2, initializations.Load())
 }
 
 func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testing.T) {
@@ -300,10 +327,9 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 		name:    "main",
 	}
 	stage, err := controller.operations.prepare(storeOperationSpec{
-		target:    target,
-		config:    secretTestConfig(confgroup.TypeUser, "value"),
-		mode:      storeOperationMutation,
-		supersede: true,
+		target: target,
+		config: secretTestConfig(confgroup.TypeUser, "value"),
+		mode:   storeOperationMutation,
 	})
 	require.NoError(t, err)
 	// This idempotent fallback covers failures before the explicit release
@@ -336,7 +362,9 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 		require.FailNow(t, "test failed", "Store operation did not release")
 	}
 
-	require.Equal(t, containment.Census{Quarantined: 1}, attempts.Census())
+	require.Equal(t, containment.Census{
+		Quarantined: 1,
+	}, attempts.Census())
 	_, err = attempts.StartProcessAttempt(context.Background(), jobmgr.ProcessAttemptPlan{
 		Identity: identity,
 		Work:     func(context.Context, jobmgr.ProcessAttemptAdmission) error { return nil },
@@ -345,7 +373,7 @@ func TestPreparedStoreOperationQuarantinesFailedUntakenMutationRelease(t *testin
 	require.NoError(t, store.Close(t.Context()))
 }
 
-func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
+func TestInvalidStoreCommandPreservesOlderPendingDesiredConfig(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))
 	commands := &initialStoreTestCommands{
@@ -399,7 +427,7 @@ func TestInvalidStoreCommandClearsOlderPendingDesiredConfig(t *testing.T) {
 	applied, err := prepared.Apply(t.Context())
 	require.NoError(t, err)
 	require.Equal(t, 400, applied.ResultStatus())
-	require.False(t, controller.pendingVersion(pending.ExposedKey(), version))
+	require.True(t, controller.pendingVersion(pending.ExposedKey(), version))
 }
 
 func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
@@ -424,7 +452,10 @@ func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
 
 	resourceID := secretResourceID(initial.ExposedKey())
 	initialResource, err := newStoreGenerationResource(
-		lifecycle.ResourceIdentity{ID: resourceID, Generation: 1},
+		lifecycle.ResourceIdentity{
+			ID:         resourceID,
+			Generation: 1,
+		},
 		store,
 		initial.ExposedKey(),
 		result.Generation,
@@ -435,7 +466,9 @@ func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		require.NoError(t, controller.CloseProjection())
-		require.NoError(t, scope.Release(context.Background()))
+		if scope != nil {
+			require.NoError(t, scope.Release(context.Background()))
+		}
 		require.NoError(t, active.Finalize())
 		require.NoError(t, store.Close(context.Background()))
 	})
@@ -494,7 +527,14 @@ func TestStoreUpdateWhilePriorGenerationRetiresIsRetryable(t *testing.T) {
 	_, disposition, next = second.Ownership()
 	require.Equal(t, lifecycle.ResourceTransactionUnchanged, disposition)
 	require.Same(t, active, next)
-	require.True(t, controller.pendingVersion(initial.ExposedKey(), 2))
+	require.False(t, controller.pendingVersion(initial.ExposedKey(), 2))
+	require.NoError(t, scope.Release(context.Background()))
+	scope = nil
+	entry, ok := controller.entry(initial.ExposedKey())
+	require.True(t, ok)
+	require.Equal(t, "replacement", entry.config["value"])
+	// No retained owner exists to install the rejected payload on release.
+	require.Empty(t, controller.pending)
 }
 
 func TestStoreBusyOperationWaitsForRetiringGeneration(t *testing.T) {
@@ -611,7 +651,9 @@ func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T)
 		t.Context(),
 		input,
 		nil,
-		lifecycle.ResourceTransactionScope{ID: secretResourceID(key)},
+		lifecycle.ResourceTransactionScope{
+			ID: secretResourceID(key),
+		},
 		lifecycle.LongLivedPermit{},
 		stage,
 	)
@@ -636,7 +678,7 @@ func TestRemoveFailedAbsentDynCfgStoreWithdrawsPendingDesiredState(t *testing.T)
 	}, 50*time.Millisecond, time.Millisecond)
 }
 
-func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
+func TestPendingStoreActivationRequiresExactPublishedVersion(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	diagnostics := &secretRecordingDiagnosticObserver{}
 	controller.diagnostics = diagnostics
@@ -647,6 +689,13 @@ func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
 	controller.mu.Unlock()
 	t.Cleanup(func() {
 		require.NoError(t, controller.CloseProjection())
+		// A failed retry releases its staged mutation from the attempt
+		// goroutine; drain attempts so Close observes a zero census.
+		attempts := controller.operations.attempts.(*containment.Authority)
+		attempts.BeginShutdown()
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		require.NoError(t, attempts.Shutdown(shutdownCtx))
 		require.NoError(t, store.Close(context.Background()))
 	})
 
@@ -656,6 +705,8 @@ func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
 	firstRelease := make(chan struct{})
 	close(firstRelease)
 	controller.retainPending(config, firstVersion, firstRelease)
+	require.Empty(t, diagnostics.snapshot())
+	controller.startPending(config.ExposedKey(), firstVersion)
 	require.Eventually(t, func() bool {
 		return countSecretDiagnostics(
 			diagnostics.snapshot(),
@@ -669,6 +720,9 @@ func TestPendingStoreRestartsInactiveWorkerForLaterDesiredState(t *testing.T) {
 	secondRelease := make(chan struct{})
 	close(secondRelease)
 	controller.retainPending(config, secondVersion, secondRelease)
+	controller.startPending(config.ExposedKey(), firstVersion)
+	require.Equal(t, 1, countSecretDiagnostics(diagnostics.snapshot(), "secret Store pending retry failed"))
+	controller.startPending(config.ExposedKey(), secondVersion)
 	require.Eventually(t, func() bool {
 		return countSecretDiagnostics(
 			diagnostics.snapshot(),
@@ -708,7 +762,7 @@ func countSecretDiagnostics(events []jobmgr.DiagnosticEvent, name string) int {
 	return count
 }
 
-func TestFailedStoreUpdateReplacesFailedProjectionWhenNoActiveGenerationExists(t *testing.T) {
+func TestFailedStoreUpdatePreservesAcceptedProjectionBeforeActivation(t *testing.T) {
 	controller, store := newSecretControllerTestHarness(t, nil)
 	require.NoError(t, controller.Bind(restartTestJobs{}))
 	controller.setCommandsReady(true)
@@ -759,12 +813,12 @@ func TestFailedStoreUpdateReplacesFailedProjectionWhenNoActiveGenerationExists(t
 		return applied.ResultStatus()
 	}
 
-	require.Equal(t, 400, apply(dyncfg.CommandAdd, "provider-failure-one"))
+	require.Equal(t, 202, apply(dyncfg.CommandAdd, "provider-failure-one"))
 	require.Equal(t, 400, apply(dyncfg.CommandUpdate, "provider-failure-two"))
 	entry, ok := controller.entry(secretstore.StoreKey(secretstore.KindVault, "main"))
 	require.True(t, ok)
-	require.Equal(t, dyncfg.StatusFailed, entry.status)
-	require.Equal(t, "provider-failure-two", entry.config["value"])
+	require.Equal(t, dyncfg.StatusAccepted, entry.status)
+	require.Equal(t, "provider-failure-one", entry.config["value"])
 	require.NoError(t, store.Close(context.Background()))
 }
 
@@ -847,9 +901,8 @@ func TestStoreTestIdentityDoesNotBlockMutationsOrDifferentTests(t *testing.T) {
 			kind:    target.kind,
 			name:    target.name,
 		},
-		config:    secretTestConfig(confgroup.TypeDyncfg, "mutation"),
-		mode:      storeOperationMutation,
-		supersede: true,
+		config: secretTestConfig(confgroup.TypeDyncfg, "mutation"),
+		mode:   storeOperationMutation,
 	})
 	require.NoError(t, err)
 	stages = append(stages, mutation)
@@ -922,7 +975,10 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 	})
 
 	resourceID := secretResourceID(existing.ExposedKey())
-	currentIdentity := lifecycle.ResourceIdentity{ID: resourceID, Generation: 1}
+	currentIdentity := lifecycle.ResourceIdentity{
+		ID:         resourceID,
+		Generation: 1,
+	}
 	current, err := newStoreGenerationResource(
 		currentIdentity,
 		store,
@@ -930,7 +986,10 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 		result.Generation,
 	)
 	require.NoError(t, err)
-	successorIdentity := lifecycle.ResourceIdentity{ID: resourceID, Generation: 2}
+	successorIdentity := lifecycle.ResourceIdentity{
+		ID:         resourceID,
+		Generation: 2,
+	}
 
 	add := CommandInput{
 		Args:        []string{"go.d:secretstore:vault", "add", "main"},
@@ -970,7 +1029,10 @@ func TestSecretAddCollisionIsReplayUpsert(t *testing.T) {
 	require.Zero(t, current.storeGen)
 	stage.Release()
 
-	repeatSuccessor := lifecycle.ResourceIdentity{ID: resourceID, Generation: 3}
+	repeatSuccessor := lifecycle.ResourceIdentity{
+		ID:         resourceID,
+		Generation: 3,
+	}
 	repeatStage, err := controller.Stage(add)
 	require.NoError(t, err)
 	repeatStage.Start()
@@ -1052,7 +1114,7 @@ func newSecretControllerTestHarnessWithWriter(
 		Store:        store,
 		Operations:   operations,
 		Creators:     catalog,
-		Dependencies: NewSecretDependencyIndex(),
+		Dependencies: NewSecretDependencyIndex(testDependencyConfigResolver(t)),
 		Initial:      initial,
 	})
 	require.NoError(t, err)

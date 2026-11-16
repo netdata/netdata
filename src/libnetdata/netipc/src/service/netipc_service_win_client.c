@@ -30,11 +30,6 @@ static nipc_np_client_config_t service_client_config_to_transport(
     return transport;
 }
 
-static void client_sleep_ms(uint32_t ms)
-{
-    Sleep(ms);
-}
-
 static void close_abort_event(nipc_client_ctx_t *ctx)
 {
     if (ctx->abort_event) {
@@ -49,9 +44,6 @@ const nipc_service_common_client_ops_t *nipc_service_win_client_ops(void)
         .disconnect = nipc_service_win_client_disconnect,
         .try_connect = nipc_service_win_client_try_connect,
         .reconnect_for_call = nipc_service_win_client_reconnect_for_call,
-        .sleep_ms = client_sleep_ms,
-        .reconnect_drain_ms = CLIENT_CALL_RECONNECT_DRAIN_MS,
-        .reconnect_retry_interval_ms = CLIENT_CALL_RECONNECT_RETRY_INTERVAL_MS,
     };
     return &ops;
 }

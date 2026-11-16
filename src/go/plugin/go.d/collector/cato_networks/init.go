@@ -3,6 +3,7 @@
 package cato_networks
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -25,12 +26,12 @@ func (c *Collector) initSiteSelector() error {
 	return nil
 }
 
-func (c *Collector) initClient() error {
+func (c *Collector) initClient(ctx context.Context) error {
 	if c.client != nil {
 		return nil
 	}
 
-	httpClient, err := web.NewHTTPClient(c.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, c.ClientConfig)
 	if err != nil {
 		return fmt.Errorf("init http client: %w", err)
 	}

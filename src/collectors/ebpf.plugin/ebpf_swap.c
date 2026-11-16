@@ -46,8 +46,8 @@ static ebpf_local_maps_t swap_maps[] = {
     {.name = NULL, .internal_input = 0, .user_input = 0}};
 
 netdata_ebpf_targets_t swap_targets[] = {
-    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
-    {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "swap_readpage", .mode = EBPF_LOAD_TRAMPOLINE},
+    {.name = "swap_writepage", .mode = EBPF_LOAD_TRAMPOLINE},
     {.name = NULL, .mode = EBPF_LOAD_TRAMPOLINE}};
 
 #define NETDATA_SWAP_KEY_WRITE_START (2)
@@ -310,7 +310,7 @@ void ebpf_swap_unload_bpf(ebpf_module_t *em)
         em->probe_links = NULL;
     }
 #ifdef LIBBPF_MAJOR_VERSION
-    else if (swap_bpf_obj) {
+    if (swap_bpf_obj) {
         swap_bpf__destroy(swap_bpf_obj);
         swap_bpf_obj = NULL;
     }
@@ -1124,6 +1124,9 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
     }
 #endif
 
+    if (ret && (em->load & EBPF_LOAD_CORE))
+        ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
+
     if (ret)
         netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->info.thread_name);
 
@@ -1140,6 +1143,7 @@ static int ebpf_swap_load_bpf(ebpf_module_t *em)
 static int ebpf_swap_set_internal_value(void)
 {
     ebpf_addresses_t address = {.function = NULL, .hash = 0, .addr = 0, .type = 0};
+    bool found[NETDATA_SWAP_END] = {false};
     int i;
     for (i = 0; swap_functions[i]; i++) {
         address.function = swap_functions[i];
@@ -1147,11 +1151,12 @@ static int ebpf_swap_set_internal_value(void)
         if (address.addr) {
             int key = (i < 2) ? NETDATA_KEY_SWAP_READPAGE_CALL : NETDATA_KEY_SWAP_WRITEPAGE_CALL;
             swap_targets[key].name = address.function;
+            found[key] = true;
             address.addr = 0;
         }
     }
 
-    if (!swap_targets[NETDATA_KEY_SWAP_READPAGE_CALL].name || !swap_targets[NETDATA_KEY_SWAP_WRITEPAGE_CALL].name) {
+    if (!found[NETDATA_KEY_SWAP_READPAGE_CALL] || !found[NETDATA_KEY_SWAP_WRITEPAGE_CALL]) {
         netdata_log_error(
             "%s (%s, %s) swap.",
             NETDATA_EBPF_DEFAULT_FNT_NOT_FOUND,

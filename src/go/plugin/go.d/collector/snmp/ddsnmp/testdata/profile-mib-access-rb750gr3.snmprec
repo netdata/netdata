@@ -1,0 +1,6 @@
+# Sanitized projection of LibreNMS routeros_rb750gr3.snmprec.
+# Original suffixes and returned types retained; addresses replaced with documentation addresses.
+1.0.8802.1.1.2.1.4.2.1.1.0.6.2|2|1
+1.0.8802.1.1.2.1.4.2.1.1.0.10.1|2|2
+1.0.8802.1.1.2.1.4.2.1.2.0.6.2|4x|c0000201
+1.0.8802.1.1.2.1.4.2.1.2.0.10.1|4x|20010db8000000000000000000000001

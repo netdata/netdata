@@ -38,7 +38,10 @@
     "required_params": {
       "type": "array",
       "items": {
-        "type": "object"
+        "type": "object",
+        "properties": {
+          "focus": { "$ref": "#/$defs/focus" }
+        }
       }
     },
     "help": {
@@ -57,6 +60,136 @@
     }
   },
   "$defs": {
+    "focus_bindings": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "table",
+        "option_column",
+        "actor_column"
+      ],
+      "properties": {
+        "table": {
+          "type": "string",
+          "minLength": 1
+        },
+        "option_column": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actor_column": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_membership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actor_type",
+        "link_type"
+      ],
+      "properties": {
+        "actor_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "link_type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "focus_traversal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connect_roots"
+      ],
+      "properties": {
+        "connector_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "boundary_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "connect_roots": {
+          "type": "boolean"
+        },
+        "prune_leaf_types": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "protected_memberships": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/focus_membership"
+          }
+        }
+      }
+    },
+    "focus": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unfocused_option",
+            "bindings",
+            "traversal"
+          ],
+          "properties": {
+            "role": {
+              "const": "roots"
+            },
+            "unfocused_option": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bindings": {
+              "$ref": "#/$defs/focus_bindings"
+            },
+            "traversal": {
+              "$ref": "#/$defs/focus_traversal"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "role",
+            "unlimited_option"
+          ],
+          "properties": {
+            "role": {
+              "const": "depth"
+            },
+            "unlimited_option": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
     "topology_data": {
       "type": "object",
       "additionalProperties": false,
@@ -230,6 +363,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "focus": {
+          "$ref": "#/$defs/view_focus"
+        },
         "id": {
           "$ref": "#/$defs/id"
         },
@@ -265,6 +401,21 @@
           "uniqueItems": true,
           "default": []
         }
+      }
+    },
+    "view_focus": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Applied focus in the returned map. Omit focus when no focus was applied; omit depth for unlimited traversal.",
+      "required": ["roots"],
+      "properties": {
+        "roots": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 0},
+          "uniqueItems": true,
+          "description": "Distinct zero-based actor row references in this response after filtering and remapping. An empty array means no selected roots survived."
+        },
+        "depth": {"type": "integer", "minimum": 0}
       }
     },
     "dictionaries": {
@@ -406,7 +557,7 @@
         },
         "merge_identity": {
           "type": "array",
-          "description": "Actor-table column ids that may be used by a cross-node or cross-source aggregator.",
+          "description": "Actor-table column ids authorized for identity-based matching across source payloads. Omitted or empty means source-local only; an aggregator must not fall back to identity for cross-source matching.",
           "items": {
             "$ref": "#/$defs/id"
           },
@@ -1057,9 +1208,10 @@
         },
         "label_keys": {
           "type": "array",
-          "description": "actor_labels.key values whose label values should be indexed for graph search.",
+          "description": "Non-empty actor_labels.key values whose label values should be indexed for graph search. Label keys are not registry ids; built-in keys such as _hostname are valid.",
           "items": {
-            "$ref": "#/$defs/id"
+            "type": "string",
+            "minLength": 1
           },
           "uniqueItems": true,
           "default": []
@@ -1154,7 +1306,11 @@
         },
         "name_column": {
           "$ref": "#/$defs/id",
-          "description": "Column in the source table used as the bullet key or label."
+          "description": "Column in the source table used as the bullet key; consumers always display its value."
+        },
+        "label_column": {
+          "$ref": "#/$defs/id",
+          "description": "Optional display column with an operator-facing label, shown together with the name_column value; consumers show the name alone when the row value is null or empty. Never used as the bullet key."
         },
         "value_column": {
           "$ref": "#/$defs/id",
@@ -2473,7 +2629,8 @@
             "evidence_ref",
             "array",
             "json"
-          ]
+          ],
+          "description": "Cell type; for direct scalar columns with aggregation set, also the item type of a one-dimensional set-valued cell. Scalar cells remain valid. Reference cells retain their integer-index encoding."
         },
         "dictionary": {
           "$ref": "#/$defs/id"
@@ -2499,7 +2656,8 @@
           ]
         },
         "aggregation": {
-          "$ref": "#/$defs/aggregation_rule"
+          "$ref": "#/$defs/aggregation_rule",
+          "description": "Column reduction. With set on a direct scalar type, cells may be scalars or one-dimensional arrays whose members satisfy that type and nullable. Empty sets are valid; nested arrays and coercion are not. This relationship is checked by semantic validation; array, json, and reference types retain their existing rules."
         }
       }
     },

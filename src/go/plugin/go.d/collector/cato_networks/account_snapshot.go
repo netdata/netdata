@@ -46,8 +46,8 @@ const accountSnapshotDocument = `query accountSnapshot($siteIDs: [ID!], $account
 					info {
 						id
 						name
-						upstreamBandwidth
-						downstreamBandwidth
+						upstreamBandwidthMbpsPrecision
+						downstreamBandwidthMbpsPrecision
 					}
 				}
 				interfacesLinkState {
@@ -119,10 +119,10 @@ type accountSnapshotInterface struct {
 }
 
 type accountSnapshotInterfaceInfo struct {
-	DownstreamBandwidth *int64  `json:"downstreamBandwidth"`
-	ID                  string  `json:"id"`
-	Name                *string `json:"name"`
-	UpstreamBandwidth   *int64  `json:"upstreamBandwidth"`
+	DownstreamBandwidth *float64 `json:"downstreamBandwidthMbpsPrecision"`
+	ID                  string   `json:"id"`
+	Name                *string  `json:"name"`
+	UpstreamBandwidth   *float64 `json:"upstreamBandwidthMbpsPrecision"`
 }
 
 type accountSnapshotInterfaceLinkState struct {

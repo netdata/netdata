@@ -3,6 +3,8 @@
 package consul
 
 import (
+	"context"
+
 	"github.com/blang/semver/v4"
 )
 
@@ -45,8 +47,8 @@ type consulConfig struct {
 	}
 }
 
-func (c *Collector) collectConfiguration() error {
-	req, err := c.createRequest(urlPathAgentSelf)
+func (c *Collector) collectConfiguration(ctx context.Context) error {
+	req, err := c.createRequest(ctx, urlPathAgentSelf)
 	if err != nil {
 		return err
 	}

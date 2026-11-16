@@ -175,6 +175,7 @@ func cloneAutogenPolicy(policy runtimecomp.AutogenPolicy) runtimecomp.AutogenPol
 			},
 		}
 	}
+	out.CounterRawCharts = slices.Clone(policy.CounterRawCharts)
 	return out
 }
 

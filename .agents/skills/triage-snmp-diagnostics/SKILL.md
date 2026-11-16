@@ -1,12 +1,24 @@
 ---
 name: triage-snmp-diagnostics
-description: Investigate offline SNMP support bundles or diagnostic files using src/go/tools/snmp-diagnostics; missing or wrong topology links/devices, metrics, BGP peers, licensing, slow collection, and discovery or lifecycle failures. Developer workflow for captured evidence, replay, and source tracing. Not for live Agent/Cloud queries, SNMP traps, creating profiles, or implementing collector/topology changes.
+description: Investigate captured SNMP diagnostics and support bundles, or review diagnostics-tool and evidence-interpretation changes. Covers missing topology/metrics/BGP/licensing, slow collection, and discovery/lifecycle failures through offline inspection, replay and source tracing. Live queries, traps and collector/profile implementation use separate skills.
 ---
 
 # Offline SNMP Diagnostics
 
 Developer workflow for investigating captured SNMP evidence with the repository's maintainer tool. Start with the
 supplied evidence and narrow the failure to acquisition, processing, or the consuming feature before proposing a fix.
+
+## Select The Operation
+
+| Task | Use this workflow |
+|---|---|
+| Investigate a supplied capture | Establish the evidence window below, then select the symptom and owner sections |
+| Review diagnostics tooling or interpretation changes | Read the affected input, evidence, replay and resource-cost contracts from the owners below; assess the diff and existing fixtures/validation |
+| Explain an evidence field or limitation | Read its owner section and relevant producer source; no capture run required solely to explain the contract |
+
+Source-only review does not require acquiring a support bundle, replaying private data or creating investigation
+artifacts. Report material evidence gaps without treating loading this skill as authorization for operational steps.
+A review of unrelated SNMP collector internals does not select this skill unless diagnostic evidence/contracts are affected.
 
 ## Owners
 

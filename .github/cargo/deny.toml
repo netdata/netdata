@@ -1,0 +1,10 @@
+# cargo-deny policy for the src/crates workspace. Not auto-discovered: pass it with --config. CI runs only `check advisories`.
+
+[advisories]
+# Unmaintained crates that were vetted and accepted. A vulnerability advisory against any of them still fails.
+ignore = [
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1 (via foyer, madsim) and 2 (direct) are unmaintained; vetted and accepted" },
+    { id = "RUSTSEC-2025-0057", reason = "fxhash (via hashers) is unmaintained; vetted and accepted" },
+    { id = "RUSTSEC-2024-0436", reason = "paste (via foyer-memory) is unmaintained; vetted and accepted" },
+    { id = "RUSTSEC-2024-0449", reason = "unsafe-libyaml (via serde_yaml) is unmaintained; vetted and accepted" },
+]

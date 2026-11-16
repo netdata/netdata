@@ -3,8 +3,8 @@
 Use this when a generated integration page links to `learn.netdata.cloud` and a link may have drifted from the current
 Learn route. The rule and its evidence live in the Learn skill:
 `.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md` (absolute Learn URLs in
-metadata bypass ingest's link rewriting and anchor validation; Learn routes come from `docs/.map/map.yaml` labels, not
-from source filenames, so never infer a slug from a filename). This file keeps the audit commands.
+metadata bypass ingest's link rewriting; Learn routes come from `docs/.map/map.yaml` labels, not from source
+filenames, so never infer a slug from a filename). This file keeps the audit commands.
 
 ## Audit command
 
@@ -27,13 +27,15 @@ curl -A 'Mozilla/5.0' -sL 'https://learn.netdata.cloud/docs/netdata-agent/config
   | rg 'id="locate-your-config-directory"'
 ```
 
-Validate source-relative metadata links (`/docs/...` and `../` targets) against the source tree:
+Validate repository-relative metadata links (`/...`, `./` and `../` targets) against the source tree. The script checks
+that each file exists, not its anchors; ingest checks those
+(`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`):
 
 ```bash
 python3 - <<'PY'
 import pathlib, re, sys
 
-root = pathlib.Path('.')
+root = pathlib.Path('.').resolve()
 pat = re.compile(r'\[[^\]]+\]\(([^)]+)\)')
 problems = []
 
@@ -41,28 +43,29 @@ for path in sorted(root.rglob('metadata.yaml')):
     text = path.read_text(errors='replace')
     for match in pat.finditer(text):
         target = match.group(1).strip()
-        if target.startswith('/docs/'):
-            file = root / target.split('#', 1)[0].lstrip('/')
+        if target.startswith('/') and not target.startswith('//'):
+            file = (root / target.split('#', 1)[0].lstrip('/')).resolve()
         elif target.startswith('../') or target.startswith('./'):
             file = (path.parent / target.split('#', 1)[0]).resolve()
         else:
             continue
 
-        if not file.is_file():
+        if not file.is_relative_to(root) or not file.is_file():
             line = text.count('\n', 0, match.start()) + 1
-            problems.append((str(path), line, target))
+            problems.append((str(path.relative_to(root)), line, target))
 
 if problems:
     for path, line, target in problems:
-        print(f'{path}:{line}: missing linked source file: {target}')
+        print(f'{path}:{line}: linked file missing or outside the repository: {target}')
     sys.exit(1)
 
-print('OK: all metadata.yaml /docs and relative markdown links resolve to source files')
+print('OK: all repository-relative metadata.yaml links resolve to source files')
 PY
 ```
 
 ## Repair rule
 
-Prefer the source-relative `/docs/... .md` form when the consuming surface supports Learn ingest rewriting. Keep an
-absolute URL only for surfaces that do not rewrite, derive its slug from the `map.yaml` label, and verify it with `curl`
-as above.
+Replace each absolute Learn URL with the repository-relative `.md` path of the target page's source file. Keep an
+anchor only when it is the slug of the target heading's text: ingest checks repository-relative anchors differently
+from absolute Learn URLs (`.agents/skills/docs-learn-site-structure/mapping.md#links-between-pages`). The rule, and
+how the generator and ingest resolve that form, are in the Learn skill how-to named above.

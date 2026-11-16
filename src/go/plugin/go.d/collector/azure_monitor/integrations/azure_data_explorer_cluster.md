@@ -47,7 +47,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -171,6 +171,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -189,7 +202,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -381,7 +394,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -636,27 +649,27 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_data_explorer_keep_alive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.keep_alive | Data Explorer keep alive on ${label:resource_name} |
-| [ am_data_explorer_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.cpu_utilization | Data Explorer CPU on ${label:resource_name} |
-| [ am_data_explorer_ingestion_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer ingestion utilization on ${label:resource_name} |
-| [ am_data_explorer_cache_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Data Explorer cache utilization on ${label:resource_name} |
-| [ am_data_explorer_throttled_commands ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_commands | Data Explorer throttled commands on ${label:resource_name} |
-| [ am_data_explorer_query_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.query_duration | Data Explorer query duration on ${label:resource_name} |
-| [ am_data_explorer_throttled_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_queries | Data Explorer throttled queries on ${label:resource_name} |
-| [ am_data_explorer_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_latency | Data Explorer ingestion latency on ${label:resource_name} |
-| [ am_data_explorer_events_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.events | Data Explorer events dropped on ${label:resource_name} |
-| [ am_data_explorer_blobs_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.blobs | Data Explorer blobs dropped on ${label:resource_name} |
-| [ am_data_explorer_ingestion_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_queue | Data Explorer ingestion queue on ${label:resource_name} |
-| [ am_data_explorer_queue_oldest_message ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.queue_oldest_message | Data Explorer queue oldest message age on ${label:resource_name} |
-| [ am_data_explorer_export_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.export_utilization | Data Explorer export utilization on ${label:resource_name} |
-| [ am_data_explorer_continuous_export_pending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_pending | Data Explorer continuous export pending on ${label:resource_name} |
-| [ am_data_explorer_continuous_export_lateness ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_lateness | Data Explorer continuous export lateness on ${label:resource_name} |
-| [ am_data_explorer_streaming_ingest_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_utilization | Data Explorer streaming ingest utilization on ${label:resource_name} |
-| [ am_data_explorer_streaming_ingest_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_duration | Data Explorer streaming ingest duration on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_health | Data Explorer materialized view health on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_age | Data Explorer materialized view age on ${label:resource_name} |
-| [ am_data_explorer_materialized_view_data_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_data_loss | Data Explorer materialized view data loss on ${label:resource_name} |
-| [ am_data_explorer_follower_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.follower_latency | Data Explorer follower latency on ${label:resource_name} |
+| [ am_data_explorer_keep_alive ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.keep_alive | Cluster keep-alive health signal for Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). A value below 1 indicates the cluster is not responding properly. |
+| [ am_data_explorer_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.cpu_utilization | Average CPU utilization of Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_explorer_ingestion_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Average ingestion utilization of Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization indicates the cluster is approaching ingestion capacity. |
+| [ am_data_explorer_cache_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.utilization | Average cache utilization factor of Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High cache utilization may cause queries to read from cold storage. |
+| [ am_data_explorer_throttled_commands ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_commands | Rate of throttled commands on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates the cluster is overloaded. |
+| [ am_data_explorer_query_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.query_duration | Average query duration on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_explorer_throttled_queries ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.throttled_queries | Rate of throttled queries on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Throttling indicates insufficient query capacity. |
+| [ am_data_explorer_ingestion_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_latency | Average ingestion latency on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High latency means data takes longer to become queryable. |
+| [ am_data_explorer_events_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.events | Rate of dropped ingestion events on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Dropped events indicate data loss during ingestion. |
+| [ am_data_explorer_blobs_dropped ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.blobs | Rate of dropped blobs during ingestion on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Dropped blobs indicate data loss during ingestion. |
+| [ am_data_explorer_ingestion_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.ingestion_queue | Average ingestion queue length on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). A growing queue indicates ingestion is not keeping up with incoming data. |
+| [ am_data_explorer_queue_oldest_message ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.queue_oldest_message | Age of the oldest message in the ingestion queue of Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Old messages indicate a significant ingestion backlog. |
+| [ am_data_explorer_export_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.export_utilization | Export utilization of Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High export utilization may cause export jobs to be delayed or fail. |
+| [ am_data_explorer_continuous_export_pending ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_pending | Number of pending continuous export jobs on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_explorer_continuous_export_lateness ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.continuous_export_lateness | Maximum continuous export lateness on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High lateness means exported data is significantly behind real-time. |
+| [ am_data_explorer_streaming_ingest_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_utilization | Average streaming ingest utilization on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High utilization indicates the cluster is approaching streaming ingest capacity. |
+| [ am_data_explorer_streaming_ingest_duration ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.streaming_ingest_duration | Average streaming ingest duration on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_explorer_materialized_view_health ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_health | Materialized view health status on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). A value below 1 indicates the materialized view is unhealthy. |
+| [ am_data_explorer_materialized_view_age ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_age | Age of the materialized view on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High age means the view is significantly behind the source data. |
+| [ am_data_explorer_materialized_view_data_loss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.materialized_view_data_loss | Materialized view is reporting data loss on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). This indicates potential data inconsistency in the view. |
+| [ am_data_explorer_follower_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_explorer.conf) | azure_monitor.data_explorer.follower_latency | Average follower replication latency on Azure Data Explorer cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High latency means follower databases are behind the leader. |
 
 
 

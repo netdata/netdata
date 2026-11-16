@@ -253,6 +253,7 @@ type c020BadgeSpec struct {
 	dimension string
 	group     string
 	units     string
+	options   string
 	after     int64
 	before    int64
 }
@@ -275,6 +276,9 @@ func c020Badge(t *testing.T, spec c020BadgeSpec) string {
 	}
 	if spec.units != "" {
 		params.Set("units", spec.units)
+	}
+	if spec.options != "" {
+		params.Set("options", "unaligned,"+spec.options)
 	}
 	endpoint := fmt.Sprintf(
 		"%s/host/%s/api/v1/badge.svg?%s",
@@ -453,12 +457,23 @@ func TestCase020BadgeSumUnits(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			trackContract(t, tc.contract)
-			svg := c020Badge(t, c020BadgeSpec{
-				baseURL: td.BaseURL, host: host, chart: tc.chart,
-				dimension: tc.dimension, group: "sum", after: first, before: before,
+			t.Run("plain", func(t *testing.T) {
+				trackContract(t, tc.contract)
+				svg := c020Badge(t, c020BadgeSpec{
+					baseURL: td.BaseURL, host: host, chart: tc.chart,
+					dimension: tc.dimension, group: "sum", after: first, before: before,
+				})
+				c020AssertBadgeUnits(t, svg, tc.want)
 			})
-			c020AssertBadgeUnits(t, svg, tc.want)
+			t.Run("return-raw-percentage", func(t *testing.T) {
+				trackContractComponent(t, "CASE-020/badge-raw-percentage-units", tc.name)
+				svg := c020Badge(t, c020BadgeSpec{
+					baseURL: td.BaseURL, host: host, chart: tc.chart,
+					dimension: tc.dimension, group: "sum", after: first, before: before,
+					options: "percentage,raw",
+				})
+				c020AssertBadgeUnits(t, svg, tc.want)
+			})
 		})
 	}
 }

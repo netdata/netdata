@@ -662,12 +662,11 @@ void pulse_dbengine_do(bool extended) {
 
     int64_t buffers_total_size = (int64_t)dbmem.xt_buf + (int64_t)dbmem.wal;
 
-    int64_t aral_structures_total_size = 0, aral_used_total_size = 0;
+    int64_t aral_structures_total_size = 0;
     int64_t aral_padding_total_size = 0;
     for(size_t i = 0; i < RRDENG_MEM_MAX ; i++) {
         buffers_total_size += (int64_t)aral_free_bytes_from_stats(dbmem.as[i]);
         aral_structures_total_size += (int64_t)aral_structures_bytes_from_stats(dbmem.as[i]);
-        aral_used_total_size += (int64_t)aral_used_bytes_from_stats(dbmem.as[i]);
         aral_padding_total_size += (int64_t)aral_padding_bytes_from_stats(dbmem.as[i]);
     }
 
@@ -1516,8 +1515,6 @@ void pulse_dbengine_do(bool extended) {
             stats_array[30] = local_stats_array[30];
             stats_array[31] = local_stats_array[31];
             stats_array[32] = local_stats_array[32];
-            stats_array[34] = local_stats_array[34];
-            stats_array[36] = local_stats_array[36];
 
             // ----------------------------------------------------------------
 
@@ -1665,7 +1662,6 @@ void pulse_dbengine_do(bool extended) {
                 static RRDSET *st_errors = NULL;
                 static RRDDIM *rd_fs_errors = NULL;
                 static RRDDIM *rd_io_errors = NULL;
-                static RRDDIM *pg_cache_over_half_dirty_events = NULL;
 
                 if (unlikely(!st_errors)) {
                     st_errors = rrdset_create_localhost(
@@ -1684,14 +1680,11 @@ void pulse_dbengine_do(bool extended) {
 
                     rd_io_errors = rrddim_add(st_errors, "io_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                     rd_fs_errors = rrddim_add(st_errors, "fs_errors", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
-                    pg_cache_over_half_dirty_events =
-                        rrddim_add(st_errors, "pg_cache_over_half_dirty_events", NULL, 1, 1, RRD_ALGORITHM_INCREMENTAL);
                 }
                 priority++;
 
                 rrddim_set_by_pointer(st_errors, rd_io_errors, (collected_number)stats_array[30]);
                 rrddim_set_by_pointer(st_errors, rd_fs_errors, (collected_number)stats_array[31]);
-                rrddim_set_by_pointer(st_errors, pg_cache_over_half_dirty_events, (collected_number)stats_array[34]);
                 rrdset_done(st_errors);
             }
 

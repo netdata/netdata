@@ -190,28 +190,32 @@ func (ck *CommandKernel) serviceTaskStarts(quantum int) bool {
 				ck.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup task slot"))
 				return more
 			}
-			delete(ck.functionCleanupRequests, start.Request)
-			ck.functionCleanupTasks[start.Task] = functionCleanupTask{
+			cleanup := functionCleanupTask{
 				ref: cleanupRef,
+				task: oneShotTask{
+					request: start.Request,
+				},
+			}
+			if err := cleanup.task.start(start, "Function cleanup"); err != nil {
+				ck.run.Dirty(err)
+				return more
+			}
+			delete(ck.functionCleanupRequests, start.Request)
+			ck.functionCleanupTasks[start.Task] = cleanup
+			continue
+		}
+		if ck.barrierWork.request.Valid() && start.Request == ck.barrierWork.request {
+			if err := ck.barrierWork.start(start, "shutdown barrier"); err != nil {
+				ck.run.Dirty(err)
+				return more
 			}
 			continue
 		}
-		if ck.shutdownBarrierRequest.Valid() && start.Request == ck.shutdownBarrierRequest {
-			if ck.shutdownBarrierTask.Valid() || ck.shutdownBarrierDone || ck.shutdownBarrierFailed {
-				ck.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier start acknowledgement"))
+		if ck.finalizerWork.request.Valid() && start.Request == ck.finalizerWork.request {
+			if err := ck.finalizerWork.start(start, "run finalizer"); err != nil {
+				ck.run.Dirty(err)
 				return more
 			}
-			ck.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
-			ck.shutdownBarrierTask = start.Task
-			continue
-		}
-		if ck.finalizerRequest.Valid() && start.Request == ck.finalizerRequest {
-			if ck.finalizerTask.Valid() || ck.finalizerDone || ck.finalizerFailed {
-				ck.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer start acknowledgement"))
-				return more
-			}
-			ck.finalizerRequest = lifecycle.TaskRequestRef{}
-			ck.finalizerTask = start.Task
 			continue
 		}
 		operation := ck.tasksByRequest[start.Request]

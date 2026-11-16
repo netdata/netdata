@@ -4,6 +4,7 @@ package promvalidation
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"os"
 	"path/filepath"
@@ -12,6 +13,8 @@ import (
 	"testing"
 
 	promreplay "github.com/netdata/netdata/go/plugins/internal/promprofile/replay"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidateSemanticSnapshotUsesProductionFacts(t *testing.T) {
@@ -41,6 +44,7 @@ template:
     - title: Value
       context: value
       units: values
+      lifecycle: {expire_after_cycles: 0}
       label_promotion: []
       instances:
         by_labels: [instance]
@@ -73,6 +77,9 @@ template:
 		snapshot.Profiles[0].FallbackRules[0].RuntimePath != "fallback_type.gauge[0]" ||
 		len(snapshot.Profiles[0].Charts) != 1 || snapshot.Profiles[0].Charts[0].Priority != 100 {
 		t.Fatalf("unexpected static profile facts: %#v", snapshot.Profiles)
+	}
+	if expiry := snapshot.Profiles[0].Charts[0].ExpireAfterCycles; expiry == nil || *expiry != 0 {
+		t.Fatalf("explicit zero expiry was lost: %v", expiry)
 	}
 	if len(snapshot.Sources) != 1 {
 		t.Fatalf("source count: got %d, want 1", len(snapshot.Sources))
@@ -133,6 +140,72 @@ template:
 	}
 	if got := report.ResultSnapshot().Semantics.Sources[0].Routes[0].ChartLabelValues[0].Value; got != "node-a" {
 		t.Fatalf("ResultSnapshot aliases route label state: got %q", got)
+	}
+}
+
+func TestSemanticSnapshotChartExpiryOwnership(t *testing.T) {
+	for name, tc := range map[string]struct {
+		lifecycle string
+		want      *int
+	}{
+		"omitted":  {},
+		"zero":     {lifecycle: "lifecycle: {expire_after_cycles: 0}", want: new(0)},
+		"positive": {lifecycle: "lifecycle: {expire_after_cycles: 7}", want: new(7)},
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			profilePath := filepath.Join(dir, "candidate.yaml")
+			dumpPath := filepath.Join(dir, "metrics.prom")
+			profile := fmt.Sprintf(`
+match: app_*
+app: app
+template:
+  family: Example
+  context_namespace: app
+  metrics: [app_value]
+  charts:
+    - title: Value
+      context: value
+      units: values
+      %s
+      dimensions:
+        - selector: app_value
+          name: value
+`, tc.lifecycle)
+			require.NoError(t, os.WriteFile(profilePath, []byte(profile), 0o600))
+			require.NoError(t, os.WriteFile(dumpPath, []byte("# TYPE app_value gauge\napp_value 7\n"), 0o600))
+			report := validateTestMode(t.Context(), Options{
+				ProfilePath: profilePath,
+				DumpPath:    dumpPath,
+			}, validationMode{semanticFacts: true})
+			first := report.ResultSnapshot().Semantics
+			require.NotNil(t, first, "findings: %#v", report.Findings)
+			require.Len(t, first.Profiles, 1)
+			require.Len(t, first.Profiles[0].Charts, 1)
+			require.Equal(t, tc.want, first.Profiles[0].Charts[0].ExpireAfterCycles)
+			sibling := report.ResultSnapshot().Semantics
+			clone := promreplay.CloneSemanticSnapshot(first)
+
+			// A returned snapshot is mutable, but cannot change the report or other copies.
+			if first.Profiles[0].Charts[0].ExpireAfterCycles == nil {
+				first.Profiles[0].Charts[0].ExpireAfterCycles = new(17)
+			} else {
+				*first.Profiles[0].Charts[0].ExpireAfterCycles = 17
+			}
+			assert.Equal(t, tc.want, report.ResultSnapshot().Semantics.Profiles[0].Charts[0].ExpireAfterCycles, "report evidence changed")
+			assert.Equal(t, tc.want, sibling.Profiles[0].Charts[0].ExpireAfterCycles, "sibling snapshot changed")
+			assert.Equal(t, tc.want, clone.Profiles[0].Charts[0].ExpireAfterCycles, "direct clone changed")
+
+			// Direct clones must own their expiry too, including an initially omitted field.
+			if clone.Profiles[0].Charts[0].ExpireAfterCycles == nil {
+				clone.Profiles[0].Charts[0].ExpireAfterCycles = new(23)
+			} else {
+				*clone.Profiles[0].Charts[0].ExpireAfterCycles = 23
+			}
+			assert.Equal(t, new(17), first.Profiles[0].Charts[0].ExpireAfterCycles, "clone changed its input")
+			assert.Equal(t, tc.want, sibling.Profiles[0].Charts[0].ExpireAfterCycles, "clone changed sibling evidence")
+			assert.Equal(t, tc.want, report.ResultSnapshot().Semantics.Profiles[0].Charts[0].ExpireAfterCycles, "clone changed retained evidence")
+		})
 	}
 }
 

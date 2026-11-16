@@ -126,7 +126,14 @@ scanit() {
 
   progress "Configuring netdata source..."
   USE_SYSTEM_PROTOBUF=1
+  # Coverity analyzes the C code only: turn off the Go-built components that
+  # default to on, so configure does not require a Go toolchain.
   ENABLE_GO=0
+  ENABLE_IBM=0
+  ENABLE_SCRIPTS=0
+  ENABLE_STATSD=0
+  ENABLE_IPMI=0
+  ENABLE_DEM=0
   prepare_cmake_options
 
   # shellcheck disable=SC2086

@@ -3,6 +3,7 @@
 package bind
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
@@ -40,8 +41,8 @@ type xml3Client struct {
 	request    web.RequestConfig
 }
 
-func (c xml3Client) serverStats() (*serverStats, error) {
-	req, err := web.NewHTTPRequestWithPath(c.request, "/server")
+func (c xml3Client) serverStats(ctx context.Context) (*serverStats, error) {
+	req, err := web.NewHTTPRequestWithPath(ctx, c.request, "/server")
 	if err != nil {
 		return nil, fmt.Errorf("failed to create HTTP request: %v", err)
 	}

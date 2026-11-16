@@ -3,6 +3,7 @@
 package mysql
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -12,7 +13,12 @@ import (
 func dsnFromFile(filename string) (string, error) {
 	f, err := ini.Load(filename)
 	if err != nil {
-		return "", err
+		var pathErr *os.PathError
+		if errors.As(err, &pathErr) {
+			return "", err
+		}
+		// INI syntax errors can include configuration lines and credentials.
+		return "", fmt.Errorf("error on parsing MySQL configuration %q: invalid INI syntax", filename)
 	}
 
 	section, err := f.GetSection("client")

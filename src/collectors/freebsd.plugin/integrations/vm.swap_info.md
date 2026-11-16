@@ -27,7 +27,7 @@ The plugin calls `sysctlnametomib` function to collect necessary data.
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -36,9 +36,6 @@ This collector supports collecting metrics from multiple instances of this integ
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -105,7 +102,7 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | swap memory utilization |
+| [ used_swap ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swap | Swap memory utilization |
 
 
 

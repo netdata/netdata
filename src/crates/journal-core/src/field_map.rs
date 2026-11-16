@@ -1,41 +1,54 @@
+//! Field-name compatibility between original log field names and systemd
+//! journal field names.
+//! The plugin's former journal writer stored each field under its original
+//! name when journald accepted it (1..=64 bytes of `A-Z`, `0-9`, `_`, starting
+//! with `A-Z`), otherwise under a remapped name, and recorded the
+//! `remapped-name=original-name` pairs in journal entries tagged with
+//! [`REMAPPING_MARKER`]. `JournalReader::load_remappings` (in
+//! `src/crates/journal-core/src/file/reader.rs`) rebuilds a [`FieldMap`] from
+//! those entries so queries can use the original names again. It keeps only
+//! remapped names in the former encoder's 35-byte `ND_` + 32-hex shape and
+//! drops the other encoded shapes (see its name-shape gate).
 use crate::collections::{HashMap, HashSet};
 
+/// The journal item that tags a remapping bookkeeping entry.
+///
+/// The plugin's former journal writer wrote it into every entry that records
+/// `remapped-name=original-name` pairs. Consumers detect those entries by this
+/// exact payload: `JournalReader::load_remappings` rebuilds [`FieldMap`] from
+/// them, journal-index excludes them from the index, and journal-engine skips
+/// them in query results.
 pub const REMAPPING_MARKER: &[u8] = b"ND_REMAPPING=1";
 
-/// Validates if a field name is compatible with systemd journal requirements.
-pub fn is_systemd_compatible(field_name: &[u8]) -> bool {
-    if field_name.is_empty() || field_name.len() > 64 {
-        return false;
-    }
-
-    // First byte must be uppercase A-Z
-    if !field_name[0].is_ascii_uppercase() {
-        return false;
-    }
-
-    // All bytes must be uppercase A-Z, digit 0-9, or underscore
-    field_name
-        .iter()
-        .all(|&b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
-}
-
-/// Extracts the field name from a `KEY=VALUE` pair.
+/// Returns the field name of a `KEY=VALUE` journal item: the bytes before the
+/// first `=`, borrowed from `item`.
+///
+/// `None` when the item contains no `=`. The name may be empty (`=value`);
+/// values may themselves contain `=`, hence "first".
 pub fn extract_field_name(item: &[u8]) -> Option<&[u8]> {
     item.iter().position(|&b| b == b'=').map(|pos| &item[..pos])
 }
 
-/// Bidirectional mapping registry between original field names and their systemd-compatible versions.
+/// Bidirectional map between original field names and their remapped
+/// systemd-compatible names.
+///
+/// `JournalReader::load_remappings` builds it from the journal's remapping
+/// bookkeeping entries to translate queries back to original names. A map
+/// covers one journal file.
+///
+/// Keys are compared as exact bytes; only the first mapping per original name
+/// is kept (see [`FieldMap::add_otel_mapping`]).
 #[derive(Debug, Default)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct FieldMap {
-    /// Maps original field name → remapped name (ND_<md5>)
+    /// Original field name → remapped journal name.
     otel_to_systemd: HashMap<Vec<u8>, String>,
-    /// Maps remapped name (ND_<md5>) → original field name
+    /// Remapped journal name → original field name (reverse lookup).
     systemd_to_otel: HashMap<String, Vec<u8>>,
 }
 
 impl FieldMap {
-    /// Creates a new empty remapping registry.
+    /// Creates an empty map.
     pub fn new() -> Self {
         Self {
             otel_to_systemd: HashMap::default(),
@@ -43,9 +56,11 @@ impl FieldMap {
         }
     }
 
-    /// Adds a new mapping to the registry.
+    /// Registers a mapping in both directions.
     ///
-    /// Returns `true` if this is a new mapping, `false` if it already existed.
+    /// Returns `true` when the original name was new; a repeated original name
+    /// changes nothing and returns `false`, so the first mapping per name
+    /// wins.
     pub fn add_otel_mapping(&mut self, otel_name: Vec<u8>, systemd_name: String) -> bool {
         if self.otel_to_systemd.contains_key(&otel_name) {
             return false;
@@ -57,40 +72,33 @@ impl FieldMap {
         true
     }
 
-    /// Gets the systemd-compatible name for an original field name.
-    ///
-    /// Returns `None` if no mapping exists for this field name.
+    /// Returns the remapped journal name for `otel_name`, or `None` if
+    /// unmapped.
     pub fn get_systemd_name(&self, otel_name: &[u8]) -> Option<&str> {
         self.otel_to_systemd.get(otel_name).map(|s| s.as_str())
     }
 
-    /// Gets the original field name for a systemd-compatible name.
-    ///
-    /// Returns `None` if no mapping exists for this systemd name.
+    /// Returns the original field name for a remapped journal name, or `None`
+    /// if unmapped.
     pub fn get_otel_name(&self, systemd_name: &str) -> Option<&[u8]> {
         self.systemd_to_otel.get(systemd_name).map(|v| v.as_slice())
     }
 
-    /// Returns `true` if the registry contains a mapping for this original field name.
-    pub fn contains_otel_name(&self, otel_name: &[u8]) -> bool {
-        self.otel_to_systemd.contains_key(otel_name)
-    }
-
-    /// Returns `true` if the registry is empty.
+    /// Returns `true` when the map has no mappings.
     pub fn is_empty(&self) -> bool {
         self.otel_to_systemd.is_empty()
     }
 
-    /// Returns the number of mappings in the registry.
+    /// Returns the number of mappings in the map.
     pub fn len(&self) -> usize {
         self.otel_to_systemd.len()
     }
 
-    pub fn clear(&mut self) {
-        self.otel_to_systemd.clear();
-        self.systemd_to_otel.clear();
-    }
-
+    /// Consumes the map and returns the set of original field names.
+    ///
+    /// Keys are reinterpreted as UTF-8 without validation
+    /// (`String::from_utf8_unchecked`); sound only while original names are
+    /// valid UTF-8.
     pub fn fields(self) -> HashSet<String> {
         self.otel_to_systemd
             .into_keys()
@@ -104,38 +112,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_is_systemd_compatible() {
-        // Valid field names
-        assert!(is_systemd_compatible(b"MESSAGE"));
-        assert!(is_systemd_compatible(b"PRIORITY"));
-        assert!(is_systemd_compatible(b"USER_ID"));
-        assert!(is_systemd_compatible(b"A"));
-        assert!(is_systemd_compatible(b"A1"));
-        assert!(is_systemd_compatible(b"A_B_C"));
-        assert!(is_systemd_compatible(b"Z9_"));
-        assert!(is_systemd_compatible(b"ND_REMAPPING")); // Our marker field
-
-        // Invalid field names - lowercase
-        assert!(!is_systemd_compatible(b"message"));
-        assert!(!is_systemd_compatible(b"Message"));
-        assert!(!is_systemd_compatible(b"mESSAGE"));
-
-        // Invalid field names - special chars
-        assert!(!is_systemd_compatible(b"my.field"));
-        assert!(!is_systemd_compatible(b"my-field"));
-        assert!(!is_systemd_compatible(b"my:field"));
-        assert!(!is_systemd_compatible(b"my field"));
-
-        // Invalid field names - doesn't start with uppercase
-        assert!(!is_systemd_compatible(b"1MESSAGE"));
-        assert!(!is_systemd_compatible(b"_MESSAGE"));
-
-        // Invalid field names - empty or too long
-        assert!(!is_systemd_compatible(b""));
-        assert!(!is_systemd_compatible(&[b'A'; 65]));
-    }
-
-    #[test]
     fn test_extract_field_name() {
         assert_eq!(
             extract_field_name(b"MESSAGE=hello"),
@@ -145,6 +121,7 @@ mod tests {
             extract_field_name(b"PRIORITY=5"),
             Some(b"PRIORITY".as_ref())
         );
+        // First `=` wins; empty key and missing `=` are both valid outcomes.
         assert_eq!(extract_field_name(b"A="), Some(b"A".as_ref()));
         assert_eq!(extract_field_name(b"=value"), Some(b"".as_ref()));
         assert_eq!(extract_field_name(b"NO_EQUALS"), None);
@@ -158,15 +135,15 @@ mod tests {
         assert!(registry.is_empty());
         assert_eq!(registry.len(), 0);
 
-        // Add first mapping
-        let otel_name = b"my.field.name".to_vec();
-        let systemd_name = rdp::encode_full(&otel_name);
+        // Both remapped shapes the former writer produced: an encoded name
+        // and the `ND_` + 32 uppercase hex MD5 fallback.
+        let otel_name = b"log.body.hostname".to_vec();
+        let systemd_name = "NDAAE_LB_HOSTNAME".to_string();
         assert!(registry.add_otel_mapping(otel_name.clone(), systemd_name.clone()));
 
         assert!(!registry.is_empty());
         assert_eq!(registry.len(), 1);
 
-        // Lookup works both ways
         assert_eq!(
             registry.get_systemd_name(&otel_name),
             Some(systemd_name.as_str())
@@ -176,22 +153,16 @@ mod tests {
             Some(otel_name.as_slice())
         );
 
-        // Adding same mapping again returns false
+        // Duplicate original name: rejected, the mapping stays unchanged.
         assert!(!registry.add_otel_mapping(otel_name.clone(), systemd_name.clone()));
         assert_eq!(registry.len(), 1);
 
-        // Add different mapping
-        let otel_name2 = b"trace-id".to_vec();
-        let systemd_name2 = rdp::encode_full(&otel_name2);
+        let otel_name2 = b"trace id".to_vec();
+        let systemd_name2 = "ND_0123456789ABCDEF0123456789ABCDEF".to_string();
         assert!(registry.add_otel_mapping(otel_name2.clone(), systemd_name2.clone()));
 
         assert_eq!(registry.len(), 2);
 
-        // Both mappings exist
-        assert!(registry.contains_otel_name(&otel_name));
-        assert!(registry.contains_otel_name(&otel_name2));
-
-        // Lookups still work
         assert_eq!(
             registry.get_systemd_name(&otel_name2),
             Some(systemd_name2.as_str())

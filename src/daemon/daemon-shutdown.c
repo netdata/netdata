@@ -6,6 +6,7 @@
 #include "daemon/daemon-shutdown-watcher.h"
 #include "static_threads.h"
 #include "common.h"
+#include "web/api/queries/weights.h"
 
 #include <curl/curl.h>
 
@@ -174,14 +175,36 @@ static void rrdeng_flush_everything_and_wait(bool wait_flush, bool wait_collecto
 }
 #endif
 
+// set when shutdown stopped waiting for dbengine or parallel weights work that may still be running
+static bool work_abandoned = false;
+
+// The last thing shutdown does. When shutdown gave up on work that may still be running (a SQLite user on a libuv
+// threadpool worker, see sqlite_teardown_is_unsafe(), undrained dbengine work, or a parallel weights chunk),
+// exit() would run destructors under it: libuv's library destructor joins every threadpool thread - so the process
+// would wait for the job it already gave up on, until systemd kills it - and the other destructors free state that
+// work may still use. Shutdown is complete and its status saved by then: leave without running destructors. No
+// stdio flush either: a thread stuck mid-write may hold a stdio lock (the logger uses raw write()).
+NORETURN void netdata_exit_process(int status) {
+    if(sqlite_teardown_is_unsafe() || __atomic_load_n(&work_abandoned, __ATOMIC_RELAXED))
+        _exit(status);
+
+    exit(status);
+}
+
 static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exit_when_done) {
     exit_initiated_set(reason);
+
+    // false when dbengine work may still be running after its event loop stopped
+    bool dbengine_drained __maybe_unused = true;
+    bool weights_drained __maybe_unused = true;
 
     // don't recurse (due to a fatal, while exiting)
     static bool run = false;
     if(run) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "EXIT: Recursion detected. Exiting immediately.");
-        exit(1);
+        // the first shutdown may be in the middle of a bounded wait, before it latched anything it gave up on:
+        // never run destructors here (libuv's would join threadpool workers that may still be running)
+        _exit(1);
     }
     run = true;
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
@@ -190,7 +213,6 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_log_exit_reason();
 
     watcher_thread_start();
-    usec_t shutdown_start_time = now_monotonic_usec();
     watcher_shutdown_begin();
 
 #ifdef ENABLE_DBENGINE
@@ -203,6 +225,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     webrtc_close_all_connections();
     watcher_step_complete(WATCHER_STEP_ID_CLOSE_WEBRTC_CONNECTIONS);
 
+    // Stop metadata detection before its publication targets start shutting down.
+    service_wait_exit(SERVICE_SYSTEM_INFO, 5 * USEC_PER_SEC);
     service_signal_exit(ABILITY_WEB_REQUESTS | SERVICE_ACLK | ABILITY_STREAMING_CONNECTIONS | SERVICE_SYSTEMD);
 
     service_signal_exit(SERVICE_EXPORTERS | SERVICE_HEALTH | SERVICE_WEB_SERVER | SERVICE_HTTPD);
@@ -239,7 +263,7 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     ml_stop_threads();
     // ml_stop_threads() only stops and joins the ML threads. It deliberately does
-    // NOT free the per-worker queues: the collector stop above is bounded to 20s,
+    // NOT free the training queue: the collector stop above is bounded to 20s,
     // so a slow collector can still reach ml_queue_push() from here on. The free
     // happens in ml_workers_free(), from the FSANITIZE_ADDRESS block below.
     //
@@ -265,9 +289,48 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_step_complete(WATCHER_STEP_ID_STOP_ACLK_MQTT_THREAD);
 
     service_wait_exit(~0, 20 * USEC_PER_SEC);
+
+    // after every service that can issue a weights request (web, websockets/MCP, ACLK) has stopped,
+    // and before dbengine stops: accepted chunks finish, later requests run their chunks inline.
+    // Not waited for on an abnormal exit, like the dbengine drain: the fatal may be on a WEIGHTS thread (which
+    // would wait for itself) or hold the weights lock. Chunks may then still be running: skip the ASAN teardown.
+    if(abnormal)
+        weights_drained = false;
+    else if(!weights_parallel_shutdown()) {
+        weights_drained = false;
+        __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+        daemon_status_file_shutdown_gave_up("WEIGHTS ", "parallel weights work may still be running");
+    }
     watcher_step_complete(WATCHER_STEP_ID_STOP_ALL_REMAINING_WORKER_THREADS);
 
     cancel_main_threads();
+
+    // Stop the netdatacli command loop. Its handlers use db_meta directly, and commands_exit()
+    // is otherwise reached only from the signal path - on every other exit path the command
+    // thread just keeps running, straight through the SQLite teardown below.
+    //
+    // Drain it HERE, alongside the other thread cancellations, rather than just before the
+    // SQLite teardown. By that later point rrdhosts, dbengine and the metadata loop are already
+    // gone, so waiting there for a handler like remove-stale-node would be waiting for it to
+    // finish operating on subsystems that no longer exist. Draining here also matches what the
+    // signal path already does, so the two orders agree.
+    //
+    // commands_exit() is idempotent and re-entry safe; where it cannot drain (it is called from
+    // the command thread itself, or another thread is already draining) it marks the SQLite
+    // teardown unsafe instead, which is the other half of the same contract.
+    //
+    // Skipped entirely on an abnormal exit: there the teardown is suppressed anyway (see the
+    // abnormal latch below), so the join would buy nothing - while a handler blocked on a lock
+    // held by the thread that is currently fatal()ing would turn that fatal into a 135 s
+    // watchdog SIGABRT, destroying the evidence of what actually went wrong.
+    if (!abnormal)
+        commands_exit();
+
+    // Billed to CANCEL_MAIN_THREADS deliberately: commands_exit() joins the command loop, so its
+    // duration belongs to a thread-stopping step. Completing the step before it would charge the
+    // join to whatever step ran next, which did nothing - and this join is the one thing here
+    // that can plausibly stall a shutdown, so it must not be misattributed in the timings the
+    // status file records.
     watcher_step_complete(WATCHER_STEP_ID_CANCEL_MAIN_THREADS);
 
     if (abnormal) {
@@ -300,7 +363,11 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
             freez(th);
 
-            dbengine_shutdown();
+            dbengine_drained = dbengine_shutdown();
+            if(!dbengine_drained) {
+                __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+                daemon_status_file_shutdown_gave_up("DBENGINE ", "pool work may still be running");
+            }
             watcher_step_complete(WATCHER_STEP_ID_STOP_DBENGINE_TIERS);
         }
         else {
@@ -319,12 +386,49 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         watcher_step_complete(WATCHER_STEP_ID_STOP_METASYNC_THREADS);
     }
 
-    // Don't register a shutdown event if we crashed
-    if (!abnormal)
-        add_agent_event(EVENT_AGENT_SHUTDOWN_TIME, (int64_t)(now_monotonic_usec() - shutdown_start_time));
+    // Do not record the shutdown duration in SQLite here. The steps above may have given up on threads (the
+    // metadata worker, health) that are still inside db_meta, and any statement on that shared connection would
+    // wait for them until the shutdown watchdog aborts the agent. The watcher records the duration in the status
+    // file instead, and the next start imports it into the agent event log.
 
     nd_thread_join_threads();
     watcher_step_complete(WATCHER_STEP_ID_JOIN_STATIC_THREADS);
+
+    // Everything below destroys SQLite state. Before any of it, establish that nobody can
+    // still be using it - and where we cannot establish that, say so and let the teardown
+    // suppress itself rather than free memory out from under a running thread.
+    //
+    // HEALTH is the thread that matters here. It caches prepared statements (the
+    // is_health_thread branches in sqlite_health.c / sqlite_aclk_alert.c) and nothing above
+    // joins it: service_wait_exit() at the top of this function is bounded and proceeds
+    // regardless, and nd_thread_join_threads() only drains threads that have ALREADY exited.
+    // Ask the service registry directly - a thread leaves it from its per-thread cleanup,
+    // which runs after its own cleanup handlers, so "gone" means health finished finalizing
+    // its statements.
+    //
+    // Do NOT try to infer this from the service_wait_exit() call above: it was given a mask of
+    // four services and returns a single bool for all of them, so a slow HTTPD would look
+    // exactly like a live HEALTH and we would suppress teardown on every ordinary shutdown.
+    if (service_is_running(SERVICE_HEALTH))
+        sqlite_mark_teardown_unsafe(
+            "the health thread is still running and may be using its cached SQL statements");
+
+    // An abnormal exit skipped the whole block above: metadata_sync_shutdown() and ml_fini()
+    // never ran, so the metadata thread and its libuv workers were never asked to stop and are
+    // still binding and stepping statements against db_meta, db_context_meta and - through
+    // metadata_scan_host() -> ml_dimension_load_models() - ml_db. None of the latch setters in
+    // those functions can have fired, because neither function was called.
+    //
+    // Zombie detection alone does not cover this: it samples sqlite3_next_stmt() at one instant,
+    // so a worker that is between statements, about to call sqlite3_prepare_v2(), leaves nothing
+    // attached and the teardown would proceed underneath it.
+    //
+    // This is also the path where tearing SQLite down does the most damage: a second crash
+    // inside the teardown masks the fatal that caused the abnormal exit in the first place,
+    // which is exactly the evidence we need to diagnose it.
+    if (abnormal)
+        sqlite_mark_teardown_unsafe(
+            "the shutdown is abnormal, so the metadata and ML subsystems were never stopped");
 
     sqlite_close_databases();
     sqlite_library_shutdown();
@@ -335,10 +439,19 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         netdata_log_error("EXIT: cannot unlink pidfile '%s'.", pidfile);
 
     // unlink the pipe
-    // During the commands_exit() signal-handler path, libuv may already
-    // have unlinked the pipe on close. For other exit paths the command
-    // thread keeps running and we must clean it up here. ENOENT just means
-    // libuv beat us to removing it.
+    // commands_exit() above (or the earlier signal-handler call) has normally stopped the
+    // command loop by now, and libuv unlinks the pipe when it closes. Two exceptions, where the
+    // loop is still live and we unlink from under it:
+    //
+    //  - `netdatacli shutdown-agent`: shutdown runs ON the command event-loop thread, so it
+    //    cannot be joined. The SQLite teardown is NOT suppressed here, and does not need to be:
+    //    CMD_EXIT runs inline in parse_commands() and touches no SQLite, and that thread is
+    //    executing the teardown rather than serving the loop. It is suppressed only if some
+    //    OTHER command is in flight at the time.
+    //  - an abnormal exit, where commands_exit() is skipped entirely. The teardown IS suppressed
+    //    there, by the abnormal latch above.
+    //
+    // ENOENT just means libuv beat us to it.
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
@@ -352,85 +465,92 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     watcher_thread_stop();
 
 #if defined(FSANITIZE_ADDRESS)
-    fprintf(stderr, "\n");
+    // a worker still running would use what the teardown frees. Health waits for notifications
+    // without the alert dictionary lock, and rrdhost_free_all() does not take the host pin health
+    // holds, so a health thread that has not exited yet can still be using a host.
+    if(!dbengine_drained || !weights_drained || service_is_running(SERVICE_HEALTH))
+        fprintf(stderr, "\nWARNING: dbengine, weights or health work may still be running, skipping the teardown.\n");
+    else {
+        fprintf(stderr, "\n");
 
-    fprintf(stderr, "Stopping spawn server...\n");
-    netdata_main_spawn_server_cleanup();
+        fprintf(stderr, "Stopping spawn server...\n");
+        netdata_main_spawn_server_cleanup();
 
-    fprintf(stderr, "Freeing all RRDHOSTs...\n");
-    mcp_functions_registry_cleanup();
-    rrdhost_free_all();
-    dyncfg_shutdown();
-    nrpc_inflight_calls_destroy();
-    nrpc_registries_destroy();
-    health_plugin_destroy();
-    cgroup_netdev_link_destroy();
-    bearer_tokens_destroy();
+        fprintf(stderr, "Freeing all RRDHOSTs...\n");
+        mcp_functions_registry_cleanup();
+        rrdhost_free_all();
+        dyncfg_shutdown();
+        nrpc_inflight_calls_destroy();
+        nrpc_registries_destroy();
+        health_plugin_destroy();
+        cgroup_netdev_link_destroy();
+        bearer_tokens_destroy();
 
-    // Deferred from ml_stop_threads(): the ML worker queues must outlive every
-    // collector that can reach ml_queue_push(), and the collector stop above is
-    // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
-    ml_workers_free();
+        // Deferred from ml_stop_threads(): the ML training queue must outlive every
+        // collector that can reach ml_queue_push(), and the collector stop above is
+        // time-bounded. Safe here, after rrdhost_free_all() removed all producers.
+        ml_workers_free();
 
-    fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
-    size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
-    if(dictionaries_referenced)
-        fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
-                dictionaries_referenced);
+        fprintf(stderr, "Cleaning up destroyed dictionaries...\n");
+        size_t dictionaries_referenced = cleanup_destroyed_dictionaries(true);
+        if(dictionaries_referenced)
+            fprintf(stderr, "WARNING: There are %zu dictionaries with references in them, that cannot be destroyed.\n",
+                    dictionaries_referenced);
                 
-    // Always report dictionary allocations during ASAN builds
-    dictionary_print_still_allocated_stacktraces();
+        // Always report dictionary allocations during ASAN builds
+        dictionary_print_still_allocated_stacktraces();
 
-#ifdef ENABLE_DBENGINE
-    // destroy the caches in reverse order (extent and open depend on main cache)
-    fprintf(stderr, "Destroying extent cache (PGC)...\n");
-    pgc_destroy(extent_cache, false);
-    fprintf(stderr, "Destroying open cache (PGC)...\n");
-    pgc_destroy(open_cache, false);
-    fprintf(stderr, "Destroying main cache (PGC)...\n");
-    pgc_destroy(main_cache, false);
+    #ifdef ENABLE_DBENGINE
+        // destroy the caches in reverse order (extent and open depend on main cache)
+        fprintf(stderr, "Destroying extent cache (PGC)...\n");
+        pgc_destroy(extent_cache, false);
+        fprintf(stderr, "Destroying open cache (PGC)...\n");
+        pgc_destroy(open_cache, false);
+        fprintf(stderr, "Destroying main cache (PGC)...\n");
+        pgc_destroy(main_cache, false);
 
-    fprintf(stderr, "Destroying metrics registry (MRG)...\n");
-    size_t metrics_referenced = mrg_destroy(main_mrg);
-    if(metrics_referenced)
-        fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
-            metrics_referenced);
+        fprintf(stderr, "Destroying metrics registry (MRG)...\n");
+        size_t metrics_referenced = mrg_destroy(main_mrg);
+        if(metrics_referenced)
+            fprintf(stderr, "WARNING: MRG had %zu metrics referenced.\n",
+                metrics_referenced);
 
-    for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
-        if(multidb_ctx[tier]) {
-            fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
-            finalize_rrd_files(multidb_ctx[tier]);
-            memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++) {
+            if(multidb_ctx[tier]) {
+                fprintf(stderr, "Finalizing data files for tier %zu...\n", tier);
+                finalize_rrd_files(multidb_ctx[tier]);
+                memset(multidb_ctx[tier], 0, sizeof(*multidb_ctx[tier]));
+            }
         }
+    #endif
+
+        fprintf(stderr, "Destroying UUIDMap...\n");
+        size_t uuid_referenced = uuidmap_destroy();
+        if(uuid_referenced)
+            fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
+                uuid_referenced);
+
+        fprintf(stderr, "Freeing configuration resources...\n");
+        claim_config_free();
+        exporting_config_free();
+        stream_config_free();
+        inicfg_free(&cloud_config);
+        inicfg_free(&netdata_config);
+
+        fprintf(stderr, "Cleaning up worker utilization...\n");
+        worker_utilization_cleanup();
+
+        alerts_by_x_cleanup();
+        size_t strings_referenced = string_destroy();
+        if(strings_referenced)
+            fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
+                    strings_referenced);
+
+        rrdlabels_aral_destroy(true);
+        fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
+
+        fprintf(stderr, "All done, exiting...\n");
     }
-#endif
-
-    fprintf(stderr, "Destroying UUIDMap...\n");
-    size_t uuid_referenced = uuidmap_destroy();
-    if(uuid_referenced)
-        fprintf(stderr, "WARNING: UUIDMAP had %zu UUIDs referenced.\n",
-            uuid_referenced);
-
-    fprintf(stderr, "Freeing configuration resources...\n");
-    claim_config_free();
-    exporting_config_free();
-    stream_config_free();
-    inicfg_free(&cloud_config);
-    inicfg_free(&netdata_config);
-
-    fprintf(stderr, "Cleaning up worker utilization...\n");
-    worker_utilization_cleanup();
-
-    alerts_by_x_cleanup();
-    size_t strings_referenced = string_destroy();
-    if(strings_referenced)
-        fprintf(stderr, "WARNING: STRING has %zu strings still allocated.\n",
-                strings_referenced);
-
-    rrdlabels_aral_destroy(true);
-    fprintf(stderr, "RRDLABELS remaining in registry: %d.\n", rrdlabels_registry_count());
-
-    fprintf(stderr, "All done, exiting...\n");
 #endif
 
     if(!exit_when_done) {
@@ -444,13 +564,13 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     nd_sentry_fini();
     curl_global_cleanup();
-    exit(abnormal ? 1 : 0);
+    netdata_exit_process(abnormal ? 1 : 0);
 #else
     if(abnormal)
         _exit(1);
     else {
         curl_global_cleanup();
-        exit(0);
+        netdata_exit_process(0);
     }
 #endif
 }

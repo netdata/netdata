@@ -7,6 +7,9 @@
 //! Wire-compatible with the C and Go implementations.
 
 #[cfg(windows)]
+use crate::transport::win_security::OwnerOnlyAttributes;
+
+#[cfg(windows)]
 mod ffi {
     #![allow(non_snake_case, non_camel_case_types, dead_code)]
 
@@ -399,12 +402,16 @@ impl WinShmContext {
             .ok_or_else(|| WinShmError::BadParam("region size overflow".into()))?
             as usize;
 
+        // Session objects take the same owner-only DACL as the pipe, so
+        // other accounts cannot open them.
+        let attrs = OwnerOnlyAttributes::new().map_err(WinShmError::CreateMapping)?;
+
         // Create page-file backed mapping
         unsafe { ffi::SetLastError(0) };
         let mapping = unsafe {
             create_file_mapping(
                 ffi::INVALID_HANDLE_VALUE,
-                std::ptr::null(),
+                attrs.as_ptr(),
                 ffi::PAGE_READWRITE,
                 (region_size >> 32) as u32,
                 (region_size & 0xFFFFFFFF) as u32,
@@ -450,7 +457,7 @@ impl WinShmContext {
         let (req_event, resp_event) = if profile == PROFILE_HYBRID {
             let re_name = build_object_name(hash, service_name, profile, session_id, "req_event")?;
             unsafe { ffi::SetLastError(0) };
-            let re = unsafe { create_event(std::ptr::null(), 0, 0, re_name.as_ptr()) };
+            let re = unsafe { create_event(attrs.as_ptr(), 0, 0, re_name.as_ptr()) };
             if re == 0 {
                 let e = last_error();
                 unsafe {
@@ -471,7 +478,7 @@ impl WinShmContext {
             let rsp_name =
                 build_object_name(hash, service_name, profile, session_id, "resp_event")?;
             unsafe { ffi::SetLastError(0) };
-            let rsp = unsafe { create_event(std::ptr::null(), 0, 0, rsp_name.as_ptr()) };
+            let rsp = unsafe { create_event(attrs.as_ptr(), 0, 0, rsp_name.as_ptr()) };
             if rsp == 0 {
                 let e = last_error();
                 unsafe {
@@ -1125,7 +1132,7 @@ fn validate_service_name(name: &str) -> Result<(), WinShmError> {
                 return Err(WinShmError::BadParam(format!(
                     "service name contains invalid character: {:?}",
                     c as char,
-                )))
+                )));
             }
         }
     }
@@ -1435,6 +1442,33 @@ mod tests {
         };
         assert_eq!(err, WinShmError::BadMagic);
 
+        server.destroy();
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn test_server_objects_dacl_owner_only_windows() {
+        use crate::transport::win_security::{object_dacl_sddl, owner_only_dacl_sddl};
+        let run_dir = test_run_dir();
+        let service = unique_service("rs_win_shm_dacl");
+        let mut server = WinShmContext::server_create(
+            &run_dir,
+            &service,
+            0x4243,
+            23,
+            PROFILE_HYBRID,
+            4096,
+            4096,
+        )
+        .expect("server_create");
+        let dacl = |mask: &str| owner_only_dacl_sddl(mask).expect("expected DACL");
+        // SECTION_ALL_ACCESS and EVENT_ALL_ACCESS.
+        assert_eq!(
+            object_dacl_sddl(server.mapping),
+            Some(dacl("CCDCLCSWRPSDRCWDWO"))
+        );
+        assert_eq!(object_dacl_sddl(server.req_event), Some(dacl("0x1f0003")));
+        assert_eq!(object_dacl_sddl(server.resp_event), Some(dacl("0x1f0003")));
         server.destroy();
     }
 

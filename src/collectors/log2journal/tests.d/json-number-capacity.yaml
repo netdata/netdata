@@ -1,0 +1,2 @@
+# numbers longer than the number buffer are rejected, not written past it
+pattern: json

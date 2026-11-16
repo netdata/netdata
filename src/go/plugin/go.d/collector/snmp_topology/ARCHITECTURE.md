@@ -23,9 +23,12 @@ immutable topology generation from SNMP jobs registered by the SNMP collector.
 
 It has three independent entry points:
 
-- `Run(ctx)` refreshes topology in the background.
+- `Run(ctx, ready)` refreshes topology in the background.
 - `Collect(ctx)` only publishes internal collector metrics.
 - `snmp:topology:snmp` serves the latest cached topology through a Function.
+
+Runtime readiness is signaled after local setup and before the first sweep. The topology Function remains unavailable
+until renderable observations exist.
 
 Function calls do not walk SNMP. They acquire one already-published generation,
 build a graph, shape/enrich it, and render `netdata.topology.v1`.
@@ -78,7 +81,7 @@ collector instance for the whole agent.
 
 ```mermaid
 flowchart TD
-    Run["Run(ctx)"]
+    Run["Run(ctx, ready)"]
     TrapPublish["publish trap enrichment"]
     Tick["initial refresh, then every update_every"]
     Devices["read registered jobs from DeviceStore"]
@@ -100,8 +103,9 @@ flowchart TD
 ```
 
 ```text
-Run(ctx)
-  publish trap enrichment handle
+Run(ctx, ready)
+  publish trap enrichment handle and start reverse DNS support
+  ready()                             # local runtime setup; no observation required
   refreshTopologyRecovering(ctx)       # immediate first refresh
   every update_every:
     refreshTopologyRecovering(ctx)
@@ -390,7 +394,13 @@ topologyRegistry.snapshotWithEnvironment(options, environment)
   read the generation's fixed renderable device membership and producer scope
   aggregate per-device observations
   build a topology graph
+  bind cached focus choices to surviving managed actor handles
 ```
+
+The Function uses `snapshotResultWithEnvironment` to receive graph data and focus
+choices from that same acquired generation. Existing data-only snapshot and replay
+readers wrap the same capture/build path. Publication during a build cannot mix a
+newer generation's choices with the older map.
 
 Each device generation contributes:
 
@@ -612,7 +622,7 @@ flowchart TD
     Request["snmp:topology:snmp request"]
     Handler["snmptopologyfunc.Handle"]
     Options["resolve QueryOptions"]
-    Registry["topologyRegistry.snapshotWithEnvironment"]
+    Registry["topologyRegistry.snapshotResultWithEnvironment"]
     Snapshot["fresh device-generation snapshots"]
     Aggregate["aggregate observations"]
     L2["l2topology BuildL2Result -> ToGraph"]
@@ -629,10 +639,18 @@ flowchart TD
 snmp:topology:snmp request
   -> snmptopologyfunc.Handle
   -> funcDepsAdapter.Snapshot(options)
-  -> topologyRegistry.snapshotWithEnvironment(options, cache-only DNS)
+  -> topologyRegistry.snapshotResultWithEnvironment(options, cache-only DNS)
   -> topologyv1.Render(data)
-  -> Function response with type "topology"
+  -> Function response with type "topology" and same-generation focus metadata
 ```
+
+The model stores only private focus binding handles. The renderer resolves them
+to final actor rows in a hidden actor-owned append table; it never serializes
+handles. Data response choices come from the same snapshot result, while `info`
+still reads cached choices without building a graph. Resolved focus policy is
+declared in the data metadata (IP cleanup differs from MAC); local filtering is
+unchanged. Generic consumer obligations live in
+`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus`.
 
 The Function returns `503` while no usable topology snapshot exists yet.
 
@@ -819,7 +837,7 @@ upload them.
 
 `topology_trap_enrich.go` publishes a separate handle used by `snmp_traps`.
 
-The topology collector publishes enrichment state when `Run(ctx)` starts and
+The topology collector publishes enrichment state when `Run(ctx, ready)` starts and
 unpublishes it on cleanup. Trap enrichment is not part of the topology Function
 payload; it is a cross-collector lookup path for trap log rows.
 
@@ -829,7 +847,7 @@ The collector emits internal metrics only. These metrics describe refresh health
 and retained device-generation state; they are not the topology payload.
 
 - `Collect(ctx)` writes current internal metric values.
-- `Run(ctx)` performs SNMP topology refresh.
+- `Run(ctx, ready)` performs SNMP topology refresh.
 - `charts.go` and `metrix.go` define this internal observability surface.
 
 ## Concurrency Rules
@@ -841,6 +859,13 @@ and retained device-generation state; they are not the topology payload.
   `topologyDeviceSnapshot`. A completed sweep activates successful snapshots as
   `topologyDeviceGeneration` values at one shared publication time. A failed
   collection retains the prior successful device generation and deadline.
+- Each device's refresh state records the registered device information it last acted on. A registered sysObjectID
+  that changes to a non-empty value discards the retained acquisition and retry state before the next attempt, so
+  failed or unsupported replacement setup cannot retain the prior device's topology. Any other change to that
+  information (name, description, contact, location, vendor, model, vnode identity or labels, or a sysObjectID that
+  becomes empty) acquires the device again on the current sweep; the retained generation stays visible until that
+  acquisition succeeds, and a failure follows the normal retry backoff. Cancellation still leaves the entire prior
+  committed cut visible.
 - A completed sweep fixes renderable membership and publishes one immutable
   `topologyGeneration` through an atomic pointer. Cancellation or panic leaves
   the previous generation visible.
@@ -878,6 +903,21 @@ When adding new collected state, add it to:
 - Add collector refresh or generation lifecycle behavior:
   - root package only.
 
+BGP inventory preserves an optional process ID independently of the routing instance.
+Process-scoped rows may omit remote AS when the source cannot prove that association;
+they still require explicit process, routing instance and neighbor identity. The process
+survives acquisition evidence, diagnostic archives, replay and the actor-owned BGP
+peer table. Device-local process IDs do not change graph relationship grouping, which
+remains the managed actor pair and routing instance.
+
+Process and routing-instance values are opaque semantic identifiers. Select the first
+nonblank typed value or fallback tag without trimming its bytes; `edge` and ` edge `
+are distinct identifiers. Empty or whitespace-only values remain absent, and the
+routing-instance default is applied only after testing whether explicit peer identity
+is complete. Inventory cells, graph grouping, repeated enrichment and relationship
+evidence preserve the same identifiers. IP and ASN normalization follow their separate
+protocol rules; generic display-string trimming does not apply to these two fields.
+
 ## Validation Checklist
 
 Useful focused checks after changes:
@@ -902,7 +942,8 @@ An unchanged golden is expected for internal ownership and generation refactors.
 
 `TestSNMPTopologyScenarioGoldens` starts from synthetic SNMP-shaped `ddsnmp`
 inputs, runs the real cache, registry, and Function rendering path, validates
-the final `topology.v1` payload, and compares it with one full-payload oracle
+the final `topology.v1` payload, and compares its established graph/presentation
+planes with one oracle
 per golden scenario (`topologyScenarioGoldenCases`, currently five of the
 eighteen scenarios; all eighteen run `TestSNMPTopologyScenarioSemantics` with
 assertions and a determinism check, and only the five also have an oracle). The
@@ -915,3 +956,10 @@ neither is present the suite skips (it fails instead only under
 checkout says nothing about the golden payloads; check the test output for the
 skip line before trusting it. The per-render normalized golden above stays
 tracked in this repository.
+
+The hidden focus binding table/type is excluded only from this external-oracle
+comparison. `TestTopologyFocusBindingsGolden` pins that new supporting plane over
+the same scenarios in Agent-owned `testdata/topology_focus_bindings.golden.json`.
+Regenerate it alone with `-run TestTopologyFocusBindingsGolden
+-update-snmp-topology-scenario-goldens`; the external checkout is not needed.
+Other normalized comparisons and determinism checks retain the binding plane.

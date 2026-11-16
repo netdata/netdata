@@ -7,6 +7,15 @@ updates:
     labels:
       - "no changelog"
       - "area/ci"
+    # Workflows pin actions by commit SHA, so every minor and patch release
+    # gets an update; batch those into one PR. Major updates stay separate.
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: gomod
     directory: /src/go
     schedule:

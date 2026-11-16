@@ -19,23 +19,26 @@ field means.
 - One idea per paragraph, a few sentences. A paragraph that enumerates becomes a list. Three or more items that share
   attributes (modes, permissions per endpoint, services per area, prerequisites per mode) become a table.
 - Admonitions carry what the reader must not miss and nothing else: `:::caution` for cost, data loss, destructive or
-  irreversible behavior; `:::tip` for a recommended shortcut ("need X, do Y"); `:::note` for a non-obvious fact that is
-  not a warning. `:::info` is the fleet's catch-all and is discouraged. At most one admonition per field. Prefer an
-  admonition over a blockquote. An admonition never replaces the field's own first paragraph.
-- Define a term inline the first time it appears; never ship engine vocabulary. A glossary table is allowed only when
-  four or more terms recur across the page and the options table, and then it closes `method_description`, after the
+  irreversible behavior; `:::info` (blue) or `:::tip` (green, "need X, do Y") for a fact the operator must notice, such
+  as persisted state and how to reset it. `:::note` renders white and blends into the page; use it only for an aside
+  that may blend in. At most one admonition per field. Prefer an admonition over a blockquote. An admonition never
+  replaces the field's own first paragraph.
+- A glossary table is allowed only when four or more terms recur across the page and the options table (otherwise
+  terms are defined at first use, `./SKILL.md#the-reading-model`); it then closes `method_description`, after the
   reader knows what the collector does, never before.
-- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, Learn, vendor
-  documentation. Never to `ARCHITECTURE.md`, source files, or tests.
+- Links go to user-facing pages only: another integration, a `profile-format.md`, a `docs/guides` page, other Netdata
+  docs, vendor documentation; never `ARCHITECTURE.md`, source code, or tests. Link a Netdata page by its
+  repository-relative `.md` path (`/src/collectors/SERVICE-DISCOVERY.md`), never by a `learn.netdata.cloud` URL
+  (`.agents/skills/docs-learn-site-structure/how-tos/integration-card-description-links.md`).
 
 ## 2. `metrics_description`: The Overview Proper
 
 **Question:** what is this and what do I get? This is the general overview, not a list of metrics, and the only text
 most visitors read.
 
-- Sentence one is the catalog row and the meta description (`integrations-lifecycle/description-authoring.md` owns its
-  mechanics). It MUST say what the collector monitors in an action phrase and MUST NOT mention options, defaults,
-  limits, or setup.
+- Sentence one supplies the catalog row; page meta descriptions resolve separately, including explicit overrides
+  (`integrations-lifecycle/description-authoring.md`). It MUST say what the collector monitors in an action phrase
+  and MUST NOT mention options, defaults, limits, or setup.
 - Then, in decreasing importance: what the reader gets (areas or scopes covered, the capabilities that distinguish the
   collector), and for a multi-service or multi-device collector one coverage table (area, services) or one pointer to
   the profile library. Exemplars: `azure_monitor/metadata.yaml` (capability list), `s3check/metadata.yaml` (mode
@@ -58,6 +61,25 @@ most visitors read.
 - Do NOT describe internal stages, caching, ownership resolution, or state handling. Those are `ARCHITECTURE.md`
   content (developer documentation, never linked from the page). "Plan, discover, query" is how the code is organized,
   not how the operator experiences it.
+
+**Worked example: routing an over-scoped field.** `redfish` shipped this field as four paragraphs, 206 words, longest
+paragraph 104 words — inside every length bound in `SKILL.md`, and still unreadable. Its first paragraph answered the
+question and the rest did not; each stray piece had a different owner:
+
+| What it said | Where it belonged |
+|---|---|
+| Reconnects once on HTTP 401 inside the cycle | Off the page: state handling |
+| Partial scans retain prior membership evidence | Off the page: ownership resolution |
+| How derived sensor health evaluates thresholds | `functions`, the `sensors` entry that displays it |
+| Session and auto config tests skip credentials | `troubleshooting.errors` |
+| Missing values produce gaps, not zeroes | `default_behavior.limits` |
+
+What remained answers the field's own question in three paragraphs and one table: what it connects to, over what
+protocol, how often, how it authenticates (four `auth_method` modes, so a table), and that its only writes are its own
+sessions.
+
+The test that catches this is not length. For each sentence, ask what the operator does differently for having read
+it; when the answer is nothing, that sentence has an owner elsewhere or no owner at all.
 
 ## 4. `supported_platforms` And `multi_instance`
 
@@ -106,8 +128,9 @@ internals. Those are Setup (option rows and `detailed_description`) or nothing.
 
 **Question:** with the defaults, what caps, quotas, or floors will I run into, and how will I notice?
 
-Empty renders "The default configuration for this integration does not impose any limits on data collection." That
-MUST be true when the field is empty.
+Collector pages omit the Limits section when this description is empty. Missing documentation MUST NOT imply that
+collection is unlimited. Authors MUST still document actionable operator limits; an omitted section does not excuse
+missing guidance. Flow and device pages use separate templates; check their rendering when editing those types.
 
 - Name the operator-visible bounds: minimum collection interval, maximum instances or series, API quotas the collector
   respects, retention or lookback windows, and what happens at the bound (charts stop appearing, the job refuses to
@@ -146,8 +169,8 @@ metric), cost is the most important content on the page and this field MUST be e
 ## 9. Review Questions For This Family
 
 - Can a reader who stops after `metrics_description` say what the collector is and what they get?
-- Does `method_description` name what the collector talks to and how, without a single internal term?
+- Does `method_description` name what the collector talks to and how, without irrelevant implementation mechanics?
 - Is every permission the code requests in the table, and nothing that it does not?
 - Is the collector covered by a `go.d/sd/*.conf` rule? Then `auto_detection` names the discoverer and the rule file.
-- Are `limits` and `performance_impact` either true-as-placeholder or filled with operator-visible bounds and costs?
+- Does `limits` document actionable operator bounds, and is `performance_impact` truthful when empty or filled?
 - Are there headings, more than one admonition, or a glossary before the first capability? Then restructure or route.

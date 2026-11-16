@@ -208,11 +208,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: pihole_gravity_list_last_update
-        metric: pihole.gravity_list_last_update_time_ago
-        info: "gravity.list (blocklist) file last update time"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/pihole.conf
     metrics:
       folding:
         title: Metrics

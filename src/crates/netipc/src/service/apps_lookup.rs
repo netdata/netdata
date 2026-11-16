@@ -1,7 +1,7 @@
 //! L2 apps-lookup service facade.
 
 use super::raw;
-use crate::protocol::{AppsLookupResponseView, NipcError, METHOD_APPS_LOOKUP, PROFILE_BASELINE};
+use crate::protocol::{AppsLookupResponseView, METHOD_APPS_LOOKUP, NipcError, PROFILE_BASELINE};
 
 #[cfg(unix)]
 use crate::transport::posix::{
@@ -13,8 +13,8 @@ use crate::transport::windows::{
     ClientConfig as TransportClientConfig, ServerConfig as TransportServerConfig,
 };
 
-use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 pub use raw::{AppsLookupHandler, ClientAbortHandle, ClientState, ClientStatus};
 
@@ -208,6 +208,11 @@ impl ManagedServer {
         self.inner.stop();
     }
 
+    /// Returns a signal that is set once `run()` accepts connections.
+    pub fn listening_signal(&self) -> raw::ListeningSignal {
+        self.inner.listening_signal()
+    }
+
     pub fn running_flag(&self) -> Arc<AtomicBool> {
         self.inner.running_flag()
     }
@@ -217,8 +222,8 @@ impl ManagedServer {
 mod tests {
     use super::*;
     use crate::protocol::PROFILE_SHM_FUTEX;
-    use std::sync::atomic::Ordering;
     use std::sync::Arc;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn client_config_maps_to_transport() {
@@ -302,7 +307,7 @@ mod tests {
         assert!(client.refresh());
         assert_eq!(client.status().state, ClientState::NotFound);
 
-        assert_eq!(client.call(&[123]).unwrap_err(), NipcError::BadLayout);
+        assert_eq!(client.call(&[123]).unwrap_err(), NipcError::NotReady);
         assert_eq!(client.status().error_count, 1);
 
         client.close();

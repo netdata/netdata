@@ -33,11 +33,11 @@ func BenchmarkSNMPTopologyTypedGraphReplayScaling(b *testing.B) {
 			b.Run("source=live", func(b *testing.B) {
 				deps := funcDepsAdapter{registry: registry}
 				probe, ok, err := deps.Snapshot(options)
-				if err != nil || !ok || probe.Links.Rows == 0 {
-					b.Fatalf("live probe links=%d ok=%t err=%v", probe.Links.Rows, ok, err)
+				if err != nil || !ok || probe.Data.Links.Rows == 0 {
+					b.Fatalf("live probe links=%d ok=%t err=%v", probe.Data.Links.Rows, ok, err)
 				}
-				b.ReportMetric(float64(probe.Actors.Rows), "actors/op")
-				b.ReportMetric(float64(probe.Links.Rows), "links/op")
+				b.ReportMetric(float64(probe.Data.Actors.Rows), "actors/op")
+				b.ReportMetric(float64(probe.Data.Links.Rows), "links/op")
 				b.ReportAllocs()
 				b.ResetTimer()
 				for b.Loop() {

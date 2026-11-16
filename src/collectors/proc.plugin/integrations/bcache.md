@@ -31,7 +31,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 
 ### Default Behavior
@@ -41,9 +41,6 @@ This collector supports collecting metrics from multiple instances of this integ
 Automatically detects BCache devices by reading stats from `/sys/block/*/bcache/`.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -100,8 +97,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ bcache_cache_dirty ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_alloc | percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small) |
-| [ bcache_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_read_races | number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device) |
+| [ bcache_cache_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_read_races | Number of times data was read from the cache, the bucket was reused and invalidated in the last 10 minutes (when this occurs the data is reread from the backing device) |
+| [ bcache_cache_dirty ](https://github.com/netdata/netdata/blob/master/src/health/health.d/bcache.conf) | disk.bcache_cache_alloc | Percentage of cache space used for dirty data and metadata (this usually means your SSD cache is too small) |
 
 
 

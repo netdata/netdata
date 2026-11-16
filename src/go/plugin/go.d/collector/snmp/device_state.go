@@ -129,16 +129,16 @@ func (c *Collector) publishDeviceState(info ddsnmp.DeviceConnectionInfo) {
 	c.deviceStore.Register(ownerKey, info)
 }
 
-func (c *Collector) syncDeviceMetadata(pms []*ddsnmp.ProfileMetrics) {
-	if c.deviceMetadataSynced || c.deviceVnode() != nil || c.sysInfo == nil {
+func (c *Collector) withdrawDeviceState() {
+	c.deviceLifecycleMu.Lock()
+	c.deviceLifecyclePending = nil
+	managed, committed, writer := c.deviceLifecycleManaged, c.deviceLifecycleCommitted, c.deviceWriter
+	c.deviceLifecycleMu.Unlock()
+	if managed {
+		if committed {
+			writer.WithdrawDevice()
+		}
 		return
 	}
-
-	metadata := make(map[string]ddsnmp.MetaTag, 2)
-	for _, pm := range pms {
-		ddsnmp.MergeDeviceIdentityMetadata(metadata, pm.DeviceMetadata)
-	}
-
-	c.registerDeviceState(c.sysInfo, metadata)
-	c.deviceMetadataSynced = true
+	c.deviceStore.WithdrawDevice(c.deviceStoreOwnerKey())
 }

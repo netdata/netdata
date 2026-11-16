@@ -277,14 +277,13 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     node_info.data.custom_info = inicfg_get(&netdata_config, CONFIG_SECTION_WEB, "custom dashboard_info.js", "");
     node_info.data.machine_guid = host->machine_guid;
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
-    node_info.data.host_labels_ptr = host->rrdlabels;
-
-    spinlock_lock(&host->rrdhost_update_lock);
-    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
-    spinlock_unlock(&host->rrdhost_update_lock);
+    RRDLABELS *labels;
+    struct rrdhost_system_info *system_info = rrdhost_system_info_labels_snapshot(host, &labels);
+    node_info.data.host_labels_ptr = labels;
     rrdhost_system_info_to_node_info(system_info, &node_info);
 
     aclk_update_node_info(&node_info, sync_completion);
+    rrdlabels_destroy(labels);
     rrdhost_system_info_free(system_info);
     nd_log(
         NDLS_ACCESS,

@@ -37,12 +37,12 @@ metrics:
     metric_tags:
       - tag: dlink_entity_ext_cpu_util_unit_id
         symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.7.1.1
           name: dEntityExtCpuUtilUnitId
+        index: 1
       - tag: dlink_entity_ext_cpu_util_cpu_id
         symbol:
-          OID: 1.3.6.1.4.1.171.14.5.1.7.1.2
           name: dEntityExtCpuUtilCpuID
+        index: 2
 
   - MIB: DLINKSW-ENTITY-EXT-MIB
     table:
@@ -65,11 +65,11 @@ metrics:
       - tag: mem
         symbol:
           name: dEntityExtMemUtilUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.4.1.1
+        index: 1
       - tag: d_entity_ext_mem_util_type
         symbol:
           name: dEntityExtMemUtilType
-          OID: 1.3.6.1.4.1.171.14.5.1.4.1.2
+        index: 2
         mapping:
           1: dram
           2: flash
@@ -99,11 +99,11 @@ metrics:
       - tag: d_entity_ext_env_temp_unit_id
         symbol:
           name: dEntityExtEnvTempUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.1
+        index: 1
       - tag: d_entity_ext_env_temp_index
         symbol:
           name: dEntityExtEnvTempIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.1.1.2
+        index: 2
       - tag: d_entity_ext_env_temp_descr
         symbol:
           name: dEntityExtEnvTempDescr
@@ -127,11 +127,11 @@ metrics:
       - tag: d_entity_ext_env_fan_unit_id
         symbol:
           name: dEntityExtEnvFanUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.1
+        index: 1
       - tag: d_entity_ext_env_fan_index
         symbol:
           name: dEntityExtEnvFanIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.2.1.2
+        index: 2
       - tag: d_entity_ext_env_fan_descr
         symbol:
           name: dEntityExtEnvFanDescr
@@ -168,11 +168,11 @@ metrics:
       - tag: d_entity_ext_env_power_unit_id
         symbol:
           name: dEntityExtEnvPowerUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.1
+        index: 1
       - tag: d_entity_ext_env_power_index
         symbol:
           name: dEntityExtEnvPowerIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.1.3.1.2
+        index: 2
       - tag: d_entity_ext_env_power_descr
         symbol:
           name: dEntityExtEnvPowerDescr
@@ -195,7 +195,7 @@ metrics:
     metric_tags:
       - symbol:
           name: dEntityExtEnvAirFlowUnitId
-          OID: 1.3.6.1.4.1.171.14.5.1.1.4.1.1
+        index: 1
         tag: d_entity_ext_env_air_flow_unit_id
 
 
@@ -218,4 +218,4 @@ metrics:
       - tag: d_entity_ext_unit_index
         symbol:
           name: dEntityExtUnitIndex
-          OID: 1.3.6.1.4.1.171.14.5.1.3.1.1
+        index: 1

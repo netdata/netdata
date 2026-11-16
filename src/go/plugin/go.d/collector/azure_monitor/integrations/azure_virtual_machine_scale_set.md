@@ -47,7 +47,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -171,6 +171,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -189,7 +202,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -381,7 +394,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -636,32 +649,32 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_vmss_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.cpu | VMSS CPU utilization on ${label:resource_name} |
-| [ am_vmss_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.cpu_credits | VMSS CPU credits low on ${label:resource_name} |
-| [ am_vmss_memory_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.memory_percentage | VMSS available memory low on ${label:resource_name} |
-| [ am_vmss_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.availability | VMSS availability degraded on ${label:resource_name} |
-| [ am_vmss_os_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_latency | VMSS OS disk latency on ${label:resource_name} |
-| [ am_vmss_os_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_queue_depth | VMSS OS disk queue depth on ${label:resource_name} |
-| [ am_vmss_os_disk_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_throttling | VMSS OS disk bandwidth consumed on ${label:resource_name} |
-| [ am_vmss_os_disk_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_throttling | VMSS OS disk IOPS consumed on ${label:resource_name} |
-| [ am_vmss_os_disk_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_burst_credits | VMSS OS disk burst BPS credits depleting on ${label:resource_name} |
-| [ am_vmss_os_disk_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_burst_credits | VMSS OS disk burst IO credits depleting on ${label:resource_name} |
-| [ am_vmss_data_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_latency | VMSS data disk latency on ${label:resource_name} |
-| [ am_vmss_data_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_queue_depth | VMSS data disk queue depth on ${label:resource_name} |
-| [ am_vmss_data_disk_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_throttling | VMSS data disk bandwidth consumed on ${label:resource_name} |
-| [ am_vmss_data_disk_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_throttling | VMSS data disk IOPS consumed on ${label:resource_name} |
-| [ am_vmss_data_disk_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_burst_credits | VMSS data disk burst BPS credits depleting on ${label:resource_name} |
-| [ am_vmss_data_disk_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_burst_credits | VMSS data disk burst IO credits depleting on ${label:resource_name} |
-| [ am_vmss_temp_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.temp_disk_latency | VMSS temp disk latency on ${label:resource_name} |
-| [ am_vmss_temp_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.temp_disk_queue_depth | VMSS temp disk queue depth on ${label:resource_name} |
-| [ am_vmss_vm_cached_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_throttling | VMSS cached bandwidth consumed on ${label:resource_name} |
-| [ am_vmss_vm_cached_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_throttling | VMSS cached IOPS consumed on ${label:resource_name} |
-| [ am_vmss_vm_uncached_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_throttling | VMSS uncached bandwidth consumed on ${label:resource_name} |
-| [ am_vmss_vm_uncached_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_throttling | VMSS uncached IOPS consumed on ${label:resource_name} |
-| [ am_vmss_vm_cached_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_burst_credits | VMSS cached burst BPS credits depleting on ${label:resource_name} |
-| [ am_vmss_vm_cached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_burst_credits | VMSS cached burst IO credits depleting on ${label:resource_name} |
-| [ am_vmss_vm_uncached_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_burst_credits | VMSS uncached burst BPS credits depleting on ${label:resource_name} |
-| [ am_vmss_vm_uncached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_burst_credits | VMSS uncached burst IO credits depleting on ${label:resource_name} |
+| [ am_vmss_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.cpu | Average CPU utilization of VMSS ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_vmss_cpu_credits_remaining ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.cpu_credits | Remaining CPU credits on burstable VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Running out of credits will cap performance to baseline. |
+| [ am_vmss_memory_available ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.memory_percentage | Average available memory percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_vmss_availability ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.availability | VM availability state on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Values below 1 indicate instances are unavailable. |
+| [ am_vmss_os_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_latency | Average OS disk latency on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_vmss_os_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_queue_depth | Average OS disk queue depth on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). High queue depth indicates disk I/O saturation. |
+| [ am_vmss_os_disk_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_throttling | OS disk bandwidth consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means disk throughput is being throttled. |
+| [ am_vmss_os_disk_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_throttling | OS disk IOPS consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means disk IOPS is being throttled. |
+| [ am_vmss_os_disk_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_burst_credits | OS disk burst bandwidth credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting burst credits will throttle disk throughput to baseline. |
+| [ am_vmss_os_disk_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.os_disk_burst_credits | OS disk burst IO credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting burst credits will throttle disk IOPS to baseline. |
+| [ am_vmss_data_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_latency | Average data disk latency on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_vmss_data_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_queue_depth | Average data disk queue depth on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). High queue depth indicates disk I/O saturation. |
+| [ am_vmss_data_disk_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_throttling | Data disk bandwidth consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means disk throughput is being throttled. |
+| [ am_vmss_data_disk_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_throttling | Data disk IOPS consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means disk IOPS is being throttled. |
+| [ am_vmss_data_disk_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_burst_credits | Data disk burst bandwidth credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting burst credits will throttle disk throughput to baseline. |
+| [ am_vmss_data_disk_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.data_disk_burst_credits | Data disk burst IO credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting burst credits will throttle disk IOPS to baseline. |
+| [ am_vmss_temp_disk_latency ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.temp_disk_latency | Average temp disk latency on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_vmss_temp_disk_queue_depth ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.temp_disk_queue_depth | Average temp disk queue depth on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). High queue depth indicates disk I/O saturation. |
+| [ am_vmss_vm_cached_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_throttling | VM-level cached bandwidth consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means the VM is being throttled at the host level. |
+| [ am_vmss_vm_cached_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_throttling | VM-level cached IOPS consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means the VM is being throttled at the host level. |
+| [ am_vmss_vm_uncached_bandwidth_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_throttling | VM-level uncached bandwidth consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means the VM is being throttled at the host level. |
+| [ am_vmss_vm_uncached_iops_throttling ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_throttling | VM-level uncached IOPS consumed percentage on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Approaching 100% means the VM is being throttled at the host level. |
+| [ am_vmss_vm_cached_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_burst_credits | VM-level cached burst bandwidth credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting credits will throttle cached IO throughput to baseline. |
+| [ am_vmss_vm_cached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_cached_burst_credits | VM-level cached burst IO credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting credits will throttle cached IOPS to baseline. |
+| [ am_vmss_vm_uncached_burst_bps_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_burst_credits | VM-level uncached burst bandwidth credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting credits will throttle uncached IO throughput to baseline. |
+| [ am_vmss_vm_uncached_burst_io_credits ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_vmss.conf) | azure_monitor.vmss.vm_uncached_burst_credits | VM-level uncached burst IO credits consumed on VMSS ${label:resource_name} in ${label:resource_group} (${label:region}). Exhausting credits will throttle uncached IOPS to baseline. |
 
 
 

@@ -100,7 +100,7 @@ Example conversion for a MIB module not shipped in the OOB pack:
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 Binding to the standard SNMP trap port (UDP/162) requires elevated bind privileges on many platforms.
 On Linux, this means `CAP_NET_BIND_SERVICE` or root. Netdata packages grant this capability to `go.d.plugin` and allow it in `netdata.service`.
@@ -311,7 +311,7 @@ Configure the **snmp_traps** collector from the Netdata web interface:
 4. In the Search box, type _snmp_traps_ (or scroll the list) to locate the **snmp_traps** collector.
 5. Click the **+** next to the **snmp_traps** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -523,26 +523,26 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ snmp_trap_emergency_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener is receiving emergency-severity traps. |
-| [ snmp_trap_alert_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener is receiving alert-severity traps that require immediate attention on the sending device. |
-| [ snmp_trap_critical_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener is receiving critical-severity traps. |
-| [ snmp_trap_error_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener is receiving error-severity traps at high rate. |
-| [ snmp_trap_warning_event_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener is receiving warning-severity traps at storm-level rate. |
-| [ snmp_trap_decode_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener has decode errors. |
-| [ snmp_trap_template_unresolved ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener received traps whose profile templates referenced missing varbinds or fields. |
-| [ snmp_trap_malformed_pdus ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener is receiving structurally invalid trap PDUs. |
-| [ snmp_trap_allowlist_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener is dropping traps because the sender IP is outside the configured allowlist. |
-| [ snmp_trap_rate_limited ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener is receiving traps above the configured per-source rate limit. |
-| [ snmp_trap_auth_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener has authentication failures. |
-| [ snmp_trap_usm_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener has USM failures. |
-| [ snmp_trap_unknown_engine_id ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener is receiving v3 traps from engine IDs outside the static whitelist, or first-time dynamic engine ID registrations when dynamic discovery is enabled. |
-| [ snmp_trap_inform_response_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to send INFORM acknowledgements back to senders. |
-| [ snmp_trap_binary_encoded_fields ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener wrote structured fields with binary journal encoding. |
-| [ snmp_trap_profile_load_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to load trap profiles. |
-| [ snmp_trap_journal_write_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to write traps to the systemd-journal. |
-| [ snmp_trap_otlp_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to export traps through OTLP. |
-| [ snmp_trap_listener_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener failed to read UDP packets from a bound socket. |
-| [ snmp_trap_high_dedup_suppression ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.dedup_suppressed | The SNMP trap listener is suppressing a high volume of duplicate traps. |
+| [ snmp_trap_emergency_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener ${label:job_name} is receiving emergency-severity traps. At least one device reports a system-unusable state. |
+| [ snmp_trap_alert_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener ${label:job_name} is receiving alert-severity traps that require immediate attention on the sending device. |
+| [ snmp_trap_critical_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener ${label:job_name} is receiving critical-severity traps. |
+| [ snmp_trap_error_events ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener ${label:job_name} is receiving error-severity traps at high rate. |
+| [ snmp_trap_warning_event_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.severity | The SNMP trap listener ${label:job_name} is receiving warning-severity traps at storm-level rate. |
+| [ snmp_trap_decode_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} has decode errors. Check that SNMP versions, communities, and USM users match sender configuration. |
+| [ snmp_trap_template_unresolved ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} received traps whose profile templates referenced missing varbinds or fields. |
+| [ snmp_trap_malformed_pdus ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} is receiving structurally invalid trap PDUs. |
+| [ snmp_trap_allowlist_drops ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} is dropping traps because the sender IP is outside the configured allowlist. |
+| [ snmp_trap_rate_limited ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} is receiving traps above the configured per-source rate limit. |
+| [ snmp_trap_auth_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} has authentication failures. Verify sender communities or SNMPv3 user configuration. |
+| [ snmp_trap_usm_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} has USM failures. Verify auth and privacy protocols and keys match the sender USM configuration. |
+| [ snmp_trap_unknown_engine_id ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} is receiving v3 traps from engine IDs outside the static whitelist. In dynamic_engine_id_discovery mode, the first accepted (engineID, username) pair increments this once as visibility; repeated or rejected increments usually mean cap exhaustion, invalid sender state, or an unauthorized sender. |
+| [ snmp_trap_inform_response_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} failed to send INFORM acknowledgements back to senders. |
+| [ snmp_trap_binary_encoded_fields ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} wrote structured fields with binary journal encoding before writing to the journal. Check profile labels and rendered varbind values for control characters, unsupported field names, or oversized values. |
+| [ snmp_trap_profile_load_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} failed to load trap profiles. Check custom profile YAML syntax and profile directories, then restart or recreate the job after correcting them. |
+| [ snmp_trap_journal_write_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} failed to write traps to the systemd-journal. Check disk space and filesystem permissions at the per-job journal directory. |
+| [ snmp_trap_otlp_export_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} failed to export traps through OTLP. Check the configured OTLP endpoint, credentials, and network path. |
+| [ snmp_trap_listener_read_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.errors | The SNMP trap listener ${label:job_name} failed to read UDP packets from a bound socket. Check for operating-system socket errors or listener lifecycle problems. |
+| [ snmp_trap_high_dedup_suppression ](https://github.com/netdata/netdata/blob/master/src/health/health.d/snmp_traps.conf) | snmp.trap.dedup_suppressed | The SNMP trap listener ${label:job_name} is suppressing a high volume of duplicate traps. Consider checking whether a trap storm is in progress. |
 
 
 

@@ -1,12 +1,14 @@
-//! L1 POSIX UDS SEQPACKET transport.
+//! L1 POSIX UDS transport.
 //!
 //! Connection lifecycle, handshake with profile/limit negotiation,
-//! and send/receive with transparent chunking over AF_UNIX SEQPACKET sockets.
-//! Wire-compatible with the C implementation in netipc_uds.c.
+//! and send/receive with transparent chunking over AF_UNIX SEQPACKET sockets
+//! (a stream socket carrying the same packets on macOS and FreeBSD, see
+//! `posix_stream.rs`). Wire-compatible with the C implementation in
+//! netipc_uds.c.
 
+use super::framing::{self, Framing, FramingError, ServerOffer, apply_default};
 use crate::protocol::{
-    self, align8, ChunkHeader, Header, Hello, HelloAck, FLAG_BATCH, HEADER_SIZE, KIND_REQUEST,
-    KIND_RESPONSE, MAGIC_CHUNK, MAGIC_MSG, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE, VERSION,
+    self, HEADER_SIZE, Header, Hello, HelloAck, MAX_PAYLOAD_DEFAULT, PROFILE_BASELINE,
 };
 use std::collections::HashSet;
 use std::ffi::CString;
@@ -22,9 +24,38 @@ use std::time::{Duration, Instant};
 
 const DEFAULT_BACKLOG: i32 = 16;
 const DEFAULT_BATCH_ITEMS: u32 = 1;
+#[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
 const DEFAULT_PACKET_SIZE_FALLBACK: u32 = 65536;
-const HELLO_PAYLOAD_SIZE: usize = 44;
-const HELLO_ACK_PAYLOAD_SIZE: usize = 48;
+const PACKET_SIZE_MAX: u32 = 262_144;
+/// Bytes Linux keeps from SO_SNDBUF for a SEQPACKET datagram: it accepts
+/// SO_SNDBUF - 32.
+#[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+const SNDBUF_OVERHEAD: u32 = 32;
+
+/// macOS has no AF_UNIX SOCK_SEQPACKET, and FreeBSD 15 SEQPACKET keeps record
+/// boundaries only where the sender sets MSG_EOR and can write part of a
+/// record. Both use a stream socket carrying the same packets
+/// (docs/level1-posix-uds.md, "Stream baseline").
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
+pub(crate) const SOCK_TYPE: libc::c_int = libc::SOCK_STREAM;
+#[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+pub(crate) const SOCK_TYPE: libc::c_int = libc::SOCK_SEQPACKET;
+
+const SEND_FLAGS: libc::c_int = libc::MSG_NOSIGNAL;
+
+#[path = "posix_stream.rs"]
+#[cfg_attr(not(any(target_os = "macos", target_os = "freebsd")), allow(dead_code))]
+mod stream;
+
+/// Profiles this platform can provide; unassigned bits are never offered or
+/// accepted. POSIX SHM needs a futex-style wait (Linux futex, FreeBSD
+/// `_umtx_op`), so other POSIX systems offer and accept the baseline
+/// profile only.
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
+const PLATFORM_PROFILES: u32 =
+    PROFILE_BASELINE | protocol::PROFILE_SHM_HYBRID | protocol::PROFILE_SHM_FUTEX;
+#[cfg(not(any(target_os = "linux", target_os = "freebsd")))]
+const PLATFORM_PROFILES: u32 = PROFILE_BASELINE;
 
 // ---------------------------------------------------------------------------
 //  Errors
@@ -102,30 +133,43 @@ impl std::fmt::Display for UdsError {
     }
 }
 
-fn header_version_incompatible(buf: &[u8], expected_code: u16) -> bool {
-    if buf.len() < HEADER_SIZE {
-        return false;
+impl FramingError for UdsError {
+    fn protocol(msg: String) -> Self {
+        UdsError::Protocol(msg)
     }
-
-    let magic = u32::from_ne_bytes(buf[0..4].try_into().unwrap());
-    let version = u16::from_ne_bytes(buf[4..6].try_into().unwrap());
-    let header_len = u16::from_ne_bytes(buf[6..8].try_into().unwrap());
-    let kind = u16::from_ne_bytes(buf[8..10].try_into().unwrap());
-    let code = u16::from_ne_bytes(buf[12..14].try_into().unwrap());
-
-    magic == MAGIC_MSG
-        && version != VERSION
-        && header_len == protocol::HEADER_LEN
-        && kind == protocol::KIND_CONTROL
-        && code == expected_code
-}
-
-fn hello_layout_incompatible(buf: &[u8]) -> bool {
-    buf.len() >= 2 && u16::from_ne_bytes(buf[0..2].try_into().unwrap()) != 1
-}
-
-fn hello_ack_layout_incompatible(buf: &[u8]) -> bool {
-    buf.len() >= 2 && u16::from_ne_bytes(buf[0..2].try_into().unwrap()) != 1
+    fn chunk(msg: String) -> Self {
+        UdsError::Chunk(msg)
+    }
+    fn incompatible(msg: String) -> Self {
+        UdsError::Incompatible(msg)
+    }
+    fn handshake(msg: String) -> Self {
+        UdsError::Handshake(msg)
+    }
+    fn bad_param(msg: String) -> Self {
+        UdsError::BadParam(msg)
+    }
+    fn limit_exceeded() -> Self {
+        UdsError::LimitExceeded
+    }
+    fn auth_failed() -> Self {
+        UdsError::AuthFailed
+    }
+    fn no_profile() -> Self {
+        UdsError::NoProfile
+    }
+    fn duplicate_msg_id(id: u64) -> Self {
+        UdsError::DuplicateMsgId(id)
+    }
+    fn unknown_msg_id(id: u64) -> Self {
+        UdsError::UnknownMsgId(id)
+    }
+    fn fails_session(&self) -> bool {
+        matches!(self, UdsError::Send(_))
+    }
+    fn is_recv_failure(&self) -> bool {
+        matches!(self, UdsError::Recv(_))
+    }
 }
 
 impl std::error::Error for UdsError {}
@@ -154,7 +198,8 @@ pub struct ClientConfig {
     pub max_response_payload_bytes: u32,
     pub max_response_batch_items: u32,
     pub auth_token: u64,
-    /// 0 = auto-detect from SO_SNDBUF.
+    /// 0 = transport limit (SEQPACKET: SO_SNDBUF - 32; stream: 256 KiB);
+    /// always capped at 256 KiB.
     pub packet_size: u32,
 }
 
@@ -183,7 +228,8 @@ pub struct ServerConfig {
     pub max_response_payload_bytes: u32,
     pub max_response_batch_items: u32,
     pub auth_token: u64,
-    /// 0 = auto-detect from SO_SNDBUF.
+    /// 0 = transport limit (SEQPACKET: SO_SNDBUF - 32; stream: 256 KiB);
+    /// always capped at 256 KiB.
     pub packet_size: u32,
     /// listen() backlog, 0 = default (16).
     pub backlog: i32,
@@ -229,18 +275,48 @@ pub struct UdsSession {
 
     // In-flight message_id set (client-side only)
     inflight_ids: HashSet<u64>,
+
+    // Inbound packets read while a pipelined send waited for buffer space
+    pending: Pending,
+
+    // Stream baseline: a receive failed after reading part of a message, so
+    // the stream is off a packet boundary and every later receive fails.
+    #[cfg_attr(not(any(target_os = "macos", target_os = "freebsd")), allow(dead_code))]
+    recv_failed: bool,
 }
 
 impl UdsSession {
-    fn fail_all_inflight(&mut self) {
-        if self.role == Role::Client {
-            self.inflight_ids.clear();
+    /// The framing of the messages this side sends (`sending`) or receives.
+    /// Clients send requests and receive responses; servers the opposite.
+    fn framing(&self, sending: bool) -> Framing {
+        let client = self.role == Role::Client;
+        let (max_payload, max_items) = if client == sending {
+            (self.max_request_payload_bytes, self.max_request_batch_items)
+        } else {
+            (
+                self.max_response_payload_bytes,
+                self.max_response_batch_items,
+            )
+        };
+        Framing {
+            client,
+            max_payload,
+            max_items,
+            packet_size: self.packet_size,
         }
     }
 
-    /// Get the raw fd for poll/epoll integration.
+    /// Get the raw fd for poll/epoll integration. A pipelined send can read
+    /// responses into the session's pending queue, where the fd no longer
+    /// shows them: check [`Self::has_pending`] before waiting on the fd.
     pub fn fd(&self) -> RawFd {
         self.fd
+    }
+
+    /// True when the next receive can return data read earlier by a
+    /// pipelined send, without the fd becoming readable.
+    pub fn has_pending(&self) -> bool {
+        !self.recv_failed && !self.pending.is_empty()
     }
 
     /// Get the session role.
@@ -261,14 +337,28 @@ impl UdsSession {
         service_name: &str,
         config: &ClientConfig,
     ) -> Result<Self, UdsError> {
+        Self::connect_with_timeout(run_dir, service_name, config, 0, None)
+    }
+
+    /// `connect()` bounded by `timeout_ms`: connect and the wait for
+    /// HELLO_ACK together end with `UdsError::Timeout` after `timeout_ms`
+    /// (0 = no deadline), and with `UdsError::Aborted` once `abort` is set.
+    pub fn connect_with_timeout(
+        run_dir: &str,
+        service_name: &str,
+        config: &ClientConfig,
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<Self, UdsError> {
+        let wait = ReceiveWait::new(timeout_ms, abort);
         let path = build_socket_path(run_dir, service_name)?;
 
-        let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0) };
+        let fd = uds_socket_cloexec();
         if fd < 0 {
             return Err(UdsError::Socket(errno()));
         }
 
-        let result = connect_and_handshake(fd, &path, config);
+        let result = connect_and_handshake(fd, &path, config, &wait);
         if result.is_err() {
             unsafe {
                 libc::close(fd);
@@ -284,125 +374,84 @@ impl UdsSession {
     /// If the total message (32 + payload_len) exceeds packet_size, the
     /// message is chunked transparently.
     pub fn send(&mut self, hdr: &mut Header, payload: &[u8]) -> Result<(), UdsError> {
+        self.send_with_control(hdr, payload, 0, None)
+    }
+
+    /// `send` with an optional deadline and abort flag for a client session.
+    ///
+    /// `timeout_ms == 0` waits without a deadline. While the socket lacks
+    /// buffer space the send reads the peer's bytes as a pipelined send
+    /// does. If the deadline passes or `abort` is set before the message is
+    /// sent, returns `UdsError::Timeout` or `UdsError::Aborted` and shuts
+    /// the session down, since part of the message may be on the wire.
+    pub fn send_with_control(
+        &mut self,
+        hdr: &mut Header,
+        payload: &[u8],
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<(), UdsError> {
         if self.fd < 0 {
             return Err(UdsError::BadParam("session closed".into()));
         }
 
-        // Validate payload against negotiated directional limits before transmitting.
-        // The u32 cast below requires payload.len() <= u32::MAX.
-        let (max_payload, max_items) = if self.role == Role::Client {
-            (self.max_request_payload_bytes, self.max_request_batch_items)
-        } else {
-            (
-                self.max_response_payload_bytes,
-                self.max_response_batch_items,
-            )
-        };
-        if payload.len() > max_payload as usize
-            || payload.len() > (u32::MAX as usize).saturating_sub(HEADER_SIZE)
-        {
-            return Err(UdsError::LimitExceeded);
-        }
-        if hdr.item_count > max_items {
-            return Err(UdsError::LimitExceeded);
+        let framing = self.framing(true);
+        let fd = self.fd;
+
+        // A client send with a deadline or abort, or with another request in
+        // flight (a pipelining client can deadlock with a server blocked
+        // sending to it), waits in the progress loop; anything else keeps the
+        // plain blocking send.
+        let controlled = timeout_ms != 0 || abort.is_some();
+        let inflight = self.inflight_ids.len()
+            + usize::from(framing.client && hdr.kind == crate::protocol::KIND_REQUEST);
+        if !(framing.client && (inflight > 1 || controlled)) {
+            return framing::send_message(framing, &mut self.inflight_ids, hdr, payload, |h, p| {
+                send_packet(fd, h, p)
+            });
         }
 
-        // Client-side: track in-flight message_ids for requests
-        if self.role == Role::Client && hdr.kind == KIND_REQUEST {
-            if !self.inflight_ids.insert(hdr.message_id) {
-                return Err(UdsError::DuplicateMsgId(hdr.message_id));
-            }
-        }
-
-        // Fill envelope fields
-        hdr.magic = MAGIC_MSG;
-        hdr.version = VERSION;
-        hdr.header_len = protocol::HEADER_LEN;
-        hdr.payload_len = payload.len() as u32;
-
-        let tracked = self.role == Role::Client && hdr.kind == KIND_REQUEST;
-        let msg_id = hdr.message_id;
-
-        let result = self.send_inner(hdr, payload);
-
-        if let Err(err) = &result {
-            if tracked {
-                match err {
-                    UdsError::Send(_) => self.fail_all_inflight(),
-                    _ => {
-                        self.inflight_ids.remove(&msg_id);
-                    }
+        // A bounded send of an untracked message can run with nothing in
+        // flight; it still gets one response's room.
+        let bound = pending_bound(
+            self.max_response_payload_bytes,
+            self.packet_size,
+            inflight.max(1),
+        );
+        let read_len = self.packet_size as usize;
+        let pending = &mut self.pending;
+        // After a failed stream receive the inbound bytes belong to an
+        // abandoned message: never queue them.
+        let recv_failed = self.recv_failed;
+        let wait = controlled.then(|| ReceiveWait::new(timeout_ms, abort));
+        let mut failed = false;
+        let result =
+            framing::send_message(framing, &mut self.inflight_ids, hdr, payload, |h, p| {
+                let r = send_with_progress(
+                    fd,
+                    h,
+                    p,
+                    pending,
+                    read_len,
+                    bound,
+                    recv_failed,
+                    wait.as_ref(),
+                );
+                if matches!(
+                    r,
+                    Err(UdsError::Protocol(_) | UdsError::Timeout | UdsError::Aborted)
+                ) {
+                    failed = true;
                 }
-            }
+                r
+            });
+        if failed {
+            // Inbound bytes were dropped, or the message stopped part way:
+            // the session cannot continue.
+            unsafe { libc::shutdown(fd, libc::SHUT_RDWR) };
+            self.inflight_ids.clear();
         }
-
         result
-    }
-
-    /// Inner send logic, separated so the caller can rollback on failure.
-    fn send_inner(&mut self, hdr: &mut Header, payload: &[u8]) -> Result<(), UdsError> {
-        let total_msg = HEADER_SIZE + payload.len();
-        // total_message_len is a u32 wire field; larger totals are
-        // unrepresentable (parity with the C nipc_uds_header_payload_len).
-        if total_msg > u32::MAX as usize {
-            return Err(UdsError::BadParam(
-                "total message length exceeds protocol limit".into(),
-            ));
-        }
-
-        // Single packet?
-        if total_msg <= self.packet_size as usize {
-            let mut hdr_buf = [0u8; HEADER_SIZE];
-            hdr.encode(&mut hdr_buf);
-            return raw_send_iov(self.fd, &hdr_buf, payload);
-        }
-
-        // Chunked send
-        let chunk_payload_budget = self.packet_size as usize - HEADER_SIZE;
-        if chunk_payload_budget == 0 {
-            return Err(UdsError::BadParam("packet_size too small".into()));
-        }
-
-        let first_chunk_payload = payload.len().min(chunk_payload_budget);
-        let remaining_after_first = payload.len() - first_chunk_payload;
-
-        let continuation_chunks = if remaining_after_first > 0 {
-            1 + ((remaining_after_first - 1) / chunk_payload_budget)
-        } else {
-            0
-        };
-        let chunk_count = 1 + continuation_chunks as u32;
-
-        // Send first chunk: outer header + first part of payload
-        let mut hdr_buf = [0u8; HEADER_SIZE];
-        hdr.encode(&mut hdr_buf);
-        raw_send_iov(self.fd, &hdr_buf, &payload[..first_chunk_payload])?;
-
-        // Send continuation chunks
-        let mut offset = first_chunk_payload;
-        for ci in 1..chunk_count {
-            let remaining = payload.len() - offset;
-            let this_chunk = remaining.min(chunk_payload_budget);
-
-            let chk = ChunkHeader {
-                magic: MAGIC_CHUNK,
-                version: VERSION,
-                flags: 0,
-                message_id: hdr.message_id,
-                total_message_len: total_msg as u32,
-                chunk_index: ci,
-                chunk_count,
-                chunk_payload_len: this_chunk as u32,
-            };
-
-            let mut chk_buf = [0u8; HEADER_SIZE];
-            chk.encode(&mut chk_buf);
-            raw_send_iov(self.fd, &chk_buf, &payload[offset..offset + this_chunk])?;
-
-            offset += this_chunk;
-        }
-
-        Ok(())
     }
 
     /// Receive one logical message. Blocks until a complete message arrives.
@@ -426,185 +475,87 @@ impl UdsSession {
         if self.fd < 0 {
             return Err(UdsError::BadParam("session closed".into()));
         }
+        // Rejected before any byte is read, so the session stays usable.
+        if buf.len() < HEADER_SIZE {
+            return Err(UdsError::BadParam("receive buffer too small".into()));
+        }
 
         let controlled = timeout_ms != 0 || abort.is_some();
+        #[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(unused_mut))]
         let mut wait = ReceiveWait::new(timeout_ms, abort);
 
-        // Read first packet
-        let n = match raw_recv_control(self.fd, buf, controlled, &mut wait) {
-            Ok(n) => n,
-            Err(err) => {
-                self.fail_all_inflight();
-                return Err(err);
+        let framing = self.framing(false);
+        let fd = self.fd;
+
+        #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+        {
+            // A failure before the first byte (a timeout or abort, also one
+            // that fires after the wait below) leaves the stream on a packet
+            // boundary. A failure after it does not: the rest of the message
+            // is still queued, so every later receive fails. The
+            // session records that instead of shutting the read side, whose
+            // effect differs by OS (FreeBSD 15 fails the peer's sends,
+            // FreeBSD 14 still returns queued bytes). Sends stay valid; they
+            // always write whole messages.
+            if self.recv_failed {
+                return Err(UdsError::Recv(0));
             }
-        };
-
-        if n < HEADER_SIZE {
-            return Err(UdsError::Protocol("packet too short for header".into()));
-        }
-
-        let hdr = Header::decode(&buf[..n])
-            .map_err(|e| UdsError::Protocol(format!("header decode: {e}")))?;
-
-        // Validate payload_len against negotiated directional limit.
-        // Server receives requests; client receives responses.
-        let max_payload = if self.role == Role::Server {
-            self.max_request_payload_bytes
-        } else {
-            self.max_response_payload_bytes
-        };
-        if hdr.payload_len > max_payload {
-            return Err(UdsError::LimitExceeded);
-        }
-
-        // Validate item_count against negotiated directional batch limit.
-        let max_batch = if self.role == Role::Server {
-            self.max_request_batch_items
-        } else {
-            self.max_response_batch_items
-        };
-        if hdr.item_count > max_batch {
-            return Err(UdsError::LimitExceeded);
-        }
-
-        // Client-side: validate response message_id is in-flight
-        if self.role == Role::Client && hdr.kind == KIND_RESPONSE {
-            if !self.inflight_ids.remove(&hdr.message_id) {
-                return Err(UdsError::UnknownMsgId(hdr.message_id));
+            let wait = controlled.then_some(&wait);
+            if let Some(wait) = wait
+                && self.pending.is_empty()
+            {
+                wait_fd_readable(fd, wait)?;
             }
+            let pending = &mut self.pending;
+            let mut first = true;
+            let mut consumed = false;
+            let result = framing::receive_message(
+                framing,
+                &mut self.inflight_ids,
+                buf,
+                &mut self.recv_buf,
+                &mut self.pkt_buf,
+                |b| {
+                    let r = stream::recv_session_packet(
+                        fd,
+                        pending,
+                        b,
+                        first,
+                        framing.packet_size,
+                        framing.max_payload,
+                        framing.max_items,
+                        wait,
+                        &mut consumed,
+                    );
+                    first = false;
+                    r
+                },
+            );
+            if result.is_err() && consumed {
+                self.recv_failed = true;
+                // Queued bytes are part of the abandoned stream too, and no
+                // response for a request in flight can arrive any more.
+                self.pending = Pending::default();
+                self.inflight_ids.clear();
+            }
+            result
         }
 
-        let total_msg = HEADER_SIZE + hdr.payload_len as usize;
-        // total_message_len is a u32 wire field; reject unrepresentable totals
-        // so the chunk-header comparison below cannot truncate-match (parity
-        // with the C nipc_uds_header_payload_len).
-        if total_msg > u32::MAX as usize {
-            return Err(UdsError::Protocol(
-                "total message length exceeds protocol limit".into(),
-            ));
-        }
-
-        if n > total_msg {
-            return Err(UdsError::Protocol(
-                "packet exceeds declared payload_len".into(),
-            ));
-        }
-
-        // Non-chunked: entire message in one packet
-        if n == total_msg {
-            let payload = &buf[HEADER_SIZE..HEADER_SIZE + hdr.payload_len as usize];
-
-            // Validate batch directory
-            if hdr.flags & FLAG_BATCH != 0 && hdr.item_count > 1 {
-                let dir_bytes = hdr.item_count as usize * 8;
-                let dir_aligned = align8(dir_bytes);
-                if payload.len() < dir_aligned {
-                    return Err(UdsError::Protocol("batch directory exceeds payload".into()));
+        #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+        framing::receive_message(
+            framing,
+            &mut self.inflight_ids,
+            buf,
+            &mut self.recv_buf,
+            &mut self.pkt_buf,
+            |b| {
+                if self.pending.is_empty() {
+                    raw_recv_control(fd, b, controlled, &mut wait)
+                } else {
+                    Ok(self.pending.pop_packet(b))
                 }
-                let packed_area_len = (payload.len() - dir_aligned) as u32;
-                protocol::batch_dir_validate(
-                    &payload[..dir_bytes],
-                    hdr.item_count,
-                    packed_area_len,
-                )
-                .map_err(|e| UdsError::Protocol(format!("batch directory: {e:?}")))?;
-            }
-
-            return Ok((hdr, payload));
-        }
-
-        // Chunked: first packet has partial payload
-        let first_payload_bytes = n - HEADER_SIZE;
-
-        // Grow recv_buf to hold full payload
-        let needed = hdr.payload_len as usize;
-        if self.recv_buf.len() < needed {
-            self.recv_buf.resize(needed, 0);
-        }
-
-        // Copy first chunk's payload
-        self.recv_buf[..first_payload_bytes]
-            .copy_from_slice(&buf[HEADER_SIZE..HEADER_SIZE + first_payload_bytes]);
-
-        let mut assembled = first_payload_bytes;
-        let chunk_payload_budget = self.packet_size as usize - HEADER_SIZE;
-
-        // Expected chunk count
-        let remaining_after_first = hdr.payload_len as usize - first_payload_bytes;
-        let expected_continuations = if remaining_after_first > 0 && chunk_payload_budget > 0 {
-            1 + ((remaining_after_first - 1) / chunk_payload_budget)
-        } else {
-            0
-        };
-        let expected_chunk_count = 1 + expected_continuations as u32;
-
-        if self.pkt_buf.len() < self.packet_size as usize {
-            self.pkt_buf.resize(self.packet_size as usize, 0);
-        }
-
-        let mut ci = 1u32;
-        while assembled < hdr.payload_len as usize {
-            let cn = match raw_recv_control(self.fd, &mut self.pkt_buf, controlled, &mut wait) {
-                Ok(n) => n,
-                Err(err) => {
-                    self.fail_all_inflight();
-                    return Err(err);
-                }
-            };
-
-            if cn < HEADER_SIZE {
-                return Err(UdsError::Chunk("continuation too short".into()));
-            }
-
-            let chk = ChunkHeader::decode(&self.pkt_buf[..cn])
-                .map_err(|e| UdsError::Chunk(format!("chunk header: {e}")))?;
-
-            // Validate chunk header
-            if chk.message_id != hdr.message_id {
-                return Err(UdsError::Chunk("message_id mismatch".into()));
-            }
-            if chk.chunk_index != ci {
-                return Err(UdsError::Chunk(format!(
-                    "chunk_index mismatch: expected {ci}, got {}",
-                    chk.chunk_index
-                )));
-            }
-            if chk.chunk_count != expected_chunk_count {
-                return Err(UdsError::Chunk("chunk_count mismatch".into()));
-            }
-            if chk.total_message_len != total_msg as u32 {
-                return Err(UdsError::Chunk("total_message_len mismatch".into()));
-            }
-
-            let chunk_data = cn - HEADER_SIZE;
-            if chunk_data != chk.chunk_payload_len as usize {
-                return Err(UdsError::Chunk("chunk_payload_len mismatch".into()));
-            }
-            if assembled + chunk_data > hdr.payload_len as usize {
-                return Err(UdsError::Chunk("chunk exceeds payload_len".into()));
-            }
-
-            self.recv_buf[assembled..assembled + chunk_data]
-                .copy_from_slice(&self.pkt_buf[HEADER_SIZE..HEADER_SIZE + chunk_data]);
-            assembled += chunk_data;
-            ci += 1;
-        }
-
-        let payload = &self.recv_buf[..hdr.payload_len as usize];
-
-        // Validate batch directory
-        if hdr.flags & FLAG_BATCH != 0 && hdr.item_count > 1 {
-            let dir_bytes = hdr.item_count as usize * 8;
-            let dir_aligned = align8(dir_bytes);
-            if payload.len() < dir_aligned {
-                return Err(UdsError::Protocol("batch directory exceeds payload".into()));
-            }
-            let packed_area_len = (payload.len() - dir_aligned) as u32;
-            protocol::batch_dir_validate(&payload[..dir_bytes], hdr.item_count, packed_area_len)
-                .map_err(|e| UdsError::Protocol(format!("batch directory: {e:?}")))?;
-        }
-
-        Ok((hdr, payload))
+            },
+        )
     }
 }
 
@@ -629,31 +580,184 @@ pub struct UdsListener {
     config: ServerConfig,
     path: PathBuf,
     next_session_id: AtomicU64,
+    /// `{service_name}.lock`, flock'ed for the listener's lifetime. Fields
+    /// drop after `Drop::drop` removed the socket file, so the endpoint is
+    /// released only once its socket file is gone.
+    _lock: EndpointLock,
+}
+
+/// Test-only hook run inside `UdsListener::bind` between bind() and
+/// listen() for the given socket path.
+#[cfg(test)]
+pub(crate) type ListenHook = (String, Box<dyn Fn() + Send>);
+#[cfg(test)]
+pub(crate) static LISTEN_HOOK: std::sync::Mutex<Option<ListenHook>> = std::sync::Mutex::new(None);
+
+/// Runs just before a new endpoint lock file is linked to its final name.
+#[cfg(test)]
+pub(crate) type LockPublishHook = Box<dyn Fn(&str) + Send>;
+#[cfg(test)]
+pub(crate) static LOCK_PUBLISH_HOOK: std::sync::Mutex<Option<LockPublishHook>> =
+    std::sync::Mutex::new(None);
+
+/// A file created under a umask without owner bits stays unopenable if the
+/// process dies before fchmod(), so a missing lock gets its name only once
+/// it is 0600. Best effort: the caller's creating open covers every failure,
+/// such as a filesystem without hard links, and a losing link means another
+/// starter published the file first.
+fn publish_endpoint_lock(lock_path: &str) {
+    use std::os::unix::fs::{OpenOptionsExt, PermissionsExt};
+
+    static SEQ: AtomicU64 = AtomicU64::new(0);
+    let tmp = format!(
+        "{lock_path}.{}.{}.tmp",
+        std::process::id(),
+        SEQ.fetch_add(1, Ordering::Relaxed)
+    );
+    let Ok(file) = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+        .open(&tmp)
+    else {
+        return;
+    };
+    let restricted = file
+        .set_permissions(std::fs::Permissions::from_mode(0o600))
+        .is_ok();
+    drop(file);
+    if restricted {
+        #[cfg(test)]
+        if let Some(hook) = LOCK_PUBLISH_HOOK.lock().unwrap().as_ref() {
+            hook(&tmp);
+        }
+        let _ = std::fs::hard_link(&tmp, lock_path);
+    }
+    let _ = std::fs::remove_file(&tmp);
+}
+
+/// Take the endpoint lock `{run_dir}/{service_name}.lock`. A server's
+/// socket file exists from bind() until listen(), and connects in that
+/// window are refused just as for a dead server's leftover file, so a
+/// connect probe alone cannot tell a starting server from a stale one. The
+/// lock can: its holder owns the endpoint, and the kernel drops it when that
+/// process dies. The file stays on disk; removing it would let a starter
+/// that already opened it lock an orphaned inode.
+fn acquire_endpoint_lock(run_dir: &str, service_name: &str) -> Result<EndpointLock, UdsError> {
+    use std::os::unix::fs::OpenOptionsExt;
+    use std::os::unix::io::AsRawFd;
+
+    use std::os::unix::fs::PermissionsExt;
+
+    let lock_path = format!("{run_dir}/{service_name}.lock");
+    // A file left with mode bits missing, by an older build or a fallback
+    // create under a umask without owner read or write, may not reopen
+    // read-write, so a narrower open follows (flock() works on any access
+    // mode) and fchmod() restores 0600 for the next starter. fchmod() fails
+    // only for a file another account owns, which the lock still works on.
+    let open_mode = |read: bool, write: bool, create: bool| {
+        std::fs::OpenOptions::new()
+            .read(read)
+            .write(write)
+            .create(create)
+            .truncate(false)
+            .mode(0o600)
+            .custom_flags(libc::O_CLOEXEC | libc::O_NOFOLLOW)
+            .open(&lock_path)
+    };
+    let denied = |e: &io::Error| e.raw_os_error() == Some(libc::EACCES);
+    let file = open_mode(true, true, false)
+        .or_else(|e| {
+            if e.raw_os_error() == Some(libc::ENOENT) {
+                publish_endpoint_lock(&lock_path);
+                open_mode(true, true, true)
+            } else {
+                Err(e)
+            }
+        })
+        .or_else(|e| {
+            if denied(&e) {
+                open_mode(false, true, false)
+            } else {
+                Err(e)
+            }
+        })
+        .or_else(|e| {
+            if denied(&e) {
+                open_mode(true, false, false)
+            } else {
+                Err(e)
+            }
+        })
+        .map_err(|e| UdsError::Socket(e.raw_os_error().unwrap_or(0)))?;
+    let _ = file.set_permissions(std::fs::Permissions::from_mode(0o600));
+    loop {
+        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+            return Ok(EndpointLock(file));
+        }
+        match errno() {
+            libc::EINTR => continue,
+            libc::EWOULDBLOCK => return Err(UdsError::AddrInUse),
+            e => return Err(UdsError::Socket(e)),
+        }
+    }
+}
+
+/// The held endpoint lock. Dropping it unlocks before closing: a child
+/// forked by another thread shares the open file description until it
+/// execs, and its copy would keep the lock held.
+struct EndpointLock(std::fs::File);
+
+impl Drop for EndpointLock {
+    fn drop(&mut self) {
+        use std::os::unix::io::AsRawFd;
+        unsafe { libc::flock(self.0.as_raw_fd(), libc::LOCK_UN) };
+    }
 }
 
 impl UdsListener {
     /// Create a listener on `{run_dir}/{service_name}.sock`.
-    /// Performs stale endpoint recovery.
+    /// First takes an exclusive flock on `{run_dir}/{service_name}.lock`,
+    /// held until the listener drops; a held lock means another server owns
+    /// the endpoint (`AddrInUse`). With the lock held, an existing socket
+    /// file no live server accepts on is stale and is replaced.
     pub fn bind(run_dir: &str, service_name: &str, config: ServerConfig) -> Result<Self, UdsError> {
         let path = build_socket_path(run_dir, service_name)?;
+        let lock = acquire_endpoint_lock(run_dir, service_name)?;
 
-        // Stale recovery
+        // The probe still guards against a live server that takes no lock
+        // (an older library version).
         match check_and_recover_stale(&path) {
             StaleResult::LiveServer => return Err(UdsError::AddrInUse),
             StaleResult::Stale | StaleResult::NotExist => { /* proceed */ }
         }
 
-        let fd = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0) };
+        let fd = uds_socket_cloexec();
         if fd < 0 {
             return Err(UdsError::Socket(errno()));
         }
 
-        // Bind
-        if let Err(e) = bind_unix(fd, &path) {
+        if let Err(e) = bind_owner_only(fd, run_dir, service_name, &path) {
             unsafe {
                 libc::close(fd);
             }
             return Err(e);
+        }
+
+        #[cfg(test)]
+        {
+            // Run the hook once, outside the lock: other binds go on.
+            let hook = {
+                let mut slot = LISTEN_HOOK.lock().unwrap();
+                match slot.as_ref() {
+                    Some((hook_path, _)) if *hook_path == path => slot.take(),
+                    _ => None,
+                }
+            };
+            if let Some((_, hook)) = hook {
+                hook();
+            }
         }
 
         let backlog = if config.backlog > 0 {
@@ -676,6 +780,7 @@ impl UdsListener {
             config,
             path: PathBuf::from(&path),
             next_session_id: AtomicU64::new(1),
+            _lock: lock,
         })
     }
 
@@ -702,47 +807,316 @@ impl UdsListener {
     }
 
     /// Accept one client using a caller-provided per-session server config
-    /// and session ID.
+    /// and session ID. The handshake waits at most
+    /// `SERVER_HANDSHAKE_TIMEOUT_MS` for HELLO.
     pub fn accept_with_config(
         &self,
         session_id: u64,
         config: ServerConfig,
     ) -> Result<UdsSession, UdsError> {
-        let client_fd =
-            unsafe { libc::accept(self.fd, std::ptr::null_mut(), std::ptr::null_mut()) };
-        if client_fd < 0 {
-            return Err(UdsError::Accept(errno()));
-        }
+        self.accept_pending()?.handshake(
+            session_id,
+            &config,
+            protocol::SERVER_HANDSHAKE_TIMEOUT_MS,
+            None,
+        )
+    }
 
-        match server_handshake(client_fd, &config, session_id) {
-            Ok(session) => Ok(session),
-            Err(e) => {
-                unsafe {
-                    libc::close(client_fd);
-                }
-                Err(e)
-            }
+    /// Accept one connection without handshaking, so the caller can run the
+    /// handshake on another thread. Blocks until a client connects.
+    pub fn accept_pending(&self) -> Result<PendingConnection, UdsError> {
+        // A signal that interrupts the wait is retried: it must not end the
+        // server's accept loop.
+        let fd = retry_eintr(
+            #[cfg(test)]
+            &eintr_inject::ACCEPT,
+            || accept_cloexec(self.fd) as isize,
+        )
+        .map_err(UdsError::Accept)?;
+        Ok(PendingConnection { fd: fd as RawFd })
+    }
+}
+
+/// An accepted connection whose handshake has not run yet. Dropping it
+/// closes the connection.
+#[derive(Debug)]
+pub struct PendingConnection {
+    fd: RawFd,
+}
+
+impl PendingConnection {
+    /// Complete the server side of the handshake. Waits at most `timeout_ms`
+    /// for HELLO (`UdsError::Timeout`; 0 waits without a deadline) and returns
+    /// `UdsError::Aborted` once `abort` is set.
+    pub fn handshake(
+        self,
+        session_id: u64,
+        config: &ServerConfig,
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+    ) -> Result<UdsSession, UdsError> {
+        self.handshake_inner(session_id, config, timeout_ms, abort, None)
+    }
+
+    /// [`handshake`](Self::handshake) with a prepare step. Once a profile is
+    /// selected and the payload limits are agreed, and before HELLO_ACK is
+    /// sent, `prepare(profile, max_request_payload_bytes,
+    /// max_response_payload_bytes)` sets up that profile's resources (an SHM
+    /// region). Returning false drops the profile and the handshake selects
+    /// again; with no profile left the client is rejected as unsupported.
+    pub fn handshake_prepared(
+        self,
+        session_id: u64,
+        config: &ServerConfig,
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+        prepare: &mut dyn FnMut(u32, u32, u32) -> bool,
+    ) -> Result<UdsSession, UdsError> {
+        self.handshake_inner(session_id, config, timeout_ms, abort, Some(prepare))
+    }
+
+    fn handshake_inner(
+        self,
+        session_id: u64,
+        config: &ServerConfig,
+        timeout_ms: u32,
+        abort: Option<&AtomicBool>,
+        prepare: Option<&mut dyn FnMut(u32, u32, u32) -> bool>,
+    ) -> Result<UdsSession, UdsError> {
+        // One deadline covers the wait for HELLO and, on a stream, its bytes.
+        let wait = ReceiveWait::new(timeout_ms, abort);
+        wait_fd_readable(self.fd, &wait)?;
+        let session = server_handshake(self.fd, config, session_id, prepare, &wait)?;
+        // The session owns the descriptor now.
+        std::mem::forget(self);
+        Ok(session)
+    }
+}
+
+impl Drop for PendingConnection {
+    fn drop(&mut self) {
+        unsafe {
+            libc::close(self.fd);
         }
     }
 }
 
-impl Drop for UdsListener {
-    fn drop(&mut self) {
+impl UdsListener {
+    /// Stop accepting: close the listening socket and remove the socket
+    /// file, keeping the endpoint lock until the listener drops, so no other
+    /// server takes the endpoint while this one still serves its sessions.
+    /// Idempotent.
+    pub fn stop_listening(&mut self) {
         if self.fd >= 0 {
             unsafe {
                 libc::close(self.fd);
             }
             self.fd = -1;
         }
-        if self.path.exists() {
+        if !self.path.as_os_str().is_empty() {
             let _ = std::fs::remove_file(&self.path);
+            self.path = PathBuf::new();
         }
+    }
+}
+
+impl Drop for UdsListener {
+    fn drop(&mut self) {
+        self.stop_listening();
     }
 }
 
 // ---------------------------------------------------------------------------
 //  Internal helpers
 // ---------------------------------------------------------------------------
+
+// SO_NOSIGPIPE is macOS's documented way to keep a write to a closed peer
+// from raising SIGPIPE in the embedding process; sends also pass
+// MSG_NOSIGNAL.
+#[cfg(target_os = "macos")]
+fn set_nosigpipe(fd: i32) {
+    let on: libc::c_int = 1;
+    unsafe {
+        libc::setsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_NOSIGPIPE,
+            &on as *const _ as *const libc::c_void,
+            std::mem::size_of::<libc::c_int>() as libc::socklen_t,
+        )
+    };
+}
+
+// Sockets must not leak into children a consumer forks and execs: an
+// inherited session socket keeps the peer from ever seeing EOF, which is
+// the dead-peer signal. Platforms without SOCK_CLOEXEC set the flag right
+// after creation.
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
+fn uds_socket_cloexec() -> i32 {
+    unsafe { libc::socket(libc::AF_UNIX, SOCK_TYPE | libc::SOCK_CLOEXEC, 0) }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "freebsd")))]
+fn uds_socket_cloexec() -> i32 {
+    let fd = unsafe { libc::socket(libc::AF_UNIX, SOCK_TYPE, 0) };
+    if fd >= 0 {
+        unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+        #[cfg(target_os = "macos")]
+        set_nosigpipe(fd);
+    }
+    fd
+}
+
+#[cfg(any(target_os = "linux", target_os = "android", target_os = "freebsd"))]
+fn accept_cloexec(listen_fd: i32) -> i32 {
+    unsafe {
+        libc::accept4(
+            listen_fd,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            libc::SOCK_CLOEXEC,
+        )
+    }
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "android", target_os = "freebsd")))]
+fn accept_cloexec(listen_fd: i32) -> i32 {
+    let fd = unsafe { libc::accept(listen_fd, std::ptr::null_mut(), std::ptr::null_mut()) };
+    if fd >= 0 {
+        unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) };
+        #[cfg(target_os = "macos")]
+        set_nosigpipe(fd);
+    }
+    fd
+}
+
+/// Bind as owner-only (0600, narrowed by the umask). Linux and FreeBSD give
+/// the socket file the mode of the unbound socket, so fchmod() before bind()
+/// sets it without a post-bind window and without touching the
+/// process-global umask, which other threads of the embedding process use.
+/// connect() needs write permission on the socket file, so a umask without
+/// owner write fails the listen instead of leaving an endpoint its own user
+/// cannot reach.
+#[cfg(not(target_os = "macos"))]
+fn bind_owner_only(
+    fd: RawFd,
+    _run_dir: &str,
+    _service_name: &str,
+    path: &str,
+) -> Result<(), UdsError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    if unsafe { libc::fchmod(fd, libc::S_IRUSR | libc::S_IWUSR) } < 0 {
+        return Err(UdsError::Socket(errno()));
+    }
+    bind_unix(fd, path)?;
+    let err = match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.permissions().mode() & 0o200 != 0 => return Ok(()),
+        Ok(_) => libc::EACCES,
+        Err(e) => e.raw_os_error().unwrap_or(libc::EIO),
+    };
+    let _ = std::fs::remove_file(path);
+    Err(UdsError::Socket(err))
+}
+
+/// macOS rejects fchmod() on an unbound socket and creates the socket file
+/// 0777 & ~umask. The socket is bound inside a private 0700 directory
+/// `{service_name}.d`, narrowed to owner-only there, then renamed into
+/// place, so it is never reachable with a wider mode and the process-global
+/// umask is untouched. The caller holds the endpoint lock, so a leftover
+/// directory belongs to a crashed server and is removed first. fchmodat()
+/// and open() resolve the directory by path without following a symlink,
+/// and the owner check on the opened descriptor refuses a directory another
+/// account swapped in. After that check every step but bind() goes through
+/// the descriptor, so a later swap makes the listen fail instead of placing
+/// a socket someone else can reach.
+#[cfg(target_os = "macos")]
+fn bind_owner_only(
+    fd: RawFd,
+    run_dir: &str,
+    service_name: &str,
+    path: &str,
+) -> Result<(), UdsError> {
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
+    use std::os::unix::io::AsRawFd;
+
+    let io_err = |e: io::Error| UdsError::Socket(e.raw_os_error().unwrap_or(libc::EIO));
+    let dir = format!("{run_dir}/{service_name}.d");
+    let tmp = format!("{dir}/s");
+
+    // Anything but a real directory is unlinked without following it.
+    match std::fs::symlink_metadata(&dir) {
+        Ok(meta) if meta.is_dir() => {
+            match std::fs::remove_file(&tmp) {
+                Ok(()) => {}
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+                Err(e) => return Err(io_err(e)),
+            }
+            std::fs::remove_dir(&dir).map_err(io_err)?;
+        }
+        Ok(_) => std::fs::remove_file(&dir).map_err(io_err)?,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(io_err(e)),
+    }
+
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&dir)
+        .map_err(io_err)?;
+    let result = (|| {
+        // fchmodat() ignores the umask, so a umask without owner bits cannot
+        // make the directory unopenable or unusable.
+        let c_dir = CString::new(dir.as_str()).map_err(|_| UdsError::PathTooLong)?;
+        if unsafe {
+            libc::fchmodat(
+                libc::AT_FDCWD,
+                c_dir.as_ptr(),
+                0o700,
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        } < 0
+        {
+            return Err(UdsError::Socket(errno()));
+        }
+        let dir_file = std::fs::OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(&dir)
+            .map_err(io_err)?;
+        if dir_file.metadata().map_err(io_err)?.uid() != unsafe { libc::geteuid() } {
+            return Err(UdsError::Socket(libc::EPERM));
+        }
+        // The descriptor is the directory every later step uses; keep it
+        // 0700 even if another one of ours replaced the path.
+        dir_file
+            .set_permissions(std::fs::Permissions::from_mode(0o700))
+            .map_err(io_err)?;
+        bind_unix(fd, &tmp)?;
+        let dfd = dir_file.as_raw_fd();
+        let name = c"s";
+        let placed = (|| {
+            // The bound file carries 0777 & ~umask. It is set to exactly
+            // 0600: a umask without owner write would leave a socket its own
+            // user cannot connect to, and only the owner can reach the
+            // private directory.
+            let mode = libc::S_IRUSR | libc::S_IWUSR;
+            if unsafe { libc::fchmodat(dfd, name.as_ptr(), mode, 0) } < 0 {
+                return Err(UdsError::Socket(errno()));
+            }
+            let c_path = CString::new(path).map_err(|_| UdsError::PathTooLong)?;
+            if unsafe { libc::renameat(dfd, name.as_ptr(), libc::AT_FDCWD, c_path.as_ptr()) } < 0 {
+                return Err(UdsError::Socket(errno()));
+            }
+            Ok(())
+        })();
+        if placed.is_err() {
+            unsafe { libc::unlinkat(dfd, name.as_ptr(), 0) };
+        }
+        placed
+    })();
+    let _ = std::fs::remove_dir(&dir);
+    result
+}
 
 fn errno() -> i32 {
     io::Error::last_os_error().raw_os_error().unwrap_or(0)
@@ -765,7 +1139,7 @@ fn validate_service_name(name: &str) -> Result<(), UdsError> {
                 return Err(UdsError::BadParam(format!(
                     "service name contains invalid character: {:?}",
                     c as char
-                )))
+                )));
             }
         }
     }
@@ -774,6 +1148,10 @@ fn validate_service_name(name: &str) -> Result<(), UdsError> {
 
 /// Build `{run_dir}/{service_name}.sock` and validate length.
 fn build_socket_path(run_dir: &str, service_name: &str) -> Result<String, UdsError> {
+    // An empty run_dir would put the socket at "/<name>".
+    if run_dir.is_empty() {
+        return Err(UdsError::BadParam("empty run_dir".into()));
+    }
     validate_service_name(service_name)?;
 
     let path = format!("{run_dir}/{service_name}.sock");
@@ -788,8 +1166,25 @@ fn build_socket_path(run_dir: &str, service_name: &str) -> Result<String, UdsErr
     Ok(path)
 }
 
-/// Get SO_SNDBUF as packet size.
-fn detect_packet_size(fd: RawFd) -> u32 {
+/// Packet size this side may propose: `configured` (0 = no preference)
+/// capped by what the kernel accepts as one datagram.
+///
+/// Linux rejects a datagram larger than SO_SNDBUF minus 32 bytes of
+/// accounting overhead with EMSGSIZE; very large buffers also hit ENOBUFS
+/// near 1 MiB, hence the fixed cap.
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
+fn packet_size_limit(_fd: RawFd, configured: u32) -> u32 {
+    // A stream has no per-message size cap; the fixed cap keeps the first
+    // packet's buffer bounded and the chunking code shared.
+    if configured != 0 && configured < PACKET_SIZE_MAX {
+        configured
+    } else {
+        PACKET_SIZE_MAX
+    }
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+fn packet_size_limit(fd: RawFd, configured: u32) -> u32 {
     let mut val: libc::c_int = 0;
     let mut len: libc::socklen_t = std::mem::size_of::<libc::c_int>() as libc::socklen_t;
 
@@ -803,26 +1198,17 @@ fn detect_packet_size(fd: RawFd) -> u32 {
         )
     };
 
-    if rc < 0 || val <= 0 {
+    let limit = if rc < 0 || val <= SNDBUF_OVERHEAD as libc::c_int {
         DEFAULT_PACKET_SIZE_FALLBACK
     } else {
-        val as u32
+        val as u32 - SNDBUF_OVERHEAD
     }
-}
+    .min(PACKET_SIZE_MAX);
 
-/// Highest set bit in a bitmask (0 if empty).
-fn highest_bit(mask: u32) -> u32 {
-    if mask == 0 {
-        return 0;
-    }
-    1u32 << (31 - mask.leading_zeros() as u32)
-}
-
-fn apply_default(val: u32, def: u32) -> u32 {
-    if val == 0 {
-        def
+    if configured != 0 && configured < limit {
+        configured
     } else {
-        val
+        limit
     }
 }
 
@@ -830,7 +1216,335 @@ fn apply_default(val: u32, def: u32) -> u32 {
 //  Low-level I/O
 // ---------------------------------------------------------------------------
 
+/// Send one packet: one SEQPACKET message, or all its bytes on a stream.
+fn send_packet(fd: RawFd, hdr: &[u8], payload: &[u8]) -> Result<(), UdsError> {
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    return stream::send_all(fd, hdr, payload);
+    #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+    raw_send_iov(fd, hdr, payload)
+}
+
+/// Send one contiguous handshake packet.
+fn send_control(fd: RawFd, pkt: &[u8]) -> Result<(), UdsError> {
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    return stream::send_all(fd, pkt, &[]);
+    #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+    raw_send(fd, pkt)
+}
+
+/// Inbound bytes a pipelined client send read while it waited for buffer
+/// space; receive consumes them before reading the socket. SEQPACKET stores
+/// each datagram as a 4-byte length record followed by its bytes; the
+/// stream stores raw bytes.
+#[derive(Default)]
+pub(crate) struct Pending {
+    buf: Vec<u8>,
+    head: usize,
+}
+
+#[cfg(any(target_os = "macos", target_os = "freebsd"))]
+const PENDING_RECORD_LEN: usize = 0;
+#[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+const PENDING_RECORD_LEN: usize = 4;
+
+impl Pending {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.head == self.buf.len()
+    }
+
+    fn consumed(&mut self) {
+        if self.head == self.buf.len() {
+            self.buf.clear();
+            self.head = 0;
+        }
+    }
+
+    /// Reads without blocking until the socket has nothing more to read, EOF
+    /// or an error (both set `eof`). Queued bytes beyond `bound` are a
+    /// protocol failure. Each datagram is stored whole, so its later
+    /// receive sees what a direct receive sees: one longer than `read_len`,
+    /// a protocol violation, is rejected there instead of being stored cut
+    /// short.
+    fn drain(
+        &mut self,
+        fd: RawFd,
+        read_len: usize,
+        bound: usize,
+        eof: &mut bool,
+    ) -> Result<(), UdsError> {
+        if self.head > 0 {
+            self.buf.drain(..self.head);
+            self.head = 0;
+        }
+        loop {
+            #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+            let read_len = {
+                // MSG_TRUNC reports the full length on Linux 3.4 and later;
+                // older kernels report at most the probe length.
+                let mut probe = 0u8;
+                let full = unsafe {
+                    libc::recv(
+                        fd,
+                        &mut probe as *mut u8 as *mut libc::c_void,
+                        1,
+                        libc::MSG_DONTWAIT | libc::MSG_PEEK | libc::MSG_TRUNC,
+                    )
+                };
+                if full <= 0 {
+                    match errno() {
+                        _ if full == 0 => *eof = true,
+                        libc::EINTR => continue,
+                        e if e == libc::EAGAIN || e == libc::EWOULDBLOCK => {}
+                        // A socket error: the retried send reports it.
+                        _ => *eof = true,
+                    }
+                    return Ok(());
+                }
+                let full = full as usize;
+                if full > bound {
+                    return Err(UdsError::Protocol(
+                        "inbound bytes exceed the in-flight responses".into(),
+                    ));
+                }
+                read_len.max(full)
+            };
+            let start = self.buf.len();
+            self.buf.resize(start + PENDING_RECORD_LEN + read_len, 0);
+            let dst = &mut self.buf[start + PENDING_RECORD_LEN..];
+            let n = unsafe {
+                libc::recv(
+                    fd,
+                    dst.as_mut_ptr() as *mut libc::c_void,
+                    dst.len(),
+                    libc::MSG_DONTWAIT,
+                )
+            };
+            if n <= 0 {
+                self.buf.truncate(start);
+                match errno() {
+                    _ if n == 0 => *eof = true,
+                    libc::EINTR => continue,
+                    e if e == libc::EAGAIN || e == libc::EWOULDBLOCK => {}
+                    // A socket error: the retried send reports it.
+                    _ => *eof = true,
+                }
+                return Ok(());
+            }
+            let n = n as usize;
+            #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+            self.buf[start..start + PENDING_RECORD_LEN].copy_from_slice(&(n as u32).to_ne_bytes());
+            self.buf.truncate(start + PENDING_RECORD_LEN + n);
+            if self.buf.len() > bound {
+                return Err(UdsError::Protocol(
+                    "inbound bytes exceed the in-flight responses".into(),
+                ));
+            }
+        }
+    }
+
+    /// SEQPACKET: pops one queued datagram into `dst`, truncating it to
+    /// `dst.len()` as recv() does. Returns the bytes copied.
+    #[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
+    fn pop_packet(&mut self, dst: &mut [u8]) -> usize {
+        let h = self.head;
+        let rec = u32::from_ne_bytes(self.buf[h..h + 4].try_into().unwrap()) as usize;
+        let n = rec.min(dst.len());
+        dst[..n].copy_from_slice(&self.buf[h + 4..h + 4 + n]);
+        self.head = h + 4 + rec;
+        self.consumed();
+        n
+    }
+
+    /// Stream: copies up to `dst.len()` queued bytes. Returns the count.
+    #[cfg_attr(not(any(target_os = "macos", target_os = "freebsd")), allow(dead_code))]
+    pub(crate) fn take(&mut self, dst: &mut [u8]) -> usize {
+        let n = dst.len().min(self.buf.len() - self.head);
+        dst[..n].copy_from_slice(&self.buf[self.head..self.head + n]);
+        self.head += n;
+        self.consumed();
+        n
+    }
+}
+
+/// Wire bytes `inflight` responses can occupy: the pending queue bound.
+fn pending_bound(max_response_payload: u32, packet_size: u32, inflight: usize) -> usize {
+    let payload = max_response_payload as usize;
+    let budget = (packet_size as usize).saturating_sub(HEADER_SIZE).max(1);
+    let packets = if payload == 0 {
+        1
+    } else {
+        1 + (payload - 1) / budget
+    };
+    packets
+        .saturating_mul(HEADER_SIZE + PENDING_RECORD_LEN)
+        .saturating_add(payload)
+        .saturating_mul(inflight)
+}
+
+/// `send_with_progress_loop`; macOS ignores MSG_DONTWAIT on a stream send
+/// that lacks buffer space and blocks, so on the stream baseline (macOS,
+/// FreeBSD) the descriptor is made non-blocking for the send instead.
+#[allow(clippy::too_many_arguments)]
+fn send_with_progress(
+    fd: RawFd,
+    hdr: &[u8],
+    payload: &[u8],
+    pending: &mut Pending,
+    read_len: usize,
+    bound: usize,
+    recv_failed: bool,
+    wait: Option<&ReceiveWait<'_>>,
+) -> Result<(), UdsError> {
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    {
+        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
+        if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+            return Err(UdsError::Send(errno()));
+        }
+        let result = send_with_progress_loop(
+            fd,
+            hdr,
+            payload,
+            pending,
+            read_len,
+            bound,
+            recv_failed,
+            wait,
+        );
+        // A descriptor left non-blocking would break later blocking calls;
+        // a Send error also fails every in-flight request.
+        if unsafe { libc::fcntl(fd, libc::F_SETFL, flags) } < 0 {
+            let e = errno();
+            unsafe { libc::shutdown(fd, libc::SHUT_RDWR) };
+            return Err(UdsError::Send(e));
+        }
+        result
+    }
+    #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+    send_with_progress_loop(
+        fd,
+        hdr,
+        payload,
+        pending,
+        read_len,
+        bound,
+        recv_failed,
+        wait,
+    )
+}
+
+/// Sends one packet without blocking; while the socket is full, reads what
+/// the peer sent into `pending`, so both peers keep making progress.
+/// Without a wait it waits as long as a blocking send would; with one it
+/// ends at the deadline or abort.
+#[allow(clippy::too_many_arguments)]
+fn send_with_progress_loop(
+    fd: RawFd,
+    hdr: &[u8],
+    payload: &[u8],
+    pending: &mut Pending,
+    read_len: usize,
+    bound: usize,
+    recv_failed: bool,
+    wait: Option<&ReceiveWait<'_>>,
+) -> Result<(), UdsError> {
+    // A SEQPACKET send moves the whole packet or nothing, so only the
+    // stream advances these.
+    #[cfg_attr(
+        not(any(target_os = "macos", target_os = "freebsd")),
+        allow(unused_mut)
+    )]
+    let mut parts = [hdr, payload];
+    #[cfg_attr(
+        not(any(target_os = "macos", target_os = "freebsd")),
+        allow(unused_mut)
+    )]
+    let mut first = 0;
+    let mut eof = recv_failed;
+    loop {
+        let mut iov = [libc::iovec {
+            iov_base: std::ptr::null_mut(),
+            iov_len: 0,
+        }; 2];
+        let mut iovcnt = 0;
+        for part in &parts[first..] {
+            if !part.is_empty() {
+                iov[iovcnt] = libc::iovec {
+                    iov_base: part.as_ptr() as *mut libc::c_void,
+                    iov_len: part.len(),
+                };
+                iovcnt += 1;
+            }
+        }
+        // Zero-initialize: musl's 64-bit msghdr has private padding fields.
+        let mut msg: libc::msghdr = unsafe { std::mem::zeroed() };
+        msg.msg_iov = iov.as_mut_ptr();
+        msg.msg_iovlen = iovcnt as _;
+
+        let n = unsafe { libc::sendmsg(fd, &msg, SEND_FLAGS | libc::MSG_DONTWAIT) };
+        if n >= 0 {
+            #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+            {
+                if n == 0 {
+                    return Err(UdsError::Send(0));
+                }
+                let mut left = n as usize;
+                while first < parts.len() && left >= parts[first].len() {
+                    left -= parts[first].len();
+                    first += 1;
+                }
+                if first == parts.len() {
+                    return Ok(());
+                }
+                parts[first] = &parts[first][left..];
+                continue;
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+            {
+                return if n as usize == hdr.len() + payload.len() {
+                    Ok(())
+                } else {
+                    Err(UdsError::Send(errno()))
+                };
+            }
+        }
+        match errno() {
+            libc::EINTR => continue,
+            e if e == libc::EAGAIN || e == libc::EWOULDBLOCK => {}
+            e => return Err(UdsError::Send(e)),
+        }
+
+        // After EOF only writability matters; the retried send reports a
+        // closed peer.
+        let timeout = match wait {
+            Some(wait) => wait.poll_timeout_ms()?,
+            None => -1,
+        };
+        let mut pfd = libc::pollfd {
+            fd,
+            events: libc::POLLOUT | if eof { 0 } else { libc::POLLIN },
+            revents: 0,
+        };
+        let rc = unsafe { libc::poll(&mut pfd, 1, timeout) };
+        if rc < 0 {
+            let e = errno();
+            if e == libc::EINTR {
+                continue;
+            }
+            return Err(UdsError::Send(e));
+        }
+        if rc == 0 {
+            // poll_timeout_ms() reports the deadline and the abort flag.
+            continue;
+        }
+        if !eof && pfd.revents & (libc::POLLIN | libc::POLLHUP | libc::POLLERR) != 0 {
+            pending.drain(fd, read_len, bound, &mut eof)?;
+        }
+    }
+}
+
 /// Send header + payload as one SEQPACKET message using sendmsg.
+#[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
 fn raw_send_iov(fd: RawFd, hdr: &[u8], payload: &[u8]) -> Result<(), UdsError> {
     let total = hdr.len() + payload.len();
 
@@ -847,46 +1561,115 @@ fn raw_send_iov(fd: RawFd, hdr: &[u8], payload: &[u8]) -> Result<(), UdsError> {
 
     let iovcnt = if payload.is_empty() { 1 } else { 2 };
 
-    let msg = libc::msghdr {
-        msg_name: std::ptr::null_mut(),
-        msg_namelen: 0,
-        msg_iov: iov.as_mut_ptr(),
-        msg_iovlen: iovcnt,
-        msg_control: std::ptr::null_mut(),
-        msg_controllen: 0,
-        msg_flags: 0,
-    };
+    // Zero-initialize: musl's 64-bit msghdr has private padding fields, so a
+    // struct literal does not compile there.
+    let mut msg: libc::msghdr = unsafe { std::mem::zeroed() };
+    msg.msg_iov = iov.as_mut_ptr();
+    msg.msg_iovlen = iovcnt;
 
-    let n = unsafe { libc::sendmsg(fd, &msg, libc::MSG_NOSIGNAL) };
-    if n < 0 || n as usize != total {
-        return Err(UdsError::Send(errno()));
+    let n = retry_eintr(
+        #[cfg(test)]
+        &eintr_inject::SENDMSG,
+        || unsafe { libc::sendmsg(fd, &msg, SEND_FLAGS) },
+    );
+    match n {
+        Ok(n) if n as usize == total => Ok(()),
+        Ok(_) => Err(UdsError::Send(errno())),
+        Err(e) => Err(UdsError::Send(e)),
     }
-    Ok(())
+}
+
+/// Run a socket call, retrying EINTR. SOCK_SEQPACKET sends and receives
+/// whole messages or nothing, so an interrupted call moved no data.
+/// Returns the call's result, or the errno of a failed call.
+fn retry_eintr(
+    #[cfg(test)] inject: &'static std::thread::LocalKey<std::cell::Cell<u32>>,
+    mut call: impl FnMut() -> isize,
+) -> Result<isize, i32> {
+    loop {
+        #[cfg(test)]
+        let injected = eintr_inject::take(inject);
+        #[cfg(not(test))]
+        let injected = false;
+        let n = if injected { -1 } else { call() };
+        if n >= 0 {
+            return Ok(n);
+        }
+        let e = if injected { libc::EINTR } else { errno() };
+        if e != libc::EINTR {
+            return Err(e);
+        }
+    }
+}
+
+/// Test-only EINTR injection: the next N socket calls of a kind made on the
+/// current thread fail with EINTR before reaching the kernel.
+#[cfg(test)]
+pub(crate) mod eintr_inject {
+    use std::cell::Cell;
+    use std::thread::LocalKey;
+
+    thread_local! {
+        pub(crate) static SEND: Cell<u32> = const { Cell::new(0) };
+        pub(crate) static SENDMSG: Cell<u32> = const { Cell::new(0) };
+        pub(crate) static RECV: Cell<u32> = const { Cell::new(0) };
+        pub(crate) static ACCEPT: Cell<u32> = const { Cell::new(0) };
+    }
+
+    pub(crate) fn take(counter: &'static LocalKey<Cell<u32>>) -> bool {
+        counter.with(|c| {
+            let left = c.get();
+            if left == 0 {
+                return false;
+            }
+            c.set(left - 1);
+            true
+        })
+    }
+
+    /// Injections on this thread not consumed yet.
+    pub(crate) fn pending() -> u32 {
+        SEND.with(Cell::get)
+            + SENDMSG.with(Cell::get)
+            + RECV.with(Cell::get)
+            + ACCEPT.with(Cell::get)
+    }
 }
 
 /// Send a contiguous buffer as one SEQPACKET message.
+#[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
 fn raw_send(fd: RawFd, data: &[u8]) -> Result<(), UdsError> {
-    let n = unsafe {
-        libc::send(
-            fd,
-            data.as_ptr() as *const libc::c_void,
-            data.len(),
-            libc::MSG_NOSIGNAL,
-        )
-    };
-    if n < 0 || n as usize != data.len() {
-        return Err(UdsError::Send(errno()));
+    let n = retry_eintr(
+        #[cfg(test)]
+        &eintr_inject::SEND,
+        || unsafe {
+            libc::send(
+                fd,
+                data.as_ptr() as *const libc::c_void,
+                data.len(),
+                SEND_FLAGS,
+            )
+        },
+    );
+    match n {
+        Ok(n) if n as usize == data.len() => Ok(()),
+        Ok(_) => Err(UdsError::Send(errno())),
+        Err(e) => Err(UdsError::Send(e)),
     }
-    Ok(())
 }
 
 /// Receive one SEQPACKET message. Returns bytes received.
 fn raw_recv(fd: RawFd, buf: &mut [u8]) -> Result<usize, UdsError> {
-    let n = unsafe { libc::recv(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0) };
-    if n <= 0 {
-        return Err(UdsError::Recv(if n == 0 { 0 } else { errno() }));
+    let n = retry_eintr(
+        #[cfg(test)]
+        &eintr_inject::RECV,
+        || unsafe { libc::recv(fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len(), 0) },
+    );
+    match n {
+        Ok(0) => Err(UdsError::Recv(0)),
+        Ok(n) => Ok(n as usize),
+        Err(e) => Err(UdsError::Recv(e)),
     }
-    Ok(n as usize)
 }
 
 struct ReceiveWait<'a> {
@@ -923,7 +1706,7 @@ impl<'a> ReceiveWait<'a> {
                 deadline
                     .duration_since(now)
                     .as_millis()
-                    .min(i32::MAX as u128) as u64,
+                    .clamp(1, i32::MAX as u128) as u64,
             )
         } else {
             None
@@ -954,10 +1737,9 @@ fn wait_fd_readable(fd: RawFd, wait: &ReceiveWait<'_>) -> Result<(), UdsError> {
             return Err(UdsError::Recv(err));
         }
         if rc == 0 {
-            if wait.aborted() {
-                return Err(UdsError::Aborted);
-            }
-            return Err(UdsError::Timeout);
+            // An empty slice only means the abort flag is due for a check;
+            // poll_timeout_ms() reports the real deadline.
+            continue;
         }
         if wait.aborted() {
             return Err(UdsError::Aborted);
@@ -966,6 +1748,7 @@ fn wait_fd_readable(fd: RawFd, wait: &ReceiveWait<'_>) -> Result<(), UdsError> {
     }
 }
 
+#[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
 fn raw_recv_with_wait(
     fd: RawFd,
     buf: &mut [u8],
@@ -975,6 +1758,7 @@ fn raw_recv_with_wait(
     raw_recv(fd, buf)
 }
 
+#[cfg_attr(any(target_os = "macos", target_os = "freebsd"), allow(dead_code))]
 fn raw_recv_control(
     fd: RawFd,
     buf: &mut [u8],
@@ -1000,6 +1784,9 @@ fn bind_unix(fd: RawFd, path: &str) -> Result<(), UdsError> {
     addr.sun_family = libc::AF_UNIX as libc::sa_family_t;
 
     let path_bytes = c_path.as_bytes_with_nul();
+    if path_bytes.len() > addr.sun_path.len() {
+        return Err(UdsError::PathTooLong);
+    }
     let sun_path_ptr = addr.sun_path.as_mut_ptr() as *mut u8;
     unsafe {
         std::ptr::copy_nonoverlapping(path_bytes.as_ptr(), sun_path_ptr, path_bytes.len());
@@ -1060,7 +1847,7 @@ fn check_and_recover_stale(path: &str) -> StaleResult {
     }
 
     // Try connecting to see if a live server is there
-    let probe = unsafe { libc::socket(libc::AF_UNIX, libc::SOCK_SEQPACKET, 0) };
+    let probe = uds_socket_cloexec();
     if probe < 0 {
         // Cannot probe liveness (fd exhaustion) — keep the endpoint; the
         // subsequent bind() fails instead of risking a live socket.
@@ -1079,7 +1866,11 @@ fn check_and_recover_stale(path: &str) -> StaleResult {
             match std::fs::remove_file(path) {
                 Ok(()) => StaleResult::Stale,
                 Err(err) if err.kind() == io::ErrorKind::NotFound => StaleResult::NotExist,
-                Err(err) if err.raw_os_error() == Some(libc::EISDIR) => {
+                // Unlinking a directory fails with EISDIR on Linux and
+                // EPERM on FreeBSD and macOS.
+                Err(err)
+                    if matches!(err.raw_os_error(), Some(libc::EISDIR) | Some(libc::EPERM)) =>
+                {
                     match std::fs::remove_dir(path) {
                         Ok(()) => StaleResult::Stale,
                         Err(_) => StaleResult::LiveServer,
@@ -1100,31 +1891,78 @@ fn check_and_recover_stale(path: &str) -> StaleResult {
 //  Handshake: client side
 // ---------------------------------------------------------------------------
 
+/// Longest single connect wait, so an abort ends a connect promptly.
+const CONNECT_SLICE_MS: u64 = 100;
+
+fn set_send_timeout(fd: RawFd, ms: u64) {
+    let tv = libc::timeval {
+        tv_sec: (ms / 1000) as _,
+        tv_usec: ((ms % 1000) * 1000) as _,
+    };
+    unsafe {
+        libc::setsockopt(
+            fd,
+            libc::SOL_SOCKET,
+            libc::SO_SNDTIMEO,
+            &tv as *const libc::timeval as *const libc::c_void,
+            std::mem::size_of::<libc::timeval>() as libc::socklen_t,
+        );
+    }
+}
+
+/// A blocking AF_UNIX connect waits while the listener's backlog is full.
+/// On Linux SO_SNDTIMEO bounds that wait and the connect fails with EAGAIN
+/// when it expires; waiting in slices lets an abort end it. Other systems
+/// refuse a full backlog at once.
+fn connect_unix_bounded(fd: RawFd, path: &str, wait: &ReceiveWait<'_>) -> Result<(), UdsError> {
+    let result = loop {
+        if wait.aborted() {
+            break Err(UdsError::Aborted);
+        }
+        let mut slice = CONNECT_SLICE_MS;
+        if let Some(deadline) = wait.deadline {
+            let now = Instant::now();
+            if now >= deadline {
+                break Err(UdsError::Timeout);
+            }
+            let left = deadline.duration_since(now).as_millis().max(1) as u64;
+            slice = slice.min(left);
+        }
+        set_send_timeout(fd, slice);
+        match connect_unix(fd, path) {
+            Ok(()) => break Ok(()),
+            Err(UdsError::Connect(e)) if e == libc::EISCONN => break Ok(()),
+            Err(UdsError::Connect(e))
+                if e == libc::EAGAIN
+                    || e == libc::EWOULDBLOCK
+                    || e == libc::EINTR
+                    || e == libc::EALREADY => {}
+            Err(e) => break Err(e),
+        }
+    };
+    // Session sends block without a timeout.
+    set_send_timeout(fd, 0);
+    result
+}
+
 fn connect_and_handshake(
     fd: RawFd,
     path: &str,
     config: &ClientConfig,
+    wait: &ReceiveWait<'_>,
 ) -> Result<UdsSession, UdsError> {
-    connect_unix(fd, path)?;
+    connect_unix_bounded(fd, path, wait)?;
 
-    let pkt_size = if config.packet_size == 0 {
-        detect_packet_size(fd)
-    } else {
-        config.packet_size
-    };
+    let pkt_size = packet_size_limit(fd, config.packet_size);
 
-    let supported = if config.supported_profiles == 0 {
-        PROFILE_BASELINE
-    } else {
-        config.supported_profiles
-    };
+    let supported = apply_default(config.supported_profiles, PROFILE_BASELINE) & PLATFORM_PROFILES;
 
     // Build HELLO
     let hello = Hello {
         layout_version: 1,
         flags: 0,
         supported_profiles: supported,
-        preferred_profiles: config.preferred_profiles,
+        preferred_profiles: config.preferred_profiles & PLATFORM_PROFILES,
         max_request_payload_bytes: apply_default(
             config.max_request_payload_bytes,
             MAX_PAYLOAD_DEFAULT,
@@ -1142,88 +1980,31 @@ fn connect_and_handshake(
         packet_size: pkt_size,
     };
 
-    let mut hello_buf = [0u8; HELLO_PAYLOAD_SIZE];
-    hello.encode(&mut hello_buf);
-
-    // Build outer CONTROL header
-    let hdr = Header {
-        magic: MAGIC_MSG,
-        version: VERSION,
-        header_len: protocol::HEADER_LEN,
-        kind: protocol::KIND_CONTROL,
-        flags: 0,
-        code: protocol::CODE_HELLO,
-        transport_status: protocol::STATUS_OK,
-        payload_len: HELLO_PAYLOAD_SIZE as u32,
-        item_count: 1,
-        message_id: 0,
-    };
-
-    let mut pkt = [0u8; HEADER_SIZE + HELLO_PAYLOAD_SIZE];
-    hdr.encode(&mut pkt[..HEADER_SIZE]);
-    pkt[HEADER_SIZE..].copy_from_slice(&hello_buf);
-
     // Send HELLO
-    raw_send(fd, &pkt)?;
+    send_control(fd, &framing::hello_packet(&hello))?;
 
-    // Receive HELLO_ACK
+    // Receive HELLO_ACK; a server that never answers must not hold the
+    // client past its deadline.
     let mut buf = [0u8; 128];
-    let n = raw_recv(fd, &mut buf)?;
-
-    // Decode outer header
-    let ack_hdr = match Header::decode(&buf[..n]) {
-        Ok(hdr) => hdr,
-        Err(crate::protocol::NipcError::BadVersion) => {
-            return Err(UdsError::Incompatible("ack header version mismatch".into()))
-        }
-        Err(e) => return Err(UdsError::Protocol(format!("ack header: {e}"))),
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    let n = stream::recv_packet(fd, &mut buf, 0, Some(wait))?;
+    #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
+    let n = {
+        wait_fd_readable(fd, wait)?;
+        raw_recv(fd, &mut buf)?
     };
-
-    if ack_hdr.kind != protocol::KIND_CONTROL || ack_hdr.code != protocol::CODE_HELLO_ACK {
-        return Err(UdsError::Protocol("expected HELLO_ACK".into()));
-    }
-
-    // Check transport_status for rejection
-    if ack_hdr.transport_status == protocol::STATUS_AUTH_FAILED {
-        return Err(UdsError::AuthFailed);
-    }
-    if ack_hdr.transport_status == protocol::STATUS_UNSUPPORTED {
-        return Err(UdsError::NoProfile);
-    }
-    if ack_hdr.transport_status == protocol::STATUS_INCOMPATIBLE {
-        return Err(UdsError::Incompatible(
-            "ack transport_status incompatible".into(),
-        ));
-    }
-    if ack_hdr.transport_status == protocol::STATUS_LIMIT_EXCEEDED {
-        return Err(UdsError::LimitExceeded);
-    }
-    if ack_hdr.transport_status != protocol::STATUS_OK {
-        return Err(UdsError::Handshake(format!(
-            "transport_status={}",
-            ack_hdr.transport_status
-        )));
-    }
-
-    // Decode hello-ack payload
-    if n < HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE {
-        return Err(UdsError::Protocol("ack payload truncated".into()));
-    }
-    let ack = match HelloAck::decode(&buf[HEADER_SIZE..n]) {
-        Ok(ack) => ack,
-        Err(crate::protocol::NipcError::BadLayout)
-            if hello_ack_layout_incompatible(&buf[HEADER_SIZE..n]) =>
-        {
-            return Err(UdsError::Incompatible(
-                "ack payload layout version mismatch".into(),
-            ))
-        }
-        Err(e) => return Err(UdsError::Protocol(format!("ack payload: {e}"))),
-    };
+    let ack: HelloAck = framing::parse_hello_ack(&buf[..n], supported)?;
 
     // Sanity: reject a packet_size too small for chunking arithmetic
     if ack.agreed_packet_size <= HEADER_SIZE as u32 {
         return Err(UdsError::Protocol("agreed packet_size too small".into()));
+    }
+    // A server may only lower our proposal; a larger size could exceed what
+    // this side's kernel accepts as one datagram.
+    if ack.agreed_packet_size > pkt_size {
+        return Err(UdsError::Protocol(
+            "agreed packet_size exceeds proposal".into(),
+        ));
     }
 
     Ok(UdsSession {
@@ -1239,6 +2020,8 @@ fn connect_and_handshake(
         recv_buf: Vec::new(),
         pkt_buf: Vec::new(),
         inflight_ids: HashSet::new(),
+        pending: Pending::default(),
+        recv_failed: false,
     })
 }
 
@@ -1250,179 +2033,55 @@ fn server_handshake(
     fd: RawFd,
     config: &ServerConfig,
     session_id: u64,
+    prepare: Option<&mut dyn FnMut(u32, u32, u32) -> bool>,
+    #[cfg_attr(
+        not(any(target_os = "macos", target_os = "freebsd")),
+        allow(unused_variables)
+    )]
+    wait: &ReceiveWait<'_>,
 ) -> Result<UdsSession, UdsError> {
-    let server_pkt_size = if config.packet_size == 0 {
-        detect_packet_size(fd)
-    } else {
-        config.packet_size
+    let offer = ServerOffer {
+        packet_size: packet_size_limit(fd, config.packet_size),
+        supported_profiles: apply_default(config.supported_profiles, PROFILE_BASELINE)
+            & PLATFORM_PROFILES,
+        preferred_profiles: config.preferred_profiles & PLATFORM_PROFILES,
+        max_request_payload_bytes: apply_default(
+            config.max_request_payload_bytes,
+            MAX_PAYLOAD_DEFAULT,
+        ),
+        max_response_payload_bytes: apply_default(
+            config.max_response_payload_bytes,
+            MAX_PAYLOAD_DEFAULT,
+        ),
+        auth_token: config.auth_token,
     };
 
-    let s_req_pay = apply_default(config.max_request_payload_bytes, MAX_PAYLOAD_DEFAULT);
-    let s_resp_pay = apply_default(config.max_response_payload_bytes, MAX_PAYLOAD_DEFAULT);
-    let s_profiles = if config.supported_profiles == 0 {
-        PROFILE_BASELINE
-    } else {
-        config.supported_profiles
-    };
-    let s_preferred = config.preferred_profiles;
-
-    let send_rejection = |status: u16| -> Result<(), UdsError> {
-        let ack = HelloAck {
-            layout_version: 1,
-            ..HelloAck::default()
-        };
-        let mut ack_buf = [0u8; HELLO_ACK_PAYLOAD_SIZE];
-        ack.encode(&mut ack_buf);
-
-        let ack_hdr = Header {
-            magic: MAGIC_MSG,
-            version: VERSION,
-            header_len: protocol::HEADER_LEN,
-            kind: protocol::KIND_CONTROL,
-            flags: 0,
-            code: protocol::CODE_HELLO_ACK,
-            transport_status: status,
-            payload_len: HELLO_ACK_PAYLOAD_SIZE as u32,
-            item_count: 1,
-            message_id: 0,
-        };
-
-        let mut pkt = [0u8; HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE];
-        ack_hdr.encode(&mut pkt[..HEADER_SIZE]);
-        pkt[HEADER_SIZE..].copy_from_slice(&ack_buf);
-        let _ = raw_send(fd, &pkt);
-        Ok(())
-    };
-
-    // Receive HELLO
+    // Receive HELLO. The caller waited for it; a datagram arrives whole,
+    // a stream packet within the same deadline.
     let mut buf = [0u8; 128];
+    #[cfg(any(target_os = "macos", target_os = "freebsd"))]
+    let n = stream::recv_packet(fd, &mut buf, 0, Some(wait))?;
+    #[cfg(not(any(target_os = "macos", target_os = "freebsd")))]
     let n = raw_recv(fd, &mut buf)?;
-
-    let hdr = match Header::decode(&buf[..n]) {
-        Ok(hdr) => hdr,
-        Err(crate::protocol::NipcError::BadVersion)
-            if header_version_incompatible(&buf[..n], protocol::CODE_HELLO) =>
-        {
-            send_rejection(protocol::STATUS_INCOMPATIBLE)?;
-            return Err(UdsError::Incompatible(
-                "hello header version mismatch".into(),
-            ));
-        }
-        Err(e) => return Err(UdsError::Protocol(format!("hello header: {e}"))),
-    };
-
-    if hdr.kind != protocol::KIND_CONTROL || hdr.code != protocol::CODE_HELLO {
-        return Err(UdsError::Protocol("expected HELLO".into()));
-    }
-
-    let hello = match Hello::decode(&buf[HEADER_SIZE..n]) {
-        Ok(hello) => hello,
-        Err(crate::protocol::NipcError::BadLayout)
-            if hello_layout_incompatible(&buf[HEADER_SIZE..n]) =>
-        {
-            send_rejection(protocol::STATUS_INCOMPATIBLE)?;
-            return Err(UdsError::Incompatible(
-                "hello payload layout version mismatch".into(),
-            ));
-        }
-        Err(e) => return Err(UdsError::Protocol(format!("hello payload: {e}"))),
-    };
-
-    // Compute intersection
-    let intersection = hello.supported_profiles & s_profiles;
-
-    // Check intersection
-    if intersection == 0 {
-        send_rejection(protocol::STATUS_UNSUPPORTED)?;
-        return Err(UdsError::NoProfile);
-    }
-
-    // Check auth
-    if hello.auth_token != config.auth_token {
-        send_rejection(protocol::STATUS_AUTH_FAILED)?;
-        return Err(UdsError::AuthFailed);
-    }
-
-    // Select profile
-    let preferred_intersection = intersection & hello.preferred_profiles & s_preferred;
-    let selected = if preferred_intersection != 0 {
-        highest_bit(preferred_intersection)
-    } else {
-        highest_bit(intersection)
-    };
-
-    if hello.max_request_payload_bytes > s_req_pay {
-        send_rejection(protocol::STATUS_LIMIT_EXCEEDED)?;
-        return Err(UdsError::LimitExceeded);
-    }
-
-    // Negotiate limits:
-    // - request payload and batch size are client-proposed and echoed
-    // - response payload is server-authoritative
-    // - response batch size is symmetric with request batch size
-    let agreed_req_pay = hello.max_request_payload_bytes;
-    let agreed_req_bat = hello.max_request_batch_items;
-    let agreed_resp_pay = s_resp_pay;
-    let agreed_resp_bat = agreed_req_bat;
-    let agreed_pkt = hello.packet_size.min(server_pkt_size);
-
-    // packet_size must be large enough for a usable message packet
-    if agreed_pkt <= HEADER_SIZE as u32 {
-        send_rejection(protocol::STATUS_INCOMPATIBLE)?;
-        return Err(UdsError::Incompatible(
-            "packet size too small for negotiated session".into(),
-        ));
-    }
-
-    // Send HELLO_ACK (success)
-    let ack = HelloAck {
-        layout_version: 1,
-        flags: 0,
-        server_supported_profiles: s_profiles,
-        intersection_profiles: intersection,
-        selected_profile: selected,
-        agreed_max_request_payload_bytes: agreed_req_pay,
-        agreed_max_request_batch_items: agreed_req_bat,
-        agreed_max_response_payload_bytes: agreed_resp_pay,
-        agreed_max_response_batch_items: agreed_resp_bat,
-        agreed_packet_size: agreed_pkt,
-        session_id,
-    };
-
-    let mut ack_buf = [0u8; HELLO_ACK_PAYLOAD_SIZE];
-    ack.encode(&mut ack_buf);
-
-    let ack_hdr = Header {
-        magic: MAGIC_MSG,
-        version: VERSION,
-        header_len: protocol::HEADER_LEN,
-        kind: protocol::KIND_CONTROL,
-        flags: 0,
-        code: protocol::CODE_HELLO_ACK,
-        transport_status: protocol::STATUS_OK,
-        payload_len: HELLO_ACK_PAYLOAD_SIZE as u32,
-        item_count: 1,
-        message_id: 0,
-    };
-
-    let mut pkt = [0u8; HEADER_SIZE + HELLO_ACK_PAYLOAD_SIZE];
-    ack_hdr.encode(&mut pkt[..HEADER_SIZE]);
-    pkt[HEADER_SIZE..].copy_from_slice(&ack_buf);
-    raw_send(fd, &pkt)?;
+    let ack = framing::server_negotiate(&buf[..n], &offer, session_id, prepare, |pkt| {
+        send_control(fd, pkt)
+    })?;
 
     Ok(UdsSession {
         fd,
         role: Role::Server,
-        max_request_payload_bytes: agreed_req_pay,
-        max_request_batch_items: agreed_req_bat,
-        max_response_payload_bytes: agreed_resp_pay,
-        max_response_batch_items: agreed_resp_bat,
-        packet_size: agreed_pkt,
-        selected_profile: selected,
+        max_request_payload_bytes: ack.agreed_max_request_payload_bytes,
+        max_request_batch_items: ack.agreed_max_request_batch_items,
+        max_response_payload_bytes: ack.agreed_max_response_payload_bytes,
+        max_response_batch_items: ack.agreed_max_response_batch_items,
+        packet_size: ack.agreed_packet_size,
+        selected_profile: ack.selected_profile,
         session_id,
         recv_buf: Vec::new(),
         pkt_buf: Vec::new(),
         inflight_ids: HashSet::new(),
+        pending: Pending::default(),
+        recv_failed: false,
     })
 }
 

@@ -40,8 +40,8 @@ metrics:
     metric_tags:
       - tag: lldp_loc_port_num
         symbol:
-          OID: 1.0.8802.1.1.2.1.2.6.1.1
           name: lldpStatsTxPortNum
+        index: 1
 
   - MIB: LLDP-MIB
     table:
@@ -63,5 +63,5 @@ metrics:
     metric_tags:
       - tag: lldp_loc_port_num
         symbol:
-          OID: 1.0.8802.1.1.2.1.2.7.1.1
           name: lldpStatsRxPortNum
+        index: 1

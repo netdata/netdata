@@ -199,17 +199,11 @@ int incrementally_collect_data_for_pid(pid_t pid, void *ptr) {
 int read_proc_pid_cmdline(struct pid_stat *p) {
     static char cmdline[MAX_CMDLINE];
 
+    // On failure p->cmdline is left unchanged; the caller decides whether the cached cmdline is still valid.
     if(unlikely(!OS_FUNCTION(apps_os_get_pid_cmdline)(p, cmdline, sizeof(cmdline))))
-        goto cleanup;
+        return 0;
 
     update_pid_cmdline(p, cmdline);
-
     return 1;
-
-cleanup:
-    // copy the command to the command line
-    string_freez(p->cmdline);
-    p->cmdline = NULL;
-    return 0;
 }
 #endif

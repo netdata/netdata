@@ -51,20 +51,20 @@ type httpFetcher struct {
 }
 
 func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
-	req, err := web.NewHTTPRequest(f.request)
+	req, err := web.NewHTTPRequest(ctx, f.request)
 	if err != nil {
 		return err
 	}
-	req = req.WithContext(ctx)
-
 	req.Header.Add("Accept", acceptHeader)
 	req.Header.Add("Accept-Encoding", "gzip")
 
+	limit := web.HTTPClientResponseBodyLimit(f.client)
 	resp, err := f.client.Do(req)
 	if err != nil {
 		return err
 	}
 
+	resp.Body = web.LimitResponseBody(resp.Body, limit)
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
@@ -89,7 +89,7 @@ func (f *httpFetcher) fetch(ctx context.Context, w io.Writer) error {
 		}
 	}
 
-	_, err = io.Copy(w, f.gzipr)
+	_, err = io.Copy(w, web.LimitResponseReader(f.gzipr, limit))
 	_ = f.gzipr.Close()
 
 	return err

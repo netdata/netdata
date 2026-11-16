@@ -124,9 +124,9 @@ Make your table more useful with these enhancements:
   "has_history": false,
   "help": "System services with CPU usage and status",
   "data": [
-    ["nginx", 25, "Running", {"rowOptions": {"severity": "normal"}}],
-    ["mysql", 67, "Stopped", {"rowOptions": {"severity": "error"}}],
-    ["redis", 91, "Running", {"rowOptions": {"severity": "warning"}}]
+    ["nginx", 25, "Running", {"severity": "normal"}],
+    ["mysql", 67, "Stopped", {"severity": "critical"}],
+    ["redis", 91, "Running", {"severity": "warning"}]
   ],
   "columns": {
     "name": {
@@ -152,7 +152,8 @@ Make your table more useful with these enhancements:
       "type": "string",
       "visualization": "pill",
       "filter": "multiselect"
-    }
+    },
+    "rowOptions": {"index": 3, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
   },
   "default_sort_column": "cpu"
 }
@@ -366,11 +367,12 @@ Log explorer functions (`has_history: true`) provide advanced log analysis with 
       "type": "string",
       "full_width": true,
       "options": ["full_width", "wrap", "visible", "main_text", "fts"]
-    }
+    },
+    "rowOptions": {"index": 3, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
   },
   "data": [
-    [1697644320000000, {"rowOptions": {"severity": "error"}}, "ERROR", "Service failed"],
-    [1697644319000000, {"rowOptions": {"severity": "normal"}}, "INFO", "Service started"]
+    [1697644320000000, "ERROR", "Service failed", {"severity": "critical"}],
+    [1697644319000000, "INFO", "Service started", {"severity": "normal"}]
   ],
   "facets": [
     {
@@ -709,24 +711,36 @@ if (usec) {
 
 ### Row Coloring by Severity
 
-Add row coloring by including `rowOptions` as the last element:
+Declare the hidden column under the exact key `rowOptions`, with `type: "none"` and
+`visualization: "rowOptions"`. Put a plain object such as `{"severity": "critical"}` at that column's index
+in every data row. A different column key or an extra `rowOptions` wrapper prevents the UI from finding the
+styling. This example places it at index 2:
 
 ```json
 {
+  "columns": {
+    "label": {"index": 0, "name": "Label", "type": "string"},
+    "value": {"index": 1, "name": "Value", "type": "string"},
+    "rowOptions": {"index": 2, "name": "Row styling", "type": "none", "visualization": "rowOptions", "visible": false}
+  },
   "data": [
-    ["normal data", "values", {"rowOptions": {"severity": "normal"}}],
-    ["warning data", "values", {"rowOptions": {"severity": "warning"}}],
-    ["error data", "values", {"rowOptions": {"severity": "error"}}],
-    ["notice data", "values", {"rowOptions": {"severity": "notice"}}]
+    ["normal data", "values", {"severity": "normal"}],
+    ["warning data", "values", {"severity": "warning"}],
+    ["error data", "values", {"severity": "critical"}],
+    ["notice data", "values", {"severity": "notice"}]
   ]
 }
 ```
 
 **Severity Levels:**
-- `"normal"` - Default appearance
-- `"warning"` - Yellow background
-- `"error"` - Red background  
-- `"notice"` - Blue background
+- `"normal"` - Default text
+- `"warning"` - Emphasized warning text
+- `"critical"` - Emphasized error text
+- `"notice"` - Emphasized text
+- `"debug"` - Emphasized muted text
+
+The cell renderer supports `critical`; `error` is not a styling severity. Source health strings and table
+styling are separate contracts.
 
 ## Chart and Grouping Configuration
 
@@ -795,11 +809,9 @@ buffer_rrdf_table_add_field(
     RRDF_FIELD_OPTS_VISIBLE, NULL
 );
 
-// Add row coloring
+// At the index declared by the rowOptions column, append the styling object.
 buffer_json_add_array_item_object(wb);
-buffer_json_member_add_object(wb, "rowOptions");
-buffer_json_member_add_string(wb, "severity", "error");
-buffer_json_object_close(wb);
+buffer_json_member_add_string(wb, "severity", "critical");
 buffer_json_object_close(wb);
 ```
 
@@ -868,6 +880,48 @@ Always handle the info request first:
 - `"v": 3` enables POST requests with JSON payloads
 - `accepted_params` determines which parameters the function accepts
 - `required_params` generates filter UI and validates execution
+
+### Accepted Option Forms
+
+Functions may describe existing alternate input forms in `required_params`:
+
+- An option's optional `aliases` array lists alternate IDs accepted for that option. For example, the
+  network-connections `container` option accepts `container_name`.
+- A selector's optional `value_separator` describes an accepted encoding of several values in one string. The
+  network-connections `sockets` and `protocols` selectors declare `","`.
+- When consumers normalize values against this metadata, option IDs are opaque. An exact canonical ID takes
+  precedence over alias matching and joined-value splitting.
+  A job named `beta rack,1` is still one job; `prod-a` and `prod_a` remain distinct IDs.
+- An alias advertised by several options does not uniquely identify any option. Consumers must not select one
+  arbitrarily or invent aliases by replacing punctuation.
+- Consumers split a joined value only when the selector declares its separator and the whole string is not an exact ID.
+  Omitting `value_separator` does not implicitly permit comma splitting. Array entries remain literal unless that
+  producer declares an accepted alternate encoding.
+
+These are discovery declarations, not changes to the Function parser or permission to reject previously accepted
+requests. A producer must advertise only forms its request path actually accepts. The Go `ParamConfig.RequiredParam`
+serializer exposes `ValueSeparator` and `ParamOption.Aliases` without changing `ResolveParam` behavior. Existing
+clients can continue selecting and sending canonical option IDs without using this optional metadata.
+
+Transport matters when sending the normalized values. Go structured Functions preserve each ID literally in
+JSON `selections`. Their legacy command arguments split commas before job or option resolution, even when the selector
+does not declare `value_separator`. Use JSON selections for IDs containing commas: `{"selections":{"__job":["beta,1"]}}`
+selects that one job, whereas the command argument `__job:beta,1` is split and rejected as multiple job values.
+
+### Topology Focus Controls
+
+A `select` or `multiselect` may declare optional `focus` metadata. `role: "roots"` identifies a graph-root selector
+with an explicit unfocused option, source-actor bindings and traversal policy; `role: "depth"` identifies its
+single-select hop limit and unlimited option. Without this declaration, a selector remains an ordinary source-side
+control. The schema validates the descriptor structure; Go managed declarations and responses also validate its
+option IDs and role relationships. This metadata does not change Function request parsing or implement filtering.
+
+The [topology contract](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus) owns binding resolution,
+aggregate-first ordering and traversal semantics. Direct Agent clients keep sending the existing selectors; cloud
+consumers must implement that contract before withholding focus controls from fan-out requests. Data response
+metadata may refine the info response's choices and policy for the actual map returned.
+
+### Error Responses
 
 For errors, return:
 

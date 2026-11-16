@@ -43,13 +43,14 @@ var _ funcapi.MethodHandler = (*funcTopology)(nil)
 
 func vsphereTopologyFunctionConfig() funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
-		ID:           topologyMethodID,
-		Aliases:      []string{topologyMethodID},
-		Name:         "vSphere Topology",
-		UpdateEvery:  30,
-		Help:         topologyMethodHelp,
-		RequireCloud: true,
-		ResponseType: "topology",
+		ID:                topologyMethodID,
+		Aliases:           []string{topologyMethodID},
+		Name:              "vSphere Topology",
+		UpdateEvery:       30,
+		Help:              topologyMethodHelp,
+		RequireCloud:      true,
+		RequireCommercial: true,
+		ResponseType:      "topology",
 	}
 }
 
@@ -90,7 +91,7 @@ func (c *Collector) topologyData(agentID, jobName string) (topologyv1.Data, bool
 		return topologyv1.Data{}, false
 	}
 
-	builder := newVSphereTopologyBuilder(jobName)
+	builder := newVSphereTopologyBuilder(jobName, c.resources.VCenterInstanceUUID)
 
 	for _, dc := range sortedDatacenters(c.resources.DataCenters) {
 		builder.addActor("vsphere_datacenter", dc.ID, dc.Name, "", vsphereActorDetail{

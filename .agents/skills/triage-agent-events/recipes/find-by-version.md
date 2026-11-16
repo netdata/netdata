@@ -88,10 +88,9 @@ Check if the count drops to ~zero in nightly N+1 and beyond.
 - **`--version auto` masks regressions** because it filters
   to recent versions. Use `--version all` for "when did this
   start?" investigations.
-- **Nightly numbers are commits-since-tag**. Higher number =
-  newer. Sorting nightly versions lexically is wrong; sort by
-  the embedded number (the auto-detection in `_lib.sh` does
-  this correctly).
+- **Nightly numbers are commits-since-tag**. Compare numeric major/minor/patch first; only within the same tag base
+  does a higher count order later builds. Auto-detection uses that tuple over observed facet values; lexical sorting
+  or count-only sorting across bases can select the wrong release.
 - **Different agents on the same install**: distinct
   `AE_AGENT_ID` (Netdata machine GUID) but same `AE_HOST_ID`
   (OS machine-id). Group by `AE_AGENT_ID` to get unique

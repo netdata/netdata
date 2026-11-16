@@ -65,7 +65,6 @@ tracing = { workspace = true }
 regex = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
 reqwest = { workspace = true, default-features = true, features = ["stream", "json", "rustls"] }
-schemars = { workspace = true }
 socket2 = { workspace = true }
 tonic = { workspace = true, features = ["transport", "tls-native-roots"] }
 tonic-prost = { workspace = true }
@@ -75,12 +74,14 @@ thiserror = { workspace = true }
 fst = { workspace = true }
 rmp-serde = { workspace = true }
 
-rt = { workspace = true }
+netdata-plugin-rt = { workspace = true }
+netdata-plugin-metrics = { workspace = true }
 netdata-plugin-error = { workspace = true }
 netdata-plugin-protocol = { workspace = true }
 
 [dev-dependencies]
 bytes = { workspace = true }
+netdata-plugin-protocol = { workspace = true, features = ["test-support"] }
 etherparse = { workspace = true }
 pcap-file = { workspace = true }
 proptest = { workspace = true }

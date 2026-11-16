@@ -2,9 +2,12 @@
 
 package powerstore
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
-func (c *Collector) collectReplication() {
+func (c *Collector) collectReplication(ctx context.Context) {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -18,7 +21,7 @@ func (c *Collector) collectReplication() {
 			c.sem <- struct{}{}
 			defer func() { <-c.sem }()
 
-			cm, err := c.client.CopyMetricsByAppliance(id)
+			cm, err := c.client.CopyMetricsByAppliance(ctx, id)
 			if err != nil {
 				c.Warningf("error collecting appliance %s copy metrics: %v", id, err)
 				return

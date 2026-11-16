@@ -1,0 +1,28 @@
+---
+name: DEM runtime wire compatibility
+on:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  node:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Read the runtime Node pin
+        id: runtime
+        run: |
+          python3 -c 'import json; print("node=" + json.load(open("src/dem-runtime/manifest.json"))["node_version"])' >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: ${{ steps.runtime.outputs.node }}
+      - name: Test real runner output against the frozen baseline
+        working-directory: src/dem-runtime
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm test

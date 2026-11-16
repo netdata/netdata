@@ -1,0 +1,126 @@
+---
+name: DEM Runtime Tests
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-node-tests.yml'
+      - '.github/workflows/dem-runtime-release.yml'
+      - '.github/data/distros.yml'
+      - '.github/scripts/package-upload.sh'
+      - 'packaging/cmake/Modules/Packaging.cmake'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-process-tree.*'
+      - 'src/collectors/utils/supervisor-pipes.h'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'packaging/dem-runtime/**'
+      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
+      - 'packaging/installer/kickstart.sh'
+      - 'packaging/docker/netdata-dem-docker-host.sh'
+      - 'packaging/docker/Dockerfile'
+      - 'packaging/docker/netdata-dem-docker'
+      - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/netdata-uninstaller.sh'
+      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
+      - 'src/dem-runtime/**'
+      - 'src/go/tools/dem-runtime-release/**'
+      - 'src/go/internal/pgptest/**'
+      - 'src/go/cmd/demplugin/**'
+      - 'src/go/plugin/dem/**'
+      - 'src/go/plugin/agent/jobmgr/**'
+      - 'src/go/plugin/framework/collectorapi/**'
+      - 'src/go/plugin/go.d/pkg/ndexec/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+  push:
+    branches: [master]
+    paths:
+      - '.github/workflows/dem-runtime-tests.yml'
+      - '.github/workflows/dem-runtime-node-tests.yml'
+      - '.github/workflows/dem-runtime-release.yml'
+      - '.github/data/distros.yml'
+      - '.github/scripts/package-upload.sh'
+      - 'packaging/cmake/Modules/Packaging.cmake'
+      - 'src/collectors/utils/nd-run.c'
+      - 'src/collectors/utils/nd-process-tree.*'
+      - 'src/collectors/utils/supervisor-pipes.h'
+      - 'src/collectors/utils/nd-file-reader.*'
+      - 'src/collectors/utils/exec-signals.h'
+      - 'packaging/dem-runtime/**'
+      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
+      - 'packaging/installer/kickstart.sh'
+      - 'packaging/docker/netdata-dem-docker-host.sh'
+      - 'packaging/docker/Dockerfile'
+      - 'packaging/docker/netdata-dem-docker'
+      - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/netdata-uninstaller.sh'
+      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
+      - 'src/dem-runtime/**'
+      - 'src/go/tools/dem-runtime-release/**'
+      - 'src/go/internal/pgptest/**'
+      - 'src/go/cmd/demplugin/**'
+      - 'src/go/plugin/dem/**'
+      - 'src/go/plugin/agent/jobmgr/**'
+      - 'src/go/plugin/framework/collectorapi/**'
+      - 'src/go/plugin/go.d/pkg/ndexec/**'
+      - 'src/go/go.mod'
+      - 'src/go/go.sum'
+permissions:
+  contents: read
+concurrency:
+  group: dem-runtime-tests-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  runtime-wire:
+    uses: ./.github/workflows/dem-runtime-node-tests.yml
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: src/go/go.mod
+          cache-dependency-path: src/go/go.sum
+      - name: Build the real supervisor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          helper_dir="$(mktemp -d /tmp/netdata-dem-runtime-ci.XXXXXX)"
+          cat > "$helper_dir/config.h" <<'CONFIG'
+          #define _GNU_SOURCE 1
+          #define NETDATA_USER "nobody"
+          #define HAVE_SETRESUID 1
+          #define HAVE_SETRESGID 1
+          CONFIG
+          cc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$helper_dir" -I src/collectors/utils \
+            src/collectors/utils/nd-run.c src/collectors/utils/nd-file-reader.c \
+            src/collectors/utils/nd-process-tree.c -o "$helper_dir/nd-run"
+          echo "DEM_RUNTIME_TEST_HELPER=$helper_dir/nd-run" >> "$GITHUB_ENV"
+      - name: Install signing and native package inspection tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gnupg cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml
+          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio; do command -v "$tool"; done
+      - name: Store lifecycle and supervisor integration
+        working-directory: src/go
+        run: |
+          go test -race -count=1 ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go vet ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release
+          echo "DEM_RELEASE_TEST_TOOL=$RUNNER_TEMP/dem-runtime-release" >> "$GITHUB_ENV"
+      - name: Builder, source assembly, and native package contracts
+        run: |
+          python3 -m unittest discover -s packaging/dem-runtime -v
+          python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
+      - name: Explicit installer and service identity contracts
+        run: |
+          docker pull python:3.13-bookworm
+          docker run --rm --network none \
+            -e NETDATA_TEST_PRIVILEGED_CONTAINER=1 \
+            -v "$PWD:/workspace:ro" -w /workspace python:3.13-bookworm \
+            sh -ec 'useradd --system netdata; exec python3 -B -m unittest discover -s packaging/installer/tests -p "test_dem_runtime*.py" -v'

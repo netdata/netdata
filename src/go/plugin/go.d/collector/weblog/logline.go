@@ -172,7 +172,7 @@ func (l *logLine) assignPort(port string) error {
 		return nil
 	}
 	if !isPortValid(port) {
-		return fmt.Errorf("assign '%s' : %w", port, errBadPort)
+		return errBadPort
 	}
 	l.port = port
 	return nil
@@ -184,13 +184,13 @@ func (l *logLine) assignVhostWithPort(vhostPort string) error {
 	}
 	idx := strings.LastIndexByte(vhostPort, ':')
 	if idx == -1 {
-		return fmt.Errorf("assign '%s' : %w", vhostPort, errBadVhostPort)
+		return errBadVhostPort
 	}
 	if err := l.assignPort(vhostPort[idx+1:]); err != nil {
-		return fmt.Errorf("assign '%s' : %w", vhostPort, errBadVhostPort)
+		return errBadVhostPort
 	}
 	if err := l.assignVhost(vhostPort[0:idx]); err != nil {
-		return fmt.Errorf("assign '%s' : %w", vhostPort, errBadVhostPort)
+		return errBadVhostPort
 	}
 	return nil
 }
@@ -200,7 +200,7 @@ func (l *logLine) assignReqScheme(scheme string) error {
 		return nil
 	}
 	if !isSchemeValid(scheme) {
-		return fmt.Errorf("assign '%s' : %w", scheme, errBadReqScheme)
+		return errBadReqScheme
 	}
 	l.reqScheme = scheme
 	return nil
@@ -220,10 +220,10 @@ func (l *logLine) assignRequest(request string) error {
 	}
 	var first, last int
 	if first = strings.IndexByte(request, ' '); first < 0 {
-		return fmt.Errorf("assign '%s': %w", request, errBadRequest)
+		return errBadRequest
 	}
 	if last = strings.LastIndexByte(request, ' '); first == last {
-		return fmt.Errorf("assign '%s': %w", request, errBadRequest)
+		return errBadRequest
 	}
 	proto := request[last+1:]
 	url := request[first+1 : last]
@@ -242,7 +242,7 @@ func (l *logLine) assignReqMethod(method string) error {
 		return nil
 	}
 	if !isReqMethodValid(method) {
-		return fmt.Errorf("assign '%s' : %w", method, errBadReqMethod)
+		return errBadReqMethod
 	}
 	l.reqMethod = method
 	return nil
@@ -253,7 +253,7 @@ func (l *logLine) assignReqURL(url string) error {
 		return nil
 	}
 	if isEmptyString(url) {
-		return fmt.Errorf("assign '%s' : %w", url, errBadReqURL)
+		return errBadReqURL
 	}
 	l.reqURL = url
 	return nil
@@ -264,7 +264,7 @@ func (l *logLine) assignReqProto(proto string) error {
 		return nil
 	}
 	if !isReqProtoValid(proto) {
-		return fmt.Errorf("assign '%s': %w", proto, errBadReqProto)
+		return errBadReqProto
 	}
 	l.reqProto = proto[5:]
 	return nil
@@ -276,7 +276,7 @@ func (l *logLine) assignRespCode(status string) error {
 	}
 	v, err := strconv.Atoi(status)
 	if err != nil || !isRespCodeValid(v) {
-		return fmt.Errorf("assign '%s': %w", status, errBadRespCode)
+		return errBadRespCode
 	}
 	l.respCode = v
 	return nil
@@ -290,7 +290,7 @@ func (l *logLine) assignReqSize(size string) error {
 	}
 	v, err := strconv.Atoi(size)
 	if err != nil || !isSizeValid(v) {
-		return fmt.Errorf("assign '%s': %w", size, errBadReqSize)
+		return errBadReqSize
 	}
 	l.reqSize = v
 	return nil
@@ -304,7 +304,7 @@ func (l *logLine) assignRespSize(size string) error {
 	}
 	v, err := strconv.Atoi(size)
 	if err != nil || !isSizeValid(v) {
-		return fmt.Errorf("assign '%s': %w", size, errBadRespSize)
+		return errBadRespSize
 	}
 	l.respSize = v
 	return nil
@@ -320,7 +320,7 @@ func (l *logLine) assignReqProcTime(time string) error {
 	}
 	v, err := strconv.ParseFloat(time, 64)
 	if err != nil || !isTimeValid(v) {
-		return fmt.Errorf("assign '%s': %w", time, errBadReqProcTime)
+		return errBadReqProcTime
 	}
 	l.reqProcTime = v * timeMultiplier(time)
 	return nil
@@ -343,7 +343,7 @@ func (l *logLine) assignUpsRespTime(time string) error {
 		val = strings.TrimSpace(val)
 		v, err := strconv.ParseFloat(val, 64)
 		if err != nil || !isTimeValid(v) {
-			return fmt.Errorf("assign '%s': %w", time, errBadUpsRespTime)
+			return errBadUpsRespTime
 		}
 
 		sum += v
@@ -358,7 +358,7 @@ func (l *logLine) assignSSLProto(proto string) error {
 		return nil
 	}
 	if !isSSLProtoValid(proto) {
-		return fmt.Errorf("assign '%s': %w", proto, errBadSSLProto)
+		return errBadSSLProto
 	}
 	l.sslProto = proto
 	return nil
@@ -369,7 +369,7 @@ func (l *logLine) assignSSLCipherSuite(cipher string) error {
 		return nil
 	}
 	if strings.IndexByte(cipher, '-') <= 0 && strings.IndexByte(cipher, '_') <= 0 {
-		return fmt.Errorf("assign '%s': %w", cipher, errBadSSLCipherSuite)
+		return errBadSSLCipherSuite
 	}
 	l.sslCipherSuite = cipher
 	return nil
@@ -390,46 +390,46 @@ func (l *logLine) verify() error {
 		return fmt.Errorf("verify: %w", errEmptyLine)
 	}
 	if l.hasRespCode() && !l.isRespCodeValid() {
-		return fmt.Errorf("verify '%d': %w", l.respCode, errBadRespCode)
+		return fmt.Errorf("verify: %w", errBadRespCode)
 	}
 	if l.hasVhost() && !l.isVhostValid() {
-		return fmt.Errorf("verify '%s': %w", l.vhost, errBadVhost)
+		return fmt.Errorf("verify: %w", errBadVhost)
 	}
 	if l.hasPort() && !l.isPortValid() {
-		return fmt.Errorf("verify '%s': %w", l.port, errBadPort)
+		return fmt.Errorf("verify: %w", errBadPort)
 	}
 	if l.hasReqScheme() && !l.isSchemeValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqScheme, errBadReqScheme)
+		return fmt.Errorf("verify: %w", errBadReqScheme)
 	}
 	if l.hasReqClient() && !l.isClientValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqClient, errBadReqClient)
+		return fmt.Errorf("verify: %w", errBadReqClient)
 	}
 	if l.hasReqMethod() && !l.isMethodValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqMethod, errBadReqMethod)
+		return fmt.Errorf("verify: %w", errBadReqMethod)
 	}
 	if l.hasReqURL() && !l.isURLValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqURL, errBadReqURL)
+		return fmt.Errorf("verify: %w", errBadReqURL)
 	}
 	if l.hasReqProto() && !l.isProtoValid() {
-		return fmt.Errorf("verify '%s': %w", l.reqProto, errBadReqProto)
+		return fmt.Errorf("verify: %w", errBadReqProto)
 	}
 	if l.hasReqSize() && !l.isReqSizeValid() {
-		return fmt.Errorf("verify '%d': %w", l.reqSize, errBadReqSize)
+		return fmt.Errorf("verify: %w", errBadReqSize)
 	}
 	if l.hasRespSize() && !l.isRespSizeValid() {
-		return fmt.Errorf("verify '%d': %w", l.respSize, errBadRespSize)
+		return fmt.Errorf("verify: %w", errBadRespSize)
 	}
 	if l.hasReqProcTime() && !l.isReqProcTimeValid() {
-		return fmt.Errorf("verify '%f': %w", l.reqProcTime, errBadReqProcTime)
+		return fmt.Errorf("verify: %w", errBadReqProcTime)
 	}
 	if l.hasUpsRespTime() && !l.isUpsRespTimeValid() {
-		return fmt.Errorf("verify '%f': %w", l.upsRespTime, errBadUpsRespTime)
+		return fmt.Errorf("verify: %w", errBadUpsRespTime)
 	}
 	if l.hasSSLProto() && !l.isSSLProtoValid() {
-		return fmt.Errorf("verify '%s': %w", l.sslProto, errBadSSLProto)
+		return fmt.Errorf("verify: %w", errBadSSLProto)
 	}
 	if l.hasSSLCipherSuite() && !l.isSSLCipherSuiteValid() {
-		return fmt.Errorf("verify '%s': %w", l.sslCipherSuite, errBadSSLCipherSuite)
+		return fmt.Errorf("verify: %w", errBadSSLCipherSuite)
 	}
 	return nil
 }

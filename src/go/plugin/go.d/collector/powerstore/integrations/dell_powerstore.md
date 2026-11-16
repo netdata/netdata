@@ -50,7 +50,10 @@ appliances, volumes, nodes, ports, file systems, and NAS servers.
 
 Performance and space metrics are collected via the `/api/rest/metrics/generate` endpoint using
 the PowerStore metrics generation API. The collector requests `Five_Mins` interval data for
-performance metrics and `One_Day` for cluster space metrics, taking the most recent data point.
+performance and volume space metrics and `One_Day` for cluster and appliance space metrics,
+taking the most recent data point. IOPS, bandwidth, latency, Ethernet rates, and node logins
+are averages over the five-minute interval. Appliance CPU utilization is the peak over that
+interval, displayed as a percentage. Space and efficiency charts use the last value in the interval.
 
 Discovery API calls use pagination (2000 items per page, HTTP 206 for partial results).
 Performance metrics for different entities are collected concurrently (up to 10 parallel API calls).
@@ -58,7 +61,7 @@ Performance metrics for different entities are collected concurrently (up to 10 
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 A user account on the PowerStore array is required. Any role with API read access
 is sufficient (e.g., the built-in `Operator` role). The account does not need write permissions.
@@ -166,7 +169,7 @@ Configure the **powerstore** collector from the Netdata web interface:
 4. In the Search box, type _powerstore_ (or scroll the list) to locate the **powerstore** collector.
 5. Click the **+** next to the **powerstore** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -340,7 +343,7 @@ Metrics:
 | powerstore.appliance_iops | Appliance IOPS | read, write | ops/s |
 | powerstore.appliance_bandwidth | Appliance Bandwidth | read, write | bytes/s |
 | powerstore.appliance_latency | Appliance Latency | read, write, avg | microseconds |
-| powerstore.appliance_cpu | Appliance IO Workload CPU Utilization | utilization | percentage |
+| powerstore.appliance_cpu | Appliance Peak IO Workload CPU Utilization | utilization | percentage |
 | powerstore.appliance_space | Appliance Space Usage | used, total | bytes |
 | powerstore.appliance_space_logical | Appliance Logical Space | provisioned, used, data_physical, shared | bytes |
 | powerstore.appliance_space_efficiency | Appliance Space Efficiency Ratios | efficiency, data_reduction, snapshot_savings, thin_savings | ratio |
@@ -384,7 +387,7 @@ Metrics:
 | powerstore.node_iops | Node IOPS | read, write | ops/s |
 | powerstore.node_bandwidth | Node Bandwidth | read, write | bytes/s |
 | powerstore.node_latency | Node Latency | read, write, avg | microseconds |
-| powerstore.node_logins | Node Current Logins | logins | logins |
+| powerstore.node_logins | Node Average Logins | logins | logins |
 
 
 ### Per fc port

@@ -43,7 +43,7 @@ Primary V2 reference:
 
 Read these files by responsibility:
 
-- `collector.go`: registration, defaults, public lifecycle methods, `MetricStore()`, `ChartTemplateYAML()`, and Function
+- `collector.go`: registration, defaults, public lifecycle methods, `MetricStore()`, the chart-provider getter, and Function
   wiring.
 - `config.go`: config defaults, normalization, validation, and intentionally small public config.
 - `collect.go`, `collect_metrics.go`, `collect_bgp.go`: collection orchestration and split domain operations.
@@ -117,7 +117,8 @@ New collectors MUST implement `collectorapi.CollectorV2` from `src/go/plugin/fra
 register via `CreateV2`. In practice, `collector.go` should:
 
 - embed `config_schema.json` for `JobConfigSchema`;
-- embed `charts.yaml` for `ChartTemplateYAML()`;
+- provide exactly one chart capability: embedded `charts.yaml` through `ChartTemplateYAML()` for static definitions,
+  or `ChartTemplateSet()` for changing native entries;
 - expose `Config: func() any { return &Config{} }`;
 - return a new collector from `CreateV2`;
 - add `Methods` and `MethodHandler` only when the collector has Functions.
@@ -135,22 +136,99 @@ Public lifecycle and framework-contract methods MUST stay in `collector.go`:
 - `Configuration() any`
 - `Init(context.Context) error`
 - `Check(context.Context) error`
+- `Test(context.Context) error`, when the optional `dyncfg.Testable` capability is needed
 - `Collect(context.Context) error`
 - `Cleanup(context.Context)`
 - `MetricStore() metrix.CollectorStore`
-- `ChartTemplateYAML() string`
+- `ChartTemplateYAML() string` or `ChartTemplateSet() *chartengine.TemplateSet`
 
-Collectors that need a long-running side-effect loop MAY additionally implement `collectorapi.CollectorV2Runner` with
-`Run(context.Context) error`. Use this only when work must start with the running job lifecycle but must not wait for
-the next globally aligned `Collect()` tick, such as an agent-wide Function state refresh. The runtime starts `Run()`
-only after the job starts, never during autodetection or DynCfg `test`, cancels it on stop, and waits for it before
-`Cleanup()`. The implementation MUST return promptly after `ctx.Done()` and SHOULD make in-flight I/O cancellation-aware
-where the underlying library allows it.
+Native snapshot ownership, construction, replacement and fixed-policy rules are documented in
+[chartengine](/src/go/plugin/framework/chartengine/README.md#named-active-template-sets). Existing YAML collectors retain
+their getter; implementing both providers is a startup error. `collecttest.AssertChartCoverage` supports either provider.
+
+Collectors that need a receiver or long-running background loop MAY implement `collectorapi.CollectorV2Runner` with
+`Run(ctx context.Context, ready func()) error`. Acquire exclusive runtime resources there, after predecessor cleanup,
+then call `ready()` once all fallible startup prerequisites succeed and state is safe for concurrent `Collect()`.
+Readiness MUST NOT wait for a first packet or remote observation. `Init()` and `Check()` still run during configuration
+validation while an incumbent may own the endpoint; DynCfg `test` never calls `Run()`.
+
+V1 and V2 collectors MAY implement `dyncfg.Testable.Test(ctx context.Context) error` when an explicit DynCfg test
+needs a different operation from activation `Check()`. The framework resolves the submitted configuration and
+secrets, checks named dependencies, calls `Init()`, then calls `Test()` if implemented or `Check()` otherwise.
+The throwaway collector is cleaned up when the operation returns, including after failure. Activation and automatic
+discovery continue using `Init()` and `Check()`; they never call `Test()`.
+
+`Test()` MUST honor its caller's context and release resources it acquires. It MUST NOT assume `Run()` or `Collect()`
+has run. Return an error when the operation fails or cannot be performed; a Test error does not fall back to Check.
+Collectors retain the existing lifecycle error policy. Without secret references, error text is returned as-is, so
+`Test()` MUST return response-safe errors and MUST NOT include credentials or sensitive endpoint/configuration values.
+`dyncfg.NewPublicError` can separate a static public explanation from a private cause. With secret references, the
+framework replaces error text with a generic redacted message, including `NewPublicError` explanations.
+`dyncfg.ErrTestUnsupported` still fails the test, but that redaction does not preserve its sentinel identity.
+
+Implementations MUST NOT log submitted or resolved credentials; reference-bearing configurations also receive
+framework log redaction. This capability does not extend the caller's request deadline or add a structured result.
+
+The framework waits for readiness before collecting. Startup errors follow the candidate recovery policy below; a
+`collectorapi.PermanentError`, unexpected nil return and recovered panic do not automatically retry the same config.
+Readiness closes automatic sibling search. Unexpected return after readiness makes the job Failed and requires an
+explicit command; sibling arrivals and retry timers do not start another config. The implementation MUST return promptly
+after `ctx.Done()` and SHOULD make in-flight I/O cancellation-aware where the library permits. Cleanup waits for `Run()` to
+return. See the
+[runtime readiness contract](/src/go/plugin/framework/jobruntime/README.md#runtime-readiness-and-termination) for
+startup timeout, cancellation, output fencing and physical ownership semantics.
+
+V2 collectors that need the Agent's existing first-sample storage behavior MAY set `StoreFirst: true` directly in
+their `collectorapi.Creator` registration. This fixed collector-wide setting applies to every collector chart,
+including automatic charts and later redefinitions. It defaults to false and does not change framework self-metrics
+or preserve counter baselines across restarts. See
+[first-sample storage](/src/go/plugin/framework/jobruntime/README.md#first-sample-storage).
 
 `Init()` validates config, prepares matchers/clients, and initializes persistent state. Explicit setup details SHOULD
 live in helper methods, preferably in `init.go`, so the public method reads as the lifecycle sequence. `Check()` MUST be
 a cheap auth/connectivity probe, not a full collection. `Collect()` MUST run the real write path through `metrix`.
 `Cleanup()` closes idle connections and forwards Function cleanup.
+
+An `Init()` or `Check()` error fails that candidate. By default, a `Check()` error can retry that config after its
+`autodetection_retry` seconds (never when it is 0, the framework default) and an `Init()` error is not retried. Classify
+the error when that default is wrong:
+
+- `collectorapi.PermanentError(err)`: a failure that retrying the same configuration cannot fix, such as an invalid
+  option or an unknown named profile. Ordinary recovery does not retry that config.
+- `collectorapi.TemporaryError(err)`: a condition that may clear on its own, such as a dependency that is not ready
+  yet. That config keeps its `autodetection_retry` schedule, even from `Init()`.
+
+If a provider requires a minimum wait before another startup attempt, return
+`collectorapi.WithRetryNotBefore(err, deadline)`, with the absolute deadline captured when the provider requests it
+(for a duration, `time.Now().Add(wait)`). This annotation only delays an already-eligible automatic retry; it does not
+classify the error, enable disabled retries or change DynCfg replies. It survives failed-collector disposal and
+secret-error redaction. When several wrapped or joined errors specify deadlines, the latest applies. The outstanding
+minimum follows the same retained configuration across automatic source promotion and search reopening, independently
+of ordinary retry permission. Other configurations keep their own eligibility. The minimum is consumed when a new
+automatic activation is admitted. Manual `test` and rejected `update` still return promptly; accepted exact
+`update`/`restart` resets the selected configuration, and a fresh `enable` resets its reopened scope. An already-enabled
+`enable` preserves deadlines.
+
+This startup annotation does not schedule retries or delay ordinary `Collect` calls. A running collector remains
+responsible for its own provider wait between collections.
+
+Several source configs can share a module/job name. Before any candidate reaches readiness, an enabled source-owned
+job tries eligible alternatives at the highest owning source tier, including alternatives in other files. Each gets
+one attempt per finite pass; initial sibling attempts do not wait for a failed config's cadence. Each config retains
+its own retry policy. Failure never permits a lower source tier to bypass an owning higher tier. At most one runtime
+collects for the public job name, and its successful selection stays sticky on identical source snapshots.
+
+DynCfg `update` rejects every failed preflight regardless of `autodetection_retry`, preserving the incumbent:
+`422` for a permanent or unclassified collector failure, `503` for a temporary one. Successful replacement preflight
+returns `202` before runtime startup completes. Enabling a passive or disabled job accepts intent with `202` before
+probing; later failures are reported through job status and use the retry policy above. Repeated `enable` on an
+already-enabled job preserves its work and retry deadlines regardless of health. It returns `202` while health is
+Accepted and `200` otherwise, including Failed. `add` is passive until enabled. RESTART probes only the currently
+exposed stored config; it does not try source siblings. A passive/disabled-to-enabled transition starts a new
+alternative search for a source-owned job. A classified failure keeps a failed stock job listed in DynCfg instead of
+removing it. Leave the expected absence of a service at a stock endpoint unclassified. For all
+command outcomes, including `restart` and `test`, see
+[the Job Manager reply contract](/src/go/plugin/agent/jobmgr/ARCHITECTURE.md#dyncfg-reply-contract).
 
 ## Config
 
@@ -160,6 +238,12 @@ Config SHOULD stay small and operator-oriented:
 - endpoint and standard HTTP/TLS/proxy fields when applicable;
 - `update_every`, `timeout`, and `vnode` when relevant;
 - selectors that let users intentionally scope cardinality.
+
+Every configuration path (stock and user files, service discovery, DynCfg) applies `confgroup.Config.ApplyDefaults`
+before the collector sees the job, replacing a non-positive `update_every`, `autodetection_retry` or `priority` with
+the module default. A collector therefore always receives a positive `update_every` and `priority` and a non-negative
+`autodetection_retry`, where zero is the valid "no retry" value. Collectors SHOULD NOT re-check those bounds; such
+checks and their troubleshooting entries are unreachable.
 
 Implementation tuning SHOULD use constants:
 
@@ -210,27 +294,34 @@ return the context error so the runtime aborts the cycle instead of committing a
 ## Metrics And Charts
 
 Metric instruments SHOULD be built once in `New()` when the metric surface is known. Use a typed collector metrics
-struct so write code is a value mapping, not repeated dynamic instrument lookup.
+struct so write code is a value mapping, not repeated dynamic instrument lookup. For input-defined metric names and
+churning labels, construct direct snapshot handles inside the collection cycle or retain them only with their owning
+series. A permanent Vec cache is unbounded; follow the descriptor-retention contract in
+`src/go/pkg/metrix/README.md#consumers-that-cache-per-name-state` for any per-name cache that survives cycles.
 
 Use the right instrument:
 
-- `SnapshotGaugeVec` for labeled current values; use scalar `SnapshotMeter.Gauge` only when the metric is intentionally
-  unlabeled;
+- `SnapshotGaugeVec` for labeled current values with a bounded, stable identity set; dynamic ingestion can use direct
+  labeled `SnapshotMeter.Gauge` handles with the ownership rules above;
 - `Counter.ObserveTotal()` for source counters;
 - `StateSet` SHOULD be used for fixed mutually exclusive states, such as connected vs disconnected or up vs down.
 
-`charts.yaml` is the chart contract. Every template MUST define:
+Use exactly one static `charts.yaml` provider or an immutable native TemplateSet provider as the chart contract.
+Native providers reuse their prepared pointer until content changes; see
+`src/go/plugin/framework/chartengine/README.md#named-active-template-sets`. Every static template MUST define:
 
 - `version: v1`;
 - `context_namespace`;
 
 Templates SHOULD also group charts by operational area, use `instances.by_labels` for stable instance identity when
-charts are entity-scoped, use `label_promotion` for descriptive labels that should not define uniqueness, and keep the
-default lifecycle unless a concrete reason exists to override it.
+charts are entity-scoped, and keep the default lifecycle unless a concrete reason exists to override it. Defaults,
+families, ordering, statesets, values, labels and shared contexts are owned by
+`.agents/skills/collectors-go-framework-v2/chart-template.md`.
 
-Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Mutable display names SHOULD
-be promoted with `label_promotion`. Do not blindly copy `instances.by_labels` from Cato or any other example; audit
-every label used for chart identity and record why it is stable enough for that collector.
+Metric labels and chart instance labels MUST be bounded and stable. Use IDs for identity. Which labels to attach
+and when to list `label_promotion` is owned by the chart template topic linked above. Do not blindly copy
+`instances.by_labels` from Cato or any other example; audit every label used for chart identity and record why it is
+stable enough for that collector.
 
 ## Host Scopes And Vnodes
 
@@ -305,6 +396,22 @@ For a new collector `<name>`:
 
 Use `.agents/skills/integrations-lifecycle/recipes/add-go-collector.md` for the integration-generation commands.
 
+A collector that works only on some operating systems (its `metadata.yaml` `supported_platforms`) MUST NOT register
+elsewhere, or its stock job starts and fails there:
+
+- Put the matching build constraint, such as `//go:build linux`, on every source and test file of the collector
+  package except `doc.go`, after the SPDX line with a blank line before and after.
+- Add an untagged `doc.go` containing only the package clause and its doc comment, so the `init.go` import still
+  compiles on every platform.
+- Platform-neutral subpackages such as `<name>func/` and `internal/` need no constraint; only the tagged files link
+  them.
+- From `src/go`, run the package tests on a supported platform, then check a platform that `supported_platforms`
+  excludes (for example `GOOS=windows` for a Linux-only collector): with that `GOOS`,
+  `go build -o /dev/null ./cmd/godplugin` succeeds and `go list -f '{{.GoFiles}}' ./plugin/go.d/collector/<name>`
+  prints only `[doc.go]`.
+
+Examples: `ap`, `zfspool`, `smbios_memory`.
+
 The PR description or design note MUST enumerate the relevant collector consistency artifacts and justify every artifact
 that did not need a matching change. Most of this is not CI-enforced; it must be reviewer-visible.
 
@@ -321,9 +428,12 @@ Recommended test coverage:
 - chart-template schema validation with `collecttest.AssertChartTemplateSchema` and chart-template compile validation
   through the chartengine path used by nearby V2 collectors;
 - post-collect chart coverage with `collecttest.AssertChartCoverage`;
+- artifact drift checks between `metadata.yaml`, `charts.yaml` and `health.d` with the `collecttest` checks named in
+  `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`; never restate template contexts or dimensions;
 - state-set values for every known state and unknown fallback;
 - host-scope routing when scopes/vnodes are used;
-- Function handler tests with fake deps when Functions exist;
+- Function handler tests with fake deps when Functions exist, plus the Live Data drift check
+  `collecttest.AssertMetadataDocumentsFunctions` against `metadata.yaml`;
 - topology schema validation when topology exists;
 - fixture validity and attribution when fixtures come from public third-party projects.
 

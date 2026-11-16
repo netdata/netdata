@@ -2529,7 +2529,7 @@ fn test_enricher_for_provider_order() -> FlowEnricher {
     }
 }
 
-/// Build a FlowRecord equivalent to the given base_fields.
+/// Build a `FlowRecord` equivalent to the given `base_fields`.
 fn base_record(
     exporter_ip: &str,
     in_if: u32,
@@ -2550,8 +2550,9 @@ fn base_record(
     rec
 }
 
-/// Compare enriched FlowFields from enrich_fields with to_fields() output
-/// from an equivalently enriched FlowRecord.
+/// Enrich `fields` with `enrich_fields` and `rec` with `enrich_record`, each
+/// through its own enricher built from `cfg`, asserting the same keep/drop
+/// decision and matching `to_fields()` values for every enrichment-written key.
 fn assert_enrich_equivalence(
     cfg: &EnrichmentConfig,
     fields: &mut FlowFields,

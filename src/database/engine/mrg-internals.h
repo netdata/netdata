@@ -14,9 +14,10 @@
 //    (metric_acquire(), mrg_metric_dup(), mrg_metric_get_and_acquire*())
 //    guarantees the object stays valid.
 //
-// 2. A bare METRIC pointer stored elsewhere -- notably PGC's page->metric_id,
-//    which is (Word_t)metric -- is NOT a reference and does NOT keep the
-//    metric alive. Such a pointer can be stale.
+// 2. A bare METRIC pointer stored elsewhere is NOT a reference and does NOT
+//    keep the metric alive. Such a pointer can be stale. PGC's page->metric_id
+//    used to be one; it is now the metric's UUIDMAP_ID (mrg_metric_id()), which
+//    cannot be dereferenced at all. Do not reintroduce a pointer key.
 //
 // 3. Acquiring from a possibly stale pointer is NOT safe: aral_freez() lets
 //    ARAL write its free-list header over the start of the element. ARAL_FREE is
@@ -33,6 +34,13 @@
 //    resolves through the MRG index is necessarily backed by a live metric --
 //    which is why callers holding an unowned pointer should resolve the metric
 //    by id (mrg_metric_get_and_acquire_by_id()) instead of dereferencing it.
+//
+// 5. An id held by something OTHER than a live METRIC (a cache page, a queued
+//    page descriptor) is not a reference either: metric_release() drops the
+//    metric's uuidmap reference on the deletion branch, so the id can go dead.
+//    Resolve such an id with uuidmap_uuid_ptr_and_dup() (returns NULL on a dead
+//    id) or mrg_metric_get_and_acquire_by_id(), never with uuidmap_dup(), which
+//    fatals. main_cache_flush_dirty_page_callback() is the worked example.
 //
 struct metric {
     Word_t section;                 // never changes
@@ -141,7 +149,7 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
     uuid_unparse_lower(uuid, uuid_txt);
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "METRIC: %s on %s at tier %d, refcount %d, partition %u, "
-           "retention [%ld - %ld (hot), %ld (clean)], update every %"PRIu32
+           "retention [%" PRId64 " - %" PRId64 " (hot), %" PRId64 " (clean)], update every %"PRIu32
 #ifdef NETDATA_INTERNAL_CHECKS
            ", writer pid %d "
 #endif
@@ -151,9 +159,9 @@ static inline void metric_log(MRG *mrg __maybe_unused, METRIC *metric, const cha
            ctx->config.tier,
            metric->refcount,
            metric->partition,
-           metric->first_time_s,
-           metric->latest_time_s_hot,
-           metric->latest_time_s_clean,
+           (int64_t)metric->first_time_s,
+           (int64_t)metric->latest_time_s_hot,
+           (int64_t)metric->latest_time_s_clean,
            metric->latest_update_every_s
 #ifdef NETDATA_INTERNAL_CHECKS
            , (int)metric->writer

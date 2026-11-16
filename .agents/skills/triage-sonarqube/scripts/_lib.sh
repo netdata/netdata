@@ -57,15 +57,15 @@ sq_audit_dir() {
     echo "${dir}"
 }
 
-# Cloudflare in front of api.sonarcloud.io rejects non-ASCII bodies.
-# Fail before the network round-trip rather than debug a 403 challenge.
+# Preserve the ASCII-only workaround for observed request challenges.
+# Enforce it locally without assuming all current service behavior.
 #
 # `tr -d '\000-\177'` deletes ALL ASCII bytes; anything left is non-ASCII.
 # This is portable across GNU and BSD/macOS (unlike `grep -P`, which is GNU-only).
 sq_require_ascii() {
     local s="$1"
     if LC_ALL=C printf '%s' "${s}" | LC_ALL=C tr -d '\000-\177' | grep -q .; then
-        echo -e "${SQ_RED}[ERROR]${SQ_NC} Comment contains non-ASCII characters. Cloudflare blocks them. Replace em-dashes with '--' and curly quotes with straight quotes." >&2
+        echo -e "${SQ_RED}[ERROR]${SQ_NC} Comment contains non-ASCII characters; this helper requires ASCII. Replace em-dashes with '--' and curly quotes with straight quotes." >&2
         return 1
     fi
 }

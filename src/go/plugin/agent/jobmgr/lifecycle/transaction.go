@@ -75,6 +75,12 @@ func (art AppliedResourceTransaction) ResultStatus() int {
 	return art.result.status
 }
 
+// Result returns the immutable sealed result for an observer of a response-free
+// transaction. It does not transfer resource ownership or authorize a reply.
+func (art AppliedResourceTransaction) Result() SealedResult {
+	return art.result
+}
+
 // Ownership returns the exact resource ownership described by the applied
 // transaction, including when Apply returned it alongside an error.
 func (art AppliedResourceTransaction) Ownership() (

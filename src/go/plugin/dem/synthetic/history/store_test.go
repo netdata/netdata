@@ -1,0 +1,705 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package history_test
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"math"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "history")
+	st, err := journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	old := time.Now().Add(-24 * time.Hour).UnixMicro()
+	run := synthetic.Run{
+		Runtime: &synthetic.RuntimeIdentity{
+			Version:  "release-a",
+			SHA256:   "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			Contract: 1,
+		},
+		ID:           "a",
+		JobID:        "journey:disabled",
+		Kind:         synthetic.Journey,
+		Name:         "disabled",
+		ScheduledUS:  old - 2000,
+		QueuedUS:     old - 1500,
+		StartedUS:    old,
+		Outcome:      synthetic.Unknown,
+		CaptureState: "disabled",
+	}
+	attempted, err := history.NewStore(st).AppendRun(ctx, "start", run)
+	require.NoError(t, err)
+	require.True(t, attempted)
+	run.CompletedUS = old + 1000
+	run.Outcome = synthetic.Failed
+	run.Events = []synthetic.Event{{Kind: "error", Message: "failure detail"}}
+	run.Tests = &synthetic.TestCounts{
+		Declared: 1,
+		Failed:   1,
+	}
+	_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
+	require.NoError(t, err)
+	pending := synthetic.Run{
+		ID:        "b",
+		JobID:     "lighthouse:page",
+		Kind:      synthetic.Lighthouse,
+		Name:      "page",
+		StartedUS: old + 2000,
+		Outcome:   synthetic.Unknown,
+	}
+	_, err = history.NewStore(st).AppendRun(ctx, "start", pending)
+	require.NoError(t, err)
+	_, err = rumhistory.NewStore(st).
+		AppendEvent(ctx, rumhistory.EventRecord{
+			Site:       "shop",
+			SessionID:  "s",
+			Type:       "pageview",
+			ObservedUS: old,
+		})
+	require.NoError(t, err)
+	require.NoError(t, st.Sync(ctx))
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	page, err := history.NewStore(st).
+		QueryRuns(ctx, history.RunFilter{
+			After: old / 1000000,
+			Limit: 1,
+		})
+	require.NoError(t, err)
+	require.Len(t, page.Runs, 1)
+	assert.True(t, page.Truncated)
+	assert.Equal(t, synthetic.Unknown, page.Runs[0].Outcome)
+	filtered, err := history.NewStore(st).QueryRuns(ctx, history.RunFilter{
+		Outcome: synthetic.Unknown,
+	})
+	require.NoError(t, err)
+	require.Len(t, filtered.Runs, 1)
+	assert.Equal(t, "b", filtered.Runs[0].ID)
+	detail, err := history.NewStore(st).GetRun(ctx, run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run, detail)
+	_, err = history.NewStore(st).GetRun(ctx, "wrong", run.ID)
+	assert.ErrorIs(t, err, os.ErrNotExist)
+	rum, err := rumhistory.NewStore(st).
+		QuerySessions(ctx, rumhistory.SessionFilter{
+			Filter: rumhistory.Filter{
+				Before: time.Now().Unix() + 1,
+			},
+			Limit: 100,
+		})
+	require.NoError(t, err)
+	require.Len(t, rum, 1)
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = history.NewStore(st).QueryRuns(cancelled, history.RunFilter{})
+	assert.ErrorIs(t, err, context.Canceled)
+	require.NoError(t, st.EnforceHistoryRetention(ctx, 30, 1<<30))
+	detail, err = history.NewStore(st).GetRun(ctx, run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, synthetic.Failed, detail.Outcome)
+}
+
+func TestSyntheticHistoryOptionalUpperBound(t *testing.T) {
+	ctx := context.Background()
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	run := synthetic.Run{
+		ID:        "upper-bound",
+		JobID:     "journey:bound",
+		Kind:      synthetic.Journey,
+		StartedUS: time.Now().UnixMicro(),
+		Outcome:   synthetic.Unknown,
+	}
+	_, err = history.NewStore(st).AppendRun(ctx, "start", run)
+	require.NoError(t, err)
+	page, err := history.NewStore(st).QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, page.Runs, 1)
+	epoch := int64(0)
+	page, err = history.NewStore(st).QueryRuns(ctx, history.RunFilter{
+		Before: &epoch,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, page.Runs)
+	_, err = history.NewStore(st).QueryRuns(ctx, history.RunFilter{
+		After:  1,
+		Before: &epoch,
+	})
+	require.ErrorContains(t, err, "invalid synthetic start-time range")
+}
+
+// Saved time is contemporary; every selected attempt below started near epoch.
+// Whole-second membership must resolve final evidence regardless of finish time.
+func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
+	ctx := context.Background()
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	historyStore := history.NewStore(st)
+	duration := 350.25
+	runs := []synthetic.Run{
+		{
+			ID:          "before",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   119999999,
+			CompletedUS: 130000000,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "lower",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   120000000,
+			CompletedUS: 250000000,
+			Outcome:     synthetic.Failed,
+		},
+		{
+			ID:          "rollback",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   125000000,
+			CompletedUS: 10000000,
+			DurationMS:  &duration,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "complete-only",
+			JobID:       "lighthouse:one",
+			Kind:        synthetic.Lighthouse,
+			StartedUS:   130000000,
+			CompletedUS: 260000000,
+			Outcome:     synthetic.Timeout,
+		},
+		{
+			ID:        "unmatched",
+			JobID:     "journey:one",
+			Kind:      synthetic.Journey,
+			StartedUS: 140000000,
+			Outcome:   synthetic.Unknown,
+		},
+		{
+			ID:          "upper",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   179999999,
+			CompletedUS: 300000000,
+			Outcome:     synthetic.Success,
+		},
+		{
+			ID:          "after",
+			JobID:       "journey:one",
+			Kind:        synthetic.Journey,
+			StartedUS:   180000000,
+			CompletedUS: 310000000,
+			Outcome:     synthetic.Success,
+		},
+	}
+	for _, run := range runs {
+		if run.CompletedUS != 0 {
+			_, err := historyStore.AppendRun(ctx, "complete", run)
+			require.NoError(t, err)
+		}
+		if run.ID != "complete-only" {
+			start := run
+			start.CompletedUS = 0
+			start.DurationMS = nil
+			start.Outcome = synthetic.Unknown
+			_, err := historyStore.AppendRun(ctx, "start", start)
+			require.NoError(t, err)
+		}
+	}
+	upper := int64(179)
+	selected := []synthetic.Run{runs[5], runs[4], runs[3], runs[2], runs[1]}
+	for name, test := range map[string]struct {
+		filter    history.RunFilter
+		want      []synthetic.Run
+		truncated bool
+	}{
+		"whole seconds": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+		}, selected, false},
+		"outcome after resolution": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Unknown,
+		}, []synthetic.Run{runs[4]}, false},
+		"completion after picker": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Failed,
+		}, []synthetic.Run{runs[1]}, false},
+		"completion survives rollback": {history.RunFilter{
+			After:   120,
+			Before:  &upper,
+			Outcome: synthetic.Success,
+		}, []synthetic.Run{runs[5], runs[2]}, false},
+		"complete only": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+			Kind:   synthetic.Lighthouse,
+		}, []synthetic.Run{runs[3]}, false},
+		"ordered limit": {history.RunFilter{
+			After:  120,
+			Before: &upper,
+			Limit:  2,
+		}, selected[:2], true},
+		"maximum seconds": {history.RunFilter{
+			After: math.MaxInt64,
+		}, []synthetic.Run{}, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			page, err := historyStore.QueryRuns(ctx, test.filter)
+			require.NoError(t, err)
+			assert.Equal(t, history.RunPage{
+				Runs:      test.want,
+				Truncated: test.truncated,
+			}, page)
+		})
+	}
+	for _, run := range runs {
+		got, err := historyStore.GetRun(ctx, run.JobID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, run, got)
+	}
+}
+
+func TestSyntheticRejectsInvalidProducerRecordBeforeAppend(t *testing.T) {
+	ctx := context.Background()
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	for name, test := range map[string]struct {
+		phase synthetic.HistoryPhase
+		run   synthetic.Run
+	}{
+		"missing run": {"start", synthetic.Run{
+			JobID:     "job",
+			StartedUS: 1,
+		}},
+		"missing job": {"start", synthetic.Run{
+			ID:        "run",
+			StartedUS: 1,
+		}},
+		"missing start": {"start", synthetic.Run{
+			ID:    "run",
+			JobID: "job",
+		}},
+		"negative start": {"start", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: -1,
+		}},
+		"missing completion": {"complete", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: 1,
+		}},
+		"negative completion": {"complete", synthetic.Run{
+			ID:          "run",
+			JobID:       "job",
+			StartedUS:   1,
+			CompletedUS: -1,
+		}},
+		"invalid phase": {"other", synthetic.Run{
+			ID:        "run",
+			JobID:     "job",
+			StartedUS: 1,
+		}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			attempted, err := history.NewStore(st).AppendRun(ctx, test.phase, test.run)
+			require.Error(t, err)
+			assert.False(t, attempted)
+		})
+	}
+	page, err := history.NewStore(st).QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	assert.Empty(t, page.Runs)
+}
+
+func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
+	cases := map[string]func(map[string][]string){
+		"scalar JSON run mismatch":   func(fields map[string][]string) { fields["DEM_RUN_ID"] = []string{"different"} },
+		"scalar JSON job mismatch":   func(fields map[string][]string) { fields["DEM_JOB_ID"] = []string{"different"} },
+		"scalar JSON start mismatch": func(fields map[string][]string) { fields["DEM_STARTED_US"] = []string{"120000001"} },
+		"invalid phase":              func(fields map[string][]string) { fields["DEM_PHASE"] = []string{"other"} },
+		"malformed JSON":             func(fields map[string][]string) { fields["DEM_DATA"] = []string{"{"} },
+	}
+	for _, field := range []string{"DEM_PHASE", "DEM_JOB_ID", "DEM_RUN_ID", "DEM_DATA"} {
+		cases["missing "+field] = func(fields map[string][]string) { delete(fields, field) }
+		cases["empty "+field] = func(fields map[string][]string) { fields[field] = []string{""} }
+		cases["multiple "+field] = func(fields map[string][]string) { fields[field] = append(fields[field], "other") }
+	}
+	for name, mutate := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			st, err := journalstore.Open(ctx, t.TempDir(), "")
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, st.Close()) })
+			run := synthetic.Run{
+				ID:          "run",
+				JobID:       "job",
+				Kind:        synthetic.Journey,
+				StartedUS:   120000000,
+				CompletedUS: 130000000,
+				Outcome:     synthetic.Success,
+			}
+			data, err := json.Marshal(run)
+			require.NoError(t, err)
+			fields := map[string][]string{
+				"DEM_KIND": {"synthetic"}, "DEM_PHASE": {"complete"}, "DEM_JOB_ID": {run.JobID},
+				"DEM_RUN_ID": {
+					run.ID,
+				}, "DEM_STARTED_US": {strconv.FormatInt(run.StartedUS, 10)}, "DEM_DATA": {string(data)},
+			}
+			mutate(fields)
+			keys := make([]string, 0, len(fields))
+			for key := range fields {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			var encoded []journal.Field
+			for _, key := range keys {
+				for _, value := range fields[key] {
+					encoded = append(encoded, journal.StringField(key, value))
+				}
+			}
+			attempted, err := st.Append(ctx, encoded)
+			require.NoError(t, err)
+			require.True(t, attempted)
+			upper := int64(120)
+			_, err = history.NewStore(st).QueryRuns(ctx, history.RunFilter{
+				After:  120,
+				Before: &upper,
+			})
+			require.Error(t, err, "malformed selected record: %s", name)
+		})
+	}
+}
+
+func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
+	ctx := context.Background()
+	root := filepath.Join(t.TempDir(), "history")
+	st, err := journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	run := synthetic.Run{
+		ID:                "timeout",
+		JobID:             "journey:test",
+		Kind:              synthetic.Journey,
+		StartedUS:         time.Now().UnixMicro(),
+		CompletedUS:       time.Now().UnixMicro(),
+		Outcome:           synthetic.Timeout,
+		TerminationReason: synthetic.ExecutionBudget,
+		Error:             "earlier assertion failed",
+	}
+	_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
+	require.NoError(t, err)
+	require.NoError(t, st.Sync(ctx))
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	defer func() { require.NoError(t, st.Close()) }()
+	retained, err := history.NewStore(st).GetRun(ctx, run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.TerminationReason, retained.TerminationReason)
+	assert.Equal(t, run.Error, retained.Error)
+}
+
+func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
+	ctx := t.Context()
+	root := t.TempDir()
+	st, err := journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	now := time.Now().UnixMicro()
+	duration := 5.25
+	location := &synthetic.EvidenceLocation{
+		File:   "checkout.spec.js",
+		Line:   12,
+		Column: 3,
+	}
+	test := synthetic.EvidenceTest{
+		ID:                "t",
+		Title:             "checkout",
+		Location:          location,
+		Status:            "failed",
+		ExpectedStatus:    "passed",
+		DurationMS:        &duration,
+		ReportingComplete: true,
+	}
+	step := synthetic.EvidenceStep{
+		ID:       "s1",
+		TestID:   "t",
+		Title:    "submit",
+		Category: "test.step",
+		Location: location,
+		State:    "running",
+	}
+	evidence := &synthetic.FailureEvidence{
+		Availability:     "supported",
+		ReporterComplete: false,
+		Truncated:        []string{"other_steps", "text"},
+		Tests:            []synthetic.EvidenceTest{test},
+		Steps:            []synthetic.EvidenceStep{step},
+		FirstFailure: &synthetic.FailureDetail{
+			Test:          test,
+			Path:          []synthetic.EvidenceStep{step},
+			Message:       "expected receipt",
+			Location:      location,
+			TextTruncated: true,
+		},
+	}
+	stopped := test
+	stopped.ID, stopped.Status = "stopped", "interrupted"
+	pending := step
+	pending.TestID = stopped.ID
+	evidence.StopContext = &synthetic.FailureDetail{
+		Test:           stopped,
+		Path:           []synthetic.EvidenceStep{pending},
+		PathIncomplete: true,
+	}
+	runs := []synthetic.Run{
+		{
+			ID:          "old",
+			JobID:       "journey:a",
+			Kind:        synthetic.Journey,
+			StartedUS:   now,
+			CompletedUS: now + 1,
+			Outcome:     synthetic.Failed,
+		},
+		{
+			ID:                "rich",
+			JobID:             "journey:a",
+			Kind:              synthetic.Journey,
+			StartedUS:         now + 2,
+			CompletedUS:       now + 3,
+			Outcome:           synthetic.Timeout,
+			TerminationReason: synthetic.ExecutionBudget,
+			FailureEvidence:   evidence,
+			BrowserSummary: &synthetic.BrowserSummary{
+				Availability: "supported",
+				Coverage:     "fixture_context",
+				Run: &synthetic.BrowserAggregate{
+					Counts: synthetic.BrowserCounts{
+						ConsoleError: 2,
+					},
+				},
+				Tests: []synthetic.BrowserTest{{ID: "t", State: "incomplete"}},
+				Samples: []synthetic.BrowserSample{
+					{ID: 1, TestID: "t", Category: "console_error", State: "pending"},
+				},
+			},
+		},
+	}
+	for _, run := range runs {
+		_, err = history.NewStore(st).AppendRun(ctx, "complete", run)
+		require.NoError(t, err)
+	}
+	require.NoError(t, st.Sync(ctx))
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	defer func() { require.NoError(t, st.Close()) }()
+	store := history.NewStore(st)
+	for _, run := range runs {
+		retained, err := store.GetRun(ctx, run.JobID, run.ID)
+		require.NoError(t, err)
+		assert.Equal(t, run, retained)
+	}
+	page, err := store.QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, page.Runs, 2)
+	assert.Equal(t, runs[1], page.Runs[0])
+	assert.Nil(t, page.Runs[1].FailureEvidence)
+}
+
+func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
+	root := t.TempDir()
+	j, err := journalstore.Open(t.Context(), root, "")
+	require.NoError(t, err)
+	test := synthetic.ArtifactTest{
+		ID:    "t1",
+		Title: "Checkout",
+	}
+	run := synthetic.Run{
+		ID:           "capture-run",
+		JobID:        "journey:test",
+		Kind:         synthetic.Journey,
+		Name:         "test",
+		StartedUS:    time.Now().UnixMicro(),
+		CompletedUS:  time.Now().UnixMicro(),
+		Outcome:      synthetic.Failed,
+		CaptureState: "unavailable",
+		Captures: &synthetic.CaptureReport{
+			Reporting: "complete",
+			Trace:     "supported",
+			Tests: []synthetic.CaptureTest{
+				{ArtifactTest: test, Status: "failed", ExpectedStatus: "passed", Accepted: 1, Unaccepted: 1},
+			},
+			Associations: []synthetic.CaptureAssociation{{ID: "s1", TestID: "t1"}, {ID: "trace1", TestID: "t1"}},
+			Unpublished:  []synthetic.CaptureOmission{{ID: "s1", Reason: "too_large"}},
+		},
+	}
+	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
+	require.NoError(t, err)
+	require.NoError(t, j.Close())
+	j, err = journalstore.Open(t.Context(), root, "")
+	require.NoError(t, err)
+	defer j.Close()
+	got, err := history.NewStore(j).GetRun(t.Context(), run.JobID, run.ID)
+	require.NoError(t, err)
+	assert.Equal(t, run.Captures, got.Captures)
+}
+
+func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	st, err := journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	store := history.NewStore(st)
+	now := time.Now().UnixMicro()
+	for i, site := range []string{"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
+		run := synthetic.Run{
+			ID:        []string{"before-move", "after-move"}[i],
+			JobID:     "journey:checkout",
+			Kind:      synthetic.Journey,
+			VnodeGUID: site,
+			StartedUS: now + int64(i),
+			Outcome:   synthetic.Unknown,
+		}
+		_, err = store.AppendRun(ctx, "start", run)
+		require.NoError(t, err)
+		run.CompletedUS = run.StartedUS + 100
+		run.Outcome = synthetic.Success
+		_, err = store.AppendRun(ctx, "complete", run)
+		require.NoError(t, err)
+	}
+	require.NoError(t, st.Close())
+	st, err = journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	store = history.NewStore(st)
+	upper := now/1e6 + 1
+	filtered, err := store.QueryRuns(
+		ctx,
+		history.RunFilter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			JobID:     "journey:checkout",
+			Kind:      synthetic.Journey,
+			Outcome:   synthetic.Success,
+			After:     now / 1e6,
+			Before:    &upper,
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, filtered.Runs, 1)
+	assert.Equal(t, "before-move", filtered.Runs[0].ID)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", filtered.Runs[0].VnodeGUID)
+	filtered, err = store.QueryRuns(
+		ctx,
+		history.RunFilter{
+			VnodeGUID: "11111111-1111-4111-8111-111111111111",
+			Kind:      synthetic.Lighthouse,
+		},
+	)
+	require.NoError(t, err)
+	assert.Empty(t, filtered.Runs)
+	all, err := store.QueryRuns(ctx, history.RunFilter{})
+	require.NoError(t, err)
+	require.Len(t, all.Runs, 2)
+	detail, err := store.GetRun(ctx, "journey:checkout", "before-move")
+	require.NoError(t, err)
+	assert.Equal(t, "11111111-1111-4111-8111-111111111111", detail.VnodeGUID)
+}
+
+// storedEntries reads every retained entry straight from the journal files with
+// the SDK, independent of the store's own reader. Trusted "_" fields come from
+// the host identity and are left out.
+func storedEntries(t *testing.T, root string) []map[string][]string {
+	t.Helper()
+	paths, err := filepath.Glob(filepath.Join(root, "*", "*.journal"))
+	require.NoError(t, err)
+	var entries []map[string][]string
+	for _, path := range paths {
+		file, err := journal.OpenIndexedSnapshot(context.Background(), path, journal.IndexedSnapshotOptions{})
+		require.NoError(t, err)
+		err = file.VisitEntries(context.Background(), func(entry *journal.SnapshotEntry) error {
+			fields := map[string][]string{}
+			entries = append(entries, fields)
+			return entry.VisitPayloads(func(payload []byte) error {
+				name, value, _ := bytes.Cut(payload, []byte("="))
+				if !bytes.HasPrefix(name, []byte("_")) {
+					fields[string(name)] = append(fields[string(name)], string(value))
+				}
+				return nil
+			})
+		})
+		require.NoError(t, errors.Join(err, file.Close()))
+	}
+	return entries
+}
+
+// The complete stored entries, including the envelope the store derives, are the
+// persisted synthetic history contract.
+func TestStoredRunEntryContract(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	st, err := journalstore.Open(ctx, root, "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, st.Close()) })
+	run := synthetic.Run{
+		ID:          "run-1",
+		JobID:       "journey:checkout",
+		Kind:        synthetic.Journey,
+		Name:        "checkout",
+		StartedUS:   1_700_000_000_000_008,
+		CompletedUS: 1_700_000_060_000_000,
+		Outcome:     synthetic.Success,
+	}
+	store := history.NewStore(st)
+	for _, phase := range []synthetic.HistoryPhase{synthetic.HistoryStart, synthetic.HistoryComplete} {
+		attempted, err := store.AppendRun(ctx, phase, run)
+		require.NoError(t, err)
+		require.True(t, attempted)
+	}
+	require.NoError(t, store.Sync(ctx))
+	data, err := json.Marshal(run)
+	require.NoError(t, err)
+	entry := func(phase string) map[string][]string {
+		return map[string][]string{
+			"DEM_SCHEMA":           {"1"},
+			"DEM_KIND":             {"synthetic"},
+			"DEM_STARTED_US":       {"1700000000000008"},
+			"DEM_SYNTHETIC_MINUTE": {"28333333"},
+			"DEM_PHASE":            {phase},
+			"DEM_JOB_ID":           {"journey:checkout"},
+			"DEM_RUN_ID":           {"run-1"},
+			"DEM_DATA":             {string(data)},
+			"MESSAGE":              {"synthetic " + phase},
+		}
+	}
+	assert.Equal(t, []map[string][]string{entry("start"), entry("complete")}, storedEntries(t, root))
+}

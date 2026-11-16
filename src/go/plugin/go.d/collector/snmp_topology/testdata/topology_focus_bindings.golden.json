@@ -1,0 +1,105 @@
+{
+  "device_display_selected_primary": {
+    "table": {
+      "columns": [
+        "option:string:role=attribute",
+        "actor:actor_ref:role=reference"
+      ],
+      "rows": [
+        {
+          "actor": "mac:02:00:00:00:10:01,02:a2:4e:38:9b:54",
+          "option": "ip:192.0.2.151"
+        },
+        {
+          "actor": "mac:02:00:00:00:10:02,02:a2:53:20:d3:c5",
+          "option": "ip:192.0.2.152"
+        }
+      ]
+    },
+    "type": "focus_root_bindings"
+  },
+  "focus_depth_l2": {
+    "table": {
+      "columns": [
+        "option:string:role=attribute",
+        "actor:actor_ref:role=reference"
+      ],
+      "rows": [
+        {
+          "actor": "mac:02:00:00:00:04:01,02:c8:29:66:76:9b",
+          "option": "ip:192.0.2.31"
+        },
+        {
+          "actor": "mac:02:00:00:00:04:02,02:c8:38:1e:6d:83,02:c8:38:1e:6f:36",
+          "option": "ip:192.0.2.32"
+        }
+      ]
+    },
+    "type": "focus_root_bindings"
+  },
+  "managed_fabric_fdb_default": {
+    "table": {
+      "columns": [
+        "option:string:role=attribute",
+        "actor:actor_ref:role=reference"
+      ],
+      "rows": [
+        {
+          "actor": "mac:02:00:00:00:03:01,02:bc:12:37:50:c8",
+          "option": "ip:192.0.2.21"
+        },
+        {
+          "actor": "mac:02:00:00:00:03:02,02:bc:17:1f:89:39",
+          "option": "ip:192.0.2.22"
+        }
+      ]
+    },
+    "type": "focus_root_bindings"
+  },
+  "mixed_l2_l3_control": {
+    "table": {
+      "columns": [
+        "option:string:role=attribute",
+        "actor:actor_ref:role=reference"
+      ],
+      "rows": [
+        {
+          "actor": "mac:02:00:00:00:01:01,02:20:11:1c:54:5f,02:20:11:1c:56:12",
+          "option": "ip:192.0.2.1"
+        },
+        {
+          "actor": "mac:02:00:00:00:01:02,02:20:02:64:5d:77",
+          "option": "ip:192.0.2.2"
+        },
+        {
+          "actor": "mac:02:00:00:00:02:01,02:dd:ce:cc:45:64,02:dd:ce:cc:4a:7d",
+          "option": "ip:192.0.2.11"
+        },
+        {
+          "actor": "mac:02:00:00:00:02:02,02:dd:c9:e4:b5:2c",
+          "option": "ip:192.0.2.12"
+        }
+      ]
+    },
+    "type": "focus_root_bindings"
+  },
+  "probable_fdb_low_confidence": {
+    "table": {
+      "columns": [
+        "option:string:role=attribute",
+        "actor:actor_ref:role=reference"
+      ],
+      "rows": [
+        {
+          "actor": "mac:02:00:00:00:03:01,02:bc:12:37:50:c8",
+          "option": "ip:192.0.2.21"
+        },
+        {
+          "actor": "mac:02:00:00:00:03:02,02:bc:17:1f:89:39",
+          "option": "ip:192.0.2.22"
+        }
+      ]
+    },
+    "type": "focus_root_bindings"
+  }
+}

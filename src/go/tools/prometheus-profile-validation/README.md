@@ -126,8 +126,8 @@ fallback_type:
   gauge: ['exporter_*']
   counter: ['*_total']
 expected_prefix: exporter_
-max_time_series: 2000
-max_time_series_per_metric: 200
+max_input_series: 10000
+max_output_series_per_context: 1000
 future_inputs:
   - name: exporter_future_requests_total
     type: counter
@@ -139,6 +139,15 @@ The schema has no URL, authentication, TLS, or profile-selection fields. The
 tool snapshots the dump, forces an isolated `file://` endpoint, empties ambient
 profile catalogs, and selects exactly the supplied candidate/supporting set. Unknown job keys and multiple job documents
 fail.
+
+`max_input_series` defaults to 10,000 and rejects the complete collection when the final assembled input exceeds it,
+after selector and relabeling and before writer eligibility. Scalars count as one; histograms count buckets plus two
+(count and sum), and summaries count quantiles plus two, including components from families the writer skips.
+`max_output_series_per_context` defaults to 1,000 and omits a whole context when its distinct current chart/dimension
+pairs exceed the limit after routing and aggregation. Each limit accepts zero to disable it; negatives and the retired
+`max_time_series` / `max_time_series_per_metric` keys are rejected. These are admission limits, not download or parser
+memory bounds. Current omissions produce `context_series_limit` findings and `context_series_omissions` records with
+context, observed count and limit; future-probe omissions produce `future_context_series_limit`.
 
 `app` remains an accepted deployment-shaped field for an intentional override or for disambiguating profiles that declare
 different apps. Omit it when automatic profile selection already supplies the intended identity. Stock proof composition is
@@ -193,6 +202,7 @@ For the supplied dump and job policy, a pass establishes that:
 - every source-fixture sample reached by a metric-name rewrite retains a valid
   non-empty name rather than being implicitly discarded;
 - every authored chart and every authored dimension materializes;
+- no current or future-probe context is omitted by the configured output series limit;
 - every selected writer series carries every label required by its chart's
   effective explicit instance identity;
 - observed cross-template rendered-ID collisions are absent;

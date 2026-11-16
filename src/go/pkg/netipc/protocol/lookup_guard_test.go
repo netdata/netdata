@@ -2041,8 +2041,8 @@ func TestLookupThirtyTwoBitGuardCoverage(t *testing.T) {
 	if payloadExceededSuffixFits(0, 0, make([]uint32, 2), overMaxInt, 1) {
 		t.Fatal("payloadExceededSuffixFits should reject unrepresentable first index")
 	}
-	if _, ok := makePayloadExceededSuffixBytes(overMaxInt); ok {
-		t.Fatal("makePayloadExceededSuffixBytes should reject unrepresentable item count")
+	if _, ok := reusePayloadExceededSuffixBytes(nil, overMaxInt); ok {
+		t.Fatal("reusePayloadExceededSuffixBytes should reject unrepresentable item count")
 	}
 	if _, ok := stringReverseEncodedLen(maxIntValue()); ok {
 		t.Fatal("string reverse encoded length should reject int overflow")

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 
 	"golang.zx2c4.com/wireguard/wgctrl"
@@ -17,21 +18,22 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var chartTemplateYAML string
+
 func init() {
 	collectorapi.Register("wireguard", collectorapi.Creator{
 		JobConfigSchema: configSchema,
-		Create:          func() collectorapi.CollectorV1 { return New() },
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
 		Config:          func() any { return &Config{} },
 	})
 }
 
 func New() *Collector {
 	return &Collector{
-		newWGClient:  func() (wgClient, error) { return wgctrl.New() },
-		charts:       &collectorapi.Charts{},
-		devices:      make(map[string]bool),
-		peers:        make(map[string]bool),
-		cleanupEvery: time.Minute,
+		newWGClient: func() (wgClient, error) { return wgctrl.New() },
+		now:         time.Now,
+		store:       metrix.NewCollectorStore(),
 	}
 }
 
@@ -44,15 +46,11 @@ type (
 		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts *collectorapi.Charts
-
 		client      wgClient
 		newWGClient func() (wgClient, error)
+		now         func() time.Time
 
-		cleanupLastTime time.Time
-		cleanupEvery    time.Duration
-		devices         map[string]bool
-		peers           map[string]bool
+		store metrix.CollectorStore
 	}
 	wgClient interface {
 		Devices() ([]*wgtypes.Device, error)
@@ -69,30 +67,18 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
+	devices, err := c.devices()
 	if err != nil {
 		return err
 	}
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
+	if len(devices) == 0 {
+		return errors.New("no WireGuard devices found")
 	}
 	return nil
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
+func (c *Collector) Collect(context.Context) error {
+	return c.collect()
 }
 
 func (c *Collector) Cleanup(context.Context) {
@@ -104,3 +90,7 @@ func (c *Collector) Cleanup(context.Context) {
 	}
 	c.client = nil
 }
+
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }

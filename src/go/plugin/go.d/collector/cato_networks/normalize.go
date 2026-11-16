@@ -78,23 +78,24 @@ func deviceDisplayName(dev deviceState) string {
 	return firstNonEmpty(dev.Name, dev.SocketSerial, dev.Identifier, dev.ID, dev.SocketID)
 }
 
-func resolveMetricInterfaceDevice(site *siteState, iface *interfaceState) {
+func resolveMetricInterfaceDevice(site *siteState, iface *interfaceState) bool {
 	if site == nil || iface == nil {
-		return
+		return false
 	}
 
 	metricDeviceID := firstNonEmpty(iface.DeviceSocketID, iface.DeviceSocketSerial)
 	if metricDeviceID == "" {
-		return
+		return false
 	}
 	for _, dev := range site.Devices {
 		if deviceMatchesMetricInterface(dev, iface.DeviceSocketID, iface.DeviceSocketSerial) {
 			iface.DeviceID = stableDeviceID(dev)
 			iface.DeviceName = deviceDisplayName(dev)
-			return
+			return true
 		}
 	}
 	iface.DeviceID = metricDeviceID
+	return false
 }
 
 func deviceMatchesMetricInterface(dev deviceState, socketID, socketSerial string) bool {

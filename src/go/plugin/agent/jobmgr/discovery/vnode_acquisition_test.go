@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +27,23 @@ func commitConfig(t *testing.T, vc *VNodeConfiguration, c *vnodes.Config) {
 	require.NoError(t, err)
 	_, err = p.Commit()
 	require.NoError(t, err)
+}
+
+func TestLookupGUIDBeforeMetadataAcquisition(t *testing.T) {
+	vc, err := NewVNodeConfigurationWithInitial(nil)
+	require.NoError(t, err)
+	c := snmpConfig(t, "router", "test-device")
+	commitConfig(t, vc, c)
+	snapshot, ok := vc.Lookup("router")
+	require.True(t, ok)
+	require.Nil(t, snapshot.Vnode)
+	guid, ok := vc.LookupGUID("router")
+	require.True(t, ok)
+	want, err := vnodes.ConfiguredGUIDKey(c.IdentityGUID())
+	require.NoError(t, err)
+	require.Equal(t, want, guid)
+	_, ok = vc.LookupGUID("unknown")
+	require.False(t, ok)
 }
 func publishMetadata(t *testing.T, vc *VNodeConfiguration, token *AcquisitionToken, m *vnodes.Metadata, failed bool) {
 	t.Helper()
@@ -74,6 +92,9 @@ func TestSNMPAcquisitionUsesCurrentOverridesAndRetainsLastGood(t *testing.T) {
 	updated, _ := vc.Lookup("router")
 	require.Equal(t, "new-name", updated.Vnode.Hostname)
 	require.NotContains(t, updated.Vnode.Labels, "site")
+	for _, snapshot := range []jobruntime.VnodeSnapshot{first, retained, withoutOverride, kept, updated} {
+		require.Equal(t, pending.Incarnation, snapshot.Incarnation, "metadata, health, labels and credential edits preserve lifetime")
+	}
 	authored, _ := vc.Authored("router")
 	require.Empty(t, authored.Config.Hostname)
 	require.False(t, authored.Failed)
@@ -97,6 +118,7 @@ func TestSNMPRemoveReaddFencesPreparedAndAcquiredResults(t *testing.T) {
 	require.ErrorIs(t, err, ErrVNodeRevision)
 	current, _ := vc.Lookup("router")
 	require.Nil(t, current.Vnode)
+	require.NotEqual(t, old.Incarnation, current.Incarnation)
 }
 func TestSNMPReservesIdentityBeforeReadinessAndRejectsHostnameCollision(t *testing.T) {
 	vc := newTestVNodeConfiguration(t)

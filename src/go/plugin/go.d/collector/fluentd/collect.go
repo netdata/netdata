@@ -2,10 +2,13 @@
 
 package fluentd
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+)
 
-func (c *Collector) collect() (map[string]int64, error) {
-	info, err := c.apiClient.getPluginsInfo()
+func (c *Collector) collect(ctx context.Context) (map[string]int64, error) {
+	info, err := c.apiClient.getPluginsInfo(ctx)
 	if err != nil {
 		return nil, err
 	}

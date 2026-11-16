@@ -166,39 +166,49 @@ func cgroupsLookupRequestPackedStartForCount(count int) (int, bool) {
 }
 
 func DecodeCgroupsLookupRequest(buf []byte) (*CgroupsLookupRequestView, error) {
+	view := &CgroupsLookupRequestView{}
+	if err := decodeCgroupsLookupRequestInto(buf, view); err != nil {
+		return nil, err
+	}
+	return view, nil
+}
+
+// decodeCgroupsLookupRequestInto decodes into a caller-owned view, so the
+// dispatch path can reuse one.
+func decodeCgroupsLookupRequestInto(buf []byte, view *CgroupsLookupRequestView) error {
 	if len(buf) < CgroupsLookupReqHdr {
-		return nil, ErrTruncated
+		return ErrTruncated
 	}
 	if ne.Uint16(buf[0:2]) != 1 || ne.Uint16(buf[2:4]) != 0 ||
 		ne.Uint32(buf[8:12]) != 0 || ne.Uint32(buf[12:16]) != 0 {
-		return nil, ErrBadLayout
+		return ErrBadLayout
 	}
 	itemCount := ne.Uint32(buf[4:8])
 	dirSize64 := uint64(itemCount) * uint64(LookupDirEntrySize)
 	dirEnd, ok := checkedInt(uint64(CgroupsLookupReqHdr) + dirSize64)
 	if !ok {
-		return nil, ErrBadItemCount
+		return ErrBadItemCount
 	}
 	if dirEnd > len(buf) {
-		return nil, ErrTruncated
+		return ErrTruncated
 	}
 	if err := validateLookupDir(buf, CgroupsLookupReqHdr, itemCount, len(buf)-dirEnd, 2, -1); err != nil {
-		return nil, err
+		return err
 	}
-	view := &CgroupsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}
+	*view = CgroupsLookupRequestView{ItemCount: itemCount, packedStart: dirEnd, payload: buf}
 	for i := range itemCount {
 		keyWithNul, key, err := view.itemBytes(i)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if keyWithNul[len(keyWithNul)-1] != 0 {
-			return nil, ErrMissingNul
+			return ErrMissingNul
 		}
 		if bytes.IndexByte(key, 0) >= 0 {
-			return nil, ErrBadLayout
+			return ErrBadLayout
 		}
 	}
-	return view, nil
+	return nil
 }
 
 func (v *CgroupsLookupRequestView) Item(index uint32) (CStringView, error) {
@@ -507,6 +517,12 @@ type CgroupsLookupBuilder struct {
 }
 
 func NewCgroupsLookupBuilder(buf []byte, maxItems uint32, generation uint64) *CgroupsLookupBuilder {
+	b := &CgroupsLookupBuilder{}
+	b.reset(buf, maxItems, generation)
+	return b
+}
+
+func (b *CgroupsLookupBuilder) reset(buf []byte, maxItems uint32, generation uint64) {
 	minRequired, ok := lookupBuilderDataOffset(CgroupsLookupRespHdr, maxItems)
 	if !ok {
 		panic("CgroupsLookupBuilder buffer too small")
@@ -514,7 +530,7 @@ func NewCgroupsLookupBuilder(buf []byte, maxItems uint32, generation uint64) *Cg
 	if len(buf) < minRequired {
 		panic("CgroupsLookupBuilder buffer too small")
 	}
-	return &CgroupsLookupBuilder{buf: buf, generation: generation, maxItems: maxItems, dataOffset: minRequired}
+	*b = CgroupsLookupBuilder{buf: buf, generation: generation, maxItems: maxItems, dataOffset: minRequired}
 }
 
 func (b *CgroupsLookupBuilder) SetGeneration(generation uint64) {
@@ -777,17 +793,21 @@ func (b *CgroupsLookupBuilder) ItemCount() uint32 {
 }
 
 func DispatchCgroupsLookup(req []byte, resp []byte, handler func(*CgroupsLookupRequestView, *CgroupsLookupBuilder) bool) (int, error) {
-	request, err := DecodeCgroupsLookupRequest(req)
-	if err != nil {
+	scratch := cgroupsLookupScratchPool.Get().(*cgroupsLookupScratch)
+	defer scratch.release()
+	request := &scratch.view
+	if err := decodeCgroupsLookupRequestInto(req, request); err != nil {
 		return 0, err
 	}
 	minRequired, ok := lookupBuilderDataOffset(CgroupsLookupRespHdr, request.ItemCount)
 	if !ok || len(resp) < minRequired {
 		return 0, ErrOverflow
 	}
-	builder := NewCgroupsLookupBuilder(resp, request.ItemCount, 0)
+	builder := &scratch.builder
+	builder.reset(resp, request.ItemCount, 0)
 	if request.ItemCount > 0 {
-		suffixBytes, ok := makePayloadExceededSuffixBytes(request.ItemCount)
+		suffixBytes, ok := reusePayloadExceededSuffixBytes(scratch.suffix, request.ItemCount)
+		scratch.suffix = suffixBytes
 		if !ok {
 			return 0, ErrOverflow
 		}

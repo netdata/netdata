@@ -11,8 +11,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
 	prompkg "github.com/netdata/netdata/go/plugins/pkg/prometheus"
+	"github.com/netdata/netdata/go/plugins/pkg/relabel"
 	promcollector "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/prometheus/relabel"
 	commonmodel "github.com/prometheus/common/model"
 	promlabels "github.com/prometheus/prometheus/model/labels"
 )

@@ -4,19 +4,17 @@
 # wants to call Netdata Cloud / Netdata Agent through token-safe
 # wrappers). Not executed directly.
 #
-# Token-safety contract (HARD requirement):
-#   * No PUBLIC function (named `agents_*`, no leading underscore)
-#     ever emits NETDATA_CLOUD_TOKEN, a per-agent bearer, or a
-#     claim_id to stdout.
-#   * Internal helpers (named `_agents_*`, leading underscore) may
-#     handle token bytes inside their own scope but must return
-#     them only through validated caller-local variable names --
-#     never to stdout.
-#   * `_agents_log_masked` redacts token / bearer bytes in stderr
-#     argv echoes.
-#   * The unit test `agents_selftest_no_token_leak` drives every
-#     public wrapper with a sentinel token and asserts the
-#     sentinel never reaches captured stdout.
+# Authentication handling:
+#   * Public query wrappers add auth internally and mask request-auth values
+#     in stderr command logs. They forward response bodies UNCHANGED.
+#     Callers must capture/project sensitive responses before displaying them.
+#   * _agents_get_claim_id and _agents_resolve_bearer return private values
+#     through validated caller-local output names, never displayed stdout.
+#   * _agents_mint_bearer_json emits credential JSON for internal capture only.
+#     Its caller must not propagate that response or log raw error excerpts.
+#   * agents_selftest_no_token_leak checks Cloud dry-run logging, masking,
+#     and internal output-variable handling; it is not a response sanitizer.
+#     test_wrappers.py covers real helper paths with offline fake transport.
 #
 # Conventions mirrored from .agents/skills/triage-coverity/scripts/_lib.sh:
 #   * set -euo pipefail at the top
@@ -212,10 +210,9 @@ _agents_mint_bearer_json() {
         "https://${NETDATA_CLOUD_HOSTNAME}/api/v2/bearer_get_token?node_id=${node_id}&machine_guid=${mg}&claim_id=${claim}"
 }
 
-# Convert an `expiration` value (which may be unix-seconds or
-# unix-milliseconds, depending on cloud version) to seconds.
-# Heuristic: values > 10^12 are ms; lower are seconds. Returns 0
-# for unparseable values so the caller treats the cache as expired.
+# Normalize expiration to seconds, tolerating milliseconds for compatibility.
+# Heuristic: values > 10^12 are ms; lower are seconds. Invalid values return
+# zero, selecting the caller's cached-at fallback rather than forcing expiry.
 _agents_exp_to_seconds() {
     local exp="$1"
     if [[ -z "${exp}" || "${exp}" == "null" ]]; then
@@ -249,11 +246,24 @@ _agents_resolve_bearer() {
     local mg="${2:?machine_guid required}"
     local host="${3:?host required}"
 
+    # Validate before creating directories or looking up a cache path.
+    if [[ ! "${mg}" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Invalid machine_guid: expected a UUID." >&2
+        return 1
+    fi
+
     local cache_dir cache_file now exp_s
     cache_dir="$(agents_audit_dir)/bearers"
+    cache_file="${cache_dir}/${mg}.json"
+    # Audit ancestors are trusted configuration; worktrees intentionally share .local via a symlink.
+    # Reject links at the bearer directory/entry so they cannot redirect cache operations.
+    # -L also catches dangling links before a mint can create their target.
+    if [[ -L "${cache_dir}" || -L "${cache_file}" ]]; then
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Bearer cache directory and entry must not be symbolic links." >&2
+        return 1
+    fi
     mkdir -p "${cache_dir}"
     chmod 0700 "${cache_dir}" 2>/dev/null || true
-    cache_file="${cache_dir}/${mg}.json"
 
     now=$(date +%s)
 
@@ -266,10 +276,10 @@ _agents_resolve_bearer() {
         if [[ -n "${cached_token}" && "${cached_token}" != "null" ]]; then
             # Two cases:
             # (a) Cloud returned a real expiration -- 1h refresh buffer
-            #     (matches cloud-frontend useAgentBearer.js).
+            #     (local client policy).
             # (b) Cloud returned expiration=0 -- fall back to a fixed
-            #     2h window from our mint timestamp. The agent issues
-            #     ~3h-TTL bearers, so 2h leaves a 1h safety margin.
+            #     2h window from our mint timestamp. This is client policy,
+            #     not a statement about the server token lifetime.
             if (( exp_s > 0 )); then
                 if (( exp_s - now > 3600 )); then
                     _agents_set_outvar "${_out_var}" "${cached_token}" || return 1
@@ -290,7 +300,7 @@ _agents_resolve_bearer() {
     resp="$(_agents_mint_bearer_json "${node_id}" "${mg}" "${claim}")"
     if ! jq -e '.token' >/dev/null 2>&1 <<< "${resp}"; then
         rm -f "${cache_file}"
-        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Bearer mint failed; first 200 chars: $(head -c 200 <<< "${resp}")" >&2
+        echo -e "${AGENTS_RED}[ERROR]${AGENTS_NC} Bearer mint failed: response has no usable token; response body withheld." >&2
         return 1
     fi
 
@@ -304,8 +314,8 @@ _agents_resolve_bearer() {
 # PUBLIC wrappers (token-safe). These are what the assistant invokes.
 # ---------------------------------------------------------------------------
 
-# Call any Netdata Cloud REST endpoint. Reads NETDATA_CLOUD_TOKEN
-# from .env internally; emits ONLY the response body to stdout.
+# Call a Netdata Cloud REST endpoint using NETDATA_CLOUD_TOKEN from the
+# environment (load it first); forwards the response body unchanged to stdout.
 # stderr shows the curl invocation with `<CLOUD_TOKEN>` masked.
 #
 # Args:
@@ -429,7 +439,7 @@ agents_call_function() {
 }
 
 # ---------------------------------------------------------------------------
-# Self-test: assert no token bytes leak through public wrappers.
+# Self-test: Cloud dry-run logging, masking and internal output variables.
 # Run with: bash -c 'source _lib.sh; agents_selftest_no_token_leak'
 # ---------------------------------------------------------------------------
 

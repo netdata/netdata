@@ -15,14 +15,16 @@ func Methods() []funcapi.FunctionConfig {
 
 func functionConfig() funcapi.FunctionConfig {
 	return funcapi.FunctionConfig{
-		ID:           MethodID,
-		FunctionName: FunctionName,
-		Aliases:      []string{MethodID},
-		Name:         "Topology (SNMP)",
-		UpdateEvery:  10,
-		Help:         "SNMP Layer-2 topology and neighbor discovery data",
-		RequireCloud: true,
-		ResponseType: topologyv1.ResponseType,
+		ID:                MethodID,
+		FunctionName:      FunctionName,
+		Aliases:           []string{MethodID},
+		Name:              "Topology (SNMP)",
+		UpdateEvery:       10,
+		Help:              "SNMP Layer-2 topology and neighbor discovery data",
+		RequireCloud:      true,
+		RequireCommercial: true,
+		ResponseType:      topologyv1.ResponseType,
+		DynamicInfo:       true,
 		RequiredParams: []funcapi.ParamConfig{
 			nodesIdentityParamConfig(),
 			mapTypeParamConfig(),

@@ -1,27 +1,22 @@
-//! Catalog builder response handling.
+//! Catalog-builder response handling for the ledger's run loop, plus the
+//! clean-shutdown catalog flush.
 //!
-//! On `Rotated`, records the new catalog file in the owning pipeline's tenant
-//! registry, marks the contained SFST seqs as rotated (so retention can evict
-//! them safely), and forwards a `UploadCatalog` request to the shared uploader
-//! when storage is enabled. The `pipeline_id` arrives tagged by the forwarder
-//! that funnels this pipeline's catalog-builder responses into the run-loop.
+//! Responses arrive on the merged per-pipeline channel, tagged with the owning
+//! `Signal` by that pipeline's forwarder (`pipeline.rs` `spawn_forwarder`).
+//! On `Rotated` — a scope's entries are now a catalog file on local
+//! disk — this records the file in the tenant registry (query-time discovery
+//! + retention scan it), marks the covered SFST seqs locally cataloged
+//! (`mark_rotated_many`: reconciliation bookkeeping — eviction itself waits
+//! for the REMOTE confirmation set on `CatalogUploaded`), and queues
+//! `UploadCatalog` with the shared uploader (none when remote storage is
+//! disabled). The remaining variants only log.
 
-use bridge::signals::Signal;
 use file_lifecycle::ipc::{CatalogBuilderRequest, CatalogBuilderResponse, UploaderRequest};
+use otel_bridge::signals::Signal;
 
 use crate::event::PipelineResp;
 
 use super::Ledger;
-
-/// Local catalog writes must land within this budget on clean shutdown; the
-/// follow-up uploads are best effort (next boot's catalog-upload reconcile
-/// finishes them). Kept BELOW the supervisor's 2s worker-exit wait
-/// (`supervisor.rs` `shutdown_workers`) so the ledger still has time to finish
-/// the flush, return, and let the process exit before the supervisor stops
-/// waiting. A flush that hits this budget just defers its last scopes to the
-/// next-boot reconcile — no data loss beyond the already-accepted graceful
-/// degradation.
-const SHUTDOWN_FLUSH_BUDGET: std::time::Duration = std::time::Duration::from_secs(1);
 
 impl Ledger {
     pub(super) async fn handle_catalog_builder_resp(
@@ -54,6 +49,9 @@ impl Ledger {
                 let pipeline = self.pipelines.get(signal);
                 let registries = pipeline.registries().clone();
 
+                // Remote key mirrors the local `{date}/{tenant}/{filename}`
+                // layout (`remote_keys::catalog`): startup's catalog diff-sync
+                // LISTs the signal's catalog prefix and parses these keys back.
                 let remote_key = file_lifecycle::remote_keys::catalog(
                     pipeline.signal(),
                     date,
@@ -64,6 +62,10 @@ impl Ledger {
                     max_timestamp_s,
                 );
 
+                // Register the rotated file and mark its seqs locally
+                // cataloged. A tenant missing from the registry is skipped:
+                // entries only ever arrive for startup-discovered tenants, so
+                // the miss is defensive.
                 {
                     let mut registries = registries.write().await;
                     if let Some(registry) = registries.get_mut(&tenant_id) {
@@ -84,6 +86,9 @@ impl Ledger {
                 }
 
                 if let Some(uploader) = self.uploader.as_mut() {
+                    // `identity`/`seqs` ride along so the `CatalogUploaded`
+                    // handler can mark the covered seqs remote-cataloged — the
+                    // stage the eviction gate actually waits for.
                     let req = UploaderRequest::UploadCatalog {
                         pipeline_id: signal.pipeline_id(),
                         local_path: path,
@@ -96,6 +101,9 @@ impl Ledger {
                     }
                 }
             }
+            // The builder keeps a failed scope's accumulator, so the next
+            // trigger retries; at shutdown the scope's entries are lost and
+            // rebuilt next boot (see `flush_all` in the builder component).
             CatalogBuilderResponse::RotationFailed {
                 tenant_id,
                 max_seq,
@@ -117,18 +125,25 @@ impl Ledger {
         }
     }
 
-    /// On clean shutdown, rotate every catalog builder's in-flight accumulators
-    /// to local disk before exit, so a quiet host doesn't lose them (they would
-    /// otherwise only reach disk on the count/time trigger). Sends `Flush` to
-    /// each pipeline's builder, then drains the merged worker channel until every
-    /// builder reports `FlushComplete` or the budget expires.
+    /// Clean-shutdown flush: rotate every catalog builder's in-flight
+    /// accumulators to local disk before exit — on a quiet host they would
+    /// otherwise wait indefinitely for the count/time trigger. Sends `Flush`
+    /// to each pipeline's builder (the closed logs+traces signal set), then
+    /// drains the merged worker channel until every builder reports
+    /// `FlushComplete` or the budget expires.
     ///
-    /// Only the LOCAL writes are guaranteed within the budget. Each `Rotated`
-    /// still queues an upload (best effort); an upload that doesn't finish before
-    /// exit is completed by the next boot's `reconcile_local_catalog_uploads`.
-    /// The drain also services `Indexer` responses (so a late seal isn't
-    /// silently dropped) and treats a `WorkerGone` catalog builder as done for
-    /// that signal, so a dead builder can't hold the drain for the full budget.
+    /// The budget is the worker's stop budget (`otel_bridge::shutdown`).
+    /// Only the LOCAL writes matter here: each `Rotated` handled here still
+    /// registers the file and queues an upload, but the ledger leaves right
+    /// after the flush and does not wait for uploads: against a real remote
+    /// they do not finish. The next start's
+    /// `recovery::remote::reconcile_local_catalog_uploads` uploads every
+    /// local catalog that the remote does not have. The drain also
+    /// services `Indexer` responses (a late indexing operation still
+    /// registers its SFST and queues its WAL delete) and counts a
+    /// `WorkerGone` builder as done — unlike the run loop, where worker death
+    /// is fatal, the process is exiting anyway and a dead builder must not
+    /// hold the drain.
     pub(in crate::ledger) async fn flush_catalogs_on_shutdown(&mut self) {
         let mut pending = 0usize;
         for signal in [Signal::Logs, Signal::Traces] {
@@ -159,8 +174,9 @@ impl Ledger {
                         }
                         other => self.handle_catalog_builder_resp(signal, other).await,
                     },
-                    // A seal may still be completing; handle it rather than drop
-                    // it (it registers the SFST / queues its WAL delete).
+                    // An indexing operation may still be completing; handle it
+                    // rather than drop it (it registers the SFST / queues its
+                    // WAL delete).
                     Some((signal, PipelineResp::Indexer(resp))) => {
                         self.handle_indexer_resp(signal, resp).await
                     }
@@ -177,14 +193,12 @@ impl Ledger {
             }
         };
 
-        if tokio::time::timeout(SHUTDOWN_FLUSH_BUDGET, drain)
-            .await
-            .is_err()
-        {
+        let budget = otel_bridge::shutdown::WORKER_STOP_BUDGET;
+        if tokio::time::timeout(budget, drain).await.is_err() {
             tracing::warn!(
                 "shutdown catalog flush exceeded {}s budget; {pending} builder(s) unconfirmed \
                  (next-boot reconcile re-uploads any missing catalogs)",
-                SHUTDOWN_FLUSH_BUDGET.as_secs(),
+                budget.as_secs(),
             );
         }
     }

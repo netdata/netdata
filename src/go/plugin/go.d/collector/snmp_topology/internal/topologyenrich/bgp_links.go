@@ -195,6 +195,7 @@ func topologyBGPAdjacencyLink(row topologymodel.BGPPeer, srcRef, dstRef topology
 
 func topologyBGPPeerActorRow(row topologymodel.BGPPeer) topologymodel.BGPPeerDetailRow {
 	return topologymodel.BGPPeerDetailRow{
+		ProcessID:             row.ProcessID,
 		RoutingInstance:       row.RoutingInstance,
 		NeighborIP:            strings.TrimSpace(row.NeighborIP),
 		RemoteAS:              strings.TrimSpace(row.RemoteAS),
@@ -219,7 +220,7 @@ func existingTopologyBGPLinkKeys(links []topologymodel.Link) map[topologyBGPPeer
 		if strings.EqualFold(strings.TrimSpace(topologyutil.FirstNonEmptyString(link.LinkType, link.Protocol)), topologymodel.BGPAdjacencyLinkType) {
 			// Seed the key set so repeated enrichment over already-shaped data remains idempotent.
 			row := topologymodel.BGPPeer{
-				RoutingInstance: topologyBGPLinkRoutingInstance(link),
+				RoutingInstance: topologymodel.LinkBGPRoutingInstance(link),
 			}
 			key := topologyBGPPeerLinkKeyParts(row, link.SrcActorHandle, link.DstActorHandle)
 			seen[key] = struct{}{}
@@ -249,14 +250,7 @@ func topologyBGPPeerLinkKeyParts(row topologymodel.BGPPeer, srcActor, dstActor t
 }
 
 func topologyBGPRoutingInstanceValue(routingInstance string) string {
-	return topologyutil.FirstNonEmptyString(routingInstance, "default")
-}
-
-func topologyBGPLinkRoutingInstance(link topologymodel.Link) string {
-	if link.Detail.BGP == nil {
-		return ""
-	}
-	return strings.TrimSpace(link.Detail.BGP.RoutingInstance)
+	return topologyutil.FirstBGPIdentifier(routingInstance, "default")
 }
 
 func topologyBGPLocalIP(link topologymodel.Link) string {

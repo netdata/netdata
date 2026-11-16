@@ -138,7 +138,7 @@ func TestVLANSourceEvidenceUsesActualContextCollection(t *testing.T) {
 			profiles := []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{Topology: []ddprofiledefinition.TopologyConfig{{Kind: ddsnmp.KindIfName, MetricsConfig: ddprofiledefinition.MetricsConfig{Table: ddprofiledefinition.SymbolConfig{OID: root, Name: "table"}, Symbols: []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: "value"}}}}}}}}
 			recorder := newTopologyAcquisitionRecorder(testTopologyAttemptID(1), topologyDeviceInputFromConnection(dev), testTopologyTarget())
 			observer := recorder.beginContext(1, tc.vlan, "synthetic")
-			_, progress, err := collectTopologyVLANContext(context.Background(), collector, dev, tc.vlan, profiles, observer)
+			_, progress, err := collectTopologyVLANContext(context.Background(), collector, recorder.attemptID.RegistrationID, dev, tc.vlan, profiles, observer)
 			require.Equal(t, tc.failed, err != nil)
 			require.Len(t, progress.sources, 1)
 			require.Equal(t, []string{root}, progress.sources[0].RequestedOIDs)

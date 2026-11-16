@@ -67,23 +67,23 @@ func LoadDCStatLegacy(cfg DCStatLegacyConfig) (*DCStatLegacyHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), true, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 
 	plan := BuildDCStatLegacyPlan(cfg)
-	if !libbpfloader.DCStatSupportsCore() {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > dcstatMaxBaseSelector {
-			selector = uint32(dcstatMaxBaseSelector)
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "dc", false, cfg.IsRHF, ObjectFlavorBase)
+	coreSupported := libbpfloader.DCStatSupportsCore()
+	if !coreSupported {
 		plan.LoadMode = LoadLegacy
-		// No fallback in legacy mode: there is only one object.
-		return tryLoadDCStatPlan(cfg, plan)
 	}
 
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)
+	if coreSupported {
+		plans = append(plans, buildCoreLegacyFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "dc", dcstatMaxBaseSelector)...)
+	}
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("dcstat has no compatible object family for this kernel")
+	}
 	var lastErr error
 	for i, fp := range plans {
 		handle, err := tryLoadDCStatPlan(cfg, fp)

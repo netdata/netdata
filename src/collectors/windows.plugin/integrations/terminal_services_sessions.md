@@ -44,9 +44,6 @@ The collector automatically detects the `Terminal Services` performance object. 
 when the object is unavailable on the host.
 
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 

@@ -13,11 +13,16 @@ Which nodes in a room received critical or emergency SNMP traps?
 
 ## Steps
 
+Run from the repository root in one Bash session. The private run directory retains raw responses for local
+inspection; token-safe request logging does not sanitize their contents. Start a new run for another execution.
+
 1. Load the token-safe wrappers:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/docs/netdata-ai/skills/query-netdata-agents/scripts/_lib.sh"
    agents_load_env
+   mkdir -p .local/audits/query-snmp-traps
+   TRAP_QUERY_DIR="$(mktemp -d .local/audits/query-snmp-traps/query.XXXXXX)"
    ```
 
 2. List node UUIDs visible in the room:
@@ -26,16 +31,14 @@ Which nodes in a room received critical or emergency SNMP traps?
    SPACE_ID="YOUR_SPACE_ID"
    ROOM_ID="YOUR_ROOM_ID"
 
-   mkdir -p .local/audits/query-snmp-traps
-
    agents_query_cloud \
      POST "/api/v3/spaces/${SPACE_ID}/rooms/${ROOM_ID}/nodes" '{}' \
-     > .local/audits/query-snmp-traps/room-nodes.json
+     > "$TRAP_QUERY_DIR/room-nodes.json"
 
-   jq -r '.[] | select(.state=="reachable") | .nd' \
-     .local/audits/query-snmp-traps/room-nodes.json \
+   jq -r '.nodes[] | select(.state=="reachable") | .nd' \
+     "$TRAP_QUERY_DIR/room-nodes.json" \
      | sort -u \
-     > .local/audits/query-snmp-traps/room-node-ids.txt
+     > "$TRAP_QUERY_DIR/room-node-ids.txt"
    ```
 
 3. Query every node for severe trap rows:
@@ -57,38 +60,45 @@ Which nodes in a room received critical or emergency SNMP traps?
      facets: ["TRAP_SEVERITY", "TRAP_SOURCE_IP", "_HOSTNAME", "TRAP_NAME"]
    }')"
 
-   rm -f .local/audits/query-snmp-traps/severity-*.json
-
    while IFS= read -r NODE_UUID; do
      [ -n "$NODE_UUID" ] || continue
-     OUT=".local/audits/query-snmp-traps/severity-${NODE_UUID}.json"
-     if ! agents_call_function \
+     PARTIAL="$(mktemp "$TRAP_QUERY_DIR/failed.XXXXXX")"
+     OUT="$TRAP_QUERY_DIR/severity-${NODE_UUID}.json"
+     if agents_call_function \
          --via cloud \
          --node "$NODE_UUID" \
          --function "$SNMP_TRAPS_FUNCTION" \
          --body "$BODY" \
-         > "$OUT"; then
-       rm -f "$OUT"
-       echo "WARN: query failed for node ${NODE_UUID}, skipping" >&2
+         > "$PARTIAL" &&
+         jq -e 'type == "object" and .status == 200 and (.data | type == "array")' "$PARTIAL" >/dev/null; then
+       mv "$PARTIAL" "$OUT"
+     else
+       echo "WARN: node query failed; partial response retained privately, skipping" >&2
      fi
-   done < .local/audits/query-snmp-traps/room-node-ids.txt
+   done < "$TRAP_QUERY_DIR/room-node-ids.txt"
    ```
 
 4. Aggregate severity facet counts:
 
    ```bash
    shopt -s nullglob
-   files=(.local/audits/query-snmp-traps/severity-*.json)
+   files=("$TRAP_QUERY_DIR"/severity-*.json)
 
    if [[ ${#files[@]} -eq 0 ]]; then
      echo "No severe trap query results were collected from reachable nodes."
    else
-     jq -s '
-       [ .[]
+     partial_nodes="$(jq -s '[.[] | select(.partial == true)] | length' "${files[@]}")"
+     if [[ "$partial_nodes" -gt 0 ]]; then
+       printf 'WARN: %s node responses are partial; aggregated counts may be incomplete.\n' "$partial_nodes" >&2
+     fi
+     jq -s --argjson requested "$(jq '.selections.TRAP_SEVERITY' <<<"$BODY")" '
+       ($requested // []) as $selected
+       | [ .[]
          | .facets[]?
          | select((.id // .name) == "TRAP_SEVERITY")
          | .options[]?
          | {severity: (.id // .name), count: (.count // 0)}
+         | select(($selected | length) == 0 or (.severity as $severity | $selected | index($severity)))
        ]
        | group_by(.severity)
        | map({severity: .[0].severity, count: (map(.count) | add)})
@@ -102,24 +112,26 @@ Which nodes in a room received critical or emergency SNMP traps?
    ```bash
    shopt -s nullglob
 
-   for f in .local/audits/query-snmp-traps/severity-*.json; do
+   for f in "$TRAP_QUERY_DIR"/severity-*.json; do
      rows="$(jq -r '(.data // []) | length' "$f")"
      [[ "$rows" -gt 0 ]] || continue
      node_uuid="${f##*/severity-}"
      node_uuid="${node_uuid%.json}"
      printf '%s rows=%s\n' "$node_uuid" "$rows"
-   done
+   done > "$TRAP_QUERY_DIR/matching-nodes.txt"
    ```
 
 ## Output
 
-Return a severity-count summary and, when needed, a local-only node list
-or a sanitized node list that had matching rows. Do not paste raw node
-UUIDs or public device IPs unless the user explicitly asks for local-only
-output.
+Return the severity-count summary. Inspect `matching-nodes.txt` privately when node identities are needed;
+redact identifying details before sharing a node list or copying it into durable artifacts.
 
 ## Notes / gotchas
 
+- Severity facets can include unselected options when several fields are selected. The aggregation explicitly
+  keeps only the severities in `BODY` when that selection is nonempty; an omitted, null or empty selection keeps
+  all severities. Successful responses alone enter this run’s aggregate. Failed partial
+  responses remain private for diagnosis. Status-200 partial results remain usable but emit a completeness warning.
 - Cloud Log Function calls are node-scoped. Room-wide trap questions
   require listing nodes, querying each node, and aggregating locally.
 - The node list filters to `.state=="reachable"` to avoid failed calls
@@ -134,6 +146,9 @@ output.
   all urgent traps, not just critical/emergency traps.
 
 ## Source guides
+
+Facet-filter behavior checked in `netdata/systemd-journal-sdk @ 9d5e3e19cf53179aaec3af67ac409d844a44c15f`:
+`go/journal/netdata.go` (`netdataRequest.toExplorerQuery`) and `go/journal/explorer.go` (`facetPassGroups`).
 
 - [query-snmp-traps](../SKILL.md)
 - [Cloud nodes guide](../../query-netdata-cloud/query-nodes.md)

@@ -3,7 +3,6 @@
 package ddsnmpcollector
 
 import (
-	"errors"
 	"fmt"
 	"maps"
 	"slices"
@@ -30,6 +29,7 @@ type tableCollector struct {
 	missingOIDs     map[string]bool
 	tableCache      *tableCache
 	log             *logger.Logger
+	logKeyPrefix    string
 	rowProcessor    *tableRowProcessor
 }
 
@@ -83,6 +83,7 @@ type (
 	tableProcessingContext struct {
 		cacheEvidence   *AcquisitionCacheInput
 		processingRoute *AcquisitionRouteReport
+		profileSource   string
 		// === Input data (set when context is created) ===
 
 		// config is the metric configuration for this table
@@ -349,7 +350,7 @@ func (tc *tableCollector) processRows(
 	stats *ddsnmp.CollectionStats,
 ) ([]ddsnmp.Metric, error) {
 	var metrics []ddsnmp.Metric
-	var errs []error
+	var rowErrors tableProcessingErrors
 
 	crossTableCtx := newCrossTableContext(ctx.walkedData, ctx.tableNameToOID)
 
@@ -378,8 +379,10 @@ func (tc *tableCollector) processRows(
 		}
 		rowMetrics, err := tc.rowProcessor.processRow(row, rowCtx)
 		if err != nil {
+			delete(ctx.oidCache, index)
+			delete(ctx.tagCache, index)
 			stats.Errors.Processing.Table++
-			errs = append(errs, err)
+			rowErrors.add(index, err)
 			continue
 		}
 
@@ -391,8 +394,10 @@ func (tc *tableCollector) processRows(
 		ctx.acquisition.addValueReferences(currentRowOrdinal, index, rowMetrics)
 	}
 
-	if len(errs) > 0 {
-		tc.log.Warningf("failed to collect table metrics: %v", errors.Join(errs...))
+	if rowErrors.count > 0 {
+		key := tc.logKeyPrefix + tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(ctx.config)
+		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
+			Warningf("failed to collect %d rows from table %q (%s) in profile %q; first error at row %q: %v", rowErrors.count, ctx.config.Table.Name, ctx.config.Table.OID, ctx.profileSource, rowErrors.firstRow, rowErrors.first)
 	}
 
 	return metrics, nil
@@ -467,8 +472,7 @@ func (tc *tableCollector) buildMetricsFromCache(
 ) ([]ddsnmp.Metric, error) {
 	staticTags := parseStaticTags(ctx.config.StaticTags)
 	var metrics []ddsnmp.Metric
-	var firstErr error
-	var errorCount int
+	var rowErrors tableProcessingErrors
 
 	var rowOrdinal uint32
 	for index, columns := range ctx.cachedOIDs {
@@ -503,9 +507,8 @@ func (tc *tableCollector) buildMetricsFromCache(
 				metric, err := tc.rowProcessor.createMetric(sym, pdu, row, ctx.symbolMode)
 				if err != nil {
 					stats.Errors.Processing.Table++
-					errorCount++
-					if firstErr == nil {
-						firstErr = fmt.Errorf(
+					if rowErrors.count == 0 {
+						err = fmt.Errorf(
 							"profile %q table %q (%s) row %q symbol %q (%s), cached column %s instance %s returned %s type %v could not be processed as a metric value",
 							ctx.profileSource,
 							ctx.tableName,
@@ -519,6 +522,7 @@ func (tc *tableCollector) buildMetricsFromCache(
 							pdu.Type,
 						)
 					}
+					rowErrors.add(index, err)
 					continue
 				}
 				if metric == nil {
@@ -531,12 +535,12 @@ func (tc *tableCollector) buildMetricsFromCache(
 		ctx.acquisition.addValueReferences(currentRowOrdinal, index, metrics[valueStart:])
 	}
 
-	if errorCount > 0 {
-		key := tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(
+	if rowErrors.count > 0 {
+		key := tc.logKeyPrefix + tableRowsProcessingErrorLogKey + ctx.profileSource + "|" + ctx.config.Table.OID + "|" + tc.tableCache.generateConfigID(
 			ctx.config,
 		)
 		tc.log.Limit(key, 1, tableRowsErrorLogEvery).
-			Warningf("failed to collect %d cached table metrics; first error: %v", errorCount, firstErr)
+			Warningf("failed to collect %d cached table metrics; first error: %v", rowErrors.count, rowErrors.first)
 	}
 
 	return metrics, nil
@@ -609,13 +613,13 @@ func extractTableDependencies(cfg ddprofiledefinition.MetricsConfig, tableNameTo
 	deps := make(map[string]bool)
 
 	for _, tagCfg := range cfg.MetricTags {
-		// Skip if not a cross-table tag
-		if tagCfg.Table == "" || tagCfg.Table == cfg.Table.Name {
-			continue
-		}
-
-		if tableOID, ok := tableNameToOID[tagCfg.Table]; ok {
-			deps[tableOID] = true
+		for source := range tagCfg.TableSources() {
+			if source.Table == cfg.Table.Name {
+				continue
+			}
+			if tableOID, ok := tableNameToOID[source.Table]; ok {
+				deps[tableOID] = true
+			}
 		}
 	}
 
@@ -636,7 +640,7 @@ func buildOrderedTags(cfg ddprofiledefinition.MetricsConfig) []orderedTagConfig 
 		switch {
 		case tagCfg.IsIndexTag():
 			tt = tagTypeIndex
-		case tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
+		case len(tagCfg.IndexFrom) > 0 || tagCfg.Table != "" && tagCfg.Table != cfg.Table.Name:
 			tt = tagTypeCrossTable
 		default:
 			tt = tagTypeSameTable

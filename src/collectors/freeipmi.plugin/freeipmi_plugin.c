@@ -1476,7 +1476,9 @@ static const char *get_sensor_function_priority(struct sensor *sn) {
 static void freeimi_function_sensors(const char *transaction, char *function __maybe_unused,
                                      usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
                                      BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
-                                     const char *source __maybe_unused, void *data __maybe_unused) {
+                                     const char *source __maybe_unused, void *data) {
+    // the sensors dictionary is passed at registration: the global state is rewritten by the main loop
+    DICTIONARY *sensors = data;
     time_t now_s = now_realtime_sec();
 
     BUFFER *wb = buffer_create(4096, NULL);
@@ -1507,7 +1509,7 @@ static void freeimi_function_sensors(const char *transaction, char *function __m
     buffer_json_member_add_array(wb, "data");
 
     struct sensor *sn;
-    dfe_start_reentrant(state.sensors.dict, sn) {
+    dfe_start_reentrant(sensors, sn) {
         if (unlikely(!sn->do_metric && !sn->do_state))
             continue;
 
@@ -1636,7 +1638,11 @@ close_and_send:
     wb->response_code = HTTP_RESP_OK;
     wb->content_type = CT_APPLICATION_JSON;
     wb->expires = now_s + update_every;
+
+    // the response spans several stdio calls; chart lines between them would become part of it
+    netdata_mutex_lock(&stdout_mutex);
     pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
 
     buffer_free(wb);
 }
@@ -1648,6 +1654,14 @@ static void plugin_exit(int code) {
     fflush(stdout);
     __atomic_store_n(&function_plugin_should_exit, true, __ATOMIC_RELEASE);
     exit(code);
+}
+
+// a Function worker may be writing a response, so the keyword is written under stdout_mutex
+static void plugin_send_and_exit(const char *keyword) {
+    netdata_mutex_lock(&stdout_mutex);
+    fprintf(stdout, "%s\n", keyword);
+    netdata_mutex_unlock(&stdout_mutex);
+    plugin_exit(0);
 }
 
 int main (int argc, char **argv) {
@@ -2031,8 +2045,7 @@ int main (int argc, char **argv) {
                     collector_error("%s(): sensors have not be collected for %zu seconds. Exiting to restart.",
                                     __FUNCTION__, (size_t)((now_monotonic_usec() - state.sensors.last_iteration_ut) / USEC_PER_SEC));
 
-                    fprintf(stdout, "EXIT\n");
-                    plugin_exit(0);
+                    plugin_send_and_exit(PLUGINSD_KEYWORD_EXIT);
                 }
                 break;
 
@@ -2041,14 +2054,12 @@ int main (int argc, char **argv) {
 
             case ICS_INIT_FAILED:
                 collector_error("%s(): sensors failed to initialize. Calling DISABLE.", __FUNCTION__);
-                fprintf(stdout, "DISABLE\n");
-                plugin_exit(0);
+                plugin_send_and_exit(PLUGINSD_KEYWORD_DISABLE);
                 break;
 
             case ICS_FAILED:
                 collector_error("%s(): sensors fails repeatedly to collect metrics. Exiting to restart.", __FUNCTION__);
-                fprintf(stdout, "EXIT\n");
-                plugin_exit(0);
+                plugin_send_and_exit(PLUGINSD_KEYWORD_EXIT);
                 break;
         }
 
@@ -2075,8 +2086,11 @@ int main (int argc, char **argv) {
             struct functions_evloop_globals *wg =
                 functions_evloop_init(1, "FREEIPMI", &stdout_mutex, &function_plugin_should_exit, NULL);
             functions_evloop_add_function(
-                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+                wg, "ipmi-sensors", freeimi_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, state.sensors.dict);
+
+            netdata_mutex_lock(&stdout_mutex);
             FREEIPMI_GLOBAL_FUNCTION_SENSORS();
+            netdata_mutex_unlock(&stdout_mutex);
         }
 
         state.updates.now_ut = now_monotonic_usec();

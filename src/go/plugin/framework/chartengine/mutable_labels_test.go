@@ -467,12 +467,12 @@ func TestBuildPlanAbortedHighCardinalityProposalDoesNotEnterCommittedLabelState(
 	observeMutableLabelSeries(t, cycle, meter, gauge, series...)
 	attempt, err := engine.PreparePlan(store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
-	assertCanonicalLabelMembership(t, engine, 1)
 	staged := attempt.state.materialized.charts["service_node-1"]
 	require.NotNil(t, staged)
 	require.NotNil(t, staged.presentation)
 	assert.Len(t, staged.presentation.labelMembership, 128)
 	attempt.Abort()
+	assertCanonicalLabelMembership(t, engine, 1)
 
 	observeMutableLabelSeries(t, cycle, meter, gauge, series[0])
 	retry, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))

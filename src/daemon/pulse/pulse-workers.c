@@ -141,6 +141,8 @@ static struct worker_utilization all_workers_utilization[] = {
     { .name = "WEB",         .family = "workers web server",              .priority = 1000000 },
     { .name = "ACLK",        .family = "workers aclk",                    .priority = 1000000 },
     { .name = "ACLKSYNC",    .family = "workers aclk sync",               .priority = 1000000 },
+    { .name = "ACLKQUERY",   .family = "workers aclk query",              .priority = 1000000 },
+    { .name = "WEIGHTS",     .family = "workers weights",                 .priority = 1000000 },
     { .name = "METASYNC",    .family = "workers metadata sync",           .priority = 1000000 },
     { .name = "PLUGINSD",    .family = "workers plugins.d",               .priority = 1000000 },
     { .name = "STATSD",      .family = "workers plugin statsd",           .priority = 1000000 },
@@ -311,13 +313,14 @@ static void workers_total_memory_calls_chart(void) {
 }
 
 static void workers_total_cpu_utilization_chart(void) {
+    static RRDSET *st = NULL;
+
     size_t i, cpu_enabled = 0;
     for(i = 0; all_workers_utilization[i].name ;i++)
         if(all_workers_utilization[i].workers_cpu_registered) cpu_enabled++;
 
-    if(!cpu_enabled) return;
-
-    static RRDSET *st = NULL;
+    // once the chart exists it keeps being updated: a group without threads uses no cpu
+    if(!cpu_enabled && !st) return;
 
     if(!st) {
         st = rrdset_create_localhost(
@@ -337,7 +340,13 @@ static void workers_total_cpu_utilization_chart(void) {
 
     for(i = 0; all_workers_utilization[i].name ;i++) {
         struct worker_utilization *wu = &all_workers_utilization[i];
-        if(!wu->workers_cpu_registered) continue;
+        if(!wu->workers_cpu_registered) {
+            // no threads left: zero, like its other activity charts; threads whose cpu could not be read
+            // leave a gap
+            if(wu->rd_total_cpu_utilizaton && !wu->workers_registered)
+                rrddim_set_by_pointer(st, wu->rd_total_cpu_utilizaton, 0);
+            continue;
+        }
 
         if(!wu->rd_total_cpu_utilizaton)
             wu->rd_total_cpu_utilizaton = rrddim_add(st, wu->name_lowercase, NULL, 1, 100, RRD_ALGORITHM_ABSOLUTE);
@@ -350,8 +359,62 @@ static void workers_total_cpu_utilization_chart(void) {
 
 #define WORKER_CHART_DECIMAL_PRECISION 100
 
+// A group whose threads have all exited (a work queue after its idle timeout, for example): its thread
+// and activity charts drop to zero instead of freezing at their last value. Ratios (utilization, cpu,
+// average job time) are left as gaps: with no threads there is nothing to measure. Only charts and
+// dimensions that already exist are updated; nothing is created for a group that never had threads.
+static void workers_utilization_update_chart_no_workers(struct worker_utilization *wu) {
+    if(wu->st_workers_threads) {
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_free, 0);
+        rrddim_set_by_pointer(wu->st_workers_threads, wu->rd_workers_threads_busy, 0);
+        rrdset_done(wu->st_workers_threads);
+    }
+
+    if(wu->st_workers_jobs_per_job_type) {
+        for(size_t i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+            if(wu->per_job_type[i].rd_jobs_started)
+                rrddim_set_by_pointer(wu->st_workers_jobs_per_job_type, wu->per_job_type[i].rd_jobs_started, 0);
+        }
+        rrdset_done(wu->st_workers_jobs_per_job_type);
+    }
+
+    if(wu->st_workers_time_per_job_type) {
+        for(size_t i = 0; i < WORKER_UTILIZATION_MAX_JOB_TYPES; i++) {
+            if(wu->per_job_type[i].rd_busy_time)
+                rrddim_set_by_pointer(wu->st_workers_time_per_job_type, wu->per_job_type[i].rd_busy_time, 0);
+        }
+        rrdset_done(wu->st_workers_time_per_job_type);
+    }
+
+    Word_t idx;
+    if(wu->st_spinlocks_locks) {
+        idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&wu->spinlocks, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&wu->spinlocks, &idx)) {
+            if(wusp->rd_locks)
+                rrddim_set_by_pointer(wu->st_spinlocks_locks, wusp->rd_locks, 0);
+        }
+        rrdset_done(wu->st_spinlocks_locks);
+    }
+
+    if(wu->st_spinlocks_spins) {
+        idx = 0;
+        for(struct worker_spinlocks *wusp = SPINLOCKS_FIRST(&wu->spinlocks, &idx);
+             wusp;
+             wusp = SPINLOCKS_NEXT(&wu->spinlocks, &idx)) {
+            if(wusp->rd_spins)
+                rrddim_set_by_pointer(wu->st_spinlocks_spins, wusp->rd_spins, 0);
+        }
+        rrdset_done(wu->st_spinlocks_spins);
+    }
+}
+
 static void workers_utilization_update_chart(struct worker_utilization *wu) {
-    if(!wu->workers_registered) return;
+    if(!wu->workers_registered) {
+        workers_utilization_update_chart_no_workers(wu);
+        return;
+    }
 
     //fprintf(stderr, "%-12s WORKER UTILIZATION: %-3.2f%%, %zu jobs done, %zu running, on %zu workers, min %-3.02f%%, max %-3.02f%%.\n",
     //        wu->name,

@@ -1,0 +1,6 @@
+{
+  "msgtype": "m.notice",
+  "body": "⚠️ Temperature is high\nA quote: \"hot\"\nUnicode: θερμοκρασία\nNode: test-node\nAlert: test_alert\nStatus: CLEAR → WARNING\nChart: test.chart\nContext: test.context\nValue: 42.5 C\nPrevious value: 0 C\nTime: 2026-09-14T12:00:00Z\nhttps://example.com/alert?id=1&view=chart#details",
+  "format": "org.matrix.custom.html",
+  "formatted_body": "⚠️ Temperature is high<br>A quote: &#34;hot&#34;<br>Unicode: θερμοκρασία<br>Node: test-node<br>Alert: test_alert<br>Status: CLEAR → WARNING<br>Chart: test.chart<br>Context: test.context<br>Value: 42.5 C<br>Previous value: 0 C<br>Time: 2026-09-14T12:00:00Z<br><a href=\"https://example.com/alert?id=1&amp;view=chart#details\">https://example.com/alert?id=1&amp;view=chart#details</a>"
+}

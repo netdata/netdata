@@ -63,6 +63,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/intelgpu"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/ipfs"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/isc_dhcpd"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/jetson"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_apiserver"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubelet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/k8s_kubeproxy"
@@ -75,6 +76,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/maxscale"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/megacli"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/memcached"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mongodb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/monit"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/mssql"
@@ -111,6 +113,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/pulsar"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/puppet"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rabbitmq"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redfish"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/redis"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/rethinkdb"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/riakkv"
@@ -119,6 +122,7 @@ import (
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/samba"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/scaleio"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smartctl"
+	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/smbios_memory"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/spigotmc"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/sql"
 	_ "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/squid"
@@ -152,6 +156,7 @@ import (
 // NewRegistry gives each Agent its own shared SNMP state and publisher.
 func NewRegistry(varLibDir string) (collectorapi.Registry, *snmpdiag.Publisher) {
 	registry := maps.Clone(collectorapi.DefaultRegistry)
+
 	// These collectors share SNMP state; wire them together here instead of
 	// exposing package-global registries from the individual collector packages.
 	deviceStore := ddsnmp.NewDeviceStore()

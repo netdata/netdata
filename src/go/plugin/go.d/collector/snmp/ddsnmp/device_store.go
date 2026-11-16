@@ -217,8 +217,9 @@ func (s *DeviceStore) LifecycleCut() DeviceLifecycleCut {
 }
 
 // ReplaceJob atomically removes a prior configuration incarnation, when
-// different, and publishes the current lifecycle plus any topology-ready state.
-// The returned writer replaces the prior runtime's update authority.
+// different, and records the current lifecycle plus any topology-ready state.
+// Only an observable lifecycle change signals publication. The returned writer
+// replaces the prior runtime's update authority.
 func (s *DeviceStore) ReplaceJob(
 	previousOwnerKey string,
 	ownerKey string,
@@ -231,17 +232,22 @@ func (s *DeviceStore) ReplaceJob(
 	}
 	s.mu.Lock()
 	s.ensureMapsLocked()
+	changed := false
 	if previousOwnerKey != "" && previousOwnerKey != ownerKey {
+		_, changed = s.ownerRegistrations[previousOwnerKey]
 		s.removeRegistrationLocked(previousOwnerKey)
 	}
 	registrationID, exists := s.ownerRegistrations[ownerKey]
+	wasReady := false
 	if !exists {
 		registrationID = s.nextRegistrationIDLocked()
 		s.ownerRegistrations[ownerKey] = registrationID
 	} else if device, ok := s.devices[registrationID]; ok {
+		wasReady = true
 		s.removeHostnameIndexLocked(ownerKey, device.Hostname)
 		delete(s.devices, registrationID)
 	}
+	prior := s.lifecycles[registrationID]
 	s.lifecycles[registrationID] = deviceLifecycleRecord{
 		info:          info,
 		lastCompleted: status,
@@ -252,8 +258,16 @@ func (s *DeviceStore) ReplaceJob(
 		s.addHostnameIndexLocked(ownerKey, cloned.Hostname)
 	}
 	s.lifecycleSequence++
-	s.notifyLifecycleChangedLocked()
-	writer := &DeviceWriter{store: s, owner: ownerKey}
+	// Re-projecting an unchanged job, such as a repeated dependency-wait
+	// failure, differs only in completion times and must not republish.
+	if changed || !exists || wasReady != (device != nil) || prior.info != info ||
+		!sameLifecycleStatus(prior.lastCompleted, status) {
+		s.notifyLifecycleChangedLocked()
+	}
+	writer := &DeviceWriter{
+		store: s,
+		owner: ownerKey,
+	}
 	if s.writers == nil {
 		s.writers = make(map[string]*DeviceWriter)
 	}
@@ -292,6 +306,28 @@ func (s *DeviceStore) registerLocked(ownerKey string, info DeviceConnectionInfo)
 	s.addHostnameIndexLocked(ownerKey, info.Hostname)
 	s.lifecycleSequence++
 	if !wasReady || priorInfo != record.info {
+		s.notifyLifecycleChangedLocked()
+	}
+}
+
+// WithdrawDevice removes connection eligibility without ending the job's
+// registration lifetime. A classified replacement can retain lifecycle evidence
+// while its new connection and profile state are not yet usable.
+func (s *DeviceStore) WithdrawDevice(ownerKey string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.withdrawDeviceLocked(ownerKey)
+}
+
+func (s *DeviceStore) withdrawDeviceLocked(ownerKey string) {
+	id, exists := s.ownerRegistrations[ownerKey]
+	if !exists {
+		return
+	}
+	if info, ready := s.devices[id]; ready {
+		s.removeHostnameIndexLocked(ownerKey, info.Hostname)
+		delete(s.devices, id)
+		s.lifecycleSequence++
 		s.notifyLifecycleChangedLocked()
 	}
 }
@@ -416,7 +452,9 @@ func (s *DeviceStore) ensureMapsLocked() {
 		s.lifecycles = make(map[DeviceRegistrationID]deviceLifecycleRecord)
 		for _, registrationID := range s.ownerRegistrations {
 			if info, ok := s.devices[registrationID]; ok {
-				s.lifecycles[registrationID] = deviceLifecycleRecord{info: lifecycleInfoFromDeviceConnection(info)}
+				s.lifecycles[registrationID] = deviceLifecycleRecord{
+					info: lifecycleInfoFromDeviceConnection(info),
+				}
 			}
 		}
 	}
@@ -513,6 +551,19 @@ func (w *DeviceWriter) UpdateDevice(info DeviceConnectionInfo) {
 	defer s.mu.Unlock()
 	if s.writers[w.owner] == w {
 		s.registerLocked(w.owner, info)
+	}
+}
+
+// WithdrawDevice is fenced by the accepted runtime's update authority.
+func (w *DeviceWriter) WithdrawDevice() {
+	if w == nil {
+		return
+	}
+	s := w.store
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.writers[w.owner] == w {
+		s.withdrawDeviceLocked(w.owner)
 	}
 }
 

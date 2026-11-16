@@ -24,19 +24,11 @@ func resolveProviderPayload(
 	// prepareConfig already deep-clones the raw config before calling here.
 	// Build a top-level payload view to keep store identity/source metadata static
 	// while avoiding another YAML round-trip clone for provider payload resolution.
-	payload := make(Config, len(cfg))
-	for k, v := range cfg {
-		switch k {
-		case keyName, keyKind, ikeySource, ikeySourceType:
-			continue
-		default:
-			payload[k] = v
-		}
-	}
+	payload := cfg.ProviderPayload()
 
 	resolved, err := resolver.Resolve(
 		ctx,
-		map[string]any(payload),
+		payload,
 		nil,
 	)
 	if err != nil {

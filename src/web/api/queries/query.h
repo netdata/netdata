@@ -49,6 +49,14 @@ typedef enum rrdr_time_grouping {
     RRDR_GROUPING_COUNTIF,
     RRDR_GROUPING_EXTREMES,
     RRDR_GROUPING_LATEST,
+    RRDR_GROUPING_PERCENTAGE_OF_TIME,
+    RRDR_GROUPING_NUMBER_OF_FLAPS,
+    RRDR_GROUPING_NUMBER_OF_TIMES,
+
+    // not a grouping - the bound anything walking them all stops at, so
+    // adding one above cannot leave a sweep silently short. RRDR_GROUPING_MAX
+    // is the max-over-time aggregation, hence the name.
+    RRDR_GROUPING_SENTINEL,
 } RRDR_TIME_GROUPING;
 
 const char *time_grouping_id2txt(RRDR_TIME_GROUPING group);
@@ -95,8 +103,24 @@ typedef enum rrdr_group_by_function {
     RRDR_GROUP_BY_FUNCTION_EXTREMES,
 } RRDR_GROUP_BY_FUNCTION;
 
+bool group_by_aggregate_function_lookup(const char *s, RRDR_GROUP_BY_FUNCTION *function);
 RRDR_GROUP_BY_FUNCTION group_by_aggregate_function_parse(const char *s);
 const char *group_by_aggregate_function_to_string(RRDR_GROUP_BY_FUNCTION group_by_function);
+
+// time groupings that keep every point of a group (median, percentile, trimmed mean) start
+// with room for at most this many points and grow as points arrive, so the size of the
+// group alone never decides how much memory is allocated
+#define QUERY_TIME_GROUPING_SERIES_INITIAL_MAX 1024
+
+static inline size_t query_time_grouping_series_initial_entries(size_t group) {
+    if(group < 10)
+        return 10;
+
+    if(group > QUERY_TIME_GROUPING_SERIES_INITIAL_MAX)
+        return QUERY_TIME_GROUPING_SERIES_INITIAL_MAX;
+
+    return group;
+}
 
 #ifdef __cplusplus
 }

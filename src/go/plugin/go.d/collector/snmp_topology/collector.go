@@ -162,7 +162,7 @@ func (c *Collector) Collect(context.Context) error {
 
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 
-func (c *Collector) Run(ctx context.Context) error {
+func (c *Collector) Run(ctx context.Context, ready func()) error {
 	defer c.releaseDiagnosticProvider()
 	if err := ctx.Err(); err != nil {
 		return nil
@@ -172,6 +172,7 @@ func (c *Collector) Run(ctx context.Context) error {
 	c.topologyRegistry.setReverseDNSWarmContext(ctx)
 	defer c.topologyRegistry.setReverseDNSWarmContext(nil)
 
+	ready()
 	c.refreshTopologyRecovering(ctx)
 	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 
@@ -210,6 +211,8 @@ type topologyRefreshDevicePlan struct {
 }
 
 type deviceRefreshState struct {
+	// registered is the device information this state last acted on.
+	registered          *topologydiag.DeviceInput
 	generation          *topologyDeviceGeneration
 	latestAttempt       *topologydiag.AcquisitionCapture
 	attemptOrdinal      uint64
@@ -291,6 +294,24 @@ func (c *Collector) refreshTopology(ctx context.Context) refreshStats {
 		seen[registrationID] = true
 
 		state, exists := nextStates[registrationID]
+		registered := topologyDeviceInputFromConnection(dev)
+		if state.registered == nil || !sameTopologyDeviceInput(*state.registered, registered) {
+			if prior := state.registered; prior != nil {
+				if registered.SysObjectID != "" && registered.SysObjectID != prior.SysObjectID {
+					// The accepted job can reclassify within one registration lifetime.
+					// Its old topology and retry state belong to the previous classification.
+					state = deviceRefreshState{attemptOrdinal: state.attemptOrdinal}
+				} else {
+					// Acquire again with the current device information. The retained
+					// generation stays visible until that succeeds.
+					state.nextRetry = time.Time{}
+				}
+			}
+			// A separate copy keeps the per-device comparison value off the heap.
+			owned := cloneTopologyDeviceInput(registered)
+			state.registered = &owned
+			nextStates[registrationID] = state
+		}
 		if !exists || state.nextRetry.IsZero() || !now.Before(state.nextRetry) {
 			plans = append(plans, topologyRefreshDevicePlan{registrationID: registrationID, device: dev})
 			if selected == nil {
@@ -540,9 +561,14 @@ func (c *Collector) refreshDeviceTopology(
 	}
 
 	coll := c.newDdSnmpColl(ddsnmpcollector.Config{
-		SnmpClient:          snmpClient,
-		Profiles:            profiles,
-		Log:                 c.Logger,
+		SnmpClient: snmpClient,
+		Profiles:   profiles,
+		Log: c.Logger.With(
+			slog.String("device", dev.Hostname),
+			slog.String("registration", attemptID.RegistrationID.String()),
+			slog.String("context", "main"),
+		),
+		LogKeyPrefix:        "snmp_topology:registration:" + attemptID.RegistrationID.String() + ":main:",
 		SysObjectID:         dev.SysObjectID,
 		DisableBulkWalk:     dev.DisableBulkWalk,
 		AcquisitionObserver: mainObserver,

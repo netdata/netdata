@@ -1,9 +1,19 @@
-//! Indexer response handling.
+//! Ledger-side handling of responses from the indexer component (sealed WALs).
+//!
+//! The indexing operation itself runs in `crate::indexer`
+//! (src/crates/otel-ledger/src/indexer.rs): one component per pipeline turns
+//! closed WAL files into SFSTs and replies with an `IndexerResponse`. This
+//! module is the reply's consumer — `handle_indexer_resp` registers the
+//! sealed SFST (or suppresses an empty one), drops the WAL's query-time
+//! chunks, queues the WAL delete, optionally queues an upload, and runs
+//! retention. Dispatched from the run loop ([`crate::Ledger::run`]) and from
+//! the shutdown flush drain (`Ledger::flush_catalogs_on_shutdown`), so an
+//! indexing operation completing during shutdown is still applied.
 
 use std::path::PathBuf;
 
-use bridge::signals::Signal;
 use file_registry::{FileId, SeqKey, TenantId};
+use otel_bridge::signals::Signal;
 
 use file_lifecycle::ipc::{CleanerRequest, IndexerResponse, UploaderRequest};
 
@@ -13,11 +23,12 @@ use super::Ledger;
 /// computed under the registry write lock and acted on after it is released.
 enum Indexed {
     /// Empty SFST (zero log rows): track nothing and delete both the WAL and
-    /// the empty index file so it is neither uploaded/cataloged nor
-    /// re-discovered on restart. An empty file carries no queryable data and
-    /// would otherwise propagate a `(0, 0)` timestamp range through the
-    /// catalog. A frame-less WAL can be sealed by a crash/rotation (see
-    /// `recover_unindexed`).
+    /// the empty index file, so nothing is uploaded, cataloged, or
+    /// re-discovered at the next restart. An empty file carries no queryable
+    /// data; tracking it would only add a bogus `(0, 0)` timestamp range to
+    /// the inventory. A frame-less WAL reaches here after a crash/rotation
+    /// (startup recovery suppresses those the same way:
+    /// `recover_unindexed`, `file-lifecycle/src/recovery/local.rs`).
     Empty {
         tenant_id: TenantId,
         file_id: FileId,
@@ -37,45 +48,47 @@ enum Indexed {
 impl Ledger {
     #[tracing::instrument(skip_all)]
     pub(super) async fn handle_indexer_resp(&mut self, signal: Signal, resp: IndexerResponse) {
-        let (seq, summary, size) = match resp {
-            IndexerResponse::IndexFailed { path, error } => {
+        let (file_id, summary, size) = match resp {
+            IndexerResponse::IndexFailed { file_id, error } => {
                 // Intentional divergence from `recover_unindexed`: at runtime
                 // the entry stays tracked (and queryable as a WAL) until the
-                // next restart's recovery retries the seal and orphans it.
-                tracing::error!(path = %path.display(), "indexing failed: {error}");
+                // next restart's recovery retries the indexing operation and
+                // orphans it.
+                tracing::error!(seq = file_id.seq, "indexing failed: {error}");
                 return;
             }
             IndexerResponse::Indexed {
-                seq, summary, size, ..
-            } => (seq, summary, size),
+                file_id,
+                summary,
+                size,
+            } => (file_id, summary, size),
         };
+        let seq = file_id.seq;
 
         tracing::info!(seq, record_count = summary.record_count, "indexed");
 
-        // Remote storage is process-global: enabled iff the shell built an
-        // uploader. Snapshot it before borrowing the pipeline for its per-signal
-        // seam provisions (signal segment + registries handle).
+        // Remote storage is process-global: the uploader exists iff the shell
+        // constructed one at startup (`remote_storage.enabled`). Snapshot the
+        // flag once — it gates whether an upload request is built at all.
         let storage_enabled = self.uploader.is_some();
         let pipeline = self.pipelines.get(signal);
         let segment = pipeline.signal();
         let registries = pipeline.registries().clone();
 
         // Decide everything under the registry write lock — including building
-        // the upload request — then act after the guard is dropped. Building
-        // the request here (rather than re-acquiring the lock in a helper)
-        // removes the second lookup that previously needed an `.expect` on the
-        // tenant still being present.
+        // the upload request, which reads the SFST entry `track` just inserted
+        // (file_lifecycle::helpers::sfst_upload_request) — then act after the
+        // guard is dropped.
         let outcome = {
             let mut registries = registries.write().await;
             let Some((tenant_id, registry)) = registries.for_seq_mut(seq) else {
                 tracing::error!(seq, "indexed unknown seq; no tenant mapping");
                 return;
             };
-            let Some(wal_file) = registry.wal.get(seq) else {
+            if registry.wal.get(seq).is_none() {
                 tracing::error!(seq, "indexed unknown WAL");
                 return;
-            };
-            let file_id = wal_file.id;
+            }
             let wal_path = registry.wal.file_path(file_id);
 
             if summary.record_count == 0 {
@@ -86,13 +99,13 @@ impl Ledger {
                     sfst_path: registry.sfst.file_path(file_id),
                 }
             } else {
-                // `part_key` is the single source of truth in the SFST's `FileId`
-                // (its filename), propagated from the WAL file this index was
-                // built from — never re-derived or stored in the summary, so the
-                // selector and the `files:true` inventory both read `id.part_key`
-                // and cannot disagree. Summary fields (timestamps, record count,
-                // content_meta) live on the registry entry; the uploader response
-                // handler reads them back.
+                // Tracked under the WAL's own `FileId`, so the SFST inherits its
+                // `partition_key` — the partition key embedded in the filename, not a
+                // summary field — and the selector and the `files:true` inventory
+                // both read `id.partition_key` and cannot disagree. The summary's
+                // timestamps/record_count/content_meta land on the registry
+                // entry; the uploader response handler
+                // (`Ledger::handle_uploader_resp`) reads them back.
                 registry.sfst.track(file_id, size, summary);
 
                 let upload = if storage_enabled {
@@ -123,9 +136,12 @@ impl Ledger {
                     seq = file_id.seq,
                     "indexed an empty WAL (0 log rows); deleting WAL + empty index, not uploading",
                 );
-                // A query may have built a chunk for this seq against the
+                // A query may have indexed a chunk for this seq against the
                 // active WAL; drop it.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_chunk_indexer.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,
@@ -156,11 +172,14 @@ impl Ledger {
                 wal_path,
                 upload,
             } => {
-                // The authoritative SFST is registered; its query-time chunks
-                // are superseded. The SFST is visible before the WAL is
-                // deleted, so a racing query resolves the seq to the SFST,
-                // never a gap.
+                // The SFST is now the authoritative copy — drop the WAL's
+                // query-time chunks. It is registered before the WAL delete is
+                // queued, so a racing query resolves the seq to the SFST, never
+                // a gap.
                 self.chunk_cache.drop_seq(file_id.seq).await;
+                if signal == Signal::Traces {
+                    self.traces_chunk_indexer.forget(file_id.seq);
+                }
 
                 if let Err(e) = self.cleaner.send(CleanerRequest::DeleteWalFile {
                     pipeline_id: file_id.pipeline_id,

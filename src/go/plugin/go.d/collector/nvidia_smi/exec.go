@@ -3,22 +3,22 @@
 package nvidia_smi
 
 import (
-	"bufio"
 	"bytes"
+	"context"
 	"errors"
-	"os/exec"
-	"path/filepath"
+	"os"
 	"runtime"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/streamexec"
 )
 
 type nvidiaSmiBinary interface {
+	// start prepares the first query; Check calls it before collecting.
+	start(ctx context.Context) error
 	queryGPUInfo() ([]byte, error)
 	stop() error
 }
@@ -39,18 +39,7 @@ func newNvidiaSmiBinary(path string, cfg Config, log *logger.Logger) (nvidiaSmiB
 		}, nil
 	}
 
-	smi := &nvidiaSmiLoopExec{
-		Logger:             log,
-		binPath:            path,
-		updateEvery:        cfg.UpdateEvery,
-		firstSampleTimeout: cfg.Timeout.Duration(),
-	}
-
-	if err := smi.run(); err != nil {
-		return nil, err
-	}
-
-	return smi, nil
+	return newNvidiaSmiLoopExec(path, cfg, log)
 }
 
 // nvidiaSmiExec executes nvidia-smi via nd-run (Linux/BSD)
@@ -60,6 +49,8 @@ type nvidiaSmiExec struct {
 	binPath string
 	timeout time.Duration
 }
+
+func (e *nvidiaSmiExec) start(context.Context) error { return nil }
 
 func (e *nvidiaSmiExec) queryGPUInfo() ([]byte, error) {
 	return ndexec.RunUnprivileged(e.Logger, e.timeout, e.binPath, "-q", "-x")
@@ -75,150 +66,109 @@ type nvidiaSmiDirectExec struct {
 	timeout time.Duration
 }
 
+func (e *nvidiaSmiDirectExec) start(context.Context) error { return nil }
+
 func (e *nvidiaSmiDirectExec) queryGPUInfo() ([]byte, error) {
 	return ndexec.RunDirect(e.Logger, e.timeout, e.binPath, "-q", "-x")
 }
 
 func (e *nvidiaSmiDirectExec) stop() error { return nil }
 
+// nvidiaSmiLoopExec keeps nvidia-smi running in loop mode (Linux/BSD) and serves its latest fresh sample.
 type nvidiaSmiLoopExec struct {
-	*logger.Logger
-
-	binPath string
-
-	updateEvery        int
-	firstSampleTimeout time.Duration
-
-	cmd  *exec.Cmd
-	done chan struct{}
-
-	mux        sync.Mutex
-	lastSample string
+	source       *streamexec.Source[[]byte]
+	startTimeout time.Duration
+	stopSource   func()
 }
 
-func (e *nvidiaSmiLoopExec) queryGPUInfo() ([]byte, error) {
-	select {
-	case <-e.done:
-		return nil, errors.New("process has already exited")
-	default:
+// loopTiming returns the nvidia-smi loop interval in seconds, the data collection interval capped at 5, and how long
+// a sample stays current. A query may take up to timeout, so a sample stays current, and the process alive, for one
+// loop interval plus timeout.
+func loopTiming(updateEvery int, timeout time.Duration) (interval int, freshFor time.Duration) {
+	interval = min(updateEvery, 5)
+	return interval, time.Duration(interval)*time.Second + timeout
+}
+
+func newNvidiaSmiLoopExec(path string, cfg Config, log *logger.Logger) (*nvidiaSmiLoopExec, error) {
+	timeout := cfg.Timeout.Duration()
+	interval, freshFor := loopTiming(cfg.UpdateEvery, timeout)
+	source, err := streamexec.New(streamexec.Config[[]byte]{
+		Name: "nvidia-smi",
+		Start: func(ctx context.Context, stdout *os.File) (*ndexec.Process, error) {
+			log.Debugf("executing '%s -q -x -l %d'", path, interval)
+			return ndexec.StartUnprivilegedProcess(ctx, ndexec.ProcessOptions{
+				Stdout: stdout,
+			},
+				path, "-q", "-x", "-l", strconv.Itoa(interval))
+		},
+		NewDecoder: func() streamexec.Decoder[[]byte] { return &logDecoder{} },
+		Timing: streamexec.Timing{
+			MaxSampleAge:    freshFor,
+			StallTimeout:    freshFor,
+			RestartDelayMin: time.Second,
+			RestartDelayMax: 30 * time.Second,
+		},
+		Logger: log,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	e.mux.Lock()
-	defer e.mux.Unlock()
-
-	return []byte(e.lastSample), nil
+	return &nvidiaSmiLoopExec{
+		source:       source,
+		startTimeout: timeout,
+	}, nil
 }
 
-func (e *nvidiaSmiLoopExec) run() error {
-	secs := min(e.updateEvery, 5)
-
-	ndrunPath := filepath.Join(buildinfo.NetdataBinDir, "nd-run")
-	cmd := exec.Command(ndrunPath, e.binPath, "-q", "-x", "-l", strconv.Itoa(secs))
-
-	e.Debugf("executing '%s'", cmd)
-
-	r, err := cmd.StdoutPipe()
+// start runs nvidia-smi and waits up to the configured timeout for its first sample.
+func (e *nvidiaSmiLoopExec) start(ctx context.Context) error {
+	if e.stopSource != nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, e.startTimeout)
+	defer cancel()
+	stop, err := e.source.Background(ctx)
 	if err != nil {
 		return err
 	}
+	e.stopSource = stop
+	return nil
+}
 
-	if err := cmd.Start(); err != nil {
-		return err
+func (e *nvidiaSmiLoopExec) queryGPUInfo() ([]byte, error) {
+	if sample, ok := e.source.Latest(); ok {
+		return sample, nil
 	}
-
-	firstSample := make(chan struct{}, 1)
-	done := make(chan struct{})
-	e.cmd = cmd
-	e.done = done
-
-	go func() {
-		defer close(done)
-
-		var buf bytes.Buffer
-		var insideLog bool
-		var emptyRows int64
-		var outsideLogRows int64
-
-		const unexpectedRowsLimit = 500
-
-		sc := bufio.NewScanner(r)
-
-		for sc.Scan() {
-			line := sc.Text()
-
-			if !insideLog {
-				outsideLogRows++
-			} else {
-				outsideLogRows = 0
-			}
-
-			if line == "" {
-				emptyRows++
-			} else {
-				emptyRows = 0
-			}
-
-			if outsideLogRows >= unexpectedRowsLimit || emptyRows >= unexpectedRowsLimit {
-				e.Errorf("unexpected output from nvidia-smi loop: outside log rows %d, empty rows %d", outsideLogRows, emptyRows)
-				break
-			}
-
-			switch {
-			case line == "<nvidia_smi_log>":
-				insideLog = true
-				buf.Reset()
-
-				buf.WriteString(line)
-				buf.WriteByte('\n')
-			case line == "</nvidia_smi_log>":
-				insideLog = false
-
-				buf.WriteString(line)
-
-				e.mux.Lock()
-				e.lastSample = buf.String()
-				e.mux.Unlock()
-
-				buf.Reset()
-
-				select {
-				case firstSample <- struct{}{}:
-				default:
-				}
-			case insideLog:
-				buf.WriteString(line)
-				buf.WriteByte('\n')
-			default:
-				continue
-			}
-		}
-	}()
-
-	select {
-	case <-e.done:
-		_ = e.stop()
-		return errors.New("process exited before the first sample was collected")
-	case <-time.After(e.firstSampleTimeout):
-		_ = e.stop()
-		return errors.New("timed out waiting for first sample")
-	case <-firstSample:
-		return nil
-	}
+	return nil, errors.New("no fresh nvidia-smi sample")
 }
 
 func (e *nvidiaSmiLoopExec) stop() error {
-	if e.cmd == nil || e.cmd.Process == nil {
-		return nil
+	if e.stopSource != nil {
+		e.stopSource()
+		e.stopSource = nil
 	}
+	return nil
+}
 
-	_ = e.cmd.Process.Kill()
-	_ = e.cmd.Wait()
-	e.cmd = nil
+// logDecoder assembles each <nvidia_smi_log> document of the loop output into one sample; lines outside a document
+// are skipped.
+type logDecoder struct {
+	buf    bytes.Buffer
+	inside bool
+}
 
-	select {
-	case <-e.done:
-		return nil
-	case <-time.After(time.Second * 2):
-		return errors.New("timed out waiting for process to exit")
+func (d *logDecoder) Decode(line []byte) ([]byte, bool) {
+	switch {
+	case string(line) == "<nvidia_smi_log>":
+		d.inside = true
+		d.buf.Reset()
+	case !d.inside:
+		return nil, false
 	}
+	d.buf.Write(line)
+	if string(line) != "</nvidia_smi_log>" {
+		d.buf.WriteByte('\n')
+		return nil, false
+	}
+	d.inside = false
+	return bytes.Clone(d.buf.Bytes()), true
 }

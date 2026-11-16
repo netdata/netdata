@@ -4,6 +4,9 @@
 #ifdef OS_WINDOWS
 void sync_uv_file_data(uv_file file)
 {
+    if (file < 0)
+        return;
+
     uv_fs_t req;
     (void) uv_fs_fsync(NULL, &req, file, NULL);
     uv_fs_req_cleanup(&req);
@@ -33,6 +36,56 @@ void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengin
     (void) JudyLDel(&ctx->datafiles.JudyL, (Word_t)datafile->fileno, PJE0);
 }
 
+
+// ----------------------------------------------------------------------------
+// samples accounting
+//
+// Samples are stored slots: the points of the pages written to disk, empty
+// (gap) slots included; a page stored in two files counts twice. Every datafile
+// carries the samples charged to it, and ctx->atomic.samples is their sum:
+//
+//  - a flushed extent charges the slots of its pages to its datafile,
+//  - replaying a v1 journal charges the slots of its valid pages,
+//  - loading a journal v2 at startup sets the charge from its samples section,
+//    or from a per-metric estimate when the file has no section,
+//  - writing a journal v2 successfully resets the charge to the indexed count
+//    (pages the index drops - duplicate start times, deleted metrics - are
+//    unreachable and stop counting; the next startup reads the same count),
+//  - deleting a datafile removes its whole charge.
+//
+// A datafile is never flushed to and re-indexed at the same time (journal v2
+// indexing skips datafiles with running writers), so a set never races a charge
+// of the same datafile.
+
+void rrdeng_datafile_samples_charge(struct rrdengine_datafile *datafile, uint64_t samples) {
+    if(!samples)
+        return;
+
+    __atomic_add_fetch(&datafile->samples.charged, samples, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&datafile->ctx->atomic.samples, samples, __ATOMIC_RELAXED);
+}
+
+void rrdeng_datafile_samples_set(struct rrdengine_datafile *datafile, uint64_t samples, bool estimated) {
+    struct rrdengine_instance *ctx = datafile->ctx;
+
+    uint64_t old = __atomic_exchange_n(&datafile->samples.charged, samples, __ATOMIC_RELAXED);
+    __atomic_store_n(&datafile->samples.estimated, estimated, __ATOMIC_RELAXED);
+
+    if(samples > old)
+        __atomic_add_fetch(&ctx->atomic.samples, samples - old, __ATOMIC_RELAXED);
+    else if(old > samples)
+        rrdeng_atomic_uint64_sub_saturating(
+            ctx, &ctx->atomic.samples, old - samples, "samples", "resetting the samples of a datafile");
+}
+
+void rrdeng_datafile_samples_uncharge(struct rrdengine_datafile *datafile) {
+    struct rrdengine_instance *ctx = datafile->ctx;
+
+    uint64_t old = __atomic_exchange_n(&datafile->samples.charged, 0, __ATOMIC_RELAXED);
+    if(old)
+        rrdeng_atomic_uint64_sub_saturating(
+            ctx, &ctx->atomic.samples, old, "samples", "deleting a datafile");
+}
 
 static struct rrdengine_datafile *datafile_alloc_and_init(struct rrdengine_instance *ctx, unsigned tier, unsigned fileno)
 {
@@ -143,10 +196,13 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
     if(should_evict_open_pages)
         pgc_open_evict_clean_pages_of_datafile(open_cache, df);
 
+#ifdef NETDATA_INTERNAL_CHECKS
+    // walks the whole open cache clean queue, only to feed the internal_error() below
     usec_t time_to_scan_ut = now_monotonic_usec();
     size_t clean_pages_in_open_cache = pgc_count_clean_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
     size_t hot_pages_in_open_cache = pgc_count_hot_pages_having_data_ptr(open_cache, (Word_t)datafile_ctx(df), df);
     time_to_scan_ut = now_monotonic_usec() - time_to_scan_ut;
+#endif
 
     spinlock_tracked_lock(&df->users.spinlock);
 
@@ -167,6 +223,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
 
     }
 
+#ifdef NETDATA_INTERNAL_CHECKS
     if(!can_be_deleted)
         internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
                              "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
@@ -182,6 +239,7 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
                        clean_pages_in_open_cache,
                        hot_pages_in_open_cache,
                        time_to_scan_ut);
+#endif
 
     spinlock_tracked_unlock(&df->users.spinlock);
 
@@ -192,6 +250,20 @@ void generate_datafilepath(struct rrdengine_datafile *datafile, char *str, size_
 {
     (void) snprintfz(str, maxlen - 1, "%s/" DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
                     datafile_ctx(datafile)->config.dbfiles_path, datafile->tier, datafile->fileno);
+}
+
+// true only for the exact name generate_datafilepath() writes; sscanf() alone also
+// accepts other extensions, trailing text and unpadded numbers
+bool datafile_name_parse(const char *name, unsigned *fileno)
+{
+    unsigned tier;
+    if (sscanf(name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, fileno) != 2 || tier != 1)
+        return false;
+
+    char expected[RRDENG_PATH_MAX];
+    (void) snprintfz(expected, sizeof(expected), DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL DATAFILE_EXTENSION,
+                     tier, *fileno);
+    return strcmp(name, expected) == 0;
 }
 
 int close_data_file(struct rrdengine_datafile *datafile)
@@ -397,11 +469,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
     bool validate_files = true;
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
-        ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
-
         // This is a datafile
-        if (2 == ret) {
-            datafile = datafile_alloc_and_init(ctx, tier, fileno);
+        if (datafile_name_parse(dent.name, &fileno)) {
+            datafile = datafile_alloc_and_init(ctx, 1, fileno);
             datafiles[matched_files++] = datafile;
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
             if (!Pvalue || Pvalue == PJERR)
@@ -505,17 +575,29 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             must_delete_pair = 1;
 
         journalfile = journalfile_alloc_and_init(datafile);
-        ret = journalfile_load(ctx, journalfile, datafile);
-        if (0 != ret) {
-            if (!must_delete_pair) /* If datafile is still open close it */
+
+        // the journal of a datafile that cannot be loaded is not replayed: its pages would
+        // point the open cache at a datafile that is deleted and freed below
+        if (!must_delete_pair) {
+            ret = journalfile_load(ctx, journalfile, datafile);
+            if (0 != ret) {
                 close_data_file(datafile);
-            must_delete_pair = 1;
+                must_delete_pair = 1;
+            }
         }
 
         if (must_delete_pair) {
             char path[RRDENG_PATH_MAX];
 
             netdata_log_error("DBENGINE: deleting invalid data and journal file pair.");
+
+            // a journal v2 loaded before the pair failed is indexed and charged: it must
+            // leave ctx->njfv2idx before the datafile is freed, and go with the pair
+            size_t journal_v2_size = journalfile_v2_data_size_get(journalfile);
+            (void)journalfile_close(journalfile, datafile);
+            if (!journalfile_v2_unlink(journalfile) && journal_v2_size)
+                ctx_current_disk_space_decrease(ctx, journal_v2_size);
+
             ret = journalfile_unlink(journalfile);
             if (!ret) {
                 journalfile_v1_generate_path(datafile, path, sizeof(path));
@@ -526,6 +608,8 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 generate_datafilepath(datafile, path, sizeof(path));
                 netdata_log_info("DBENGINE: deleted data file \"%s\".", path);
             }
+            // the v1 replay may have charged samples to this datafile already
+            rrdeng_datafile_samples_uncharge(datafile);
             freez(journalfile);
             freez(datafile);
             ++failed_to_load;

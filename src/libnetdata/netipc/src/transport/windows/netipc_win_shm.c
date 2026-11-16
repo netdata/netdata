@@ -12,6 +12,7 @@
 
 #include "netipc/netipc_win_shm.h"
 #include "netipc/netipc_named_pipe.h" /* nipc_fnv1a_64 */
+#include "netipc_win_security.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -117,6 +118,42 @@ static HANDLE test_create_event(LPSECURITY_ATTRIBUTES attrs,
         return NULL;
 
     return CreateEventW(attrs, manual_reset, initial_state, name);
+}
+
+/* Session objects take the same owner-only DACL as the pipe, so other
+ * accounts cannot open them. On failure the Win32 error is preserved. */
+static HANDLE create_secure_mapping(size_t size, LPCWSTR name)
+{
+    SECURITY_ATTRIBUTES sa;
+    if (!nipc_win_security_attrs_init(&sa))
+        return NULL;
+
+    /* Building the descriptor leaves stale errors; ERROR_ALREADY_EXISTS
+     * must come from the create alone. */
+    SetLastError(ERROR_SUCCESS);
+    HANDLE h = test_create_file_mapping(INVALID_HANDLE_VALUE, /* page file */
+                                        &sa, PAGE_READWRITE,
+                                        (DWORD)(size >> 32),
+                                        (DWORD)(size & 0xFFFFFFFF), name);
+    DWORD err = GetLastError();
+    nipc_win_security_attrs_free(&sa);
+    SetLastError(err);
+    return h;
+}
+
+/* Auto-reset event with the owner-only DACL. */
+static HANDLE create_secure_event(LPCWSTR name)
+{
+    SECURITY_ATTRIBUTES sa;
+    if (!nipc_win_security_attrs_init(&sa))
+        return NULL;
+
+    SetLastError(ERROR_SUCCESS);
+    HANDLE h = test_create_event(&sa, FALSE, FALSE, name);
+    DWORD err = GetLastError();
+    nipc_win_security_attrs_free(&sa);
+    SetLastError(err);
+    return h;
 }
 
 static HANDLE test_open_event(DWORD access,
@@ -345,14 +382,7 @@ nipc_win_shm_error_t nipc_win_shm_server_create(
     size_t region_size = (size_t)resp_off + resp_capacity;
 
     /* Create file mapping backed by page file */
-    SetLastError(ERROR_SUCCESS);
-    HANDLE mapping = test_create_file_mapping(
-        INVALID_HANDLE_VALUE,   /* page file backed */
-        NULL,                   /* default security */
-        PAGE_READWRITE,
-        (DWORD)(region_size >> 32),
-        (DWORD)(region_size & 0xFFFFFFFF),
-        mapping_name);
+    HANDLE mapping = create_secure_mapping(region_size, mapping_name);
     if (!mapping)
         return NIPC_WIN_SHM_ERR_CREATE_MAPPING;
     if (GetLastError() == ERROR_ALREADY_EXISTS) {
@@ -404,9 +434,7 @@ nipc_win_shm_error_t nipc_win_shm_server_create(
             return NIPC_WIN_SHM_ERR_BAD_PARAM;
         }
 
-        /* Auto-reset events (bManualReset = FALSE) */
-        SetLastError(ERROR_SUCCESS);
-        req_event = test_create_event(NULL, FALSE, FALSE, req_event_name);
+        req_event = create_secure_event(req_event_name);
         if (!req_event) {
             UnmapViewOfFile(base);
             CloseHandle(mapping);
@@ -419,8 +447,7 @@ nipc_win_shm_error_t nipc_win_shm_server_create(
             return NIPC_WIN_SHM_ERR_ADDR_IN_USE;
         }
 
-        SetLastError(ERROR_SUCCESS);
-        resp_event = test_create_event(NULL, FALSE, FALSE, resp_event_name);
+        resp_event = create_secure_event(resp_event_name);
         if (!resp_event) {
             CloseHandle(req_event);
             UnmapViewOfFile(base);

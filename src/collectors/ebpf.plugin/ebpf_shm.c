@@ -254,7 +254,7 @@ static inline int ebpf_shm_load_and_attach(struct shm_bpf *obj, ebpf_module_t *e
     int ret = shm_bpf__load(obj);
     if (!ret) {
         if (mode != EBPF_LOAD_PROBE && mode != EBPF_LOAD_RETPROBE)
-            shm_bpf__attach(obj);
+            ret = shm_bpf__attach(obj);
         else
             ret = ebpf_shm_attach_probe(obj);
 
@@ -1224,6 +1224,9 @@ static int ebpf_shm_load_bpf(ebpf_module_t *em)
         }
     }
 #endif
+
+    if (ret && (em->load & EBPF_LOAD_CORE))
+        ret = ebpf_load_legacy_fallback(em, running_on_kernel, isrh);
 
     if (ret)
         netdata_log_error("%s %s", EBPF_DEFAULT_ERROR_MSG, em->info.thread_name);

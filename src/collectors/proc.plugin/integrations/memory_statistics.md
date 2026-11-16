@@ -60,9 +60,6 @@ This collector only supports collecting metrics from a single instance of this i
 
 This integration doesn't support auto-detection.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -101,8 +98,8 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | percentage of the system RAM swapped in the last 30 minutes |
-| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | number of out of memory kills in the last 30 minutes |
+| [ oom_kill ](https://github.com/netdata/netdata/blob/master/src/health/health.d/ram.conf) | mem.oom_kill | Number of out of memory kills in the last 30 minutes |
+| [ 30min_ram_swapped_out ](https://github.com/netdata/netdata/blob/master/src/health/health.d/swap.conf) | mem.swapio | Percentage of the system RAM swapped in the last 30 minutes |
 
 
 
@@ -127,7 +124,7 @@ Metrics:
 |:------|:------------|:----------|:----|
 | mem.swapio | Swap I/O | in, out | KiB/s |
 | system.pgpgio | Memory Paged from/to disk | in, out | KiB/s |
-| system.pgfaults | Memory Page Faults | minor, major | faults/s |
+| mem.pgfaults | Memory Page Faults | minor, major | faults/s |
 | mem.balloon | Memory Ballooning Operations | inflate, deflate, migrate | KiB/s |
 | mem.zswapio | ZSwap I/O | in, out | KiB/s |
 | mem.ksm_cow | KSM Copy On Write Operations | swapin, write | KiB/s |

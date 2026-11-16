@@ -45,7 +45,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -169,6 +169,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -187,7 +200,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -379,7 +392,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -634,32 +647,32 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_data_factory_pipeline_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline failures on ${label:resource_name} |
-| [ am_data_factory_pipeline_cancelled_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Data Factory pipeline cancellations on ${label:resource_name} |
-| [ am_data_factory_activity_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.activity_runs | Data Factory activity failures on ${label:resource_name} |
-| [ am_data_factory_trigger_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.trigger_runs | Data Factory trigger failures on ${label:resource_name} |
-| [ am_data_factory_ssis_ir_start_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_starts | Data Factory SSIS IR start failures on ${label:resource_name} |
-| [ am_data_factory_ssis_ir_stop_stuck ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_stops | Data Factory SSIS IR stuck stops on ${label:resource_name} |
-| [ am_data_factory_ssis_package_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_package_executions | Data Factory SSIS package failures on ${label:resource_name} |
-| [ am_data_factory_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_cpu | Data Factory IR CPU on ${label:resource_name} |
-| [ am_data_factory_ir_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_queue | Data Factory IR queue depth on ${label:resource_name} |
-| [ am_data_factory_ir_task_pickup_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_task_pickup_delay | Data Factory IR task pickup delay on ${label:resource_name} |
-| [ am_data_factory_size_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.factory_size | Data Factory size utilization on ${label:resource_name} |
-| [ am_data_factory_entity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.entity_count | Data Factory entity count on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_copy_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_copy_capacity | Data Factory MVNet IR copy utilization on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_external_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_external_capacity | Data Factory MVNet IR external utilization on ${label:resource_name} |
-| [ am_data_factory_mvnet_ir_pipeline_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_pipeline_capacity | Data Factory MVNet IR pipeline utilization on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_cpu | Data Factory Airflow IR CPU on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_memory | Data Factory Airflow IR memory on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_dag_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_dag_errors | Data Factory Airflow DAG errors on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_operator_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_operators | Data Factory Airflow operator failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_job_heartbeat_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_jobs | Data Factory Airflow job heartbeat failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_pool_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_pool_starving | Data Factory Airflow pool starvation on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_tasks_killed_externally ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow tasks killed externally on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_tasks_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Data Factory Airflow scheduler starving tasks on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_task_instance_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_task_instances | Data Factory Airflow task failures on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_trigger_issues ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_trigger_issues | Data Factory Airflow trigger issues on ${label:resource_name} |
-| [ am_data_factory_airflow_ir_zombies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_zombies | Data Factory Airflow zombie tasks on ${label:resource_name} |
+| [ am_data_factory_pipeline_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Failed pipeline runs on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) over the last 5 minutes |
+| [ am_data_factory_pipeline_cancelled_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.pipeline_runs | Cancelled pipeline runs on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) over the last 10 minutes. Frequent cancellations may indicate configuration or dependency issues |
+| [ am_data_factory_activity_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.activity_runs | Failed activity runs on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) over the last 5 minutes |
+| [ am_data_factory_trigger_failed_runs ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.trigger_runs | Failed trigger runs on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) over the last 5 minutes |
+| [ am_data_factory_ssis_ir_start_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_starts | Failed SSIS Integration Runtime start operations on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_ssis_ir_stop_stuck ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_ir_stops | SSIS Integration Runtime stop operations stuck on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_ssis_package_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ssis_package_executions | Failed SSIS package executions on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_cpu | Integration Runtime CPU utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_ir_queue_length ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_queue | Integration Runtime queue length on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). Growing queues indicate the runtime cannot keep up with submitted work |
+| [ am_data_factory_ir_task_pickup_delay ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.ir_task_pickup_delay | Average task pickup delay for Integration Runtime on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). High delay indicates insufficient runtime capacity |
+| [ am_data_factory_size_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.factory_size | Factory size as percentage of maximum allowed on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_entity_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.entity_count | Entity count (pipelines, datasets, etc.) as percentage of maximum allowed on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_mvnet_ir_copy_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_copy_capacity | Managed VNet Integration Runtime copy capacity utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_mvnet_ir_external_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_external_capacity | Managed VNet Integration Runtime external activity capacity utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_mvnet_ir_pipeline_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.mvnet_ir_pipeline_capacity | Managed VNet Integration Runtime pipeline capacity utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_cpu | Airflow Integration Runtime CPU utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_memory | Airflow Integration Runtime memory utilization on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_dag_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_dag_errors | DAG processing errors (callback exceptions, file refresh errors, import errors) on Airflow IR of Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_operator_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_operators | Failed Airflow operator executions on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_job_heartbeat_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_jobs | Airflow job heartbeat failures on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). Heartbeat failures indicate scheduler or worker health issues |
+| [ am_data_factory_airflow_ir_pool_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_pool_starving | Starving tasks in Airflow pool on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). Tasks are waiting for pool slots, consider increasing pool size |
+| [ am_data_factory_airflow_ir_tasks_killed_externally ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Tasks killed externally by the Airflow scheduler on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). May indicate OOM kills or infrastructure issues |
+| [ am_data_factory_airflow_ir_tasks_starving ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_scheduler_tasks | Starving tasks reported by Airflow scheduler on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). Tasks cannot be scheduled due to resource constraints |
+| [ am_data_factory_airflow_ir_task_instance_failures ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_task_instances | Failed Airflow task instances on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_trigger_issues ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_trigger_issues | Trigger issues (blocked main thread, Celery timeouts) on Airflow IR of Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_data_factory_airflow_ir_zombies ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_data_factory.conf) | azure_monitor.data_factory.airflow_ir_zombies | Zombie tasks killed by Airflow on Data Factory ${label:resource_name} in ${label:resource_group} (${label:region}). Zombies occur when tasks are marked running but no process is executing them |
 
 
 

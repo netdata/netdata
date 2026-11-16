@@ -153,20 +153,25 @@ See `query-discipline.md` for the rule and worked examples.
 
 ## Default version filter
 
-Latest stable + latest 2-3 nightlies. The dataset is noisy
+Highest observed stable + up to three observed nightlies. The dataset is noisy
 because many unupdated agents report crashes that have been
 fixed. Filtering to recent versions focuses triage on bugs
 that still matter.
 
 `get-events.sh --version auto` (the default) computes:
-1. Quick discovery query: the same time window as the main query, no version filter,
+1. Quick discovery query: the same parsed after/before bounds as the main query, no version filter,
    `AE_AGENT_VERSION` as a facet.
-2. From the facet result, pick the latest stable
-   (`v\d+\.\d+\.\d+` matching `^v2\.([89]|\d\d)\.\d+$` or the
-   newest by version sort) plus the top 3 nightlies
-   (`v\d+\.\d+\.\d+-\d+-nightly`).
+2. From the returned facet, pick the highest numeric stable `v<major>.<minor>.<patch>` and up to three nightlies
+   `v<major>.<minor>.<patch>-<count>-nightly`. Order by numeric release tuple first, then nightly count. These are
+   observed versions, not a release-catalog lookup; missing/partial discovery limits what can be selected.
 3. Re-run the main query with `selections.AE_AGENT_VERSION`
    set to that list.
+
+If no matching versions are observed, auto mode stops without a main fetch; select explicit `--versions` or
+`--version all` deliberately rather than silently broadening the query.
+
+Relative bounds are evaluated by the server on two successive requests and can drift slightly; use absolute bounds
+for a reproducible historical interval.
 
 `--version all` skips the auto filter for "when did X
 start?" investigations.

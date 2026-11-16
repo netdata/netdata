@@ -195,6 +195,12 @@ groups:
     metrics:
       - ipsec_tunnels_active
       - ipsec_tunnel_sa_lifetime
+      - ipsec_tunnel_state_active
+      - ipsec_tunnel_state_inactive
+      - ipsec_tunnel_state_init
+      - ipsec_tunnel_state_unknown
+      - ipsec_gateway_state_up
+      - ipsec_gateway_state_down
     charts:
       - id: ipsec_tunnels
         title: IPsec Tunnels
@@ -207,12 +213,46 @@ groups:
         title: IPsec Tunnel SA Remaining Lifetime
         context: ipsec.tunnel.sa_lifetime
         units: seconds
+        aggregation: max
         label_promotion: [protocol, encryption]
         instances:
           by_labels: [tunnel, gateway, remote, tunnel_id]
         dimensions:
           - selector: ipsec_tunnel_sa_lifetime
             name: remaining_lifetime
+      - id: ipsec_tunnel_state
+        title: IPsec Tunnel State
+        context: ipsec.tunnel.state
+        units: state
+        type: stacked
+        lifecycle:
+          expire_after_cycles: 1
+        instances:
+          by_labels: [tunnel, tunnel_id]
+        dimensions:
+          - selector: ipsec_tunnel_state_active
+            name: active
+          - selector: ipsec_tunnel_state_inactive
+            name: inactive
+          - selector: ipsec_tunnel_state_init
+            name: init
+          - selector: ipsec_tunnel_state_unknown
+            name: unknown
+      - id: ipsec_gateway_state
+        title: IPsec Gateway State
+        context: ipsec.gateway.state
+        units: state
+        type: stacked
+        lifecycle:
+          expire_after_cycles: 1
+        label_promotion: [ike_version]
+        instances:
+          by_labels: [gateway]
+        dimensions:
+          - selector: ipsec_gateway_state_down
+            name: down
+          - selector: ipsec_gateway_state_up
+            name: up
 
   - family: bgp peers
     metrics:

@@ -11,7 +11,7 @@
 #include "machine-guid.h"
 #include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 29
+#define STATUS_FILE_VERSION 30
 #define DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER STACK_TRACE_INFO_PREFIX " shutdown steps timings"
 
 typedef enum {
@@ -69,7 +69,13 @@ typedef struct daemon_status_file {
         time_t init;
         usec_t exit_started_ut;
         time_t exit;
+        usec_t exit_ut;         // monotonic duration of a completed shutdown, set by the shutdown watcher
     } timings;
+
+    struct {
+        char abandoned[640];    // services and threads shutdown gave up waiting for, in step order
+        char sqlite_unsafe[160];// the first reason the SQLite teardown was suppressed
+    } shutdown;
 
     uint64_t oom_protection;
     uint64_t netdata_max_rss;
@@ -147,6 +153,9 @@ void daemon_status_file_check_crash(void);
 
 bool daemon_status_file_has_last_crashed(DAEMON_STATUS_FILE *ds);
 bool daemon_status_file_was_incomplete_shutdown(void);
+void daemon_status_file_set_shutdown_duration_ut(usec_t duration_ut);
+void daemon_status_file_shutdown_gave_up(const char *services, const char *threads);
+usec_t daemon_status_file_last_shutdown_duration_ut(void);
 
 void daemon_status_file_startup_step(const char *step);
 void daemon_status_file_shutdown_step(const char *step, const char *step_timings);

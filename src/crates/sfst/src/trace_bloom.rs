@@ -1,47 +1,68 @@
 //! The trace-id bloom filter (`TBLM` chunk): a per-file membership pre-check
-//! that lets a reader skip a whole file without touching `TIDX`/`TRCE`.
+//! that lets trace-by-id lookups skip a whole file without touching
+//! `TIDX`/`TRCE`.
 //!
-//! `TIDX` answers "where are this trace's spans" in O(log) *within* a file;
-//! what it cannot do is make "not in this file" cheap across MANY files — the
-//! cross-file trace-by-id (the query engine's fan-out) would otherwise open
-//! every candidate file's index. The bloom is the industry-standard answer
-//! (Tempo's only auxiliary index is exactly this): one small chunk read gives
-//! "definitely absent" for ~95% of non-member files at the configured 5%
-//! false-positive rate. False positives cost only a wasted `TIDX` lookup;
+//! `TIDX` locates a trace's spans *within* one file; it cannot make "not in
+//! this file" cheap across MANY files — the cross-file fan-out would
+//! otherwise open every candidate file's index. A bloom `false` is definitive
+//! and skips the file; a false positive costs one wasted `TIDX` lookup;
 //! false negatives cannot happen.
 //!
-//! The filter itself is [`fastbloom::BloomFilter`] — an audited, widely-used
-//! crate (no `unsafe` in its source as of the pinned version; see the
-//! workspace `Cargo.toml` pin note) — serialized verbatim inside the chunk via
-//! serde, so the on-disk payload is self-describing (bit length, hash count,
-//! and seeded hasher state all travel with it). Build-time policy lives here:
-//! 5% target FP over the file's DISTINCT non-unset trace ids, one filter per
-//! file, and a constant seed so identical inputs seal to identical bytes.
+//! The filter is a `fastbloom::BloomFilter` serialized verbatim inside the
+//! chunk via serde, so the payload is self-describing: bit length, hash
+//! count, and seeded hasher state all travel with it. The crate is pinned
+//! and audited `unsafe`-free per version (see the workspace `Cargo.toml`).
 //!
-//! Same additive TOC-indexed contract as `TIDX`/`EVNB`/`LNKB`: optional,
-//! detected via the TOC, no format version bump; absent when the file has no
-//! set trace ids.
+//! Write-time policy lives here: a 0.001% false-positive target over the
+//! file's DISTINCT non-unset trace ids, one filter per file, a constant seed
+//! so identical inputs write identical bytes, ~24 bits per distinct id
+//! (≈3 MB per million). The target is tight because one query probes every
+//! file's filter per candidate and a false positive costs a decode (~0.5 ms
+//! against a ~50 ns probe): at 5% a trace lookup decoded ~12 files' lookup
+//! structures for nothing at 243 files. Files sealed before this target
+//! carry 5% filters (≈6.25 bits per id); the payload says which
+//! ([`is_tight`](TraceIdBloom::is_tight)). Bounding the cardinality is the
+//! producer's responsibility (file-rotation limits), not this module's.
 //!
-//! Build-time sizing is ~6.25 bits per distinct id (≈0.8 MB per million
-//! distinct traces): bounded in practice by the producer's file-rotation
-//! limits, not here — bounding distinct-id cardinality is the seal's
-//! responsibility (see the production-cutover ingest caps).
+//! Chunk contract: additive and TOC-detected like `TIDX`/`EVNB`/`LNKB` (no
+//! format version bump); the chunk is absent when the file has no set trace
+//! ids. Consumers: `reader.rs` decodes and validates it at the trust
+//! boundary; `index_reader/session.rs` tests it per id and, when corrupt,
+//! warns once and degrades to exact `TIDX` lookups.
+//!
+//! The same type serves as a session's query-time screen: for a file whose
+//! sealed filter is not tight (or is absent or corrupt), a session that
+//! looks up many ids builds one from the lookup structures, so such a file
+//! costs one lookup decode per query instead of one per false positive.
+//!
+//! [`RepeatFilter`] is a query-time sibling: fixed memory, it tells which
+//! ids were recorded more than once (by a query, once per source), so a
+//! trace held by exactly one source can be decided from that source alone.
 
 use fastbloom::BloomFilter;
 use serde::{Deserialize, Serialize};
 
 use crate::{Error, TraceId, TraceIdIndex, TraceIds};
 
-/// Build-time false-positive target over the distinct ids (≈6.25 bits/id).
-const FALSE_POSITIVE_RATE: f64 = 0.05;
+/// False-positive target over the distinct ids (≈24 bits/id, ~30 KB for
+/// 10k distinct ids), sealed and query-time alike. A false positive costs
+/// a decode (lookup structures, or a rollup for the trace-level gate,
+/// ~0.5 ms) where a probe costs ~50 ns: this rate keeps those decodes near
+/// 0.5% of the probe work; at 0.1% they doubled a gated search's time.
+const FALSE_POSITIVE_RATE: f64 = 0.000_01;
 
-/// Constant hashing seed: identical inputs seal to byte-identical chunks
+/// A filter whose estimated false-positive rate is at most this needs no
+/// query-time screen (an order of magnitude above the target, so filter
+/// sizing details never matter; a 5% filter is far above it).
+const TIGHT_FALSE_POSITIVE_RATE: f64 = 0.000_1;
+
+/// Constant hashing seed: identical inputs write byte-identical chunks
 /// (reproducible files), and the seed state serializes with the filter so
 /// readers never depend on this constant.
 const SEED: u128 = 0x6e64_5442_4c4d_2031; // arbitrary, stable ("ndTBLM 1")
 
 /// Body of the `TBLM` chunk. `distinct_ids` is carried for validation and
-/// diagnostics (the filter itself does not expose its build-time item count).
+/// diagnostics (the filter itself does not expose its write-time item count).
 ///
 /// Equality note: the derived `PartialEq` delegates to fastbloom's, which
 /// compares bits + hash count but NOT the hasher seed — `==` is structural,
@@ -53,20 +74,23 @@ pub struct TraceIdBloom {
 }
 
 impl TraceIdBloom {
-    /// Build the per-file filter from the file's sorted trace-id index —
-    /// adjacent-dedup over the permutation yields each distinct id exactly
-    /// once, collected up front because the filter must be sized before
-    /// insertion. The transient `Vec` costs 16 B per distinct id, bounded by
-    /// the `TRCE` column the seal already holds in memory twice
-    /// (insertion-order + chronological) — never the peak. Returns `None`
-    /// when the file has no set (non-zero) trace ids: no chunk is written,
-    /// and a reader treats absence as "cannot skip".
+    /// Build the per-file filter from the file's sorted trace-id index.
+    /// Returns `None` when the file has no set (non-zero) trace ids: no
+    /// chunk is written (the writer declares `TBLM` only when a set id
+    /// exists), and a reader treats absence as "cannot skip".
     ///
     /// `trace_ids` MUST be the chronological `TRCE` column `index` was built
     /// from (the same coupling `TraceIdIndex::positions` documents).
+    ///
+    /// A session builds its query-time screen the same way, from the lookup
+    /// pair the exact lookup reads, so a screen never rules out an id that
+    /// lookup would find.
     pub(crate) fn build(index: &TraceIdIndex, trace_ids: &TraceIds) -> Option<Self> {
-        // One pass: the filter needs its item count BEFORE insertion (sizing),
-        // so collect the distinct ids rather than walking the permutation twice.
+        // fastbloom sizes the filter from the item count BEFORE insertion, so
+        // collect the distinct ids — adjacent-dedup over the sorted
+        // permutation, each exactly once — into a transient `Vec` first. That
+        // buffer costs 16 B per distinct id, bounded by the `TRCE` column the
+        // caller already holds.
         let distinct: Vec<TraceId> = index.distinct_ids(trace_ids).collect();
         if distinct.is_empty() {
             return None;
@@ -84,15 +108,28 @@ impl TraceIdBloom {
     }
 
     /// Whether the file MIGHT contain `id`. `false` is definitive (no false
-    /// negatives); `true` is probabilistic (~5% of absent ids). The unset
-    /// (all-zero) id forms no trace and is never contained.
+    /// negatives); `true` is probabilistic (the filter's false-positive
+    /// rate over absent ids). The unset (all-zero) id forms no trace and is
+    /// never contained.
     pub fn might_contain(&self, id: TraceId) -> bool {
         !id.is_unset() && self.filter.contains(id.as_bytes())
     }
 
-    /// Distinct set trace ids at build time.
+    /// Distinct set trace ids the filter was built from.
     pub fn distinct_ids(&self) -> u32 {
         self.distinct_ids
+    }
+
+    /// Whether the filter is tight enough that a query-time screen would add
+    /// nothing: its estimated false-positive rate, `(1 - e^(-k·n/m))^k`
+    /// over its bits `m`, hashes `k` and distinct ids `n`, is at most
+    /// 0.01%. False for 5% filters sealed before the tight target. Call on a
+    /// validated filter (the reader validates).
+    pub fn is_tight(&self) -> bool {
+        let m = self.filter.num_bits() as f64;
+        let k = f64::from(self.filter.num_hashes());
+        let n = f64::from(self.distinct_ids);
+        (1.0 - (-k * n / m).exp()).powf(k) <= TIGHT_FALSE_POSITIVE_RATE
     }
 
     /// Test-only constructor for deliberately malformed filters (validate /
@@ -107,10 +144,12 @@ impl TraceIdBloom {
 
     /// Panic-safety validation at the trust boundary (the `TIDX` contract):
     /// a decoded chunk claiming an impossible shape surfaces as
-    /// [`Error::CorruptIndex`] so the query layer skips the file.
+    /// [`Error::CorruptIndex`]. The bloom is only a hint, so corruption never
+    /// skips the file — `index_reader/session.rs` warns once and falls back
+    /// to exact `TIDX` lookups.
     ///
     /// This deliberately reaches INTO the decoded filter, not just our
-    /// envelope: serde bypasses the crate's constructor asserts, so a
+    /// envelope: serde bypasses fastbloom's constructor asserts, so a
     /// CRC-valid crafted chunk could deserialize a filter whose bit vector is
     /// empty (`contains` would index it — panic) or whose hash count is
     /// absurd (`contains` would run up to ~4B probes per lookup — a stall).
@@ -133,12 +172,12 @@ impl TraceIdBloom {
                 "trace_id bloom filter has an empty bit vector".into(),
             ));
         }
-        // The optimal hash count at our 5% target is 4 for normal filters —
-        // but fastbloom floors the filter at 64 bits, which inflates the
-        // optimal k for tiny files (a legitimate 1-distinct-id filter at 5%
-        // computes k = 44). The cap must therefore stay >= 44; do NOT tighten
-        // it toward the "normal" optimum or freshly-rolled low-volume files
-        // become unreadable.
+        // The optimal hash count is 4 for normal filters at the old 5% target
+        // and ~17 at 0.001% — but fastbloom floors the filter at 64 bits,
+        // which inflates the optimal k for tiny files (a legitimate
+        // 1-distinct-id filter computes k = 44 at either target). The cap
+        // must therefore stay >= 44; do NOT tighten it toward the "normal"
+        // optimum or freshly-rolled low-volume files become unreadable.
         //
         // fastbloom's `num_hashes()` computes `num_hashes_minus_one + 1`
         // UNCHECKED on a serde-visible private field: a crafted chunk carrying
@@ -166,6 +205,28 @@ impl TraceIdBloom {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Ids recorded once never repeat; ids recorded twice always do (no
+    /// false negatives); a never-recorded id does not.
+    #[test]
+    fn repeat_filter_tells_once_from_more() {
+        let id = |i: u32| {
+            let mut b = [0u8; 16];
+            b[..4].copy_from_slice(&i.to_be_bytes());
+            b[15] = 1;
+            TraceId::from(b)
+        };
+        let mut filter = RepeatFilter::new();
+        for i in 0..20_000 {
+            filter.record(id(i));
+        }
+        for i in 10_000..20_000 {
+            filter.record(id(i));
+        }
+        assert!((0..10_000).all(|i| !filter.may_repeat(id(i))));
+        assert!((10_000..20_000).all(|i| filter.may_repeat(id(i))));
+        assert!(!filter.may_repeat(id(99_999)));
+    }
 
     fn id(seed: u8, tail: u8) -> TraceId {
         let mut a = [0u8; 16];
@@ -204,9 +265,9 @@ mod tests {
     }
 
     #[test]
-    fn false_positive_rate_near_target() {
-        // 10k distinct member ids; probe 100k absent ids. Expect ~5%,
-        // asserted loosely (< 2x target) to stay robust across crate versions.
+    fn false_positives_stay_near_the_target() {
+        // 10k distinct member ids, 100k absent probes: at 0.001%, one
+        // false positive expected; ten would be 100x the target.
         let members: Vec<TraceId> = (0..10_000u32)
             .map(|i| {
                 let mut a = [0u8; 16];
@@ -217,23 +278,38 @@ mod tests {
             .collect();
         let (col, idx) = indexed(&members);
         let bloom = TraceIdBloom::build(&idx, &col).unwrap();
+        assert!(members.iter().all(|&m| bloom.might_contain(m)));
+        let probes = 100_000u32;
+        let hits = (0..probes)
+            .filter(|i| {
+                let mut a = [0u8; 16];
+                a[..4].copy_from_slice(&i.to_be_bytes());
+                a[8] = 0xAB; // disjoint from the member universe
+                bloom.might_contain(TraceId::from(a))
+            })
+            .count();
+        assert!(hits < 10, "{hits} false positives in {probes} probes");
+    }
 
-        let mut hits = 0u32;
-        const PROBES: u32 = 100_000;
-        for i in 0..PROBES {
+    #[test]
+    fn built_filters_are_tight_and_old_five_percent_ones_are_not() {
+        for n in [1u8, 2, 200] {
+            let ids: Vec<TraceId> = (0..n).map(|i| id(i, 1)).collect();
+            let (col, idx) = indexed(&ids);
+            let bloom = TraceIdBloom::build(&idx, &col).unwrap();
+            bloom.validate(ids.len()).unwrap();
+            assert!(bloom.is_tight(), "{n} ids");
+        }
+        // A filter sealed at the former 5% target.
+        let mut loose = BloomFilter::with_false_pos(0.05)
+            .seed(&SEED)
+            .expected_items(10_000);
+        for i in 0..10_000u32 {
             let mut a = [0u8; 16];
             a[..4].copy_from_slice(&i.to_be_bytes());
-            a[8] = 0xAB; // disjoint from the member universe
-            if bloom.might_contain(TraceId::from(a)) {
-                hits += 1;
-            }
+            loose.insert(&a);
         }
-        let rate = hits as f64 / PROBES as f64;
-        assert!(
-            rate < 0.10,
-            "measured FP rate {rate} exceeds 2x the 5% target"
-        );
-        assert!(rate > 0.005, "suspiciously low FP rate {rate} — wrong n?");
+        assert!(!TraceIdBloom::raw_for_tests(10_000, loose).is_tight());
     }
 
     #[test]
@@ -250,7 +326,7 @@ mod tests {
 
     #[test]
     fn bincode_round_trip_through_the_chunk_codec() {
-        // The crate tests its serde support with serde_cbor; OUR chunk codec
+        // fastbloom tests its serde support with serde_cbor; OUR chunk codec
         // is bincode+zstd (`writer::pack` / `reader::unpack`). Round-trip
         // through the real codec — seed/hasher state must survive, proven by
         // identical membership answers.
@@ -432,10 +508,9 @@ mod tests {
             tree: SchemaTree::flat(&Vec::new().into()),
             columns: ColumnsTable::default(), // no TRCE in the manifest
         };
-        let prim = crate::PrefixMap::<crate::BitmapValue>::build(
-            Vec::<(&str, crate::BitmapValue)>::new(),
-        )
-        .unwrap();
+        let prim =
+            crate::PrefixMap::<crate::BitmapValue>::build(Vec::<(&str, crate::BitmapValue)>::new())
+                .unwrap();
 
         let mut w = chunk_file::container::StreamingWriter::new(
             std::io::Cursor::new(Vec::new()),
@@ -444,16 +519,31 @@ mod tests {
             7,
         )
         .unwrap();
-        w.write_chunk(crate::CHUNK_SUMMARY, &crate::writer::pack(&summary, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_META, &crate::writer::pack(&metadata, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TIMS, &crate::writer::pack(&[1i64][..], lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_PRIMARY, &crate::writer::pack(&prim, lvl).unwrap())
-            .unwrap();
-        w.write_chunk(crate::CHUNK_TRACE_INDEX, &crate::writer::pack(&idx, lvl).unwrap())
-            .unwrap();
+        w.write_chunk(
+            crate::CHUNK_SUMMARY,
+            &crate::writer::pack(&summary, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_META,
+            &crate::writer::pack(&metadata, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TIMS,
+            &crate::writer::pack(&[1i64][..], lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_PRIMARY,
+            &crate::writer::pack(&prim, lvl).unwrap(),
+        )
+        .unwrap();
+        w.write_chunk(
+            crate::CHUNK_TRACE_INDEX,
+            &crate::writer::pack(&idx, lvl).unwrap(),
+        )
+        .unwrap();
         w.write_chunk(
             crate::CHUNK_TRACE_BLOOM,
             &crate::writer::pack(&bloom, lvl).unwrap(),
@@ -468,6 +558,66 @@ mod tests {
 
         let reader = crate::reader::ChunkReader::open(&buf).unwrap();
         assert!(reader.has_trace_id_bloom() && reader.has_trace_id_index());
-        assert!(reader.trace_id_bloom().is_err(), "missing TRCE column rejected");
+        assert!(
+            reader.trace_id_bloom().is_err(),
+            "missing TRCE column rejected"
+        );
+    }
+}
+
+/// Fixed-memory "recorded more than once?" filter over trace ids: two
+/// blooms, one of every recorded id and one of the ids recorded while
+/// already present. A query records each id once per source; then
+/// [`may_repeat`](Self::may_repeat) `false` proves the id came from at
+/// most one source. Memory never grows: more ids only raise the false
+/// positives, which answer `true` (the safe side).
+#[derive(Debug, Clone)]
+pub struct RepeatFilter {
+    seen: BloomFilter,
+    repeated: BloomFilter,
+}
+
+impl RepeatFilter {
+    /// Bits per bloom: 4 MiB each. At a day of a busy agent (~2.5 M
+    /// distinct ids) a once-recorded id answers `true` about 0.1% of the
+    /// time (0.4% for the last ids recorded).
+    const BITS: usize = 1 << 25;
+    /// Hashes per id: fewer than the optimum for the ids above (`m/n·ln 2`
+    /// is ~9), for half the probes per id.
+    const HASHES: u32 = 4;
+
+    pub fn new() -> Self {
+        let bloom = || {
+            BloomFilter::with_num_bits(Self::BITS)
+                .seed(&SEED)
+                .hashes(Self::HASHES)
+        };
+        Self {
+            seen: bloom(),
+            repeated: bloom(),
+        }
+    }
+
+    /// Record one occurrence of `id` (callers record an id once per
+    /// source).
+    pub fn record(&mut self, id: TraceId) {
+        let bytes = id.as_bytes();
+        if self.seen.contains(bytes) {
+            self.repeated.insert(bytes);
+        } else {
+            self.seen.insert(bytes);
+        }
+    }
+
+    /// Whether `id` may have been recorded more than once. `false` is
+    /// definitive (no false negatives).
+    pub fn may_repeat(&self, id: TraceId) -> bool {
+        self.repeated.contains(id.as_bytes())
+    }
+}
+
+impl Default for RepeatFilter {
+    fn default() -> Self {
+        Self::new()
     }
 }

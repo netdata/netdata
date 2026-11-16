@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func LinkInferenceValue(link Link) string {
@@ -57,7 +58,7 @@ func LinkBGPRoutingInstance(link Link) string {
 	if link.Detail.BGP == nil {
 		return ""
 	}
-	return strings.TrimSpace(link.Detail.BGP.RoutingInstance)
+	return topologyutil.FirstBGPIdentifier(link.Detail.BGP.RoutingInstance)
 }
 
 func LinkBGPLocalIP(link Link) string {

@@ -1,0 +1,314 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package runtimehost
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
+	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
+	"github.com/stretchr/testify/require"
+)
+
+func testStore(t *testing.T) *browserruntime.Store {
+	t.Helper()
+	config := browserruntime.DefaultConfig(filepath.Join(t.TempDir(), "store"))
+	config.PreviousRetention = 0
+	store, err := browserruntime.Open(config)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	return store
+}
+
+var installSequence atomic.Uint64
+
+// Each installation publishes a sequence above every earlier one in this process.
+func installBundle(t *testing.T, store *browserruntime.Store, version string) browserruntime.Manifest {
+	t.Helper()
+	release, data := publishedBundle(t, version, installSequence.Add(1))
+	selectPublished(t, store, release, data, browserruntime.ManualUpdates)
+	return release.Manifest
+}
+
+// publishedBundle describes the shared fixture payload as a published release.
+// Its synthetic bytes prove storage and host ownership, not browser
+// qualification.
+func publishedBundle(t *testing.T, version string, sequence uint64) (browserruntime.Release, []byte) {
+	t.Helper()
+	b := browserruntimetest.NewBundle(t, version)
+	m := browserruntime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  version,
+		Platform: "linux/" + runtime.GOARCH,
+		Archive:  browserruntime.Archive(b.Bounds),
+		Layout:   browserruntime.Layout(b.Layout),
+	}
+	m.Archive.URL = "https://artifacts.example.invalid/runtime.tar.zst"
+	for _, binding := range b.Bindings {
+		m.Bindings = append(m.Bindings, browserruntime.Binding(binding))
+	}
+	require.NoError(t, m.Validate())
+	return browserruntime.Release{
+		Format:   1,
+		Sequence: sequence,
+		Manifest: m,
+		Sources: browserruntime.ReleaseSource{
+			URL:    "https://artifacts.example.invalid/sources.tar.zst",
+			SHA256: strings.Repeat("a", 64),
+			Bytes:  100,
+		},
+	}, b.Data
+}
+
+// verifiedRelease signs release with the fixture publisher key and authenticates
+// it as a production loader does.
+func verifiedRelease(t *testing.T, release browserruntime.Release) browserruntime.VerifiedRelease {
+	t.Helper()
+	key := pgptest.Key(t, 66)
+	public, err := browserruntime.ParseReleaseKeyring(pgptest.Public(t, key))
+	require.NoError(t, err)
+	envelope, err := pgptest.Release(release, key)
+	require.NoError(t, err)
+	verified, err := browserruntime.VerifyRelease(envelope, public)
+	require.NoError(t, err)
+	return verified
+}
+
+func selectPublished(
+	t *testing.T,
+	store *browserruntime.Store,
+	release browserruntime.Release,
+	data []byte,
+	policy browserruntime.UpdatePolicy,
+) {
+	t.Helper()
+	verified := verifiedRelease(t, release)
+	// Non-executable bytes test acquisition/ownership; this does not qualify a browser.
+	path := filepath.Join(t.TempDir(), "archive.tar.zst")
+	require.NoError(t, os.WriteFile(path, data, 0600))
+	candidate, err := store.BeginPublishedInstall(
+		context.Background(),
+		browserruntime.ReleaseInstallOptions{
+			Operation: browserruntime.InstallRelease,
+			Updates:   policy,
+		},
+		func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil },
+	)
+	require.NoError(t, err)
+	require.NoError(t, candidate.Import(context.Background(), path))
+	require.NoError(t, candidate.Select())
+	require.NoError(t, candidate.Close())
+}
+
+func newTestHost(t *testing.T, store *browserruntime.Store) *Host {
+	t.Helper()
+	host := newManaged(store)
+	t.Cleanup(func() { require.NoError(t, host.Close()) })
+	return host
+}
+
+func TestHostSelectionIsFixedAcrossInstallationUpdates(t *testing.T) {
+	store := testStore(t)
+	first := installBundle(t, store, "first")
+	old := newTestHost(t, store)
+	require.NoError(t, old.Ready())
+	second := installBundle(t, store, "second")
+	newer := newTestHost(t, store)
+	require.NoError(t, newer.Ready())
+	require.NoError(t, store.Sweep())
+	for _, test := range []struct {
+		host     *Host
+		manifest browserruntime.Manifest
+	}{{old, first}, {newer, second}} {
+		use, err := test.host.BeginUse()
+		require.NoError(t, err)
+		require.Equal(t, test.manifest.Archive.SHA256, use.Paths().Identity.SHA256)
+		require.Equal(t, test.manifest.Version, use.Paths().Identity.Version)
+		require.Equal(t, test.manifest.Contract, use.Paths().Identity.Contract)
+		require.FileExists(t, use.Paths().Node)
+		content, err := os.ReadFile(use.Paths().EntryPoint)
+		require.NoError(t, err)
+		require.Equal(t, test.manifest.Version, string(content))
+		require.NotNil(t, use.Completion())
+		require.NoError(t, use.Finish(true))
+	}
+	require.Equal(t, first.Identity(), *old.identity)
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Equal(t, second, status.Release.Manifest)
+	require.Equal(t, 2, status.ProcessClaims)
+	require.ErrorIs(t, store.Uninstall(t.Context()), browserruntime.ErrInUse)
+	require.NoError(t, old.Close())
+	require.Error(t, old.Ready())
+	require.ErrorIs(t, store.Uninstall(t.Context()), browserruntime.ErrInUse)
+	require.NoError(t, newer.Close())
+	require.NoError(t, store.Uninstall(t.Context()))
+}
+
+func TestMissingStartupSelectionRequiresNewProcess(t *testing.T) {
+	store := testStore(t)
+	empty := newTestHost(t, store)
+	require.ErrorIs(t, empty.Ready(), browserruntime.ErrUnavailable)
+	require.ErrorContains(t, empty.Ready(), "install a browser runtime and restart")
+	manifest := installBundle(t, store, "installed-after-start")
+	empty.sweep()
+	require.ErrorIs(t, empty.Ready(), browserruntime.ErrUnavailable)
+	require.Nil(t, empty.identity)
+	_, err := empty.BeginUse()
+	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
+	next := newTestHost(t, store)
+	require.NoError(t, next.Ready())
+	require.Equal(t, manifest.Identity(), *next.identity)
+}
+
+func TestSelectedInstallationSurvivesMaintenanceWithoutBrowserJobs(t *testing.T) {
+	store := testStore(t)
+	manifest := installBundle(t, store, "retained")
+	host := newTestHost(t, store)
+	host.sweepInterval = time.Millisecond
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go host.Run(ctx)
+	require.Eventually(t, func() bool {
+		host.mu.Lock()
+		defer host.mu.Unlock()
+		return host.started
+	}, time.Second, time.Millisecond)
+	require.NoError(t, host.Close())
+	require.NoError(t, store.Sweep())
+	consumer, err := store.AcquireSelected()
+	require.NoError(t, err)
+	require.Equal(t, manifest.Archive.SHA256, consumer.Manifest().Archive.SHA256)
+	require.NoError(t, consumer.Close())
+}
+
+func TestLostSelectedGenerationRequiresRepairRatherThanInstall(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store")
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	manifest := installBundle(t, store, "installed")
+	generation := filepath.Join(path, "generations", manifest.Archive.SHA256)
+	require.NoError(t, os.Rename(generation, filepath.Join(t.TempDir(), "lost")))
+	host := newTestHost(t, store)
+	require.ErrorIs(t, host.Ready(), browserruntime.ErrDamaged)
+	require.NotErrorIs(t, host.Ready(), browserruntime.ErrUnavailable)
+	require.ErrorContains(t, host.Ready(), "runtime repair")
+}
+
+func TestUncertainExecutionOutlivesHost(t *testing.T) {
+	store := testStore(t)
+	installBundle(t, store, "uncertain")
+	host := newTestHost(t, store)
+	use, err := host.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, use.Finish(false))
+	require.NoError(t, host.Close())
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Zero(t, status.ProcessClaims)
+	require.Equal(t, 1, status.UncertainPins)
+	require.ErrorIs(t, store.Uninstall(t.Context()), browserruntime.ErrInUse)
+}
+
+func TestExecutionFinishErrorIsMaintenanceNotReadiness(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store")
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	installBundle(t, store, "maintenance")
+	host := newTestHost(t, store)
+	var logs healthLog
+	host.log = logger.NewWithWriter(&logs)
+	use, err := host.BeginUse()
+	require.NoError(t, err)
+	trash := filepath.Join(path, "trash")
+	require.NoError(t, os.Rename(trash, trash+".saved"))
+	require.NoError(t, os.WriteFile(trash, []byte("blocked"), 0600))
+	finishErr := use.Finish(true)
+	require.NoError(t, os.Rename(trash, trash+".failed"))
+	require.NoError(t, os.Rename(trash+".saved", trash))
+	require.Error(t, finishErr)
+	require.Contains(t, logs.String(), "execution completion failed")
+	require.NoError(t, host.Ready())
+	other, err := host.BeginUse()
+	require.NoError(t, err)
+	require.NoError(t, other.Finish(true))
+	require.NotContains(t, logs.String(), "recovered", "a healthy invocation cannot clear an earlier failure")
+	host.sweep()
+	require.Equal(t, 1, strings.Count(logs.String(), "execution completion recovered"))
+	status, err := store.Inspect()
+	require.NoError(t, err)
+	require.Zero(t, status.ExecutionPins)
+}
+
+func TestExecutionAdmissionFailureCanRetrySameSelection(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "store")
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, store.Close()) })
+	manifest := installBundle(t, store, "retry")
+	host := newTestHost(t, store)
+	uses := filepath.Join(path, "uses")
+	require.NoError(t, os.Rename(uses, uses+".saved"))
+	require.NoError(t, os.WriteFile(uses, []byte("blocked"), 0600))
+	_, useErr := host.BeginUse()
+	require.NoError(t, os.Rename(uses, uses+".failed"))
+	require.NoError(t, os.Rename(uses+".saved", uses))
+	require.Error(t, useErr)
+	require.NoError(t, host.Ready())
+	use, err := host.BeginUse()
+	require.NoError(t, err)
+	require.Equal(t, manifest.Archive.SHA256, use.Paths().Identity.SHA256)
+	require.NoError(t, use.Finish(true))
+}
+
+func TestHandleIdentityNamesTheRunningRelease(t *testing.T) {
+	for _, mode := range []Mode{ModeManaged, ModePreloaded} {
+		t.Run(string(mode), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "runtime")
+			store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
+			require.NoError(t, err)
+			release, data := publishedBundle(t, "handle", installSequence.Add(1))
+			cfg := DefaultConfig()
+			cfg.Mode = mode
+			if mode == ModeManaged {
+				selectPublished(t, store, release, data, browserruntime.ManualUpdates)
+				cfg.CachePath = path
+			} else {
+				verified := verifiedRelease(t, release)
+				archive := filepath.Join(t.TempDir(), "archive.tar.zst")
+				require.NoError(t, os.WriteFile(archive, data, 0600))
+				candidate, err := store.BeginPublishedInstall(
+					context.Background(),
+					browserruntime.ReleaseInstallOptions{
+						Operation: browserruntime.InstallRelease,
+						Updates:   browserruntime.ManualUpdates,
+					},
+					func(context.Context) (browserruntime.VerifiedRelease, error) { return verified, nil },
+				)
+				require.NoError(t, err)
+				require.NoError(t, candidate.Import(context.Background(), archive))
+				require.NoError(t, candidate.SealPreload())
+				require.NoError(t, candidate.Close())
+				cfg.PreloadPath = path
+			}
+			require.NoError(t, store.Close())
+			handle := Open(cfg, "")
+			t.Cleanup(func() { require.NoError(t, handle.Close()) })
+			require.NoError(t, handle.SetupError)
+			require.Equal(t, release.Manifest.Identity(), handle.Identity())
+			require.Nil(t, handle.NativeStatus(), "only native mode inspects package proof")
+		})
+	}
+}

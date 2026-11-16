@@ -189,7 +189,7 @@ func newCollectorMetrics(store metrix.CollectorStore) *collectorMetrics {
 		},
 		node: nodeGauges{
 			perf:          newPerfVecs(nodeVec, "node"),
-			currentLogins: nodeVec.Gauge("node_current_logins"),
+			currentLogins: nodeVec.Gauge("node_current_logins", metrix.WithFloat(true)),
 		},
 		fcPort: fcPortGauges{
 			perf:   newPerfVecs(fcVec, "fc_port"),

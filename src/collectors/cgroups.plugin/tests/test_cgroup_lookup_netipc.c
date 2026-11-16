@@ -524,6 +524,12 @@ cleanup_root_mutex:
 cleanup_pattern:
     simple_pattern_free(search_cgroup_paths);
 cleanup_dir:
+    {
+        // NetIPC keeps the endpoint lock file after the server stops.
+        char lock_path[FILENAME_MAX + 1];
+        snprintfz(lock_path, sizeof(lock_path) - 1, "%s/%s.lock", temp_dir, service_name);
+        (void)unlink(lock_path);
+    }
     (void)rmdir(temp_dir);
     return rc;
 }

@@ -1,0 +1,86 @@
+---
+name: Rust Tests
+on:
+  push:
+    branches:
+      - master
+  pull_request: null
+concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
+  group: rust-tests-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+permissions:
+  contents: read
+jobs:
+  file-check: # Check what files changed if we’re being run in a PR or on a push.
+    name: Check Modified Files
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.check-run.outputs.run }}
+    steps:
+      - name: Checkout
+        id: checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Check files
+        id: check-files
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            .github/workflows/rust-tests.yml
+            src/crates/**
+          files_ignore: |
+            **/*.md
+            src/crates/**/metadata.yaml
+      - name: List all changed files in pattern
+        continue-on-error: true
+        env:
+          ALL_CHANGED_FILES: ${{ steps.check-files.outputs.all_changed_files }}
+        run: |
+          for file in ${ALL_CHANGED_FILES}; do
+            echo "$file was changed"
+          done
+      - name: Check Run
+        id: check-run
+        run: |
+          if [ "${{ steps.check-files.outputs.any_modified }}" == "true" ]; then
+            echo 'run=true' >> "${GITHUB_OUTPUT}"
+          else
+            echo 'run=false' >> "${GITHUB_OUTPUT}"
+          fi
+
+  tests:
+    name: Rust workspace tests
+    runs-on: ubuntu-latest
+    needs:
+      - file-check
+    timeout-minutes: 60
+    steps:
+      - name: Skip Check
+        id: skip
+        if: needs.file-check.outputs.run != 'true'
+        run: echo "SKIPPED"
+      - name: Checkout
+        if: needs.file-check.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install MSRV toolchain # Tests run on the oldest Rust the workspace promises to build with.
+        if: needs.file-check.outputs.run == 'true'
+        run: |
+          msrv="$(sed -n 's/^rust-version = "\(.*\)"$/\1/p' src/crates/Cargo.toml)"
+          if [ -z "${msrv}" ]; then
+            echo "::error::rust-version not found in src/crates/Cargo.toml"
+            exit 1
+          fi
+          rustup toolchain install "${msrv}" --profile minimal
+          echo "RUSTUP_TOOLCHAIN=${msrv}" >> "${GITHUB_ENV}"
+      - name: Cargo test
+        if: needs.file-check.outputs.run == 'true'
+        working-directory: src/crates
+        env: # Incremental artifacts and full debug info would triple the build size on the runner's limited disk.
+          CARGO_INCREMENTAL: 0
+          CARGO_PROFILE_DEV_DEBUG: line-tables-only
+          CARGO_TERM_COLOR: always
+        run: |
+          cargo --version
+          cargo test --locked --workspace --exclude netflow-plugin --exclude netipc

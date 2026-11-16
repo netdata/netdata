@@ -241,7 +241,7 @@ metrics:
     metric_tags:
       - tag: temperature_index
         symbol:
-          OID: 1.3.6.1.4.1.232.6.2.6.8.1.3
+          OID: 1.3.6.1.4.1.232.6.2.6.8.1.2
           name: cpqHeTemperatureIndex
 
     # Power supplies.

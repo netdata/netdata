@@ -7,6 +7,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -16,8 +18,11 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/discovery/dummy"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
+	secretconfig "github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/backends"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -110,15 +115,35 @@ func TestAgent_setupRuntimeService(t *testing.T) {
 func TestAgent_Run(t *testing.T) {
 	tests := map[string]struct {
 		restarts int
+		secrets  bool
 	}{
-		"collects and terminates": {},
+		"collects and terminates with secrets":    {secrets: true},
+		"collects and terminates without secrets": {},
+		"restart without secrets":                 {restarts: 1},
 		"acknowledged restart rotates the complete generation": {
 			restarts: 1,
+			secrets:  true,
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			a := newLifecycleTestAgent()
+			root := t.TempDir()
+			require.NoError(t, os.MkdirAll(filepath.Join(root, "ss"), 0755))
+			require.NoError(t, os.WriteFile(filepath.Join(root, "ss", "vault.conf"), []byte("jobs:\n  - name: sentinel\n    kind: vault\n"), 0600))
+			a.CollectorsConfDir = []string{root}
+			loads := 0
+			a.loadSecretStores = func(roots []string) ([]secretstore.Config, []error) {
+				loads++
+				return secretstore.LoadFileConfigs(roots)
+			}
+			if test.secrets {
+				resolver, err := secretresolver.NewDefaultAtomicResolver()
+				require.NoError(t, err)
+				creators, err := secretstore.NewCreatorCatalog(backends.Creators())
+				require.NoError(t, err)
+				a.Secrets = &secretconfig.Config{Resolver: resolver, Creators: creators}
+			}
 			var buf bytes.Buffer
 			a.Out = safewriter.New(&buf)
 			reader, writer := io.Pipe()
@@ -162,6 +187,13 @@ func TestAgent_Run(t *testing.T) {
 				assert.Equalf(t, generations, stats[module+"_cleanup"], "%s cleanup", module)
 			}
 			assert.NotEmpty(t, buf.String())
+			if test.secrets {
+				require.Equal(t, 1, loads, "file configurations are process-fixed")
+				require.Contains(t, buf.String(), "test:secretstore:vault")
+			} else {
+				require.Zero(t, loads)
+				require.NotContains(t, buf.String(), "test:secretstore:")
+			}
 		})
 	}
 }

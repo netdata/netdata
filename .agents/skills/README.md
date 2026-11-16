@@ -62,3 +62,13 @@ The per-skill grouped index is the "Skills index" in the root `AGENTS.md`: skill
 point marked where it has one, and a skill that serves two areas cross-referenced from the other. A skill's frontmatter
 description is its trigger. How to create, edit, slim, split, or review a skill, and the rot signals to watch for:
 `repo-skill-authoring`, which cites sections of this file and of the root `AGENTS.md` by heading anchor.
+
+Selection by operation and affected contract, review applicability, reference depth and action boundaries are owned by
+`AGENTS.md#skill-selection`. The index and descriptions support that selection; they do not authorize execution.
+
+## Verification Scenarios
+
+Offline invocation cases and their grading rubric live under `.agents/skill-verification/invocation/`. Use them when
+changing discovery, task routing or shared selection rules. They test selection and action boundaries without running
+the operational procedures they describe. The query-specific question sets beside them are separate operational
+seeds; loading a verification file does not authorize its live queries.

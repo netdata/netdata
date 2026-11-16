@@ -1,13 +1,12 @@
 use super::*;
 use crate::protocol::{
-    AppsLookupBuilder, AppsLookupRequestView, APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN,
+    APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, AppsLookupBuilder, AppsLookupRequestView,
     NIPC_UID_UNSET, ORCHESTRATOR_DOCKER, PID_LOOKUP_KNOWN, PID_LOOKUP_UNKNOWN, PROFILE_BASELINE,
 };
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const TEST_RUN_DIR: &str = "/tmp/nipc_apps_lookup_rust_test";
 const AUTH_TOKEN: u64 = 0xDEADBEEFCAFEBABE;
@@ -23,13 +22,15 @@ fn unique_service(prefix: &str) -> String {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos();
-    format!(
+    let service = format!(
         "{}_{}_{}_{}",
         prefix,
         std::process::id(),
         SERVICE_COUNTER.fetch_add(1, Ordering::Relaxed) + 1,
         stamp
-    )
+    );
+    crate::test_locks::track(TEST_RUN_DIR, &service);
+    service
 }
 
 fn socket_path(service: &str) -> PathBuf {
@@ -38,17 +39,6 @@ fn socket_path(service: &str) -> PathBuf {
 
 fn cleanup(service: &str) {
     let _ = std::fs::remove_file(socket_path(service));
-}
-
-fn wait_for_listener_bind(service: &str) {
-    let sock = socket_path(service);
-    for _ in 0..2000 {
-        if sock.exists() {
-            return;
-        }
-        thread::sleep(Duration::from_micros(500));
-    }
-    panic!("listener did not bind for service {service}");
 }
 
 fn server_config() -> ServerConfig {
@@ -137,47 +127,24 @@ fn handler() -> Handler {
 }
 
 struct TestServer {
-    stop_flag: Arc<std::sync::atomic::AtomicBool>,
-    thread: Option<thread::JoinHandle<()>>,
+    _inner: raw::RunningTestServer,
 }
 
 impl TestServer {
     fn start(service: &str) -> Self {
         ensure_run_dir();
         cleanup(service);
-
-        let mut server = ManagedServer::new(TEST_RUN_DIR, service, server_config(), handler());
-        let stop_flag = server.running_flag();
-        let thread = thread::spawn(move || {
-            let _ = server.run();
-        });
-        wait_for_listener_bind(service);
+        let server = ManagedServer::new(TEST_RUN_DIR, service, server_config(), handler());
         Self {
-            stop_flag,
-            thread: Some(thread),
+            _inner: server.inner.spawn_for_test(),
         }
     }
 }
 
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.stop_flag
-            .store(false, std::sync::atomic::Ordering::Release);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
-    }
-}
-
+/// The server listens before tests connect, so one refresh must succeed.
 fn connect_ready(client: &mut AppsLookupClient) {
-    for _ in 0..200 {
-        client.refresh();
-        if client.ready() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-    panic!("client did not reach READY state");
+    client.refresh();
+    assert!(client.ready(), "client did not reach READY state");
 }
 
 #[test]
@@ -224,7 +191,7 @@ fn test_apps_lookup_facade_not_ready_and_abort_unix() {
     abort.abort();
     assert!(matches!(
         client.call_with_timeout(&[1], 1),
-        Err(NipcError::BadLayout)
+        Err(NipcError::NotReady)
     ));
     client.clear_abort();
     client.close();

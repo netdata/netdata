@@ -83,7 +83,12 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
+func (c *Collector) Check(ctx context.Context) error {
+	if c.exec != nil {
+		if err := c.exec.start(ctx); err != nil {
+			return err
+		}
+	}
 	mx, err := c.collect()
 	if err != nil {
 		return err

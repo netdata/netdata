@@ -39,12 +39,12 @@ type Client struct {
 }
 
 // NewClient constructs a client with a freshly created HTTP transport.
-func NewClient(cfg Config) (*Client, error) {
+func NewClient(ctx context.Context, cfg Config) (*Client, error) {
 	if time.Duration(cfg.HTTPConfig.ClientConfig.Timeout) <= 0 {
 		cfg.HTTPConfig.ClientConfig.Timeout = confopt.Duration(10 * time.Second)
 	}
 
-	httpClient, err := web.NewHTTPClient(cfg.HTTPConfig.ClientConfig)
+	httpClient, err := web.NewHTTPClient(ctx, cfg.HTTPConfig.ClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: creating http client failed: %w", err)
 	}
@@ -53,6 +53,8 @@ func NewClient(cfg Config) (*Client, error) {
 }
 
 // NewClientWithHTTP constructs a client using the provided *http.Client instance (useful for tests).
+// The supplied client's response policy applies, including to decompressed data;
+// cfg.HTTPConfig.ClientConfig is used only when NewClient builds the HTTP client.
 func NewClientWithHTTP(cfg Config, httpClient *http.Client) (*Client, error) {
 	if httpClient == nil {
 		return nil, errors.New("openmetrics protocol: http client is required")
@@ -83,21 +85,23 @@ func (c *Client) FetchSeries(ctx context.Context, sr selector.Selector) (prometh
 		return nil, err
 	}
 
-	parser := seriesParser{selector: sr}
+	parser := seriesParser{
+		selector: sr,
+	}
 	return parser.parse(payload)
 }
 
 func (c *Client) fetch(ctx context.Context) ([]byte, error) {
-	req, err := web.NewHTTPRequest(c.request)
+	req, err := web.NewHTTPRequest(ctx, c.request)
 	if err != nil {
 		return nil, fmt.Errorf("openmetrics protocol: building request failed: %w", err)
 	}
 
-	req = req.WithContext(ctx)
 	req.Header.Set("Accept", c.acceptHeader)
 	// Prefer gzip for large payloads but fall back gracefully.
 	req.Header.Set("Accept-Encoding", "gzip")
 
+	limit := web.HTTPClientResponseBodyLimit(c.httpClient)
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -105,6 +109,7 @@ func (c *Client) fetch(ctx context.Context) ([]byte, error) {
 		}
 		return nil, fmt.Errorf("openmetrics protocol: request failed: %w", err)
 	}
+	resp.Body = web.LimitResponseBody(resp.Body, limit)
 	defer web.CloseBody(resp)
 
 	if resp.StatusCode != http.StatusOK {
@@ -119,7 +124,7 @@ func (c *Client) fetch(ctx context.Context) ([]byte, error) {
 			return nil, fmt.Errorf("openmetrics protocol: creating gzip reader failed: %w", err)
 		}
 		defer gz.Close()
-		reader = gz
+		reader = web.LimitResponseReader(gz, limit)
 	}
 
 	buf := bytes.Buffer{}

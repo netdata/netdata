@@ -1,0 +1,97 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Lighthouse collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Job name. It identifies the audit in charts and run history, so renaming starts a separate history.",
+        "type": "string",
+        "minLength": 1
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "url": {
+        "title": "URL",
+        "description": "Page to audit, as an absolute http:// or https:// URL without a username or password.",
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^[Hh][Tt][Tt][Pp][Ss]?://[^\\s/:@?#][^\\s/@?#]*(?:[/?#][^\\r\\n]*)?$"
+      },
+      "save_report": {
+        "title": "Save HTML report",
+        "description": "Save the full Lighthouse HTML report of each audit. Reports can contain sensitive URLs and page content.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Time limit for one audit, in seconds. Time spent waiting for a free browser does not count.",
+        "type": "number",
+        "default": 180,
+        "minimum": 0.001
+      },
+      "check_every": {
+        "title": "Check every",
+        "description": "How often to audit the page, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9223372036,
+        "default": 1800
+      }
+    },
+    "required": [
+      "name",
+      "url"
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Target",
+          "fields": [
+            "name",
+            "url"
+          ]
+        },
+        {
+          "title": "Diagnosis",
+          "fields": [
+            "save_report"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "check_every",
+            "update_every",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    },
+    "vnode": {
+      "ui:placeholder": "storefront",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
+    }
+  }
+}

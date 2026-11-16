@@ -3,7 +3,10 @@
 #ifndef NETDATA_SQLITE_ACLK_H
 #define NETDATA_SQLITE_ACLK_H
 
-#define ACLK_MAX_ALERT_UPDATES  "50"
+// numeric first: the drain loops buffer one batch of consumed rows on the stack, and the SQL needs the
+// same value as a string literal
+#define ACLK_MAX_ALERT_UPDATES_N  50
+#define ACLK_MAX_ALERT_UPDATES    TOSTRING(ACLK_MAX_ALERT_UPDATES_N)
 #define ACLK_SYNC_QUERY_SIZE 512
 
 static inline int uuid_parse_fix(char *in, nd_uuid_t uuid)

@@ -107,47 +107,6 @@ modules:
     troubleshooting:
       problems:
         list: []
-    alerts:
-      - name: apcupsd_ups_load_capacity
-        metric: apcupsd.ups_load_capacity_utilization
-        info: "APC UPS average load over the last 10 minutes"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_battery_charge
-        metric: apcupsd.ups_battery_charge
-        info: "APC UPS average battery charge over the last minute"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_last_collected_secs
-        metric: apcupsd.ups_status
-        info: "APC UPS number of seconds since the last successful data collection"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_selftest_warning
-        metric: apcupsd.ups_selftest
-        info: "APC UPS self-test failed due to insufficient battery capacity or due to overload"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_onbatt
-        metric: apcupsd.ups_status
-        info: "APC UPS has switched to battery power because the input power has failed"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_overload
-        metric: apcupsd.ups_status
-        info: "APC UPS is overloaded and cannot supply enough power to the load"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_lowbatt
-        metric: apcupsd.ups_status
-        info: "APC UPS battery is low and needs to be recharged"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_replacebatt
-        metric: apcupsd.ups_status
-        info: "APC UPS battery has reached the end of its lifespan and needs to be replaced"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_nobatt
-        metric: apcupsd.ups_status
-        info: "APC UPS has no battery"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
-      - name: apcupsd_ups_status_commlost
-        metric: apcupsd.ups_status
-        info: "APC UPS communication link is lost"
-        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/apcupsd.conf
     metrics:
       folding:
         title: Metrics

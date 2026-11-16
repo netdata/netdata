@@ -631,7 +631,7 @@ fn journal_tier_retention_uses_per_tier_values_when_present() {
         Duration::from_secs(2 * 24 * 60 * 60)
     );
 
-    // Other tiers untouched -- still at the built-in defaults.
+    // Minute1 untouched -- still at the built-in defaults.
     let minute_1 = cfg.journal.retention_for_tier(TierKind::Minute1);
     assert_eq!(
         minute_1.size_of_journal_files.unwrap().as_u64(),
@@ -755,7 +755,7 @@ tiers:
         raw.duration_of_journal_files,
         Some(Duration::from_secs(24 * 60 * 60))
     );
-    // Other tiers still at the built-in size-only defaults.
+    // Minute1 still at the built-in size-only defaults.
     assert_eq!(minute_1.size_of_journal_files, Some(ByteSize::gb(10)));
     assert_eq!(minute_1.duration_of_journal_files, None);
 }

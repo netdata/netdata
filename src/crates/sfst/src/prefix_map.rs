@@ -1,9 +1,30 @@
-//! A prefix-searchable associative map, backed by a finite state transducer.
+//! An in-memory, prefix-searchable associative map, backed by a finite
+//! state transducer.
 //!
-//! [`PrefixMap<T>`] maps byte-string keys to values of type `T`, using an FST
-//! for compact, sorted key storage and a parallel `Vec<T>` for the values —
-//! giving O(key_length) exact lookups and efficient prefix scans with far less
-//! key overhead than a `HashMap`.
+//! [`PrefixMap<T>`] maps byte-string keys to values of type `T`: the FST
+//! stores each key mapped to its entry index, and a parallel `Vec<T>`
+//! holds the values in that same sorted-key order — O(key_length) exact
+//! lookups and prefix scans in key order, at a fraction of a `HashMap`'s
+//! per-key overhead.
+//!
+//! # Role in this crate
+//!
+//! Crate-internal (`pub(crate)` re-export in `lib.rs`). In-tree it is
+//! always used as `PrefixMap<BitmapValue>` (`schema.rs`): keys are
+//! `key=value` strings of low- and mid-cardinality fields, values are
+//! the row bitmaps where each pair occurs. The writer builds one map per
+//! chunk — `PRIM` via `writer.rs::primary`, fed by
+//! `index_writer.rs::write_primary_chunk`, and one `MF{hi}{lo}` chunk per
+//! mid-card field — serializing it bincode+zstd at `ZSTD_LEVEL_FST`
+//! (`writer.rs::pack`). The reader unpacks them back into this map
+//! (`reader.rs::primary` / `mid_field`); `IndexReader`
+//! (`index_reader.rs`) keeps the primary map resident for exact lookups
+//! and field-prefix scans.
+//!
+//! Each key's FST output is its position in sorted key order, so the
+//! outputs grow with the keys and the FST also answers the reverse
+//! question, the key at a position ([`key_at`]), in O(key length): the
+//! KvId resolver (`index_reader/kv_resolver.rs`) relies on it.
 
 // Not every accessor is used in-tree yet; the unit tests exercise the full API.
 #![allow(dead_code)]
@@ -11,6 +32,7 @@
 use fst::automaton::Automaton;
 use fst::{IntoStreamer, Streamer};
 
+/// Serde wire form: the raw FST bytes plus the parallel values vec.
 mod serde_impl {
     use super::PrefixMap;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -65,10 +87,11 @@ impl From<fst::Error> for BuildError {
 
 /// A prefix-searchable associative map, backed by a finite state transducer.
 ///
-/// Maps byte-string keys to values of type `T`: keys live in a compressed FST,
-/// values in a `Vec<T>` ordered by sorted key. Supports exact lookup and prefix
-/// search. The key set is fixed at construction (no insert/remove), though
-/// individual values can be updated in place via [`get_mut`](Self::get_mut).
+/// The FST maps each key to its entry index; `values` holds the values in
+/// that same sorted-key order, so every lookup is one FST hit plus one vec
+/// index. Exact lookup and prefix search only — the key set is fixed at
+/// construction (no insert/remove), though individual values can be
+/// updated in place via [`get_mut`](Self::get_mut).
 pub struct PrefixMap<T> {
     map: fst::Map<Vec<u8>>,
     values: Vec<T>,
@@ -96,8 +119,9 @@ impl<T: Clone> Clone for PrefixMap<T> {
 impl<T> PrefixMap<T> {
     /// Build a map from an unsorted iterator of `(key, value)` pairs.
     ///
-    /// Keys are sorted internally before FST construction. Duplicate keys
-    /// are an error.
+    /// Keys are sorted internally before FST construction; the sorted
+    /// order also fixes the order of the `values` vec. Duplicate keys
+    /// are an error — the FST builder requires strictly increasing keys.
     pub fn build<K: Ord + AsRef<[u8]>>(
         iter: impl IntoIterator<Item = (K, T)>,
     ) -> Result<Self, BuildError> {
@@ -133,7 +157,8 @@ impl<T> PrefixMap<T> {
         self.map.len() == 0
     }
 
-    /// Size of the serialized FST data in bytes (keys only, not values).
+    /// Size of the serialized FST in bytes (excludes the parallel values
+    /// vec).
     pub fn fst_bytes(&self) -> usize {
         self.map.as_fst().as_bytes().len()
     }
@@ -152,6 +177,22 @@ impl<T> PrefixMap<T> {
     /// Returns `true` if the map contains the given key.
     pub fn contains_key(&self, key: &[u8]) -> bool {
         self.map.contains_key(key)
+    }
+
+    /// Write the key at sorted position `index` into `key` (see
+    /// [`key_at`]).
+    pub fn key_at(&self, index: u64, key: &mut Vec<u8>) -> bool {
+        key_at(&self.map, index, key)
+    }
+
+    /// The sorted position of the first key that starts with `prefix`, or
+    /// `None` when no key does.
+    pub fn first_index_with_prefix(&self, prefix: &[u8]) -> Option<u64> {
+        let mut stream = self.map.range().ge(prefix).into_stream();
+        match stream.next() {
+            Some((key, index)) if key.starts_with(prefix) => Some(index),
+            _ => None,
+        }
     }
 
     /// Collect all values whose keys start with `prefix`.
@@ -182,7 +223,7 @@ impl<T> PrefixMap<T> {
         result
     }
 
-    /// Call `f` for each value whose key starts with `prefix`.
+    /// Call `f` for each `(key, value)` pair whose key starts with `prefix`.
     ///
     /// This avoids allocating a temporary `Vec` when you only need to process
     /// each value once. Values are visited in key-sorted order.
@@ -208,7 +249,21 @@ impl<T> PrefixMap<T> {
     }
 }
 
+/// Write the key at sorted position `index` of a [`PrefixMap`]'s FST into
+/// `key` (cleared first); `false` when `index` is past the last key. For
+/// an FST read on its own, without the values (`reader.rs::mid_field_fst`):
+/// the reverse lookup is only defined because [`PrefixMap::build`] makes
+/// each output the key's sorted position.
+pub(crate) fn key_at(map: &fst::Map<Vec<u8>>, index: u64, key: &mut Vec<u8>) -> bool {
+    key.clear();
+    index < map.len() as u64 && map.as_fst().get_key_into(index, key)
+}
+
 /// Automaton that matches keys starting with a given byte prefix.
+///
+/// State is `Some(pos)` = the first `pos` prefix bytes matched so far,
+/// or `None` — the dead state after a mismatching byte. Once the whole
+/// prefix is consumed, every further byte is accepted unchanged.
 struct Prefix<'a>(&'a [u8]);
 
 impl Automaton for Prefix<'_> {
@@ -355,7 +410,7 @@ mod tests {
     fn unsorted_input_is_sorted() {
         let m = PrefixMap::build([("cherry", 3u32), ("apple", 1), ("banana", 2)]).unwrap();
 
-        // Values should be in key-sorted order
+        // Values come back in key-sorted order
         assert_eq!(m.values(), &[1, 2, 3]);
         assert_eq!(m.get(b"apple"), Some(&1));
         assert_eq!(m.get(b"banana"), Some(&2));
@@ -417,6 +472,87 @@ mod tests {
         assert_eq!(deserialized.get(b"beta"), Some(&2));
         assert_eq!(deserialized.get(b"gamma"), Some(&3));
         assert_eq!(deserialized.get(b"delta"), None);
+    }
+
+    /// `key_at` inverts the sorted position of every key, including keys
+    /// that prefix others and the `.`/`=` neighbours of the dot-extended
+    /// field families; `false` past the end and on an empty map.
+    #[test]
+    fn key_at_inverts_every_position() {
+        let keys = [
+            "",
+            "a",
+            "a.b=y",
+            "a=",
+            "a=x",
+            "a=xy",
+            "a=x=y",
+            "ab",
+            "b=\u{e9}t\u{e9}",
+            "b=\u{1f600}",
+        ];
+        let m = PrefixMap::build(keys.iter().map(|k| (*k, 0u32))).unwrap();
+        let mut sorted = keys.to_vec();
+        sorted.sort();
+        let mut buf = b"stale".to_vec();
+        for (i, want) in sorted.iter().enumerate() {
+            assert!(m.key_at(i as u64, &mut buf), "position {i}");
+            assert_eq!(buf, want.as_bytes(), "position {i}");
+        }
+        assert!(!m.key_at(sorted.len() as u64, &mut buf));
+        assert!(!m.key_at(u64::MAX, &mut buf));
+        let empty: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
+        assert!(!empty.key_at(0, &mut buf));
+    }
+
+    /// The same over a few thousand generated keys with long shared
+    /// prefixes and mixed lengths, so the FST has deep chains and wide
+    /// fan-out nodes.
+    #[test]
+    fn key_at_inverts_generated_keys() {
+        let mut state = 0x9e37_79b9_7f4a_7c15u64;
+        let mut next = || {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (state >> 33) as usize
+        };
+        let mut keys = std::collections::BTreeSet::new();
+        while keys.len() < 3_000 {
+            let field = ["f", "f.g", "f.g.h", "fg"][next() % 4];
+            let len = next() % 40;
+            let value: String = (0..len)
+                .map(|_| ['a', 'b', '=', '.', '\u{e9}', 'z'][next() % 6])
+                .collect();
+            keys.insert(format!("{field}={value}"));
+        }
+        let m = PrefixMap::build(keys.iter().map(|k| (k.as_str(), ()))).unwrap();
+        let mut buf = Vec::new();
+        for (i, want) in keys.iter().enumerate() {
+            assert!(m.key_at(i as u64, &mut buf), "position {i}");
+            assert_eq!(buf, want.as_bytes(), "position {i}");
+        }
+        assert!(!m.key_at(keys.len() as u64, &mut buf));
+    }
+
+    #[test]
+    fn first_index_with_prefix() {
+        // Sorted: "a.b=y" (0) < "a=x" (1) < "a=z" (2) < "ab=1" (3).
+        let m = PrefixMap::build([("a=z", 0u32), ("ab=1", 0), ("a.b=y", 0), ("a=x", 0)]).unwrap();
+        assert_eq!(m.first_index_with_prefix(b"a="), Some(1));
+        assert_eq!(m.first_index_with_prefix(b"a.b="), Some(0));
+        assert_eq!(m.first_index_with_prefix(b"ab="), Some(3));
+        assert_eq!(m.first_index_with_prefix(b"a"), Some(0));
+        assert_eq!(m.first_index_with_prefix(b""), Some(0));
+        assert_eq!(
+            m.first_index_with_prefix(b"a=x"),
+            Some(1),
+            "prefix is a key"
+        );
+        assert_eq!(m.first_index_with_prefix(b"a.c="), None, "between keys");
+        assert_eq!(m.first_index_with_prefix(b"b="), None, "past every key");
+        let empty: PrefixMap<u32> = PrefixMap::build(Vec::<(&str, u32)>::new()).unwrap();
+        assert_eq!(empty.first_index_with_prefix(b""), None);
     }
 
     #[test]

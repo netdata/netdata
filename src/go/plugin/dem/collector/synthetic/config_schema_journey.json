@@ -1,0 +1,222 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Journey collector configuration.",
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "description": "Job name. It identifies the journey in charts, alerts and run history, so renaming starts a separate history.",
+        "type": "string",
+        "minLength": 1
+      },
+      "vnode": {
+        "title": "Virtual node",
+        "description": "Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "script": {
+        "title": "Script",
+        "description": "Playwright Test source code, in JavaScript or TypeScript. Set either this or `script_path`.",
+        "type": "string"
+      },
+      "script_path": {
+        "title": "Script path",
+        "description": "Absolute path to a Playwright Test file (.js, .ts, .mjs, .cjs, .mts or .cts) readable by the Netdata service account. Set either this or `script`.",
+        "type": "string"
+      },
+      "secrets": {
+        "title": "Secrets",
+        "description": "Credentials passed to the script as environment variables. Leave empty when the journey needs none.",
+        "type": [
+          "array",
+          "null"
+        ],
+        "items": {
+          "title": "Secret",
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Environment name",
+              "description": "Environment variable name for the script, starting with `DEM_SECRET_` and followed by letters, digits or underscores. Names must be unique within the job.",
+              "type": "string",
+              "pattern": "^DEM_SECRET_[A-Za-z0-9_]+$"
+            },
+            "value": {
+              "title": "Value",
+              "description": "Secret value. Prefer a secret reference, such as `${env:WORKFLOW_PASSWORD}`, over a literal value.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "value"
+          ]
+        }
+      },
+      "screenshot_on_failure": {
+        "title": "Capture failure screenshot",
+        "description": "Save a screenshot when a test fails. Screenshots can show sensitive page content.",
+        "type": "boolean",
+        "default": false
+      },
+      "trace_on_failure": {
+        "title": "Capture failure trace",
+        "description": "Save a Playwright trace when a test fails; requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.",
+        "type": "boolean",
+        "default": false
+      },
+      "browser_error_summary": {
+        "title": "Collect browser error summary",
+        "description": "Count uncaught exceptions, console errors, failed requests and HTTP error responses during every run, with a few samples of each. Adds CPU and memory use on pages that log heavily.",
+        "type": "boolean",
+        "default": false
+      },
+      "update_every": {
+        "title": "Update every",
+        "description": "How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.",
+        "type": "integer",
+        "minimum": 1,
+        "default": 10
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "Time limit for one run of the journey, in seconds. Time spent waiting for a free browser does not count.",
+        "type": "number",
+        "default": 120,
+        "minimum": 0.001
+      },
+      "check_every": {
+        "title": "Check every",
+        "description": "How often to run the journey, in seconds.",
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 9223372036,
+        "default": 900
+      }
+    },
+    "required": [
+      "name"
+    ],
+    "allOf": [
+      {
+        "if": {
+          "required": [
+            "script"
+          ],
+          "properties": {
+            "script": {
+              "minLength": 1
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "script_path": {
+              "maxLength": 0
+            },
+            "script": {
+              "pattern": "[^\\t\\n\\v\\f\\r \u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]"
+            }
+          }
+        },
+        "else": {
+          "required": [
+            "script_path"
+          ],
+          "properties": {
+            "script_path": {
+              "minLength": 1
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "required": [
+            "trace_on_failure"
+          ],
+          "properties": {
+            "trace_on_failure": {
+              "const": true
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "screenshot_on_failure"
+          ],
+          "properties": {
+            "screenshot_on_failure": {
+              "const": true
+            }
+          }
+        }
+      }
+    ]
+  },
+  "uiSchema": {
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Journey",
+          "fields": [
+            "name",
+            "script",
+            "script_path"
+          ]
+        },
+        {
+          "title": "Secrets",
+          "fields": [
+            "secrets"
+          ]
+        },
+        {
+          "title": "Diagnosis",
+          "fields": [
+            "screenshot_on_failure",
+            "trace_on_failure",
+            "browser_error_summary"
+          ]
+        },
+        {
+          "title": "Collection",
+          "fields": [
+            "check_every",
+            "update_every",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    },
+    "script": {
+      "ui:widget": "textarea",
+      "ui:options": {
+        "rows": 12
+      }
+    },
+    "secrets": {
+      "ui:listFlavour": "list",
+      "items": {
+        "value": {
+          "ui:widget": "password"
+        }
+      }
+    },
+    "vnode": {
+      "ui:placeholder": "storefront",
+      "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
+    },
+    "trace_on_failure": {
+      "ui:help": "Recording runs during every run, including runs that pass, and adds CPU, memory and temporary disk use. Traces larger than 5 MiB are not kept.\n\nDownload a saved trace from the run's captures and open it with the Playwright Trace Viewer. Secrets are not masked inside traces."
+    }
+  }
+}

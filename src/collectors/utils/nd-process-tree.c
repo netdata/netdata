@@ -1,0 +1,433 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "config.h"
+#include "nd-process-tree.h"
+
+#include <stdio.h>
+
+#ifdef __linux__
+#include "supervisor-pipes.h"
+#include <errno.h>
+#include <dirent.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <poll.h>
+#include <signal.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/prctl.h>
+#include <sys/file.h>
+#include <sys/signalfd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+
+// The supervisor is single-threaded and is the only reaper. Direct children
+// (including adopted orphans) cannot have their PID reused until it reaps them.
+// Enumeration candidates are never used after waitpid(); no group signals are used.
+static int kill_children(void) {
+    FILE *children = fopen("/proc/thread-self/children", "re");
+    if (!children)
+        return -1;
+
+    long value;
+    int result = 0, scanned;
+    while ((scanned = fscanf(children, "%ld", &value)) == 1) {
+        if (value <= 0 || value > INT_MAX) {
+            result = -1;
+            break;
+        }
+        if (kill((pid_t)value, SIGKILL) != 0 && errno != ESRCH)
+            result = -1;
+    }
+    if (scanned != EOF || ferror(children))
+        result = -1;
+    fclose(children);
+    return result;
+}
+
+static bool compatible_procfs(void) {
+    // procfs must expose IDs in our PID namespace. A procfs mounted in an outer
+    // namespace may otherwise expose a valid PID belonging to a different child.
+    FILE *status = fopen("/proc/thread-self/status", "re");
+    if (!status)
+        return false;
+    char *line = NULL;
+    size_t size = 0;
+    bool compatible = false;
+    while (getline(&line, &size, status) >= 0) {
+        if (strncmp(line, "NSpid:", 6) == 0) {
+            long pid;
+            char extra;
+            compatible = sscanf(line + 6, "%ld %c", &pid, &extra) == 1 && pid == getpid();
+            break;
+        }
+    }
+    free(line);
+    fclose(status);
+    if (!compatible)
+        return false;
+
+    // CONFIG_PROC_CHILDREN is required. Enumeration is never a drain proof.
+    FILE *children = fopen("/proc/thread-self/children", "re");
+    if (!children)
+        return false;
+    int c = fgetc(children);
+    compatible = c == EOF && !ferror(children);
+    fclose(children);
+    return compatible;
+}
+
+// The caller owns a fresh private directory and durable pending record. This
+// descriptor protocol certifies quiescence only, not the command's outcome.
+struct tree_completion {
+    int directory;
+    int lock;
+    const char *id;
+};
+
+static bool completion_id_valid(const char *id) {
+    if (!id || strlen(id) != 64)
+        return false;
+    for (size_t i = 0; i < 64; i++)
+        if (!((id[i] >= '0' && id[i] <= '9') || (id[i] >= 'a' && id[i] <= 'f')))
+            return false;
+    return true;
+}
+
+static bool private_regular(int fd) {
+    struct stat st;
+    return fstat(fd, &st) == 0 && S_ISREG(st.st_mode) && st.st_nlink == 1 &&
+           st.st_uid == geteuid() && (st.st_mode & 0777) == 0600;
+}
+
+static void completion_close(struct tree_completion *completion) {
+    if (completion->lock >= 0)
+        close(completion->lock);
+    if (completion->directory >= 0)
+        close(completion->directory);
+    completion->lock = completion->directory = -1;
+}
+
+static bool completion_open(struct tree_completion *completion) {
+    if (completion->directory < 0)
+        return true;
+    struct stat st;
+    if (!completion_id_valid(completion->id) || fstat(completion->directory, &st) ||
+        !S_ISDIR(st.st_mode) || st.st_uid != geteuid() || (st.st_mode & 0777) != 0700)
+        return false;
+    completion->lock = openat(completion->directory, "publication.lock", O_RDWR | O_NOFOLLOW | O_CLOEXEC);
+    if (completion->lock < 0 || !private_regular(completion->lock))
+        return false;
+    // A used invocation may never launch again, even with the same token.
+    if (fstatat(completion->directory, "complete", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    if (fstatat(completion->directory, "complete.pending", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    if (fstatat(completion->directory, "started", &st, AT_SYMLINK_NOFOLLOW) == 0 || errno != ENOENT)
+        return false;
+    int pending = openat(completion->directory, "pending", O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC);
+    if (pending < 0)
+        return false;
+    if (!private_regular(pending)) {
+        close(pending);
+        return false;
+    }
+    char expected[96], actual[96];
+    int length = snprintf(expected, sizeof(expected), "NDTREE1 pending %s\n", completion->id);
+    ssize_t n;
+    do {
+        n = read(pending, actual, sizeof(actual));
+    } while (n < 0 && errno == EINTR);
+    bool valid = n == length && memcmp(expected, actual, (size_t)length) == 0;
+    close(pending);
+    if (!valid)
+        return false;
+    // A lost supervisor must never permit another run to complete its pin.
+    int started = openat(completion->directory, "started", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (started < 0)
+        return false;
+    valid = fsync(started) == 0;
+    if (close(started) != 0)
+        valid = false;
+    if (!valid || fsync(completion->directory) != 0)
+        return false;
+    // The exclusive claim rejects reuse; readers may only delay first launch.
+    int locked;
+    do {
+        locked = flock(completion->lock, LOCK_EX);
+    } while (locked < 0 && errno == EINTR);
+    return locked == 0;
+}
+
+static bool sync_fd(int fd) {
+    int result;
+    do {
+        result = fsync(fd);
+    } while (result < 0 && errno == EINTR);
+    return result == 0;
+}
+
+static bool completion_write(struct tree_completion *completion) {
+    if (completion->directory < 0)
+        return true;
+    char frame[96];
+    int length = snprintf(frame, sizeof(frame), "NDTREE1 drained %s\n", completion->id);
+    int fd = openat(completion->directory, "complete.pending", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0600);
+    if (fd < 0)
+        return false;
+    size_t offset = 0;
+    while (offset < (size_t)length) {
+        ssize_t n = write(fd, frame + offset, (size_t)length - offset);
+        if (n < 0 && errno == EINTR)
+            continue;
+        if (n <= 0)
+            break;
+        offset += (size_t)n;
+    }
+    bool written = offset == (size_t)length && sync_fd(fd);
+    if (close(fd) != 0)
+        written = false;
+    if (!written || linkat(completion->directory, "complete.pending", completion->directory, "complete", 0) != 0)
+        return false;
+    if (unlinkat(completion->directory, "complete.pending", 0) != 0)
+        return false;
+    return sync_fd(completion->directory);
+}
+
+static void completion_finish(struct tree_completion *completion) {
+    if (!completion_write(completion))
+        fprintf(stderr, "nd-run: cannot persist tree completion; retain pending ownership\n");
+    // No more record I/O follows. Recovery needs this boundary, not a Go join.
+    completion_close(completion);
+}
+
+static bool protocol_pipes(int control_fd, int status_fd, const struct tree_completion *completion) {
+    const int descriptors[] = {control_fd, status_fd, completion->directory, completion->lock};
+    return supervisor_protocol_pipes(descriptors, completion->directory >= 0 ? 4 : 2);
+}
+
+static bool write_frame(int status_fd, const char *frame, size_t length) {
+    ssize_t written;
+    do {
+        written = write(status_fd, frame, length);
+    } while (written < 0 && errno == EINTR);
+    return written == (ssize_t)length;
+}
+
+// Prelaunch refusals can release ownership too, but only a wait result proves
+// absence of children; neither rejected descriptors nor procfs are that proof.
+static bool completion_finish_if_childless(struct tree_completion *completion) {
+    pid_t result;
+    do {
+        result = waitpid(-1, NULL, WNOHANG | __WALL);
+    } while (result < 0 && errno == EINTR);
+    if (result >= 0 || errno != ECHILD)
+        return false;
+    completion_finish(completion);
+    return true;
+}
+
+static int setup_unavailable(int control_fd, int status_fd, struct tree_completion *completion) {
+    // Only used with validated private pipes and before a successful fork.
+    // Capability refusal is distinct from losing a supervisor after launch.
+    // Even here, absence of children must come from wait, not procfs discovery.
+    bool childless = completion_finish_if_childless(completion);
+    struct sigaction ignore_pipe = { .sa_handler = SIG_IGN };
+    sigemptyset(&ignore_pipe.sa_mask);
+    if (childless && sigaction(SIGPIPE, &ignore_pipe, NULL) == 0) {
+        static const char unavailable[] = "NDTREE1 unavailable\n";
+        (void)write_frame(status_fd, unavailable, sizeof(unavailable) - 1);
+    }
+    completion_close(completion);
+    close(control_fd);
+    close(status_fd);
+    return 126;
+}
+
+int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const char *completion_id, char **command) {
+    struct tree_completion completion = { .directory = completion_fd, .lock = -1, .id = completion_id };
+    if (!completion_open(&completion)) {
+        fprintf(stderr, "nd-run: invalid or used tree completion record\n");
+        completion_close(&completion);
+        return 126;
+    }
+    if (!protocol_pipes(control_fd, status_fd, &completion)) {
+        (void)completion_finish_if_childless(&completion);
+        completion_close(&completion);
+        fprintf(stderr, "nd-run: tree supervision requires private protocol descriptors\n");
+        return 126;
+    }
+    if (!compatible_procfs()) {
+        int result = setup_unavailable(control_fd, status_fd, &completion);
+        fprintf(stderr, "nd-run: tree supervision requires compatible procfs with children and NSpid support\n");
+        return result;
+    }
+
+    // Block before fork: a fast child exit cannot be lost between wait and poll.
+    // Explicit SIG_DFL prevents inherited SIG_IGN/SA_NOCLDWAIT auto-reaping.
+    const int signals[] = { SIGCHLD, SIGTERM, SIGINT, SIGHUP, SIGQUIT, SIGPIPE };
+    struct sigaction original[sizeof(signals) / sizeof(signals[0])];
+    struct sigaction action = { .sa_handler = SIG_DFL };
+    sigemptyset(&action.sa_mask);
+    sigset_t watched, original_mask;
+    sigemptyset(&watched);
+    for (size_t i = 0; i < sizeof(signals) / sizeof(signals[0]); i++) {
+        if (sigaction(signals[i], NULL, &original[i]) != 0)
+            goto setup_failed;
+        sigaddset(&watched, signals[i]);
+    }
+    if (sigprocmask(SIG_BLOCK, &watched, &original_mask) != 0 ||
+        sigaction(SIGCHLD, &action, NULL) != 0)
+        goto setup_failed;
+    action.sa_handler = SIG_IGN;
+    if (sigaction(SIGPIPE, &action, NULL) != 0)
+        goto setup_failed;
+    // Ignored termination signals do not reach signalfd; normalize those too.
+    action.sa_handler = SIG_DFL;
+    for (size_t i = 1; i < sizeof(signals) / sizeof(signals[0]) - 1; i++) {
+        if (sigaction(signals[i], &action, NULL) != 0)
+            goto setup_failed;
+    }
+    int signal_fd = signalfd(-1, &watched, SFD_CLOEXEC | SFD_NONBLOCK);
+    if (signal_fd < 0)
+        goto setup_failed;
+    if (prctl(PR_SET_CHILD_SUBREAPER, 1) != 0) {
+        close(signal_fd);
+        goto setup_failed;
+    }
+
+    // Descendants must not gain identities the dropped supervisor cannot signal.
+    // This flag is inherited across fork/exec and cannot be cleared by payloads.
+    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0) {
+        close(signal_fd);
+        goto setup_failed;
+    }
+    int no_new_privs = prctl(PR_GET_NO_NEW_PRIVS, 0, 0, 0, 0);
+    if (no_new_privs != 1) {
+        if (no_new_privs >= 0)
+            errno = EPERM;
+        close(signal_fd);
+        goto setup_failed;
+    }
+
+    pid_t child = fork();
+    if (child < 0) {
+        close(signal_fd);
+        goto setup_failed;
+    }
+    if (child == 0) {
+        completion_close(&completion);
+        close(control_fd);
+        close(status_fd);
+        close(signal_fd);
+        for (size_t i = 0; i < sizeof(signals) / sizeof(signals[0]); i++) {
+            if (sigaction(signals[i], &original[i], NULL) != 0)
+                _exit(126);
+        }
+        if (sigprocmask(SIG_SETMASK, &original_mask, NULL) != 0)
+            _exit(126);
+        execvp(command[0], command);
+        int error = errno;
+        perror("nd-run: tree execvp");
+        _exit(error == ENOENT ? 127 : 126);
+    }
+
+    bool draining = false, command_done = false, reported_failure = false;
+    int command_status = 0;
+    for (;;) {
+        // Bound each batch so orphan churn cannot starve cancellation handling.
+        bool exhausted = false, full_batch = true;
+        for (int i = 0; i < 256; i++) {
+            int status;
+            pid_t reaped = waitpid(-1, &status, WNOHANG | __WALL);
+            if (reaped > 0) {
+                if (reaped == child && (WIFEXITED(status) || WIFSIGNALED(status))) {
+                    command_status = status;
+                    child = -1; // Discard the identity before another child can reuse it.
+                    command_done = true;
+                    draining = true;
+                }
+                continue;
+            }
+            if (reaped < 0 && errno == EINTR) {
+                i--;
+                continue;
+            }
+            if (reaped < 0 && errno == ECHILD)
+                exhausted = true;
+            else if (reaped < 0) {
+                draining = true;
+                if (!reported_failure) {
+                    perror("nd-run: tree waitpid; retaining supervision");
+                    reported_failure = true;
+                }
+            }
+            full_batch = false;
+            break;
+        }
+        if (exhausted) {
+            completion_finish(&completion);
+            close(control_fd);
+            close(signal_fd);
+            if (!command_done) {
+                fprintf(stderr, "nd-run: tree command outcome unavailable\n");
+                close(status_fd);
+                return 126;
+            }
+            char frame[64];
+            int length = snprintf(frame, sizeof(frame), "NDTREE1 %d\n", command_status);
+            bool written = write_frame(status_fd, frame, (size_t)length);
+            close(status_fd);
+            if (!written)
+                return 126;
+            return WIFEXITED(command_status) ? WEXITSTATUS(command_status) : 128 + WTERMSIG(command_status);
+        }
+
+        if (draining && kill_children() != 0 && !reported_failure) {
+            fprintf(stderr, "nd-run: tree child termination failed; retaining supervision\n");
+            reported_failure = true;
+        }
+
+        struct pollfd events[] = {
+            { .fd = draining ? -1 : control_fd, .events = POLLIN },
+            { .fd = signal_fd, .events = POLLIN },
+            { .fd = draining ? -1 : status_fd, .events = 0 },
+        };
+        // The bounded backstop also handles clone children with unusual exit
+        // notification signals. Time or an empty children file NEVER means done.
+        int ready = poll(events, sizeof(events) / sizeof(events[0]), full_batch ? 0 : 1000);
+        if (ready < 0 && errno != EINTR)
+            draining = true;
+        if (events[0].revents || events[2].revents)
+            draining = true;
+        if (events[1].revents & POLLIN) {
+            struct signalfd_siginfo info;
+            for (int i = 0; i < 64 && read(signal_fd, &info, sizeof(info)) == sizeof(info); i++) {
+                if (info.ssi_signo != SIGCHLD)
+                    draining = true;
+            }
+        }
+    }
+
+setup_failed: {
+    int setup_error = errno;
+    int result = setup_unavailable(control_fd, status_fd, &completion);
+    errno = setup_error;
+    perror("nd-run: tree supervision setup");
+    return result;
+}
+}
+
+#else
+int nd_process_tree_run(int control_fd, int status_fd, int completion_fd, const char *completion_id, char **command) {
+    (void)completion_fd;
+    (void)completion_id;
+    (void)control_fd;
+    (void)status_fd;
+    (void)command;
+    fprintf(stderr, "nd-run: tree supervision is supported only on Linux\n");
+    return 126;
+}
+#endif

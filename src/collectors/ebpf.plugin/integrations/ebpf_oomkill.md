@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -45,9 +45,6 @@ eBPF OOMkill can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -143,7 +140,7 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | cgroup.oomkills | OOM kills. This chart is provided by eBPF plugin. | cgroup name | kills |
-| services.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
+| systemd.oomkills | OOM kills. This chart is provided by eBPF plugin. | a dimension per systemd service | kills |
 
 
 ### Per apps

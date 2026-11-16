@@ -214,13 +214,15 @@ func formatDuration(d time.Duration) string {
 		}
 	}
 
-	// For values >= 1s without clean division, prefer fractional seconds over ms
+	// For values >= 1s without clean division, prefer fractional seconds over ms.
+	// %g would emit scientific notation past 1000s, which ParseDuration cannot
+	// read back, so format the shortest plain decimal instead.
 	if d >= time.Second {
-		seconds := float64(d) / float64(time.Second)
+		seconds := strconv.FormatFloat(float64(d)/float64(time.Second), 'f', -1, 64)
 		if neg {
-			return fmt.Sprintf("-%.3gs", seconds)
+			return "-" + seconds + "s"
 		}
-		return fmt.Sprintf("%.3gs", seconds)
+		return seconds + "s"
 	}
 
 	// For sub-second values, try milliseconds

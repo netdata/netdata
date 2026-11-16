@@ -6,8 +6,6 @@
 
 #include "sqlite_db_migration.h"
 
-#define DB_METADATA_VERSION 18
-
 #define COMPUTE_DURATION(var_name, unit, start, end)      \
     char var_name[64];                                    \
     duration_snprintf(var_name, sizeof(var_name),         \
@@ -58,7 +56,7 @@ const char *database_config[] = {
     "red text, warn text, crit text, exec text, to_key text, info text, delay text, options text, "
     "repeat text, host_labels text, p_db_lookup_dimensions text, p_db_lookup_method text, p_db_lookup_options int, "
     "p_db_lookup_after int, p_db_lookup_before int, p_update_every int, source text, chart_labels text, "
-    "summary text, time_group_condition INT, time_group_value DOUBLE, dims_group INT, data_source INT)",
+    "summary text, time_group_condition INT, time_group_value DOUBLE, time_group_options text, dims_group INT, data_source INT)",
 
     "CREATE TABLE IF NOT EXISTS host_info(host_id blob, system_key text NOT NULL, system_value text NOT NULL, "
     "date_created INT, PRIMARY KEY(host_id, system_key))",
@@ -200,9 +198,9 @@ sqlite3 *db_meta = NULL;
     "ON CONFLICT(dim_id) DO UPDATE SET id=excluded.id, name=excluded.name, multiplier=excluded.multiplier, "           \
     "divisor=excluded.divisor, algorithm=excluded.algorithm, options=excluded.options"
 
-#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id"
-#define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id"
-#define SELECT_CHART_LABEL_LIST "SELECT chart_id, rowid FROM chart_label WHERE rowid > @row_id"
+#define SELECT_DIMENSION_LIST "SELECT dim_id, rowid FROM dimension WHERE rowid > @row_id AND rowid <= @max_row_id"
+#define SELECT_CHART_LIST "SELECT chart_id, rowid FROM chart WHERE rowid > @row_id AND rowid <= @max_row_id"
+#define SELECT_CHART_LABEL_LIST "SELECT chart_id, rowid FROM chart_label WHERE rowid > @row_id AND rowid <= @max_row_id"
 
 #define SQL_STORE_HOST_SYSTEM_INFO_VALUES                                                                              \
     "INSERT OR REPLACE INTO host_info (host_id, system_key, system_value, date_created) VALUES "                       \
@@ -274,11 +272,17 @@ struct thread_unittest {
     unsigned *done;
 };
 
+// returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
 int sql_metadata_cache_stats(int op)
 {
-    int count, dummy;
+    int count = 0, dummy;
 
-    sqlite3_db_status(db_meta, op, &count, &dummy, 0);
+    if (unlikely(!db_meta))
+        return -1;
+
+    if (sqlite3_db_status(db_meta, op, &count, &dummy, 0) != SQLITE_OK)
+        return -1;
+
     return count;
 }
 
@@ -757,6 +761,23 @@ bool sql_metadata_wal_size_acceptable()
 }
 
 // Init
+
+// Why the last sql_init_meta_database() failed; written and read on the thread that initializes the database.
+static __thread SQLITE_INIT_FAILURE meta_init_failure;
+
+void sql_init_meta_failure_reason(char *dst, size_t dst_size, int *os_errno)
+{
+    sqlite_init_failure_format(&meta_init_failure, dst, dst_size);
+    if (os_errno) {
+#if defined(OS_WINDOWS)
+        // a GetLastError() code is not an errno; the reason above carries it
+        *os_errno = 0;
+#else
+        *os_errno = meta_init_failure.os_errno;
+#endif
+    }
+}
+
 /*
  * Initialize the SQLite database
  * Return 0 on success
@@ -766,6 +787,9 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     char *err_msg = NULL;
     char sqlite_database[FILENAME_MAX + 1];
     int rc;
+
+    memset(&meta_init_failure, 0, sizeof(meta_init_failure));
+    sqlite_init_failure_clear();
 
     if (likely(!memory)) {
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.recover", netdata_configured_cache_dir);
@@ -797,11 +821,8 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
 
     rc = sqlite3_open(sqlite_database, &db_meta);
     if (rc != SQLITE_OK) {
+        sqlite_init_failure_record(db_meta, "meta_open", NULL, rc);
         error_report("Failed to initialize database at %s, due to \"%s\"", sqlite_database, sqlite3_errstr(rc));
-        char *error_str = get_database_extented_error(db_meta, 0, "meta_open");
-        if (error_str)
-            analytics_set_data_str(&analytics_data.netdata_fail_reason, error_str);
-        freez(error_str);
         goto close_database;
     }
 
@@ -870,6 +891,7 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
     return 0;
 
 close_database:
+    sqlite_init_failure_get(&meta_init_failure);
     sqlite3_close_v2(db_meta);
     db_meta = NULL;
     return 1;
@@ -885,8 +907,8 @@ typedef enum {
 
 // Structure to hold a single label entry for collection
 struct label_entry {
-    char *name;
-    char *value;
+    STRING *name;
+    STRING *value;
     RRDLABEL_SRC ls;
 };
 
@@ -903,7 +925,7 @@ struct label_collect_ctx {
 #define LABEL_BATCH_SIZE (1024)
 
 // Callback to collect labels into an array (no SQLite I/O while spinlock is held)
-static int collect_label_callback(const char *name, const char *value, RRDLABEL_SRC ls, void *data)
+static int collect_label_callback(STRING *name, STRING *value, RRDLABEL_SRC ls, void *data)
 {
     struct label_collect_ctx *ctx = data;
 
@@ -916,9 +938,9 @@ static int collect_label_callback(const char *name, const char *value, RRDLABEL_
         ctx->entries = reallocz(ctx->entries, ctx->capacity * sizeof(*ctx->entries));
     }
 
-    // Copy label data
-    ctx->entries[ctx->count].name = strdupz(name);
-    ctx->entries[ctx->count].value = strdupz(value);
+    // Keep a reference to the interned label strings (no copies)
+    ctx->entries[ctx->count].name = string_dup(name);
+    ctx->entries[ctx->count].value = string_dup(value);
     ctx->entries[ctx->count].ls = ls;
     ctx->count++;
 
@@ -968,8 +990,10 @@ static int store_label_batch(
     for (size_t i = 0; i < count; i++) {
         SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(stmt, ++param, uuid, sizeof(*uuid), SQLITE_STATIC));
         SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(stmt, ++param, (int)(entries[i].ls & ~(RRDLABEL_FLAG_INTERNAL))));
-        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].name, -1, SQLITE_STATIC));
-        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text(stmt, ++param, entries[i].value, -1, SQLITE_STATIC));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text64(stmt, ++param, string2str(entries[i].name),
+                                                        string_strlen(entries[i].name), SQLITE_STATIC, SQLITE_UTF8));
+        SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_text64(stmt, ++param, string2str(entries[i].value),
+                                                        string_strlen(entries[i].value), SQLITE_STATIC, SQLITE_UTF8));
     }
     param = 0;
 
@@ -1002,7 +1026,7 @@ static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t t
         .capacity = LABEL_COLLECT_INITIAL_CAPACITY,
     };
 
-    rrdlabels_walkthrough_read(labels, collect_label_callback, &collect_ctx);
+    rrdlabels_walkthrough_read_string(labels, collect_label_callback, &collect_ctx);
     // Spinlock is now released
 
     // Phase 2: Execute SQLite operations in batches (no spinlock held)
@@ -1031,8 +1055,8 @@ static int store_labels(nd_uuid_t *uuid, RRDLABELS *labels, label_store_type_t t
 
     // Cleanup collected labels
     for (size_t i = 0; i < collect_ctx.count; i++) {
-        freez(collect_ctx.entries[i].name);
-        freez(collect_ctx.entries[i].value);
+        string_freez(collect_ctx.entries[i].name);
+        string_freez(collect_ctx.entries[i].value);
     }
     freez(collect_ctx.entries);
 
@@ -1339,6 +1363,7 @@ static bool dimension_can_be_deleted(nd_uuid_t *dim_uuid __maybe_unused, sqlite3
 #endif
 }
 
+// Returns true when the scan reached the end of the snapshot (no rows left up to max_row_id)
 static bool run_cleanup_loop(
     sqlite3_stmt *res,
     struct meta_config_s *config,
@@ -1347,28 +1372,38 @@ static bool run_cleanup_loop(
     uint32_t *total_checked,
     uint32_t *total_deleted,
     uint64_t *row_id,
+    uint64_t max_row_id,
     sqlite3_stmt **check_stmt,
     sqlite3_stmt **action_stmt,
     bool check_flag,
     bool action_flag)
 {
     if (unlikely(SHUTDOWN_REQUESTED(config)))
-        return true;
+        return false;
 
     int rc = sqlite3_bind_int64(res, 1, (sqlite3_int64) *row_id);
+    if (likely(rc == SQLITE_OK))
+        rc = sqlite3_bind_int64(res, 2, (sqlite3_int64) max_row_id);
     if (unlikely(rc != SQLITE_OK))
-        return true;
+        return false;
 
     time_t start_running = now_monotonic_sec();
     bool time_expired = false;
+    bool reached_end = false;
 
     uint32_t l_checked = 0;
     uint32_t l_deleted = 0;
-    while (!time_expired && sqlite3_step_monitored(res) == SQLITE_ROW) {
+    while (!time_expired) {
         nd_uuid_t uuid = {0};
 
         if (unlikely(SHUTDOWN_REQUESTED(config)))
             break;
+
+        rc = sqlite3_step_monitored(res);
+        if (rc != SQLITE_ROW) {
+            reached_end = (rc == SQLITE_DONE);
+            break;
+        }
 
         *row_id = sqlite3_column_int64(res, 1);
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, uuid)))
@@ -1387,7 +1422,7 @@ static bool run_cleanup_loop(
 
     (*total_checked) += l_checked;
     (*total_deleted) += l_deleted;
-    return time_expired;
+    return reached_end;
 }
 
 
@@ -1499,7 +1534,7 @@ static uint64_t get_rowid_from_statement(const char *sql)
 //   else                  -> run one cleanup_loop slice and re-arm short timer
 struct cleanup_cycle {
     // descriptor (immutable)
-    const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ?
+    const char *select_sql;        // SELECT id, rowid FROM <table> WHERE rowid > ? AND rowid <= ?
     const char *max_rowid_sql;     // SELECT MAX(rowid) FROM <table>
     bool (*check_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
     void (*action_cb)(nd_uuid_t *, sqlite3_stmt **, bool);
@@ -1576,13 +1611,18 @@ static bool run_cleanup_cycle(struct cleanup_cycle *c, struct meta_config_s *wc)
     sqlite3_stmt *check_res = NULL;
     sqlite3_stmt *action_res = NULL;
 
-    (void) run_cleanup_loop(
+    bool reached_end = run_cleanup_loop(
         res, wc,
         c->check_cb, c->action_cb,
         &total_checked, &total_deleted,
-        &c->last_row_id,
+        &c->last_row_id, c->max_row_id,
         &check_res, &action_res,
         c->check_flag, c->action_flag);
+
+    // The rows up to the snapshot are done even when the last ones were deleted
+    // before the scan reached them; without this the pass would never complete.
+    if (reached_end)
+        c->last_row_id = c->max_row_id;
 
     SQLITE_FINALIZE(check_res);
     SQLITE_FINALIZE(action_res);
@@ -1751,11 +1791,15 @@ void vacuum_database(sqlite3 *database, const char *db_alias, int threshold, int
 #define SQL_SELECT_HOST_CTX_CHART_DIM_LIST                                                                             \
     "SELECT d.dim_id, d.rowid FROM chart c, dimension d WHERE c.chart_id = d.chart_id AND c.rowid = @rowid"
 
+// The deletions grow the WAL; check its size every this many dimensions, not on every one
+#define METADATA_WAL_CHECK_ROWS (256)
+
+// Returns true when every dimension of the chart was checked
 static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id, size_t *checked, size_t *deleted)
 {
     struct meta_config_s *config = &meta_config;
 
-    bool can_continue = false;
+    bool completed = false;
 
     if (!*res) {
         if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_HOST_CTX_CHART_DIM_LIST, res))
@@ -1767,10 +1811,12 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
 
     sqlite3_stmt *dim_del_stmt = NULL;
 
-    can_continue = true;
-    while (can_continue && sqlite3_step_monitored(*res) == SQLITE_ROW) {
-        nd_uuid_t dim_uuid;
+    int rc;
+    while ((rc = sqlite3_step_monitored(*res)) == SQLITE_ROW) {
+        if (SHUTDOWN_REQUESTED(config))
+            break;
 
+        nd_uuid_t dim_uuid;
         if (!sqlite3_column_uuid_copy(*res, 0, dim_uuid))
             continue;
 
@@ -1781,14 +1827,17 @@ static bool clean_host_chart_dimensions(sqlite3_stmt **res, int64_t chart_row_id
             (*deleted)++;
         }
         (*checked)++;
-        can_continue = (!SHUTDOWN_REQUESTED(config)) && sql_metadata_wal_size_acceptable();
+
+        if ((*checked % METADATA_WAL_CHECK_ROWS) == 0 && !sql_metadata_wal_size_acceptable())
+            break;
     }
+    completed = (rc == SQLITE_DONE);
     SQLITE_FINALIZE(dim_del_stmt);
 
 done:
     REPORT_BIND_FAIL(*res, param);
     SQLITE_RESET(*res);
-    return can_continue;
+    return completed;
 }
 
 #define SQL_SELECT_HOST_CTX_CHART_LIST "SELECT rowid, context FROM chart WHERE host_id = @host"
@@ -1811,7 +1860,7 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
 
     Word_t num_of_contexts = JudyLCount(CTX_JudyL, 0, -1, PJE0);
 
-    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", num_of_contexts, rrdhost_hostname(host));
+    nd_log_daemon(NDLP_DEBUG, "Verifying the retention of %zu contexts for host %s", (size_t)num_of_contexts, rrdhost_hostname(host));
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
@@ -1823,28 +1872,50 @@ static void cleanup_host_context_metadata(Pvoid_t CTX_JudyL, void *data)
     size_t deleted = 0;
     size_t checked = 0;
 
-    bool can_continue = true;
-    while (can_continue && sqlite3_step_monitored(res) == SQLITE_ROW) {
+    int rc;
+    while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
+        if (SHUTDOWN_REQUESTED(config))
+            break;
+
         chart_row_id = sqlite3_column_int64(res, 0);
         const char *context = (char *)sqlite3_column_text(res, 1);
         STRING *ctx = string_strdupz(context);
         Pvalue = JudyLGet(CTX_JudyL, (Word_t)ctx, PJE0);
-        if (Pvalue) {
-            can_continue = clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted);
-            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, context);
-        }
         string_freez(ctx);
-        can_continue = can_continue && (!SHUTDOWN_REQUESTED(config)) && sql_metadata_wal_size_acceptable();
+
+        if (Pvalue && !clean_host_chart_dimensions(&dimension_res, chart_row_id, &checked, &deleted))
+            break;
     }
     SQLITE_FINALIZE(dimension_res);
+
+    // A context can have more charts further down the walk, so the queued
+    // contexts are removed only after all the charts of the host were checked;
+    // an interrupted walk leaves them queued for the next run. The deletions
+    // stop on shutdown or a full WAL too; the rest stay queued.
+    bool completed = (rc == SQLITE_DONE);
+    if (completed) {
+        bool first = true;
+        Word_t Index = 0;
+        size_t removed = 0;
+        while ((Pvalue = JudyLFirstThenNext(CTX_JudyL, &Index, &first))) {
+            if (SHUTDOWN_REQUESTED(config) ||
+                ((removed % METADATA_WAL_CHECK_ROWS) == 0 && !sql_metadata_wal_size_acceptable())) {
+                completed = false;
+                break;
+            }
+            ctx_delete_metadata_cleanup_context(&context_res, &host->host_id.uuid, string2str((STRING *)Index));
+            removed++;
+        }
+    }
     SQLITE_FINALIZE(context_res);
 
     nd_log_daemon(
         NDLP_DEBUG,
-        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)",
+        "Verified the contexts of host %s (Checked %zu metrics and removed %zu)%s",
         rrdhost_hostname(host),
         checked,
-        deleted);
+        deleted,
+        completed ? "" : ", interrupted");
 
 done:
     REPORT_BIND_FAIL(res, param);
@@ -2067,7 +2138,7 @@ static void ctx_load_one_host(
     if (thread_found) {
         __atomic_store_n(&hclt[thread_index].busy, true, __ATOMIC_RELAXED);
         hclt[thread_index].host = host;
-        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_DEFAULT, restore_host_context, &hclt[thread_index]);
+        hclt[thread_index].thread = nd_thread_create("CTXLOAD", NETDATA_THREAD_OPTION_MANUAL_JOIN, restore_host_context, &hclt[thread_index]);
         rc = (hclt[thread_index].thread == NULL);
         *async_exec += (rc == 0);
         // if it failed, mark the thread slot as free
@@ -2239,11 +2310,9 @@ static void after_metadata_hosts(uv_work_t *req, int status __maybe_unused)
     Pvoid_t *Pvalue;
     while ((Pvalue = JudyLFirstThenNext(config->ae_DelJudyL, &Index, &first))) {
         ALARM_ENTRY *ae = (ALARM_ENTRY *) Index;
-        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED)) {
+        if(!__atomic_load_n(&ae->pending_save_count, __ATOMIC_ACQUIRE)) {
             health_alarm_log_free_one_nochecks_nounlink(ae);
             (void) JudyLDel(&config->ae_DelJudyL, Index, PJE0);
-            first = true;
-            Index = 0;
         }
     }
 
@@ -2332,8 +2401,11 @@ static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool
                 worker_is_busy(UV_EVENT_STORE_CHART);
 
             rc = check_and_update_chart_labels(st, work_buffer);
-            if (unlikely(rc))
+            if (unlikely(rc)) {
+                host_need_recheck = true;
+                rrdset_flag_set(st, RRDSET_FLAG_METADATA_UPDATE);
                 error_report("METADATA: 'host:%s': Failed to update labels for chart %s", rrdhost_hostname(host), rrdset_name(st));
+            }
 
             rc = store_chart_metadata(st, &store_chart);
             if (unlikely(rc)) {
@@ -2531,7 +2603,8 @@ static void store_alert_transitions(struct judy_list_t *pending_alert_list, bool
 
         sql_health_alarm_log_save(host, ae);
 
-        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELAXED);
+        // release: the save above happens before whoever frees the entry sees the count drop
+        __atomic_add_fetch(&ae->pending_save_count, -1, __ATOMIC_RELEASE);
         __atomic_add_fetch(&host->health.pending_transitions, -1, __ATOMIC_RELAXED);
     }
 
@@ -3027,6 +3100,19 @@ static void metadata_event_loop(void *arg)
 
     (void)uv_loop_close(loop);
 
+    // Did we give up on outstanding libuv work? Key this on the flags themselves rather than
+    // on loop_count: the loop above also exits when uv_run() reports no pending callbacks,
+    // and what matters is not "did we time out" but "is a worker still using the databases".
+    //
+    // Such a worker runs on a libuv threadpool thread, which nd_thread_join_threads() does not
+    // know about and cannot wait for. It is still binding and stepping statements against
+    // db_meta - and, via metadata_scan_host() -> ml_dimension_load_models(), against ml_db.
+    // Suppress the whole SQLite teardown so its handles and statements stay valid until the
+    // process exits.
+    if (config->metadata_running || config->ctx_load_running)
+        sqlite_mark_teardown_unsafe(
+            "a metadata worker outlived the shutdown wait and may still be using the databases");
+
     store_alert_transitions(pending_alert_list, false, true);
     store_sql_statements(pending_sql_statement, false, true);
 
@@ -3061,6 +3147,13 @@ void metadata_sync_shutdown(void)
     // and shutdown will timeout
     if (!metadata_enq_cmd(&cmd, true)) {
         nd_log_daemon(NDLP_WARNING, "METADATA: Failed to send a shutdown command");
+
+        // We never asked the metadata thread to stop, so we are returning with it - and its
+        // libuv workers - still running against db_meta and ml_db. This is a worse position
+        // than the watchdog timeout below: there we at least drained for 15s first. Suppress
+        // the SQLite teardown, including ml_fini()'s close, before the caller walks into it.
+        sqlite_mark_teardown_unsafe(
+            "the metadata shutdown command could not be queued, so the metadata thread is still running");
         return;
     }
     nd_log_daemon(NDLP_INFO, "METADATA: Submitted shutdown command, waiting for ACK");
@@ -3069,8 +3162,13 @@ void metadata_sync_shutdown(void)
     completion_destroy(&meta_config.start_stop_complete);
 
     int rc = nd_thread_join(meta_config.thread);
-    if (rc)
+    if (rc) {
         nd_log_daemon(NDLP_ERR, "METADATA: Failed to join synchronization thread");
+
+        // Same reasoning as the enqueue failure above: an unjoined metadata thread may still
+        // be inside SQLite when the caller tears it down.
+        sqlite_mark_teardown_unsafe("the metadata synchronization thread could not be joined");
+    }
     else
         nd_log_daemon(NDLP_INFO, "METADATA: synchronization thread shutdown completed");
 }
@@ -3192,7 +3290,12 @@ void metadata_execute_store_statement(sqlite3_stmt *stmt)
     if (unlikely(!stmt))
         return;
 
-    (void) queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL);
+    // the queue owns the statement once it is accepted; if metasync is not
+    // running - shutdown, or before init - nobody will ever execute or
+    // finalize it, so it goes back here (metaqueue_delete_dimension_uuid
+    // does the same with its allocation)
+    if (!queue_metadata_cmd(METADATA_EXECUTE_STORE_STATEMENT, stmt, NULL))
+        SQLITE_FINALIZE(stmt);
 }
 
 void commit_alert_transitions(RRDHOST *host __maybe_unused)

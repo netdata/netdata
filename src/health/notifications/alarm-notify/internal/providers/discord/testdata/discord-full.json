@@ -1,0 +1,22 @@
+{
+  "username": "netdata on test-node",
+  "allowed_mentions": {"parse": []},
+  "embeds": [
+    {
+      "title": "WARNING: Temperature is high",
+      "description": "A quote: \"hot\"\nUnicode: θερμοκρασία",
+      "url": "https://example.com/alert?id=1&view=chart#details",
+      "color": 16426522,
+      "timestamp": "2026-09-14T12:00:00Z",
+      "fields": [
+        {"name": "Node", "value": "test\\-node", "inline": true},
+        {"name": "Alert", "value": "test\\_alert", "inline": true},
+        {"name": "Status", "value": "CLEAR → WARNING", "inline": true},
+        {"name": "Chart", "value": "test\\.chart", "inline": true},
+        {"name": "Context", "value": "test\\.context", "inline": true},
+        {"name": "Value", "value": "42\\.5 C", "inline": true},
+        {"name": "Previous value", "value": "0 C", "inline": true}
+      ]
+    }
+  ]
+}

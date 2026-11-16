@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<response status="success">
+  <result>
+    <entry>
+      <gwid>1</gwid>
+      <name>gw-branch-a</name>
+      <role>Resp</role>
+      <mode>Main</mode>
+      <algo>PSK/ DH5/ AES/SHA1</algo>
+      <created>Jan.01 00:00:00</created>
+      <expires>Jan.02 00:00:00</expires>
+    </entry>
+    <entry>
+      <gwid>2</gwid>
+      <name>gw-branch-b</name>
+      <role>Resp</role>
+      <mode>Main</mode>
+      <algo>PSK/ DH5/ AES/SHA1</algo>
+      <created>Jan.01 00:00:00</created>
+      <expires>Jan.02 00:00:00</expires>
+    </entry>
+    <entry>
+      <gwid>3</gwid>
+      <name>gw-branch-c</name>
+      <role>Init</role>
+      <mode>IKEv2</mode>
+      <algo>RSA/DH20/AES256-GCM16/COMBINED</algo>
+      <created>Jan.01 00:00:00</created>
+      <expires>Jan.01 08:00:00</expires>
+    </entry>
+    <entry>
+      <gwid>4</gwid>
+      <name>gw-branch-d</name>
+      <role>Init</role>
+      <mode>IKEv2</mode>
+      <algo>RSA/DH20/AES256-GCM16/COMBINED</algo>
+      <created>Jan.01 00:00:00</created>
+      <expires>Jan.01 08:00:00</expires>
+    </entry>
+  </result>
+</response>

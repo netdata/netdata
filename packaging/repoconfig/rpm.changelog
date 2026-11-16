@@ -1,3 +1,6 @@
+* Tue Nov 10 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-6
+- Add preview repository configuration packages
+- Ensure repository configuration variants conflict with each other
 * Tue Jan 27 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-5
 - Use hardcoded release version for RHEL systems
 * Thu Jan 22 2026 Austin Hemmelgarn <austin@netdata.cloud> 5-4

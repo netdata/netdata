@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -21,7 +23,14 @@ const testPluginName = "test.plugin"
 func TestReadRegistryUniqueID(t *testing.T) {
 	tmp := t.TempDir()
 	mkdir(t, filepath.Join(tmp, "registry"))
-	require.NoError(t, os.WriteFile(filepath.Join(tmp, "registry", "netdata.public.unique.id"), []byte("  test-machine-guid\n"), 0o644))
+	require.NoError(
+		t,
+		os.WriteFile(
+			filepath.Join(tmp, "registry", "netdata.public.unique.id"),
+			[]byte("  test-machine-guid\n"),
+			0o644,
+		),
+	)
 
 	assert.Equal(t, "test-machine-guid", readRegistryUniqueID(tmp))
 	assert.Empty(t, readRegistryUniqueID(filepath.Join(tmp, "missing")))
@@ -70,10 +79,13 @@ func TestDirectoriesBuild(t *testing.T) {
 				stockConfigDir:     probeStock,
 				collectorsUserDirs: []string{"/tmp/user1/" + testPluginName, "/tmp/user2/" + testPluginName},
 				collectorsStockDir: filepath.Join(probeStock, testPluginName),
-				sdUserDirs:         []string{"/tmp/user1/" + testPluginName + "/sd", "/tmp/user2/" + testPluginName + "/sd"},
-				sdStockDir:         filepath.Join(probeStock, testPluginName, "sd"),
-				collectorsWatch:    []string{},
-				varLibDir:          "",
+				sdUserDirs: []string{
+					"/tmp/user1/" + testPluginName + "/sd",
+					"/tmp/user2/" + testPluginName + "/sd",
+				},
+				sdStockDir:      filepath.Join(probeStock, testPluginName, "sd"),
+				collectorsWatch: []string{},
+				varLibDir:       "",
 			},
 		},
 		"env_dirs_only": {
@@ -106,10 +118,13 @@ func TestDirectoriesBuild(t *testing.T) {
 				stockConfigDir:     "/tmp/env/stock",
 				collectorsUserDirs: []string{"/tmp/cli/dir/" + testPluginName, "/tmp/env/user/" + testPluginName},
 				collectorsStockDir: "/tmp/env/stock/" + testPluginName,
-				sdUserDirs:         []string{"/tmp/cli/dir/" + testPluginName + "/sd", "/tmp/env/user/" + testPluginName + "/sd"},
-				sdStockDir:         "/tmp/env/stock/" + testPluginName + "/sd",
-				collectorsWatch:    []string{},
-				varLibDir:          "",
+				sdUserDirs: []string{
+					"/tmp/cli/dir/" + testPluginName + "/sd",
+					"/tmp/env/user/" + testPluginName + "/sd",
+				},
+				sdStockDir:      "/tmp/env/stock/" + testPluginName + "/sd",
+				collectorsWatch: []string{},
+				varLibDir:       "",
 			},
 		},
 		"fallback_dirs_when_no_config": {
@@ -117,14 +132,41 @@ func TestDirectoriesBuild(t *testing.T) {
 			env:   envData{},
 			// build-relative fallback from execDir
 			want: directories{
-				userConfigDirs:     []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata")},
-				stockConfigDir:     filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"),
-				collectorsUserDirs: []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName)},
-				collectorsStockDir: filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName),
-				sdUserDirs:         []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName, "sd")},
-				sdStockDir:         filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d", testPluginName, "sd"),
-				collectorsWatch:    []string{},
-				varLibDir:          "",
+				userConfigDirs: []string{filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata")},
+				stockConfigDir: filepath.Join(execDir, "..", "..", "..", "..", "usr", "lib", "netdata", "conf.d"),
+				collectorsUserDirs: []string{
+					filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName),
+				},
+				collectorsStockDir: filepath.Join(
+					execDir,
+					"..",
+					"..",
+					"..",
+					"..",
+					"usr",
+					"lib",
+					"netdata",
+					"conf.d",
+					testPluginName,
+				),
+				sdUserDirs: []string{
+					filepath.Join(execDir, "..", "..", "..", "..", "etc", "netdata", testPluginName, "sd"),
+				},
+				sdStockDir: filepath.Join(
+					execDir,
+					"..",
+					"..",
+					"..",
+					"..",
+					"usr",
+					"lib",
+					"netdata",
+					"conf.d",
+					testPluginName,
+					"sd",
+				),
+				collectorsWatch: []string{},
+				varLibDir:       "",
 			},
 		},
 		"multiple_cli_dirs": {
@@ -268,6 +310,8 @@ func TestDirectoriesBuild(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+			tc.want.cacheDir = handleDirOnWin(tc.env.cygwinBase, buildinfo.CacheDir, execDir)
+			tc.want.stockDataDir = handleDirOnWin(tc.env.cygwinBase, buildinfo.StockDataDir, execDir)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -374,7 +418,9 @@ func TestIsStock(t *testing.T) {
 	})
 
 	t.Run("uses configured stock root when available", func(t *testing.T) {
-		dirs = directories{stockConfigDir: "/custom/stock"}
+		dirs = directories{
+			stockConfigDir: "/custom/stock",
+		}
 		assert.True(t, IsStock("/custom/stock/go.d/module.conf"))
 		assert.False(t, IsStock("/usr/lib/netdata/conf.d/go.d/module.conf"))
 		assert.False(t, IsStock("/etc/netdata/go.d/module.conf"))

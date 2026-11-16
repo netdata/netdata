@@ -83,6 +83,34 @@ static void pluginsd_worker_thread_handle_success(struct plugind *cd) {
     }
 }
 
+// The policy for a failed run, whether the plugin exited with an error or we
+// disconnected it because we could not parse its output: disable it if it never
+// produced useful output, otherwise restart it with backoff until too many
+// consecutive runs fail without useful output.
+static void pluginsd_worker_thread_handle_failure(struct plugind *cd, const char *failure) {
+    if (!cd->successful_collections) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s and haven't collected any data. Disabling it.",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure);
+        plugin_set_disabled(cd);
+        return;
+    }
+
+    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
+        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times). %s",
+              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure, cd->successful_collections,
+              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
+
+        pluginsd_sleep(cd->update_every * 10);
+        return;
+    }
+
+    netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) %s, but has given useful output in the past (%zu times)."
+          "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
+          rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, failure,
+          cd->successful_collections, cd->serial_failures);
+    plugin_set_disabled(cd);
+}
+
 static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_ret_code) {
     if (worker_ret_code == -1) {
         netdata_log_info("PLUGINSD: 'host:%s', '%s' (pid %d) exited abnormally. Disabling it.",
@@ -91,30 +119,9 @@ static void pluginsd_worker_thread_handle_error(struct plugind *cd, int worker_r
         return;
     }
 
-    if (!cd->successful_collections) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d and haven't collected any data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code);
-        plugin_set_disabled(cd);
-        return;
-    }
-
-    if (cd->serial_failures <= SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times). %s",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code, cd->successful_collections,
-              plugin_is_enabled(cd) ? "Waiting a bit before starting it again." : "Will not start it again - it is disabled.");
-
-        pluginsd_sleep(cd->update_every * 10);
-        return;
-    }
-
-    if (cd->serial_failures > SERIAL_FAILURES_THRESHOLD) {
-        netdata_log_error("PLUGINSD: 'host:%s', '%s' (pid %d) exited with error code %d, but has given useful output in the past (%zu times)."
-              "We tried to restart it %zu times, but it failed to generate data. Disabling it.",
-              rrdhost_hostname(cd->host), string2str(cd->fullfilename), cd->unsafe.pid, worker_ret_code,
-              cd->successful_collections, cd->serial_failures);
-        plugin_set_disabled(cd);
-        return;
-    }
+    char failure[50];
+    snprintfz(failure, sizeof(failure), "exited with error code %d", worker_ret_code);
+    pluginsd_worker_thread_handle_failure(cd, failure);
 }
 
 #undef SERIAL_FAILURES_THRESHOLD
@@ -159,11 +166,11 @@ static void pluginsd_worker_thread(void *arg) {
         };
         ND_LOG_STACK_PUSH(lgs);
 
-        bool retry = false;
+        bool retry = false, protocol_error = false;
         count = pluginsd_process(cd->host, cd,
                                  spawn_popen_read_fd(cd->unsafe.pi),
                                  spawn_popen_write_fd(cd->unsafe.pi),
-                                 0, &retry);
+                                 0, &retry, &protocol_error);
 
         nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                "PLUGINSD: 'host:%s', '%s' (pid %d) disconnected after %zu successful data collections.",
@@ -174,6 +181,10 @@ static void pluginsd_worker_thread(void *arg) {
 
         if (retry && worker_ret_code != -1)
             pluginsd_sleep(cd->update_every);
+        else if (protocol_error && worker_ret_code != -1)
+            // after the disconnect the plugin usually exits cleanly or on SIGTERM/SIGPIPE,
+            // so its exit code cannot tell that the run failed
+            pluginsd_worker_thread_handle_failure(cd, "sent output that could not be parsed");
         else if(likely(worker_ret_code == 0))
             pluginsd_worker_thread_handle_success(cd);
         else
@@ -293,6 +304,173 @@ static bool is_obsolete_plugin(const char *pluginname) {
     return false;
 }
 
+static bool pluginsd_find_ipmi(char *path, size_t size, char *const *directories, const char *name) {
+    for (size_t i = 0; i < PLUGINSD_MAX_DIRECTORIES && directories[i]; i++) {
+        DIR *dir = opendir(directories[i]);
+        if (!dir)
+            continue; // The normal scan reports directory errors.
+
+        struct dirent *file;
+        while ((file = readdir(dir))) {
+            char pluginname[CONFIG_MAX_NAME + 1];
+            if (!is_plugin(pluginname, sizeof(pluginname), file->d_name) || strcmp(pluginname, name))
+                continue;
+
+            char candidate[FILENAME_MAX + 1];
+            int len = snprintf(candidate, sizeof(candidate), "%s/%s", directories[i], file->d_name);
+            struct stat st;
+            if (len < 0 || (size_t)len >= sizeof(candidate) || stat(candidate, &st) ||
+                !S_ISREG(st.st_mode) || access(candidate, X_OK))
+                continue;
+
+            strncpyz(path, candidate, size - 1);
+            closedir(dir);
+            return true;
+        }
+        closedir(dir);
+    }
+    return false;
+}
+
+// Resolve once before spawning workers. A failed plugin or a later directory scan
+// must not transfer ownership to the other implementation.
+static void pluginsd_select_ipmi(struct config *config, char *const *directories, int default_run,
+                                char *path, size_t size) {
+    bool legacy_configured = inicfg_exists(config, CONFIG_SECTION_PLUGINS, "freeipmi");
+    bool legacy_enabled = inicfg_get_boolean(config, CONFIG_SECTION_PLUGINS, "freeipmi", default_run);
+    const char *options = "";
+    if (inicfg_exists(config, "plugin:freeipmi", "command options"))
+        options = inicfg_get(config, "plugin:freeipmi", "command options", "");
+    options += strspn(options, " \t\r\n");
+
+    // Preserve deliberate disablement and legacy settings (possibly remote BMCs).
+    // An explicit ipmi=yes overrides this default without interpreting C options.
+    int go_default = (legacy_configured && !legacy_enabled) || *options ? CONFIG_BOOLEAN_NO : default_run;
+    bool go_enabled = inicfg_get_boolean(config, CONFIG_SECTION_PLUGINS, "ipmi", go_default);
+
+    path[0] = '\0';
+    if (go_enabled && pluginsd_find_ipmi(path, size, directories, "ipmi"))
+        return;
+    if (legacy_enabled)
+        pluginsd_find_ipmi(path, size, directories, "freeipmi");
+}
+
+static bool pluginsd_ipmi_allowed(const char *selected, const char *pluginname,
+                                 const char *directory, const char *filename) {
+    if (strcmp(pluginname, "ipmi") && strcmp(pluginname, "freeipmi"))
+        return true;
+
+    char path[FILENAME_MAX + 1];
+    int len = snprintf(path, sizeof(path), "%s/%s", directory, filename);
+    return len >= 0 && (size_t)len < sizeof(path) && !strcmp(selected, path);
+}
+
+int pluginsd_ipmi_unittest(void) {
+#if defined(OS_WINDOWS)
+    return 0; // Neither IPMI implementation is shipped on Windows.
+#else
+    char directory[] = "/tmp/netdata-ipmi-selection-XXXXXX";
+    if (!mkdtemp(directory))
+        return 1;
+
+    char other[FILENAME_MAX + 1], legacy[FILENAME_MAX + 1], modern[FILENAME_MAX + 1];
+    snprintfz(other, sizeof(other), "%s/other", directory);
+    snprintfz(legacy, sizeof(legacy), "%s/freeipmi.plugin", directory);
+    snprintfz(modern, sizeof(modern), "%s/ipmi.plugin", other);
+    int errors = 0;
+    if (mkdir(other, 0700)) {
+        rmdir(directory);
+        return 1;
+    }
+    const char *files[] = { legacy, modern };
+    for (size_t i = 0; i < _countof(files); i++) {
+        // Selection only needs executable paths; these fixtures are never launched.
+        int fd = open(files[i], O_WRONLY | O_CREAT | O_EXCL, 0700);
+        if (fd == -1) {
+            errors++;
+            goto cleanup;
+        }
+        if (close(fd) || chmod(files[i], 0700)) {
+            errors++;
+            goto cleanup;
+        }
+    }
+
+    char *both[] = { directory, other, NULL };
+    char *reversed[] = { other, directory, NULL };
+    char *only_legacy[] = { directory, NULL };
+    char *only_modern[] = { other, NULL };
+    char *neither[] = { NULL };
+    struct {
+        const char *name, *go, *c, *options;
+        int default_run;
+        char **directories;
+        const char *expected;
+    } cases[] = {
+        { "Go in later directory", NULL, NULL, NULL, 1, both, modern },
+        { "directory order reversed", NULL, NULL, NULL, 1, reversed, modern },
+        { "explicitly enabled both", "yes", "yes", NULL, 1, both, modern },
+        { "legacy disablement", NULL, "no", NULL, 1, both, "" },
+        { "explicit Go overrides disablement", "yes", "no", NULL, 1, both, modern },
+        { "rollback", "no", "yes", NULL, 1, both, legacy },
+        { "both disabled", "no", "no", NULL, 1, both, "" },
+        { "legacy remote config", NULL, NULL, "hostname bmc.example", 1, both, legacy },
+        { "disabled legacy config", NULL, "no", "no-sel", 1, both, "" },
+        { "explicit migration", "yes", NULL, "no-sel", 1, both, modern },
+        { "whitespace options", NULL, NULL, " \t\r\n", 1, both, modern },
+        { "automatic run disabled", NULL, NULL, NULL, 0, both, "" },
+        { "Go overrides automatic run", "yes", NULL, NULL, 0, both, modern },
+        { "C overrides automatic run", NULL, "yes", NULL, 0, both, legacy },
+        { "only C installed", NULL, NULL, NULL, 1, only_legacy, legacy },
+        { "only Go installed", NULL, NULL, NULL, 1, only_modern, modern },
+        { "legacy options without C installed", NULL, NULL, "no-sel", 1, only_modern, "" },
+        { "nothing installed", NULL, NULL, NULL, 1, neither, "" },
+    };
+    for (size_t i = 0; i < _countof(cases); i++) {
+        struct config config = APPCONFIG_INITIALIZER;
+        if (cases[i].go)
+            inicfg_set(&config, CONFIG_SECTION_PLUGINS, "ipmi", cases[i].go);
+        if (cases[i].c)
+            inicfg_set(&config, CONFIG_SECTION_PLUGINS, "freeipmi", cases[i].c);
+        if (cases[i].options)
+            inicfg_set(&config, "plugin:freeipmi", "command options", cases[i].options);
+        char selected[FILENAME_MAX + 1];
+        pluginsd_select_ipmi(&config, cases[i].directories, cases[i].default_run, selected, sizeof(selected));
+        if (strcmp(selected, cases[i].expected) ||
+            pluginsd_ipmi_allowed(selected, "ipmi", other, "ipmi.plugin") != !strcmp(cases[i].expected, modern) ||
+            pluginsd_ipmi_allowed(selected, "freeipmi", directory, "freeipmi.plugin") != !strcmp(cases[i].expected, legacy) ||
+            !pluginsd_ipmi_allowed(selected, "go.d", directory, "go.d.plugin") ||
+            pluginsd_ipmi_allowed(selected, "ipmi", other, "ipmi-plugin")) {
+            fprintf(stderr, "IPMI selection failed: %s\n", cases[i].name);
+            errors++;
+        }
+        inicfg_free(&config);
+    }
+
+    // A present but non-executable Go binary must not suppress an available C plugin.
+    if (chmod(modern, 0600))
+        errors++;
+    else {
+        struct config config = APPCONFIG_INITIALIZER;
+        char selected[FILENAME_MAX + 1];
+        pluginsd_select_ipmi(&config, both, 1, selected, sizeof(selected));
+        if (strcmp(selected, legacy)) {
+            fprintf(stderr, "IPMI selection failed: non-executable Go binary\n");
+            errors++;
+        }
+        inicfg_free(&config);
+    }
+
+cleanup:
+    unlink(modern);
+    unlink(legacy);
+    rmdir(other);
+    rmdir(directory);
+    fprintf(stderr, "IPMI selection: %d errors\n", errors);
+    return errors ? 1 : 0;
+#endif
+}
+
 void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
@@ -303,11 +481,16 @@ void *pluginsd_main(void *ptr) {
 
     // disable some plugins by default
     inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "slabinfo", CONFIG_BOOLEAN_NO);
-    // it crashes (both threads) on Alpine after we made it multi-threaded
-    // works with "--device /dev/ipmi0", but this is not default
-    // see https://github.com/netdata/netdata/pull/15564 for details
-    if (getenv("NETDATA_LISTENER_PORT"))
-        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_PLUGINS, "freeipmi", CONFIG_BOOLEAN_NO);
+    // Preserve the container opt-in policy for IPMI. FreeIPMI can crash without
+    // an exposed device: https://github.com/netdata/netdata/pull/15564
+    char ipmi_path[FILENAME_MAX + 1];
+    pluginsd_select_ipmi(&netdata_config, plugin_directories,
+                        getenv("NETDATA_LISTENER_PORT") ? CONFIG_BOOLEAN_NO : automatic_run,
+                        ipmi_path, sizeof(ipmi_path));
+    if (*ipmi_path)
+        netdata_log_info("PLUGINSD: using '%s' for IPMI; other IPMI plugin candidates are suppressed until restart", ipmi_path);
+    else
+        netdata_log_debug(D_PLUGINSD, "no enabled IPMI plugin selected; restart Netdata after installing or enabling one");
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
@@ -346,6 +529,9 @@ void *pluginsd_main(void *ptr) {
                     netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
                     continue;
                 }
+
+                if (!pluginsd_ipmi_allowed(ipmi_path, pluginname, directory_name, file->d_name))
+                    continue;
 
                 // Skip any obsolete plugins.
                 if(is_obsolete_plugin(pluginname)) {

@@ -41,6 +41,8 @@ type ClientConfig transportconfig.TypedConfig
 type ServerConfig transportconfig.TypedConfig
 
 // SnapshotHandler is the typed callback used by the cgroups-snapshot service.
+// The request is decoded into scalar fields, and the builder writes into the
+// response buffer, which is valid only during the call.
 type SnapshotHandler = func(*protocol.CgroupsRequest, *protocol.CgroupsBuilder) bool
 
 // Handler defines the public typed callback surface for the cgroups-snapshot

@@ -1,0 +1,13 @@
+{
+  "driver": "lanplus",
+  "device": 0,
+  "hostname": "bmc.example",
+  "port": 9623,
+  "username": "monitor",
+  "password": "test-secret",
+  "privilege_level": "operator",
+  "vnode": "server-node",
+  "update_every": 10,
+  "timeout": 3,
+  "collect_sel": true
+}

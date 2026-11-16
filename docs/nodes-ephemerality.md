@@ -62,7 +62,7 @@ Both alerts are configured with `to: silent` by default. They trigger and appear
         template: streaming_disconnected
               on: netdata.streaming_inbound
            class: Availability
-            type: Streaming
+            type: Netdata
        component: Streaming
     chart labels: type=permanent
             calc: ${stale disconnected}
@@ -83,7 +83,7 @@ Both alerts are configured with `to: silent` by default. They trigger and appear
         template: streaming_never_connected
               on: netdata.streaming_inbound
            class: Availability
-            type: Streaming
+            type: Netdata
        component: Streaming
     chart labels: type=permanent
             calc: ${stale archived}

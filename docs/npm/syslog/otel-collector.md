@@ -12,14 +12,14 @@ endmeta-->
 
 Network devices send syslog; an OpenTelemetry Collector receives it, normalizes it, and forwards it to Netdata over OTLP. This page walks through a working configuration.
 
-For applications, host metrics, and general file logs, use [Ingest OpenTelemetry Metrics and Logs](/docs/opentelemetry/otlp-ingestion.md). This page remains the canonical workflow for network-device syslog.
+For applications, host metrics, and general file logs, use [Ingest OpenTelemetry Metrics, Logs, and Traces](/docs/opentelemetry/otlp-ingestion.md). This page remains the canonical workflow for network-device syslog.
 
 ## What you need
 
 - A Netdata Agent — its OTLP endpoint listens on `127.0.0.1:4317` by default.
 - An [OpenTelemetry Collector Contrib](https://github.com/open-telemetry/opentelemetry-collector-releases) binary on the network, typically on the same host as the devices' hub.
 - Devices configured to send syslog to the collector.
-- A Netdata Cloud account and sign-in to verify the records in the access-gated `otel-logs` view.
+- A Netdata Cloud account, sign-in as a member of the node's Space with permission to view sensitive data, and a Space on a paid plan or an active trial to verify the records in the access-gated `otel-logs` view.
 
 ## A working configuration
 

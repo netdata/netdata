@@ -82,12 +82,29 @@ metrics:
           unit: "{event}/s"
     metric_tags:
       - tag: ike_tunnel_index
-        index: 1
-      - tag: _peer_remote_address
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 3
+      - tag: peer_address_type
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 1
+      - tag: peer_remote_address
         symbol:
-          OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.2
           name: jnxIkeTunMonRemoteAddr
           format: ip_address
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 2
       - tag: _peer_local_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.1.2.1.4
@@ -158,12 +175,29 @@ metrics:
           unit: "{drop}/s"
     metric_tags:
       - tag: ipsec_tunnel_index
-        index: 1
-      - tag: _peer_remote_address
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 3
+      - tag: peer_address_type
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 1
+      - tag: peer_remote_address
         symbol:
-          OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.2
           name: jnxIpSecTunMonRemoteGwAddr
           format: ip_address
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+          component: 2
       - tag: _peer_local_address
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.2.1.5
@@ -210,7 +244,39 @@ metrics:
         scale_factor: 0.01
     metric_tags:
       - tag: sa_index
-        index: 1
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+            - type: integer
+          component: 4
+      - tag: ipsec_tunnel_index
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+            - type: integer
+          component: 3
+      - tag: peer_address_type
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+            - type: integer
+          component: 1
+      - tag: peer_remote_address
+        symbol:
+          format: ip_address
+        index_decode:
+          components:
+            - type: integer
+            - type: octet_string
+            - type: integer
+            - type: integer
+          component: 2
       - tag: _sa_encap_mode
         symbol:
           OID: 1.3.6.1.4.1.2636.3.52.1.2.3.1.6

@@ -12,7 +12,10 @@ run cd "${NETDATA_SOURCE_PATH}" || exit 1
 # -----------------------------------------------------------------------------
 # copy the files needed by makeself installation
 
-run mkdir -p "${NETDATA_INSTALL_PATH}/system"
+(
+    umask 022
+    run mkdir -p "${NETDATA_INSTALL_PATH}/system" "${NETDATA_INSTALL_PATH}/bin/srv"
+)
 
 run cp \
   packaging/makeself/post-installer.sh \
@@ -22,8 +25,6 @@ run cp \
 
 # -----------------------------------------------------------------------------
 # create a wrapper to start our netdata with a modified path
-
-run mkdir -p "${NETDATA_INSTALL_PATH}/bin/srv"
 
 run mv "${NETDATA_INSTALL_PATH}/bin/netdata" \
   "${NETDATA_INSTALL_PATH}/bin/srv/netdata" || exit 1

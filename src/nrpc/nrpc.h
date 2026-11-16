@@ -71,6 +71,10 @@ extern size_t nrpc_methods_functions;   // bytes held by method descriptors (hea
 #define NRPC_VERSION_DEFAULT 0
 #define NRPC_TAG_HIDDEN "hidden"
 
+// errorMsgKey of the denial for callers lacking HTTP_ACCESS_COMMERCIAL_SPACE;
+// dashboards use it to offer a plan upgrade, so it is a public contract
+#define NRPC_ERROR_KEY_COMMERCIAL_REQUIRED "ErrCommercialRequired"
+
 #define NRPC_DEADLINE_GRACE_UT (1 * USEC_PER_SEC)
 
 // the in-flight calls table grants every deadline a grace extension before enforcing it;

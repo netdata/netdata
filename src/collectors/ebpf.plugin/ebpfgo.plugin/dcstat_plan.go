@@ -4,12 +4,11 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-const dcstatKernelMask uint32 = (1 << 12) - 1
+const dcstatKernelMask uint32 = (1 << 14) - 1
 const dcstatDefaultPIDTableSize uint32 = 32768
 
-// dcstatMaxBaseSelector is the highest SelectKernelName index for which a
-// base-flavor (no suffix) dcstat object file is shipped.  Unlike cachestat
-// (5.16) the dc family stops at 5.14, so the two constants differ.
+// dcstatMaxBaseSelector caps base-flavor paths at the highest RHF artifact
+// rung. Generic selection skips the RHF-only 5.14 object and falls back to 5.4.
 const dcstatMaxBaseSelector = 7 // 5.14
 
 type DCStatLegacyConfig struct {

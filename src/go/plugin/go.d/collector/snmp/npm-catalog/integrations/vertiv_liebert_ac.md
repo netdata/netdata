@@ -88,7 +88,7 @@ Configure the **snmp** collector from the Netdata web interface:
 4. In the Search box, type _snmp_ (or scroll the list) to locate the **snmp** collector.
 5. Click the **+** next to the **snmp** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -144,13 +144,13 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_lgpEnvHumidityMeasurementRel` | `%` | per lgp_env_temperature_descr_deg_f | The measured humidity value |
+| `snmp.device_prof_lgpEnvHumidityMeasurementRel` | `%` | per lgp_env_humidity_descr_rel | The measured humidity value |
 
 ### Environment / Temperature
 
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
-| `snmp.device_prof_lgpEnvTemperatureMeasurementDegC` | `Cel` | per lgp_env_temperature_descr_deg_f | The measured temperature value |
+| `snmp.device_prof_lgpEnvTemperatureMeasurementDegC` | `Cel` | per lgp_env_temperature_descr_deg_c | The measured temperature value |
 | `snmp.device_prof_lgpEnvTemperatureMeasurementDegF` | `degF` | per lgp_env_temperature_descr_deg_f | The measured temperature value |
 | `snmp.device_prof_lgpEnvTemperatureSettingDegF` | `degF` | device | The temperature setting used to control the well known temperature object lgpEnvControlTemperature |
 | `snmp.device_prof_lgpEnvTemperatureToleranceDegF` | `degF` | device | The acceptable variance from lgpEnvTemperatureSettingDegF without initiating a control action |

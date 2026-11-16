@@ -871,4 +871,19 @@ static bool strendswith_lengths(const char *string, size_t string_len, const cha
     return strcmp(string + string_len - suffix_len, suffix) == 0;
 }
 
+// compare a secret (api key, token) without leaking how many leading bytes match
+ALWAYS_INLINE
+static bool streq_constant_time(const char *a, const char *b) {
+    if (a == NULL || b == NULL)
+        return false;
+
+    size_t a_len = strlen(a);
+    size_t b_len = strlen(b);
+
+    if (a_len != b_len)
+        return false;
+
+    return CRYPTO_memcmp(a, b, a_len) == 0;
+}
+
 #endif //NETDATA_INLINED_H

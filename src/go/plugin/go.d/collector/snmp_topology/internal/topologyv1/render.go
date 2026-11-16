@@ -7,6 +7,7 @@ import (
 
 	topologyapi "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
@@ -54,6 +55,15 @@ func Render(data topologymodel.Data) (topologyapi.Data, error) {
 	if tableTypes == nil {
 		tableTypes = make(map[string]topologyapi.TableType)
 	}
+	bindings, bindingType, err := buildFocusBindings(data.FocusRootBindings, actorIndex)
+	if err != nil {
+		return topologyapi.Data{}, err
+	}
+	if actorDetails == nil {
+		actorDetails = make(map[string]topologyapi.DetailTable)
+	}
+	actorDetails[topologyoptions.ManagedFocusBindingsTable] = bindings
+	tableTypes[topologyoptions.ManagedFocusBindingsType] = bindingType
 	if _, ok := tableTypes["actor_labels"]; !ok {
 		tableTypes["actor_labels"] = snmpTopologyV1ActorLabelsTableType()
 	}

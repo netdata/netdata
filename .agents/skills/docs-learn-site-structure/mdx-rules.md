@@ -7,6 +7,8 @@ collector metadata: `.agents/skills/collectors-metadata-yaml/SKILL.md#safety-of-
 
 ## What `sanitize_page` does, in its order
 
+Only step 4 sets code aside; every other step rewrites the whole body, fenced and inline code included.
+
 1. The first `<!--` and the first `-->` become `---` (the injected metadata block becomes frontmatter).
 2. `<!--unhideme` and `unhideme-->` markers are removed.
 3. `<details><summary>` and `<details open><summary>` get a newline between the tags; no other variant is touched.
@@ -17,7 +19,8 @@ collector metadata: `.agents/skills/collectors-metadata-yaml/SKILL.md#safety-of-
 5. Integration pages (`INTEGRATION_MARKER`) get their `netdata.cloud/img` logo tags annotated with contrast data
    attributes (`_annotate_integration_logo_tags`, one HTTP fetch per logo URL per run, `LOGO_ANALYSIS_TIMEOUT`); a
    failed fetch still writes the attributes, with `unknown` contrast and `low` confidence.
-6. The exact substrings `<=`, `%<`, and `<->` are backslash-escaped. `< =` or `<-->` are not.
+6. The exact substrings `<=`, `%<`, and `<->` are backslash-escaped, even after an existing backslash: a source `\<=`
+   becomes `\\<=` and fails the build, and code shows the added backslash.
 7. `<https://...>`, `<http://...>`, and `<user@host>` become markdown links.
 8. A `meta_yaml: "<url>"` line anywhere in the file is removed and `custom_edit_url` is rewritten to that URL.
 9. Lines starting with `[![analytics]` are dropped, and blank lines around the frontmatter are normalized.
@@ -35,9 +38,10 @@ Not covered by the transforms, each fails the MDX build:
   step 6, such as `<-->` or `< =`.
 
 Fixes, in order of preference: wrap the token in inline code (step 4 preserves it); rephrase (`under 100 minutes`);
-escape as `\<` only when the character must read as a less-than sign. Fenced and inline code, MDX `import`/`export`
-at the top of the file, `style={{ }}`, and fenced Mermaid blocks (`markdown.mermaid` is on in
-`docusaurus.config.js`; `fix_mermaid_diagram_contrast` rewrites low-contrast fills) survive as written.
+escape as `\<` only when the character must read as a less-than sign. Step 6's `<=`, `%<` and `<->` are the exception:
+write them bare in prose. Step 4 also leaves MDX `import`/`export` at the top of the file, `style={{ }}`, and fenced
+Mermaid blocks (`markdown.mermaid` is on in `docusaurus.config.js`; `fix_mermaid_diagram_contrast` rewrites
+low-contrast fills) unescaped.
 
 ## Tests and gates
 

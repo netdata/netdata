@@ -28,3 +28,5 @@ The **Home tab** offers a **real-time overview of your Room** in Netdata Cloud. 
 Use the Home tab regularly to stay ahead of infrastructure issues and monitor alert trends at a glance.
 
 :::
+
+For edge fleets, see [using the Nodes Map with host labels and custom metrics](../fleet-management/monitor-the-fleet.md#see-the-fleet-in-the-nodes-map). The Nodes view provides filtering, metric grouping and independent fill and border colors.

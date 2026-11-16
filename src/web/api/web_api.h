@@ -39,14 +39,28 @@ void web_api_command_hashes_init(struct web_api_command *api_commands, SPINLOCK 
 
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands);
 
-static inline void fix_google_param(char *s) {
-    if(unlikely(!s || !*s)) return;
+// Google Visualization (tqx) and JSONP parameters of the data endpoints
+typedef struct data_query_jsonp {
+    char *google_version;
+    char *google_reqId;
+    char *google_sig;
+    char *google_out;
+    char *responseHandler;
+    char *outFileName;
+    time_t google_timestamp;
+} DATA_QUERY_JSONP;
 
-    for( ; *s ;s++) {
-        if(!isalnum((uint8_t)*s) && *s != '.' && *s != '_' && *s != '-')
-            *s = '_';
+#define DATA_QUERY_JSONP_DEFAULTS (DATA_QUERY_JSONP){ \
+        .google_version = "0.6",                       \
+        .google_reqId = "0",                           \
+        .google_sig = "0",                             \
+        .google_out = "json",                          \
     }
-}
+
+void data_query_jsonp_parse_tqx(DATA_QUERY_JSONP *jp, char *value, DATASOURCE_FORMAT *format);
+void data_query_jsonp_sanitize(DATA_QUERY_JSONP *jp);
+int data_query_response_begin(struct web_client *w, DATA_QUERY_JSONP *jp, DATASOURCE_FORMAT format, int timeout, time_t sig);
+int data_query_response_execute(ONEWAYALLOC *owa, struct web_client *w, struct query_target *qt, DATA_QUERY_JSONP *jp, DATASOURCE_FORMAT format);
 
 int web_client_api_request_weights(RRDHOST *host, struct web_client *w, char *url, WEIGHTS_METHOD method, WEIGHTS_FORMAT format, size_t api_version);
 

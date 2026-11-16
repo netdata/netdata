@@ -1,22 +1,23 @@
 use super::*;
 use crate::protocol::{
-    increment_encode, AppsLookupBuilder, AppsLookupRequestView, AppsLookupResponseView,
-    BatchBuilder, CgroupsBuilder, CgroupsLookupBuilder, CgroupsLookupRequestView,
-    CgroupsLookupResponseView, CgroupsRequest, Header, HelloAck, NipcError, APPS_CGROUP_HOST_ROOT,
-    APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE, CGROUPS_LOOKUP_RESP_HDR_SIZE,
-    CGROUP_LOOKUP_KNOWN, CGROUP_LOOKUP_OVERSIZED_ITEM, CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
-    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CODE_HELLO_ACK, FLAG_BATCH, HEADER_SIZE,
-    INCREMENT_PAYLOAD_SIZE, KIND_CONTROL, KIND_REQUEST, KIND_RESPONSE, MAX_PAYLOAD_CAP,
-    METHOD_APPS_LOOKUP, METHOD_CGROUPS_LOOKUP, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT,
-    METHOD_STRING_REVERSE, NIPC_UID_UNSET, ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
+    APPS_CGROUP_HOST_ROOT, APPS_CGROUP_KNOWN, APPS_LOOKUP_RESP_HDR_SIZE, AppsLookupBuilder,
+    AppsLookupRequestView, AppsLookupResponseView, BatchBuilder, CGROUP_LOOKUP_KNOWN,
+    CGROUP_LOOKUP_OVERSIZED_ITEM, CGROUP_LOOKUP_PAYLOAD_EXCEEDED,
+    CGROUP_LOOKUP_UNKNOWN_RETRY_LATER, CGROUPS_LOOKUP_RESP_HDR_SIZE, CODE_HELLO_ACK,
+    CgroupsBuilder, CgroupsLookupBuilder, CgroupsLookupRequestView, CgroupsLookupResponseView,
+    CgroupsRequest, FLAG_BATCH, HEADER_SIZE, Header, HelloAck, INCREMENT_PAYLOAD_SIZE,
+    KIND_CONTROL, KIND_REQUEST, KIND_RESPONSE, MAX_PAYLOAD_CAP, METHOD_APPS_LOOKUP,
+    METHOD_CGROUPS_LOOKUP, METHOD_CGROUPS_SNAPSHOT, METHOD_INCREMENT, METHOD_STRING_REVERSE,
+    NIPC_UID_UNSET, NipcError, ORCHESTRATOR_DOCKER, ORCHESTRATOR_K8S, PID_LOOKUP_KNOWN,
     PID_LOOKUP_OVERSIZED_ITEM, PID_LOOKUP_PAYLOAD_EXCEEDED, PID_LOOKUP_UNKNOWN, PROFILE_BASELINE,
     PROFILE_SHM_HYBRID, STATUS_INTERNAL_ERROR, STATUS_LIMIT_EXCEEDED, STATUS_OK, VERSION,
+    increment_encode,
 };
 use crate::transport::windows::build_pipe_name;
 use std::ptr;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::mpsc;
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -122,23 +123,33 @@ fn batch_client_config() -> ClientConfig {
 }
 
 fn snapshot_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_snapshot(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_snapshot(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn increment_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_increment(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_increment(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn string_reverse_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_string_reverse(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_string_reverse(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn cgroups_lookup_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_cgroups_lookup(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn apps_lookup_client(service: &str, config: ClientConfig) -> RawClient {
-    RawClient::new_apps_lookup(TEST_RUN_DIR, service, config)
+    let mut client = RawClient::new_apps_lookup(TEST_RUN_DIR, service, config);
+    client.use_test_timings();
+    client
 }
 
 fn fill_test_cgroups_snapshot(builder: &mut CgroupsBuilder<'_>) -> bool {
@@ -276,36 +287,26 @@ fn apps_lookup_dispatch_handler() -> DispatchHandler {
     }))
 }
 
+/// The server listens before tests connect, so one refresh must succeed.
 fn connect_ready(client: &mut RawClient) {
-    for _ in 0..200 {
-        client.refresh();
-        if client.ready() {
-            return;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-
-    panic!("client did not reach READY state");
+    client.refresh();
+    assert!(client.ready(), "client did not reach READY state");
 }
 
+/// The server listens before tests connect, so one refresh must reach `want`.
 fn wait_for_state(client: &mut RawClient, want: ClientState) {
-    for _ in 0..200 {
-        client.refresh();
-        if client.state == want {
-            return;
-        }
-        thread::sleep(Duration::from_millis(10));
-    }
-
-    panic!("client did not reach state {:?}", want);
+    client.refresh();
+    assert_eq!(client.state, want, "client did not reach state {want:?}");
 }
 
 #[test]
 fn test_client_call_timeout_on_wedged_peer() {
     let svc = unique_service("rs_win_call_timeout");
+    let (release_tx, release_rx) = mpsc::channel::<()>();
     let mut server =
         start_raw_session_server(&svc, server_config(), move |_session, _hdr, _payload| {
-            thread::sleep(Duration::from_millis(150));
+            // Never answer; the test releases the peer once the call timed out.
+            let _ = release_rx.recv_timeout(server::TEST_WAIT_LIMIT);
             Ok(())
         });
 
@@ -324,6 +325,7 @@ fn test_client_call_timeout_on_wedged_peer() {
     );
 
     client.close();
+    drop(release_tx);
     server.wait();
     cleanup_all(&svc);
 }
@@ -370,10 +372,7 @@ fn test_client_abort_unblocks_call() {
 }
 
 struct TestServer {
-    service: String,
-    wake_config: ClientConfig,
-    stop_flag: Arc<AtomicBool>,
-    thread: Option<thread::JoinHandle<()>>,
+    inner: server::RunningTestServer,
 }
 
 impl TestServer {
@@ -413,57 +412,32 @@ impl TestServer {
     fn start_with(
         service: &str,
         config: ServerConfig,
-        wake_config: ClientConfig,
+        _client_config: ClientConfig,
         expected_method_code: u16,
         handler: DispatchHandler,
         worker_count: usize,
     ) -> Self {
         ensure_run_dir();
         cleanup_all(service);
-
-        let svc = service.to_string();
-        let stop_cfg = wake_config.clone();
-        let mut server = ManagedServer::with_workers(
+        let server = ManagedServer::with_workers(
             TEST_RUN_DIR,
-            &svc,
+            service,
             config,
             expected_method_code,
             Some(handler),
             worker_count,
         );
-        let stop_flag = server.running_flag();
-
-        let thread = thread::spawn(move || {
-            let _ = server.run();
-        });
-        thread::sleep(Duration::from_millis(50));
-
         TestServer {
-            service: svc,
-            wake_config: stop_cfg,
-            stop_flag,
-            thread: Some(thread),
+            inner: server.spawn_for_test(),
         }
+    }
+
+    fn events(&self) -> &server::TestEvents {
+        &self.inner.events
     }
 
     fn stop(&mut self) {
-        self.stop_flag.store(false, Ordering::Release);
-
-        // Wake a blocking ConnectNamedPipe() so the accept loop can observe
-        // the stop flag and exit.
-        let _ = NpSession::connect(TEST_RUN_DIR, &self.service, &self.wake_config);
-
-        if let Some(handle) = self.thread.take() {
-            let _ = handle.join();
-        }
-
-        cleanup_all(&self.service);
-    }
-}
-
-impl Drop for TestServer {
-    fn drop(&mut self) {
-        self.stop();
+        self.inner.stop();
     }
 }
 
@@ -565,27 +539,29 @@ fn start_raw_hello_ack_version_server(service: &str, version: u16) -> RawHelloAc
     let svc = service.to_string();
     let packet = encode_hello_ack_packet_with_version(version, STATUS_OK, 1);
 
-    let thread = thread::spawn(move || {
-        let pipe_name =
-            build_pipe_name(TEST_RUN_DIR, &svc).map_err(|e| format!("pipe name: {e}"))?;
-        let pipe = unsafe {
-            CreateNamedPipeW(
-                pipe_name.as_ptr(),
-                PIPE_ACCESS_DUPLEX,
-                PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
-                1,
-                RAW_PIPE_PACKET_SIZE,
-                RAW_PIPE_PACKET_SIZE,
-                0,
-                ptr::null(),
-            )
-        };
-        if pipe == INVALID_HANDLE_VALUE {
-            return Err(format!("CreateNamedPipeW failed: {}", unsafe {
-                GetLastError()
-            }));
-        }
+    // Create the pipe before returning so the client's first connect cannot
+    // race it.
+    let pipe_name = build_pipe_name(TEST_RUN_DIR, &svc).expect("pipe name");
+    let pipe = unsafe {
+        CreateNamedPipeW(
+            pipe_name.as_ptr(),
+            PIPE_ACCESS_DUPLEX,
+            PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
+            1,
+            RAW_PIPE_PACKET_SIZE,
+            RAW_PIPE_PACKET_SIZE,
+            0,
+            ptr::null(),
+        )
+    };
+    assert_ne!(
+        pipe,
+        INVALID_HANDLE_VALUE,
+        "CreateNamedPipeW failed: {}",
+        unsafe { GetLastError() }
+    );
 
+    let thread = thread::spawn(move || {
         let connect_ok = unsafe { ConnectNamedPipe(pipe, ptr::null_mut()) };
         if connect_ok == 0 {
             let err = unsafe { GetLastError() };
@@ -638,7 +614,6 @@ fn start_raw_hello_ack_version_server(service: &str, version: u16) -> RawHelloAc
         Ok(())
     });
 
-    thread::sleep(Duration::from_millis(200));
     RawHelloAckServer {
         accepted,
         thread: Some(thread),
@@ -670,9 +645,8 @@ where
     cleanup_all(service);
 
     let svc = service.to_string();
+    let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, cfg).expect("bind");
     let thread = thread::spawn(move || {
-        let mut listener =
-            NpListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
         let mut session = listener.accept().map_err(|e| format!("accept: {e}"))?;
 
         let (hdr, payload) = {
@@ -686,7 +660,6 @@ where
         handler(&mut session, hdr, &payload)
     });
 
-    thread::sleep(Duration::from_millis(200));
     RawSessionServer {
         thread: Some(thread),
     }
@@ -709,10 +682,8 @@ fn start_raw_overflow_no_growth_server(service: &str, cfg: ServerConfig) -> RawS
     cleanup_all(service);
 
     let svc = service.to_string();
+    let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, cfg).expect("bind");
     let thread = thread::spawn(move || {
-        let mut listener =
-            NpListener::bind(TEST_RUN_DIR, &svc, cfg).map_err(|e| format!("bind: {e}"))?;
-
         let mut first = listener
             .accept()
             .map_err(|e| format!("first accept: {e}"))?;
@@ -745,7 +716,6 @@ fn start_raw_overflow_no_growth_server(service: &str, cfg: ServerConfig) -> RawS
         Ok(())
     });
 
-    thread::sleep(Duration::from_millis(200));
     RawSessionServer {
         thread: Some(thread),
     }
@@ -1434,9 +1404,14 @@ fn test_lookup_timeout_during_followup_subcall_windows() {
     cfg.max_response_payload_bytes = 320;
     let calls = Arc::new(AtomicU32::new(0));
     let handler_calls = calls.clone();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
-            thread::sleep(Duration::from_millis(150));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(9);
         for i in 0..req.item_count {
@@ -1476,13 +1451,16 @@ fn test_lookup_timeout_during_followup_subcall_windows() {
         TestServer::start_with(&svc, cfg, client_config(), METHOD_APPS_LOOKUP, handler, 8);
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    let err = match client.call_apps_lookup_with_timeout(&[11, 22, 33], 30) {
+    // The budget leaves slow or emulated runners room for the first subcall;
+    // only the much slower second subcall can expire it.
+    let err = match client.call_apps_lookup_with_timeout(&[11, 22, 33], 500) {
         Ok(_) => panic!("apps follow-up timeout should fail"),
         Err(err) => err,
     };
     assert_eq!(err, NipcError::Timeout);
     assert!(calls.load(Ordering::SeqCst) >= 2);
     client.close();
+    drop(release_tx);
     server.stop();
 
     let svc = unique_service("rs_win_cgroups_lookup_followup_timeout");
@@ -1490,9 +1468,14 @@ fn test_lookup_timeout_during_followup_subcall_windows() {
     cfg.max_response_payload_bytes = 160;
     let calls = Arc::new(AtomicU32::new(0));
     let handler_calls = calls.clone();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
-            thread::sleep(Duration::from_millis(150));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(7);
         for i in 0..req.item_count {
@@ -1533,13 +1516,16 @@ fn test_lookup_timeout_during_followup_subcall_windows() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     let paths: [&[u8]; 3] = [b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()];
-    let err = match client.call_cgroups_lookup_with_timeout(&paths, 30) {
+    // The budget leaves slow or emulated runners room for the first subcall;
+    // only the much slower second subcall can expire it.
+    let err = match client.call_cgroups_lookup_with_timeout(&paths, 500) {
         Ok(_) => panic!("cgroups follow-up timeout should fail"),
         Err(err) => err,
     };
     assert_eq!(err, NipcError::Timeout);
     assert!(calls.load(Ordering::SeqCst) >= 2);
     client.close();
+    drop(release_tx);
     server.stop();
 }
 
@@ -1551,10 +1537,15 @@ fn test_lookup_abort_during_followup_subcall_windows() {
     let calls = Arc::new(AtomicU32::new(0));
     let handler_calls = calls.clone();
     let (second_tx, second_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = apps_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
             let _ = second_tx.send(());
-            thread::sleep(Duration::from_millis(250));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(9);
         for i in 0..req.item_count {
@@ -1611,6 +1602,7 @@ fn test_lookup_abort_during_followup_subcall_windows() {
             .expect("apps abort result"),
         Err(NipcError::Aborted)
     );
+    drop(release_tx);
     server.stop();
 
     let svc = unique_service("rs_win_cgroups_lookup_followup_abort");
@@ -1619,10 +1611,15 @@ fn test_lookup_abort_during_followup_subcall_windows() {
     let calls = Arc::new(AtomicU32::new(0));
     let handler_calls = calls.clone();
     let (second_tx, second_rx) = mpsc::channel();
+    let (release_tx, release_rx) = mpsc::channel::<()>();
+    let release_rx = std::sync::Mutex::new(release_rx);
     let handler = cgroups_lookup_dispatch(Arc::new(move |req, builder| {
         if handler_calls.fetch_add(1, Ordering::SeqCst) + 1 == 2 {
             let _ = second_tx.send(());
-            thread::sleep(Duration::from_millis(250));
+            let _ = release_rx
+                .lock()
+                .unwrap()
+                .recv_timeout(server::TEST_WAIT_LIMIT);
         }
         builder.set_generation(7);
         for i in 0..req.item_count {
@@ -1680,6 +1677,7 @@ fn test_lookup_abort_during_followup_subcall_windows() {
             .expect("cgroups abort result"),
         Err(NipcError::Aborted)
     );
+    drop(release_tx);
     server.stop();
 }
 
@@ -2273,9 +2271,11 @@ fn test_lookup_logical_limits_windows() {
         max_subcalls: 0,
         max_response_bytes: 0,
     });
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
 
     let svc = unique_service("rs_win_apps_lookup_response_limit");
     let mut server = TestServer::start(&svc, METHOD_APPS_LOOKUP, apps_lookup_dispatch_handler());
@@ -2352,7 +2352,7 @@ fn test_lookup_logical_limits_windows() {
         client
             .call_cgroups_lookup(&[b"/request-key-too-large-for-configured-cap".as_slice()])
             .unwrap_err(),
-        NipcError::BadLayout
+        NipcError::NotReady
     );
 }
 
@@ -2405,9 +2405,11 @@ fn test_cgroups_lookup_rejects_mixed_generation_retry_windows() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
 
-    assert!(client
-        .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup(&[b"/a".as_slice(), b"/huge".as_slice(), b"/b".as_slice()])
+            .is_err()
+    );
     assert!(
         calls.load(Ordering::SeqCst) >= 2,
         "handler should be called for at least two subrequests"
@@ -2691,9 +2693,11 @@ fn test_lookup_endpoint_gone_after_partial_progress_windows() {
     });
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22, 33], 1_000)
+            .is_err()
+    );
     client.close();
     server.wait();
 
@@ -2718,12 +2722,14 @@ fn test_lookup_endpoint_gone_after_partial_progress_windows() {
     });
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
-    assert!(client
-        .call_cgroups_lookup_with_timeout(
-            &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
-            1_000,
-        )
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(
+                &[b"/a".as_slice(), b"/b".as_slice(), b"/c".as_slice()],
+                1_000,
+            )
+            .is_err()
+    );
     client.close();
     server.wait();
 }
@@ -2735,9 +2741,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_windows() {
     let mut client = apps_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_apps_lookup_with_timeout(&[11, 22], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_apps_lookup_with_timeout(&[11, 22], 1_000)
+            .is_err()
+    );
     client.close();
 
     let svc = unique_service("rs_win_cgroups_lookup_gone_before_call");
@@ -2749,9 +2757,11 @@ fn test_lookup_endpoint_gone_before_first_subcall_windows() {
     let mut client = cgroups_lookup_client(&svc, client_config());
     connect_ready(&mut client);
     server.stop();
-    assert!(client
-        .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
-        .is_err());
+    assert!(
+        client
+            .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
+            .is_err()
+    );
     client.close();
 }
 
@@ -2764,7 +2774,7 @@ fn test_lookup_endpoint_absent_before_call_windows() {
     let err = client
         .call_apps_lookup_with_timeout(&[11, 22], 1_000)
         .expect_err("apps absent lookup should fail");
-    assert_eq!(err, NipcError::BadLayout);
+    assert_eq!(err, NipcError::NotReady);
     client.close();
 
     let svc = unique_service("rs_win_cgroups_lookup_absent");
@@ -2777,7 +2787,7 @@ fn test_lookup_endpoint_absent_before_call_windows() {
     let err = client
         .call_cgroups_lookup_with_timeout(&[b"/a".as_slice(), b"/b".as_slice()], 1_000)
         .expect_err("cgroups absent lookup should fail");
-    assert_eq!(err, NipcError::BadLayout);
+    assert_eq!(err, NipcError::NotReady);
     client.close();
 }
 
@@ -2950,7 +2960,6 @@ fn test_retry_on_failure_windows() {
         stop_rx.recv_timeout(Duration::from_secs(2)).is_ok(),
         "server stop should not hang with an active client session"
     );
-    thread::sleep(Duration::from_millis(100));
 
     let mut server2 = TestServer::start(&svc, METHOD_CGROUPS_SNAPSHOT, test_cgroups_dispatch());
 
@@ -2980,7 +2989,7 @@ fn test_non_request_terminates_session_windows() {
     };
     let send_result = session.send(&mut hdr, &[]);
     if send_result.is_ok() {
-        thread::sleep(Duration::from_millis(100));
+        server.events().wait_session_exits(1);
         let mut recv_buf = vec![0u8; 4096];
         let mut hdr2 = Header {
             kind: KIND_REQUEST,
@@ -3106,20 +3115,81 @@ fn test_client_auth_failure_windows() {
     server.stop();
 }
 
+/// A region that never becomes attachable, with a call timeout below the
+/// WinSHM attach timeout: every attach wait ends at the call deadline. The
+/// first one keeps WinSHM; the second in a row drops it, so the third
+/// connect runs on the baseline instead of every call ending at its deadline.
+#[test]
+fn test_refresh_persistent_call_bound_winshm_attach_failure_falls_back() {
+    let svc = unique_service("rs_win_svc_shm_call_bound");
+    ensure_run_dir();
+    cleanup_all(&svc);
+
+    let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, shm_server_config()).expect("bind");
+    let (server_tx, server_rx) = std::sync::mpsc::channel();
+    thread::spawn(move || {
+        let mut selected = Vec::new();
+        let mut recv_buf = vec![0u8; RESPONSE_BUF_SIZE];
+        for _ in 0..3 {
+            let Ok(mut session) = listener.accept() else {
+                break;
+            };
+            selected.push(session.selected_profile);
+            let _ = session.receive(&mut recv_buf);
+        }
+        let _ = server_tx.send(selected);
+    });
+
+    let mut client = increment_client(&svc, shm_client_config());
+    client.shm_attach_timeout = Duration::from_secs(5);
+    client.call_timeout_ms = 100;
+
+    assert!(
+        !client.refresh() && !client.ready(),
+        "first refresh ends at the call deadline"
+    );
+    assert_ne!(
+        client.transport_config.supported_profiles & PROFILE_SHM_HYBRID,
+        0,
+        "one call-bound attach failure keeps WinSHM"
+    );
+    assert!(
+        !client.refresh() && !client.ready(),
+        "second refresh ends at the call deadline"
+    );
+    assert_eq!(
+        client.transport_config.supported_profiles & PROFILE_SHM_HYBRID,
+        0,
+        "a second call-bound attach failure in a row drops WinSHM"
+    );
+    assert!(
+        client.refresh() && client.ready(),
+        "third refresh connects over the baseline"
+    );
+    assert!(client.shm.is_none());
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+
+    client.close();
+    assert_eq!(
+        server_rx
+            .recv_timeout(server::TEST_WAIT_LIMIT)
+            .expect("session server finished"),
+        vec![PROFILE_SHM_HYBRID, PROFILE_SHM_HYBRID, PROFILE_BASELINE]
+    );
+    cleanup_all(&svc);
+}
+
 #[test]
 fn test_refresh_winshm_attach_failure_falls_back_to_baseline() {
     let svc = unique_service("rs_win_svc_shm_attach_fail");
     ensure_run_dir();
     cleanup_all(&svc);
 
-    let ready = Arc::new(AtomicBool::new(false));
-    let ready_clone = ready.clone();
-    let server_svc = svc.clone();
+    let mut listener = NpListener::bind(TEST_RUN_DIR, &svc, shm_server_config()).expect("bind");
     let server_thread = thread::spawn(move || -> Result<(), String> {
-        let mut listener = NpListener::bind(TEST_RUN_DIR, &server_svc, shm_server_config())
-            .map_err(|e| format!("bind: {e}"))?;
-        ready_clone.store(true, Ordering::Release);
-
         let mut first = listener
             .accept()
             .map_err(|e| format!("accept first: {e}"))?;
@@ -3151,10 +3221,6 @@ fn test_refresh_winshm_attach_failure_falls_back_to_baseline() {
 
         Ok(())
     });
-
-    while !ready.load(Ordering::Acquire) {
-        thread::sleep(Duration::from_millis(1));
-    }
 
     let mut client = increment_client(&svc, shm_client_config());
     assert!(
@@ -3293,11 +3359,11 @@ fn test_transport_without_session_windows() {
 
     assert_eq!(
         client.transport_send(&mut hdr, &[]),
-        Err(NipcError::Truncated)
+        Err(NipcError::Transport)
     );
     assert!(matches!(
         client.transport_receive(0),
-        Err(NipcError::Truncated)
+        Err(NipcError::Transport)
     ));
     client.close();
 }
@@ -3485,4 +3551,86 @@ fn test_call_increment_batch_rejects_wrong_item_count_windows() {
 
     client.close();
     server.wait();
+}
+
+#[path = "raw_robustness_windows_tests.rs"]
+mod robustness;
+
+/// The server creates a session's SHM objects only when the handshake
+/// selects SHM, and falls back to baseline in the same handshake when they
+/// cannot be created.
+#[test]
+fn test_untrusted_server_is_auth_failed_windows() {
+    use crate::transport::win_security::TRUSTED_OWNER_FOR_TESTS;
+    let svc = unique_service("rs_win_untrusted");
+    let mut server = TestServer::start_with(
+        &svc,
+        server_config(),
+        client_config(),
+        METHOD_INCREMENT,
+        increment_dispatch_handler(),
+        8,
+    );
+
+    // BUILTIN\Users never owns the test pipe.
+    TRUSTED_OWNER_FOR_TESTS.with(|t| *t.borrow_mut() = Some("S-1-5-32-545".into()));
+    let mut client = increment_client(&svc, client_config());
+    client.refresh();
+    TRUSTED_OWNER_FOR_TESTS.with(|t| *t.borrow_mut() = None);
+    assert_eq!(client.state, ClientState::AuthFailed);
+    client.close();
+    server.stop();
+}
+
+#[test]
+fn test_shm_region_only_for_shm_sessions_windows() {
+    let svc = unique_service("rs_win_shm_after_negotiation");
+    let mut server = TestServer::start_with(
+        &svc,
+        shm_server_config(),
+        shm_client_config(),
+        METHOD_INCREMENT,
+        increment_dispatch_handler(),
+        8,
+    );
+
+    let mut client = increment_client(&svc, client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_none());
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 0, "baseline session");
+    client.close();
+
+    let mut bad_auth = shm_client_config();
+    bad_auth.auth_token = AUTH_TOKEN + 1;
+    let mut client = increment_client(&svc, bad_auth);
+    client.refresh();
+    assert_eq!(client.state, ClientState::AuthFailed);
+    assert_eq!(server.events().take_shm_created(), 0, "rejected client");
+    client.close();
+
+    let mut client = increment_client(&svc, shm_client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_some(), "expected SHM to be negotiated");
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 1, "SHM session");
+    client.close();
+
+    server.events().set_fail_shm_create(true);
+    let mut client = increment_client(&svc, shm_client_config());
+    client.refresh();
+    assert_eq!(client.state, ClientState::Ready);
+    assert!(client.shm.is_none(), "expected the baseline fallback");
+    assert_eq!(
+        client.session.as_ref().map(|s| s.selected_profile),
+        Some(PROFILE_BASELINE)
+    );
+    server.events().set_fail_shm_create(false);
+    assert_eq!(client.call_increment(1), Ok(2));
+    assert_eq!(server.events().take_shm_created(), 0, "failed creation");
+    client.close();
+
+    server.stop();
 }

@@ -1,0 +1,132 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+// Package dem composes native DEM jobs and process-owned investigation Functions.
+package dem
+
+import (
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
+	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
+	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
+	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+)
+
+// Dependencies are the process-owned resources the components borrow. History
+// and Artifacts are required; their owner (Process, in production) keeps them
+// open across Agent run generations and closes them after the components stop.
+type Dependencies struct {
+	GeoIPPaths geoip.Paths
+	History    *journalstore.Store
+	Artifacts  *artifacts.Store
+	Executor   synthetic.Executor
+	// BrowserActivation names the process browser runtime that synthetic jobs
+	// wait for; nil when the runtime mode has no readiness owner (preloads).
+	BrowserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
+	// ReloadConfig rereads dem.conf for the retention worker; nil keeps the initial policies.
+	ReloadConfig func() (Config, error)
+}
+
+// Components separates collector selection from process-owned investigation.
+type Components struct {
+	Collectors collectorapi.Registry
+	Functions  []funcapi.ProcessFunctionProvider
+	Retention  *Retention
+}
+
+// New builds the four DEM collectors, the RUM, synthetic and history Functions,
+// and the retention worker over the caller's stores. It does not close them.
+// Open calls it with the stores and runner it opens; tests inject their own.
+func New(deps Dependencies, cfg Config) Components {
+	rumRegistry := rumregistry.New()
+	rumHistory := rumhistory.NewStore(deps.History)
+	rumQueries := rumquery.New(rumRegistry, rumHistory)
+	syntheticRegistry := syntheticregistry.New()
+	collectors := collectorapi.Registry{}
+	collectors.Register("receiver", receiver.Creator(receiver.Dependencies{
+		Registry:   rumRegistry,
+		GeoIPPaths: deps.GeoIPPaths,
+	}))
+	collectors.Register("rum", rum.Creator(rum.Dependencies{
+		Registry: rumRegistry,
+		History:  rumHistory,
+	}))
+	collectors.Register("journey", synthetic.JourneyCreator(synthetic.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
+	collectors.Register("lighthouse", synthetic.LighthouseCreator(synthetic.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
+	retention := &Retention{
+		history:        deps.History,
+		historyPolicy:  cfg.History,
+		artifacts:      deps.Artifacts,
+		artifactPolicy: cfg.Artifacts,
+		reloadConfig:   deps.ReloadConfig,
+		log:            logger.New(),
+	}
+	syntheticQueries := syntheticquery.New(
+		syntheticRegistry,
+		synthetichistory.NewStore(deps.History),
+		deps.Artifacts,
+		retention.PolicyError,
+	)
+	return Components{
+		Collectors: collectors,
+		Functions: []funcapi.ProcessFunctionProvider{
+			{
+				ID: "rum",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(rumfunc.Declarations(), func() bool {
+						return rumRegistry.HasSites() || deps.History.HasObservedKind(journalstore.KindRUM)
+					})
+				},
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return rumfunc.New(rumQueries, ctx.LookupVnodeGUID)
+				},
+			},
+			{
+				ID: "synthetics",
+				Functions: func() []funcapi.FunctionConfig {
+					return availableFunctions(syntheticfunc.Declarations(), func() bool {
+						return syntheticRegistry.HasJobs() ||
+							deps.History.HasObservedKind(journalstore.KindSynthetic) ||
+							deps.Artifacts.HasObservedPublished()
+					})
+				},
+				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
+					return syntheticfunc.New(syntheticQueries, ctx.LookupVnodeGUID)
+				},
+			},
+			{
+				ID:         "dem-history",
+				Functions:  historyfunc.Declarations,
+				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(deps.History, retention.PolicyError) },
+			},
+		},
+		Retention: retention,
+	}
+}
+
+func availableFunctions(methods []funcapi.FunctionConfig, available func() bool) []funcapi.FunctionConfig {
+	for i := range methods {
+		methods[i].Available = available
+	}
+	return methods
+}

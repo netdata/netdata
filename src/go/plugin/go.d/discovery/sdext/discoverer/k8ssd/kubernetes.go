@@ -133,39 +133,29 @@ func (d *KubeDiscoverer) Discover(ctx context.Context, in chan<- []model.TargetG
 		go func(disc model.Discoverer) { defer wg.Done(); disc.Discover(ctx, updates) }(disc)
 	}
 
-	done := make(chan struct{})
-	go func() { defer close(done); wg.Wait() }()
+	go func() { wg.Wait(); close(updates) }()
 
 	close(d.started)
 
-	for {
-		select {
-		case <-ctx.Done():
-			select {
-			case <-done:
-				d.Info("all discoverers exited")
-			case <-time.After(time.Second * 5):
-				d.Warning("not all discoverers exited")
-			}
-			return
-		case <-done:
-			d.Info("all discoverers exited")
-			return
-		case tggs := <-updates:
-			if d.cfgSource != "" {
-				for _, tgg := range tggs {
-					if v, ok := tgg.(interface{ setSource(string) }); ok {
-						src := fmt.Sprintf("%s,%s", tgg.Source(), d.cfgSource)
-						v.setSource(src)
-					}
+	// Drain until every child exits, including any final sends after cancellation.
+	for tggs := range updates {
+		if ctx.Err() != nil {
+			continue
+		}
+		if d.cfgSource != "" {
+			for _, tgg := range tggs {
+				if v, ok := tgg.(interface{ setSource(string) }); ok {
+					src := fmt.Sprintf("%s,%s", tgg.Source(), d.cfgSource)
+					v.setSource(src)
 				}
 			}
-			select {
-			case <-ctx.Done():
-			case in <- tggs:
-			}
+		}
+		select {
+		case <-ctx.Done():
+		case in <- tggs:
 		}
 	}
+	d.Info("all discoverers exited")
 }
 
 func (d *KubeDiscoverer) setupPodDiscoverer(ctx context.Context, ns string) *podDiscoverer {

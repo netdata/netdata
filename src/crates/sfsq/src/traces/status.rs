@@ -1,59 +1,119 @@
 //! Query-level result status — the no-silent-degrade contract.
 //!
-//! Every traces operation returns a [`QueryStatus`] beside its data:
+//! Every traces operation — trace-by-id, search, overview, suggest,
+//! explore — returns a [`QueryStatus`] beside
+//! its data:
 //! [`Complete`](QueryStatus::Complete) means every relevant source was
 //! successfully and fully examined; [`Partial`](QueryStatus::Partial)
 //! carries the non-empty set of reasons why the result may be missing
 //! something. Reasons coexist (a query can hit the span cap AND lose a
 //! source), so the status holds a set, not a single variant — an
-//! explicit precedence rule that discards reasons would hide information.
+//! explicit precedence rule that discards reasons would hide
+//! information.
+//!
+//! Consumers render it, never reinterpret it: the CLI prints the set,
+//! and the ledger's `to_*_result` adapters map it 1:1 onto the wire
+//! `StatusWire` (search pagination additionally requires
+//! [`QueryStatus::is_complete`] before it emits a next cursor). The
+//! reasons a consumer adds are [`DroppedFields`](PartialReason::DroppedFields),
+//! for the names it leaves out of what it emits, and the ledger's own
+//! [`SourceFailure`](PartialReason::SourceFailure) (a WAL its capture
+//! refused) and [`Busy`](PartialReason::Busy) (a request refused under
+//! load).
 
 use std::collections::BTreeSet;
 
-/// Why a result is partial. Ordered (BTreeSet) so the set — and its
-/// rendering — is deterministic.
+/// Why a result is partial. The derived `Ord` is declaration order, so
+/// the set — and its wire rendering — is deterministic; add new
+/// reasons at the end.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PartialReason {
     /// The span cap was reached: the result holds the globally earliest
-    /// `cap` canonical spans (combiner total order); at least one more
-    /// unique span exists.
+    /// `cap` canonical spans (the combiner's total order); at least one
+    /// more unique span existed (an exactly-cap trace is not truncated).
     SizeCap,
-    /// A source failed (map/open, TIDX, column, EVNB/LNKB, tail decode):
-    /// spans that may live there are absent from the result.
+    /// A source failed (map/open, TIDX, column or EVNB/LNKB decode,
+    /// tail scan): spans that may live there are absent from the result.
     SourceFailure,
-    /// The operation's work ceiling was hit before the candidate space
-    /// was exhausted (search-phase concept; unused by 4a trace-by-id,
-    /// which deliberately has no work ceiling — adversarial-input
-    /// hardening is deferred whole).
+    /// A work ceiling was hit before every source was visited: search's
+    /// (the assembled-candidate ceiling, or the visited-rows ceiling that
+    /// gates a grow-K refill) or the explorer's rows budget. Window files
+    /// are visited newest first, so what the ceiling left out is the
+    /// older files'. Never from trace-by-id — the span cap is that
+    /// mode's runaway-work guard.
     WorkCeiling,
-    /// The caller cancelled: before all source heads were resolved the
-    /// result is empty; during TRACE-BY-ID's merge it is the
-    /// deterministic merged prefix (that mode's pinned exception).
-    /// Search and the aggregate folds are ALL-OR-EMPTY instead — a
+    /// The caller cancelled. Trace-by-id returns EMPTY before all
+    /// source heads are resolved, and the deterministic merged prefix
+    /// once the merge has begun (that mode's pinned exception); search,
+    /// the attribute scans and the aggregate folds are ALL-OR-EMPTY — a
     /// mid-flight search prefix cannot be deterministic under canonical
     /// re-ranking and grow-K, and a mid-loop aggregate cancel discards
     /// the partial fold.
     Cancelled,
-    /// The overview's own visited-rows ceiling was hit before every
-    /// in-window source was binned: the grid holds the deterministic
-    /// prefix of sources (SourceId order) processed so far. Distinct
-    /// from [`WorkCeiling`] — the overview's cost is O(spans-in-window)
-    /// per source, a different budget than search's candidate loop.
+    /// One of the overview's budgets was hit before every in-window
+    /// source was binned: the fold budget (TRSU rows / tail spans per
+    /// source) or the filter's (its scans and matches). The grid holds
+    /// the deterministic prefix of sources ([`SourceId`](super::SourceId)
+    /// order) processed so far. Distinct from
+    /// [`WorkCeiling`](Self::WorkCeiling), search's candidate loop.
     OverviewCeiling,
     /// A sealed source has no trace rollup chunk (`TRSU`) and was
     /// EXCLUDED from trace-level aggregation: including it would
     /// silently undercount, and mixing span-level numbers into a
-    /// trace-level result is forbidden (no mixed units). Two
-    /// causes: the file predates the rollup (data returns when it
-    /// ages out), or the file stored no real traces — an all-UNSET
-    /// trace-id file writes no chunk by the seal's `is_meaningful`
-    /// rule, and exclusion loses nothing.
+    /// trace-level result is forbidden (no mixed units). Two causes:
+    /// the file predates the rollup (pre-rollup retention — the reason
+    /// disappears when the file ages out), or the file stored no real
+    /// traces: an all-UNSET trace-id file accumulates no rollup rows,
+    /// writes no chunk by the writer's `is_meaningful` rule, and
+    /// exclusion loses nothing.
     RollupAbsent,
-    /// The slowest mode's own visited-rows ceiling was hit before every
-    /// in-window source was folded: the ranking covers the
-    /// deterministic prefix of sources (SourceId order) processed so
-    /// far — the true slowest trace may live in an unvisited source.
-    SlowestCeiling,
+    /// A source's bytes could not be obtained from remote storage (the
+    /// download failed, or the catalog listing the file could not be
+    /// read): spans that may live there are absent. Distinct from
+    /// [`SourceFailure`](Self::SourceFailure), which reports bytes that
+    /// were available but could not be read.
+    RemoteUnavailable,
+    /// The response reached its byte budget: what it carries is a
+    /// complete, valid prefix (for a trace, its earliest spans), and the
+    /// rest is left out. Raised by trace-by-id when the caller's shaper
+    /// budget refuses a span, and by a caller that shapes a response
+    /// itself.
+    ByteBudget,
+    /// The request was refused before any work: too many requests of its
+    /// kind were already running. The result is empty, not wrong; the
+    /// caller retries. Raised by the ledger's admission control, never
+    /// by an engine operation.
+    Busy,
+    /// A newest-first walk visited its budget of sources and stopped:
+    /// older sources were not visited (the result says from when on it
+    /// is complete). Suggest-only.
+    FileBudget,
+    /// A newest-first walk reached its deadline and stopped: older
+    /// sources were not visited. Suggest-only (the one operation with a
+    /// deadline).
+    Deadline,
+    /// A newest-first walk stopped after several consecutive sources
+    /// added no new match: older sources were not visited. Suggest-only.
+    NoNewMatches,
+    /// The overview met more traces stored in several files than its
+    /// merge holds: the rest were counted once per file, each with its
+    /// file-local envelope and filter matches (the per-block rule some
+    /// tracing stores apply to every trace). With a filter, a fragment
+    /// can also miss a match its other files hold, so a trace may count
+    /// less, not only more. Overview-only.
+    TraceFragments,
+    /// A consumer left out field names that are not in the key
+    /// vocabulary ([`super::vocab::classify_storage`] says `Unknown`): no
+    /// span is missing, but those spans lack the dropped fields. Such
+    /// names come from a damaged file or from a file written by another
+    /// version (for example the status names before `status.code`).
+    /// Raised by a consumer that shapes trace-by-id results, never by an
+    /// engine operation.
+    DroppedFields,
+    /// The explorer's stack key is high-cardinality in at least one
+    /// file, which cannot be stacked: that file's spans count as `other`.
+    /// Explore-only.
+    StackFieldHighCard,
 }
 
 /// The status of one query's result.
@@ -67,8 +127,20 @@ pub enum QueryStatus {
 }
 
 impl QueryStatus {
+    /// True for [`QueryStatus::Complete`] — nothing is known to be
+    /// missing.
     pub fn is_complete(&self) -> bool {
         matches!(self, QueryStatus::Complete)
+    }
+
+    /// This status with `reason` added.
+    pub fn with(self, reason: PartialReason) -> Self {
+        let mut reasons = match self {
+            QueryStatus::Complete => BTreeSet::new(),
+            QueryStatus::Partial(reasons) => reasons,
+        };
+        reasons.insert(reason);
+        QueryStatus::Partial(reasons)
     }
 
     /// Whether `reason` is among the partial reasons (`false` for
@@ -99,6 +171,8 @@ impl StatusBuilder {
         self.reasons.insert(reason);
     }
 
+    /// `Complete` when nothing was recorded; otherwise `Partial` with
+    /// every recorded reason.
     pub fn finish(self) -> QueryStatus {
         if self.reasons.is_empty() {
             QueryStatus::Complete
@@ -120,7 +194,7 @@ mod tests {
 
     #[test]
     fn reasons_coexist_and_render_deterministically() {
-        // Insertion order must not matter (the round-4 contract: a set,
+        // Insertion order must not matter (the contract: a set,
         // deterministic; e.g. SizeCap + SourceFailure both survive).
         let mut a = StatusBuilder::new();
         a.add(PartialReason::SourceFailure);

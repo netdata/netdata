@@ -1,0 +1,8 @@
+{
+  "chat_id": "-100123",
+  "message_thread_id": 7,
+  "text": "⚠️ <b>WARNING: Temperature is high</b>\n<b>Node:</b> test-node\n<b>Alert:</b> test_alert\n<b>Status:</b> CLEAR → WARNING\n<b>Chart:</b> test.chart\n<b>Context:</b> test.context\n<b>Value:</b> 42.5 C\n<b>Previous value:</b> 0 C\n<b>Time:</b> 2026-09-14T12:00:00Z\n<i>A quote: &#34;hot&#34;\nUnicode: θερμοκρασία</i>\n<a href=\"https://example.com/alert?id=1&amp;view=chart#details\">View alert</a>",
+  "parse_mode": "HTML",
+  "disable_notification": false,
+  "link_preview_options": {"is_disabled": true}
+}

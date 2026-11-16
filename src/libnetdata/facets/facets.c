@@ -1167,8 +1167,6 @@ static inline void facets_key_value_transformed(FACETS *facets, FACET_KEY *k, FA
 }
 
 static inline void facets_histogram_value_ids(BUFFER *wb, FACETS *facets __maybe_unused, FACET_KEY *k, const char *key, const char *first_key) {
-    CLEAN_BUFFER *tb = buffer_create(0, NULL);
-
     buffer_json_member_add_array(wb, key);
     {
         if(first_key)

@@ -40,11 +40,11 @@ func New() *Collector {
 }
 
 type Config struct {
-	Vnode              string `yaml:"vnode,omitempty" json:"vnode"`
-	UpdateEvery        int    `yaml:"update_every,omitempty" json:"update_every"`
+	Vnode              string `yaml:"vnode,omitempty"               json:"vnode"`
+	UpdateEvery        int    `yaml:"update_every,omitempty"        json:"update_every"`
 	AutoDetectionRetry int    `yaml:"autodetection_retry,omitempty" json:"autodetection_retry"`
-	URL                string `yaml:"url" json:"url"`
-	web.ClientConfig   `yaml:",inline" json:""`
+	URL                string `yaml:"url"                           json:"url"`
+	web.ClientConfig   `       yaml:",inline"                       json:""`
 }
 
 type Collector struct {
@@ -62,13 +62,13 @@ func (c *Collector) Configuration() any {
 	return c.Config
 }
 
-func (c *Collector) Init(context.Context) error {
+func (c *Collector) Init(ctx context.Context) error {
 	err := c.verifyConfig()
 	if err != nil {
 		return fmt.Errorf("verify config: %v", err)
 	}
 
-	client, err := c.initSupervisorClient()
+	client, err := c.initSupervisorClient(ctx)
 	if err != nil {
 		return fmt.Errorf("init supervisord client: %v", err)
 	}
@@ -77,7 +77,7 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
+func (c *Collector) Check(ctx context.Context) error {
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -92,7 +92,7 @@ func (c *Collector) Charts() *collectorapi.Charts {
 	return c.charts
 }
 
-func (c *Collector) Collect(context.Context) map[string]int64 {
+func (c *Collector) Collect(ctx context.Context) map[string]int64 {
 	ms, err := c.collect()
 	if err != nil {
 		c.Error(err)
@@ -104,7 +104,7 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 	return ms
 }
 
-func (c *Collector) Cleanup(context.Context) {
+func (c *Collector) Cleanup(ctx context.Context) {
 	if c.client != nil {
 		c.client.closeIdleConnections()
 	}

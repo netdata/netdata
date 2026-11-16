@@ -4,6 +4,8 @@ package chartengine
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -44,6 +46,15 @@ type matchIndex struct {
 	autogenLabels    *chartLabelPolicy
 	byMetricName     map[string][]routeCandidate
 	wildcardMatchers []routeCandidate
+	// firstInfer is the first inferred dimension in template-ID order, used to
+	// validate that the plan reader is flattened.
+	firstInfer inferredDimensionRef
+}
+
+type inferredDimensionRef struct {
+	templateID string
+	dimIndex   int
+	ok         bool
 }
 
 func buildMatchIndex(charts []program.Chart) matchIndex {
@@ -74,7 +85,21 @@ func buildMatchIndex(charts []program.Chart) matchIndex {
 		}
 	}
 
+	index.firstInfer = firstInferDimension(index.chartsByID)
 	return index
+}
+
+func firstInferDimension(chartsByID map[string]program.Chart) inferredDimensionRef {
+	templateIDs := slices.Sorted(maps.Keys(chartsByID))
+	for _, templateID := range templateIDs {
+		chart := chartsByID[templateID]
+		for i := range chart.Dimensions {
+			if chart.Dimensions[i].InferNameFromSeriesMeta {
+				return inferredDimensionRef{templateID: templateID, dimIndex: i, ok: true}
+			}
+		}
+	}
+	return inferredDimensionRef{}
 }
 
 type routeCache = routecache.RouteCache[routeBinding]
@@ -221,12 +246,17 @@ func (e *Engine) resolveSeriesRoutes(
 		})
 	}
 
+	typedOrder := e.state.templateSet != nil && !e.state.templateSet.legacy
 	sort.Slice(routes, func(i, j int) bool {
 		if routes[i].ChartID != routes[j].ChartID {
 			return routes[i].ChartID < routes[j].ChartID
 		}
 		if routes[i].ChartTemplateID != routes[j].ChartTemplateID {
-			return routes[i].ChartTemplateID < routes[j].ChartTemplateID
+			left, right := routes[i].ChartTemplateID, routes[j].ChartTemplateID
+			if typedOrder {
+				return index.chartsByID[left].RoutingRank < index.chartsByID[right].RoutingRank
+			}
+			return left < right
 		}
 		if routes[i].DimensionIndex != routes[j].DimensionIndex {
 			return routes[i].DimensionIndex < routes[j].DimensionIndex

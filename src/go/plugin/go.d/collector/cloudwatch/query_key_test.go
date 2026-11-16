@@ -19,7 +19,7 @@ func TestPlannedQueryKey_StableIdentityContract(t *testing.T) {
 		query := testPlannedQuery("", "target", "us-east-1", "AWS/EC2", 300)
 		query.seriesName = "ec2.cpu_utilization_average"
 		query.labels = []metrix.Label{{Key: "account_id", Value: "000000000000"}, {Key: "instance_id", Value: "i-1"}}
-		query.tagLabels = []metrix.Label{{Key: "owner", Value: "old"}}
+		query.enrichmentLabels = []metrix.Label{{Key: "owner", Value: "old"}}
 		query.query.MetricStat.Stat = aws.String("Average")
 		query.query.MetricStat.Metric.MetricName = aws.String("CPUUtilization")
 		query.query.MetricStat.Metric.Dimensions = []cwtypes.Dimension{{Name: aws.String("InstanceId"), Value: aws.String("i-1")}}
@@ -38,7 +38,7 @@ func TestPlannedQueryKey_StableIdentityContract(t *testing.T) {
 	baseKey := plannedQueryKey(base, baseInstanceID)
 
 	changedTag, changedTagInstanceID := newQuery()
-	changedTag.tagLabels = []metrix.Label{{Key: "owner", Value: "new"}}
+	changedTag.enrichmentLabels = []metrix.Label{{Key: "owner", Value: "new"}}
 	assert.Equal(t, baseKey, plannedQueryKey(changedTag, changedTagInstanceID), "mutable tag labels do not change query state identity")
 
 	mutations := map[string]func(*plannedQuery, *structuralID){

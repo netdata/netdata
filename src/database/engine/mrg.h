@@ -74,6 +74,7 @@ time_t mrg_metric_get_first_time_s(MRG *mrg, METRIC *metric);
 
 bool mrg_metric_set_clean_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
 bool mrg_metric_set_hot_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
+void mrg_metric_clear_hot_latest_time_s(MRG *mrg, METRIC *metric, time_t latest_time_s);
 time_t mrg_metric_get_latest_time_s(MRG *mrg, METRIC *metric);
 time_t mrg_metric_get_latest_clean_time_s(MRG *mrg, METRIC *metric);
 
@@ -101,8 +102,7 @@ void mrg_update_metric_retention_and_granularity_by_uuid(
     time_t first_time_s,
     time_t last_time_s,
     uint32_t update_every_s,
-    time_t now_s,
-    uint64_t *journal_samples);
+    time_t now_s);
 
 bool mrg_save(MRG *mrg);
 bool mrg_load(MRG *mrg);

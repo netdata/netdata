@@ -4,6 +4,8 @@ import (
 	"math"
 	"time"
 
+	"context"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/oldmetrix"
 )
 
@@ -22,8 +24,8 @@ type nodeCoordinates struct {
 	}
 }
 
-func (c *Collector) collectNetworkRTT(mx map[string]int64) error {
-	req, err := c.createRequest(urlPathCoordinateNodes)
+func (c *Collector) collectNetworkRTT(ctx context.Context, mx map[string]int64) error {
+	req, err := c.createRequest(ctx, urlPathCoordinateNodes)
 	if err != nil {
 		return err
 	}

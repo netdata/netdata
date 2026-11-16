@@ -1,13 +1,17 @@
 ---
 name: topology-authoring
-description: Developer workflow for creating or changing Netdata topology producers and their `netdata.topology.v1` Function payloads (`topology:network-connections`, `topology:streaming`, `topology:snmp`, vSphere, `topology:cato_networks`, or a new producer), including actor and link design, evidence and detail tables, correlation rules, graph presentation, modal composition, telemetry overlays, validation, and the Cloud aggregator contract a producer relies on. Not for querying topology as an operator (query-netdata-cloud, query-netdata-agents) or for SNMP profile `topology:` rows (collectors-snmp-profiles).
+description: Design, change or review Netdata topology producers and netdata.topology.v1 payloads, including actors, links, evidence, correlation, presentation, modals, overlays and validators. Operator topology queries use query skills; SNMP profile topology rows use collectors-snmp-profiles.
 ---
 
 # Topology Producers
 
 Developer skill for assistants working in this repository, not an operator skill. It routes to the documents that
 own each fact and keeps only the rules and workflow that have no other owner. When you find a fact here and in an
-owner document, the owner document wins; fix this file.
+owner document, verify the affected contract at its source and correct stale guidance during authorized maintenance.
+
+Apply `AGENTS.md#skill-selection`. Review the affected planes and existing design/validation evidence; authoring steps
+below do not require reviewers to create a SOW, redesign unrelated planes or query a live Agent. Live verification
+recipes apply only when the task includes that operation. A changed validator requires checking the claims it affects.
 
 ## Owners
 
@@ -15,19 +19,19 @@ Read the owner for the plane you touch; do not work from memory of it.
 
 | Owner | Owns |
 |---|---|
-| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries, `evidence`, `scale_keys`, `correlation.rules`, and the maps under `data.tables.actor` / `.relationship` are maps keyed by producer-chosen ids (`propertyNames` = `id`); `dictionaries`, `stats`, `extensions`, `badge_map`, and `link_aggregation.metrics` are open maps; `required_params[]` items are objects with no further constraint. |
+| `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | Every required field and closed token (icons, colors, layout, cell types, visibility, projections, arrow, direction, severities, rule classes). Named record definitions are `additionalProperties: false`; the type registries, `evidence`, `scale_keys`, `correlation.rules`, and the maps under `data.tables.actor` / `.relationship` are maps keyed by producer-chosen ids (`propertyNames` = `id`); `dictionaries`, `stats`, `extensions`, `badge_map`, and `link_aggregation.metrics` are open maps; `required_params[]` stays open except for optional typed focus metadata. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | The payload contract, plane by plane, plus per-producer Shape sections and the aggregator rules a producer relies on. |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Migration state per producer, Cloud aggregator and frontend scope, the CTS gate, and design that is not yet in the schema. |
-| `src/go/pkg/topology/v1` | Go builders and the semantic validator (`validate.go`, `validate_notification.go`). |
+| `src/go/pkg/topology/v1` | Go builders and semantic validators (`validate.go`, `validate_notification.go`, `validate_focus.go`, `validate_view.go`). |
 | `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md` | SNMP producer internals, where to change what, and its validation commands. |
 | `src/go/pkg/l2topology/parity/README.md` | The L2 parity runbook against the enlinkd oracle. |
 | `src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures` | Validating any topology payload file from the CLI. |
 | `src/plugins.d/FUNCTION_UI_REFERENCE.md`, `src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md` | Function transport: envelope, `v: 3`, `selections`, `info` responses. |
 | `docs/npm/topology/` | What operators are told the topology means. Change it when a user-visible meaning changes. |
 
-If you are also changing the collector that hosts the producer, `.agents/skills/collectors-authoring/SKILL.md` routes
-that work. SNMP profile `topology:` rows (which OIDs feed the producer) belong to `collectors-snmp-profiles`; this skill
-starts where those rows have become observations.
+If the task also changes or reviews the collector that hosts the producer,
+`.agents/skills/collectors-authoring/SKILL.md` routes that work. SNMP profile `topology:` rows (which OIDs feed the
+producer) belong to `collectors-snmp-profiles`; this skill starts where those rows have become observations.
 
 ## Producers
 
@@ -38,42 +42,55 @@ starts where those rows have become observations.
 | `topology:snmp` | `src/go/plugin/go.d/collector/snmp_topology/` (render in `internal/topologyv1`) | `topology_scenario_golden_test.go`, `internal/topologyv1/golden_test.go`, see `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md#validation-checklist` |
 | `topology:vsphere` | `src/go/plugin/go.d/collector/vsphere/func_topology*.go` | `func_topology_test.go` |
 | `topology:cato_networks` | `src/go/plugin/go.d/collector/cato_networks/topology.go`, `catofunc/topology.go` | `topology_test.go` |
+| `topology:tracing` | `src/crates/otel-service-map/` (`payload.rs`, `topology_template.json`, `function.rs`), served by the otel-plugin ingestor | the crate's tests (`cargo test -p otel-service-map`), including the golden test that keeps `src/go/tools/functions-validation/fixtures/topology-v1/tracing.json` current |
 
-All five emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
+All six emit `netdata.topology.v1`; no producer still emits a pre-v1 payload. Remaining per-producer refinements
 are tracked in `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md#current-migration-inventory`. Cross-producer
 fixtures live in `src/go/tools/functions-validation/fixtures/topology-v1/` (none for `topology:cato_networks`); the
 Cloud aggregator itself is not in this repository.
 
 ## What The Code Enforces
 
-State these as facts in reviews; do not re-derive them, and do not claim enforcement the code does not have.
+Use this map to locate enforcement and its known limits. Before relying on a claim affected by the task, verify it in
+the current schema, validator and relevant tests. Do not re-audit unrelated behavior or infer enforcement from this
+summary alone; distinguish intended contract from what the checked implementation actually rejects.
 
 - JSON Schema (`FUNCTION_TOPOLOGY_SCHEMA.json`): structure, required fields, closed tokens, unknown properties. A
   violation is an error from any validator that loads the schema. It does not check cross-references or row counts.
 - Go semantic validator (`topologyv1.ValidateDecodedData` on `data`, `topologyv1.ValidateDecodedResponse` on a whole
   envelope; both return an error, there is no warning level): actor and link reference bounds (evidence references
   only where the table type declares `source_evidence`), column-length equality with `rows`,
-  dictionary indexes, label-policy display types, search columns, the `ports.sources[]` rules except the
+  dictionary indexes, label-policy display types, search columns and label-key shape independently of optional actor
+  presentation, declared actor aggregation-scope memberships, the `ports.sources[]` rules except the
   `actor_table` carve-out below (and `show_bullets` is read untyped, so only the schema rejects a non-boolean),
-  highlight-path column types (including that a `path_table` not under `data.tables.actor` is owned by `actor`, the
-  one use the validator makes of `table_type.owner`), every overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules
+  highlight-path column types (including actor ownership of a `path_table` outside `data.tables.actor`), every
+  overlay-refs convention rule except the id-pattern rule (schema-only), correlation rules
   and point/claim key columns, all modal projections, and the presentation, correlation, and overlay token
   vocabularies. Structural tokens (`orientation`, `direction_role`, `link_type.aggregation.*`, `evidence_type.role`,
-  `table_type.role` and `aggregation`, `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are
-  schema-only; the Go validator never reads them. Producer tests call `ValidateDecodedData`
+  `column.role`, `layer`, `view.mode`, `supported_modes`, `evidence_policy`) are schema-only. Whole-response focus
+  validation also checks role/option consistency, binding-table actor ownership/detail/append semantics, binding
+  options/actor refs and traversal type references. Applied `data.view.focus` validates distinct returned-map
+  actor references and optional non-negative depth. Outside this focus obligation, table role/aggregation remain
+  schema-only. See `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus`.
+  Producer data-only tests call `ValidateDecodedData`
   (`cato_networks/topology_test.go` is the reference shape). The CLI tool always validates against one JSON Schema
   first, defaulting to `FUNCTION_UI_SCHEMA.json`, which rejects a topology payload, so a topology run passes
   `--schema ../plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` from `src/go`
   (`src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`); it then calls
   `ValidateDecodedResponse`.
+- Go builders (`Table.Validate`) and the decoded semantic validator enforce scalar numeric validity, typed-set member
+  types, and nullability as errors across the compact-table codecs.
+  Contract: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#compact-tables`;
+  validation workflow: `src/go/tools/functions-validation/README.md#validate-topology-v1-fixtures`.
 - The CLI tool (`src/go/tools/functions-validation`) counts a topology payload's rows as
   `max(actor rows, link rows)` (`topologyv1.GraphRowsFromDecodedData`) for its `--min-rows` and `--require-rows`
   gates, so an actor-only payload passes; nothing in `pkg/topology` caps row counts.
 - Not checked by the Go validator although the contract states them: `actor_labels` key, value, source, and kind
   column types (only `actor_column` is type-checked), `search.label_keys[]` against any label registry (string shape
-  only), correlation `key_space` values (schema-required, never read), unknown optional column ids on `actor_table`
-  port sources, and the owner of a detail table named as an `actor_table` source by port bullets, modal sections, or
-  modal labels (a link- or evidence-owned table is accepted there).
+  only), correlation `key_space` values (schema-required, never read), unknown optional enrichment column ids on
+  `actor_table` port sources (`label_column` and `value_column` are checked on every source), and the owner of a
+  detail table named as an `actor_table` source by port bullets, modal sections, or modal labels (a link- or
+  evidence-owned table is accepted there).
 - The network-connections 64 MiB budget is a producer-side hard stop (a `413` Function error), not a validator check
   (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#network-connections-shape`).
 - The SNMP scenario golden suite skips, not fails, without the external fixture checkout
@@ -84,7 +101,8 @@ State these as facts in reviews; do not re-derive them, and do not claim enforce
 
 ## Workflow
 
-Each step names the owner section that holds the rules; read it before designing. Guide means
+Select the steps for the affected planes; a new producer considers every applicable plane. Implementation reads its
+owners before design, while review checks the resulting contracts and evidence. Guide means
 `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md`.
 
 1. Purpose and scale: name the graph users need, choose which plane carries what, and estimate actor, link, and
@@ -128,7 +146,8 @@ Each step names the owner section that holds the rules; read it before designing
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-modal-sections`,
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmpl2-shape` and
     `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#snmp-logical-l3-and-control-plane-links`,
-    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape`.
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#vsphere-shape` and
+    `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#cato-networks-shape`.
 11. Validate and measure: schema plus semantic validation in tests, the producer's own suites (table above), size
     on realistic data, and the checklist.
     Guide: `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#producer-checklist`.
@@ -142,6 +161,8 @@ Each step names the owner section that holds the rules; read it before designing
   logs, docs, SOWs, or review artifacts (`src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#streaming-shape`).
 - Sparse grouping columns: test that a consumer keeps actor identity for null or empty grouping keys instead of
   merging every null row into one bucket.
+- Parallel-link tests MUST hold endpoints and type/state constant while varying only the grouping identity.
+  Cover ID-bearing interfaces with equal names and name-only interfaces; removing a required `group_key` must fail.
 - Fail explicitly on any size or row limit; never truncate a topology and present it as complete.
 - Validators need negative tests: missing label-policy columns, non-display label columns, a missing port-bullet
   source table, bad highlight-path columns, an invalid token, and a modal projection over a missing source. A producer

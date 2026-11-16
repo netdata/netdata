@@ -1025,10 +1025,14 @@ func (d *routeDigestWriter) addMetric(kind string, cfg ddprofiledefinition.Metri
 }
 
 func (d *routeDigestWriter) addMetricTag(tag ddprofiledefinition.MetricTagConfig) {
-	d.add(tag.Table)
 	d.add(tag.Column.OID)
-	d.add(tag.Symbol.OID)
-	d.add(tag.LookupSymbol.OID)
+	if tag.Table == "" {
+		d.add(tag.Symbol.OID)
+	}
+	for source := range tag.TableSources() {
+		d.add(source.Table)
+		d.add(source.Symbol.OID)
+	}
 }
 
 func (d *routeDigestWriter) addMetadata(metadata ddprofiledefinition.MetadataConfig) {

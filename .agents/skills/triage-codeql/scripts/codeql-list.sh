@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# List GitHub Code Scanning alerts (CodeQL with security-extended) for the repo.
+# List GitHub Code Scanning alerts for the repo; --tool=CodeQL selects CodeQL.
 #
 # Usage:
 #   codeql-list.sh                        # all OPEN alerts (default)
@@ -44,7 +44,7 @@ path="/repos/${slug}/code-scanning/alerts?state=${state}&per_page=100"
 # `gh api --paginate` writes the per-page JSON arrays back-to-back
 # (e.g. `[a,b,c][d,e]`), which is NOT a single valid JSON array. Pipe
 # through `jq -s 'add'` to slurp the multiple top-level values into one
-# array. Without this, downstream `jq '.[]'` only sees the first page.
+# array, so --raw has one consistent array output rather than a JSON stream.
 echo -e "${GH_GRAY}> gh api --paginate ${path}${GH_NC}" >&2
 data="$(gh_api api --paginate "${path}" | jq -s 'add // []')"
 

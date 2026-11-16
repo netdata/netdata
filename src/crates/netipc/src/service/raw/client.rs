@@ -1,7 +1,9 @@
-use super::common::{ensure_client_scratch, next_power_of_2_u32, LookupLogicalConfig};
-use crate::protocol::{self, NipcError, MAX_PAYLOAD_CAP};
-use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+use super::common::CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS;
+use super::common::{LookupLogicalConfig, ensure_client_scratch, next_power_of_2_u32};
+use crate::protocol::{self, MAX_PAYLOAD_CAP, NipcError};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 #[cfg(unix)]
@@ -10,7 +12,7 @@ pub(super) use crate::transport::posix::ClientConfig;
 #[cfg(unix)]
 use crate::transport::posix::UdsSession;
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "freebsd"))]
 use crate::transport::shm::ShmContext;
 
 #[cfg(windows)]
@@ -25,6 +27,7 @@ use crate::transport::win_shm::WinShmContext;
 /// Default timeout for synchronous client calls.
 pub const CLIENT_CALL_TIMEOUT_DEFAULT_MS: u32 = 30_000;
 
+#[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
 pub(super) const CLIENT_ABORT_POLL_MS: u32 = 100;
 
 /// Client connection state machine.
@@ -63,7 +66,7 @@ pub struct RawClient {
 
     #[cfg(unix)]
     pub(super) session: Option<UdsSession>,
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "freebsd"))]
     pub(super) shm: Option<ShmContext>,
 
     #[cfg(windows)]
@@ -72,6 +75,7 @@ pub struct RawClient {
     pub(super) shm: Option<WinShmContext>,
 
     pub(super) request_buf: Vec<u8>,
+    #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
     pub(super) send_buf: Vec<u8>,
     pub(super) transport_buf: Vec<u8>,
 
@@ -85,6 +89,15 @@ pub struct RawClient {
     pub(super) max_logical_lookup_subcalls: u32,
     pub(super) max_logical_lookup_response_bytes: u32,
     pub(super) abort_requested: Arc<AtomicBool>,
+    /// How long to retry attaching a negotiated SHM region; tests shorten it.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+    pub(super) shm_attach_timeout: std::time::Duration,
+    /// Consecutive SHM attaches the call deadline ended with the session
+    /// still connected.
+    #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+    pub(super) shm_call_bound_failures: u32,
+    /// Deadline of the call or refresh in progress.
+    pub(super) op_deadline: Instant,
 }
 
 /// Cloneable handle that can abort a blocking client call from another thread.
@@ -133,6 +146,18 @@ impl RawCallKind {
     }
 }
 
+#[cfg(test)]
+impl RawClient {
+    /// Shorten the client's internal waits for tests.
+    pub(crate) fn use_test_timings(&mut self) -> &mut Self {
+        #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+        {
+            self.shm_attach_timeout = std::time::Duration::from_millis(300);
+        }
+        self
+    }
+}
+
 impl RawClient {
     pub(super) fn new_bound(
         run_dir: &str,
@@ -148,11 +173,12 @@ impl RawClient {
             expected_method_code,
             transport_config: config,
             session: None,
-            #[cfg(target_os = "linux")]
+            #[cfg(any(target_os = "linux", target_os = "freebsd"))]
             shm: None,
             #[cfg(windows)]
             shm: None,
             request_buf: Vec::new(),
+            #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
             send_buf: Vec::new(),
             transport_buf: Vec::new(),
             connect_count: 0,
@@ -164,6 +190,46 @@ impl RawClient {
             max_logical_lookup_subcalls: lookup_config.max_subcalls,
             max_logical_lookup_response_bytes: lookup_config.max_response_bytes,
             abort_requested: Arc::new(AtomicBool::new(false)),
+            #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+            shm_attach_timeout: std::time::Duration::from_millis(
+                CLIENT_SHM_ATTACH_RETRY_TIMEOUT_MS,
+            ),
+            #[cfg(any(target_os = "linux", target_os = "freebsd", windows))]
+            shm_call_bound_failures: 0,
+            op_deadline: Instant::now(),
+        }
+    }
+
+    /// Start a call or refresh: one deadline, `timeout_ms` resolved as for
+    /// calls, bounds every connect, handshake, attach and retry inside it.
+    pub(super) fn begin_op(&mut self, timeout_ms: u32) {
+        self.op_deadline =
+            Instant::now() + Duration::from_millis(self.resolved_call_timeout(timeout_ms) as u64);
+    }
+
+    /// Time left before the current deadline; 0 once it passed. Rounded up,
+    /// so a wait given this time never ends before the deadline itself.
+    pub(super) fn op_remaining_ms(&self) -> u32 {
+        let now = Instant::now();
+        if now >= self.op_deadline {
+            return 0;
+        }
+        let left = self
+            .op_deadline
+            .duration_since(now)
+            .as_micros()
+            .div_ceil(1000);
+        left.min(u32::MAX as u128) as u32
+    }
+
+    /// A reconnect inside a call failed: report why the call ended.
+    pub(super) fn call_reconnect_failure(&self, err: NipcError) -> NipcError {
+        if self.abort_requested() {
+            NipcError::Aborted
+        } else if self.op_remaining_ms() == 0 {
+            NipcError::Timeout
+        } else {
+            err
         }
     }
 
@@ -211,7 +277,7 @@ impl RawClient {
     pub(super) fn ensure_ready_for_logical_lookup(&mut self) -> Result<(), NipcError> {
         if self.state != ClientState::Ready {
             self.error_count += 1;
-            return Err(NipcError::BadLayout);
+            return Err(NipcError::NotReady);
         }
         if self.abort_requested() {
             self.disconnect();
@@ -225,6 +291,7 @@ impl RawClient {
     pub(super) fn ensure_lookup_request_capacity(
         &mut self,
         required: usize,
+        deadline: Instant,
     ) -> Result<bool, NipcError> {
         if self.abort_requested() {
             self.disconnect();
@@ -246,12 +313,13 @@ impl RawClient {
         }
 
         let prev_req = self.session_max_request_payload_bytes();
+        self.op_deadline = deadline;
         self.disconnect();
         self.state = ClientState::Broken;
         self.state = self.try_connect();
         if self.state != ClientState::Ready {
             self.error_count += 1;
-            return Err(NipcError::Overflow);
+            return Err(self.call_reconnect_failure(NipcError::Overflow));
         }
         self.reconnect_count += 1;
         if self.session_max_request_payload_bytes() <= prev_req
@@ -295,6 +363,12 @@ impl RawClient {
     /// Returns true if the state changed.
     pub fn refresh(&mut self) -> bool {
         let old_state = self.state;
+
+        // A pending abort keeps the client offline until it is cleared.
+        if self.abort_requested() {
+            return false;
+        }
+        self.begin_op(0);
 
         match self.state {
             ClientState::Disconnected | ClientState::NotFound => {
@@ -401,7 +475,7 @@ impl RawClient {
 
     /// Tear down the current connection.
     pub(super) fn disconnect(&mut self) {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "freebsd"))]
         {
             if let Some(mut shm) = self.shm.take() {
                 shm.close();

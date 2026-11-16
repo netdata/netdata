@@ -71,37 +71,48 @@ pub struct Subject {
 
 const PING_INTERVAL: Duration = Duration::from_secs(30);
 
-/// Connect to CertStream and send parsed certificate data through the channel.
-/// Heartbeats and unknown messages are silently skipped.
-/// Returns when the WebSocket connection closes or errors.
+/// Connect to CertStream and forward each certificate update through the
+/// channel paired with its raw JSON. Heartbeats and unknown messages are
+/// skipped silently; malformed messages are logged and skipped. Returns when
+/// the connection closes or errors (mid-stream errors are logged and yield
+/// `Ok`; only a failed initial connect yields `Err`), or when sending a
+/// certificate update fails because the receiver dropped the channel; the
+/// drop is noticed only at that send, so the loop can keep running through
+/// skipped messages or with no further updates.
 pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(CertData, serde_json::Value)>,
 ) -> anyhow::Result<()> {
-    crate::ws::run("CertStream", url, None, Some(PING_INTERVAL), move |raw_json| {
-        let tx = tx.clone();
-        async move {
-            let message: Message = match serde_json::from_value(raw_json.clone()) {
-                Ok(m) => m,
-                Err(e) => {
-                    warn!("Failed to deserialize CertStream message: {e}");
-                    return ControlFlow::Continue(());
+    crate::ws::run(
+        "CertStream",
+        url,
+        None,
+        Some(PING_INTERVAL),
+        move |raw_json| {
+            let tx = tx.clone();
+            async move {
+                let message: Message = match serde_json::from_value(raw_json.clone()) {
+                    Ok(m) => m,
+                    Err(e) => {
+                        warn!("Failed to deserialize CertStream message: {e}");
+                        return ControlFlow::Continue(());
+                    }
+                };
+
+                let data = match message {
+                    Message::CertificateUpdate(data) => *data,
+                    Message::Other => return ControlFlow::Continue(()),
+                };
+
+                if tx.send((data, raw_json)).await.is_err() {
+                    info!("Receiver dropped, stopping WebSocket reader");
+                    return ControlFlow::Break(());
                 }
-            };
 
-            let data = match message {
-                Message::CertificateUpdate(data) => *data,
-                Message::Other => return ControlFlow::Continue(()),
-            };
-
-            if tx.send((data, raw_json)).await.is_err() {
-                info!("Receiver dropped, stopping WebSocket reader");
-                return ControlFlow::Break(());
+                ControlFlow::Continue(())
             }
-
-            ControlFlow::Continue(())
-        }
-    })
+        },
+    )
     .await
 }
 

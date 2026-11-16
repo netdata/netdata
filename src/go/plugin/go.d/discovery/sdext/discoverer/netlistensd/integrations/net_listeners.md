@@ -71,7 +71,7 @@ The stock rule set covers most commonly-monitored services out of the box (Apach
 
 #### Options
 
-The configuration file has two top-level blocks: `discoverer:` (the options below) and `services:` (rules that turn discovered listeners into collector jobs — see [Service Rules](#service-rules)).
+The configuration file has two top-level blocks: `discoverer:` (the discoverer-specific options below) and `services:` (rules that turn discovered listeners into collector jobs — see [Service Rules](#service-rules)).
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -79,8 +79,27 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
+| [trust_discovered_targets](#option-trust-discovered-targets) | Allow secret references in generated collector jobs, including target-controlled values that can make Netdata read files, run commands, or fetch stored secrets. Off by default; enable only if you control and trust every discoverable target and accept the risk of exposing resolved values to it. | no | no |
 | interval | How often to re-scan the listening-socket table. | 2m | no |
 | timeout | Maximum time to wait for the `local-listeners` helper to return. | 5s | no |
+
+<a id="option-trust-discovered-targets"></a>
+##### trust_discovered_targets
+
+Set this option at the top level, alongside `discoverer:` and `services:`, not inside the discoverer block.
+It enables `${env:...}`, `${file:...}`, `${cmd:...}` and `${store:...}` in generated collector jobs.
+
+If a service rule copies a target-controlled value into a job field, the target can insert a reference that
+makes Netdata read a local file, run a command, or fetch a stored secret with the secret provider's
+permissions. The collector may send the result to that target as a credential or other request field.
+Enable only if you control and trust every target this pipeline can discover; enabling it accepts
+this risk for the whole pipeline. One untrusted target is enough to abuse it.
+
+Local users can control process command lines and other values used by service rules.
+
+The default keeps reference syntax literal. This option does not resolve the discoverer's own connection
+credentials. See [Service Discovery](https://github.com/netdata/netdata/blob/master/src/collectors/SERVICE-DISCOVERY.md#configuration-file-structure).
+
 
 
 
@@ -96,7 +115,7 @@ After editing the file, restart the Netdata Agent to load the updated discovery 
 
 Define the discovery pipeline in `/etc/netdata/go.d/sd/net_listeners.conf`.
 
-The file has two top-level blocks: `discoverer:` (the options above) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)).
+The file has two top-level blocks: `discoverer:` (discoverer-specific settings) and `services:` (rules that turn discovered targets into collector jobs — see [Service Rules](#service-rules)). Set pipeline options such as `trust_discovered_targets` alongside these blocks, not inside `discoverer:`.
 
 After editing the file, restart the Netdata Agent to load the updated discovery pipeline.
 
@@ -116,8 +135,7 @@ services:
   - id: redis
     match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
     config_template: |
-      name: local
-      address: redis://@{{.Address}}
+      {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
 
 ```
 ###### Faster scan interval
@@ -179,8 +197,7 @@ The most common stock-rule shape. Match the canonical port AND the canonical pro
 - id: redis
   match: '{{ or (eq .Port "6379") (eq .Comm "redis-server") }}'
   config_template: |
-    name: local
-    address: redis://@{{.Address}}
+    {{ job "name" "local" "address" (printf "redis://@%s" .Address) }}
 
 ```
 
@@ -192,27 +209,27 @@ When the process is `java`/`python`/`node` and the real service name lives in th
 - id: rabbitmq
   match: '{{ or (eq .Port "15672") (glob .Cmdline "*rabbitmq*") }}'
   config_template: |
-    name: local
-    url: http://{{.Address}}
-    username: guest
-    password: guest
-    collect_queues_metrics: no
+    {{ job
+      "name" "local"
+      "url" (printf "http://%s" .Address)
+      "username" "guest"
+      "password" "guest"
+      "collect_queues_metrics" false
+    }}
 
 ```
 
-#### Multiple jobs from one target (sequence output)
+#### Multiple jobs from one target
 
-When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. The rendered YAML is a top-level sequence; each item becomes a separate job.
+When one running service should produce multiple collector jobs — for example, MySQL exposing both a Unix-socket DSN and a TCP DSN. Call `job` once for each collector job, in the desired order.
 
 
 ```yaml
 - id: mysql
   match: '{{ or (eq .Port "3306") (eq .Comm "mysqld" "mariadbd") }}'
   config_template: |
-    - name: local
-      dsn: netdata@unix(/var/run/mysqld/mysqld.sock)/
-    - name: local
-      dsn: netdata@tcp({{.Address}})/
+    {{ job "name" "local" "dsn" "netdata@unix(/var/run/mysqld/mysqld.sock)/" }}
+    {{ job "name" "local" "dsn" (printf "netdata@tcp(%s)/" .Address) }}
 
 ```
 
@@ -225,13 +242,15 @@ The last rule in the stock conf catches generic Prometheus exporters by port. `p
 - id: exporter
   match: '{{ or (and (not (empty (promPort .Port))) (not (eq .Comm "docker-proxy"))) (glob .Comm "*exporter*") }}'
   config_template: |
-    {{ $name := promPort .Port -}}
-    {{ if empty $name -}}
-    {{ $name = printf "%s_%s" .Comm .Port -}}
-    {{ end -}}
-    module: prometheus
-    name: {{$name}}_local
-    url: http://{{.Address}}/metrics
+    {{ $job := dict }}
+    {{ $name := promPort .Port }}
+    {{ if empty $name }}
+    {{ $name = printf "%s_%s" .Comm .Port }}
+    {{ end }}
+    {{ $_ := set $job "module" "prometheus" }}
+    {{ $_ := set $job "name" (printf "%s_local" $name) }}
+    {{ $_ := set $job "url" (printf "http://%s/metrics" .Address) }}
+    {{ job $job }}
 
 ```
 

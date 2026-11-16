@@ -41,7 +41,7 @@ It uses the [Azure Monitor Metrics batch API](https://learn.microsoft.com/en-us/
 
 This collector is supported on all platforms.
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The service principal or managed identity requires these Azure RBAC roles:
 
@@ -165,6 +165,19 @@ The following options can be defined globally: `update_every`, `autodetection_re
 User profile files with the same basename as a [stock profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/azure_monitor.profiles/default) override it.
 Custom profiles extend the collector's catalog -- they do not replace the discovery mechanism.
 
+**Resource properties in profiles:**
+
+Besides Azure Monitor metrics, a profile can read [Azure Resource Graph](https://learn.microsoft.com/en-us/azure/governance/resource-graph/overview) properties of each resource during discovery:
+
+| Profile key | Purpose |
+|:------------|:--------|
+| `resource_labels` | Adds a label to every series of the resource. Each entry has `name`, `property` (a dot-separated path under `properties` whose segments contain only letters and digits, for example `properties.hardwareProfile.vmSize`), and optional `value: arm_name` to keep only the last segment of an ARM resource ID. |
+| `resource_states` | Exports one enum metric named `<profile>.<id>` from a property such as `properties.extended.instanceView.powerState.code`. Each `states` entry maps a `name` to an Azure `value`, matched case-insensitively. A chart dimension with `selector: <id>` and neither `name` nor `name_from_label` expands into one 0/1 dimension per state; the collector supplies the state label for any valid ID, including `phase` or `power`. Missing or unrecognized values produce no state observation. |
+
+In `discovery.mode: query`, the custom KQL must return each property as a column named `nd_` followed by the property path with dots replaced by underscores (for example `nd_properties_hardwareProfile_vmSize`). Missing columns leave the label empty and the state unreported.
+
+Resource-state charts refresh with discovery (every 300 seconds by default). They remain available when Azure Monitor metrics fail, provided the discovery snapshot is still valid. If a scheduled discovery refresh fails, state charts show gaps until discovery succeeds again; ordinary metrics continue using the last known resource inventory. Setting `discovery.refresh_every: 0` disables resource-state output as well as rediscovery.
+
 
 <details open><summary>Config options</summary>
 
@@ -183,7 +196,7 @@ Custom profiles extend the collector's catalog -- they do not replace the discov
 |  | auth.mode_service_principal.client_id | Entra ID application (client) ID. Required for `service_principal` mode. |  | no |
 |  | auth.mode_service_principal.client_secret | Entra ID client secret. Required for `service_principal` mode. |  | no |
 |  | auth.mode_managed_identity.client_id | Client ID of a user-assigned managed identity. Leave empty for a system-assigned identity. |  | no |
-| **Discovery** | discovery.refresh_every | How often to refresh the discovered resources, in seconds. Zero disables rediscovery after startup. | 300 | no |
+| **Discovery** | discovery.refresh_every | How often to refresh resources and their states, in seconds. Zero disables rediscovery after startup and disables resource-state charts. | 300 | no |
 |  | [discovery.mode](#option-discovery-discovery-mode) | How resources are selected: `filters` (structured filters) or `query` (custom KQL). | filters | no |
 |  | discovery.mode_filters.resource_groups | Azure resource groups to include. Leave empty for all. | [] | no |
 |  | discovery.mode_filters.regions | Azure regions to include. Leave empty for all. | [] | no |
@@ -375,7 +388,7 @@ Configure the **azure_monitor** collector from the Netdata web interface:
 4. In the Search box, type _azure_monitor_ (or scroll the list) to locate the **azure_monitor** collector.
 5. Click the **+** next to the **azure_monitor** collector to add a new job.
 6. Fill in the job fields, then click **Test** to verify the configuration and **Submit** to save.
-    - **Test** runs the job with the provided settings and shows whether data can be collected.
+    - **Test** validates the provided settings and checks the collector's startup prerequisites. Successful validation does not guarantee that every metric will be available during collection.
     - If it fails, an error message appears with details (for example, connection refused, timeout, or command execution errors), so you can adjust and retest.
 
 
@@ -630,18 +643,18 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | AKS API server CPU on ${label:resource_name} |
-| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | AKS API server memory on ${label:resource_name} |
-| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | AKS API server inflight requests on ${label:resource_name} |
-| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | AKS etcd CPU on ${label:resource_name} |
-| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | AKS etcd memory on ${label:resource_name} |
-| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | AKS etcd database usage on ${label:resource_name} |
-| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | AKS autoscaler unsafe on ${label:resource_name} |
-| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | AKS unschedulable pods on ${label:resource_name} |
-| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | AKS node CPU on ${label:resource_name} |
-| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | AKS node memory working set on ${label:resource_name} |
-| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | AKS node memory RSS on ${label:resource_name} |
-| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | AKS node disk usage on ${label:resource_name} |
+| [ am_aks_apiserver_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_cpu | Average API server CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_apiserver_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_memory | Average API server memory utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_apiserver_inflight_requests ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.apiserver_inflight_requests | Average number of inflight requests to the API server on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_cpu | Average etcd CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_memory ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_memory | Average etcd memory utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_etcd_database ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.etcd_database | Average etcd database utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High etcd database usage can lead to cluster instability. |
+| [ am_aks_autoscaler_safe_to_autoscale ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_health | Cluster autoscaler reports the cluster is not safe to autoscale on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_autoscaler_unschedulable_pods ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.autoscaler_unschedulable_pods | Number of pods that cannot be scheduled by the cluster autoscaler on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). Indicates insufficient cluster capacity. |
+| [ am_aks_node_cpu ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_cpu_percentage | Average node CPU utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_memory_working_set ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_working_set_percentage | Average node memory working set utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_memory_rss ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_memory_rss_percentage | Average node memory RSS utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}) |
+| [ am_aks_node_disk ](https://github.com/netdata/netdata/blob/master/src/health/health.d/azure_monitor_aks.conf) | azure_monitor.aks.node_disk_percentage | Average node disk utilization on AKS cluster ${label:resource_name} in ${label:resource_group} (${label:region}). High disk usage can cause pod evictions. |
 
 
 

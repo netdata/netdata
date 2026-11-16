@@ -1,5 +1,8 @@
 use super::*;
 
+// Evict entries whose last access is older than `ttl`, so entries live as long as they
+// keep being read. Pruning runs lazily from the get/set paths, at most once per
+// min(ttl, CLASSIFIER_CACHE_PRUNE_INTERVAL).
 fn maybe_prune_classifier_cache<K, V>(
     cache: &mut TimedClassifierCache<K, V>,
     ttl: Duration,
@@ -62,6 +65,8 @@ impl FlowEnricher {
         interface: &InterfaceInfo,
         exporter_classification: &ExporterClassification,
     ) -> Option<InterfaceClassification> {
+        // The exporter classification is part of the cache key, so cached interface
+        // results stop matching when the exporter's classification changes.
         let key = ExporterAndInterfaceInfo {
             exporter: exporter.clone(),
             interface: interface.clone(),

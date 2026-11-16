@@ -1,0 +1,305 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package aggregate
+
+import (
+	"fmt"
+	"testing"
+	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Reports of one session accumulate into one timeline in receipt order, each
+// entry with the context of its own report, and count as one investigated session.
+func TestSessionDetailAccumulates(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	start := *now
+	b1 := mk(*now, "sess1", "/a")
+	b1.AppVersion = "1.0.0"
+	a.Ingest(b1)
+	*now = now.Add(5 * time.Second)
+	b2 := mk(*now, "sess1", "/b")
+	b2.Errors = []beacon.Error{{Type: "TypeError", Message: "boom", Fingerprint: "fp1"}}
+	a.Ingest(b2)
+	*now = now.Add(5 * time.Second)
+
+	events, ok := a.SessionEvents("sess1")
+	require.True(t, ok)
+	assert.Equal(t, []HistoryEvent{
+		{
+			ExperienceID: b1.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.UnixMicro(),
+			Type:         "pageview",
+			Page:         "/a",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Version:      "1.0.0",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "pageview",
+			Page:         "/b",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "error",
+			Page:         "/b",
+			Text:         "TypeError: boom",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Fingerprint:  "fp1",
+			ErrorType:    "TypeError",
+			Message:      "boom",
+		},
+	}, events)
+	assert.Equal(t, 1, a.Activity().InvestigatedSessions)
+}
+
+func trackedSessions(a *Aggregator) []*sessionDetail {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	var out []*sessionDetail
+	for el := a.site.sess.Front(); el != nil; el = el.Next() {
+		out = append(out, el.Value.(*sessionDetail))
+	}
+	return out
+}
+
+func TestSessionEventsRing(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	a.Ingest(mk(*now, "sess1", "/a"))
+	*now = now.Add(time.Second)
+	b := mk(*now, "sess1", "/b")
+	b.Errors = []beacon.Error{{Type: "E", Message: "boom"}}
+	a.Ingest(b)
+	*now = now.Add(time.Second)
+	b2 := mk(*now, "sess1", "/b")
+	b2.Events = []beacon.Event{{Name: "checkout"}}
+	a.Ingest(b2)
+
+	events, ok := a.SessionEvents("sess1")
+	if !ok {
+		t.Fatal("session must be found")
+	}
+	wantTypes := []string{"pageview", "pageview", "error", "event"}
+	if len(events) != len(wantTypes) {
+		t.Fatalf("events = %+v", events)
+	}
+	for i, want := range wantTypes {
+		if events[i].Type != want {
+			t.Fatalf("event[%d].Type = %q want %q (%+v)", i, events[i].Type, want, events)
+		}
+	}
+	if events[2].Text != "E: boom" {
+		t.Fatalf("error text = %q", events[2].Text)
+	}
+	if events[3].Text != "checkout" {
+		t.Fatalf("event text = %q", events[3].Text)
+	}
+}
+
+func TestSessionEventsFiltersNavigationAndResource(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	b := mk(*now, "sess1", "/a")
+	b.Events = append(b.Events, beacon.Event{
+		Kind: beacon.EventNavigation,
+	}, beacon.Event{
+		Kind: beacon.EventResource,
+	}, beacon.Event{
+		Name: "custom",
+	})
+	a.Ingest(b)
+	*now = now.Add(time.Second)
+
+	events, ok := a.SessionEvents("sess1")
+	if !ok {
+		t.Fatal("session must be found")
+	}
+	// pageview + the one custom event only.
+	if len(events) != 2 || events[1].Text != "custom" {
+		t.Fatalf("events = %+v", events)
+	}
+}
+
+func TestSessionViewChangeEmitsViewEvent(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	b1 := mk(*now, "sess1", "/")
+	b1.View = "home"
+	a.Ingest(b1)
+	*now = now.Add(time.Second)
+	b2 := mk(*now, "sess1", "/")
+	b2.View = "checkout"
+	b2.ViewID = "checkout-occurrence"
+	b2.Events = []beacon.Event{
+		{Kind: beacon.EventView, ID: "checkout-event", Revision: 1, Attrs: map[string]string{"toView": "checkout"}},
+	}
+	a.Ingest(b2)
+
+	events, ok := a.SessionEvents("sess1")
+	if !ok {
+		t.Fatal("session must be found")
+	}
+	var sawView bool
+	for _, e := range events {
+		if e.Type == "view" {
+			sawView = true
+			if e.Text != "checkout" {
+				t.Fatalf("view event text = %q", e.Text)
+			}
+		}
+	}
+	if !sawView {
+		t.Fatalf("expected a view event on view change: %+v", events)
+	}
+}
+
+func TestSessionEventsUnknownID(t *testing.T) {
+	a, _ := newAgg(30 * time.Minute)
+	if _, ok := a.SessionEvents("nope"); ok {
+		t.Fatal("unknown session must report not found")
+	}
+}
+
+func TestSessionEventRingBounded(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	for i := 0; i < sessionEventRingCap+20; i++ {
+		b := mk(*now, "sess1", fmt.Sprintf("/p%d", i))
+		a.Ingest(b)
+		*now = now.Add(time.Second)
+	}
+	events, ok := a.SessionEvents("sess1")
+	if !ok || len(events) != sessionEventRingCap {
+		t.Fatalf("events len = %d want %d (ok=%v)", len(events), sessionEventRingCap, ok)
+	}
+}
+
+func TestSessionLRUEvictsOldest(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	for i := 0; i < maxTrackedSessions+50; i++ {
+		a.Ingest(mk(*now, fmt.Sprintf("sess-%d", i), "/a"))
+	}
+	got := trackedSessions(a)
+	if len(got) != maxTrackedSessions {
+		t.Fatalf("tracked sessions = %d want %d", len(got), maxTrackedSessions)
+	}
+	for _, sd := range got {
+		if sd.id == "sess-0" {
+			t.Fatal("oldest session should have been evicted")
+		}
+	}
+	_ = now
+}
+
+// A traced request lands in the timeline with its trace id.
+func TestTracedRequestInSessionTimeline(t *testing.T) {
+	a, now := newAgg(5 * time.Minute)
+	b := mk(*now, "s1", "/checkout")
+	b.Events = []beacon.Event{{
+		Kind: beacon.EventRequest, Name: "faro.tracing.fetch", TraceID: "360b7dd27710ac98272283e6f1f29102",
+		Attrs: map[string]string{
+			"http.request.method":       "POST",
+			"url.full":                  "https://api.example.com/orders",
+			"http.response.status_code": "201",
+			"duration_ns":               "12400000",
+		},
+	}}
+	a.Ingest(b)
+	events, ok := a.SessionEvents("s1")
+	if !ok {
+		t.Fatal("session missing")
+	}
+	var req *HistoryEvent
+	for i := range events {
+		if events[i].Type == "request" {
+			req = &events[i]
+		}
+	}
+	if req == nil || req.TraceID != "360b7dd27710ac98272283e6f1f29102" ||
+		req.Text != "POST api.example.com/orders 201 · 12 ms" {
+		t.Fatalf("request event = %+v", req)
+	}
+}
+
+// A poor vital names its element on the timeline and in Pages;
+// frustration signals count per session, page and site; the user id is kept.
+func TestElementsFrustrationAndUser(t *testing.T) {
+	a, now := newAgg(5 * time.Minute)
+	h := &fakeHistorySink{}
+	a.SetHistorySink(h)
+	b := mk(*now, "s1", "/checkout")
+
+	b.UserID = "u_42"
+	b.Vitals = []beacon.Vital{
+		{ID: "lcp", Revision: 1, Name: beacon.LCP, Value: 5200, Element: "#hero img"},
+	}
+	b.Events = []beacon.Event{{Name: beacon.RageClickEvent, Attrs: map[string]string{"target": "button#buy"}}}
+	a.Ingest(b)
+	a.Snapshot()
+
+	events, _ := a.SessionEvents("s1")
+	var texts []string
+	for _, e := range events {
+		if e.Type == "vital" || e.Type == "frustration" {
+			texts = append(texts, e.Text)
+		}
+	}
+	if len(texts) != 2 || texts[0] != "poor LCP 5200 ms on #hero img" || texts[1] != "rage click on button#buy" {
+		t.Fatalf("timeline = %v", texts)
+	}
+	pages := a.Pages("")
+	if len(pages) != 1 || pages[0].LCPElement != "#hero img" || pages[0].FrustrationWindow != 1 {
+		t.Fatalf("pages = %+v", pages)
+	}
+	if got := a.Snapshot().Counters[CounterRageClicks]; got != 1 {
+		t.Fatalf("rage clicks = %d", got)
+	}
+	last := h.events[len(h.events)-1]
+	if last.UserID != "u_42" || last.Type != "frustration" {
+		t.Fatalf("history event = %+v", last)
+	}
+}
+
+// A page view takes the revision of the report's first document activation.
+func TestDocumentRevision(t *testing.T) {
+	tests := map[string]struct {
+		events []beacon.Event
+		want   uint64
+	}{
+		"no activation": {
+			events: []beacon.Event{{Kind: beacon.EventView, Revision: 3}},
+		},
+		"first activation": {
+			events: []beacon.Event{
+				{Kind: beacon.EventView, Revision: 3},
+				{Kind: beacon.EventDocument, Revision: 2},
+				{Kind: beacon.EventDocument, Revision: 5},
+			},
+			want: 2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{
+				Events: tc.events,
+			}))
+		})
+	}
+}

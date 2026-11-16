@@ -500,7 +500,15 @@ static void nv_apps_lookup_apply_response(
             continue;
         }
 
-        if (item.status == NIPC_PID_LOOKUP_UNKNOWN) {
+        // Level 2 resolves PAYLOAD_EXCEEDED with follow-up calls; one that
+        // reaches here is a contract failure, not data.
+        if (item.status == NIPC_PID_LOOKUP_PAYLOAD_EXCEEDED) {
+            nv_apps_lookup_counter_inc(&apps_lookup_requests_failed);
+            continue;
+        }
+
+        // An OVERSIZED_ITEM PID is final and not enriched, like UNKNOWN.
+        if (item.status == NIPC_PID_LOOKUP_UNKNOWN || item.status == NIPC_PID_LOOKUP_OVERSIZED_ITEM) {
             char key[16];
             nv_apps_lookup_pid_key(item.pid, key);
             if (dictionary_get(apps_lookup_cache, key)) {

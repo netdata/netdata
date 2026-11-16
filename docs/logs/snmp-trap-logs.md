@@ -12,6 +12,10 @@ full-text search, histograms, and live tail as every other source.
 - **Command line and SIEM:** on Linux with systemd 252 or later, `journalctl --directory=<dir>` reads the files, and
   so do SIEM agents that ingest journal files. Netdata reads them on every platform it writes them on.
 - **Forwarding:** traps can also be sent over OTLP to any OpenTelemetry backend.
+- **Viewing:** the **SNMP Trap Logs** view requires a signed-in member of the node's Netdata Cloud Space with permission
+  to view sensitive data, on a paid plan or an active trial. Reception and decoding work on every plan; storage and
+  forwarding depend on the configured outputs. Local storage, the view and `journalctl` access need journal output
+  enabled (the default); an OTLP-only job forwards traps without storing them locally.
 
 The collector, its configuration, the trap fields, and the query workflows are documented under Network Performance
 Monitoring:

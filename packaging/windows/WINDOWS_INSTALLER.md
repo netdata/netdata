@@ -22,7 +22,7 @@ Older Windows and Windows Server releases are end-of-life and are more likely to
 
 ## Access and Limitations
 
-On Windows, whether you can view monitoring data on the local dashboard at <http://localhost:19999> depends on your Netdata Cloud plan and deployment mode. On the free Community tier, standalone Agents collect metrics but the local dashboard is locked — view your data in [Netdata Cloud](https://app.netdata.cloud) instead. For the full details by plan and deployment mode (including air-gapped and streaming setups), see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
+The local dashboard at <http://localhost:19999> works on Windows as it does on Linux, on every plan, including the free Community tier. Sensitive Functions and the node limit follow the same rules on every operating system; see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
 
 ## Download the Windows Installer (MSI)
 
@@ -337,6 +337,27 @@ On Windows, `edit-config` opens files with the `nano` editor.
 ## Uninstalling Netdata on Windows
 
 The MSI uninstall removes the Netdata binaries and the Windows service, but it does **not** remove your metric database, cache, or edited configuration files. To uninstall the Agent and completely delete the data it leaves behind, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
+
+## Troubleshooting installation failures
+
+If installation fails, rerun the MSI from an Administrator command prompt with verbose logging enabled:
+
+```cmd
+msiexec /i "netdata-x64.msi" /l*v "C:\Path\To\install_log.txt"
+```
+
+- Replace `C:\Path\To\install_log.txt` with a file in an existing directory you can write to. `msiexec` does not create missing directories.
+- Use the full path to the downloaded MSI if it is not in the current directory. Keep the quotes, because the path may contain spaces.
+- The command opens the installation wizard and writes diagnostic details to the log file, even when the installation fails.
+- If you install silently, add the same `/l*v` option to your existing command:
+
+  ```cmd
+  msiexec /qn /i "netdata-x64.msi" TOKEN="<YOUR_TOKEN>" /l*v "C:\Path\To\install_log.txt"
+  ```
+
+To find the failure, open the log and search for `Return value 3`. The lines just above it show the step that failed and the error message.
+
+Before sharing the log with support, review it. The installer masks the claim token and proxy values, but the log still contains your computer name, user name, Room IDs, the Cloud URL, and file paths.
 
 ## Related Windows documentation
 

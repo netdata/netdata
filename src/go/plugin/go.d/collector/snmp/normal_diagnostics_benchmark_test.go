@@ -3,6 +3,7 @@
 package snmp
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -30,8 +31,30 @@ func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 	if h.fail {
 		return nil, errors.New("benchmark timeout")
 	}
-	packet := &gosnmp.SnmpPacket{Variables: make([]gosnmp.SnmpPDU, len(oids))}
+	packet := &gosnmp.SnmpPacket{
+		Variables: make([]gosnmp.SnmpPDU, len(oids)),
+	}
 	for i, oid := range oids {
+		switch oid {
+		case snmputils.OidSysObject:
+			packet.Variables[i] = gosnmp.SnmpPDU{
+				Name:  oid,
+				Type:  gosnmp.ObjectIdentifier,
+				Value: "1.3.6.1.4.1.99999.1",
+			}
+			continue
+		case snmputils.OidSysName, snmputils.OidSysDescr, snmputils.OidSysContact, snmputils.OidSysLocation:
+			value := ""
+			if oid == snmputils.OidSysName {
+				value = "benchmark"
+			}
+			packet.Variables[i] = gosnmp.SnmpPDU{
+				Name:  oid,
+				Type:  gosnmp.OctetString,
+				Value: []byte(value),
+			}
+			continue
+		}
 		value := 7
 		if oid == normalTestRoot+".3.0" {
 			value = 0
@@ -42,14 +65,22 @@ func (h *normalBenchmarkHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) 
 		if oid == normalTestRoot+".5.0" {
 			value = 6
 		}
-		packet.Variables[i] = gosnmp.SnmpPDU{Name: oid, Type: gosnmp.Integer, Value: value}
+		packet.Variables[i] = gosnmp.SnmpPDU{
+			Name:  oid,
+			Type:  gosnmp.Integer,
+			Value: value,
+		}
 	}
 	return packet, nil
 }
 func (h *normalBenchmarkHandler) BulkWalkAll(root string) ([]gosnmp.SnmpPDU, error) {
 	values := make([]gosnmp.SnmpPDU, h.rows)
 	for i := range values {
-		values[i] = gosnmp.SnmpPDU{Name: root + ".1." + strconv.Itoa(i+1), Type: gosnmp.Counter64, Value: uint64(7)}
+		values[i] = gosnmp.SnmpPDU{
+			Name:  root + ".1." + strconv.Itoa(i+1),
+			Type:  gosnmp.Counter64,
+			Value: uint64(7),
+		}
 	}
 	return values, nil
 }
@@ -110,21 +141,50 @@ func newNormalBenchmarkCollector(tables, rows int, record bool) *Collector {
 	for i := range tables {
 		root := fmt.Sprintf("1.3.6.1.4.1.99999.200.%d", i+1)
 		profile.Definition.Metrics = append(profile.Definition.Metrics, ddprofiledefinition.MetricsConfig{
-			Table:      ddprofiledefinition.SymbolConfig{OID: root, Name: fmt.Sprintf("table%d", i)},
+			Table: ddprofiledefinition.SymbolConfig{
+				OID:  root,
+				Name: fmt.Sprintf("table%d", i),
+			},
 			Symbols:    []ddprofiledefinition.SymbolConfig{{OID: root + ".1", Name: fmt.Sprintf("metric%d", i)}},
 			MetricTags: []ddprofiledefinition.MetricTagConfig{{Tag: "index", Index: 1}},
 		})
 	}
 	c := New(ddsnmp.NewDeviceStore())
 	c.Config = prepareV2Config()
-	c.sysInfo = &snmputils.SysInfo{Name: "benchmark"}
-	c.snmpClient = &normalBenchmarkHandler{rows: rows}
-	cfg := ddsnmpcollector.Config{SnmpClient: c.snmpClient, Profiles: []*ddsnmp.Profile{profile}, Log: c.Logger}
+	c.sysInfo = &snmputils.SysInfo{
+		SysObjectID: "1.3.6.1.4.1.99999.1",
+		Name:        "benchmark",
+	}
+	c.snmpClient = &normalBenchmarkHandler{
+		rows: rows,
+	}
+	cfg := ddsnmpcollector.Config{
+		SnmpClient: c.snmpClient,
+		Profiles:   []*ddsnmp.Profile{profile},
+		Log:        c.Logger,
+	}
 	if record {
 		cfg.AcquisitionObserver = ddsnmpcollector.AcquisitionObserverFunc(c.observeNormalProfile)
 	}
 	c.ddSnmpColl = ddsnmpcollector.New(cfg)
 	return c
+}
+
+// Include the production lifecycle and the not-yet-due metadata check. The
+// initial poll settles discovery before measuring repeated warm collections.
+func BenchmarkNormalRuntimeCollection(b *testing.B) {
+	c := newNormalBenchmarkCollector(1, 32, true)
+	c.initialized = true
+	if len(c.Collect(context.Background())) == 0 {
+		b.Fatal("missing initial samples")
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		if len(c.Collect(context.Background())) == 0 {
+			b.Fatal("missing samples")
+		}
+	}
 }
 
 // Cold costs include constructing a device and its profile fixture in both modes.
@@ -183,7 +243,12 @@ func BenchmarkNormalCaptureAndEncode(b *testing.B) {
 						b.Fatal(err)
 					}
 					if encode {
-						if err := diagnostics.Write(io.Discard, diagnostics.Document{Format: diagnostics.Format, Version: diagnostics.Version, Kind: diagnostics.KindNormal, Normal: device}); err != nil {
+						if err := diagnostics.Write(io.Discard, diagnostics.Document{
+							Format:  diagnostics.Format,
+							Version: diagnostics.Version,
+							Kind:    diagnostics.KindNormal,
+							Normal:  device,
+						}); err != nil {
 							b.Fatal(err)
 						}
 					}

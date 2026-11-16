@@ -33,6 +33,7 @@ type ModeServiceAccountFileConfig struct {
 }
 
 type runtime struct {
+	readFile       func(context.Context, string) ([]byte, error)
 	apiClient      *http.Client
 	metadataClient *http.Client
 }

@@ -5,8 +5,9 @@ description: Author, adapt, modify, or review Netdata health alerts and alert te
 
 # Author Netdata Health Alerts
 
-Use this skill before changing a health-alert definition. Alerts are production policy: a syntactically valid expression
-can still page incorrectly, manufacture a recovery, duplicate an incident owner, or make a disappearing entity look healthy.
+Use this skill when changing or reviewing a health-alert definition. Alerts are production policy: a syntactically valid
+expression can still page incorrectly, manufacture a recovery, duplicate an incident owner, or make a disappearing entity
+look healthy.
 
 The normal goal when translating an alert from another system is **Netdata-adapted operational equivalence**, not
 execution-engine emulation. Preserve the operator-visible incident as closely as Netdata can express it through NIDL
@@ -15,18 +16,20 @@ engine as explicit design facts to document and test, not as defects by default.
 
 ## Read The Right Sources
 
-1. Read `AGENTS.md`, the active SOW, the target alert file, and its collector/profile source.
-2. Read `docs/NIDL-Framework.md`, `src/health/REFERENCE.md`, `src/health/README.md`, and
-   `src/health/alert-configuration-ordering.md`.
-3. Read the existing alert owner and search for duplicate names, contexts, metric prefixes, and equivalent generic alerts.
-4. When lifecycle, missing-data, expression, or lookup semantics matter, confirm them in current runtime source:
-   - `src/health/health_event_loop.c`
-   - `src/health/health_variable.c`
-   - `src/web/api/queries/query-execute.c`
-   - the selected grouping implementation below `src/web/api/queries/`
-   - `src/libnetdata/eval/eval-evaluate.c`
-5. When the source is a go.d collector or Prometheus profile, also load the matching collector/profile skill and its required
-   references. Do not treat this skill as a replacement for collector or profile authoring guidance.
+Read the target alert, its collector/profile signal contract, and the existing incident owner. Search for duplicate
+names, contexts and equivalent generic alerts. Select the affected references:
+
+| Question | Sources |
+|---|---|
+| Identity, scope, variables and expression syntax | `docs/NIDL-Framework.md`, `src/health/REFERENCE.md`; current variable/evaluator code when affected |
+| Template/alarm ownership or overrides | `src/health/alert-configuration-ordering.md` and existing named/generic rules |
+| Lifecycle, gaps or timing | `src/health/README.md`, relevant lookup/delay sections of `src/health/REFERENCE.md`, and runtime owners below |
+| Runtime semantics changed or uncertain | `health_event_loop.c`, `health_variable.c` under `src/health/`; `src/web/api/queries/query-execute.c`, selected grouping implementation and `src/libnetdata/eval/eval-evaluate.c` as applicable |
+| Collector/profile signal or identity changes | Matching collector/profile skill and its affected references; this skill does not replace them |
+
+For review, use the contract and completion sections as questions against the complete assigned change and existing
+design/test evidence. Read an active SOW when available; do not create one or demand a new authoring note merely to
+review. Missing evidence matters when it leaves an affected contract unproven. Implementation follows the root SOW gate.
 
 Never query or reconfigure a live Agent merely to validate an alert unless the user has explicitly authorized that access.
 
@@ -64,6 +67,10 @@ Write down the following in the active SOW before changing a non-trivial alert:
   a lookup window an implementation of another engine's `for:` state machine.
 - **Validation:** List the boundary, transition, missing-data, recovery, and duplicate-ownership tests that prove the
   contract.
+- **Policy change disclosure:** for a change to a shipped alert's lookup, window, threshold or recovery, you MUST show
+  the old and the new outcome on one short source trace that includes an active event followed by quiet samples, and
+  state what clears the alert and whether it can clear while the underlying cumulative value stays nonzero. A lookup
+  name and window do not disclose that trade-off; the user-owned decision is not informed without it.
 
 Pause for a user decision when the change creates a public alert contract, changes default notification policy, changes
 the owner of an incident, needs shared health/query framework work, or cannot preserve the approved operator-visible
@@ -87,7 +94,9 @@ template: example_ratio
 
 Runtime facts:
 
-- Matching is by dimension ID or name in the alert's own chart.
+- Matching is by dimension ID or name in the alert's own chart. go.d sends each dimension's name as its ID
+  (`jobruntime/job_v1_render.go`, `chartemit/apply.go`), so a go.d collector's internal metric key never resolves;
+  use the dimension name the chart and `metadata.yaml` show (`${failed volumes}` when it contains a space).
 - The default dimension value is `collector.last_stored_value`: the latest database-stored value after interpolation, not
   a database-window aggregate and not necessarily the raw last collector sample.
 - A missing dimension makes the expression fail with an unknown variable and the alert value become `NaN`.
@@ -96,6 +105,16 @@ Runtime facts:
 
 Use `$dimension_raw` only when the contract specifically needs the last collected value before interpolation/storage
 presentation, and `$dimension_last_collected_t` only when it needs that dimension's collection timestamp.
+
+Do not treat equal dimension timestamps as a collection identifier: PLUGINSD `SET` calls timestamp dimensions
+independently. `pluginsd_set` calls `rrddim_set_by_pointer` (or its double variant), which stamps a `timeval` with
+microsecond precision; health's `variable_lookup_in_chart` exposes only its `tv_sec` field. One complete collection
+can cross a second boundary. Conversely, an omitted dimension retains its previous raw value, so freshness and
+arithmetic coherence alone can miss a partial collection. When using raw values, also test stored-input gaps:
+`rrdset_done_interpolate` sets the normal dimension value to NaN when an omitted dimension reaches a storage beat.
+Validate omission after a valid zero, as well as a never-present dimension. These checks provide native freshness
+and gap eligibility; they do not prove atomic transaction membership, particularly when collections occur faster
+than the storage cadence.
 
 ### Pattern 2 — dimensions from another chart or context
 
@@ -218,14 +237,23 @@ collection-failure alert or replace a known-obsolete chart's `REMOVED` lifecycle
 ### Current State
 
 Use `calc` when the source's current value is the full condition. Test start-up, missing input, normal recovery, and chart
-obsoletion separately. `delay:` controls Netdata alert transition/notification hysteresis; it is not a general substitute
+obsoletion separately. `delay:` controls notification hysteresis, not the evaluated alert state; it is not a substitute
 for a Prometheus `for:` duration.
+
+### Event Counts
+
+A `sum` lookup adds the stored points of its window. Incremental dimensions are stored as per-second rates
+(`new_value /= st->update_every` in `src/database/rrdset-collection.c`), so a `sum` over a counter is the event count
+divided by the chart's update interval. When the alert value or its notification must be a count, read a gauge of the
+events since the previous sample, or multiply by `$update_every`. Either sum stays approximate: a missed update
+interpolates the stored points (`rrdset_done_interpolate`), which can add a fraction, so compare it with zero rather
+than with an exact count.
 
 ## Control Flapping With Three Combinable Layers
 
-Stability is a signal-shaping problem, a threshold-boundary problem, and a transition-confirmation problem. Address them
-deliberately in that order. Do not label every anti-flapping technique “hysteresis”: only `delay:` postpones an alert
-transition.
+Stability involves signal smoothing, threshold hysteresis and notification delay. Address them in that order.
+State-dependent thresholds are hysteresis; `delay:` postpones notification execution while the evaluated alert state
+changes immediately. See `src/health/REFERENCE.md#alert-line-delay` and its conditional-operator hysteresis section.
 
 ### Layer 1 — stabilize the queried value
 
@@ -249,18 +277,18 @@ For policy thresholds whose signal may hover near the boundary, use a state-depe
 
 ```text
 warn: $this > (($status >= $WARNING) ? (90) : (100))
-crit: $this > (($status == $CRITICAL) ? (95) : (99))
+crit: $this > (($status == $CRITICAL) ? (105) : (110))
 ```
 
 This changes one threshold into two thresholds:
 
 - clear-to-warning raises above 100;
-- active-warning clears below 90;
+- the warning predicate becomes false at or below 90 (CLEAR when the critical predicate is also false);
 - critical can independently use another raise/clear pair.
 
 Important semantics:
 
-- This is **not hysteresis** and does not delay any transition.
+- This is threshold hysteresis, without a time delay.
 - The alert continues evaluating at its normal `every:` cadence.
 - It only changes the boundary used by the current status, so a genuine crossing of the recovery threshold acts
   immediately.
@@ -269,22 +297,24 @@ Important semantics:
 Prefer this when independent raise/clear boundaries are meaningful and the signal is expected to linger near one boundary.
 Do not use it to redefine a categorical exact condition into a policy band.
 
-### Layer 3 — confirm transitions with true hysteresis
+### Layer 3 — delay transition notifications
 
-Use `delay:` only when a transition must remain selected for a duration before Netdata executes the transition
-notification:
+Use `delay:` when notification execution should wait after a state change:
 
 ```text
 delay: down 5m multiplier 1.5 max 1h
 ```
 
-- `up` delays a state escalation; `down` delays a recovery/de-escalation.
+- `up` is selected when the new numeric status is greater than the old; `down` otherwise.
+  This includes `UNDEFINED (-1)` → `CLEAR (1)` using `up`, not just warning/critical escalation.
+  Owners: `src/health/health_event_loop.c` (delay selection), `src/health/rrdcalc.h` (status values).
 - `multiplier` grows the delay when the state changes during the delay.
 - `max` caps the accumulated delay.
 
 This is the only layer that postpones an alert transition notification. It can suppress rapid clear/reactivate
-notification cycles, but it can also postpone a real transition. Use it sparingly and record the expected transition
-delay in the alert contract.
+notification cycles, but it can also postpone notice of a real incident. Use it sparingly and record the expected
+notification delay in the alert contract. The status still changes on the evaluation beat: `health_event_loop.c`
+updates it immediately, while `health_notifications.c` checks the notification due time.
 
 ### Selection procedure
 
@@ -348,9 +378,23 @@ from the look of an expression alone.
 Run the smallest relevant tests first, then the full affected suite. A complete alert change normally needs all applicable
 items below:
 
-1. Run `/usr/sbin/netdata -W healthconfigtest` for the built-in health parser and lookup suite.
-2. Add or update a focused test that reads the shipped alert template and asserts its context, labels, lookup, units,
-   cadence, expressions, routing, source ownership, and declared fidelity—not merely a copied expected string.
+1. Run the rebuilt binary's built-in health parser and lookup suite with private state:
+
+   Set `AGENT_BIN` to the rebuilt executable and `CASE_DIR` to an owned scratch directory containing `netdata.conf`.
+
+   ```sh
+   NETDATA_RUN_DIR="$CASE_DIR/run" TMPDIR="$CASE_DIR/tmp" \
+       "$AGENT_BIN" -c "$CASE_DIR/netdata.conf" -W healthconfigtest
+   ```
+
+   Pre-create private run/temp directories and configure private cache, lib, log and registry paths, including DynCfg's
+   `lib/config`. `-c` MUST precede `-W`: `main` in `src/daemon/main.c` returns during option parsing for this selector.
+   The tests can create GUID/lock and DynCfg files, so MUST NOT use production state directories.
+2. Verify the shipped alert against an independent oracle: exercise the signal's behavior, or compare independently
+   owned artifacts with the `collecttest` health checks named in
+   `.agents/skills/collectors-go-framework-v2/chart-template.md#tests`. A test MUST NOT copy the definition's lookup,
+   cadence, thresholds, expressions or recipients into expected literals; that restates the file and pins whatever it
+   said, right or wrong.
 3. Test the signal's lifecycle through the real query/health runtime where practical. If a lower-level deterministic model
    is necessary, derive it directly from runtime timestamps and numeric-point selection; do not pass an arbitrary
    `windowComplete` flag or label skipped NULLs as continuous evaluation. Cover startup, active transition, normal zero
@@ -361,7 +405,17 @@ items below:
 5. Run collector/profile validation when the alert depends on a collector or profile change. Include source absence and
    collision-bearing labels where relevant.
 6. Search for same-incident alerts, duplicate contexts, old names, fallback overlap, and generated artifacts. Record the
-   result in the SOW.
+   result in the SOW. The integration pages list the alert automatically when its `on:` context is one the collector's
+   `metadata.yaml` declares and its `_os` and plugin/module filters admit the collector, unless the integration lists
+   it in `excluded_alerts` (`.agents/skills/collectors-metadata-yaml/alerts-and-meta.md`, section 1);
+   `integrations/tests/test_health_alerts.py` fails on an alert no integration owns. For an alert whose target an
+   integration documents in `metrics.scopes` (contexts created from profiles are not checked), it also fails on a
+   `calc`, `warn` or `crit` variable that is not a documented dimension name (a `_raw` or `_last_collected_t` suffix is
+   allowed), an alert name, a chart or host variable listed in `CHART_VARIABLES` or `HOST_VARIABLES`
+   (`integrations/health_alerts.py`; add a new one there with the file that defines it), or a `context.dimension`
+   reference; such a reference is checked only when its context is documented, and health built-ins and the rule's own
+   `green`/`red` are exempt. Read dimensions by name: a C dimension ID that differs from its name resolves at runtime
+   but fails the check.
 7. For an externally sourced alert pack, commit a source-pinned mapping that records the original condition, scope,
    severity, persistence intent, supported releases, Netdata owner, adaptation, and known differences. Tests MUST consume
    that mapping rather than restating the intended result independently.
@@ -385,6 +439,10 @@ Before requesting review, confirm all of the following:
 - Its timing is the closest safe Netdata adaptation, with startup/gap/stale differences disclosed; `delay:` is not
   standing in for another engine's persistence state machine.
 - Notification defaults follow the approved product policy.
+- It sets `class`, `type` and `component` by the definitions and component rules in `src/health/REFERENCE.md`
+  ("Alert Line `class`", "`type`", "`component`"); `integrations/tests/test_health_alerts.py` enforces the vocabulary.
+  A new class or type value is a user-visible contract change: it needs user approval and changes the REFERENCE.md table
+  and `integrations/health_alerts.py` together.
 - No shared health/query behavior was added or assumed without the required separate scope approval.
 
 ## Authoritative References

@@ -1,32 +1,34 @@
-//! Time units for journal timestamps.
-//!
-//! Provides type-safe wrappers for seconds and microseconds to prevent unit confusion.
+//! Type-safe time units for the journal stack: the `Seconds`/`Microseconds`
+//! newtypes, imported via the flat crate-root re-export ([`crate::Seconds`],
+//! [`crate::Microseconds`]), not this path.
 
 use serde::{Deserialize, Serialize};
-use std::cell::Cell;
 use std::ops::{Add, Rem, Sub};
 
-/// Timestamp in seconds since Unix epoch.
-///
-/// Used for histogram buckets, time ranges, and coarse-grained time operations.
+/// A count of seconds (`u32`): epoch seconds for timestamps (registry time
+/// ranges, index `indexed_at`), plain seconds for durations (histogram
+/// bucket widths). The tuple field is public; the stack reads `.0` directly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Seconds(pub u32);
 
-/// Timestamp in microseconds since Unix epoch.
-///
-/// Used for journal entry timestamps and fine-grained time operations.
+/// A count of microseconds (`u64`): epoch microseconds for journal entry
+/// timestamps and histogram timestamp pairs. The tuple field is public;
+/// `u64` spans ~584k years, so there is no practical wrap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "allocative", derive(allocative::Allocative))]
 pub struct Microseconds(pub u64);
 
 impl Seconds {
-    /// Create a timestamp from seconds.
+    /// Wraps a raw seconds count.
     pub fn new(seconds: u32) -> Self {
         Self(seconds)
     }
 
-    /// Get the current time as seconds since Unix epoch.
+    /// Current wall-clock time as epoch seconds.
+    ///
+    /// Panics if the system clock is before the Unix epoch; past `u32`
+    /// capacity (year 2106) the `u64`-to-`u32` cast keeps only the low bits.
     pub fn now() -> Self {
         Self(
             std::time::SystemTime::now()
@@ -41,17 +43,17 @@ impl Seconds {
         self.0
     }
 
-    /// Convert to microseconds.
+    /// Converts to microseconds (exact).
     pub fn to_microseconds(self) -> Microseconds {
         Microseconds(self.0 as u64 * 1_000_000)
     }
 
-    /// Add two durations with saturation at the numeric bounds.
+    /// Adds `other`, saturating at `u32::MAX`.
     pub fn saturating_add(self, other: Self) -> Self {
         Seconds(self.0.saturating_add(other.0))
     }
 
-    /// Subtract two durations with saturation at the numeric bounds.
+    /// Subtracts `other`, saturating at 0.
     pub fn saturating_sub(self, other: Self) -> Self {
         Seconds(self.0.saturating_sub(other.0))
     }
@@ -66,21 +68,30 @@ impl Seconds {
         self.0.checked_sub(other.0).map(Seconds)
     }
 
-    /// Returns true if this duration is a multiple of the other duration.
+    /// Returns `true` if `self` is an integer multiple of `other`.
     ///
-    /// Useful for checking if bucket durations align.
+    /// A zero divisor yields `false` rather than panicking (unlike
+    /// `journal_common::compat::is_multiple_of`, which panics); zero is a
+    /// multiple of every non-zero divisor. Used for bucket-duration
+    /// compatibility in `journal-engine/src/indexing.rs`
+    /// (`batch_compute_file_indexes`); journal-index instead checks histogram
+    /// alignment through the compat function on raw integers
+    /// (`journal-index/src/histogram.rs`
+    /// `Histogram::count_entries_in_time_range`).
     pub fn is_multiple_of(self, other: Self) -> bool {
         other.0 != 0 && self.0 % other.0 == 0
     }
 }
 
 impl Microseconds {
-    /// Create a timestamp from microseconds.
+    /// Wraps a raw microsecond count.
     pub fn new(microseconds: u64) -> Self {
         Self(microseconds)
     }
 
-    /// Get the current time as microseconds since Unix epoch.
+    /// Current wall-clock time as epoch microseconds.
+    ///
+    /// Panics if the system clock is before the Unix epoch.
     pub fn now() -> Self {
         Self(
             std::time::SystemTime::now()
@@ -95,17 +106,18 @@ impl Microseconds {
         self.0
     }
 
-    /// Convert to seconds (truncates).
+    /// Convert to seconds (truncates). Past `u32` capacity (year 2106) the
+    /// `u64`-to-`u32` cast keeps only the low bits.
     pub fn to_seconds(self) -> Seconds {
         Seconds((self.0 / 1_000_000) as u32)
     }
 
-    /// Add two durations with saturation at the numeric bounds.
+    /// Adds `other`, saturating at `u64::MAX`.
     pub fn saturating_add(self, other: Self) -> Self {
         Microseconds(self.0.saturating_add(other.0))
     }
 
-    /// Subtract two durations with saturation at the numeric bounds.
+    /// Subtracts `other`, saturating at 0.
     pub fn saturating_sub(self, other: Self) -> Self {
         Microseconds(self.0.saturating_sub(other.0))
     }
@@ -120,9 +132,10 @@ impl Microseconds {
         self.0.checked_sub(other.0).map(Microseconds)
     }
 
-    /// Returns true if this duration is a multiple of the other duration.
+    /// Returns `true` if `self` is an integer multiple of `other`.
     ///
-    /// Useful for checking if bucket durations align.
+    /// Same semantics as [`Seconds::is_multiple_of`]: a zero divisor yields
+    /// `false`; zero is a multiple of every non-zero divisor.
     pub fn is_multiple_of(self, other: Self) -> bool {
         other.0 != 0 && self.0 % other.0 == 0
     }
@@ -146,7 +159,11 @@ impl From<u64> for Microseconds {
     }
 }
 
-// Arithmetic operators for Seconds
+// The `Add`/`Sub`/`Rem` impls below (both types) are plain integer
+// arithmetic: `Add`/`Sub` panic on overflow/underflow when debug assertions
+// are on (dev/test builds) and wrap silently in release; `%` by zero panics
+// in every profile. Use the saturating_*/checked_* methods above when that is
+// unacceptable.
 impl Add for Seconds {
     type Output = Self;
 
@@ -171,7 +188,6 @@ impl Rem for Seconds {
     }
 }
 
-// Arithmetic operators for Microseconds
 impl Add for Microseconds {
     type Output = Self;
 
@@ -208,95 +224,6 @@ impl std::fmt::Display for Microseconds {
     }
 }
 
-/// A monotonic realtime clock that ensures timestamps always move forward.
-///
-/// Wraps `SystemTime` but guarantees each `now()` call returns a timestamp
-/// strictly greater than all previous calls, even if the system clock jumps
-/// backwards. When the clock goes backwards, it increments from the last seen
-/// timestamp by one microsecond.
-#[derive(Debug)]
-pub struct RealtimeClock {
-    max_seen: Cell<u64>,
-}
-
-impl RealtimeClock {
-    /// Create a new realtime clock initialized with the current system time.
-    pub fn new() -> Self {
-        Self::with_initial(Microseconds::now())
-    }
-
-    /// Create a realtime clock initialized with a specific timestamp.
-    ///
-    /// Useful for resuming from a persisted state (e.g., last journal entry).
-    pub fn with_initial(initial: Microseconds) -> Self {
-        Self {
-            max_seen: Cell::new(initial.get()),
-        }
-    }
-
-    /// Get the current monotonic timestamp in microseconds since Unix epoch.
-    ///
-    /// Returns system time if it moved forward, otherwise returns last seen + 1µs.
-    pub fn now(&self) -> Microseconds {
-        let current = Microseconds::now();
-        let max = self.max_seen.get();
-
-        let next = if current.get() > max {
-            current.get()
-        } else {
-            max.saturating_add(1)
-        };
-
-        self.max_seen.set(next);
-        Microseconds::new(next)
-    }
-
-    /// Observe an external timestamp and return a monotonic realtime value.
-    ///
-    /// If the provided value is not strictly greater than the last seen timestamp,
-    /// returns `last_seen + 1us` to preserve strict monotonicity.
-    pub fn observe(&self, candidate: Microseconds) -> Microseconds {
-        let max = self.max_seen.get();
-        let next = if candidate.get() > max {
-            candidate.get()
-        } else {
-            max.saturating_add(1)
-        };
-
-        self.max_seen.set(next);
-        Microseconds::new(next)
-    }
-
-    /// Get the last seen timestamp without advancing the clock.
-    pub fn last_seen(&self) -> Microseconds {
-        Microseconds::new(self.max_seen.get())
-    }
-}
-
-impl Default for RealtimeClock {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-/// Gets the current monotonic timestamp in microseconds since boot.
-///
-/// Uses CLOCK_MONOTONIC which provides a monotonically increasing timestamp
-/// that is not affected by system clock adjustments but does not count time
-/// when the system is suspended.
-///
-/// This matches systemd's behavior for journal entry monotonic timestamps.
-pub fn monotonic_now() -> std::io::Result<Microseconds> {
-    use nix::sys::time::TimeValLike;
-    use nix::time::ClockId;
-
-    let ts = ClockId::CLOCK_MONOTONIC
-        .now()
-        .map_err(|e| std::io::Error::from_raw_os_error(e as i32))?;
-
-    Ok(Microseconds::new(ts.num_microseconds() as u64))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -331,7 +258,6 @@ mod tests {
         assert_eq!(us.get(), 42000);
     }
 
-    // Arithmetic operator tests for Seconds
     #[test]
     fn test_seconds_add() {
         let a = Seconds::new(10);
@@ -351,7 +277,7 @@ mod tests {
     fn test_seconds_sub_underflow() {
         let a = Seconds::new(10);
         let b = Seconds::new(20);
-        let _ = a - b; // Should panic
+        let _ = a - b;
     }
 
     #[test]
@@ -413,10 +339,9 @@ mod tests {
 
         let g = Seconds::new(10);
         let h = Seconds::new(0);
-        assert!(!g.is_multiple_of(h)); // Division by zero case
+        assert!(!g.is_multiple_of(h)); // zero divisor returns false, no panic
     }
 
-    // Arithmetic operator tests for Microseconds
     #[test]
     fn test_microseconds_add() {
         let a = Microseconds::new(1000);
@@ -436,7 +361,7 @@ mod tests {
     fn test_microseconds_sub_underflow() {
         let a = Microseconds::new(1000);
         let b = Microseconds::new(2000);
-        let _ = a - b; // Should panic
+        let _ = a - b;
     }
 
     #[test]
@@ -498,79 +423,6 @@ mod tests {
 
         let g = Microseconds::new(10000);
         let h = Microseconds::new(0);
-        assert!(!g.is_multiple_of(h)); // Division by zero case
-    }
-
-    // RealtimeClock tests
-    #[test]
-    fn test_realtime_clock_monotonic() {
-        let clock = RealtimeClock::new();
-        let t1 = clock.now();
-        let t2 = clock.now();
-        let t3 = clock.now();
-
-        assert!(t2 > t1);
-        assert!(t3 > t2);
-    }
-
-    #[test]
-    fn test_realtime_clock_with_initial() {
-        let initial = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(initial);
-
-        assert_eq!(clock.last_seen(), initial);
-
-        let t1 = clock.now();
-        assert!(t1 >= initial);
-    }
-
-    #[test]
-    fn test_realtime_clock_handles_same_time() {
-        // Start with a specific timestamp
-        let initial = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(initial);
-
-        // Even if system time doesn't advance, clock should increment
-        let t1 = clock.now();
-        let t2 = clock.now();
-
-        assert!(t2 > t1);
-        assert_eq!(t2.get() - t1.get(), 1); // Should increment by 1 microsecond
-    }
-
-    #[test]
-    fn test_realtime_clock_last_seen() {
-        let clock = RealtimeClock::new();
-
-        let t1 = clock.now();
-        assert_eq!(clock.last_seen(), t1);
-
-        let t2 = clock.now();
-        assert_eq!(clock.last_seen(), t2);
-    }
-
-    #[test]
-    fn test_realtime_clock_forward_jump() {
-        // Start with a timestamp in the past
-        let past = Microseconds::new(1000000);
-        let clock = RealtimeClock::with_initial(past);
-
-        // When system time is ahead, it should use system time
-        let t1 = clock.now();
-        assert!(t1.get() > past.get());
-    }
-
-    #[test]
-    fn test_realtime_clock_observe_preserves_monotonicity() {
-        let clock = RealtimeClock::with_initial(Microseconds::new(1_000_000));
-
-        let t1 = clock.observe(Microseconds::new(900_000));
-        assert_eq!(t1.get(), 1_000_001);
-
-        let t2 = clock.observe(Microseconds::new(1_000_001));
-        assert_eq!(t2.get(), 1_000_002);
-
-        let t3 = clock.observe(Microseconds::new(1_500_000));
-        assert_eq!(t3.get(), 1_500_000);
+        assert!(!g.is_multiple_of(h)); // zero divisor returns false, no panic
     }
 }

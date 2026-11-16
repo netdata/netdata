@@ -85,76 +85,76 @@ There are eight sections in the file which you can configure:
 
 
 
-| Option | Description | Default | Required |
-|:-----|:------------|:--------|:---------:|
-| enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). | yes | no |
-| system swap | Enable or disable monitoring of system swap metrics (free, used). | yes | no |
-| bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). | yes | no |
-| ipv4 TCP packets | Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent). | yes | no |
-| ipv4 TCP errors | Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments). | yes | no |
-| ipv4 TCP handshake issues | Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails). | yes | no |
-| ECN packets | Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts). | auto | no |
-| TCP SYN cookies | Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed). | auto | no |
-| TCP out-of-order queue | Enable or disable monitoring of TCP out-of-order queue metrics (inqueue). | auto | no |
-| TCP connection aborts | Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout). | auto | no |
-| ipv4 UDP packets | Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.). | yes | no |
-| ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). | yes | no |
-| ipv4 icmp packets | Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error). | yes | no |
-| ipv4 icmp messages | Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum). | yes | no |
-| ipv4 packets | Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered). | yes | no |
-| ipv4 fragments sent | Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates). | yes | no |
-| ipv4 fragments assembly | Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all). | yes | no |
-| ipv4 errors | Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes). | yes | no |
-| ipv6 packets | Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered). | auto | no |
-| ipv6 fragments sent | Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all). | auto | no |
-| ipv6 fragments assembly | Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all). | auto | no |
-| ipv6 errors | Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes). | auto | no |
-| icmp | Enable or disable monitoring of ICMP metrics (sent, received). | auto | no |
-| icmp redirects | Enable or disable monitoring of ICMP redirects metrics (received, sent). | auto | no |
-| icmp errors | Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.). | auto | no |
-| icmp echos | Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply). | auto | no |
-| icmp router | Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements). | auto | no |
-| icmp neighbor | Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements). | auto | no |
-| icmp types | Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145). | auto | no |
-| space usage for all disks | Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root). | yes | no |
-| inodes usage for all disks | Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root). | yes | no |
-| bandwidth | Enable or disable monitoring of bandwidth metrics (received, sent). | yes | no |
-| system uptime | Enable or disable monitoring of system uptime metrics (uptime). | yes | no |
-| cpu utilization | Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel). | yes | no |
-| system ram | Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free). | yes | no |
-| swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | no |
-| memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
-| disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
-| battery capacity | Enable or disable monitoring of battery capacity metrics. | yes | no |
-| power supply voltage | Enable or disable monitoring of battery and UPS voltage metrics. | yes | no |
-| power supply current | Enable or disable monitoring of battery and UPS current metrics. | yes | no |
-| battery temperature | Enable or disable monitoring of battery temperature metrics when exposed by macOS. | yes | no |
-| battery cycle count | Enable or disable monitoring of battery cycle count metrics when exposed by macOS. | yes | no |
-| enabled | Enable or disable Apple Silicon GPU monitoring through IOReport. The module creates charts only when macOS exposes the required IOReport GPU channels. | yes | no |
-| SMC temperature sample every | How often to read AppleSMC GPU temperature keys when IOHID GPU temperature is unavailable and AppleSMC is used as the fallback source. | 10s | no |
-| enabled | Enable or disable direct AppleSMC and IOHID hardware sensor monitoring. | yes | no |
-| SMC sensors | Enable or disable direct AppleSMC hardware temperature, fan, voltage, current, and power sensor monitoring. | yes | no |
-| IOHID sensors | Enable or disable direct IOHID temperature, current, and voltage sensor monitoring. | yes | no |
-| per sensor temperature charts | Chart every temperature sensor individually, in addition to the per-subsystem summary charts and the temperature histogram. | no | no |
-| per sensor fan charts | Chart every fan sensor individually. | yes | no |
-| per sensor voltage charts | Chart every voltage sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
-| per sensor current charts | Chart every current sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
-| per sensor power charts | Chart every power sensor individually, in addition to the per-subsystem power summary charts. | no | no |
-| discovery every | How often to rescan AppleSMC for available hardware sensor keys. | 300s | no |
-| SMC sample every | How often to read values from discovered AppleSMC hardware sensor keys. | 10s | no |
-| sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 1s | no |
-| sample window | One-shot sampling window used while probing which `powermetrics` sampler set is available. | 1000ms | no |
-| command timeout | Maximum extra time to wait for one `powermetrics` probe or loop sample before restarting the sampler. | 5000ms | no |
-| use ndsudo | Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper. | yes | no |
-| command path | Path to the native Apple `powermetrics` command when `use ndsudo` is disabled. | /usr/bin/powermetrics | no |
-| thermal pressure | Enable or disable monitoring of macOS thermal pressure state. | yes | no |
-| SMC fan speed | Enable or disable monitoring of SMC fan speed when available. | yes | no |
-| SMC temperatures | Enable or disable monitoring of SMC CPU and GPU die temperatures when available. | yes | no |
-| SMC thermal levels | Enable or disable monitoring of SMC thermal levels when available. | yes | no |
-| SMC prochot | Enable or disable monitoring of SMC processor-hot assertion flags when available. | yes | no |
-| GPU power | Enable or disable fallback GPU power monitoring from `powermetrics` when IOReport GPU power is unavailable and the `gpu_power` sampler exposes a value. | yes | no |
-| sample every | How often to read native NVMe SMART data through IOKit. | 10s | no |
-| discovery every | How often to rescan IORegistry for NVMe SMART-capable services. | 300s | no |
+| Group | Option | Description | Default | Required |
+|:------|:-----|:------------|:--------|:---------:|
+| **plugin:macos:sysctl** | enable load average | Enable or disable monitoring of load average metrics (load1, load5, load15). | yes | no |
+|  | system swap | Enable or disable monitoring of system swap metrics (free, used). | yes | no |
+|  | bandwidth | Enable or disable monitoring of network bandwidth metrics (received, sent). | yes | no |
+|  | ipv4 TCP packets | Enable or disable monitoring of IPv4 TCP total packets metrics (received, sent). | yes | no |
+|  | ipv4 TCP errors | Enable or disable monitoring of IPv4 TCP packets metrics (Input Errors, Checksum, Retransmission segments). | yes | no |
+|  | ipv4 TCP handshake issues | Enable or disable monitoring of IPv4 TCP handshake metrics (Established Resets, Active Opens, Passive Opens, Attempt Fails). | yes | no |
+|  | ECN packets | Enable or disable monitoring of ECN statistics metrics (InCEPkts, InNoECTPkts). | auto | no |
+|  | TCP SYN cookies | Enable or disable monitoring of TCP SYN cookies metrics (received, sent, failed). | auto | no |
+|  | TCP out-of-order queue | Enable or disable monitoring of TCP out-of-order queue metrics (inqueue). | auto | no |
+|  | TCP connection aborts | Enable or disable monitoring of TCP connection aborts metrics (Bad Data, User closed, No memory, Timeout). | auto | no |
+|  | ipv4 UDP packets | Enable or disable monitoring of ipv4 UDP packets metrics (sent, received.). | yes | no |
+|  | ipv4 UDP errors | Enable or disable monitoring of ipv4 UDP errors metrics (Recieved Buffer error, Input Errors, No Ports, IN Checksum Errors, Ignore Multi). | yes | no |
+|  | ipv4 icmp packets | Enable or disable monitoring of IPv4 ICMP packets metrics (sent, received, in error, OUT error, IN Checksum error). | yes | no |
+|  | ipv4 icmp messages | Enable or disable monitoring of ipv4 ICMP messages metrics (I/O messages, I/O Errors, In Checksum). | yes | no |
+|  | ipv4 packets | Enable or disable monitoring of ipv4 packets metrics (received, sent, forwarded, delivered). | yes | no |
+|  | ipv4 fragments sent | Enable or disable monitoring of IPv4 fragments sent metrics (ok, fails, creates). | yes | no |
+|  | ipv4 fragments assembly | Enable or disable monitoring of IPv4 fragments assembly metrics (ok, failed, all). | yes | no |
+|  | ipv4 errors | Enable or disable monitoring of IPv4 errors metrics (I/O discard, I/O HDR errors, In Addr errors, In Unknown protos, OUT No Routes). | yes | no |
+|  | ipv6 packets | Enable or disable monitoring of IPv6 packets metrics (received, sent, forwarded, delivered). | auto | no |
+|  | ipv6 fragments sent | Enable or disable monitoring of IPv6 fragments sent metrics (ok, failed, all). | auto | no |
+|  | ipv6 fragments assembly | Enable or disable monitoring of IPv6 fragments assembly metrics (ok, failed, timeout, all). | auto | no |
+|  | ipv6 errors | Enable or disable monitoring of IPv6 errors metrics (I/O Discards, In Hdr Errors, In Addr Errors, In Truncaedd Packets, I/O No Routes). | auto | no |
+|  | icmp | Enable or disable monitoring of ICMP metrics (sent, received). | auto | no |
+|  | icmp redirects | Enable or disable monitoring of ICMP redirects metrics (received, sent). | auto | no |
+|  | icmp errors | Enable or disable monitoring of ICMP metrics (I/O Errors, In Checksums, In Destination Unreachable, In Packet too big, In Time Exceeds, In Parm Problem, Out Dest Unreachable, Out Timee Exceeds, Out Parm Problems.). | auto | no |
+|  | icmp echos | Enable or disable monitoring of ICMP echos metrics (I/O Echos, I/O Echo Reply). | auto | no |
+|  | icmp router | Enable or disable monitoring of ICMP router metrics (I/O Solicits, I/O Advertisements). | auto | no |
+|  | icmp neighbor | Enable or disable monitoring of ICMP neighbor metrics (I/O Solicits, I/O Advertisements). | auto | no |
+|  | icmp types | Enable or disable monitoring of ICMP types metrics (I/O Type1, I/O Type128, I/O Type129, Out Type133, Out Type135, In Type136, Out Type145). | auto | no |
+|  | space usage for all disks | Enable or disable monitoring of space usage for all disks metrics (available, used, reserved for root). | yes | no |
+|  | inodes usage for all disks | Enable or disable monitoring of inodes usage for all disks metrics (available, used, reserved for root). | yes | no |
+|  | bandwidth | Enable or disable monitoring of bandwidth metrics (received, sent). | yes | no |
+|  | system uptime | Enable or disable monitoring of system uptime metrics (uptime). | yes | no |
+| **plugin:macos:mach_smi** | cpu utilization | Enable or disable monitoring of CPU utilization metrics (user, nice, system, idel). | yes | no |
+|  | system ram | Enable or disable monitoring of system RAM metrics (Active, Wired, throttled, compressor, inactive, purgeable, speculative, free). | yes | no |
+|  | swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | no |
+|  | memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
+| **plugin:macos:iokit** | disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
+| **plugin:macos:power_sources** | battery capacity | Enable or disable monitoring of battery capacity metrics. | yes | no |
+|  | power supply voltage | Enable or disable monitoring of battery and UPS voltage metrics. | yes | no |
+|  | power supply current | Enable or disable monitoring of battery and UPS current metrics. | yes | no |
+|  | battery temperature | Enable or disable monitoring of battery temperature metrics when exposed by macOS. | yes | no |
+|  | battery cycle count | Enable or disable monitoring of battery cycle count metrics when exposed by macOS. | yes | no |
+| **plugin:macos:gpu** | enabled | Enable or disable Apple Silicon GPU monitoring through IOReport. The module creates charts only when macOS exposes the required IOReport GPU channels. | yes | no |
+|  | SMC temperature sample every | How often to read AppleSMC GPU temperature keys when IOHID GPU temperature is unavailable and AppleSMC is used as the fallback source. | 10s | no |
+| **plugin:macos:sensors** | enabled | Enable or disable direct AppleSMC and IOHID hardware sensor monitoring. | yes | no |
+|  | SMC sensors | Enable or disable direct AppleSMC hardware temperature, fan, voltage, current, and power sensor monitoring. | yes | no |
+|  | IOHID sensors | Enable or disable direct IOHID temperature, current, and voltage sensor monitoring. | yes | no |
+|  | per sensor temperature charts | Chart every temperature sensor individually, in addition to the per-subsystem summary charts and the temperature histogram. | no | no |
+|  | per sensor fan charts | Chart every fan sensor individually. | yes | no |
+|  | per sensor voltage charts | Chart every voltage sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
+|  | per sensor current charts | Chart every current sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
+|  | per sensor power charts | Chart every power sensor individually, in addition to the per-subsystem power summary charts. | no | no |
+|  | discovery every | How often to rescan AppleSMC for available hardware sensor keys. | 300s | no |
+|  | SMC sample every | How often to read values from discovered AppleSMC hardware sensor keys. | 10s | no |
+| **plugin:macos:powermetrics** | sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 1s | no |
+|  | sample window | One-shot sampling window used while probing which `powermetrics` sampler set is available. | 1000ms | no |
+|  | command timeout | Maximum extra time to wait for one `powermetrics` probe or loop sample before restarting the sampler. | 5000ms | no |
+|  | use ndsudo | Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper. | yes | no |
+|  | command path | Path to the native Apple `powermetrics` command when `use ndsudo` is disabled. | /usr/bin/powermetrics | no |
+|  | thermal pressure | Enable or disable monitoring of macOS thermal pressure state. | yes | no |
+|  | SMC fan speed | Enable or disable monitoring of SMC fan speed when available. | yes | no |
+|  | SMC temperatures | Enable or disable monitoring of SMC CPU and GPU die temperatures when available. | yes | no |
+|  | SMC thermal levels | Enable or disable monitoring of SMC thermal levels when available. | yes | no |
+|  | SMC prochot | Enable or disable monitoring of SMC processor-hot assertion flags when available. | yes | no |
+|  | GPU power | Enable or disable fallback GPU power monitoring from `powermetrics` when IOReport GPU power is unavailable and the `gpu_power` sampler exposes a value. | yes | no |
+| **plugin:macos:nvme_smart** | sample every | How often to read native NVMe SMART data through IOKit. | 10s | no |
+|  | discovery every | How often to rescan IORegistry for NVMe SMART-capable services. | 300s | no |
 
 
 </details>
@@ -278,7 +278,24 @@ The following alerts are available:
 
 | Alert name  | On metric | Description |
 |:------------|:----------|:------------|
-| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | network interface ${label:device} current speed |
+| [ disk_space_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Total space utilization of disk ${label:mount_point} |
+| [ disk_inode_usage ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Total inode utilization of disk ${label:mount_point} |
+| [ disk_fill_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | average rate the disk fills up (positive), or frees up (negative) space, for the last hour |
+| [ out_of_disk_space_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.space | Estimated time the disk ${label:mount_point} will run out of space, if the system continues to add data with the rate of the last hour |
+| [ disk_inode_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | average rate at which disk inodes are allocated (positive), or freed (negative), for the last hour |
+| [ out_of_disk_inodes_time ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.inodes | Estimated time the disk ${label:mount_point} will run out of inodes, if the system continues to allocate inodes with the rate of the last hour |
+| [ 10min_disk_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/disks.conf) | disk.util | Average percentage of time ${label:device} disk was busy over the last 10 minutes |
+| [ interface_speed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.net | Network interface ${label:device} current speed |
+| [ net_interface_inbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Received packets for the network interface ${label:device} in the last 10 minutes |
+| [ net_interface_outbound_packets ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Sent packets for the network interface ${label:device} in the last 10 minutes |
+| [ inbound_packets_dropped_ratio ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.drops | Ratio of inbound dropped packets for the network interface ${label:device} over the last 10 minutes |
+| [ 1m_received_packets_rate ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Average number of packets received by the network interface ${label:device} over the last minute |
+| [ 10s_received_packets_storm ](https://github.com/netdata/netdata/blob/master/src/health/health.d/net.conf) | net.packets | Ratio of average number of received packets for the network interface ${label:device} over the last 10 seconds, compared to the rate over the last minute |
+| [ nvme_device_critical_warnings_state ](https://github.com/netdata/netdata/blob/master/src/health/health.d/nvme.conf) | nvme.device_critical_warnings_state | NVMe device ${label:device} has critical warnings |
+| [ power_supply_capacity ](https://github.com/netdata/netdata/blob/master/src/health/health.d/power_supply_capacity.conf) | powersupply.capacity | Percentage of remaining power supply capacity |
+| [ system_reboot_detection ](https://github.com/netdata/netdata/blob/master/src/health/health.d/reboot.conf) | system.uptime | System has rebooted within the last 10 minutes |
+| [ 1m_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts over the last minute |
+| [ 10s_ipv4_tcp_resets_received ](https://github.com/netdata/netdata/blob/master/src/health/health.d/tcp_resets.conf) | ipv4.tcphandshake | average number of failed TCP connection attempts (reset or timed out before being established) over the last 10 seconds. This can be an indication that a service this host needs is down or unreachable. Netdata will not send a clear notification for this alarm. |
 
 
 

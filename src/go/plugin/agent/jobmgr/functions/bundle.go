@@ -314,7 +314,7 @@ func newAgentFunctionBundle(
 	creator collectorapi.Creator,
 	methods []funcapi.FunctionConfig,
 ) (*functionBundle, error) {
-	return newFunctionBundle(functionBundleAgent, module, creator, nil, methods)
+	return newFunctionBundle(functionBundleAgent, module, collectorHandlerFactory(creator, nil), nil, methods)
 }
 
 func newJobFunctionBundle(
@@ -323,13 +323,20 @@ func newJobFunctionBundle(
 	job collectorapi.RuntimeJob,
 	methods []funcapi.FunctionConfig,
 ) (*functionBundle, error) {
-	return newFunctionBundle(functionBundleJob, module, creator, job, methods)
+	return newFunctionBundle(functionBundleJob, module, collectorHandlerFactory(creator, job), job, methods)
+}
+
+func collectorHandlerFactory(creator collectorapi.Creator, job collectorapi.RuntimeJob) func() funcapi.MethodHandler {
+	if creator.MethodHandler == nil {
+		return nil
+	}
+	return func() funcapi.MethodHandler { return creator.MethodHandler(job) }
 }
 
 func newFunctionBundle(
 	kind functionBundleKind,
 	module string,
-	creator collectorapi.Creator,
+	create func() funcapi.MethodHandler,
 	job collectorapi.RuntimeJob,
 	methods []funcapi.FunctionConfig,
 ) (*functionBundle, error) {
@@ -339,18 +346,18 @@ func newFunctionBundle(
 		kind == functionBundleJob && (job == nil || job.ModuleName() != module) {
 		return nil, errors.New("jobmgr Function bundle: invalid construction")
 	}
-	if len(methods) != 0 && creator.MethodHandler == nil {
-		return nil, errors.New("jobmgr Function bundle: collector has no method handler")
+	if len(methods) != 0 && create == nil {
+		return nil, errors.New("jobmgr Function bundle: no method handler factory")
 	}
 	var handler funcapi.MethodHandler
 	if len(methods) != 0 {
 		var err error
-		handler, err = callMethodHandler(creator, job)
+		handler, err = callHandlerFactory(create)
 		if err != nil {
 			return nil, err
 		}
 		if nilMethodHandler(handler) {
-			return nil, errors.New("jobmgr Function bundle: collector returned a nil method handler")
+			return nil, errors.New("jobmgr Function bundle: handler factory returned a nil method handler")
 		}
 	}
 	bundle := &functionBundle{
@@ -380,9 +387,8 @@ func newFunctionBundle(
 	return bundle, nil
 }
 
-func callMethodHandler(
-	creator collectorapi.Creator,
-	job collectorapi.RuntimeJob,
+func callHandlerFactory(
+	create func() funcapi.MethodHandler,
 ) (handler funcapi.MethodHandler, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -394,7 +400,7 @@ func callMethodHandler(
 			))
 		}
 	}()
-	return creator.MethodHandler(job), nil
+	return create(), nil
 }
 
 func nilMethodHandler(handler funcapi.MethodHandler) bool {

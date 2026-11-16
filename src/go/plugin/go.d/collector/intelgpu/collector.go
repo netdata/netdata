@@ -23,9 +23,8 @@ func init() {
 
 func New() *Collector {
 	return &Collector{
-		ndsudoName: "ndsudo",
-		charts:     charts.Copy(),
-		engines:    make(map[string]bool),
+		charts:  charts.Copy(),
+		engines: make(map[string]bool),
 	}
 }
 
@@ -40,8 +39,7 @@ type Collector struct {
 
 	charts *collectorapi.Charts
 
-	exec       intelGpuTop
-	ndsudoName string
+	exec intelGpuTop
 
 	engines map[string]bool
 }
@@ -51,18 +49,23 @@ func (c *Collector) Configuration() any {
 }
 
 func (c *Collector) Init(context.Context) error {
-	topExec, err := c.initIntelGPUTopExec()
-
-	if err != nil {
-		return fmt.Errorf("init intelgpu top exec: %v", err)
+	if c.exec == nil {
+		topExec, err := c.initIntelGPUTopExec()
+		if err != nil {
+			return fmt.Errorf("init intelgpu top exec: %v", err)
+		}
+		c.exec = topExec
 	}
-
-	c.exec = topExec
 
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
+func (c *Collector) Check(ctx context.Context) error {
+	if c.exec != nil {
+		if err := c.exec.start(ctx); err != nil {
+			return err
+		}
+	}
 	mx, err := c.collect()
 	if err != nil {
 		return err
@@ -94,9 +97,7 @@ func (c *Collector) Collect(context.Context) map[string]int64 {
 
 func (c *Collector) Cleanup(context.Context) {
 	if c.exec != nil {
-		if err := c.exec.stop(); err != nil {
-			c.Error(err)
-		}
+		c.exec.stop()
 		c.exec = nil
 	}
 }

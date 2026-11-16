@@ -42,7 +42,7 @@ static inline long query_target_chart_labels_filter_v1(BUFFER *wb, const char *k
 
             QUERY_METRIC *qm = query_metric(qt, c);
             QUERY_INSTANCE *qi = query_instance(qt, qm->link.query_instance_id);
-            rrdlabels_value_to_buffer_array_item_or_null(rrdinstance_acquired_labels(qi->ria), wb, label_key);
+            rrdlabels_value_to_buffer_array_item_or_null(query_instance_labels(qi), wb, label_key);
             i++;
         }
         buffer_json_array_close(wb);

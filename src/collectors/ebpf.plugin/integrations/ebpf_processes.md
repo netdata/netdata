@@ -30,7 +30,7 @@ This collector is only supported on the following platforms:
 
 - Linux
 
-This collector supports collecting metrics from multiple instances of this integration, including remote instances.
+This collector supports collecting metrics from multiple instances of this integration.
 
 The plugin needs setuid because it loads data inside kernel. Netada sets necessary permission during installation time.
 
@@ -45,9 +45,6 @@ eBPF Processes can be monitored further using the following other integrations:
 
 The plugin checks kernel compilation flags (CONFIG_KPROBES, CONFIG_BPF, CONFIG_BPF_SYSCALL, CONFIG_BPF_JIT), files inside debugfs, and presence of BTF files to decide which eBPF program will be attached.
 
-#### Limits
-
-The default configuration for this integration does not impose any limits on data collection.
 
 #### Performance Impact
 
@@ -203,8 +200,8 @@ Metrics:
 | cgroup.task_exit | Tasks starts exit process | exit | calls/s |
 | cgroup.task_close | Tasks closed | process | calls/s |
 | cgroup.task_error | Errors to create process or threads | process | calls/s |
-| services.process_create | Process started | a dimension per systemd service | calls/s |
-| services.thread_create | Threads started | a dimension per systemd service | calls/s |
-| services.task_close | Tasks starts exit process | a dimension per systemd service | calls/s |
-| services.task_exit | Tasks closed | a dimension per systemd service | calls/s |
-| services.task_error | Errors to create process or threads | a dimension per systemd service | calls/s |
+| systemd.service.process_create | Process started | a dimension per systemd service | calls/s |
+| systemd.service.thread_create | Threads started | a dimension per systemd service | calls/s |
+| systemd.service.task_close | Tasks starts exit process | a dimension per systemd service | calls/s |
+| systemd.service.task_exit | Tasks closed | a dimension per systemd service | calls/s |
+| systemd.service.task_error | Errors to create process or threads | a dimension per systemd service | calls/s |

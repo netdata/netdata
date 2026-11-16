@@ -9,7 +9,18 @@ import (
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+func (c *Collector) collect() error {
+	devices, err := c.devices()
+	if err != nil {
+		return err
+	}
+
+	c.writeMetrics(devices, c.now())
+
+	return nil
+}
+
+func (c *Collector) devices() ([]*wgtypes.Device, error) {
 	if c.client == nil {
 		client, err := c.newWGClient()
 		if err != nil {
@@ -18,92 +29,57 @@ func (c *Collector) collect() (map[string]int64, error) {
 		c.client = client
 	}
 
-	// TODO: probably we need to get a list of interfaces and query interfaces using client.Device()
-	// https://github.com/WireGuard/wgctrl-go/blob/3d4a969bb56bb6931f6661af606bc9c4195b4249/internal/wglinux/client_linux.go#L79-L80
+	// Devices() fails as a whole when any single device cannot be read (for example an interface removed between
+	// listing and querying), so one bad device costs the whole cycle. Querying each interface with Device() would
+	// keep the others.
 	devices, err := c.client.Devices()
 	if err != nil {
 		return nil, fmt.Errorf("retrieving WireGuard devices: %v", err)
 	}
 
-	if len(devices) == 0 {
-		c.Info("no WireGuard devices found on the host system")
-	}
-
-	now := time.Now()
-	if c.cleanupLastTime.IsZero() {
-		c.cleanupLastTime = now
-	}
-
-	mx := make(map[string]int64)
-
-	c.collectDevicesPeers(mx, devices, now)
-
-	if now.Sub(c.cleanupLastTime) > c.cleanupEvery {
-		c.cleanupLastTime = now
-		c.cleanupDevicesPeers(devices)
-	}
-
-	return mx, nil
+	return devices, nil
 }
 
-func (c *Collector) collectDevicesPeers(mx map[string]int64, devices []*wgtypes.Device, now time.Time) {
-	for _, d := range devices {
-		if !c.devices[d.Name] {
-			c.devices[d.Name] = true
-			c.addNewDeviceCharts(d.Name)
-		}
+// writeMetrics builds the instruments every cycle: devices and peers come and go with the host's WireGuard
+// configuration, so a long-lived Vec would keep a handle for every peer ever seen.
+func (c *Collector) writeMetrics(devices []*wgtypes.Device, now time.Time) {
+	meter := c.store.Write().SnapshotMeter("")
+	deviceVec := meter.Vec("device")
+	peerVec := meter.Vec("device", "public_key")
 
-		mx["device_"+d.Name+"_peers"] = int64(len(d.Peers))
-		if len(d.Peers) == 0 {
-			mx["device_"+d.Name+"_receive"] = 0
-			mx["device_"+d.Name+"_transmit"] = 0
-			continue
-		}
+	devicePeers := deviceVec.Gauge("device_peers")
+	deviceReceive := deviceVec.Counter("device_receive")
+	deviceTransmit := deviceVec.Counter("device_transmit")
+	peerReceive := peerVec.Counter("peer_receive")
+	peerTransmit := peerVec.Counter("peer_transmit")
+	peerLatestHandshakeAgo := peerVec.Gauge("peer_latest_handshake_ago")
+
+	for _, d := range devices {
+		devicePeers.WithLabelValues(d.Name).Observe(float64(len(d.Peers)))
+
+		// Device traffic is the sum over peers that have completed a handshake. A device without peers reports
+		// zero; a device whose peers have no handshake yet reports no traffic sample.
+		var receive, transmit int64
+		hasTraffic := len(d.Peers) == 0
 
 		for _, p := range d.Peers {
 			if p.LastHandshakeTime.IsZero() {
 				continue
 			}
+			hasTraffic = true
 
 			pubKey := p.PublicKey.String()
-			id := peerID(d.Name, pubKey)
+			receive += p.ReceiveBytes
+			transmit += p.TransmitBytes
 
-			if !c.peers[id] {
-				c.peers[id] = true
-				c.addNewPeerCharts(id, d.Name, pubKey)
-			}
+			peerReceive.WithLabelValues(d.Name, pubKey).ObserveTotal(float64(p.ReceiveBytes))
+			peerTransmit.WithLabelValues(d.Name, pubKey).ObserveTotal(float64(p.TransmitBytes))
+			peerLatestHandshakeAgo.WithLabelValues(d.Name, pubKey).Observe(float64(int64(now.Sub(p.LastHandshakeTime).Seconds())))
+		}
 
-			mx["device_"+d.Name+"_receive"] += p.ReceiveBytes
-			mx["device_"+d.Name+"_transmit"] += p.TransmitBytes
-			mx["peer_"+id+"_receive"] = p.ReceiveBytes
-			mx["peer_"+id+"_transmit"] = p.TransmitBytes
-			mx["peer_"+id+"_latest_handshake_ago"] = int64(now.Sub(p.LastHandshakeTime).Seconds())
+		if hasTraffic {
+			deviceReceive.WithLabelValues(d.Name).ObserveTotal(float64(receive))
+			deviceTransmit.WithLabelValues(d.Name).ObserveTotal(float64(transmit))
 		}
 	}
-}
-
-func (c *Collector) cleanupDevicesPeers(devices []*wgtypes.Device) {
-	seenDevices, seenPeers := make(map[string]bool), make(map[string]bool)
-	for _, d := range devices {
-		seenDevices[d.Name] = true
-		for _, p := range d.Peers {
-			seenPeers[peerID(d.Name, p.PublicKey.String())] = true
-		}
-	}
-	for d := range c.devices {
-		if !seenDevices[d] {
-			delete(c.devices, d)
-			c.removeDeviceCharts(d)
-		}
-	}
-	for p := range c.peers {
-		if !seenPeers[p] {
-			delete(c.peers, p)
-			c.removePeerCharts(p)
-		}
-	}
-}
-
-func peerID(device, peerPublicKey string) string {
-	return device + "_" + peerPublicKey
 }

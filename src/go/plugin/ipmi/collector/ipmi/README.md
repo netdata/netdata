@@ -1,0 +1,1 @@
+integrations/ipmi_go_collector.md

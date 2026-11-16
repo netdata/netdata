@@ -240,25 +240,12 @@ func validateEncodedColumnValue(columnIndex, rowIndex int, column Column, value 
 		if _, ok := value.([]any); !ok {
 			return fmt.Errorf("values[%d][%d] is not an array", columnIndex, rowIndex)
 		}
-	case "bool":
-		if _, ok := value.(bool); !ok {
-			return fmt.Errorf("values[%d][%d] is not a bool", columnIndex, rowIndex)
-		}
-	case "int":
-		if _, ok := integerValue(value); !ok {
-			return fmt.Errorf("values[%d][%d] is not an integer", columnIndex, rowIndex)
-		}
-	case "uint":
-		if n, ok := integerValue(value); !ok || n < 0 {
-			return fmt.Errorf("values[%d][%d] is not a non-negative integer", columnIndex, rowIndex)
-		}
-	case "float", "duration":
-		if _, ok := numberValue(value); !ok {
-			return fmt.Errorf("values[%d][%d] is not a number", columnIndex, rowIndex)
-		}
-	case "string", "ip", "mac", "timestamp":
-		if _, ok := value.(string); !ok {
-			return fmt.Errorf("values[%d][%d] is not a string", columnIndex, rowIndex)
+	case "bool", "int", "uint", "float", "duration", "string", "ip", "mac", "timestamp":
+		if member, reason := scalarColumnValueError(column.Type, column.Aggregation, column.Nullable, value); reason != "" {
+			if member >= 0 {
+				return fmt.Errorf("values[%d][%d][%d] %s", columnIndex, rowIndex, member, reason)
+			}
+			return fmt.Errorf("values[%d][%d] %s", columnIndex, rowIndex, reason)
 		}
 	case "json":
 		return nil

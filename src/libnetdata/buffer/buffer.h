@@ -11,6 +11,9 @@
 
 #define API_RELATIVE_TIME_MAX (time_t)(3 * 365 * 86400)
 
+// how far back a query window may reach, and the largest resampling time a query accepts
+#define API_QUERY_TIME_SPAN_MAX (time_t)(10 * 365 * 86400)
+
 #define BUFFER_JSON_MAX_DEPTH 32 // max is 255
 
 // gcc with libstdc++ may require this,
@@ -1144,6 +1147,15 @@ static void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t va
     buffer_putc(wb, ':');
     buffer_print_int64(wb, value);
 
+    wb->json.stack[wb->json.depth].count++;
+}
+
+// writes the key and the colon; the caller appends a raw JSON value
+ALWAYS_INLINE
+static void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
     wb->json.stack[wb->json.depth].count++;
 }
 

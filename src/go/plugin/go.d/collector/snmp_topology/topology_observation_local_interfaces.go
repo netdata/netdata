@@ -50,7 +50,7 @@ func (c *topologyBuilder) appendObservedInterfaces(observation *topologyengine.L
 			IfDescr:       ifDescr,
 			IfAlias:       strings.TrimSpace(status.ifAlias),
 			MAC:           strings.TrimSpace(status.mac),
-			SpeedBps:      status.speedBps,
+			SpeedBps:      status.speedBps(),
 			LastChange:    status.lastChange,
 			Duplex:        strings.TrimSpace(status.duplex),
 			InterfaceType: strings.TrimSpace(status.ifType),

@@ -1,4 +1,4 @@
-//go:build linux && !amd64
+//go:build (linux && !amd64) || (freebsd && 386)
 
 package posix
 

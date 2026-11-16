@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Common helpers for triage-codacy scripts.
 #
-# Token-safe by design: CODACY_TOKEN never reaches the
-# assistant-visible stdout. Internal helpers that handle
-# credential bytes have leading-underscore names; public
-# wrappers read .env internally and emit only the response
-# body.
+# Public wrappers use already configured shell values; action
+# scripts explicitly call codacyaudit_load_env when needed.
+# Credentials are not logged. Successful response bodies are
+# forwarded unchanged and can contain private service data.
 #
 # Sourced from the per-action scripts; not executed directly.
 
@@ -46,9 +45,9 @@ codacyaudit_repo_root() {
 
 # Source <repo-root>/.env. CODACY_TOKEN is required for token-gated
 # endpoints (issue search across master, repo metadata, future write
-# actions). Read-only PR-issue queries also work anonymously, but
-# this skill drives them through the token wrapper for consistency
-# and to exercise the no-leak self-test on every run.
+# actions). Some public PR endpoints have allowed anonymous reads;
+# these scripts use the configured token wrapper. Offline self-tests
+# do not load the environment or query a service.
 codacyaudit_load_env() {
     local root env
     root="$(codacyaudit_repo_root)"
@@ -93,9 +92,9 @@ codacyaudit_audit_dir() {
 # stderr: minimal status line on error.
 _codacyaudit_run() {
     local method="$1"
-    local path="$2"
+    local request_path="$2"
     local data="${3:-}"
-    local url="${CODACY_HOST}${path}"
+    local url="${CODACY_HOST}${request_path}"
 
     local -a curl_args=(
         --silent --show-error --fail-with-body
@@ -108,26 +107,28 @@ _codacyaudit_run() {
         curl_args+=(--header 'Content-Type: application/json' --data-raw "$data")
     fi
 
-    local body
-    if ! body="$(curl "${curl_args[@]}" "$url")"; then
-        echo -e "${CA_RED}[ERROR]${CA_NC} ${method} ${path} failed (see body below)" >&2
-        printf '%s\n' "$body" >&2
-        return 1
+    local body curl_status
+    if body="$(curl "${curl_args[@]}" "$url" 2>/dev/null)"; then
+        printf '%s' "$body"
+    else
+        curl_status=$?
+        # A service/proxy can reflect credentials or request data in errors.
+        printf '[ERROR] Codacy %s request failed (curl status %s)\n' "$method" "$curl_status" >&2
+        return "$curl_status"
     fi
-    printf '%s' "$body"
 }
 
-# Public GET. Stdout is the response body; the token never leaks.
+# Public GET. Stdout is the successful response body, unchanged.
 codacyaudit_get() {
-    local path="$1"
-    _codacyaudit_run GET "$path"
+    local request_path="$1"
+    _codacyaudit_run GET "$request_path"
 }
 
 # Public POST.
 codacyaudit_post() {
-    local path="$1"
+    local request_path="$1"
     local data="$2"
-    _codacyaudit_run POST "$path" "$data"
+    _codacyaudit_run POST "$request_path" "$data"
 }
 
 # Paginated GET. Walks the v3 cursor protocol and concatenates
@@ -145,13 +146,13 @@ codacyaudit_get_paged() {
 
     while :; do
         if [[ "$path_base" == *'?'* ]]; then sep='&'; else sep='?'; fi
-        local path="${path_base}${sep}limit=${limit}"
+        local request_path="${path_base}${sep}limit=${limit}"
         if [ -n "$cursor" ]; then
-            path="${path}&cursor=${cursor}"
+            request_path="${request_path}&cursor=${cursor}"
         fi
 
         local resp
-        resp="$(_codacyaudit_run GET "$path")" || return 1
+        resp="$(_codacyaudit_run GET "$request_path")" || return $?
 
         # Append data[] to accumulator.
         out="$(printf '%s\n%s' "$out" "$resp" \
@@ -187,38 +188,44 @@ codacyaudit_repo_info() {
 }
 
 # ---------------------------------------------------------------
-# No-token-leak self-test.
-#
-# Drives every public wrapper with a sentinel CODACY_TOKEN and
-# asserts the sentinel never appears on captured stdout. Run
-# this after editing any wrapper.
+# No-token-leak self-test. Exercise real wrappers with an offline
+# transport in a subshell; caller variables/functions remain unchanged.
+codacyaudit_selftest_no_token_leak() (
+    CODACY_TOKEN="test-codacy-secret"
+    CODACY_HOST="https://codacy.example.invalid"
+    CODACY_PROVIDER="gh"
+    CODACY_ORG="fixture-org"
+    CODACY_REPO="fixture-repo"
 
-codacyaudit_selftest_no_token_leak() {
-    local sentinel="deadbeef-1234-5678-9abc-def012345678"
+    curl() {
+        local arg url=""
+        for arg in "$@"; do url="$arg"; done
+        case "$url" in
+            "$CODACY_HOST"/api/v3/*cursor=fixture-next)
+                printf '%s' '{"data":[{"fixture":"second"}],"pagination":{}}' ;;
+            "$CODACY_HOST"/api/v3/*limit=*)
+                printf '%s' '{"data":[{"fixture":"first"}],"pagination":{"cursor":"fixture-next"}}' ;;
+            "$CODACY_HOST"/api/v3/*)
+                printf '%s' '{"fixture":"single"}' ;;
+            *) return 97 ;;
+        esac
+    }
 
-    local saved="${CODACY_TOKEN:-}"
-    CODACY_TOKEN="$sentinel"
-    export CODACY_TOKEN
-
-    # Drive each public wrapper. The expected outcome is HTTP
-    # 401 (sentinel is not a real token); we capture stdout and
-    # assert the sentinel does not appear there.
-    local out
-    out="$( {
-        codacyaudit_get  "/api/v3/user"                           2>/dev/null || true
-        codacyaudit_post "/api/v3/user" '{"noop":true}'           2>/dev/null || true
-        codacyaudit_pr_issues 22423                                2>/dev/null || true
-        codacyaudit_repo_info                                      2>/dev/null || true
-    } )"
-
-    CODACY_TOKEN="$saved"
-    export CODACY_TOKEN
-
-    if printf '%s' "$out" | grep -q "$sentinel"; then
-        echo -e "${CA_RED}FAIL${CA_NC}: sentinel ${sentinel} appeared on captured stdout" >&2
-        return 1
-    fi
-
-    echo -e "${CA_GREEN}PASS${CA_NC}: codacyaudit_selftest_no_token_leak"
-    return 0
-}
+    local wrapper out selftest_status
+    for wrapper in get post paged issues repository; do
+        if out="$(
+            case "$wrapper" in
+                get) codacyaudit_get /api/v3/user ;;
+                post) codacyaudit_post /api/v3/user '{"noop":true}' ;;
+                paged) codacyaudit_get_paged /api/v3/fixture ;;
+                issues) codacyaudit_pr_issues 1 ;;
+                repository) codacyaudit_repo_info ;;
+            esac 2>&1
+        )"; then selftest_status=0; else selftest_status=$?; fi
+        if [ "$selftest_status" -ne 0 ] || [[ "$out" != *'"fixture"'* || "$out" == *"$CODACY_TOKEN"* ]]; then
+            printf 'FAIL: Codacy offline wrapper self-test (%s)\n' "$wrapper" >&2
+            return 1
+        fi
+    done
+    printf '%s\n' 'PASS: codacyaudit_selftest_no_token_leak'
+)

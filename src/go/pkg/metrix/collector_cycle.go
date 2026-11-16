@@ -19,16 +19,7 @@ func (c *storeCycleController) BeginCycle() {
 
 	c.core.sequence++
 	c.core.active = &cycleFrame{
-		seq:                c.core.sequence,
-		hostScopes:         make(map[string]HostScope),
-		gauges:             make(map[string]*stagedGauge),
-		counters:           make(map[string]*stagedCounter),
-		histograms:         make(map[string]*stagedHistogram),
-		summaries:          make(map[string]*stagedSummary),
-		stateSet:           make(map[string]*stagedStateSet),
-		measureSetGauges:   make(map[string]*stagedMeasureSet),
-		measureSetCounters: make(map[string]*stagedMeasureSet),
-		pendingInstruments: make(map[string][]*instrumentDescriptor),
+		seq: c.core.sequence,
 	}
 }
 
@@ -62,6 +53,14 @@ func (f *cycleFrame) dropStagedNames(names map[string]struct{}) {
 	for name := range names {
 		delete(f.pendingInstruments, name)
 	}
+}
+
+// observedNamesHint sizes the commit's per-name maps: the names the frame can observe,
+// at most one per staged write or conflict and at most the registered names.
+func (f *cycleFrame) observedNamesHint(registered int) int {
+	staged := len(f.gauges) + len(f.counters) + len(f.histograms) + len(f.summaries) + len(f.stateSet) +
+		len(f.measureSetGauges) + len(f.measureSetCounters) + len(f.conflicts)
+	return min(staged, registered+len(f.pendingInstruments))
 }
 
 // CommitCycleSuccess publishes staged writes into a new committed snapshot.
@@ -247,11 +246,11 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	// any surviving series whose name somehow lacks one.
 	// liveNames is collected here (folded into the existing scan) and consumed by the
 	// descriptor-universe sweep below, so the sweep needs no separate pass over next.series.
-	liveNames := make(map[string]struct{})
+	liveNames := make(map[string]struct{}, len(c.core.instruments))
 	for key := range next.series {
 		series := next.series[key]
 		liveNames[series.name] = struct{}{}
-		canonical, ok := resolution.canonical[series.name]
+		canonical, ok := resolution.canonicalFor(series.name)
 		if !ok {
 			if _, exists := c.core.instruments[series.name]; !exists {
 				c.core.instruments[series.name] = series.desc
@@ -361,7 +360,7 @@ func (c *storeCore) prepareHostScopeForWriteLocked(scope HostScope) (HostScope, 
 		c.recordCycleErrorLocked(fmt.Errorf("%w: scope_key=%q", ErrHostScopeConflict, scope.ScopeKey))
 		return scope, false
 	}
-	c.active.hostScopes[scope.ScopeKey] = cloneHostScope(scope)
+	stageEntry(&c.active.hostScopes, scope.ScopeKey, cloneHostScope(scope))
 	return scope, true
 }
 

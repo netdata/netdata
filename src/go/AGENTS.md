@@ -9,15 +9,26 @@ them from there.
 
 ## Task Routing
 
+Use this table for implementation and for review of the affected contracts. Apply the root
+`AGENTS.md#skill-selection` action and evidence boundaries; reading a design or delivery workflow during review does
+not require creating its implementation artifacts.
+
+For collector review, start with the collector entry and relevant framework/version contracts. For go.d, expand Go
+design when config, metric meaning, identity, Functions, ownership, persistent state or coordination is affected. A
+performance lens still needs that design guidance when ownership or lifecycle creates the costs; an isolated parser
+change preserving those contracts does not require the full design workflow. Follow the table's domain-specific
+references when their surfaces are affected, including the IBM.d exception.
+
 | Work area | Start here | Notes |
 |---|---|---|
 | New go.d collector, or a public-contract change (option, mode, metric meaning, ownership, Functions, vnodes) | `.agents/skills/collectors-go-design/SKILL.md`, then `src/go/plugin/go.d/docs/how-to-write-a-collector.md` | Design note in the SOW gate first; new go.d collectors use framework V2. |
 | `config_schema.json` (the DynCfg form) | `.agents/skills/collectors-go-design/config-schema.md`, then `src/plugins.d/DYNCFG.md` ("JSON Schema for Configuration UI") | Every visible property has a title and description; tabs equal `metadata.yaml` groups; secrets use `ui:widget: password`; the repo-wide `TestConfigSchemas*` rules must pass. |
-| Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Preserve public contracts unless a breaking change is explicitly approved. |
+| Migrating go.d V1 collector to V2 | `src/go/plugin/go.d/docs/migrate-v1-to-v2.md` | Follow its context/name compatibility contract and chart/dimension ID policy. |
 | go.d V2 implementation details | `.agents/skills/collectors-go-framework-v2/SKILL.md`, `src/go/pkg/metrix/README.md`, `src/go/plugin/framework/charttpl/README.md`, `src/go/plugin/framework/chartengine/README.md` | Skill for maintainer style, READMEs for framework API contracts. Editing `metrix` or framework packages is framework-gated work. |
+| New go.d discoverer or changed discovery capability, ownership or lifecycle | `.agents/skills/collectors-go-design/SKILL.md#the-collector-design-note` and its architecture gate | Implementation under `src/go/plugin/go.d/discovery/sdext/discoverer/`; shared engine under `src/go/plugin/agent/discovery/`. |
 | go.d helper packages | `src/go/plugin/go.d/docs/helper-packages.md` | Check existing HTTP, config-option, matcher, logger, socket, command, SQL, ping, log-file, and cloud-auth helpers before adding custom plumbing. |
 | Collector design across plugins | `.agents/skills/collectors-authoring/SKILL.md` | NIDL, cardinality, obsoletion, missing data, logging, config discipline. |
-| `metadata.yaml` content (what the integration page says) | `.agents/skills/collectors-metadata-yaml/SKILL.md` | One contract per field; metric, option, and alert rows mirror the code; an empty default-behavior field renders a placeholder claim that MUST be true. |
+| `metadata.yaml` content (what the integration page says) | `.agents/skills/collectors-metadata-yaml/SKILL.md` | One contract per field; metric and option rows mirror the code; the alert table is derived from `health.d` through the declared metric contexts. Empty auto-detection and performance fields render claims that MUST be true; actionable limits need explicit text. |
 | Integration pipeline, generated docs | `.agents/skills/integrations-lifecycle/SKILL.md`, `.agents/skills/integrations-lifecycle/consistency.md` | Source and generated artifacts MUST stay synchronized. |
 | IBM.d work | `src/go/plugin/ibm.d/AGENTS.md` | Generator-driven workflow; go.d V2 layout rules MUST NOT be applied there. |
 | Function handlers | `src/go/plugin/framework/functions/README.md`, `src/go/tools/functions-validation/README.md` | Collector Functions SHOULD be isolated behind narrow dependencies. |
@@ -30,7 +41,8 @@ them from there.
 
 - New go.d collectors MUST implement `collectorapi.CollectorV2` from
   `src/go/plugin/framework/collectorapi/collector.go` and register via `CreateV2`: metrics through
-  `metrix.CollectorStore`, charts through `ChartTemplateYAML()`.
+  `metrix.CollectorStore`, charts through exactly one static YAML or native-set provider. See
+  `src/go/plugin/framework/chartengine/README.md#named-active-template-sets`.
 - Guidance for new collectors MUST NOT teach or copy the V1 `Collect() map[string]int64` pattern.
 - Public config options SHOULD exist only for real operator decisions. Implementation tuning (page sizes, scan
   windows, retry limits, cadence) SHOULD be internal constants unless user control is clearly justified.
@@ -48,8 +60,10 @@ them from there.
 ## go.d V1-to-V2 Migration Rules
 
 - Migrations MUST start with `src/go/plugin/go.d/docs/migrate-v1-to-v2.md`.
-- Migrations MUST preserve chart IDs, contexts, dimensions, config keys, defaults, health lookups, metadata,
+- Migrations MUST preserve contexts, dimension names, config keys, defaults, health lookups, metadata,
   stock config, and service discovery behavior unless the user explicitly approves a breaking change.
+- Chart and dimension IDs MAY adopt V2 naming without a separate approval; follow the migration guide's
+  "Chart And Dimension IDs" contract, reference audit and explicit-ID-continuity exception.
 - Compatibility migration SHOULD be separate from enrichment (new labels, host scopes, topology, Functions, config
   expansion).
 - A completed migration MUST NOT keep a runtime V1-to-V2 bridge. Temporary V1 logic MAY serve parity checks during
@@ -92,16 +106,21 @@ a plausible future problem is not a requirement.
   unreachable value is not the clean end state.
 - Do not add allocation- or latency-oriented complexity until the path is shown hot by production frequency, a
   profile, or a representative benchmark. Once hot, follow "Hot-Path And Benchmark Discipline".
-- Coupling one job to another job's state, durable state for independent reads, schedulers, and queues are answered
-  by the Architecture Gate in `.agents/skills/collectors-go-design/SKILL.md` before implementation.
+- Collector and discoverer mechanisms covered above use
+  `.agents/skills/collectors-go-design/SKILL.md#architecture-gate`, including mechanisms owned by only one job.
 
 ## Hot-Path And Benchmark Discipline
 
 metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths: they run for every collector on
 every cycle.
 
-- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers (use `git stash` for the
-  "before" baseline), not just "tests pass".
+- Before/after REQUIRED: a hot-path change MUST include before/after `go test -bench` numbers, not just "tests pass".
+  Build the "before" test binaries at the base commit (`go test -c`), run them alternately with the new ones
+  (`-count 6`), and compare with `benchstat`. Do not use `git stash` for the baseline: the stash is shared across
+  worktrees and sessions.
+  - Without a second checkout, build the baseline with `go test -c -overlay <json>`: extract the base versions of the
+    changed files (`git archive <base> <paths> | tar -x -C <dir>`), map each changed path to its base copy, and map
+    each file added since the base to `""` (treated as deleted).
 - Allocation count is the gate: assert allocs stay within the intended envelope (for example a sparse commit stays
   ~O(touched), never O(retained)). `ns/op` is a dev-machine trend indicator, NOT a CI gate; label it as such inline
   and never record a personal name in the file.
@@ -109,6 +128,14 @@ every cycle.
   prove the change introduced no O(samples), O(retained), or O(n^2) regression.
 - Keep bench comments in sync with the code they measure, in the same change, with self-contained wording (no
   round or session references).
+- Attribute allocations with `-memprofile` and `-memprofilerate=1` (`pprof -sample_index=alloc_objects`). macOS CPU
+  profiles over-attribute runtime syscalls; read them with `-focus` on the benchmark body.
+- Verify reused or stack storage with `-gcflags=-m` and an allocation benchmark. Escape analysis is field-insensitive:
+  a buffer reachable through a struct whose other fields escape moves to the heap.
+- An interface call the compiler cannot devirtualize makes its arguments escape: a callback passed to it escapes with
+  every variable it captures, and a pointer handed to it (an option applying itself to `*config`) moves its target to
+  the heap. Confirm with `-gcflags=-m` first; then keep per-pass state in an object already on the heap, or resolve
+  option values by type switch.
 
 ## Go Formatting
 
@@ -140,6 +167,26 @@ See `src/go/tools/expandstructs/README.md`.
 - Prefer `testify/require` for prerequisites and `testify/assert` for comparisons. Use `t.Fatal`/`t.Fatalf`
   directly for genuine test control flow or when no clearer assertion exists. Test shape: root `AGENTS.md`, "Go
   Test Style".
+- testify `NotEqual` between a named string type and a plain string always passes (the types differ); convert one
+  side or use `NotEqualValues`.
+
+### CI Test Timings And Caches
+
+The Go Tests workflow retains `go-test-timings-*` artifacts for seven days after successful or failed test execution.
+Each contains the raw `go-test.jsonl` stream (including toolchain diagnostics) and `go-test-timings.md`; the timing
+summary also appears in the job summary. Native artifact suffixes are matrix job indices; the report names the module.
+To summarize a downloaded log locally, run from the repository root:
+
+```bash
+python3 .github/scripts/summarize-go-test-json.py /path/to/go-test.jsonl --label src/go
+```
+
+Package durations overlap, and top-level test durations include their subtests. These durations MUST NOT be summed to
+estimate wall time. Compare runner resources, build-cache state, build tags and available external fixtures before
+attributing local timings to CI. Module download caches are shared for identical module manifests; compiled-output
+caches also distinguish toolchain, module and build purpose/target. This does not skip tests: full race coverage and
+`-count=1` remain enabled. Inspect the cache actions' hit/miss and save messages separately from the Go test timings
+when diagnosing cold compilation.
 
 ## Go Review And Reachability
 

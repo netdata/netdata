@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/pkg/credentialfile"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore/internal/httpx"
 )
@@ -19,6 +20,7 @@ func (s *store) init(_ context.Context) error {
 		s.Config.Timeout = defaultTimeout
 	}
 	s.runtime = &runtime{
+		readFile:           credentialfile.Read,
 		httpClient:         httpx.VaultClient(s.Config.Timeout.Duration()),
 		httpClientInsecure: httpx.VaultInsecureClient(s.Config.Timeout.Duration()),
 	}

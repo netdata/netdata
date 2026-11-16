@@ -1,6 +1,6 @@
 //! Shared helpers for lookup codecs.
 
-use crate::protocol::{align8, NipcError, StrView, ALIGNMENT};
+use crate::protocol::{ALIGNMENT, NipcError, StrView, align8};
 
 pub const LOOKUP_DIR_ENTRY_SIZE: usize = 8;
 pub const LOOKUP_LABEL_ENTRY_SIZE: usize = 16;

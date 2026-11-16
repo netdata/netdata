@@ -13,14 +13,14 @@ static const char *status_file_io_fallback_dirs[] = {
 };
 
 static bool status_file_io_obsolete_removed = false;
-static _Alignas(8) uint64_t status_file_io_tmp_attempt_counter = 0;
+// 32 bits: 32-bit targets without 64-bit atomics (ppc32, mips32) must still build
+static uint32_t status_file_io_tmp_attempt_counter = 0;
 
 _Static_assert(__atomic_always_lock_free(sizeof(status_file_io_obsolete_removed),
                                          &status_file_io_obsolete_removed),
                "signal-safe status cleanup state must be lock-free");
-_Static_assert(__alignof__(status_file_io_tmp_attempt_counter) >= sizeof(status_file_io_tmp_attempt_counter),
-               "signal-safe status temporary counter must be naturally aligned");
-_Static_assert(__atomic_always_lock_free(sizeof(status_file_io_tmp_attempt_counter), NULL),
+_Static_assert(__atomic_always_lock_free(sizeof(status_file_io_tmp_attempt_counter),
+                                         &status_file_io_tmp_attempt_counter),
                "signal-safe status temporary counter must be lock-free");
 
 static void status_file_io_fallback_dirs_update(void) {

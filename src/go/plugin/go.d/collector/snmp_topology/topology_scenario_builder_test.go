@@ -255,8 +255,8 @@ func (s *topologyScenario) render(t testing.TB) topologyapi.Data {
 	payload, ok, err := (funcDepsAdapter{registry: registry}).Snapshot(s.opts)
 	require.NoError(t, err)
 	require.True(t, ok)
-	require.NoError(t, topologyv1test.ValidateData(payload))
-	return payload
+	require.NoError(t, topologyv1test.ValidateData(payload.Data))
+	return payload.Data
 }
 
 func (s *topologyScenario) cacheForDevice(t testing.TB, dev *topologyScenarioDevice) *topologyBuilder {

@@ -18,9 +18,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// listenersCli changes the mock listener set one scenario step at a time.
 type listenersCli interface {
-	addListener(s string)
-	removeListener(s string)
+	addListeners(s ...string)
+	removeListeners(s ...string)
 }
 
 type discoverySim struct {
@@ -108,19 +109,24 @@ type mockLocalListenersExec struct {
 	listeners   []string
 }
 
-func (m *mockLocalListenersExec) addListener(s string) {
+// addListeners and removeListeners apply a whole step under one lock: discovery
+// starts concurrently with the scenario, and a real local-listeners run never
+// reports a partial step.
+func (m *mockLocalListenersExec) addListeners(s ...string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	m.listeners = append(m.listeners, s)
+	m.listeners = append(m.listeners, s...)
 }
 
-func (m *mockLocalListenersExec) removeListener(s string) {
+func (m *mockLocalListenersExec) removeListeners(s ...string) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 
-	if i := slices.Index(m.listeners, s); i != -1 {
-		m.listeners = append(m.listeners[:i], m.listeners[i+1:]...)
+	for _, l := range s {
+		if i := slices.Index(m.listeners, l); i != -1 {
+			m.listeners = slices.Delete(m.listeners, i, i+1)
+		}
 	}
 }
 

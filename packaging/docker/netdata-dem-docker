@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Service-user operations for the host kickstart Docker action.
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+
+die() {
+  printf 'DEM browser runtime: %s\n' "$*" >&2
+  exit 1
+}
+
+[[ $# == 1 ]] || die 'expected one Docker runtime operation'
+action=$1
+case "$action" in
+  identity | plan | ensure) ;;
+  *) die 'invalid Docker runtime operation' ;;
+esac
+
+# Kickstart verifies that the container runs the stock Agent invocation.
+service_user=${DOCKER_USR:-netdata}
+service_uid=$(id -u -- "$service_user")
+service_gid=$(id -g -- "$service_user")
+[[ $service_uid =~ ^[1-9][0-9]*$ && $service_gid =~ ^[1-9][0-9]*$ ]] ||
+  die 'Docker enrollment requires a service account with a nonzero UID and GID'
+
+if [[ $action == identity ]]; then
+  printf '%s:%s\n' "$service_uid" "$service_gid"
+  exit 0
+fi
+[[ $EUID == "$service_uid" && $(id -g) == "$service_gid" ]] ||
+  die 'invoke this operation as the configured numeric service UID and GID'
+
+agent_query() {
+  /usr/sbin/netdata -u "$service_user" -W get directories "$1" ''
+}
+
+# Ask the Agent for the directories it will export to plugins. A restricted
+# account must not silently fall through to stock config that root could read.
+if [[ -e /etc/netdata/netdata.conf && ! -r /etc/netdata/netdata.conf ]]; then
+  die 'the service account cannot read /etc/netdata/netdata.conf'
+fi
+NETDATA_USER_CONFIG_DIR=$(agent_query config)
+NETDATA_STOCK_CONFIG_DIR=$(agent_query 'stock config')
+NETDATA_LIB_DIR=$(agent_query lib)
+plugins=$(agent_query plugins)
+plugin_dir=/usr/libexec/netdata/plugins.d
+case "$plugins " in
+  "\"$plugin_dir\" "* | "$plugin_dir "*) ;;
+  *) die 'Docker enrollment requires the stock image plugin directory first in the Agent configuration' ;;
+esac
+for dir in "$NETDATA_USER_CONFIG_DIR" "$NETDATA_STOCK_CONFIG_DIR" "$NETDATA_LIB_DIR"; do
+  [[ $dir == /* && ! $dir =~ [[:cntrl:]] && -d $dir && -x $dir ]] ||
+    die 'Agent configuration and data directories must be absolute and accessible to the service account'
+done
+export NETDATA_USER_CONFIG_DIR NETDATA_STOCK_CONFIG_DIR NETDATA_LIB_DIR
+export HOME="$NETDATA_LIB_DIR" USER="$service_user" LOGNAME="$service_user"
+cd /
+if [[ $action == plan ]]; then
+  exec "$plugin_dir/dem.plugin" runtime setup-plan --config-dir "$NETDATA_USER_CONFIG_DIR"
+fi
+exec "$plugin_dir/dem.plugin" runtime ensure --allow-download --config-dir "$NETDATA_USER_CONFIG_DIR" \
+  --expected-root /var/lib/netdata/dem/runtime --cancel-on-stdin-close

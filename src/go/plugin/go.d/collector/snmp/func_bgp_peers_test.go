@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
@@ -477,12 +479,22 @@ func TestCollectSNMP_HidesBGPDiagnosticsButKeepsFunctionCache(t *testing.T) {
 	mx := collr.Collect(context.Background())
 	require.NotNil(t, mx)
 
-	assert.Contains(t, mx, "snmp_bgp_peers_availability_192_0_2_1_65001_blue_established")
-	assert.Contains(t, mx, "snmp_bgp_peers_availability_192_0_2_1_65001_blue_admin_enabled")
-
-	chart := collr.Charts().Get("snmp_bgp_peers_availability_192_0_2_1_65001_blue")
+	var chart *collectorapi.Chart
+	for _, candidate := range *collr.Charts() {
+		if candidate.Ctx == "snmp.bgp.peers.availability" && chartLabels(candidate)["neighbor"] == "192.0.2.1" {
+			chart = candidate
+			break
+		}
+	}
 	require.NotNil(t, chart)
 	assert.Equal(t, "snmp.bgp.peers.availability", chart.Ctx)
+	require.Len(t, chart.Dims, 2)
+	dimensions := make(map[string]int64, len(chart.Dims))
+	for _, dim := range chart.Dims {
+		require.Contains(t, mx, dim.ID)
+		dimensions[dim.Name] = mx[dim.ID]
+	}
+	assert.Equal(t, map[string]int64{"established": 1, "admin_enabled": 1}, dimensions)
 	assert.Equal(t, "198.51.100.1", chartLabels(chart)["local_address"])
 	assert.Equal(t, "Transit Peer", chartLabels(chart)["peer_description"])
 

@@ -101,35 +101,39 @@ func (cb *sdCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (sdConf
 	return cb.sd.prepareDyncfgConfig(fn, name)
 }
 
-func (cb *sdCallbacks) Start(fn dyncfg.Function, cfg sdConfig) error {
-	prepared, err := cb.sd.preparePipeline(fn.Context(), cfg)
-	if err != nil {
-		cb.sd.retainPendingPipeline(cfg, err)
-		return err
-	}
-	if err := cb.sd.mgr.StartPrepared(cb.sd.ctx, cfg.PipelineKey(), prepared); err != nil {
-		return err
-	}
-	cb.sd.cancelPendingPipeline(cfg)
-	return nil
+func (cb *sdCallbacks) Enable(cfg sdConfig) (func(), error) {
+	return cb.sd.mgr.enable(cfg, nil, nil)
 }
 
-func (cb *sdCallbacks) Update(fn dyncfg.Function, oldCfg, newCfg sdConfig) error {
+func (cb *sdCallbacks) PrepareUpdate(fn dyncfg.Function, oldCfg, newCfg sdConfig) (dyncfg.PreparedActivation, error) {
 	prepared, err := cb.sd.preparePipeline(fn.Context(), newCfg)
 	if err != nil {
-		return dyncfg.MarkNonDisruptiveUpdate(err)
+		return nil, err
 	}
-	if err := cb.sd.mgr.RestartPrepared(cb.sd.ctx, newCfg.PipelineKey(), prepared); err != nil {
-		return err
-	}
-	cb.sd.cancelPendingPipeline(newCfg)
-	return nil
+	return &sdPreparedActivation{
+		manager:  cb.sd.mgr,
+		old:      oldCfg,
+		config:   newCfg,
+		pipeline: prepared,
+	}, nil
 }
 
-func (cb *sdCallbacks) Stop(cfg sdConfig) {
-	cb.sd.cancelPendingPipeline(cfg)
-	cb.sd.mgr.Stop(cfg.PipelineKey())
+type sdPreparedActivation struct {
+	manager     *PipelineManager
+	old, config sdConfig
+	pipeline    sdPipeline
 }
+
+func (p *sdPreparedActivation) Accept() (func(), error) {
+	published, err := p.manager.enable(p.config, p.pipeline, p.old)
+	if err == nil {
+		p.pipeline = nil
+	}
+	return published, err
+}
+func (p *sdPreparedActivation) Dispose() { p.pipeline = nil }
+
+func (cb *sdCallbacks) Stop(cfg sdConfig) { cb.sd.mgr.Stop(cfg.PipelineKey()) }
 
 func (cb *sdCallbacks) OnStatusChange(_ *dyncfg.Entry[sdConfig], _ dyncfg.Status, _ dyncfg.Function) {
 }
@@ -144,7 +148,7 @@ func (cb *sdCallbacks) ConfigType(sdConfig) dyncfg.ConfigType {
 
 // dyncfgConfig is the handler for dyncfg config commands.
 // Read-only commands (schema, get, userconfig) are executed directly.
-// State-changing commands are queued for serial execution.
+// State-changing commands use the registered prepared-command port.
 func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 	if err := fn.ValidateArgs(2); err != nil {
 		d.Warningf("dyncfg: %v", err)
@@ -169,35 +173,7 @@ func (d *ServiceDiscovery) dyncfgConfig(fn dyncfg.Function) {
 		return
 	}
 
-	// State-changing commands are queued for serial execution.
-	d.enqueueDyncfgFunction(fn)
-}
-
-// dyncfgSeqExec executes state-changing dyncfg commands serially.
-func (d *ServiceDiscovery) dyncfgSeqExec(fn dyncfg.Function) {
-	// Linearize physical start before checking cancellation: cancellation
-	// either wins first, or its response owner must wait for completion.
-	d.startDyncfg(fn)
-	if dyncfgFunctionContext(fn).Err() != nil {
-		return
-	}
-	d.handler.SyncDecision(fn)
-
-	switch fn.Command() {
-	case dyncfg.CommandAdd:
-		d.handler.CmdAdd(fn)
-	case dyncfg.CommandUpdate:
-		d.handler.CmdUpdate(fn)
-	case dyncfg.CommandEnable:
-		d.handler.CmdEnable(fn)
-	case dyncfg.CommandDisable:
-		d.handler.CmdDisable(fn)
-	case dyncfg.CommandRemove:
-		d.handler.CmdRemove(fn)
-	default:
-		d.Warningf("dyncfg: command '%s' not implemented", fn.Command())
-		d.dyncfgApi.SendCodef(fn, 501, "Command '%s' is not implemented.", fn.Command())
-	}
+	d.dyncfgApi.SendCodef(fn, 501, "Command '%s' requires prepared execution.", fn.Command())
 }
 
 // dyncfgCmdSchema handles the schema command for templates and jobs
@@ -389,6 +365,7 @@ func (d *ServiceDiscovery) registerDyncfgTemplates(ctx context.Context) {
 	// Register prefix handler for config commands
 	// Wrap to convert functions.Function to dyncfg.Function
 	d.fnReg.RegisterPrefix("config", d.dyncfgSDPrefixValue(), dyncfg.WrapHandler(d.dyncfgConfig))
+	d.fnReg.RegisterCommandPreparer("config", d.dyncfgSDPrefixValue(), d.prepareDyncfgCommand)
 
 	// Register templates for each discoverer type
 	for _, dt := range d.discovererRegistry().Types() {
