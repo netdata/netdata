@@ -120,30 +120,6 @@ Traces arrive through the same OpenTelemetry pipeline, so one data model covers 
 
 It ingests Prometheus, OpenTelemetry, Nagios plugins and StatsD, exports metrics to Prometheus, Graphite, OpenTSDB and other systems, and connects to AI assistants through its [MCP server](/docs/netdata-ai/mcp/README.md). The Agent is open source, and your data is never locked in.
 
-## How it feels to work with Netdata
-
-**You install it, open the dashboard, and the answers are already there.**
-
-### At 3 a.m.
-
-An alert fires. You open the node and every metric of that system is already collected, charted and organized in a table of contents that follows the data. You do not need to know a metric's name, write a query or build a dashboard. The anomaly ranking shows which metrics behaved unusually in the incident window, so you start from the most likely culprits instead of from a blank page.
-
-### In the middle of a crisis
-
-You can install Netdata while the incident is happening. The moment the Agent starts, you have real-time, per-second charts of everything on the system and AI-assisted troubleshooting. Machine learning needs about 15 minutes to build its first models and has no baseline for behavior before the install, so anomaly scores come later; the live data and the AI assistance are useful immediately.
-
-### For a large organization
-
-Every node is complete on its own. You add Parents for shared storage, longer history and high availability, and Netdata Cloud gives you one view of all of them. Teams see the same dashboards and the same structure across the whole fleet.
-
-### For a small team
-
-Nobody has to build the monitoring before it is useful. Install the Agent and the system is covered. Dashboards, alerts and anomaly detection exist from the first minute and follow the infrastructure as it changes.
-
-### For a dynamic environment
-
-New containers and nodes appear in the dashboards as soon as they exist, with the same coverage as everything else. Removed resources disappear, and machine learning models keep adapting to new behavior.
-
 ## How the pieces fit
 
 **Every Agent is complete on its own, Parents add shared storage and fleet capacity, and Netdata Cloud ties them together.**
@@ -212,6 +188,8 @@ Netdata is infrastructure and application observability. It is not a business-in
 - **AI:** ask Netdata AI, or connect any AI assistant through the [MCP server](/docs/netdata-ai/mcp/README.md).
 
 Custom dashboards are supported but optional: Netdata provides single-node, multi-node and infrastructure-level dashboards automatically.
+
+You can install Netdata during an incident: live per-second data and AI-assisted troubleshooting start immediately, and anomaly scores follow after about 15 minutes, once machine learning has built its first models.
 
 ## What you still do
 
