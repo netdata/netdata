@@ -6,7 +6,7 @@
     "properties": {
       "name": {
         "title": "Name",
-        "description": "Native job name used to identify this monitor and its history. Renaming creates a separate monitor.",
+        "description": "Job name. It identifies the journey in charts, alerts and run history, so renaming starts a separate history.",
         "type": "string",
         "minLength": 1
       },
@@ -17,17 +17,17 @@
       },
       "script": {
         "title": "Script",
-        "description": "Inline Playwright Test JavaScript or TypeScript source. Leave empty when using Script path.",
+        "description": "Playwright Test source code, in JavaScript or TypeScript. Set either this or `script_path`.",
         "type": "string"
       },
       "script_path": {
         "title": "Script path",
-        "description": "Absolute path to a readable Playwright Test JavaScript or TypeScript entry file. Leave empty when using Script.",
+        "description": "Absolute path to a Playwright Test file (.js, .ts, .mjs, .cjs, .mts or .cts) readable by the Netdata service account. Set either this or `script`.",
         "type": "string"
       },
       "secrets": {
         "title": "Secrets",
-        "description": "Credentials passed to the workflow as named environment variables. Leave empty for workflows without credentials.",
+        "description": "Credentials passed to the script as environment variables. Leave empty when the journey needs none.",
         "type": [
           "array",
           "null"
@@ -38,13 +38,13 @@
           "properties": {
             "name": {
               "title": "Environment name",
-              "description": "Unique environment variable name starting with DEM_SECRET_, followed by letters, digits or underscores.",
+              "description": "Environment variable name for the script, starting with `DEM_SECRET_` and followed by letters, digits or underscores. Names must be unique within the job.",
               "type": "string",
               "pattern": "^DEM_SECRET_[A-Za-z0-9_]+$"
             },
             "value": {
               "title": "Value",
-              "description": "Credential value or a native secret reference, such as ${env:WORKFLOW_PASSWORD}.",
+              "description": "Secret value. Prefer a secret reference, such as `${env:WORKFLOW_PASSWORD}`, over a literal value.",
               "type": "string"
             }
           },
@@ -56,39 +56,39 @@
       },
       "screenshot_on_failure": {
         "title": "Capture failure screenshot",
-        "description": "Save a screenshot when a workflow check fails. Screenshots can contain sensitive page content; timeout capture is best effort.",
+        "description": "Save a screenshot when a test fails. Screenshots can show sensitive page content.",
         "type": "boolean",
         "default": false
       },
       "trace_on_failure": {
         "title": "Capture failure trace",
-        "description": "Save a Playwright trace ZIP when a workflow check fails; requires failure screenshots and is disabled by default. ZIPs can contain raw passwords, cookies and request/response bodies without redaction.",
+        "description": "Save a Playwright trace when a test fails; requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.",
         "type": "boolean",
         "default": false
       },
       "browser_error_summary": {
         "title": "Collect browser error summary",
-        "description": "Collect bounded browser error counts and primitive samples from journey fixture contexts, including passing tests. Disabled by default; enabling can add substantial CPU and memory cost on console-heavy pages and retain sensitive text.",
+        "description": "Count uncaught exceptions, console errors, failed requests and HTTP error responses during every run, with a few samples of each. Adds CPU and memory use on pages that log heavily.",
         "type": "boolean",
         "default": false
       },
       "update_every": {
         "title": "Update every",
-        "description": "Chart refresh interval, in seconds; publishes the latest completed observation without starting a browser check. When upgrading an existing job, move its old browser interval to `check_every`.",
+        "description": "How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.",
         "type": "integer",
         "minimum": 1,
         "default": 10
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Browser attempt budget, in seconds, excluding time waiting for a browser slot. Journeys reserve up to 5 seconds (20% for budgets below 25 seconds) inside this budget for timeout reporting. Verified cleanup and persistence follow execution.",
+        "description": "Time limit for one run of the journey, in seconds. Time spent waiting for a free browser does not count.",
         "type": "number",
         "default": 120,
         "minimum": 0.001
       },
       "check_every": {
         "title": "Check every",
-        "description": "Browser check interval, in seconds. Checks start independently from chart refreshes; overloaded jobs keep only the newest pending check.",
+        "description": "How often to run the journey, in seconds.",
         "type": "integer",
         "minimum": 1,
         "maximum": 9223372036,
@@ -216,7 +216,7 @@
       "ui:help": "Charts of this job appear under the Virtual Node instead of this host. Define a static Virtual Node through `dem:vnode` or a YAML file in `vnodes/` under the Netdata configuration directory, then enter its reference name here. Leave empty to use the collecting Agent."
     },
     "trace_on_failure": {
-      "ui:help": "Recording adds CPU, memory and temporary disk use even on passing runs. ZIPs above 5 MiB are omitted; timeout capture is best effort. Download retained ZIPs and open them with the Playwright Trace Viewer.\n\nAfter downgrading to an Agent without trace support, capture sets containing traces cannot be read, including their screenshots, and are excluded from retention cleanup until re-upgrade."
+      "ui:help": "Recording runs during every run, including runs that pass, and adds CPU, memory and temporary disk use. Traces larger than 5 MiB are not kept.\n\nDownload a saved trace from the run's captures and open it with the Playwright Trace Viewer. Secrets are not masked inside traces."
     }
   }
 }
