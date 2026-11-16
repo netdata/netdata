@@ -1,8 +1,55 @@
 # Netdata Design
 
-**Netdata is designed to simplify and automate operations and troubleshooting: it ships finished, collects at high fidelity in real time, keeps your metrics, logs and traces where they are created, and scales out by adding Parents.** This document explains why Netdata is built this way and what that means for scale, availability, history, openness and the choices it makes for you.
+**Netdata is designed to simplify and automate operations and troubleshooting: it ships finished, collects at high fidelity in real time, keeps your metrics, logs and traces where they are created, and scales out by adding Parents.** This document explains why Netdata is built this way and what that means for scale, availability, history, openness and the values behind it.
 
 It is one of three core documents. [Welcome to Netdata](/docs/welcome-to-netdata.md) explains the outcomes and principles, this document explains the design behind them, and the [Complete Product Description](/docs/netdata-complete-product-description.md) lists every capability.
+
+## What Netdata values
+
+**These values shape every design decision in this document. Each one says what you get, why, and what delivers it.**
+
+### Understanding over traffic lights
+
+*You should be able to find the root cause and estimate the impact, not just learn that something is wrong.*
+
+- **Because:** a red light tells you something is wrong, not why, and the detail a tool drops is often the detail an incident needs. Making a lot of data simple to read is Netdata's job, not yours: consistent organization, machine learning on every metric and AI do that work.
+- **Delivered by:** per-second collection without sampling, anomaly detection on every metric, and AI that reasons from what changed together. See [Collect everything](#collect-everything-every-second-analyze-everything).
+
+### The answer is already there, from the first minute
+
+*When an incident starts, the chart and the alert you need already exist.*
+
+- **Because:** nobody has the time or the discipline to chart everything by hand, so the missing view is always the one an incident needs. Netdata collects everything it finds and charts everything it collects, right after installation, with no project to finish first.
+- **Delivered by:** auto-discovery, dashboards that build themselves, and stock alerts. See [Dashboards that build themselves](#dashboards-that-build-themselves).
+
+### High fidelity over a central database
+
+*Every metric, every second, from every component, at full resolution however large the infrastructure grows.*
+
+- **Because:** fidelity is what makes troubleshooting possible, and centralizing every metric at full resolution is what makes fidelity expensive. Storing data as close to its source as possible keeps full resolution and cardinality affordable at any scale. Your data stays on your infrastructure as a natural result.
+- **Scaling:** Parent clusters are independent shards, so you grow by adding capacity, with no coordination between shards. Netdata Cloud combines them into one view.
+- **Delivered by:** storage on Agents and Parents, independent Parent clusters, and queries that run where the data is. See [Data stays where it is created](#data-stays-where-it-is-created) and [Fleet-wide queries](#fleet-wide-queries).
+
+### Anyone on the team can use it
+
+*The on-call developer and the new hire can read it, not only the observability expert.*
+
+- **Because:** observability is for everyone, and an incident should not wait for the one person who knows the syntax. Netdata has a structured query API: the dashboard builds queries from your clicks, AI assistants build them from your questions, and your scripts and tools can call it directly.
+- **Delivered by:** point-and-click analysis, the same organization on every node, and plain-language questions through Netdata AI or any AI assistant.
+
+### Built-in expertise over hired specialists
+
+*No time-series database administrators, no dashboard engineers, no data scientists.*
+
+- **Because:** the tool should take work away from your team, not add jobs to it. Admins get to know Netdata the way they know any application they deploy: once, during setup. Your team runs Parents like any other service: there is no separate database to administer, no dashboards you must build and no models to train.
+- **Delivered by:** self-managing storage tiers and retention, automatic machine-learning training, and capacity that grows by adding Parents. See [Edge architecture](#edge-architecture-with-no-separate-database-to-operate).
+
+### Observability costs a fraction of the infrastructure it monitors
+
+*Every system needs observability, so it must be affordable for every system.*
+
+- **Because:** observability data is vast and short-lived, and only a small fraction of it is ever viewed. Paying to ship and store all of it centrally makes monitoring a major line item. Netdata keeps resource use per node low and stores data where it is generated: the Agent uses under 5% of one CPU core and about 200 MB of RAM on a typical server with default settings, and about 30 MiB on edge devices configured as a lightweight Child.
+- **Delivered by:** an efficient Agent, tiered storage on your own infrastructure, and no ingestion pipeline to pay for. See [History](#history-tiers-and-what-they-cost) and the [Netdata resource footprint](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 ## Observability should just work
 
@@ -185,16 +232,6 @@ Everything that collects, stores, analyzes, alerts on, streams and queries your 
 - **Embedding means calling the APIs.** Netdata's APIs are GPL, and anyone can embed API calls anywhere.
 - **Open in, open out.** Netdata ingests Prometheus and OpenTelemetry (metrics, logs and traces), Nagios plugins and StatsD, and can export metrics to Prometheus, Graphite, OpenTSDB and other systems when you want them elsewhere. Export is openness: your data is never locked in.
 - **Netdata is a complete platform on its own.** You do not need to run anything beside it to collect, store, visualize, alert on or analyze your data.
-
-## Design choices
-
-**These are choices Netdata makes for you, each with what Netdata does instead.**
-
-- **No query language required.** Netdata has a structured query API, and people never have to write queries for it: the dashboard builds them from your clicks, AI assistants build them from your questions, and your scripts and tools can call it directly. Nobody on the team has to learn a query language, and nobody has to write one during a crisis, when every minute counts.
-- **Metrics live on your Agents and Parents.** Netdata has no object-storage tier for metrics. Retention is bounded by the disk you give your Parents, and it is configurable per tier.
-- **Parent clusters are shards.** They do not talk to each other. The view across all of them is what Netdata Cloud provides, as SaaS or On-Prem, including air-gapped.
-- **Netdata is opinionated.** Every metric arrives with a ready-made chart and stock alerts, organized the same way across the infrastructure. Teams trade hand-built dashboards for coverage that is complete from the first minute, with nothing to maintain, and can still build custom dashboards whenever they want one.
-- **Netdata is infrastructure and application observability.** It is not a business-intelligence, SIEM, ITSM or data-warehouse platform; it can export metrics and forward logs and traces to the systems that are.
 
 ## Questions buyers ask
 
