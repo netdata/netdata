@@ -19,8 +19,8 @@ var checksMethod = method{
 		Title: "Synthetic monitors",
 		Help: "The current status of every active journey and Lighthouse job: its latest result and whether it " +
 			"is still fresh, its last success and failure, and whether its checks are waiting for a free browser. " +
-			"Disabled jobs and jobs that failed to start are not listed. Pass job_id for one job or kind (journey " +
-			"or lighthouse) for one kind. " + limitHelp + " " + rawfunc.VnodeHelp,
+			"Disabled jobs and jobs that failed to start are not listed. Pass job_id to show one job and kind " +
+			"(journey or lighthouse) to show one kind. " + limitHelp + " " + rawfunc.VnodeHelp,
 		Sort:        "job_id",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},

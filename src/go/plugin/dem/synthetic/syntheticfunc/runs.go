@@ -34,10 +34,10 @@ var (
 )
 
 // runsHelp follows each run history summary.
-var runsHelp = " Runs are selected by start time and show their latest outcome. after and before set the time " +
-	"range in Unix seconds, or negative seconds from now; before defaults to now and after to all saved history. " +
-	"Pass job_id for one job or outcome (such as failed or timeout) for one result. " + limitHelp + " " +
-	rawfunc.VnodeHelp
+var runsHelp = " Runs are selected by start time and show their latest outcome. Pass after and before (Unix " +
+	"seconds, or negative seconds from now) to set the time range; before defaults to now, and without after the " +
+	"range starts at the oldest saved run. Pass job_id to show one job and outcome (such as failed or timeout) to " +
+	"show runs with that outcome. " + limitHelp + " " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp
 
 func runsMethod(kind model.Kind, id, title, summary string, columns rawfunc.Columns[model.Run]) method {
 	return method{

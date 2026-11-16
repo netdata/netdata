@@ -115,15 +115,17 @@ func methodIDs(methods []funcapi.FunctionConfig) []string {
 }
 
 // The Cloud Function table offers no input for accepted parameters, so the help
-// is where an operator learns them. Every help names each parameter its method
-// accepts, and the methods with vnode selectors share one wording of their rule.
+// is where an operator learns them. Every help introduces each parameter its
+// method accepts ("Pass site", "and kind (", "as cursor", "(session_id)"), so a
+// common word such as site elsewhere in the prose does not count, and the
+// methods with vnode selectors share one wording of their rule.
 func TestFunctionHelpNamesAcceptedParameters(t *testing.T) {
 	for provider, methods := range declared {
 		for _, method := range methods {
 			t.Run(provider+"/"+method.ID, func(t *testing.T) {
 				for _, param := range method.AcceptedParams {
-					named := regexp.MustCompile(`(^|[^\w])` + regexp.QuoteMeta(param) + `([^\w]|$)`)
-					assert.Regexp(t, named, method.Help, "help must name accepted parameter %q", param)
+					introduced := regexp.MustCompile(`(?:[Pp]ass |and |or |as |\()` + regexp.QuoteMeta(param) + `\b`)
+					assert.Regexp(t, introduced, method.Help, "help must introduce accepted parameter %q", param)
 				}
 				if slices.Contains(method.AcceptedParams, "vnode") {
 					assert.Contains(t, method.Help, rawfunc.VnodeHelp)

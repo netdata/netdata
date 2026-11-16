@@ -17,7 +17,7 @@ var pagesMethod = method{
 		Title: "RUM Pages",
 		Help: "Every page of each site seen in the site's window (5 minutes by default), with views, sessions, " +
 			"errors, Web Vital p75 values and the element most involved in each vital. It lists all pages, not only " +
-			"the busiest ones that get breakdown charts. Pass site for one site. " + rawfunc.VnodeHelp,
+			"the busiest ones that get breakdown charts. Pass site to show one site. " + rawfunc.VnodeHelp,
 		Sort:        "pageviews_window",
 		UpdateEvery: 10,
 		Params:      []string{"site", "vnode", "vnode_guid"},

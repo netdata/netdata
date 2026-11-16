@@ -12,23 +12,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
-var errorsMethod = method{
+var errorsMethod = sampled(method{
 	Method: rawfunc.Method{
 		ID:    "rum-errors",
 		Title: "RUM Errors",
 		Help: "Saved JavaScript errors received by the Agent in the time range, grouped by fingerprint, with " +
-			"counts and a sample stack. " + samplingCaveat + " Pass fingerprint to show only that error, with its " +
-			"affected sessions, top page and browsers. " + historyRangeHelp + " Pass site for one site. " +
-			rawfunc.VnodeHelp,
+			"counts and a sample stack. Pass fingerprint to show only that error, with its affected sessions, top " +
+			"page and browsers. " + historyRangeHelp + " Pass site to show one site. " + rawfunc.VnodeHelp + " " +
+			rawfunc.RecordedVnodeHelp,
 		Sort:        "count_window",
 		UpdateEvery: 10,
 		History:     true,
 		Params:      []string{"site", "vnode", "vnode_guid", "fingerprint", "after", "before"},
 		Columns:     errorsColumns.Build(),
 	},
-	samplingHelp: true,
-	rows:         (*Handler).errorsRows,
-}
+	rows: (*Handler).errorsRows,
+})
 
 // errorRow is one error group with the request time.
 type errorRow struct {

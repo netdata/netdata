@@ -15,8 +15,8 @@ var sessionEventsMethod = method{
 		ID:    "rum-session-events",
 		Title: "RUM Session Events",
 		Help: "The timeline of one session (session_id) in the order the Agent received its events, with trace " +
-			"IDs of traced requests. It includes events not saved yet and events outside the time range. " +
-			"Pass site for one site. " + rawfunc.VnodeHelp,
+			"IDs of traced requests. It ignores the time range and includes events not saved yet. Pass site to " +
+			"show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "ts",
 		UpdateEvery: 10,
 		History:     true,

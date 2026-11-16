@@ -16,9 +16,10 @@ var liveMethod = method{
 		ID:    "rum-live",
 		Title: "RUM Live",
 		Help: "Recent events of each site in arrival order: page views, application views, Web Vital reports " +
-			"and errors. Each request returns up to " + strconv.Itoa(rawfunc.MaxRows) + " events; pass the " +
-			"response's next value as cursor to get the events that arrived after them (changing the virtual node " +
-			"selection starts over). Pass site for one site. " + rawfunc.VnodeHelp,
+			"and errors. Each request returns up to " + strconv.Itoa(rawfunc.MaxRows) + " events. A request " +
+			"without cursor starts at the oldest event still held; pass the response's next value as cursor to get " +
+			"the events after them (changing the virtual node selection starts over). Pass site to show one site. " +
+			rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "seq",
 		UpdateEvery: 2,
 		Params:      []string{"site", "vnode", "vnode_guid", "cursor"},

@@ -12,24 +12,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
-var sessionsMethod = method{
+var sessionsMethod = sampled(method{
 	Method: rawfunc.Method{
 		ID:    "rum-sessions",
 		Title: "RUM Sessions",
 		Help: "Saved RUM sessions with activity received by the Agent in the time range, most recent first; " +
-			"counts and durations cover only that range. " + samplingCaveat + " " + historyRangeHelp +
-			" user_id finds the sessions where that exact ID was seen in the range; a masked ID shown in the table " +
-			"may not match. Returns up to " + strconv.Itoa(rawfunc.MaxRows) + " sessions; truncated is true when " +
-			"more match. Pass site for one site. " + rawfunc.VnodeHelp,
+			"counts and durations cover only that range. " + historyRangeHelp + " Pass user_id to find the " +
+			"sessions where that exact ID was seen in the range; a masked ID shown in the table may not match. " +
+			"Returns up to " + strconv.Itoa(rawfunc.MaxRows) + " sessions; truncated is true when more match. " +
+			"Pass site to show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "last_observed_us",
 		UpdateEvery: 10,
 		History:     true,
 		Params:      []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
 		Columns:     sessionsColumns.Build(),
 	},
-	samplingHelp: true,
-	rows:         (*Handler).sessionsRows,
-}
+	rows: (*Handler).sessionsRows,
+})
 
 // sessionRow is one session summary with the request time.
 type sessionRow struct {

@@ -33,10 +33,13 @@ const (
 // pages and session summaries use the same bound.
 const MaxRows = 2000
 
-// VnodeHelp states the vnode selector rule that resolveVnode enforces. It ends
-// the help of every method that accepts vnode and vnode_guid.
-const VnodeHelp = "For one virtual node, pass vnode (its configured name) or vnode_guid (its GUID, also one no " +
-	"longer configured), not both."
+// VnodeHelp states the vnode selector rule that resolveVnode enforces, in the
+// help of every method that accepts vnode and vnode_guid.
+const VnodeHelp = "For one virtual node, pass vnode (its configured name) or vnode_guid (its GUID), not both."
+
+// RecordedVnodeHelp follows VnodeHelp in methods whose rows keep the GUID they
+// were recorded under; methods showing current state filter on the current one.
+const RecordedVnodeHelp = "Data of a virtual node no longer configured is still found by its vnode_guid."
 
 // Permitted reports whether the request's access mask holds every required bit.
 func Permitted(req funcapi.RawMethodRequest, required uint64) bool {

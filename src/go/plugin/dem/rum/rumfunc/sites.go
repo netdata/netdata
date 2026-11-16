@@ -21,7 +21,7 @@ var sitesMethod = method{
 			"capture settings, and recent traffic, including the last accepted report and the last refused origin. " +
 			"Start here when a site shows no data. The script URL and tag stay empty until the site or the receiver " +
 			"has a public_url. The response's collector object shows the receiver's state and GeoIP database. " +
-			"Pass site for one site. " + rawfunc.VnodeHelp,
+			"Pass site to show one site. " + rawfunc.VnodeHelp,
 		Sort:        "site",
 		UpdateEvery: 10,
 		Params:      []string{"site", "vnode", "vnode_guid"},

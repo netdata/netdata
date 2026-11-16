@@ -42,8 +42,8 @@ var method = rawfunc.Method{
 	ID:    "dem-history-status",
 	Title: "DEM History Status",
 	Help: "Status of the history storage shared by RUM and synthetic monitoring: retention policy, journal " +
-		"size (including preallocated space) and file count, cleanup times, and any cleanup, writer or " +
-		"configuration reload error. It cannot show whether history is complete or how far back it reaches.",
+		"size (including preallocated space) and file count, cleanup times, and any inventory, cleanup, writer " +
+		"or configuration reload error. It cannot show whether history is complete or how far back it reaches.",
 	Sort:        "observed_us",
 	UpdateEvery: 60,
 	Columns:     statusColumns.Build(),

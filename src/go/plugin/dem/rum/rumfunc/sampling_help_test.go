@@ -100,9 +100,9 @@ func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {
 					assert.Contains(t, help, "earlier sampling policy")
 					assert.Contains(t, help, "does not estimate all visitors or errors")
 					if tc.biased {
-						assert.Contains(t, help, "failures are over-represented")
+						assert.Contains(t, help, "are over-represented")
 					} else {
-						assert.NotContains(t, help, "failures are over-represented")
+						assert.NotContains(t, help, "are over-represented")
 					}
 				}
 			})

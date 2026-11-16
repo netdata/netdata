@@ -12,7 +12,7 @@ import (
 const defaultRangeSeconds = 15 * 60
 
 // historyRangeHelp describes the after and before arguments of historyRange.
-var historyRangeHelp = "after and before set the time range in Unix seconds, or negative seconds from now; " +
+var historyRangeHelp = "Pass after and before (Unix seconds, or negative seconds from now) to set the time range; " +
 	"before defaults to now and after to " + strconv.Itoa(defaultRangeSeconds/60) + " minutes before it."
 
 func historyRange(args map[string]string, now int64) (int64, int64, error) {

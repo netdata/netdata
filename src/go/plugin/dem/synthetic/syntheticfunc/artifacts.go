@@ -18,10 +18,10 @@ var artifactsMethod = method{
 		ID:    "synthetics-artifacts",
 		Title: "Retained synthetic captures",
 		Help: "Saved captures (screenshots, Playwright traces and Lighthouse reports), one set per run, newest " +
-			"first. They are kept apart from run history, so they can outlive it until they expire; the storage " +
-			"object shows the retention policy, size and cleanup state of all captures. Pass job_id for one job. " +
-			limitHelp + " Pass the response's next value as cursor for the next page; retention can remove sets " +
-			"between pages. " + rawfunc.VnodeHelp,
+			"first. They are kept apart from run history, so they can outlive it until retention removes them; the " +
+			"storage object shows the retention policy, size and cleanup state of all captures. Pass job_id to " +
+			"show one job. " + limitHelp + " Pass the response's next value as cursor for the next page; retention " +
+			"can remove sets between pages. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "published_us",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "cursor", "limit", "vnode", "vnode_guid"},

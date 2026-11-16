@@ -13,8 +13,8 @@ import (
 )
 
 // limitHelp describes the limit argument of rowLimit and the truncated response field.
-var limitHelp = "limit caps the rows (1 to " + strconv.Itoa(rawfunc.MaxRows) + ", default " +
-	strconv.Itoa(rawfunc.MaxRows) + "); truncated is true when more match."
+var limitHelp = "Pass limit (1 to " + strconv.Itoa(rawfunc.MaxRows) + ", default " +
+	strconv.Itoa(rawfunc.MaxRows) + ") to cap the rows; truncated is true when more match."
 
 func rowLimit(value string) (int, error) {
 	if value == "" {
