@@ -27,6 +27,7 @@ func TestMissingInstallationLeavesRUMSetupAvailable(t *testing.T) {
 	require.NoError(t, handle.Close())
 	require.NoError(t, handle.Close())
 }
+
 func TestPreloadedRuntimeRequiresProtectedInstallation(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Mode = ModePreloaded

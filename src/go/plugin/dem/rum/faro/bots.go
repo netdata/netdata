@@ -17,11 +17,14 @@ type contextRule struct {
 	notAfter  []string
 }
 
-var (
-	botOnce    sync.Once
-	botEntries []*regexp.Regexp
-	botRules   []contextRule
-)
+// botList is the compiled isbot list: the plain entries, matched one at a
+// time, and the look-around entries.
+type botList struct {
+	entries []*regexp.Regexp
+	rules   []contextRule
+}
+
+var compiledBots = sync.OnceValue(compileBots)
 
 // botFolded is every plain entry as one case-folding expression. Matching it
 // walks all alternatives for each input character, so it serves only input
@@ -31,23 +34,26 @@ var botFolded = sync.OnceValue(func() *regexp.Regexp {
 	return regexp.MustCompile("(?i)" + strings.Join(botPatternsRE2, "|"))
 })
 
-func compileBots() {
+func compileBots() *botList {
 	// Entries are lower-case; compiled separately they match lower-cased ASCII
 	// text exactly like botFolded, and literal entries use substring search.
-	botEntries = make([]*regexp.Regexp, len(botPatternsRE2))
+	entries := make([]*regexp.Regexp, len(botPatternsRE2))
 	for i, entry := range botPatternsRE2 {
-		botEntries[i] = regexp.MustCompile(entry)
+		entries[i] = regexp.MustCompile(entry)
 	}
 	rule := func(core string, notBefore, notAfter []string) contextRule {
 		return contextRule{regexp.MustCompile(core), notBefore, notAfter}
 	}
-	botRules = []contextRule{
-		rule(`news`, []string{"g"}, []string{"sapphire"}),
-		rule(`google`, []string{" channel/", "google/"}, []string{"wv", "app", "/google", " pixel"}),
-		rule(`bots?(?:\b|_)`, []string{" cu"}, nil),
-		rule(`scan`, []string{"cam"}, nil),
-		rule(`http`, []string{"lib"}, nil),
-		rule(`java`, nil, []string{";"}),
+	return &botList{
+		entries: entries,
+		rules: []contextRule{
+			rule(`news`, []string{"g"}, []string{"sapphire"}),
+			rule(`google`, []string{" channel/", "google/"}, []string{"wv", "app", "/google", " pixel"}),
+			rule(`bots?(?:\b|_)`, []string{" cu"}, nil),
+			rule(`scan`, []string{"cam"}, nil),
+			rule(`http`, []string{"lib"}, nil),
+			rule(`java`, nil, []string{";"}),
+		},
 	}
 }
 
@@ -57,10 +63,10 @@ func IsBot(ua string) bool {
 	if ua == "" {
 		return false
 	}
-	botOnce.Do(compileBots)
+	bots := compiledBots()
 	lower := strings.ToLower(ua)
 	if isASCII(ua) {
-		for _, entry := range botEntries {
+		for _, entry := range bots.entries {
 			if entry.MatchString(lower) {
 				return true
 			}
@@ -68,7 +74,7 @@ func IsBot(ua string) bool {
 	} else if botFolded().MatchString(ua) {
 		return true
 	}
-	for _, r := range botRules {
+	for _, r := range bots.rules {
 		for _, m := range r.core.FindAllStringIndex(lower, -1) {
 			if !endsWithAny(lower[:m[0]], r.notBefore) && !startsWithAny(lower[m[1]:], r.notAfter) {
 				return true

@@ -28,10 +28,12 @@ type Observations interface {
 	Snapshot(time.Time) []registry.Job
 	Latest(jobID, runID string) (synthetic.Run, bool)
 }
+
 type History interface {
 	QueryRuns(context.Context, history.RunFilter) (history.RunPage, error)
 	GetRun(context.Context, string, string) (synthetic.Run, error)
 }
+
 type Artifacts interface {
 	Catalogue(context.Context, artifacts.Filter) (artifacts.Page, error)
 	Manifest(context.Context, string, string) (artifacts.Manifest, error)

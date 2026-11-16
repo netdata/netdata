@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 //go:build !linux
 
 package main
@@ -19,9 +20,11 @@ type nativeChild struct{}
 func nativeServiceAccount() (nativeIdentity, error) {
 	return nativeIdentity{}, errNativeCommandPlatform
 }
+
 func newNativeChild(nativeIdentity, io.Writer) (*nativeChild, error) {
 	return nil, errNativeCommandPlatform
 }
+
 func (*nativeChild) run(context.Context, string, []byte) ([]byte, error) {
 	return nil, errNativeCommandPlatform
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package main
 
 import (
@@ -117,6 +118,7 @@ func (w *functionWire) Write(p []byte) (int, error) {
 	defer w.mu.Unlock()
 	return w.buffer.Write(p)
 }
+
 func (w *functionWire) String() string { w.mu.Lock(); defer w.mu.Unlock(); return w.buffer.String() }
 
 // demAgent is an Agent composed like dem.plugin, driven over its Function wire.

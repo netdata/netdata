@@ -180,13 +180,9 @@ func TestRuntimeStatusReportsUnknownWhenSafetyStructureIsMissing(t *testing.T) {
 // Only authentic release inputs can establish both workload qualifications.
 func realAdminInputs(t *testing.T) (manifest, archive, publicKey string) {
 	t.Helper()
-	manifest, archive, helper := os.Getenv(
-		"DEM_RUNTIME_TEST_RELEASE",
-	), os.Getenv(
-		"DEM_RUNTIME_TEST_ARCHIVE",
-	), os.Getenv(
-		"DEM_RUNTIME_TEST_HELPER",
-	)
+	manifest = os.Getenv("DEM_RUNTIME_TEST_RELEASE")
+	archive = os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")
+	helper := os.Getenv("DEM_RUNTIME_TEST_HELPER")
 	publicKey = os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
 		t.Skip(

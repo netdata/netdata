@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -33,6 +34,7 @@ func newDiagnosticStream(r *textRedactor, emit func(string)) *diagnosticStream {
 		emit:   emit,
 	}
 }
+
 func (d *diagnosticStream) write(value string) {
 	if d.ended {
 		return
@@ -44,6 +46,7 @@ func (d *diagnosticStream) write(value string) {
 		d.drain(false)
 	}
 }
+
 func (d *diagnosticStream) end() {
 	if d.ended {
 		return
@@ -58,6 +61,7 @@ func (d *diagnosticStream) end() {
 		d.flushLine()
 	}
 }
+
 func (d *diagnosticStream) drain(final bool) {
 	pending := d.pending.Bytes()
 	safe := max(0, len(pending)-d.redact.longest+1)
@@ -127,6 +131,7 @@ func secretPrefixSuffix(value []byte, secret string) int {
 	}
 	return n
 }
+
 func (d *diagnosticStream) decoded(value string) {
 	value = d.utf8Tail + value
 	d.utf8Tail = ""
@@ -140,6 +145,7 @@ func (d *diagnosticStream) decoded(value string) {
 		d.character(r)
 	}
 }
+
 func (d *diagnosticStream) character(r rune) {
 	// Generic pattern redaction recognizes whole multiline PEM blocks. Suppress from
 	// the BEGIN prefix through the END line, without retaining the block itself.
@@ -197,6 +203,7 @@ func (d *diagnosticStream) character(r rune) {
 	}
 	d.line = append(d.line, r)
 }
+
 func (d *diagnosticStream) flushLine() {
 	line := string(d.line)
 	d.line = nil

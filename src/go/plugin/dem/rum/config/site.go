@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package config declares the RUM receiver and site configuration, validates it, and derives the effective capture
+// and sampling policy.
 package config
 
 import "regexp"
@@ -113,6 +115,7 @@ func (s Site) Secrets() []string {
 	}
 	return secrets
 }
+
 func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.IncludeConsoleLogs }
 
 // Effective returns defaults without changing the stored configuration.

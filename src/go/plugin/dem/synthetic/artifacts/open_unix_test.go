@@ -1,6 +1,7 @@
 //go:build unix
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts_test
 
 import (

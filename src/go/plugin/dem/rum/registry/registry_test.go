@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package registry_test
 
 import (
@@ -10,12 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
@@ -95,6 +94,7 @@ func TestRetirementInterruptsNetworkBody(t *testing.T) {
 	_, _, _, ok := hub.AcquireSite("shop")
 	assert.False(t, ok)
 }
+
 func TestRetirementIsIndependentAndGenerationFenced(t *testing.T) {
 	hub := rumregistry.New()
 	oldRetire, err := hub.Register("first", &rumregistry.Site{
@@ -139,6 +139,7 @@ func TestRetirementIsIndependentAndGenerationFenced(t *testing.T) {
 	assert.Equal(t, "new", data.Generation)
 	end()
 }
+
 func TestReceiverAvailabilityIsGenerationFenced(t *testing.T) {
 	hub := rumregistry.New()
 	assert.Equal(t, rumregistry.Availability{

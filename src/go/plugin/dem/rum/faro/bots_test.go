@@ -131,12 +131,11 @@ func referenceIsBot(ua string) bool {
 	if ua == "" {
 		return false
 	}
-	botOnce.Do(compileBots)
 	if botFolded().MatchString(ua) {
 		return true
 	}
 	lower := strings.ToLower(ua)
-	for _, r := range botRules {
+	for _, r := range compiledBots().rules {
 		for _, m := range r.core.FindAllStringIndex(lower, -1) {
 			if !endsWithAny(lower[:m[0]], r.notBefore) && !startsWithAny(lower[m[1]:], r.notAfter) {
 				return true

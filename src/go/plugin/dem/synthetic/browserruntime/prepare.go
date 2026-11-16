@@ -121,7 +121,10 @@ func (s *Store) prepare(ctx context.Context, m Manifest, open func() (io.ReadClo
 		} else if !errors.Is(err, ErrUnavailable) {
 			return err
 		}
-		if err := s.root.Rename(filepath.Join(name, "payload"), filepath.Join("generations", m.Archive.SHA256)); err != nil {
+		if err := s.root.Rename(
+			filepath.Join(name, "payload"),
+			filepath.Join("generations", m.Archive.SHA256),
+		); err != nil {
 			return err
 		}
 		if err := errors.Join(syncDirectory(s.root, name), syncDirectory(s.root, "generations")); err != nil {
@@ -238,7 +241,13 @@ func (s *Store) preparationBytes(m Manifest) (int64, error) {
 		return 0, err
 	}
 	var total int64
-	for _, amount := range []int64{m.Archive.Bytes, m.Archive.ExpandedBytes, int64(len(fonts) + len(launcher)), 2 * int64(len(g)+1), 2 * int64(len(r)+1)} {
+	for _, amount := range []int64{
+		m.Archive.Bytes,
+		m.Archive.ExpandedBytes,
+		int64(len(fonts) + len(launcher)),
+		2 * int64(len(g)+1),
+		2 * int64(len(r)+1),
+	} {
 		if amount > math.MaxInt64-total {
 			return 0, errors.New("runtime reservation size overflows")
 		}

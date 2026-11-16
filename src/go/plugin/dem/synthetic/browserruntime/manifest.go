@@ -101,7 +101,14 @@ func (m Manifest) Validate() error {
 	if a.URL != "" && !ValidHTTPSURL(a.URL) {
 		return errors.New("runtime download requires an installed HTTPS URL without credentials")
 	}
-	for _, name := range []string{m.Layout.EntryPoint, m.Layout.Node, m.Layout.Dependencies, m.Layout.Browser, m.Layout.Loader, m.Layout.Fonts} {
+	for _, name := range []string{
+		m.Layout.EntryPoint,
+		m.Layout.Node,
+		m.Layout.Dependencies,
+		m.Layout.Browser,
+		m.Layout.Loader,
+		m.Layout.Fonts,
+	} {
 		if !localName(name) || reservedName(name) {
 			return errors.New("invalid runtime layout path")
 		}

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package rum implements the rum module, one job per monitored site. The job owns the site's aggregator, history
+// writer and optional OTLP exports, admits the site's route to the RUM registry while it runs, and publishes the
+// site's metrics.
 package rum
 
 import (
@@ -31,10 +34,12 @@ type Config struct {
 	Window      confopt.Duration `yaml:"window"                 json:"window"`
 	config.Site `yaml:",inline" json:""`
 }
+
 type Dependencies struct {
 	Registry *rumregistry.Registry
 	History  *rumhistory.Store
 }
+
 type Collector struct {
 	collectorapi.Base
 	Config     `yaml:",inline" json:""`
@@ -58,6 +63,7 @@ func Creator(deps Dependencies) collectorapi.Creator {
 		StoreFirst:      true,
 	}
 }
+
 func New(deps Dependencies) *Collector {
 	return &Collector{
 		Config: Config{
@@ -72,11 +78,13 @@ func New(deps Dependencies) *Collector {
 		store: metrix.NewCollectorStore(),
 	}
 }
+
 func (c *Collector) Configuration() any {
 	cfg := c.Config
 	cfg.Site = cfg.Site.Effective()
 	return cfg
 }
+
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }
 

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum_test
 
 import (
@@ -8,11 +9,10 @@ import (
 	"testing"
 	"time"
 
-	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -1,6 +1,7 @@
 //go:build linux
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package dem_test
 
 import (
@@ -284,8 +285,7 @@ func TestPreparedLinuxRuntime(t *testing.T) {
 			require.NoError(t, err)
 			assert.Empty(t, page.Runs, "draft must not enter retained history")
 			require.NotNil(t, collector)
-			collector.MetricStore().
-				Read(metrix.ReadRaw(), metrix.ReadFlatten()).
+			collector.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()).
 				ForEachSeries(func(name string, _ metrix.LabelView, _ metrix.SampleValue) {
 					t.Errorf("draft published metric %s", name)
 				})

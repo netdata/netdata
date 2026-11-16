@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package dem
 
 import (
@@ -15,6 +16,7 @@ type RetentionConfig struct {
 	Days     int   `yaml:"days"`
 	MaxBytes int64 `yaml:"max_bytes"`
 }
+
 type BrowserConfig struct {
 	Concurrency int `yaml:"concurrency"`
 }

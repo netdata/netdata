@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -346,6 +347,7 @@ func validDetail(f synthetic.FailureDetail) bool {
 func evidenceText(value string, limit int, redact *textRedactor) (string, bool) {
 	return clippedEvidenceText(redact.redacted(value), limit)
 }
+
 func clippedEvidenceText(value string, limit int) (string, bool) {
 	clipped := utf8.RuneCountInString(value) > textLimit
 	value = clip(value)

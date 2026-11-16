@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package history persists synthetic run start and completion records in the command-owned DEM journal and reduces
+// them back into runs for queries.
 package history
 
 import (
@@ -18,6 +20,7 @@ func NewStore(store *journalstore.Store) *Store {
 		store: store,
 	}
 }
+
 func (s *Store) Sync(ctx context.Context) error { return s.store.Sync(ctx) }
 
 type RunFilter struct {
@@ -29,6 +32,7 @@ type RunFilter struct {
 	Before    *int64
 	Limit     int
 }
+
 type RunPage struct {
 	Runs      []synthetic.Run
 	Truncated bool

@@ -28,10 +28,12 @@ func New(deps Deps, policyError func() string) *Handler {
 		policyError: policyError,
 	}
 }
+
 func (h *Handler) Cleanup(context.Context) {}
 func (h *Handler) MethodParams(context.Context, string) ([]funcapi.ParamConfig, error) {
 	return nil, nil
 }
+
 func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funcapi.FunctionResponse {
 	return funcapi.ErrorResponse(400, "raw history status request required")
 }
@@ -81,12 +83,14 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	})}
 	return funcapi.RawResponse(response)
 }
+
 func timestamp(t time.Time) any {
 	if t.IsZero() {
 		return nil
 	}
 	return t.UnixMicro()
 }
+
 func nullable(s string) any {
 	if s == "" {
 		return nil

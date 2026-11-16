@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
@@ -15,11 +16,13 @@ type counterMetric struct {
 	name       string
 	instrument metrix.SnapshotCounter
 }
+
 type percentileMetrics struct{ p50, p75, p95, observations metrix.SnapshotGauge }
 type vitalMetrics struct {
 	percentileMetrics
 	good, needsImprovement, poor metrix.SnapshotGauge
 }
+
 type collectorMetrics struct {
 	meter                                                                         metrix.SnapshotMeter
 	ingress                                                                       metrix.StateSetInstrument
@@ -100,6 +103,7 @@ func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignal
 	}
 	return metrics
 }
+
 func newPercentileMetrics(m metrix.SnapshotMeter, name string) percentileMetrics {
 	return percentileMetrics{
 		p50:          m.Gauge(name+"_p50", metrix.WithFloat(true)),
@@ -108,6 +112,7 @@ func newPercentileMetrics(m metrix.SnapshotMeter, name string) percentileMetrics
 		observations: m.Gauge(name + "_observations"),
 	}
 }
+
 func (m percentileMetrics) observe(st aggregate.VitalStats) {
 	m.observations.Observe(float64(st.N))
 	if st.N == 0 {

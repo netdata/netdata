@@ -48,6 +48,7 @@ func (s *Store) QueryRuns(ctx context.Context, f RunFilter) (RunPage, error) {
 	}
 	return page, ctx.Err()
 }
+
 func (s *Store) GetRun(ctx context.Context, jobID, runID string) (synthetic.Run, error) {
 	if runID == "" {
 		return synthetic.Run{}, fmt.Errorf("run ID is required")

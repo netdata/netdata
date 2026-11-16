@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -26,6 +27,7 @@ func (r *fragmentReader) Read(p []byte) (int, error) {
 	}
 	return n, nil
 }
+
 func diagnosticText(events []synthetic.Event) string {
 	var b strings.Builder
 	for _, e := range events {
@@ -33,6 +35,7 @@ func diagnosticText(events []synthetic.Event) string {
 	}
 	return b.String()
 }
+
 func TestBootstrapStderrRedactsAcrossReadBoundaries(t *testing.T) {
 	s := newSink(
 		synthetic.Request{
@@ -104,6 +107,7 @@ func TestDiagnosticStreamsKeepBoundariesAndEvidence(t *testing.T) {
 		"structured evidence remains incremental while a stream is buffered",
 	)
 }
+
 func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	secret := strings.Repeat("private-fixture-", 300)
 	s := newSink(synthetic.Request{
@@ -136,6 +140,7 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 		assert.LessOrEqual(t, utf8.RuneCountInString(event.Message), textLimit)
 	}
 }
+
 func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {
 	values := map[string]string{
 		"DEM_SECRET_A": "abc",

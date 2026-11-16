@@ -33,16 +33,8 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 	t.Helper()
 	root := t.TempDir()
 	user, stock = filepath.Join(root, "user"), filepath.Join(root, "stock")
-	buildUser, buildStock, cli = filepath.Join(
-		root,
-		"build-user",
-	), filepath.Join(
-		root,
-		"build-stock",
-	), filepath.Join(
-		root,
-		"cli",
-	)
+	buildUser, buildStock = filepath.Join(root, "build-user"), filepath.Join(root, "build-stock")
+	cli = filepath.Join(root, "cli")
 	for _, dir := range []string{user, stock, buildUser, buildStock, cli} {
 		require.NoError(t, os.MkdirAll(dir, 0700))
 	}

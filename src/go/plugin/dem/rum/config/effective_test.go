@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package config
 
 import (
@@ -109,4 +110,5 @@ func TestDisabledDestinationsRetainButDoNotValidate(t *testing.T) {
 	require.Equal(t, s.EventLogs, round.EventLogs)
 	require.Equal(t, s.Tracing, round.Tracing)
 }
+
 func stringPtr(s string) *string { return &s }

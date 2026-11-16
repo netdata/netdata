@@ -342,6 +342,7 @@ func TestRuntimeEnsureReportsRefusalsBeforeStorage(t *testing.T) {
 	assert.Empty(t, result.stderr)
 	assert.NoDirExists(t, filepath.Dir(cache))
 }
+
 func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 	for _, args := range [][]string{
 		{"runtime"}, {"runtime", "unknown"}, {"runtime", "status", "stray"}, {"runtime", "install", "--url", "https://arbitrary.invalid"},
@@ -352,6 +353,7 @@ func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 		t.Run(args[len(args)-1], func(t *testing.T) { _, err := runtimeCommand(t, args...); require.Error(t, err) })
 	}
 }
+
 func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 	for _, command := range []string{"install", "update", "repair", "preload"} {
 		t.Run(command, func(t *testing.T) {
@@ -386,6 +388,7 @@ func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
 		})
 	}
 }
+
 func TestRuntimeSelectionCommandsDoNotRequireOriginalDescriptor(t *testing.T) {
 	for _, command := range []string{"status", "qualify", "uninstall"} {
 		t.Run(command, func(t *testing.T) {
@@ -399,6 +402,7 @@ func TestRuntimeSelectionCommandsDoNotRequireOriginalDescriptor(t *testing.T) {
 		})
 	}
 }
+
 func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 	dir := t.TempDir()
 	require.NoError(

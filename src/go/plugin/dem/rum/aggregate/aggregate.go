@@ -23,7 +23,8 @@ const (
 	KindVersion = "version"
 )
 
-// versionTopN is the fixed top-N for the version breakdown ("top-10 by pageviews"); unlike page/country it has no per-site config.
+// versionTopN is the fixed top-N for the version breakdown ("top-10 by
+// pageviews"); unlike page/country it has no per-site config.
 const versionTopN = 10
 
 // Other is the display value of a synthetic fold; output also carries a typed flag.
@@ -44,7 +45,9 @@ const (
 )
 
 var frustrationCounters = map[string]string{
-	beacon.RageClickEvent: CounterRageClicks, beacon.DeadClickEvent: CounterDeadClicks, beacon.ErrorClickEvent: CounterErrorClicks,
+	beacon.RageClickEvent:  CounterRageClicks,
+	beacon.DeadClickEvent:  CounterDeadClicks,
+	beacon.ErrorClickEvent: CounterErrorClicks,
 }
 
 const (
@@ -134,6 +137,7 @@ type vitalIdentity struct {
 	revision uint64
 	attrs    *attributes
 }
+
 type activityObservation struct {
 	attrs                                  *attributes
 	documents, views, errors, frustrations uint64

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts
 
 import (
@@ -14,6 +15,7 @@ type Policy struct {
 	Days     int   `json:"days"`
 	MaxBytes int64 `json:"max_bytes"`
 }
+
 type Cleanup struct {
 	AttemptedUS  int64  `json:"attempted_us"`
 	SuccessfulUS int64  `json:"successful_us"`

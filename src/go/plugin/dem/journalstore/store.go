@@ -112,6 +112,7 @@ func (s *Store) acquire(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
+
 func (s *Store) release() { <-s.gate }
 
 func (s *Store) Close() error {

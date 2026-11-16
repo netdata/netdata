@@ -16,10 +16,12 @@ type hostKey struct {
 	host    string
 	unknown bool
 }
+
 type resourcePopulation struct {
 	count  uint64
 	values []float64
 }
+
 type ResourceHostGroup struct {
 	Host     string
 	Other    bool
@@ -81,6 +83,7 @@ func (r *windowRead) addResource(v *activityObservation) {
 		r.api = append(r.api, resource.DurationMS)
 	}
 }
+
 func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 	var keys []hostKey
 	for key := range r.resourceGroups {

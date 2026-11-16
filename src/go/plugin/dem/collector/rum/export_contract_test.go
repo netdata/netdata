@@ -73,6 +73,7 @@ func (s *contractTraces) Export(
 	}
 	return &coltraces.ExportTraceServiceResponse{}, nil
 }
+
 func contractReceiver(t *testing.T, reject bool) (string, *contractLogs, *contractTraces) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -88,6 +89,7 @@ func contractReceiver(t *testing.T, reject bool) (string, *contractLogs, *contra
 	t.Cleanup(func() { srv.Stop(); <-done })
 	return "http://" + ln.Addr().String(), logs, traces
 }
+
 func contractSite(t *testing.T) (*rum.Collector, *rumregistry.Registry, *history.Store) {
 	t.Helper()
 	db, err := journalstore.Open(context.Background(), "")
@@ -101,6 +103,7 @@ func contractSite(t *testing.T) (*rum.Collector, *rumregistry.Registry, *history
 	site.Name, site.AllowedOrigins = "shop", []string{"https://example.org"}
 	return site, hub, store
 }
+
 func sendContractBeacon(t *testing.T, hub *rumregistry.Registry, body []byte) {
 	t.Helper()
 	req, err := http.NewRequest(
@@ -116,6 +119,7 @@ func sendContractBeacon(t *testing.T, hub *rumregistry.Registry, body []byte) {
 	require.NoError(t, res.Body.Close())
 	require.Equal(t, http.StatusAccepted, res.StatusCode)
 }
+
 func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts
 
 import (
@@ -8,7 +9,6 @@ import (
 	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 

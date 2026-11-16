@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package query
 
 import (
@@ -58,6 +59,7 @@ func (s *Service) Sessions(ctx context.Context, f SessionFilter) ([]Session, err
 	}
 	return rows, nil
 }
+
 func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID string) ([]SessionEvent, error) {
 	// Copy the bounded active ring before journal I/O, releasing leases before any I/O.
 	// A retiring generation can then flush while this query reads persisted data.
@@ -104,6 +106,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 	}
 	return rows, nil
 }
+
 func redactSessionEvent(row *history.SessionEventRecord, redact *redact.Redactor) {
 	row.UserID = redact.Apply(row.UserID)
 	row.Type = redact.Apply(row.Type)

@@ -187,7 +187,8 @@ func (t *timeline) recordPoorVitals(vitals []beacon.Vital, page string, now time
 		origin := t.context
 		originPage := page
 		if attrs := v.Origin; attrs != nil {
-			origin.browser, origin.device, origin.country, origin.version = attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
+			origin.browser, origin.device, origin.country, origin.version =
+				attrs.Browser, attrs.Device, attrs.Country, attrs.AppVersion
 			originPage = attrs.PageGroup
 		}
 		t.record(sessionEvent{

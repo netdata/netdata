@@ -37,13 +37,9 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
-		ErrorLog: stdlog.New(
-			io.Discard,
-			"",
-			0,
-		),
-		BaseContext: func(net.Listener) context.Context { return ctx },
-		TLSConfig:   c.tlsConfig,
+		ErrorLog:          stdlog.New(io.Discard, "", 0),
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+		TLSConfig:         c.tlsConfig,
 	}
 	srv.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()

@@ -83,6 +83,7 @@ func trustedFixture() browserruntime.Manifest {
 		},
 	}
 }
+
 func signedSetupFixture(t *testing.T) (Config, browserruntime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()

@@ -35,9 +35,7 @@ func (s *Store) EnforceHistoryRetention(ctx context.Context, days int, maxBytes 
 	if maxBytes < MinHistoryBytes {
 		return fmt.Errorf("history retention max_bytes must be at least %d: %d", MinHistoryBytes, maxBytes)
 	}
-	policy := journal.RetentionPolicy{}.
-		WithMaxAge(time.Duration(days) * 24 * time.Hour).
-		WithMaxBytes(uint64(maxBytes))
+	policy := journal.RetentionPolicy{}.WithMaxAge(time.Duration(days) * 24 * time.Hour).WithMaxBytes(uint64(maxBytes))
 	if err := s.log.SetRootRetentionPolicy(policy); err != nil {
 		return fmt.Errorf("set history retention policy: %w", s.recordFailure(err))
 	}

@@ -10,6 +10,7 @@ type errorPopulation struct {
 	count   uint64
 	message string
 }
+
 type ErrorChartGroup struct {
 	Fingerprint, Message string
 	Other                bool
@@ -30,6 +31,7 @@ func (r *windowRead) addError(v *activityObservation) {
 	}
 	g.count += v.errors
 }
+
 func (r *windowRead) rankErrorGroups() []ErrorChartGroup {
 	var keys []string
 	for key := range r.errorGroups {

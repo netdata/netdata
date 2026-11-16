@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package faro decodes Faro web SDK transport bodies into normalized beacons under the site's input policy
+// (normalization, redaction, error fingerprints, bot classification), and renders the pinned Faro bootstrap script
+// and assets.
 package faro
 
 import (

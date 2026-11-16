@@ -9,15 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
-	"google.golang.org/grpc"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	collogspb "go.opentelemetry.io/proto/otlp/collector/logs/v1"
+	"google.golang.org/grpc"
 )
 
 type processingLogs struct {

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package synthetic defines shared workflow values and pure request validation.
 package synthetic
 

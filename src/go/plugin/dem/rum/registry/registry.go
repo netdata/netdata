@@ -21,6 +21,7 @@ type Site struct {
 	Aggregator *aggregate.Aggregator
 	Generation string
 }
+
 type Availability struct {
 	// Listen is the actual bound socket, never an advertised browser address.
 	Listen    string
@@ -28,12 +29,14 @@ type Availability struct {
 	PublicURL string
 	GeoIP     geoip.Status
 }
+
 type registration struct {
 	data   *Site
 	ctx    context.Context
 	cancel context.CancelFunc
 	users  sync.WaitGroup
 }
+
 type Registry struct {
 	mu    sync.Mutex
 	sites map[string]*registration
@@ -89,6 +92,7 @@ func (h *Registry) Register(key string, site *Site) (func(), error) {
 		entry.users.Wait()
 	}, nil
 }
+
 func (h *Registry) AcquireSite(key string) (*Site, context.Context, func(), bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -99,6 +103,7 @@ func (h *Registry) AcquireSite(key string) (*Site, context.Context, func(), bool
 	entry.users.Add(1)
 	return entry.data, entry.ctx, entry.users.Done, true
 }
+
 func (h *Registry) Acquire(key string) (*httpapi.Route, context.Context, func(), bool) {
 	data, ctx, release, ok := h.AcquireSite(key)
 	if !ok {
@@ -106,6 +111,7 @@ func (h *Registry) Acquire(key string) (*httpapi.Route, context.Context, func(),
 	}
 	return data.Route, ctx, release, true
 }
+
 func (h *Registry) Keys() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -131,6 +137,7 @@ func (h *Registry) PublishReceiver(state Availability) *ReceiverRegistration {
 	h.mu.Unlock()
 	return r
 }
+
 func (r *ReceiverRegistration) SetGeoIP(status geoip.Status) {
 	h := r.registry
 	h.mu.Lock()
@@ -139,6 +146,7 @@ func (r *ReceiverRegistration) SetGeoIP(status geoip.Status) {
 		h.availability.GeoIP = status
 	}
 }
+
 func (r *ReceiverRegistration) Close() {
 	h := r.registry
 	h.mu.Lock()
@@ -149,6 +157,7 @@ func (r *ReceiverRegistration) Close() {
 		h.availability.GeoIP = stoppedGeoIP(h.availability.GeoIP.Selection)
 	}
 }
+
 func (h *Registry) Availability() Availability {
 	h.mu.Lock()
 	defer h.mu.Unlock()

@@ -43,6 +43,10 @@ func Bootstrap(key string, opts BootstrapOptions) string {
 		opt["tracing"] = append([]string{}, opts.Propagate...)
 	}
 	o, _ := json.Marshal(opt)
-	return strings.NewReplacer("__KEY__", string(k), "__OPT__", string(o), "__SDK_PATH__", SDKPath, "__TRACING_PATH__", TracingPath).
-		Replace(bootstrapTemplate)
+	return strings.NewReplacer(
+		"__KEY__", string(k),
+		"__OPT__", string(o),
+		"__SDK_PATH__", SDKPath,
+		"__TRACING_PATH__", TracingPath,
+	).Replace(bootstrapTemplate)
 }

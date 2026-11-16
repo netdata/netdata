@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package historyfunc
 
 import (
@@ -22,6 +23,7 @@ func request() funcapi.RawMethodRequest {
 		Permissions: "0x1b",
 	}
 }
+
 func TestStatusPreservesIndependentFacts(t *testing.T) {
 	now := time.Unix(1000, 0)
 	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
@@ -56,6 +58,7 @@ func TestStatusPreservesIndependentFacts(t *testing.T) {
 	}}
 	assert.Equal(t, funcapi.RawResponse(want), h.HandleRaw(context.Background(), request()))
 }
+
 func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 	for _, inventory := range []*journalstore.Inventory{nil, {Bytes: 0, Files: 0}} {
 		h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
@@ -78,6 +81,7 @@ func TestUnknownAndEmptyStatusAreDistinct(t *testing.T) {
 		}
 	}
 }
+
 func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 	h := New(statusFunc(func(context.Context) (journalstore.Status, error) {
 		t.Fatal("unexpected storage I/O")
@@ -141,6 +145,7 @@ func TestMetadataAndRejectedRequestsDoNotReadStorage(t *testing.T) {
 	assert.True(t, declarations[0].RequireCloud)
 	assert.True(t, declarations[0].RequireCommercial)
 }
+
 func TestCancellationReachesStorage(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := New(statusFunc(func(got context.Context) (journalstore.Status, error) {

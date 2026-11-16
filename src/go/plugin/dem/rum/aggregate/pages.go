@@ -17,6 +17,7 @@ type PageInfo struct {
 	FrustrationWindow                       int
 	FrustrationsKnown                       bool
 }
+
 type elemSample struct {
 	vital, sel string
 	poor       bool
@@ -61,6 +62,7 @@ func (a *Aggregator) Pages(vnodeGUID string) []PageInfo {
 	sort.Slice(out, func(i, j int) bool { return out[i].Page < out[j].Page })
 	return out
 }
+
 func topElement(samples []elemSample, vital string) string {
 	poor, all := map[string]int{}, map[string]int{}
 	for _, v := range samples {
@@ -77,6 +79,7 @@ func topElement(samples []elemSample, vital string) string {
 	}
 	return mostCommon(all)
 }
+
 func mostCommon(counts map[string]int) string {
 	best, n := "", 0
 	for sel, count := range counts {

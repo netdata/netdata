@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum_test
 
 import (
@@ -14,12 +15,11 @@ import (
 	"testing"
 	"time"
 
-	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -38,6 +38,7 @@ func (o *output) Write(p []byte) (int, error) {
 	defer o.mu.Unlock()
 	return o.buf.Write(p)
 }
+
 func (o *output) String() string { o.mu.Lock(); defer o.mu.Unlock(); return o.buf.String() }
 func startJob(t *testing.T, module, name string, c collectorapi.CollectorV2) (*jobruntime.JobV2, *output, func()) {
 	t.Helper()
@@ -51,6 +52,7 @@ func startJob(t *testing.T, module, name string, c collectorapi.CollectorV2) (*j
 		StoreFirst:  true,
 	})
 }
+
 func startJobWithConfig(t *testing.T, cfg jobruntime.JobV2Config) (*jobruntime.JobV2, *output, func()) {
 	t.Helper()
 	out := &output{}
@@ -83,6 +85,7 @@ func startJobWithConfig(t *testing.T, cfg jobruntime.JobV2Config) (*jobruntime.J
 	require.True(t, run.Running())
 	return job, out, stop
 }
+
 func tickUntil(t *testing.T, job *jobruntime.JobV2, out *output, needle string) {
 	t.Helper()
 	for i := 1; i <= 300; i++ {

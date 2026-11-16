@@ -16,8 +16,8 @@ import (
 
 var viewURLScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
-// Text is normalized before it becomes an aggregation key or retained evidence.
-// Opaque protocol IDs use their own validation and are not generalized as paths.
+// redactor is the site redactor, or the credential patterns alone for a route
+// built without one.
 func (o Options) redactor() *redact.Redactor {
 	if o.Redactor == nil {
 		return redact.Patterns
@@ -32,6 +32,9 @@ func (o Options) redacted(value string) string {
 	return strings.TrimSpace(o.redactor().ApplyRemoving(value, unicode.IsControl))
 }
 
+// text normalizes free text before it becomes an aggregation key or retained
+// evidence. Opaque protocol IDs use their own validation and are not
+// generalized as paths.
 func (o Options) text(value string, limit int) string {
 	return truncate(o.redacted(value), limit)
 }
@@ -230,7 +233,8 @@ func observationID(value string) string {
 		return ""
 	}
 	for _, c := range value {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.' || c == ':') {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
+			c == '_' || c == '-' || c == '.' || c == ':') {
 			return ""
 		}
 	}

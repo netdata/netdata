@@ -10,7 +10,6 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -4,20 +4,16 @@ package otlp
 
 import (
 	"context"
-
 	"encoding/hex"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-
 	"google.golang.org/grpc/metadata"
 )
 
@@ -84,7 +80,18 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 		service = "rum:" + b.Site
 	}
 	res := []*commonpb.KeyValue{strAttr("service.name", service), strAttr("rum.site", b.Site)}
-	for _, kv := range [][2]string{{"dem.vnode_guid", b.VnodeGUID}, {"rum.browser", b.Browser}, {"rum.browser_version", b.BrowserVersion}, {"rum.device", b.Device}, {"rum.country", b.Country}, {"rum.session_id", b.SessionID}, {"rum.experience_id", b.ExperienceID}, {"rum.view_id", b.ViewID}, {"rum.view", b.View}, {"rum.document_entry", b.PageGroup}} {
+	for _, kv := range [][2]string{
+		{"dem.vnode_guid", b.VnodeGUID},
+		{"rum.browser", b.Browser},
+		{"rum.browser_version", b.BrowserVersion},
+		{"rum.device", b.Device},
+		{"rum.country", b.Country},
+		{"rum.session_id", b.SessionID},
+		{"rum.experience_id", b.ExperienceID},
+		{"rum.view_id", b.ViewID},
+		{"rum.view", b.View},
+		{"rum.document_entry", b.PageGroup},
+	} {
 		if kv[1] != "" {
 			res = append(res, strAttr(kv[0], kv[1]))
 		}
