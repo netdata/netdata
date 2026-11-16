@@ -307,6 +307,32 @@ Metrics:
 
 ### Known Errors
 
+#### opening DEM history: load journal identity: journalhost: machine id: no machine id found
+
+**When**
+
+The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+whichever modules are enabled.
+
+
+**Cause**
+
+DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+`/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, and neither file exists under the
+Netdata host prefix (`/host` in the official Docker image). This is common in minimal containers.
+
+
+**Fix**
+
+On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+`sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+`-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+Compose, then recreate the container. Check first that the host has `/etc/machine-id`: Docker creates a
+missing source path as an empty directory, which DEM rejects.
+
+
 #### listen tcp 127.0.0.1:19938: bind: address already in use
 
 **Cause**

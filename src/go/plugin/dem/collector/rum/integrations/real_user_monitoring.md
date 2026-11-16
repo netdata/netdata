@@ -750,6 +750,11 @@ paid plan or an active trial. Reports are received and history is kept on every 
 To narrow the results to one virtual node, pass `vnode` with its configured name, or `vnode_guid` with its GUID for a
 virtual node that was renamed or removed. Pass `site` for one site.
 
+The plugin-wide `dem-history-status` Function covers the history that RUM and synthetic monitoring share. It is
+available whenever the plugin runs, needs the same access and takes no parameters. It shows the retention in
+effect (`history` in `dem.conf`), how much disk the history files use, and the latest cleanup, write or
+configuration reload error.
+
 
 ### RUM Sites
 
@@ -1060,6 +1065,32 @@ One row per event, oldest first, for the whole saved session regardless of time 
 ## Troubleshooting
 
 ### Known Errors
+
+#### opening DEM history: load journal identity: journalhost: machine id: no machine id found
+
+**When**
+
+The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+whichever modules are enabled.
+
+
+**Cause**
+
+DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+`/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, and neither file exists under the
+Netdata host prefix (`/host` in the official Docker image). This is common in minimal containers.
+
+
+**Fix**
+
+On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+`sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+`-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+Compose, then recreate the container. Check first that the host has `/etc/machine-id`: Docker creates a
+missing source path as an empty directory, which DEM rejects.
+
 
 #### Netdata RUM: cannot load the core SDK. Check the browser Network and CSP errors for the RUM script requests.
 

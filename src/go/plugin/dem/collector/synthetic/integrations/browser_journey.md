@@ -109,7 +109,7 @@ the script makes.
 #### Install the browser runtime
 
 Journeys and Lighthouse audits run in a separately installed browser runtime (Node.js, Chromium,
-Playwright and Lighthouse). Netdata never downloads it on its own, and a job waits until it is
+Playwright and Lighthouse). Netdata never installs it on its own, and a job waits until it is
 installed. It needs Linux on amd64 or arm64.
 
 | Netdata installation | Install the runtime with |
@@ -133,7 +133,7 @@ Docker requirements, updates and removal.
 A running Agent keeps the runtime it found when it started. After the first installation, restart the
 Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
 does this for you. On static, source and Docker installations, runtime updates are prepared daily
-(unless you installed with `--manual-updates`) and also take effect at the next restart.
+(unless your last install or repair used `--manual-updates`) and also take effect at the next restart.
 
 To check the runtime, run as the Netdata service account:
 
@@ -416,6 +416,11 @@ To narrow the results to one virtual node, pass `vnode` with its configured name
 for a virtual node that was renamed or removed. Without either, every job is included, with or without a
 virtual node.
 
+The plugin-wide `dem-history-status` Function covers the history that RUM and synthetic monitoring share. It is
+available whenever the plugin runs, needs the same access and takes no parameters. It shows the retention in
+effect (`history` in `dem.conf`), how much disk the history files use, and the latest cleanup, write or
+configuration reload error.
+
 
 ### Synthetic monitors
 
@@ -560,7 +565,15 @@ No additional configuration is required.
 
 #### Returns
 
-One row per recorded test, step or audit event. The response also carries the full run record, including what was captured; a missing completion time means the run has not finished or its end was not recorded.
+One row per recorded test, step or audit event. The response also carries the full run record, including
+what was captured; a missing completion time means the run has not finished or its end was not recorded.
+
+A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
+reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
+says why), `not_eligible` (taken while the run was being stopped; such captures are kept only when it
+stopped with `execution_budget`) or `not_in_final_report` (listed in `captures.associations` but missing
+from the run's final report).
+
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -657,6 +670,32 @@ One row per capture of the run. A capture that has expired is reported as `expir
 ## Troubleshooting
 
 ### Known Errors
+
+#### opening DEM history: load journal identity: journalhost: machine id: no machine id found
+
+**When**
+
+The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+whichever modules are enabled.
+
+
+**Cause**
+
+DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+`/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, and neither file exists under the
+Netdata host prefix (`/host` in the official Docker image). This is common in minimal containers.
+
+
+**Fix**
+
+On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+`sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+`-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+Compose, then recreate the container. Check first that the host has `/etc/machine-id`: Docker creates a
+missing source path as an empty directory, which DEM rejects.
+
 
 #### install a browser runtime and restart dem.plugin: matching browser runtime is not prepared
 
