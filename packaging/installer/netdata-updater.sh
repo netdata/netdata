@@ -929,7 +929,12 @@ parse_version() {
       b=99999
     fi
   elif echo "${b1}" | grep -Eq "^[0-9]+$"; then
-    t=0
+    # Nightlies after a stable tag (-post-nightly) follow that release; others precede it.
+    if [ "${b2}" = post ]; then
+      t=4
+    else
+      t=0
+    fi
     rc=0
     b="${b1}"
   elif [ -z "${b1}" ]; then

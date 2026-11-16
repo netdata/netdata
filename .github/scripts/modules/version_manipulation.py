@@ -127,6 +127,9 @@ def sort_and_grouby_major_agents_of_channel(channel):
     # Keep the published titles: nightly names cannot be rebuilt from the parsed numbers.
     titles = {}
     for item in releases:
+        # Release candidates are published as prereleases and are not stable or nightly builds.
+        if item.prerelease or item.draft:
+            continue
         version = extract_version(item.title)
         if version is not None:
             titles.setdefault(version, item.title)
