@@ -73,7 +73,7 @@ ALARM_ENTRY* health_create_alarm_entry(
     int delay,
     HEALTH_ENTRY_FLAGS flags);
 
-void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool async);
+void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae);
 
 const char *health_user_config_dir(void);
 const char *health_stock_config_dir(void);
