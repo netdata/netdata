@@ -48,46 +48,7 @@ struct netdata_static_thread cgroup_integration_thread = {
     .init_routine = NULL,
     .start_routine = NULL};
 
-/* Process accounting is owned by ebpf-go.plugin.  Keep the historical module
- * slot for index/ABI compatibility, but never start the legacy collector. */
-static void ebpf_process_disabled_thread(void *ptr)
-{
-	if (ptr)
-		ebpf_module_enabled_set((ebpf_module_t *)ptr, NETDATA_THREAD_EBPF_STOPPING);
-}
-
 ebpf_module_t ebpf_modules[] = {
-    {.info =
-         {.thread_name = "process", .config_name = "process", .thread_description = NETDATA_EBPF_MODULE_PROCESS_DESC},
-     .functions =
-         {.start_routine = ebpf_process_disabled_thread,
-          .apps_routine = NULL,
-          .bpf_unload = NULL},
-     .enabled = NETDATA_THREAD_EBPF_NOT_RUNNING,
-     .update_every = EBPF_DEFAULT_UPDATE_EVERY,
-     .global_charts = 0,
-     .apps_charts = NETDATA_EBPF_APPS_FLAG_NO,
-     .apps_level = NETDATA_APPS_LEVEL_REAL_PARENT,
-     .cgroup_charts = CONFIG_BOOLEAN_NO,
-     .mode = MODE_ENTRY,
-     .optional = 1,
-     .maps = NULL,
-     .pid_map_size = ND_EBPF_DEFAULT_PID_SIZE,
-     .names = NULL,
-     .cfg = &process_config,
-     .config_file = NETDATA_PROCESS_CONFIG_FILE,
-     .kernels =
-         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0,
-     .rhel10_kernels =
-         NETDATA_V3_10 | NETDATA_V4_14 | NETDATA_V4_16 | NETDATA_V4_18 | NETDATA_V5_4 | NETDATA_V5_10 | NETDATA_V5_14 | NETDATA_V6_12 | NETDATA_V7_0,
-     .load = EBPF_LOAD_LEGACY,
-     .targets = process_targets,
-     .probe_links = NULL,
-     .objects = NULL,
-     .thread = NULL,
-     .maps_per_core = CONFIG_BOOLEAN_YES,
-     .lifetime = EBPF_DEFAULT_LIFETIME,
-     .running_time = 0},
     {.info = {.thread_name = "sync", .config_name = "sync", .thread_description = NETDATA_EBPF_SYNC_MODULE_DESC},
      .functions =
          {.start_routine = ebpf_sync_thread,
@@ -706,7 +667,6 @@ struct mount_bpf *mount_bpf_obj = NULL;
 struct shm_bpf *shm_bpf_obj = NULL;
 struct swap_bpf *swap_bpf_obj = NULL;
 struct vfs_bpf *vfs_bpf_obj = NULL;
-struct process_bpf *process_bpf_obj = NULL;
 #else
 void *default_btf = NULL;
 #endif
@@ -1110,7 +1070,6 @@ static void ebpf_set_global_variables()
 }
 
 static const struct option ebpf_long_options[] = {
-    {"process", no_argument, 0, EBPF_MODULE_PROCESS_IDX},
     {"sync", no_argument, 0, EBPF_MODULE_SYNC_IDX},
     {"swap", no_argument, 0, EBPF_MODULE_SWAP_IDX},
     {"vfs", no_argument, 0, EBPF_MODULE_VFS_IDX},
@@ -1214,14 +1173,6 @@ static void ebpf_parse_args(int argc, char **argv)
             break;
 
         switch (c) {
-            case EBPF_MODULE_PROCESS_IDX: {
-                select_threads |= 1 << EBPF_MODULE_PROCESS_IDX;
-#ifdef NETDATA_INTERNAL_CHECKS
-                netdata_log_info(
-                    "EBPF enabling \"PROCESS\" charts, because it was started with the option \"[-]-process\".");
-#endif
-                break;
-            }
             case EBPF_MODULE_SYNC_IDX: {
                 select_threads |= 1 << EBPF_MODULE_SYNC_IDX;
 #ifdef NETDATA_INTERNAL_CHECKS
@@ -2019,8 +1970,7 @@ static void ebpf_initialize_data_sharing()
 
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SHM:
-            // All pid_map_size have the same value
-            if (netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_PROCESS_IDX].pid_map_size)) {
+            if (netdata_integration_initialize_shm(ND_EBPF_DEFAULT_PID_SIZE)) {
                 ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_NO);
                 ebpf_disable_cgroups();
             }

@@ -1,15 +1,19 @@
 package libbpfloader
 
+// ProcessSnapshot holds the cumulative global counters of tbl_total_stats
+// (enum process_counters in netdata/kernel-collector includes/netdata_process.h).
 type ProcessSnapshot struct {
-	Exits     uint64
-	TaskClose uint64
-	Forks     uint64
-	Clones    uint64
-	Errors    uint64
+	Exits      uint64
+	TaskClose  uint64
+	Process    uint64
+	ProcessErr uint64
+	Thread     uint64
+	ThreadErr  uint64
 }
 
 const ProcessAppCommLen = 96
 
+// ProcessAppSnapshot holds one TGID's cumulative per-PID counters.
 type ProcessAppSnapshot struct {
 	Pid       uint32
 	Ppid      uint32

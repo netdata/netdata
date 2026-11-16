@@ -9,9 +9,10 @@ struct netdata_ebpf_process_runtime;
 struct netdata_ebpf_process_snapshot {
     unsigned long long exits;
     unsigned long long task_close;
-    unsigned long long forks;
-    unsigned long long clones;
-    unsigned long long errors;
+    unsigned long long process;
+    unsigned long long process_err;
+    unsigned long long thread;
+    unsigned long long thread_err;
 };
 
 struct netdata_ebpf_process_pid_snapshot {
@@ -57,6 +58,7 @@ int netdata_process_runtime_delete_pids(
     size_t count);
 void netdata_ebpf_process_pid_snapshot_list_free(struct netdata_ebpf_process_pid_snapshot_list *psl);
 void netdata_process_runtime_close(struct netdata_ebpf_process_runtime *rt);
+unsigned long long netdata_process_runtime_arena_drops(struct netdata_ebpf_process_runtime *rt);
 */
 import "C"
 
@@ -168,11 +170,12 @@ func (r *ProcessRuntime) Snapshot(mapsPerCore bool) (ProcessSnapshot, error) {
 	}
 
 	return ProcessSnapshot{
-		Exits:     uint64(cSnapshot.exits),
-		TaskClose: uint64(cSnapshot.task_close),
-		Forks:     uint64(cSnapshot.forks),
-		Clones:    uint64(cSnapshot.clones),
-		Errors:    uint64(cSnapshot.errors),
+		Exits:      uint64(cSnapshot.exits),
+		TaskClose:  uint64(cSnapshot.task_close),
+		Process:    uint64(cSnapshot.process),
+		ProcessErr: uint64(cSnapshot.process_err),
+		Thread:     uint64(cSnapshot.thread),
+		ThreadErr:  uint64(cSnapshot.thread_err),
 	}, nil
 }
 
@@ -231,13 +234,19 @@ func (r *ProcessRuntime) DeletePids(pids []uint32) error {
 	return nil
 }
 
+// ArenaDropped returns the events the arena producer dropped; 0 for other flavors.
+func (r *ProcessRuntime) ArenaDropped() uint64 {
+	if r == nil || r.ptr == nil {
+		return 0
+	}
+	return uint64(C.netdata_process_runtime_arena_drops(r.ptr))
+}
+
 func (r *ProcessRuntime) Close() {
 	if r == nil || r.ptr == nil {
 		return
 	}
 
-	if r.ptr != nil {
-		C.netdata_process_runtime_close(r.ptr)
-		r.ptr = nil
-	}
+	C.netdata_process_runtime_close(r.ptr)
+	r.ptr = nil
 }

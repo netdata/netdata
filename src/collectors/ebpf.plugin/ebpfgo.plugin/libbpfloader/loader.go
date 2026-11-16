@@ -317,3 +317,4 @@ func (r *CachestatRuntime) ArenaDropped() uint64 { return 0 }
 func (r *DCStatRuntime) ArenaDropped() uint64    { return 0 }
 func (r *FDRuntime) ArenaDropped() uint64        { return 0 }
 func (r *SocketRuntime) ArenaDropped() uint64    { return 0 }
+func (r *ProcessRuntime) ArenaDropped() uint64   { return 0 }

@@ -15,7 +15,22 @@ uint32_t cgroup_ebpfgo_shared_memory_flags(void);
 void cgroup_ebpfgo_shared_memory_close(void);
 
 struct cgroup;
-void cgroup_ebpfgo_update_single_chart(
+/* dimension_name NULL shows the dimension id. */
+void cgroup_ebpfgo_update_single_chart_named(
+    struct cgroup *cg,
+    RRDSET **chart_ptr,
+    const char *chart_id,
+    const char *title,
+    const char *family,
+    const char *context,
+    const char *dimension,
+    const char *dimension_name,
+    const char *units,
+    int priority,
+    collected_number divisor,
+    collected_number value);
+
+static inline void cgroup_ebpfgo_update_single_chart(
     struct cgroup *cg,
     RRDSET **chart_ptr,
     const char *chart_id,
@@ -26,7 +41,11 @@ void cgroup_ebpfgo_update_single_chart(
     const char *units,
     int priority,
     collected_number divisor,
-    collected_number value);
+    collected_number value)
+{
+    cgroup_ebpfgo_update_single_chart_named(
+        cg, chart_ptr, chart_id, title, family, context, dimension, NULL, units, priority, divisor, value);
+}
 
 #endif
 

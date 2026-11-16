@@ -111,6 +111,8 @@ func TestEBPFPidStatSchemaLayouts(t *testing.T) {
 				{name: "CreateProcess", kind: reflect.Uint32, typ: "uint32"},
 				{name: "CreateThread", kind: reflect.Uint32, typ: "uint32"},
 				{name: "TaskErr", kind: reflect.Uint32, typ: "uint32"},
+				// v7: mirrors ebpf_process_stat.process_update_every_s.
+				{name: "ProcessUpdateEverySec", kind: reflect.Uint32, typ: "uint32"},
 			},
 		},
 		"shm": {

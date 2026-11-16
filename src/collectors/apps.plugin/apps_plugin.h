@@ -362,6 +362,7 @@ typedef enum __attribute__((packed)) {
     TARGET_CHARTS_EBPF_FD           = (1 << 4),
     TARGET_CHARTS_EBPF_FD_ERRORS    = (1 << 5),
     TARGET_CHARTS_EBPF_PROCESS      = (1 << 6),
+    TARGET_CHARTS_EBPF_PROCESS_ERRORS = (1 << 7),
 } TARGET_CHARTS;
 
 typedef enum __attribute__((packed)) {
@@ -949,6 +950,7 @@ bool apps_ebpf_fd_data_ready(void);
 bool apps_ebpf_fd_errors_are_available(void);
 bool apps_ebpf_process_data_ready(void);
 bool apps_ebpf_process_is_available(void);
+bool apps_ebpf_process_errors_are_available(void);
 #endif
 
 // --------------------------------------------------------------------------------------------------------------------

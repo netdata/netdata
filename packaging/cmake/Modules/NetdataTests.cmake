@@ -31,8 +31,10 @@ if(OS_LINUX)
             src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
             src/collectors/cgroups.plugin/cgroup-name-config.c)
 
-    add_executable(cgroup-ebpfgo-fd-rate-test EXCLUDE_FROM_ALL
-            src/collectors/cgroups.plugin/tests/test_cgroup_ebpfgo_fd_rate.c)
+    add_executable(cgroup-ebpfgo-rate-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_ebpfgo_rate.c
+            src/collectors/cgroups.plugin/cgroup_ebpfgo_rate.c)
+    target_link_libraries(cgroup-ebpfgo-rate-test libnetdata)
 
     add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c

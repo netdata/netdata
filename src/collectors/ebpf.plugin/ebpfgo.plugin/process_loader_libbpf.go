@@ -10,41 +10,6 @@ import (
 	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 )
 
-func processLoadFunction(cfg ProcessLegacyConfig, plan LoadPlan) (*libbpfloader.ProcessRuntime, error) {
-	if plan.ObjectPath == "" {
-		return nil, fmt.Errorf("invalid plan: object path not set")
-	}
-
-	useCore := plan.LoadMode == LoadCore
-
-	rt, err := libbpfloader.ProcessRuntimeOpenMode(plan.ObjectPath, useCore)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open process eBPF object: %w", err)
-	}
-
-	if err := rt.Prepare(cfg.PidTableSize, cfg.MapsPerCore); err != nil {
-		rt.Close()
-		return nil, fmt.Errorf("failed to prepare process runtime: %w", err)
-	}
-
-	if err := rt.Load(); err != nil {
-		rt.Close()
-		return nil, fmt.Errorf("failed to load process eBPF programs: %w", err)
-	}
-
-	if err := rt.Attach(); err != nil {
-		rt.Close()
-		return nil, fmt.Errorf("failed to attach process eBPF programs: %w", err)
-	}
-
-	if err := rt.UpdateController(cfg.AppsEnabled, cfg.AppsLevel); err != nil {
-		rt.Close()
-		return nil, fmt.Errorf("failed to update process controller: %w", err)
-	}
-
-	return rt, nil
-}
-
 func tryLoadProcessPlan(cfg ProcessLegacyConfig, plan LoadPlan) (*ProcessLegacyHandle, error) {
 	rt, err := libbpfloader.ProcessRuntimeOpenMode(plan.ObjectPath, plan.LoadMode == LoadCore)
 	if err != nil {
@@ -65,7 +30,7 @@ func tryLoadProcessPlan(cfg ProcessLegacyConfig, plan LoadPlan) (*ProcessLegacyH
 	}
 	return &ProcessLegacyHandle{Plan: plan, Runtime: rt, UpdateEvery: cfg.UpdateEvery, ConfigFound: cfg.ConfigFound,
 		PidTableSize: cfg.PidTableSize, MapsPerCore: cfg.MapsPerCore, AppsEnabled: cfg.AppsEnabled,
-		CgroupsEnabled: cfg.CgroupsEnabled, AppsLevel: cfg.AppsLevel}, nil
+		CgroupsEnabled: cfg.CgroupsEnabled, AppsLevel: cfg.AppsLevel, ReportErrors: cfg.ReportErrors}, nil
 }
 
 func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
@@ -77,16 +42,14 @@ func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
 	if err != nil {
 		return nil, fmt.Errorf("kernel reject check: %w", err)
 	}
-	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), "ebpf-go.plugin"); err != nil {
+	if err := CanLoadCode(cfg.KernelVersion, cfg.IsRHF, rejected, IsRoot(), true, "ebpf-go.plugin"); err != nil {
 		return nil, err
 	}
 	plan := BuildProcessLegacyPlan(cfg)
 	if !libbpfloader.ProcessRuntimeSupportsCore() {
-		selector := SelectIndex(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion)
-		if int(selector) > processMaxBaseSelector {
-			selector = processMaxBaseSelector
-		}
-		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "process", false, cfg.IsRHF, ObjectFlavorBase)
+		selector := selectHighestIndexAtOrBelow(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion,
+			effectiveMaxBaseSelectorForModule(processMaxBaseSelector, "process", cfg.IsRHF, cfg.KernelVersion), "process")
+		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "process", true, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
 		return tryLoadProcessPlan(cfg, plan)
 	}

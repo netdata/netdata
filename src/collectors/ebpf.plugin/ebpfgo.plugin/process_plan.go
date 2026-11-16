@@ -2,14 +2,17 @@ package main
 
 import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 
-const processKernelMask uint32 = (1 << 12) - 1
+// processKernelMask is the C process module's kernel list (3.10, 4.14, 4.16,
+// 4.18, 5.4, 5.10, 5.14, 6.12, 7.0; SelectKernelName indexes): the kernels with
+// a shipped base object.  Every flavor walks down to one of them.
+const processKernelMask uint32 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<7 | 1<<11 | 1<<12
 const processDefaultPIDTableSize uint32 = 32768
 const processMaxPIDTableSize uint32 = 32768
 const processDefaultBTFFile = "vmlinux"
 
 // processMaxBaseSelector is the highest SelectKernelName index for which a
 // base-flavor (no suffix) process object file is shipped.
-const processMaxBaseSelector = 11 // 6.12
+const processMaxBaseSelector = 12 // 7.0
 
 type ProcessLegacyConfig struct {
 	PluginsDir     string
@@ -28,7 +31,9 @@ type ProcessLegacyConfig struct {
 	MapsPerCore    bool
 	ObjectFlavor   string
 	AppsLevel      int // BPF apps collection level: 0=real parent, 1=parent, 2=all
-	Targets        ProcessTargets
+	// ReportErrors mirrors `ebpf load mode`: true for `return`/`dev`.  It gates
+	// only the error charts; the return-probe objects always count task errors.
+	ReportErrors bool
 }
 
 type ProcessLegacyHandle struct {
@@ -42,19 +47,17 @@ type ProcessLegacyHandle struct {
 	AppsEnabled    bool
 	CgroupsEnabled bool
 	AppsLevel      int
+	ReportErrors   bool
 }
 
 func (h *ProcessLegacyHandle) Close() {
-	if h == nil || h.Runtime == nil {
-		if h != nil && h.SharedMemory != nil {
-			h.SharedMemory.Close()
-			h.SharedMemory = nil
-		}
+	if h == nil {
 		return
 	}
-
-	h.Runtime.Close()
-	h.Runtime = nil
+	if h.Runtime != nil {
+		h.Runtime.Close()
+		h.Runtime = nil
+	}
 	if h.SharedMemory != nil {
 		h.SharedMemory.Close()
 		h.SharedMemory = nil
@@ -73,11 +76,11 @@ func defaultProcessLegacyConfig() ProcessLegacyConfig {
 		PidTableSize:   processDefaultPIDTableSize,
 		MapsPerCore:    true,
 		ObjectFlavor:   processDefaultObjectFlavor,
-		Enabled:        true,
+		Enabled:        false,
 		AppsEnabled:    false,
 		CgroupsEnabled: false,
-		AppsLevel:      0, // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock process.conf default
-		Targets:        defaultProcessTargets(),
+		AppsLevel:      0,     // NETDATA_APPS_LEVEL_REAL_PARENT — matches stock process.conf default
+		ReportErrors:   false, // `ebpf load mode = entry` is the stock default
 	}
 }
 
@@ -102,6 +105,7 @@ func resolveProcessLegacyConfig() (ProcessLegacyConfig, error) {
 		HasBTF:         &cfg.HasBTF,
 		ObjectFlavor:   &cfg.ObjectFlavor,
 		AppsLevel:      &cfg.AppsLevel,
+		ReturnMode:     &cfg.ReportErrors,
 	})
 	kver, isRHF, err := resolveKernelAndRH()
 	if err != nil {
@@ -109,12 +113,6 @@ func resolveProcessLegacyConfig() (ProcessLegacyConfig, error) {
 	}
 	cfg.KernelVersion = kver
 	cfg.IsRHF = isRHF
-
-	targets, err := resolveProcessTargets()
-	if err != nil {
-		return ProcessLegacyConfig{}, err
-	}
-	cfg.Targets = targets
 
 	return cfg, nil
 }
@@ -139,5 +137,8 @@ func BuildProcessLegacyPlan(cfg ProcessLegacyConfig) LoadPlan {
 		ObjectFlavor:    flavor,
 		Name:            "process",
 		MaxBaseSelector: processMaxBaseSelector,
+		// The `r`-prefixed objects count task-creation errors.  They are used in
+		// both `entry` and `return` mode; see ProcessLegacyConfig.ReportErrors.
+		IsReturn: true,
 	})
 }

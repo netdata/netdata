@@ -286,7 +286,7 @@ func parsePluginConfigFile(path string) (pluginConfigFile, bool, error) {
 			found = true
 		case "ebpf load mode":
 			// `return` is only meaningful for a module that has error charts, which
-			// today means fd alone (see collectorCommonConfig.ReturnMode); for every
+			// today means fd and process (see collectorCommonConfig.ReturnMode); for every
 			// other module it selects nothing, exactly as in the C plugin where they
 			// had no error charts either.  It is therefore NOT warned about: the
 			// [global] section of ebpf.d.conf is parsed once per module, so a warning

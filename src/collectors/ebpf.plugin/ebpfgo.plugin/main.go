@@ -171,6 +171,9 @@ func main() {
 			shouldPublish := processWillPublish
 			wg.Go(func() {
 				runProcessGlobalCollector(api, handle, stop, processStore, ue, shouldPublish)
+				if processStore != nil {
+					processStore.MarkProcessInactive()
+				}
 				handle.Close()
 			})
 		}

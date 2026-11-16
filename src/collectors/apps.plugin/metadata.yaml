@@ -198,31 +198,31 @@ modules:
               dimensions:
                 - name: calls
             - name: app.ebpf_process_start
-              description: Processes started
+              description: Process started.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app.ebpf_thread_start
-              description: Threads started
+              description: Threads started.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app.ebpf_task_exit
-              description: Tasks started exiting
+              description: Tasks starts exit process.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app.ebpf_task_released
-              description: Tasks released
+              description: Tasks released.
               unit: "calls/s"
               chart_type: stacked
               dimensions:
                 - name: calls
             - name: app.ebpf_task_error
-              description: Process or thread creation errors
+              description: "Errors to create process or threads. Published only when ebpf-go.plugin runs the process module with `ebpf load mode = return`."
               unit: "calls/s"
               chart_type: stacked
               dimensions:
