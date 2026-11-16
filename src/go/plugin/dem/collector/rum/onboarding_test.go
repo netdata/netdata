@@ -20,7 +20,7 @@ import (
 
 func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 	hub := registry.New()
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	var previous string

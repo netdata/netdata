@@ -21,7 +21,7 @@ import (
 func newTestStore(t *testing.T) (*Store, string) {
 	t.Helper()
 	root := t.TempDir()
-	owner, err := journalstore.Open(context.Background(), root)
+	owner, err := journalstore.Open(context.Background(), root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, owner.Close()) })
 	return NewStore(owner), root
@@ -79,7 +79,7 @@ func storedEventFields(r EventRecord) []journal.Field {
 func TestJournalReopen(t *testing.T) {
 	ctx := context.Background()
 	path := filepath.Join(t.TempDir(), "history")
-	owner, err := journalstore.Open(ctx, path)
+	owner, err := journalstore.Open(ctx, path, "")
 	s := NewStore(owner)
 	require.NoError(t, err)
 	event := EventRecord{
@@ -99,7 +99,7 @@ func TestJournalReopen(t *testing.T) {
 	appendEvent(t, s, event)
 	require.NoError(t, s.Sync(ctx))
 	require.NoError(t, s.store.Close())
-	owner, err = journalstore.Open(ctx, path)
+	owner, err = journalstore.Open(ctx, path, "")
 	s = NewStore(owner)
 	require.NoError(t, err)
 	defer s.store.Close()
@@ -174,7 +174,7 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	require.NoError(t, err)
 	sequenceID, sequence := first.Header().SeqnumID(), first.Header().TailEntrySeqnum()
 	require.NoError(t, first.Close())
-	owner, err := journalstore.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root, "")
 	s := NewStore(owner)
 	require.NoError(t, err)
 	appendEvent(t, s, EventRecord{
@@ -190,7 +190,7 @@ func TestChainContinuesAcrossBootIdentityChange(t *testing.T) {
 	assert.Equal(t, sequence+1, second.Header().HeadEntrySeqnum())
 	assert.Equal(t, host.BootID(), second.Header().TailEntryBootID())
 	require.NoError(t, s.store.Close())
-	owner, err = journalstore.Open(ctx, root)
+	owner, err = journalstore.Open(ctx, root, "")
 	s = NewStore(owner)
 	require.NoError(t, err)
 	defer s.store.Close()
@@ -221,7 +221,7 @@ func TestRetentionIdleExpiryAndRetainedCounts(t *testing.T) {
 		},
 		old,
 	)
-	owner, err := journalstore.Open(ctx, root)
+	owner, err := journalstore.Open(ctx, root, "")
 	s := NewStore(owner)
 	require.NoError(t, err)
 	defer s.store.Close()

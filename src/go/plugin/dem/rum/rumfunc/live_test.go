@@ -96,7 +96,7 @@ func TestLiveRejectsTheFormerCursorName(t *testing.T) {
 // liveHandler serves rum-live for one registered site, shop, over a temporary journal.
 func liveHandler(t *testing.T) (*rumfunc.Handler, *aggregate.Aggregator) {
 	t.Helper()
-	journalStore, err := journalstore.Open(t.Context(), "")
+	journalStore, err := journalstore.Open(t.Context(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
 	hub := rumregistry.New()

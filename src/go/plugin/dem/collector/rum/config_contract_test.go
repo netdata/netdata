@@ -28,7 +28,7 @@ import (
 
 func nativeRUMConfigFactory(t *testing.T) (*joboutput.ConfigModuleFactory, func() *rum.Collector) {
 	t.Helper()
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	creator := rum.Creator(rum.Dependencies{

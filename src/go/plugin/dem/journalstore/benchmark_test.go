@@ -17,7 +17,7 @@ import (
 // trend, never a CI limit.
 func BenchmarkHistoryAppend(b *testing.B) {
 	ctx := context.Background()
-	store, err := Open(ctx, "")
+	store, err := Open(ctx, "", "")
 	if err != nil {
 		b.Fatal(err)
 	}

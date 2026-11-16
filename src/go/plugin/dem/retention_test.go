@@ -51,7 +51,7 @@ var keptArtifacts = artifactRetentionFunc(func(context.Context, int, int64) (art
 
 func TestRetentionWithoutSitesAndAfterServiceShutdown(t *testing.T) {
 	ctx := context.Background()
-	st, err := journalstore.Open(ctx, "")
+	st, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	now := time.Now().Unix()
@@ -137,7 +137,7 @@ func TestRetentionPropagatesCancellationIntoStoreWork(t *testing.T) {
 func TestRetentionReloadsValidPolicyAndRetainsItOnInvalidConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "dem.conf")
-	history, err := journalstore.Open(context.Background(), "")
+	history, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	components := New(
@@ -277,7 +277,7 @@ func TestRetentionMaintainsHourlySweep(t *testing.T) {
 
 func TestStatusReportsAppliedPolicyAndReloadErrors(t *testing.T) {
 	ctx := context.Background()
-	store, err := journalstore.Open(ctx, "")
+	store, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, store.Close()) })
 	initial := DefaultConfig()

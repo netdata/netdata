@@ -99,7 +99,7 @@ func TestSamplingFormAndRuntimeValidation(t *testing.T) {
 	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
 	form, err := compiler.Compile("rum.json")
 	require.NoError(t, err)
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	for _, tc := range []struct {

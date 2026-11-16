@@ -27,7 +27,7 @@ import (
 func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join(t.TempDir(), "history")
-	st, err := journalstore.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	old := time.Now().Add(-24 * time.Hour).UnixMicro()
@@ -79,7 +79,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, st.Sync(ctx))
 	require.NoError(t, st.Close())
-	st, err = journalstore.Open(ctx, root)
+	st, err = journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	page, err := history.NewStore(st).
 		QueryRuns(ctx, history.RunFilter{
@@ -122,7 +122,7 @@ func TestSyntheticHistoryReopenMixedKindsAndUnmatchedStart(t *testing.T) {
 
 func TestSyntheticHistoryOptionalUpperBound(t *testing.T) {
 	ctx := context.Background()
-	st, err := journalstore.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	run := synthetic.Run{
@@ -154,7 +154,7 @@ func TestSyntheticHistoryOptionalUpperBound(t *testing.T) {
 // Whole-second membership must resolve final evidence regardless of finish time.
 func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 	ctx := context.Background()
-	st, err := journalstore.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	historyStore := history.NewStore(st)
@@ -289,7 +289,7 @@ func TestSyntheticStartMembershipAndRetainedPhases(t *testing.T) {
 
 func TestSyntheticRejectsInvalidProducerRecordBeforeAppend(t *testing.T) {
 	ctx := context.Background()
-	st, err := journalstore.Open(ctx, t.TempDir())
+	st, err := journalstore.Open(ctx, t.TempDir(), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	for name, test := range map[string]struct {
@@ -357,7 +357,7 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 	for name, mutate := range cases {
 		t.Run(name, func(t *testing.T) {
 			ctx := context.Background()
-			st, err := journalstore.Open(ctx, t.TempDir())
+			st, err := journalstore.Open(ctx, t.TempDir(), "")
 			require.NoError(t, err)
 			t.Cleanup(func() { require.NoError(t, st.Close()) })
 			run := synthetic.Run{
@@ -404,7 +404,7 @@ func TestSyntheticValidatesSelectedScalarAndJSONAgreement(t *testing.T) {
 func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 	ctx := context.Background()
 	root := filepath.Join(t.TempDir(), "history")
-	st, err := journalstore.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	run := synthetic.Run{
 		ID:                "timeout",
@@ -420,7 +420,7 @@ func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, st.Sync(ctx))
 	require.NoError(t, st.Close())
-	st, err = journalstore.Open(ctx, root)
+	st, err = journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	defer func() { require.NoError(t, st.Close()) }()
 	retained, err := history.NewStore(st).GetRun(ctx, run.JobID, run.ID)
@@ -432,7 +432,7 @@ func TestTimeoutReasonSurvivesJournalReopen(t *testing.T) {
 func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	ctx := t.Context()
 	root := t.TempDir()
-	st, err := journalstore.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	now := time.Now().UnixMicro()
 	duration := 5.25
@@ -520,7 +520,7 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 	}
 	require.NoError(t, st.Sync(ctx))
 	require.NoError(t, st.Close())
-	st, err = journalstore.Open(ctx, root)
+	st, err = journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	defer func() { require.NoError(t, st.Close()) }()
 	store := history.NewStore(st)
@@ -538,7 +538,7 @@ func TestFailureEvidenceSurvivesHistoryReopen(t *testing.T) {
 
 func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	root := t.TempDir()
-	j, err := journalstore.Open(t.Context(), root)
+	j, err := journalstore.Open(t.Context(), root, "")
 	require.NoError(t, err)
 	test := synthetic.ArtifactTest{
 		ID:    "t1",
@@ -566,7 +566,7 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 	_, err = history.NewStore(j).AppendRun(t.Context(), "complete", run)
 	require.NoError(t, err)
 	require.NoError(t, j.Close())
-	j, err = journalstore.Open(t.Context(), root)
+	j, err = journalstore.Open(t.Context(), root, "")
 	require.NoError(t, err)
 	defer j.Close()
 	got, err := history.NewStore(j).GetRun(t.Context(), run.JobID, run.ID)
@@ -577,7 +577,7 @@ func TestCaptureObservationsSurviveHistoryRestart(t *testing.T) {
 func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	st, err := journalstore.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	store := history.NewStore(st)
 	now := time.Now().UnixMicro()
@@ -598,7 +598,7 @@ func TestHistoryRetainsAssociationAcrossJobReassignment(t *testing.T) {
 		require.NoError(t, err)
 	}
 	require.NoError(t, st.Close())
-	st, err = journalstore.Open(ctx, root)
+	st, err = journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	store = history.NewStore(st)
@@ -667,7 +667,7 @@ func storedEntries(t *testing.T, root string) []map[string][]string {
 func TestStoredRunEntryContract(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
-	st, err := journalstore.Open(ctx, root)
+	st, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	run := synthetic.Run{

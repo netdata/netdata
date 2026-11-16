@@ -34,7 +34,7 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 	} {
 		b.Run(workload.name, func(b *testing.B) {
 			ctx := context.Background()
-			owner, err := journalstore.Open(ctx, "")
+			owner, err := journalstore.Open(ctx, "", "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -198,7 +198,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	if err := log.Close(); err != nil {
 		b.Fatal(err)
 	}
-	owner, err := journalstore.Open(context.Background(), root)
+	owner, err := journalstore.Open(context.Background(), root, "")
 	s := NewStore(owner)
 	if err != nil {
 		b.Fatal(err)
@@ -272,7 +272,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 // -benchtime=50000x) when comparing timings.
 func BenchmarkHistoryEventAppend(b *testing.B) {
 	ctx := context.Background()
-	owner, err := journalstore.Open(ctx, "")
+	owner, err := journalstore.Open(ctx, "", "")
 	if err != nil {
 		b.Fatal(err)
 	}

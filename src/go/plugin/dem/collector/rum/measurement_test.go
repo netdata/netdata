@@ -22,7 +22,7 @@ import (
 func measurementCollector(t *testing.T) (*Collector, *registry.Registry) {
 	t.Helper()
 	ctx := context.Background()
-	db, err := journalstore.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()
@@ -334,7 +334,7 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 
 func TestConfiguredVnodeDoesNotBecomeChartLabelOrIdentity(t *testing.T) {
 	ctx := context.Background()
-	db, err := journalstore.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()

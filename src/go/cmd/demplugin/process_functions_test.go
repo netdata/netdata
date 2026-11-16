@@ -46,7 +46,7 @@ func retainedComponents(t *testing.T) dem.Components {
 	t.Helper()
 	ctx := context.Background()
 	root := t.TempDir()
-	history, err := journalstore.Open(ctx, root)
+	history, err := journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	cfg := dem.DefaultConfig()
 	require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
@@ -75,7 +75,7 @@ func retainedComponents(t *testing.T) dem.Components {
 		require.NoError(t, err)
 	}
 	require.NoError(t, history.Close())
-	history, err = journalstore.Open(ctx, root)
+	history, err = journalstore.Open(ctx, root, "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	require.NoError(t, history.EnforceHistoryRetention(ctx, cfg.History.Days, cfg.History.MaxBytes))
@@ -480,7 +480,7 @@ func TestDEMFunctionHandlersPerGeneration(t *testing.T) {
 
 // With no job, the RUM and synthetic Functions appear only once retained data of their kind exists.
 func TestDEMFunctionsWaitForDataWithoutJobs(t *testing.T) {
-	history, err := journalstore.Open(t.Context(), "")
+	history, err := journalstore.Open(t.Context(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, history.Close()) })
 	captures, err := artifacts.Open("")

@@ -101,7 +101,7 @@ func tickUntil(t *testing.T, job *jobruntime.JobV2, out *output, needle string) 
 // Receiver reload must preserve an independent site's measurements and history.
 func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	hub := rumregistry.New()
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
@@ -180,7 +180,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 }
 
 func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
@@ -199,7 +199,7 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 
 func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	ctx := context.Background()
-	db, err := journalstore.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := rumregistry.New()
@@ -282,7 +282,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 
 func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T) {
 	hub := rumregistry.New()
-	db, err := journalstore.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	site := rum.New(rum.Dependencies{
@@ -328,7 +328,7 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	const guidA = "11111111-1111-4111-8111-111111111111"
 	const guidB = "22222222-2222-4222-8222-222222222222"
 	ctx := context.Background()
-	db, err := journalstore.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := rumregistry.New()
