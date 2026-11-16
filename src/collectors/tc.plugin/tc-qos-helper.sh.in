@@ -147,7 +147,7 @@ if [ ! -d "${fireqos_run_dir}" ]; then
 
 		fireqos_exec_dir="$(realdir "${fireqos}")"
 
-		if [ -n "${fireqos_exec_dir}" ] && [ "${fireqos_exec_dir}" != "." ] && [ -f "${fireqos_exec_dir}/install.config" ]; then
+		if [ -n "${fireqos_exec_dir}" ] && [ "${fireqos_exec_dir}" != "." ] && [ -r "${fireqos_exec_dir}/install.config" ]; then
 			LOCALSTATEDIR=
 			#shellcheck source=/dev/null
 			. "${fireqos_exec_dir}/install.config"
@@ -198,10 +198,12 @@ update_every=$((t))
 # allow the user to override our defaults
 
 for CONFIG in "${NETDATA_STOCK_CONFIG_DIR}/tc-qos-helper.conf" "${NETDATA_USER_CONFIG_DIR}/tc-qos-helper.conf"; do
-	if [ -f "${CONFIG}" ]; then
+	if [ -r "${CONFIG}" ]; then
 		info "Loading config file '${CONFIG}'..."
 		#shellcheck source=/dev/null
 		. "${CONFIG}" || error "Failed to load config file '${CONFIG}'."
+	elif [ -e "${CONFIG}" ]; then
+		warning "Cannot read file '${CONFIG}'."
 	else
 		warning "Cannot find file '${CONFIG}'."
 	fi
@@ -227,7 +229,7 @@ loopsleepms() {
 # if found and included, this file overwrites loopsleepms()
 # with a high resolution timer function for precise looping.
 # It needs bash, any other shell keeps the plain sleep above.
-if [ -n "${BASH_VERSION}" ]; then
+if [ -n "${BASH_VERSION}" ] && [ -r "${plugins_dir}/loopsleepms.sh.inc" ]; then
 	#shellcheck source=/dev/null
 	. "${plugins_dir}/loopsleepms.sh.inc"
 fi
@@ -280,13 +282,22 @@ show_fireqos_names() {
 		name="$(cat "${fireqos_run_dir}/ifaces/${x}")"
 		echo "SETDEVICENAME ${name}" || exit
 
-		#shellcheck source=/dev/null
-		. "${fireqos_run_dir}/${name}.conf"
+		if [ -r "${fireqos_run_dir}/${name}.conf" ]; then
+			#shellcheck source=/dev/null
+			. "${fireqos_run_dir}/${name}.conf"
+		fi
+
+		# the names are data, not file patterns
+		set -f
 		for n in ${interface_classes_monitor}; do
 			# shellcheck disable=SC2046
 			setclassname $(printf '%s' "${n}" | tr '|' ' ')
 		done
-		[ -n "${interface_dev}" ] && echo "SETDEVICEGROUP ${interface_dev}" || exit
+		set +f
+
+		if [ -n "${interface_dev}" ]; then
+			echo "SETDEVICEGROUP ${interface_dev}" || exit
+		fi
 
 		return 0
 	fi
