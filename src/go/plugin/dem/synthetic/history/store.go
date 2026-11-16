@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// Package history persists synthetic run start and completion records in the command-owned DEM journal and reduces
+// Package history persists synthetic run start and completion records in the process-owned DEM journal and reduces
 // them back into runs for queries.
 package history
 
@@ -11,8 +11,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-// Store encodes and queries synthetic runs in the command-owned journal.
-// It borrows the journal; only the command may close it or enforce retention.
+// Store encodes and queries synthetic runs in the process-owned journal.
+// It borrows the journal; only the plugin process (dem.Process) may close it or enforce retention.
 type Store struct{ store *journalstore.Store }
 
 func NewStore(store *journalstore.Store) *Store {
