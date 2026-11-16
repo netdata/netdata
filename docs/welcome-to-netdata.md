@@ -18,7 +18,7 @@ This page explains what Netdata is and the principles behind it. [Netdata Design
 
 ## How Netdata is different
 
-### It is automated, so the work is already done
+### Automated
 
 **Netdata does the work other approaches leave to your team.**
 
@@ -26,7 +26,7 @@ It discovers collection sources and starts collecting. It builds dashboards algo
 
 At 3 a.m., you search for a metric, find it already charted, and see which metrics behaved unusually in the incident window.
 
-### It is high-fidelity and real-time at any scale
+### High fidelity, in real time
 
 **Netdata collects at per-second resolution by default, independently of scale, because each Agent and Parent does its share of the work.**
 
@@ -36,13 +36,13 @@ You also see the effect of every change as you make it: a fix, a configuration c
 
 Because Netdata evaluates every metric every second, anomalies such as traffic floods and DDoS patterns show up in the data within seconds of starting.
 
-### Your metrics, logs and traces stay in your own infrastructure
+### Your data stays with you
 
 **Data is stored where it is created: on your Agents and Parents.**
 
 Your metrics, logs and traces leave your servers only when someone views them. Netdata Cloud routes queries to the nodes that hold the data and merges the answers, and it is not in the data path. Every Agent keeps working without Cloud and without internet access. Netdata meets data-sovereignty and residency requirements by design, and keeping data at the edge means no egress charges for monitoring data.
 
-### Troubleshooting starts from data that is already explained
+### Ready for AI
 
 **Machine learning and AI start from complete, well-described data.**
 
@@ -50,7 +50,7 @@ Anomaly detection runs on every metric. The Anomaly Advisor ranks the metrics th
 
 ## The principles behind it
 
-### Meaning is given at collection time
+### Meaning at collection time
 
 **Every metric is collected with its meaning, so Netdata can chart it correctly without anyone describing it.**
 
@@ -70,7 +70,7 @@ Selecting what to collect ties the quality of your visibility to what someone th
 - **Accurate sequencing:** the exact order of events across systems.
 - **Complete context for machine learning and AI,** which can only reason about what was collected.
 
-### Every Agent is complete, and scaling is adding Parents
+### Scale by adding Parents
 
 **Every Agent is a full monitoring system, and a larger fleet is the same architecture with more Parents.**
 
@@ -89,7 +89,7 @@ The same rule holds across the fleet: when a node does not answer a query, the d
 - **Stress is visible** the moment it starts.
 - **Honest answers:** a fleet-wide result always says which sources it covers.
 
-### Alerts that cover every component
+### Alerts for every component
 
 **Pre-configured alerts watch every individual instance of the systems and applications Netdata detects.**
 
@@ -98,7 +98,7 @@ Alerts are templates that apply to each database, web server, container and serv
 - **Coverage from the start**, plus your own alerts where you need them.
 - **Early detection** of component failures before they become service outages.
 
-### Logs in place, or ingested efficiently
+### Logs
 
 **Netdata handles logs in two ways, and neither needs a separate logging backend.**
 
@@ -212,7 +212,7 @@ Netdata configurations are infrastructure-as-code friendly, and provisioning sys
 4. **Add Parents** when you want shared storage and high availability. See [deployment with centralization points](/docs/deployment-guides/deployment-with-centralization-points.md).
 5. **Invite your team.** See [organize your infrastructure and invite your team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md).
 
-## Where to go next
+**Read next:**
 
 | If you want to know | Read |
 |---|---|
@@ -245,7 +245,3 @@ A complete deployment is usually achieved within a few days; an Agent starts sho
 ### Which operating systems does it support?
 
 Linux, Windows, macOS and FreeBSD, plus Docker and Kubernetes.
-
-### How do I start?
-
-Install an Agent and open the dashboard. See [Get started](#get-started).
