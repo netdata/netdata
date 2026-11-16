@@ -74,7 +74,7 @@ The Agent receives OpenTelemetry logs and SNMP traps on all plans. OpenTelemetry
 traps are stored locally when journal output is enabled (the default). An OTLP-only trap job forwards events without
 local storage or a local `snmp:traps` source. See [SNMP Traps](/docs/npm/snmp-traps/README.md).
 The read-only `legacy-otel-logs` source is available only where journals from the former plugin remain; see the
-[legacy logs guidance](/src/crates/otel-plugin/README.md#logs-from-the-former-experimental-plugin-are-not-visible).
+[legacy logs guidance](/src/crates/otel-plugin/README.md#logs-written-by-the-previous-opentelemetry-plugin-are-not-visible).
 
 The content is transmitted encrypted to your browser and is not stored in Netdata Cloud. For full data sovereignty,
 [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md)
