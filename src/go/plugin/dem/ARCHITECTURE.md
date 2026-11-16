@@ -495,7 +495,7 @@ Shared and process-wide packages:
 | `collector/{receiver,rum}` | Native lifecycle, configuration, scheduling callbacks and metric publication |
 | `collector/synthetic` | The `journey` and `lighthouse` modules: each keeps its configuration, form and request building over the shared synthetic job; one chart template and one integration metadata file serve both |
 | `collector/internal/syntheticjob` | Synthetic job lifecycle shared by journey and lighthouse: browser `Executor`, preparation, rehearsal, registration, monitor session, vnode association, and attempt and kind metrics |
-| `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close |
+| `journalstore` | Shared root policy, the shared record envelope, SDK admission and inventory, independent snapshots, retention status and close, over the pure-Go `systemd-journal-sdk` journal files |
 | `historyfunc` | Read-only process history status presentation behind a narrow store dependency |
 | `internal/rawfunc` | Request and response plumbing shared by the three Function packages: request admission (access masks, strict parameters from arguments or a JSON body, vnode selectors), the cancellation status, the row bound, method declarations and table responses built from ordered column lists |
 | `internal/redact` | DEM text and credential redaction: the RUM site value policy, the journey secret policy and the credential patterns |
