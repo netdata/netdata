@@ -1128,9 +1128,10 @@ Fixed startup selection (`synthetic/runtimehost`):
 - Enabling or validating a monitor never downloads executables. Contained structural configuration validation remains
   required before a malformed binding can become a named-dependency waiter; no per-monitor runtime claim is reserved.
 - Readiness reads the fixed process state. There is no import polling or installation-driven readiness notification.
-  The automatic updater (`runtimehost.Updater`, managed hosts only) is the one preparation worker: after explicit
-  install consent it checks within five minutes of startup and then every 23-25 hours, retries a failed check at the
-  next scheduled check, and changes only the next process's selection.
+  The automatic updater (`runtimehost.Updater`, managed hosts only) is the one preparation worker. It checks within
+  five minutes of startup and then every 23-25 hours; a check does nothing unless the installed selection enabled
+  automatic updates (install or repair without `--manual-updates`). It retries a failed check at the next scheduled
+  check and changes only the next process's selection.
 - Startup and hourly maintenance retire unprotected old versions independently of enabled monitors. Maintenance
   errors do not invalidate an otherwise usable runtime or change website outcomes.
 
