@@ -73,9 +73,11 @@ This integration doesn't support auto-detection.
 - Audits that run at the same time compete for the host's CPU, which changes their timings and scores.
 - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
   and Lighthouse charts leave a gap until a new audit completes.
-- Run history is shared with RUM and kept up to 30 days or 1 GiB, and reports up to 7 days or 2 GiB
-  (`history` and `artifacts` in `dem.conf`). When the size limit is reached, the oldest entries go first.
+- Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and reports for
+  7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day expire
+  together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go first.
 - A report larger than 5 MiB is not kept.
+- Run diagnostics keep up to 500 events per audit and 2,000 characters per text, and count what they drop.
 - To be alerted on a low performance score, add your own health alert on
   `dem_synthetic.lighthouse.performance`.
 
@@ -153,7 +155,7 @@ Each job audits one page. All options apply per job.
 | **Diagnosis** | [save_report](#option-diagnosis-save-report) | Save the full Lighthouse HTML report of each audit. Reports can contain sensitive URLs and page content. | no | no |
 | **Collection** | [check_every](#option-collection-check-every) | How often to audit the page, in seconds. | 1800 | no |
 |  | update_every | How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser. | 10 | no |
-|  | timeout | Time limit for one audit, in seconds. Time spent waiting for a free browser does not count. | 180 | no |
+|  | [timeout](#option-collection-timeout) | Time limit for one audit, in seconds. Time spent waiting for a free browser does not count. | 180 | no |
 | **Virtual Node** | [vnode](#option-virtual-node-vnode) | Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 <a id="option-diagnosis-save-report"></a>
@@ -169,6 +171,13 @@ browser. Reports larger than 5 MiB are not kept.
 A new job runs its first audit right away. The second comes one to two intervals later, at a point that
 depends on the job name, so jobs created together do not all run at once. After that, audits follow
 every `check_every` seconds.
+
+
+<a id="option-collection-timeout"></a>
+##### timeout
+
+An audit that exceeds it ends as `timeout`. After the browser and its processes exit, saving the report and
+history has up to 10 more seconds, and the audit keeps its browser slot until then.
 
 
 <a id="option-virtual-node-vnode"></a>
@@ -449,6 +458,9 @@ No additional configuration is required.
 
 One row per recorded test, step or audit event. The response also carries the full run record, including
 what was captured; a missing completion time means the run has not finished or its end was not recorded.
+For a journey, the record's `failure_evidence` holds the first failure's test and step path, source
+locations and error excerpts, plus what was still pending when a timed-out test was stopped, and
+`browser_summary` holds the browser error counts and samples when `browser_error_summary` is on.
 
 A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
 reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
@@ -544,7 +556,7 @@ One row per capture of the run. A capture that has expired is reported as `expir
 | bytes | integer | bytes |  | File size. |
 | sha256 | string |  |  | SHA-256 of the file. |
 | availability | string |  |  | Whether the file is still kept. |
-| test | string |  |  | Title of the test a screenshot or trace belongs to. Empty for Lighthouse reports. |
+| test | string |  |  | Title of the test a screenshot or trace belongs to, or `Test not recorded` when the run did not report it. Empty for Lighthouse reports. |
 | label | string |  |  | Screenshot, Trace or Lighthouse report. |
 
 
@@ -683,6 +695,46 @@ The browser is busy with other jobs for longer than this job's check interval, s
 **Fix**
 
 Raise `check_every` or lower `timeout` on busy jobs, or raise `browser.concurrency` in `dem.conf` if the host has CPU and memory to spare, then restart the Agent.
+
+#### plugin exiting with retained unverified synthetic work: `ERROR`
+
+**When**
+
+A journey or Lighthouse run, or a runtime check, ends without proof that its browser processes exited, and the whole plugin, RUM included, exits.
+
+**Cause**
+
+DEM could not confirm that every browser and Node.js process of the run exited, for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's files and its runtime release protected instead of deleting something that may still be in use.
+
+**Fix**
+
+Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+reboot, which also lets DEM release the protected runtime files.
+
+Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+in place: DEM never removes protected work based on age or a missing process ID.
+
+
+#### unverified synthetic completion: `ERROR`
+
+**When**
+
+The plugin was shutting down when a run or runtime check ended without proof that its browser processes exited.
+
+**Cause**
+
+DEM could not confirm that every browser and Node.js process of the run exited, for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's files and its runtime release protected instead of deleting something that may still be in use.
+
+**Fix**
+
+Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+reboot, which also lets DEM release the protected runtime files.
+
+Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+in place: DEM never removes protected work based on age or a missing process ID.
+
 
 #### audit URL must be absolute HTTP(S) without credentials
 

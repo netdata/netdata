@@ -42,7 +42,9 @@ your website over the network, like a visitor would.
 
 Everything the script does is real: form submissions, orders and account changes happen on the website and
 are not rolled back. Point write actions at test accounts or a staging site. The **Test** action in the job
-editor also runs the journey once, for real, without recording the result.
+editor also runs the journey once, for real, without recording the result: a pass reports success, and a failure
+shows the same failure summary that run history would, with browser error counts when `browser_error_summary` is
+on. Test shares the browser with the running jobs, so it can wait for them and delay their checks.
 
 Credentials reach the script as `DEM_SECRET_*` environment variables. The script and the secret values are
 not stored in run history, and secret values are masked in recorded error text. Screenshots and traces are
@@ -81,8 +83,12 @@ This integration doesn't support auto-detection.
   waiting when the job's next check comes due, it is skipped and counted as coalesced.
 - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
   and test charts leave a gap until a new run completes.
-- Run history is shared with RUM and kept up to 30 days or 1 GiB, and captures up to 7 days or 2 GiB
-  (`history` and `artifacts` in `dem.conf`). When the size limit is reached, the oldest entries go first.
+- Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and captures
+  for 7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day
+  expire together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go
+  first.
+- Run diagnostics keep up to 500 test, step, error and output events per run and 2,000 characters per text,
+  and count what they drop. HAR files, videos and filmstrips are not captured.
 - A screenshot or trace larger than 5 MiB is not kept.
 
 
@@ -201,16 +207,20 @@ The trace records DOM snapshots, network activity and a visual timeline of the f
 runs during every run, including runs that pass, and adds CPU, memory and temporary disk use. Traces
 larger than 5 MiB are not kept.
 
-Download a trace with the `synthetics-artifact` Function (administrator access) and open it with the
-[Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer). Secrets are not masked inside
-traces, and a script can change what is recorded, for example with `test.use({ trace: 'on' })`.
+Download a trace with the `synthetics-artifact` Function (administrator access), save the decoded bytes
+as a `.zip` file and open it with the [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer).
+Secrets are not masked inside traces, and a script can change what is recorded, for example with
+`test.use({ trace: 'on' })`.
+
+When a run times out, saving the trace can use up the time kept for recording the timeout, and the run can
+then lose its final report and screenshots. Traces never extend the time limit or cause a retry.
 
 
 <a id="option-diagnosis-browser-error-summary"></a>
 ##### browser_error_summary
 
-The counts and up to three samples per kind appear in the journey run history, for runs that pass as well
-as runs that fail. Only pages opened through the test's `page` or `context` fixtures are observed; a
+The counts and up to four samples per kind (at most three from each test) appear in the journey run history,
+for runs that pass as well as runs that fail. Only pages opened through the test's `page` or `context` fixtures are observed; a
 browser context the script creates itself is not. Samples can contain text from the page.
 
 
@@ -227,7 +237,8 @@ every `check_every` seconds.
 
 The limit applies to the whole file and to each test in it. The last 5 seconds of it (one fifth of a
 limit under 25 seconds) are kept for recording the timeout, so the tests have slightly less time. A run
-that exceeds it ends as `timeout`.
+that exceeds it ends as `timeout`. After the browser and its processes exit, saving captures and history
+has up to 10 more seconds, and the run keeps its browser slot until then.
 
 
 <a id="option-virtual-node-vnode"></a>
@@ -567,6 +578,9 @@ No additional configuration is required.
 
 One row per recorded test, step or audit event. The response also carries the full run record, including
 what was captured; a missing completion time means the run has not finished or its end was not recorded.
+For a journey, the record's `failure_evidence` holds the first failure's test and step path, source
+locations and error excerpts, plus what was still pending when a timed-out test was stopped, and
+`browser_summary` holds the browser error counts and samples when `browser_error_summary` is on.
 
 A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
 reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
@@ -662,7 +676,7 @@ One row per capture of the run. A capture that has expired is reported as `expir
 | bytes | integer | bytes |  | File size. |
 | sha256 | string |  |  | SHA-256 of the file. |
 | availability | string |  |  | Whether the file is still kept. |
-| test | string |  |  | Title of the test a screenshot or trace belongs to. Empty for Lighthouse reports. |
+| test | string |  |  | Title of the test a screenshot or trace belongs to, or `Test not recorded` when the run did not report it. Empty for Lighthouse reports. |
 | label | string |  |  | Screenshot, Trace or Lighthouse report. |
 
 
@@ -802,6 +816,46 @@ The browser is busy with other jobs for longer than this job's check interval, s
 
 Raise `check_every` or lower `timeout` on busy jobs, or raise `browser.concurrency` in `dem.conf` if the host has CPU and memory to spare, then restart the Agent.
 
+#### plugin exiting with retained unverified synthetic work: `ERROR`
+
+**When**
+
+A journey or Lighthouse run, or a runtime check, ends without proof that its browser processes exited, and the whole plugin, RUM included, exits.
+
+**Cause**
+
+DEM could not confirm that every browser and Node.js process of the run exited, for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's files and its runtime release protected instead of deleting something that may still be in use.
+
+**Fix**
+
+Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+reboot, which also lets DEM release the protected runtime files.
+
+Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+in place: DEM never removes protected work based on age or a missing process ID.
+
+
+#### unverified synthetic completion: `ERROR`
+
+**When**
+
+The plugin was shutting down when a run or runtime check ended without proof that its browser processes exited.
+
+**Cause**
+
+DEM could not confirm that every browser and Node.js process of the run exited, for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's files and its runtime release protected instead of deleting something that may still be in use.
+
+**Fix**
+
+Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+reboot, which also lets DEM release the protected runtime files.
+
+Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+in place: DEM never removes protected work based on age or a missing process ID.
+
+
 #### set exactly one of script and script_path
 
 **Cause**
@@ -926,8 +980,8 @@ Open the run in the journey run history. The last observed step and stop context
 
 **Cause**
 
-Test runs the whole journey and must finish before the editor's request times out, which a long journey can exceed.
+Test first waits for a free browser, shared with the running jobs, then runs the whole journey; the editor's request must cover both, which a long journey or a busy Agent can exceed. A Test that timed out keeps no result to look at later.
 
 **Fix**
 
-Save the job without testing it and check its first run in the journey run history.
+Save the job without testing it and check its first run in the journey run history, or test again when fewer checks are running.

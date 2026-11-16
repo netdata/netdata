@@ -46,7 +46,9 @@ memory for the charts and saves the details of sampled sessions to local history
 Before anything is charted, saved or exported, URLs lose their query strings, fragments and credentials, and path
 segments that look like email addresses, IDs or tokens are replaced. Client IP addresses are used to enforce rate
 limits and look up the visitor's location, and are not stored. This is not full anonymization: error messages, page
-paths, user IDs that your application sets and exported event attributes can still identify people.
+paths, user IDs that your application sets and exported event attributes can still identify people. Credentials
+from the site's configuration, such as an export `auth_token`, are masked in saved and exported text when they are
+at least 4 bytes long; a shorter value is masked only when it looks like a credential (`token=...` or `Bearer ...`).
 
 
 This collector is only supported on the following platforms:
@@ -81,8 +83,11 @@ This integration doesn't support auto-detection.
   10 error fingerprints and 10 resource hosts. The `rum-pages` Function lists every page.
 - The Web Vital alerts need at least 30 observations of that vital in the window, so a quiet site never triggers them.
   No stock alert fires when traffic stops.
-- Session history is shared with the synthetic monitors and kept up to 30 days or 1 GiB (`history` in `dem.conf`);
-  when the size limit is reached, the oldest records go first. Only sessions selected by `investigate` are saved.
+- Session history is shared with the synthetic monitors and kept for about 30 days, or less once it would exceed
+  1 GiB (`history` in `dem.conf`). Files of up to a day expire together, so records can stay about a day longer; when the
+  size limit is reached, the oldest records go first. Only sessions selected by `investigate` are saved.
+- Up to 2,000 sessions per site are tracked in memory. A session that goes quiet or is pushed out loses the details
+  held for it, so a later error can no longer save them.
 - City locations appear only in the live feed. History and exports keep the country at most.
 
 
@@ -130,13 +135,19 @@ with your receiver address and site key:
 <script async src="https://rum.example.org/rum/shop.js"></script>
 ```
 
-- Add it to every page as an external script tag. A tag manager must insert the tag itself; pasting the script's
-  contents inline does not work.
-- If the website has a Content Security Policy, allow the receiver's address in `script-src` and `connect-src`.
+- Add it to every page as a classic external script tag, with the address exactly as shown. The SDK and the reports
+  use addresses relative to the tag's `src`, so a redirect of only the script does not carry over to them. A tag
+  manager must insert the tag itself; pasting the script's contents inline, loading it as a module or evaluating it
+  does not work.
+- If the website has a Content Security Policy, allow the receiver's script address in `script-src-elem` (or
+  `script-src`) and its `/rum/` address in `connect-src`. A `nonce` on the tag is passed on to the SDK scripts, and
+  `strict-dynamic` works as usual. A policy that requires Trusted Types for script URLs needs your own integration:
+  the script creates no permissive policy. HTTPS pages need an HTTPS receiver address.
 - Optionally, set `data-version="1.4.2"` on the tag to compare application releases, call
   `window.netdataRum.setUser({ id: '...' })` to find a user's sessions later, and, once the SDK has loaded, report
   single-page application routes with `GrafanaFaroWebSdk.faro.api.setView({ name: '/checkout' })`. Use an internal,
-  non-personal user ID: it is stored without hashing.
+  non-personal user ID of at most 128 bytes, and clear it when the user logs out: it is stored without hashing. It
+  appears in session history only, not in the live feed, the charts or the exports.
 
 
 #### Check that reports arrive
@@ -144,6 +155,7 @@ with your receiver address and site key:
 Open the website in a regular browser (automated and headless browsers are excluded by default) and look at the
 browser's Network panel: the script and SDK load from the receiver, and a `POST` to `/rum/shop/collect` returns `202`.
 `rum-sites` then shows a recent last accepted report for the site. Charts appear within the next `update_every`.
+A `202` means the report reached the live measurements; it does not prove that it was saved or exported.
 
 
 #### Optional - send event logs and traces to OpenTelemetry
@@ -185,22 +197,22 @@ Each job is one website. All options apply per job; event logs and tracing each 
 |  | [capture.frustration_signals](#option-capture-capture-frustration-signals) | Detect rage clicks, dead clicks and clicks followed by an error. These are heuristics, not proof of user frustration. | no | no |
 | **Sampling** | [measure_sample_rate](#option-sampling-measure-sample-rate) | Share of browser sessions that send reports, from 0 to 1. 1 measures every session; 0 stops collection for the site. | 1 | no |
 |  | investigate | Which measured sessions are saved to history with their details, and exported when event logs or tracing are on. Leave empty to save every session. |  | no |
-|  | investigate.sample_rate | Share of measured sessions saved with their details, from 0 to 1. 0 saves only the sessions that `always_keep` selects. | 1 | no |
+|  | [investigate.sample_rate](#option-sampling-investigate-sample-rate) | Share of measured sessions saved with their details, from 0 to 1. 0 saves only the sessions that `always_keep` selects. | 1 | no |
 |  | [investigate.always_keep](#option-sampling-investigate-always-keep) | Sessions to save whatever the sample rate - `errors` (a JavaScript error) and `poor_vitals` (a poor Web Vital). An empty list adds none. | ["errors","poor_vitals"] | no |
-| **Event logs** | event_logs | Export browser events, including custom event attributes, as OpenTelemetry logs. Session history in Netdata works without it. |  | no |
-|  | event_logs.enabled | Send event logs to their destination. | no | no |
+| **Event logs** | [event_logs](#option-event-logs-event-logs) | Export browser events, including custom event attributes, as OpenTelemetry logs. Session history in Netdata works without it. |  | no |
+|  | [event_logs.enabled](#option-event-logs-event-logs-enabled) | Send event logs to their destination. | no | no |
 |  | [event_logs.include_console_logs](#option-event-logs-event-logs-include-console-logs) | Also export the console info, warning and error messages of saved sessions. Requires event logs. | no | no |
 |  | event_logs.destination | OTLP/gRPC receiver for this signal. Leave empty to use `http://127.0.0.1:4317`, where the Netdata OpenTelemetry plugin listens by default. |  | no |
-|  | event_logs.destination.endpoint | Receiver address with a port, `http://host:port` for plaintext or `https://host:port` for TLS, without a path or credentials. | http://127.0.0.1:4317 | no |
+|  | [event_logs.destination.endpoint](#option-event-logs-event-logs-destination-endpoint) | Receiver address with a port, `http://host:port` for plaintext or `https://host:port` for TLS, without a path or credentials. | http://127.0.0.1:4317 | no |
 |  | [event_logs.destination.auth_token](#option-event-logs-event-logs-destination-auth-token) | Bearer token for the receiver. Use a secret reference such as `${env:OTLP_TOKEN}`. Leave empty for no authentication. |  | no |
 |  | event_logs.destination.tls_ca | CA certificate file to verify an HTTPS receiver. Leave empty to use the system's trusted CAs. |  | no |
 |  | event_logs.destination.tls_cert | Client certificate file for an HTTPS receiver that requires one. Set together with the client key. |  | no |
 |  | event_logs.destination.tls_key | Client private key file. Set together with the client certificate. |  | no |
-| **Browser tracing** | tracing | Record spans for the browser's requests and pass trace context to your APIs, exported as OpenTelemetry traces. |  | no |
-|  | tracing.enabled | Send browser spans to their destination. Independent of event logs. | no | no |
+| **Browser tracing** | [tracing](#option-browser-tracing-tracing) | Record spans for the browser's requests and pass trace context to your APIs, exported as OpenTelemetry traces. |  | no |
+|  | [tracing.enabled](#option-browser-tracing-tracing-enabled) | Send browser spans to their destination. Independent of event logs. | no | no |
 |  | tracing.propagate_to | Origins of other APIs, such as `https://api.example.org`, whose requests also get the `traceparent` header. Requests to the page's own origin always get it. |  | no |
 |  | tracing.destination | OTLP/gRPC receiver for this signal. Leave empty to use `http://127.0.0.1:4317`, where the Netdata OpenTelemetry plugin listens by default. |  | no |
-|  | tracing.destination.endpoint | Receiver address with a port, `http://host:port` for plaintext or `https://host:port` for TLS, without a path or credentials. | http://127.0.0.1:4317 | no |
+|  | [tracing.destination.endpoint](#option-browser-tracing-tracing-destination-endpoint) | Receiver address with a port, `http://host:port` for plaintext or `https://host:port` for TLS, without a path or credentials. | http://127.0.0.1:4317 | no |
 |  | [tracing.destination.auth_token](#option-browser-tracing-tracing-destination-auth-token) | Bearer token for the receiver. Use a secret reference such as `${env:OTLP_TOKEN}`. Leave empty for no authentication. |  | no |
 |  | tracing.destination.tls_ca | CA certificate file to verify an HTTPS receiver. Leave empty to use the system's trusted CAs. |  | no |
 |  | tracing.destination.tls_cert | Client certificate file for an HTTPS receiver that requires one. Set together with the client key. |  | no |
@@ -258,13 +270,41 @@ reaches a visitor in their next session. At 0 the script stops loading the SDK a
 discards reports from pages that are still open, and the measurement charts stop.
 
 
+<a id="option-sampling-investigate-sample-rate"></a>
+##### investigate.sample_rate
+
+Reports that carry no session ID still count in the measurements. They are saved and exported only when
+`sample_rate` is 1 or they match `always_keep`; their JavaScript errors are then saved as standalone errors,
+outside any session.
+
+
 <a id="option-sampling-investigate-always-keep"></a>
 ##### investigate.always_keep
 
 To save details only for problem sessions, set `sample_rate` to 0 and keep the default list. When a session starts to
-match, the details already held for it are saved, and so is everything after, while the Agent still tracks the
-session.
+match, the details already held for it (up to 100 entries) are saved, and so is everything after, while the Agent
+still tracks the session (up to 2,000 per site; quiet sessions expire).
 Event logs and spans sent before the session matched are not exported afterwards.
+
+
+<a id="option-event-logs-event-logs"></a>
+##### event_logs
+
+With the default destination, open the Logs tab of the receiving node, select the `otel-logs` source and the
+`netdata-rum` service (`resource.attributes.service.name`), then filter by `resource.attributes.rum.site` (the
+site key) and `attributes.session.id`. Each record's `attributes.rum.type` is `console`, `event`, `error`,
+`pageview` or `vital`; look at `attributes.console.level`, `attributes.event.name`, `attributes.event.attr.KEY`,
+and for errors `attributes.error.type` and `attributes.error.stack`. Viewing logs needs Netdata Cloud sign-in.
+
+
+<a id="option-event-logs-event-logs-enabled"></a>
+##### event_logs.enabled
+
+Export never blocks measurements or history. On the `rum.otlp` chart, `sent` counts records the receiver accepted
+(not proof that it stored them), `errors` counts records whose delivery failed or was refused (a timeout can
+leave the outcome unknown), and `dropped` counts records lost locally because the queue was full or the job
+stopped first. Failed records are not retried. Turning the export off keeps its saved settings without checking
+them.
 
 
 <a id="option-event-logs-event-logs-include-console-logs"></a>
@@ -274,10 +314,39 @@ Console errors are exported as logs. Uncaught exceptions and unhandled promise r
 JavaScript errors, with or without this option.
 
 
+<a id="option-event-logs-event-logs-destination-endpoint"></a>
+##### event_logs.destination.endpoint
+
+Omit the key to use the default; an explicitly empty value is rejected while the export is on. Write IPv6
+addresses in brackets, such as `https://[2001:db8::1]:4317`.
+
+
 <a id="option-event-logs-event-logs-destination-auth-token"></a>
 ##### event_logs.destination.auth_token
 
 A secret reference must resolve even while the export is disabled, or the job does not start.
+
+
+<a id="option-browser-tracing-tracing"></a>
+##### tracing
+
+Browser spans show the browser's side of each request; they do not prove what the backend did. A session can
+contain several traces, and event logs are not linked to traces automatically: look up a trace ID from the
+browser in your tracing system.
+
+
+<a id="option-browser-tracing-tracing-enabled"></a>
+##### tracing.enabled
+
+The `rum.spans` chart counts spans with the same `sent`, `errors` and `dropped` meaning as the event log chart
+(see `event_logs.enabled`). Turning tracing off keeps its saved settings without checking them.
+
+
+<a id="option-browser-tracing-tracing-destination-endpoint"></a>
+##### tracing.destination.endpoint
+
+Omit the key to use the default; an explicitly empty value is rejected while tracing is on. Write IPv6
+addresses in brackets, such as `https://[2001:db8::1]:4317`.
 
 
 <a id="option-browser-tracing-tracing-destination-auth-token"></a>
@@ -494,6 +563,11 @@ Each site has its own charts, under its virtual node when `vnode` is set and und
 - Percentile and count charts describe the reports received in the last `window`. Each page view counts once per Web
   Vital, with its latest value; percentiles cannot be averaged across sites or breakdown values.
 - A vital with no observations in the window leaves a gap in its percentile chart; a measured zero is a real value.
+- A page view is a document load or a return from the browser's back-forward cache. Single-page application route
+  changes are application views, and Web Vitals stay with the page view even when reported after a route change.
+- Same-site fetch timing covers the fetch and XHR requests the browser reports for the page's own site, not every
+  backend request; the RUM script's own requests are excluded. JavaScript errors are events, so errors per page view
+  is not a failure rate.
 - Breakdown charts exist for the busiest values in the window, plus `other` for the rest (the `bucket` label).
 - While the receiver is not serving, or `measure_sample_rate` is 0, the measurement charts stop; the receiver
   availability, history and export charts continue.
@@ -782,7 +856,14 @@ No additional configuration is required.
 
 #### Returns
 
-One row per active site. The response also shows whether the receiver is serving, its public URL and the state of its location database (`collector.geoip`).
+One row per active site. The response also shows whether the receiver is serving, its public URL and the state
+of its location database (`collector.geoip`). In that object, `selection` is `auto` (empty `geoip_db`) or
+`explicit`, `state` is `loaded`, `unavailable` or `using_previous`, `source` is `cache`, `stock` or
+`explicit`, `database_type` is the database's declared type, and `reason` explains a missing database
+without paths (the Agent log has the details). `lookup_errors` counts failed lookups, not unmatched addresses, and
+`loaded` does not mean the database is current or complete. Its times (`build_at`, `loaded_at`,
+`last_checked_at`) are Unix microseconds.
+
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
@@ -883,7 +964,7 @@ No additional configuration is required.
 | Virtual node name (`vnode`) | string | Only sites of the configured virtual node with this name. An empty or unknown name is an error. Do not combine with `vnode_guid`. | no |  |  |
 | Virtual node GUID (`vnode_guid`) | string | Only data recorded under the virtual node with this GUID. Do not combine with `vnode`. | no |  |  |
 | Site (`site`) | string | Only this site, by its site key. | no |  |  |
-| Cursor (`cursor`) | string | The `next` value of the previous response, unchanged. Empty returns the most recent events. | no |  |  |
+| Cursor (`cursor`) | string | The `next` value of the previous response, unchanged. Empty returns the most recent events. The cursor keeps a position for each site, so a busy site never skips a quiet site's events; a site whose job restarted or was replaced starts a new stream, from that job's first events. | no |  |  |
 
 #### Returns
 
@@ -940,7 +1021,7 @@ No additional configuration is required.
 | Virtual node name (`vnode`) | string | Only sites of the configured virtual node with this name. An empty or unknown name is an error. Do not combine with `vnode_guid`. | no |  |  |
 | Virtual node GUID (`vnode_guid`) | string | Only data recorded under the virtual node with this GUID. Do not combine with `vnode`. | no |  |  |
 | Site (`site`) | string | Only this site, by its site key. | no |  |  |
-| User ID (`user_id`) | string | Only sessions in which the application set this user ID during the time range. | no |  |  |
+| User ID (`user_id`) | string | Only sessions in which the application set this user ID during the time range. The match is exact, on the ID as stored after DEM shortens or masks it, so a displayed `[REDACTED]` value cannot be used to look a user up. | no |  |  |
 | Received after (`after`) | integer | Start of the time range, in Unix seconds, or seconds before now when negative (`-3600` for the last hour). | no | 15 minutes before `before` |  |
 | Received before (`before`) | integer | End of the time range, in Unix seconds, or seconds before now when negative. | no | now |  |
 
@@ -1100,7 +1181,21 @@ The browser console shows this when the page cannot load the SDK from the receiv
 
 **Fix**
 
-Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver, and allow the receiver's address in `script-src` and `connect-src`.
+Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver, and allow the receiver's address in `script-src` and `connect-src`. If several Agents answer for the same public address, run the same Agent version on all of them, so each serves the SDK files the script refers to.
+
+#### Netdata RUM: cannot load the tracing SDK. Check the browser Network and CSP errors for the RUM script requests.
+
+**When**
+
+`tracing` is enabled for the site.
+
+**Cause**
+
+The page could not load the tracing bundle from the receiver, for the same reasons as the core SDK. RUM keeps working without browser spans.
+
+**Fix**
+
+Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver, and allow the receiver's address in the page's Content Security Policy.
 
 #### Netdata RUM: cannot determine receiver URL. Use the external script tag from RUM setup.
 
@@ -1122,15 +1217,25 @@ The SDK loaded but could not start, usually because the page's script policy (Co
 
 Read the browser console errors logged just before this message and adjust the page's policy for the receiver's scripts.
 
-#### The `collect` request returns 403
+#### The `collect` request or its `OPTIONS` request returns 403
 
 **Cause**
 
-The page's origin is not in `allowed_origins`. Scheme, host and port must match, and `*.example.org` does not cover `example.org` itself.
+The page's origin is not in `allowed_origins`. Scheme, host and port must match, and `*.example.org` does not cover `example.org` itself. A refused `OPTIONS` (preflight) request stops the browser from sending the report.
 
 **Fix**
 
-`rum-sites` shows the last refused origin. If it is your website, add it to `allowed_origins`.
+`rum-sites` shows the last refused origin, which can come from a preflight and stays after later reports succeed. If it is your website, add it to `allowed_origins`.
+
+#### The `collect` request returns 400
+
+**Cause**
+
+The request body is not a valid RUM report. It was cut off or changed on the way, for example by a proxy, or it was not sent by the RUM script.
+
+**Fix**
+
+Check that the reverse proxy forwards the request body unchanged, and that the page uses the script tag `rum-sites` shows.
 
 #### The script or `collect` request returns 404
 
