@@ -83,11 +83,11 @@ Child and Parent storage are independent:
 
 ## `ram`
 
-`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In both of these modes, metric samples exist only in memory, and only while they’re collected.
+`ram` mode can help when Netdata shouldn’t introduce any disk I/O at all. In this mode, metric samples exist only in memory, and only while they’re collected.
 
 When Netdata is configured to stream its metrics to a Metrics Observability Centralization Point (a Netdata Parent), metric samples are forwarded in real-time to that Netdata Parent. The samples kept in memory cache the collected data for some time, in case there are network issues, or the Netdata Parent is restarted for maintenance.
 
-`ram` (and `alloc`, which is the same) keeps tier 0 of the Database Engine in memory, without files. Samples are compressed in memory pages, so the memory used depends on how compressible each metric is, and it grows with the samples actually stored instead of being allocated up front. Whole pages are released once they fall out of the retention, so a dimension can hold up to one page more than requested. When the system has less free memory than `[db].dbengine out of memory protection` (by default 10% of RAM, up to 5 GiB), the Database Engine releases pages early, the oldest that are not being queried first, and the retention gets shorter.
+`ram` (and `alloc`, which is the same) keeps tier 0 of the Database Engine in memory, without files. On a Parent with Database Engine tiers, a `ram` Child's higher tiers are still stored on disk. Agents built without the Database Engine (`--disable-dbengine`) keep the older buffers instead: four bytes per sample, allocated up front, with `ram` rounded up to whole memory pages and `alloc` exact. Samples are compressed in memory pages, so the memory used depends on how compressible each metric is, and it grows with the samples actually stored instead of being allocated up front. Whole pages are released once they fall out of the retention, so a dimension can hold up to one page more than requested. When the system has less free memory than `[db].dbengine out of memory protection` (by default 10% of RAM, up to 5 GiB), the Database Engine releases pages early, the oldest that are not being queried first, and the retention gets shorter.
 
 **Configuring ram mode and retention**:
 

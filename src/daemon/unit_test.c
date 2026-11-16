@@ -1337,7 +1337,7 @@ struct test test15 = {
 // --------------------------------------------------------------------------------------------------------------------
 
 // The values tier 0 holds for a dimension, oldest first, read back with a query: it works for every backend, the ring
-// of db = alloc / none (in builds without dbengine) and the in-memory dbengine of db = ram / alloc. Gaps are skipped:
+// of db = ram / alloc (in builds without dbengine) and the in-memory dbengine of db = ram / alloc. Gaps are skipped:
 // the ring reports an empty interval before its first point. Returns how many values it read.
 static size_t unittest_stored_values(RRDSET *st, RRDDIM *rd, NETDATA_DOUBLE *values, size_t max) {
     size_t n = 0;

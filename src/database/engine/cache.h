@@ -213,6 +213,7 @@ typedef enum {
 } PGC_SEARCH;
 
 PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method);
+PGC_PAGE *pgc_page_get_and_acquire_no_access(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method);
 
 // get information from an acquired page
 Word_t pgc_page_section(PGC_PAGE *page);

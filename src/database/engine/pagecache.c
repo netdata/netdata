@@ -1254,7 +1254,9 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
     PGC_SEARCH method = PGC_SEARCH_FIRST;
     PGC_PAGE *page;
 
-    while ((page = pgc_page_get_and_acquire(cache, section, metric_id, start_s, method))) {
+    // not an access: the scan must not move the metric's oldest page to the end of the clean queue, which the out of
+    // memory protection evicts from its start
+    while ((page = pgc_page_get_and_acquire_no_access(cache, section, metric_id, start_s, method))) {
         method = PGC_SEARCH_NEXT;
         start_s = pgc_page_start_time_s(page);
         time_t end_s = pgc_page_end_time_s(page);
@@ -1279,6 +1281,11 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
     return oldest_s;
 }
 
+// The callbacks run on the evictor threads and the retention pass at once. Each one decides from the pages it finds,
+// and another callback's page may be gone by the time it applies its decision: run the decisions one at a time, so
+// the callback of the last page removed from the index decides last, from the pages that remain.
+static SPINLOCK ram_cache_retention_spinlock = SPINLOCK_INITIALIZER;
+
 static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
 {
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) entry.section;
@@ -1288,6 +1295,8 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
         mrg_metric_get_and_acquire_by_id(main_mrg, (UUIDMAP_ID)entry.metric_id, entry.section);
 
     if (metric) {
+        spinlock_lock(&ram_cache_retention_spinlock);
+
         time_t oldest_s = ram_cache_metric_pages_retention(cache, entry.section, entry.metric_id, NULL);
         if (oldest_s)
             mrg_metric_set_first_time_s_if_bigger(main_mrg, metric, oldest_s);
@@ -1305,6 +1314,8 @@ static void ram_cache_free_clean_page_callback(PGC *cache, PGC_ENTRY entry)
             else
                 __atomic_store_n(&ram_cache_metrics_lost_retention, true, __ATOMIC_RELAXED);
         }
+
+        spinlock_unlock(&ram_cache_retention_spinlock);
 
         // releasing it deletes it, when this was its last page and nothing collects it
         mrg_metric_release(main_mrg, metric);
@@ -1332,11 +1343,12 @@ static bool in_memory_page_is_out_of_retention(PGC_PAGE *page, void *data) {
 }
 
 void rrdeng_in_memory_enforce_retention(time_t now_s) {
-    if (!ram_cache)
+    PGC *cache = __atomic_load_n(&ram_cache, __ATOMIC_ACQUIRE);
+    if (!cache)
         return;
 
     in_memory_retention_now_s = now_s;
-    pgc_evict_clean_pages_matching(ram_cache, in_memory_page_is_out_of_retention, &now_s);
+    pgc_evict_clean_pages_matching(cache, in_memory_page_is_out_of_retention, &now_s);
     in_memory_retention_now_s = 0;
 }
 

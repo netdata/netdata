@@ -2636,6 +2636,11 @@ PGC_PAGE *pgc_page_get_and_acquire(PGC *cache, Word_t section, Word_t metric_id,
     return page;
 }
 
+// For bookkeeping lookups: the page is not counted as accessed, so it keeps its place in the clean queue.
+PGC_PAGE *pgc_page_get_and_acquire_no_access(PGC *cache, Word_t section, Word_t metric_id, time_t start_time_s, PGC_SEARCH method) {
+    return page_find_and_acquire_once(cache, section, metric_id, start_time_s, method);
+}
+
 struct pgc_statistics pgc_get_statistics(PGC *cache) {
     // FIXME - get the statistics atomically
     return cache->stats;
