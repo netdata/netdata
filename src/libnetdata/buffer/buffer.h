@@ -1150,6 +1150,15 @@ static void buffer_json_member_add_int64(BUFFER *wb, const char *key, int64_t va
     wb->json.stack[wb->json.depth].count++;
 }
 
+// writes the key and the colon; the caller appends a raw JSON value
+ALWAYS_INLINE
+static void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
+    buffer_print_json_comma_newline_spacing(wb);
+    buffer_print_json_key(wb, key);
+    buffer_fast_strcat(wb, ":", 1);
+    wb->json.stack[wb->json.depth].count++;
+}
+
 ALWAYS_INLINE
 static void buffer_json_member_add_double(BUFFER *wb, const char *key, NETDATA_DOUBLE value) {
     buffer_print_json_comma_newline_spacing(wb);
