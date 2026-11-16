@@ -514,7 +514,10 @@ modules:
           description: |
             These metrics refer to the PersistentVolumeClaim.
 
-            `requested` is the storage the PVC asks for and `capacity` is the size of the volume it got. `requested_capacity_diff` is `requested` minus `capacity`: positive while the volume is smaller than requested (an expansion is pending or failed), 0 when the sizes are equal, negative when the volume is larger than requested. A value that is not known is a gap, not 0: a Pending PVC has no `capacity` yet, so it has no `requested_capacity_diff` either.
+            - Requested Storage shows the storage requested by the PVC. Capacity shows the capacity reported in its status. These are Kubernetes allocation values, not filesystem usage or free space.
+            - Capacity Shortfall is `max(requested - capacity, 0)`. It is positive while reported capacity is below the request and zero when capacity meets or exceeds the request. A persistent shortfall can indicate an expansion that is pending or failed; it does not identify the cause.
+            - Each chart has one dimension. Summing across PVCs gives total requested storage, total reported capacity, or total outstanding requested capacity. Excess capacity on one PVC does not cancel another PVC's shortfall.
+            - Unknown values are gaps, not zero. For example, a Pending PVC without reported capacity has no Capacity or Capacity Shortfall values.
           labels:
             - name: k8s_cluster_id
               description: Cluster ID. This is equal to the kube-system namespace UID.
@@ -525,11 +528,21 @@ modules:
             - name: k8s_pvc_name
               description: PersistentVolumeClaim name.
           metrics:
-            - name: k8s_state.pvc_capacity
-              description: PVC Capacity Request Difference
+            - name: k8s_state.pvc_requested_storage
+              description: PVC Requested Storage
               unit: B
               chart_type: line
               dimensions:
                 - name: requested
+            - name: k8s_state.pvc_capacity
+              description: PVC Capacity
+              unit: B
+              chart_type: line
+              dimensions:
                 - name: capacity
-                - name: requested_capacity_diff
+            - name: k8s_state.pvc_capacity_shortfall
+              description: PVC Capacity Shortfall
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: shortfall

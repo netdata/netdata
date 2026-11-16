@@ -73,7 +73,9 @@ const (
 )
 
 const (
-	prioPVCCapacity = 50800 + iota
+	prioPVCRequestedStorage = 50800 + iota
+	prioPVCCapacity
+	prioPVCCapacityShortfall
 )
 
 const (
@@ -164,7 +166,9 @@ var cronJobChartsTmpl = collectorapi.Charts{
 }
 
 var pvcChartsTmpl = collectorapi.Charts{
+	pvcRequestedStorageChartTmpl.Copy(),
 	pvcCapacityChartTmpl.Copy(),
+	pvcCapacityShortfallChartTmpl.Copy(),
 }
 
 var (
@@ -989,18 +993,40 @@ func (c *Collector) removeCronJobCharts(st *cronJobState) {
 }
 
 var (
+	pvcRequestedStorageChartTmpl = collectorapi.Chart{
+		IDSep:    true,
+		ID:       "pvc_%s.requested_storage",
+		Title:    "PVC Requested Storage",
+		Units:    "B",
+		Fam:      "pvc",
+		Ctx:      "k8s_state.pvc_requested_storage",
+		Priority: prioPVCRequestedStorage,
+		Dims: collectorapi.Dims{
+			{ID: "pvc_%s_requested", Name: "requested"},
+		},
+	}
 	pvcCapacityChartTmpl = collectorapi.Chart{
 		IDSep:    true,
 		ID:       "pvc_%s.capacity",
-		Title:    "PVC Capacity Request Difference",
+		Title:    "PVC Capacity",
 		Units:    "B",
 		Fam:      "pvc",
 		Ctx:      "k8s_state.pvc_capacity",
 		Priority: prioPVCCapacity,
 		Dims: collectorapi.Dims{
-			{ID: "pvc_%s_requested", Name: "requested"},
 			{ID: "pvc_%s_capacity", Name: "capacity"},
-			{ID: "pvc_%s_requested_capacity_diff", Name: "requested_capacity_diff"},
+		},
+	}
+	pvcCapacityShortfallChartTmpl = collectorapi.Chart{
+		IDSep:    true,
+		ID:       "pvc_%s.capacity_shortfall",
+		Title:    "PVC Capacity Shortfall",
+		Units:    "B",
+		Fam:      "pvc",
+		Ctx:      "k8s_state.pvc_capacity_shortfall",
+		Priority: prioPVCCapacityShortfall,
+		Dims: collectorapi.Dims{
+			{ID: "pvc_%s_capacity_shortfall", Name: "shortfall"},
 		},
 	}
 )

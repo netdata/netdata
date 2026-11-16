@@ -263,8 +263,7 @@ func (ps pvcState) chartID() string {
 	return ps.namespace + "_" + strings.ReplaceAll(ps.name, ".", "_")
 }
 
-// requestedCapacityDiff returns requested - capacity, and false if either quantity is not set. It is signed and not
-// clamped: negative means the volume is larger than requested.
-func (ps pvcState) requestedCapacityDiff() (int64, bool) {
-	return ps.requested - ps.capacity, ps.hasRequested && ps.hasCapacity
+// capacityShortfall returns unmet requested storage, and false if either quantity is not set.
+func (ps pvcState) capacityShortfall() (int64, bool) {
+	return max(ps.requested-ps.capacity, 0), ps.hasRequested && ps.hasCapacity
 }

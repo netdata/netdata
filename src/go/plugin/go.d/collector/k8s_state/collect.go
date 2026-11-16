@@ -469,10 +469,10 @@ func (c *Collector) collectPVCState(mx map[string]int64) {
 		if ps.hasCapacity {
 			mx[px+"capacity"] = ps.capacity
 		}
-		// requested and capacity are set together from one PVC object under the state lock, so the difference
+		// requested and capacity are set together from one PVC object under the state lock, so the shortfall
 		// never mixes two updates.
-		if diff, ok := ps.requestedCapacityDiff(); ok {
-			mx[px+"requested_capacity_diff"] = diff
+		if shortfall, ok := ps.capacityShortfall(); ok {
+			mx[px+"capacity_shortfall"] = shortfall
 		}
 
 		return false
