@@ -107,11 +107,13 @@ What a vnode does and does not do:
   Agent. A vnode does not combine RUM populations, add browser capacity or change who owns captures.
 - **Evidence keeps its vnode.** Saved sessions, runs and captures keep the vnode GUID they were recorded under, even
   after the job moves to another vnode. Moving a RUM job to another vnode restarts its measurements; a synthetic job's
-  latest result clears until a check for the new vnode completes. Renaming a vnode or changing its labels, with the
-  same GUID, resets nothing.
+  latest result clears until a check for the new vnode completes. Changing a vnode's labels or display hostname,
+  while its reference name and GUID stay the same, resets nothing.
 - **Functions stay on the Agent.** The investigation Functions run on the collecting Agent, not on each vnode. Select a
   site with `vnode:NAME` (its configured name) or with `vnode_guid:GUID`, which also reaches a vnode that was renamed or
-  removed. These selectors filter data; they are not an access boundary.
+  removed; give one, never both. The six RUM Functions and `synthetics-checks`, `synthetics-journey-runs`,
+  `synthetics-lighthouse-runs` and `synthetics-artifacts` accept them. These selectors filter data; they are not an
+  access boundary.
 
 ## Plugin configuration
 
@@ -128,14 +130,14 @@ history:
 artifacts:
   days: 7
   max_bytes: 2147483648
-runtime:
-  mode: managed
 ```
 
 | Option | Default | Meaning | Applies |
 |---|---|---|---|
 | `enabled` | `yes` | Runs the plugin. `no` stops every DEM module and Function. | Restart |
-| `browser.concurrency` | `1` | Maximum simultaneous browser attempts in the plugin process. Monitoring, journey **Test** runs and runtime qualification share it. A positive integer. | Restart |
+| `default_run` | `yes` | Runs every module that `modules` does not turn off. | Restart |
+| `modules` | empty | Per-module switches, such as `journey: no` under `modules:`. A module turned off keeps its saved history readable. | Restart |
+| `browser.concurrency` | `1` | Maximum simultaneous browser attempts in the plugin process. Monitoring, journey **Test** runs and the automatic updater's runtime qualification share it. A positive integer. | Restart |
 | `history.days` | `30` | Age target of the shared investigation history, 1-365 days. | Next hourly sweep |
 | `history.max_bytes` | `1073741824` (1 GiB) | Size target of the shared investigation history; at least 8 MiB. | Next hourly sweep |
 | `artifacts.days` | `7` | Age target of retained screenshots, traces and reports, 1-365 days. | Next hourly sweep |
@@ -145,8 +147,9 @@ runtime:
 - **Concurrency.** Ready jobs take turns, and a fresh browser starts for every attempt. A browser slot is not a memory
   limit: size it for the Agent's CPU and memory and for the Lighthouse measurement quality you need.
   [DEM performance and sizing](/src/go/plugin/dem/PERFORMANCE.md) has measured workloads.
-- **Invalid edits.** A history or artifacts change that fails validation keeps the last valid policy, logs a warning
-  and shows the error in `dem-history-status` or `synthetics-artifacts`. An invalid file at startup stops the plugin.
+- **Invalid edits.** A `dem.conf` edit that fails validation keeps the last valid history and artifacts policy, logs a
+  warning and shows the error in `dem-history-status` and `synthetics-artifacts`. An invalid file at startup stops the
+  plugin.
 
 ## Storage and retention
 
@@ -154,7 +157,7 @@ runtime:
 |---|---|---|---|
 | Investigation history | `${NETDATA_LIB_DIR}/dem/journal` | Sampled RUM sessions, events and errors; synthetic run records | 30 days, 1 GiB |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | Failure screenshots, journey traces and Lighthouse HTML reports, one set per run | 7 days, 2 GiB |
-| Browser runtime | `${NETDATA_LIB_DIR}/dem/runtime` | The installed runtime releases | 4 GiB; see the [runtime guide](/packaging/installer/DEM-RUNTIME.md#managed-store-and-retention) |
+| Browser runtime (managed mode) | `${NETDATA_LIB_DIR}/dem/runtime` | The installed runtime releases | 4 GiB; see the [runtime guide](/packaging/installer/DEM-RUNTIME.md#managed-store-and-retention) |
 
 `${NETDATA_LIB_DIR}` is usually `/var/lib/netdata`. A cleanup sweep runs at startup and then hourly.
 
@@ -170,8 +173,9 @@ Investigation history:
 - **Sampled, not lossless.** The plugin writes queued records every five seconds or 500 records, so a crash can lose
   the latest ones. History holds what each job's sampling policy selected, not every event.
 - **Damage stops startup.** If the history files fail their startup check, the plugin exits before any Function
-  registers and leaves the files intact for recovery; check the Agent log. A write failure at run time makes history
-  unavailable until restart, while measurements continue.
+  registers and leaves the files intact for recovery; check the Agent log. A journal write with an uncertain outcome
+  makes history unavailable until restart, while measurements continue; other write failures only drop the affected
+  records (RUM counts them on its `rum.history` chart).
 
 Captures:
 
@@ -210,7 +214,7 @@ or Cloud API.
 | `synthetics-lighthouse-runs` | Saved Lighthouse audits and their lab measurements | Lighthouse Desktop Audit |
 | `synthetics-run` | One run's full diagnosis | Both synthetic pages |
 | `synthetics-artifacts` | Retained capture sets and capture storage | Both synthetic pages |
-| `synthetics-artifact` | One capture's metadata or bytes | Both synthetic pages |
+| `synthetics-artifact` | One run's captures, or one capture's bytes | Both synthetic pages |
 | `dem-history-status` | The shared history's policy, size and maintenance errors | [History status](#history-status) |
 
 - **Access.** Viewing any DEM Function requires a signed-in member of the node's Netdata Cloud Space with permission
@@ -240,7 +244,8 @@ To adjust them for one site, use normal Netdata health configuration with the `_
 
 Journey and Lighthouse jobs need a separately installed browser runtime: one signed bundle with its own Node, Chromium,
 Playwright and Lighthouse. RUM does not. Enabling a browser job never downloads it; without it, browser jobs wait and
-report no website failures. Restart the Agent after installing or updating it.
+report no website failures. Restart the Agent after installing or updating it; the native package's hooks restart a
+running Agent themselves.
 
 [Browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) covers installation for native packages, static and
 source installations, Docker and protected preloads, plus automatic updates and the `dem.plugin runtime` command

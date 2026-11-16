@@ -7,14 +7,16 @@ JavaScript adapters. Installing it does not require, use or discover a system br
 :::info
 
 The browser runtime is experimental, and its public release publication is not yet confirmed. `runtime.release_url` in
-`dem.conf` has no default: online setup works only after you set it to the signed release URL for the host's
-architecture. Offline setup needs a signed release descriptor, its archive and an administrator-provisioned keyring.
+`dem.conf` has no default, and finding the latest release needs it: kickstart, the Docker command,
+`--allow-download` without `--release`, and automatic updates. Set it to the signed release URL for the host's
+architecture. Offline setup needs a signed release descriptor, its archive and an administrator-provisioned keyring;
+install offline with `--manual-updates` unless `release_url` is set, or each daily update check logs a failure.
 
 :::
 
 Enabling a browser monitor never downloads or installs the runtime. Without one, browser jobs wait for it and report
 no website failures. **Restart the Agent after every installation, update or repair, including the first.** A running
-plugin keeps the release it acquired at startup.
+plugin keeps the release it acquired at startup. The native package's hooks restart a running Agent themselves.
 
 On Ubuntu 24.04, default AppArmor restrictions prevent an ordinary unconfined process from creating Chromium's
 sandbox. `netdata-dem-runtime.sh` prepares the host allowance and then runs the existing runtime CLI as Netdata's
@@ -39,8 +41,9 @@ Install the optional `netdata-dem-runtime` package with the system package manag
 manager itself, and the package owns its installation lifecycle: the low-level CLI refuses to install, update, repair
 or remove a native runtime.
 
-- **Hooks.** The package hooks need a live systemd host. They stop the Agent, wait for runtime consumers to drain,
-  qualify the new payload and restore the Agent. Installing into an image or chroot is not supported yet.
+- **Hooks.** The package hooks need a live systemd host. They stop the Agent, refuse to change the payload while a
+  runtime consumer (such as a standalone CLI qualification) still runs, qualify the new payload and restart the Agent
+  if it was running. Installing into an image or chroot is not supported yet.
 - **AppArmor.** On hosts with AppArmor, the package ships a profile for its root-owned Chromium executable and loads it
   before qualification. The profile permits the user namespaces Chromium needs for its sandbox; it does not add browser
   confinement.
@@ -187,10 +190,6 @@ runtime:
   Never move a sealed preload.
 - **Native packages** use their coordinated package hooks instead.
 
-The allowance matches the registered root followed by `generations/*/chrome`. The generated launcher is stable across
-compatible independent runtime releases. New generations and changed internal Chromium directories therefore require
-no new root action. Moving the runtime root requires explicit host setup for the new root.
-
 ## Activation and automatic updates
 
 Each DEM process acquires the selected release when it starts and keeps it for its whole lifetime. A process started
@@ -314,10 +313,50 @@ processes may adopt named profiles, and matching paths in other mount namespaces
 Root-owned native payloads protect file replacement but do not, by themselves, prevent profile adoption.
 Administrator edits and disable markers stay authoritative.
 
+The AppArmor allowance matches the registered runtime root followed by `generations/*/chrome`. The generated launcher
+is stable across compatible independent runtime releases, so new generations and changed internal Chromium directories
+need no new root action. Moving the runtime root requires explicit host setup for the new root.
+
 The helper leaves global AppArmor settings, administrator parser settings and other profiles unchanged. Browser
 sandboxing, unprivileged execution, supervision and runtime verification remain required. Successful terminal
-qualification does not establish that a differently confined service or container will work; verify both journeys and
-Lighthouse through the actual deployment after setup and restart.
+qualification does not prove that the service works (see
+[Troubleshooting the browser sandbox](#troubleshooting-the-browser-sandbox)).
+
+## Configuration
+
+The `runtime:` section of `dem.conf` configures the runtime. Changes apply after restarting the plugin.
+
+```yaml
+runtime:
+  mode: managed
+  cache_path: ''
+  max_bytes: 4294967296
+  previous_retention_days: 7
+  release_url: https://artifacts.example.invalid/dem-runtime/latest/arm64.json
+  offline_keyring: /absolute/path/netdatabot.gpg.key  # required only for offline operations
+```
+
+| Option | Default | Meaning |
+|---|---|---|
+| `mode` | `native` on DEB/RPM builds, `managed` elsewhere | `managed` (a store DEM maintains), `native` (the package-manager payload) or `preloaded` (a sealed preload). |
+| `cache_path` | `NETDATA_LIB_DIR/dem/runtime` | Managed store directory, absolute. Managed mode only. |
+| `max_bytes` | `4294967296` (4 GiB) | Logical allowance of the managed store. |
+| `previous_retention_days` | `7` | Grace for the most recently used obsolete release (0-36500). |
+| `release_url` | empty | HTTPS URL of the signed latest release for the host's architecture. The value above is an example. |
+| `offline_keyring` | empty | Absolute path to an administrator-provisioned OpenPGP public keyring for offline operations. |
+| `preload_path` | empty | Sealed preload root. Requires `mode: preloaded`. |
+
+## Managed store and retention
+
+- **Lifetime.** The selected runtime stays installed until explicitly uninstalled, even with no browser monitors.
+- **Allowance.** The 4 GiB logical allowance includes preparation workspace and reservations. It is not a physical
+  disk quota.
+- **Protection.** Processes and executions protect the releases they use. Protected files can prevent a new
+  installation within the allowance.
+- **Cleanup.** Unprotected old releases are removed hourly, with the `previous_retention_days` grace for the most
+  recently used obsolete release; storage pressure can shorten that grace.
+- **Location.** Use the same store and service account for the CLI and the running plugin. In Docker, persist the store
+  (under `/var/lib/netdata`) to keep the installation across container replacement.
 
 ## Runtime CLI reference
 
@@ -334,14 +373,15 @@ any required host policy is prepared, with the same installation directory and c
 | `update` | Prepares, qualifies and selects a newer signed release. Keeps the installed update policy. | managed |
 | `repair` | Removes damaged generations and rebuilds the requested release, even an older one or the same one. | managed |
 | `uninstall` | Clears the selection and removes every managed generation, once nothing uses them. | managed |
-| `preload` | Prepares, qualifies and seals a protected preload at `--root`. | any |
-| `status` | Reports the selected installation and storage inventory without launching a browser. | all |
-| `qualify` | Runs a sandboxed journey and a Lighthouse audit against the selected release. | all |
+| `preload` | Prepares, qualifies and seals a protected preload at `--root`. | every |
+| `status` | Reports the selected installation and storage inventory without launching a browser. | every |
+| `qualify` | Runs a sandboxed journey and a Lighthouse audit against the selected release. | every |
 | `ensure` | First enrollment for the Docker host command: does nothing when a usable release is selected, otherwise downloads, qualifies and selects one with automatic preparation. Refuses to run as root. | managed |
 
-In `native` mode the commands that change files refuse and point to the package manager; in `preloaded` mode they
-require `runtime.mode: managed`. `setup-plan` and the `native-*` commands are internal interfaces of
-`netdata-dem-runtime.sh` and the native package hooks; do not call them directly.
+In `native` mode, `install`, `update`, `repair`, `uninstall` and `ensure` refuse and point to the package manager; in
+`preloaded` mode they require `runtime.mode: managed`. `preload`, `status` and `qualify` work in every mode.
+`setup-plan` and the `native-*` commands are internal interfaces of `netdata-dem-runtime.sh` and the native package
+hooks; do not call them directly.
 
 ### Flags
 
@@ -356,9 +396,9 @@ require `runtime.mode: managed`. `setup-plan` and the `native-*` commands are in
 | `--config-dir DIR` | all | Absolute directory that holds the administrator `dem.conf`. Terminal sessions ignore the Agent's configuration-root environment variables, so use it when the configuration is not in the default place. |
 | `--expected-root DIR`, `--cancel-on-stdin-close` | `ensure` | Used by the Docker host command. |
 
-Once its configuration loads, every command prints exactly one JSON report, failures included. Its `state` is `installed`, `qualified`,
-`uninstalled`, `unavailable`, `damaged` or `unknown`; `ensure` adds an `outcome` of `already-selected`,
-`newly-selected` or `failed`. A failure also sets `setup_error` and a nonzero exit status.
+Once its configuration loads, every command prints exactly one JSON report, failures included. Its `state` is
+`installed`, `qualified`, `uninstalled`, `unavailable`, `damaged` or `unknown`; `ensure` adds an `outcome` of
+`already-selected`, `newly-selected` or `failed`. A failure also sets `setup_error` and a nonzero exit status.
 
 ### Install, update and qualify
 
@@ -373,8 +413,8 @@ dem.plugin runtime status
 dem.plugin runtime qualify
 ```
 
-- `qualify` repeats the install-time checks for the selected release. It tests the calling account and environment,
-  not a different service's AppArmor, SELinux or container policy.
+- `qualify` repeats the install-time checks for the selected release, in the calling account and environment only
+  (see [Troubleshooting the browser sandbox](#troubleshooting-the-browser-sandbox)).
 - A successful update does not replace files used by running processes. Install and update errors keep the previous
   selection.
 - Ctrl-C or SIGTERM asks the command to cancel at the next safe point. If qualification launched a browser, the command
@@ -427,50 +467,11 @@ dem.plugin runtime uninstall
   removal.
 - A failed selection write after publication reports uncertainty; inspection establishes the selected state before
   cleanup proceeds.
-- It removes runtime state only. For a managed runtime with an Agent-linked policy registration, complete the policy
-  cleanup with `netdata-dem-runtime.sh uninstall --agent /path/to/netdata` after drainage. Protected preloads also
-  need `--root /absolute/preload/path --deployments-stopped`. For Docker, use the host retirement command printed at
-  setup; other explicit policy-only registrations use `policy-remove --deployment TOKEN --deployments-stopped` on the
-  host. See [Status, retry and removal](#status-retry-and-removal).
+- It removes runtime state only. Host policy cleanup (the helper's `uninstall --agent`, preload and Docker
+  registrations, `policy-remove`) is in [Status, retry and removal](#status-retry-and-removal).
 
 Repair and uninstall can remove generations with damaged executable metadata only when independent ownership records
 prove that removal is safe. They refuse active consumers, preparation, unresolved executions, missing safety structure
 and storage access errors. There is no force-delete option: dead PIDs and timeouts do not prove that an execution
 finished. Do not edit selection records or remove generation directories by hand. Deleting individual ownership records
 or copying a live store is outside this recovery guarantee.
-
-### Configuration
-
-The `runtime:` section of `dem.conf` configures the runtime. Changes apply after restarting the plugin.
-
-```yaml
-runtime:
-  mode: managed
-  cache_path: ''
-  max_bytes: 4294967296
-  previous_retention_days: 7
-  release_url: https://artifacts.example.invalid/dem-runtime/latest/arm64.json
-  offline_keyring: /absolute/path/netdatabot.gpg.key  # required only for offline operations
-```
-
-| Option | Default | Meaning |
-|---|---|---|
-| `mode` | `native` on DEB/RPM builds, `managed` elsewhere | `managed` (a store DEM maintains), `native` (the package-manager payload) or `preloaded` (a sealed preload). |
-| `cache_path` | `NETDATA_LIB_DIR/dem/runtime` | Managed store directory, absolute. Managed mode only. |
-| `max_bytes` | `4294967296` (4 GiB) | Logical allowance of the managed store. |
-| `previous_retention_days` | `7` | Grace for the most recently used obsolete release (0-36500). |
-| `release_url` | empty | HTTPS URL of the signed latest release for the host's architecture. The value above is an example. |
-| `offline_keyring` | empty | Absolute path to an administrator-provisioned OpenPGP public keyring for offline operations. |
-| `preload_path` | empty | Sealed preload root. Requires `mode: preloaded`. |
-
-### Managed store and retention
-
-- **Lifetime.** The selected runtime stays installed until explicitly uninstalled, even with no browser monitors.
-- **Allowance.** The 4 GiB logical allowance includes preparation workspace and reservations. It is not a physical
-  disk quota.
-- **Protection.** Processes and executions protect the releases they use. Protected files can prevent a new
-  installation within the allowance.
-- **Cleanup.** Unprotected old releases are removed hourly, with the `previous_retention_days` grace for the most
-  recently used obsolete release; storage pressure can shorten that grace.
-- **Location.** Use the same store and service account for the CLI and the running plugin. In Docker, persist the store
-  (under `/var/lib/netdata`) to keep the installation across container replacement.

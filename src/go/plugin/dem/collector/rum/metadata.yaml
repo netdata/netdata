@@ -58,8 +58,8 @@ modules:
           segments that look like email addresses, IDs or tokens are replaced. Client IP addresses are used to enforce rate
           limits and look up the visitor's location, and are not stored. This is not full anonymization: error messages, page
           paths, user IDs that your application sets and exported event attributes can still identify people. Credentials
-          from the site's configuration, such as an export `auth_token`, are masked in that text when they are at least
-          4 bytes long; a shorter value is masked only when it looks like a credential (`token=...` or `Bearer ...`).
+          from the site's configuration, such as an export `auth_token`, are masked in saved and exported text when they are
+          at least 4 bytes long; a shorter value is masked only when it looks like a credential (`token=...` or `Bearer ...`).
       supported_platforms:
         include:
           - Linux
@@ -82,8 +82,8 @@ modules:
               10 error fingerprints and 10 resource hosts. The `rum-pages` Function lists every page.
             - The Web Vital alerts need at least 30 observations of that vital in the window, so a quiet site never triggers them.
               No stock alert fires when traffic stops.
-            - Session history is shared with the synthetic monitors and kept for about 30 days or until it reaches 1 GiB
-              (`history` in `dem.conf`). Files of up to a day expire together, so records can stay about a day longer; when the
+            - Session history is shared with the synthetic monitors and kept for about 30 days, or less once it would exceed
+              1 GiB (`history` in `dem.conf`). Files of up to a day expire together, so records can stay about a day longer; when the
               size limit is reached, the oldest records go first. Only sessions selected by `investigate` are saved.
             - Up to 2,000 sessions per site are tracked in memory. A session that goes quiet or is pushed out loses the details
               held for it, so a later error can no longer save them.
@@ -560,7 +560,8 @@ modules:
             cause: 'The browser console shows this when the page cannot load the SDK from the receiver: the reverse proxy
               does not forward the whole `/rum/` path, or the page''s Content Security Policy blocks the receiver''s address.'
             fix: Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver,
-              and allow the receiver's address in `script-src` and `connect-src`.
+              and allow the receiver's address in `script-src` and `connect-src`. If several Agents answer for the same public
+              address, run the same Agent version on all of them, so each serves the SDK files the script refers to.
           - error: 'Netdata RUM: cannot load the tracing SDK. Check the browser Network and CSP errors for the RUM script requests.'
             when: '`tracing` is enabled for the site.'
             cause: The page could not load the tracing bundle from the receiver, for the same reasons as the core SDK. RUM keeps
@@ -583,9 +584,10 @@ modules:
             fix: '`rum-sites` shows the last refused origin, which can come from a preflight and stays after later reports
               succeed. If it is your website, add it to `allowed_origins`.'
           - error: The `collect` request returns 400
-            cause: The receiver could not decode the report. This usually means the page loaded its script or SDK from a
-              receiver of another Agent version, for example while an upgrade rolls out across the servers behind your proxy.
-            fix: Make every server that answers for the public `/rum/` address run the same Agent version, then reload the page.
+            cause: The request body is not a valid RUM report. It was cut off or changed on the way, for example by a proxy,
+              or it was not sent by the RUM script.
+            fix: Check that the reverse proxy forwards the request body unchanged, and that the page uses the script tag
+              `rum-sites` shows.
           - error: The script or `collect` request returns 404
             cause: 'The receiver has no running site job with the key in the URL: the job is disabled or failed to start,
               its `name` differs from the key in the script tag, or the reverse proxy changes the path.'
@@ -1344,9 +1346,10 @@ modules:
           returns:
             description: |
               One row per active site. The response also shows whether the receiver is serving, its public URL and the state
-              of its location database (`collector.geoip`). In that object, `state` is `loaded`, `unavailable` or
-              `using_previous`, `source` is `cache`, `stock` or `explicit`, and `reason` explains a missing database without
-              paths (the Agent log has the details). `lookup_errors` counts failed lookups, not unmatched addresses, and
+              of its location database (`collector.geoip`). In that object, `selection` is `auto` (empty `geoip_db`) or
+              `explicit`, `state` is `loaded`, `unavailable` or `using_previous`, `source` is `cache`, `stock` or
+              `explicit`, `database_type` is the database's declared type, and `reason` explains a missing database
+              without paths (the Agent log has the details). `lookup_errors` counts failed lookups, not unmatched addresses, and
               `loaded` does not mean the database is current or complete. Its times (`build_at`, `loaded_at`,
               `last_checked_at`) are Unix microseconds.
             columns:
@@ -1557,7 +1560,9 @@ modules:
             - *id003
             - id: cursor
               name: Cursor (`cursor`)
-              description: The `next` value of the previous response, unchanged. Empty returns the most recent events.
+              description: The `next` value of the previous response, unchanged. Empty returns the most recent events. The
+                cursor keeps a position for each site, so a busy site never skips a quiet site's events; a site whose job
+                restarted or was replaced starts a new stream, from that job's first events.
               type: string
               required: false
               default: ''
@@ -1685,7 +1690,8 @@ modules:
             - id: user_id
               name: User ID (`user_id`)
               description: Only sessions in which the application set this user ID during the time range. The match is exact,
-                on the ID as stored after cleanup, so a displayed `[REDACTED]` value cannot be used to look a user up.
+                on the ID as stored after DEM shortens or masks it, so a displayed `[REDACTED]` value cannot be used to look
+                a user up.
               type: string
               required: false
               default: ''

@@ -50,7 +50,9 @@ modules:
 
           Everything the script does is real: form submissions, orders and account changes happen on the website and
           are not rolled back. Point write actions at test accounts or a staging site. The **Test** action in the job
-          editor also runs the journey once, for real, without recording the result.
+          editor also runs the journey once, for real, without recording the result: a pass reports success, and a failure
+          shows the same failure summary that run history would, with browser error counts when `browser_error_summary` is
+          on. Test shares the browser with the running jobs, so it can wait for them and delay their checks.
 
           Credentials reach the script as `DEM_SECRET_*` environment variables. The script and the secret values are
           not stored in run history, and secret values are masked in recorded error text. Screenshots and traces are
@@ -78,8 +80,8 @@ modules:
               waiting when the job's next check comes due, it is skipped and counted as coalesced.
             - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
               and test charts leave a gap until a new run completes.
-            - Run history is shared with RUM and kept for about 30 days or until it reaches 1 GiB, and captures for
-              7 days or until they reach 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day
+            - Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and captures
+              for 7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day
               expire together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go
               first.
             - Run diagnostics keep up to 500 test, step, error and output events per run and 2,000 characters per text,
@@ -373,14 +375,24 @@ modules:
             fix: Raise `check_every` or lower `timeout` on busy jobs, or raise `browser.concurrency` in `dem.conf` if the host has CPU and memory to spare, then restart the Agent.
           - &error_unverified_cleanup
             error: 'plugin exiting with retained unverified synthetic work: `ERROR`'
-            when: A journey or Lighthouse run, or a runtime check, ended without proof that its browser processes exited.
-              The whole plugin exits, so RUM stops too.
-            cause: DEM could not confirm that every browser and Node.js process of the run exited, for example because one
-              is stuck in uninterruptible disk I/O or its supervisor was lost. It keeps the run's files and its runtime
-              release protected instead of deleting something that may still be in use.
-            fix: Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
-              keeps them running, then restart the Agent. Leave the files under `/var/lib/netdata/dem/` in place; DEM never
-              removes protected work based on age or a missing process ID.
+            when: A journey or Lighthouse run, or a runtime check, ends without proof that its browser processes exited, and
+              the whole plugin, RUM included, exits.
+            cause: &cause_unverified_cleanup DEM could not confirm that every browser and Node.js process of the run exited,
+              for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's
+              files and its runtime release protected instead of deleting something that may still be in use.
+            fix: &fix_unverified_cleanup |
+              Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+              keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+              reboot, which also lets DEM release the protected runtime files.
+
+              Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+              in place: DEM never removes protected work based on age or a missing process ID.
+          - &error_unverified_completion
+            error: 'unverified synthetic completion: `ERROR`'
+            when: The plugin was shutting down when a run or runtime check ended without proof that its browser processes
+              exited.
+            cause: *cause_unverified_cleanup
+            fix: *fix_unverified_cleanup
           - error: set exactly one of script and script_path
             cause: The job sets both `script` and `script_path`, or neither.
             fix: Keep exactly one of them.
@@ -892,8 +904,7 @@ modules:
               what was captured; a missing completion time means the run has not finished or its end was not recorded.
               For a journey, the record's `failure_evidence` holds the first failure's test and step path, source
               locations and error excerpts, plus what was still pending when a timed-out test was stopped, and
-              `browser_summary` holds the browser error counts and samples when `browser_error_summary` is on. A failed
-              **Test** action in the job editor returns the same failure summary as text.
+              `browser_summary` holds the browser error counts and samples when `browser_error_summary` is on.
 
               A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
               reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
@@ -1143,10 +1154,11 @@ modules:
             - Audits that run at the same time compete for the host's CPU, which changes their timings and scores.
             - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
               and Lighthouse charts leave a gap until a new audit completes.
-            - Run history is shared with RUM and kept for about 30 days or until it reaches 1 GiB, and reports for 7 days
-              or until they reach 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day expire
+            - Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and reports for
+              7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day expire
               together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go first.
             - A report larger than 5 MiB is not kept.
+            - Run diagnostics keep up to 500 events per audit and 2,000 characters per text, and count what they drop.
             - To be alerted on a low performance score, add your own health alert on
               `dem_synthetic.lighthouse.performance`.
         performance_impact:
@@ -1201,6 +1213,9 @@ modules:
               default_value: 180
               required: false
               group: Collection
+              detailed_description: |
+                An audit that exceeds it ends as `timeout`. After the browser and its processes exit, saving the report and
+                history has up to 10 more seconds, and the audit keeps its browser slot until then.
             - *option_vnode
         examples:
           folding:
@@ -1240,6 +1255,7 @@ modules:
           - *error_sandbox
           - *error_coalesced
           - *error_unverified_cleanup
+          - *error_unverified_completion
           - error: audit URL must be absolute HTTP(S) without credentials
             cause: '`url` is not an absolute `http://` or `https://` URL, or it contains a username or password.'
             fix: Use a full URL such as `https://example.org/`. Pages behind a login cannot be audited this way; check them with a journey instead.
