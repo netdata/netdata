@@ -40,8 +40,8 @@ relative to `src/go/`.
   Functions expose both when a corresponding job is active or retained data has been observed. Retained-data access
   works with every collector disabled; already-announced Functions remain callable for that framework generation.
   An empty fresh installation announces only `dem-history-status`.
-- The command (`cmd/demplugin`) owns the shared stores. Jobs only borrow them, and the stores close only after a clean
-  shutdown.
+- The root `dem` package's `Process` (`process.go`) owns the shared stores. Jobs only borrow them, and the command
+  (`cmd/demplugin`) closes them only after a clean shutdown.
 
 ## What DEM measures
 
@@ -63,7 +63,7 @@ A few words used throughout this guide:
 | Capture | A screenshot, trace ZIP or HTML report published for one run. |
 | Browser runtime | The Node + Chromium bundle that executes synthetic runs. RUM never needs it. |
 | Job generation | One admitted instance of a job's runtime state. Replacing or restarting a job starts a new generation. |
-| Framework generation | One run of the framework inside the process. A framework restart (for example on SIGHUP) starts a new one while the command keeps the stores open. |
+| Framework generation | One run of the framework inside the process. A framework restart (for example on SIGHUP) starts a new one while the process keeps the stores open. |
 
 ## The big picture
 
@@ -110,7 +110,7 @@ How to read it:
 - Data flows from left to right: inputs, collector jobs, storage, then the investigation Functions.
 - **Green** boxes are collector jobs. The framework creates, schedules and retires them like any `go.d` job.
 - **Yellow** boxes are process services. They exist once per process, independently of which jobs are enabled.
-- **Grey** cylinders are on-disk stores, owned by the command for the whole process lifetime.
+- **Grey** cylinders are on-disk stores, owned by the process (`dem.Process`) for its whole lifetime.
 - **Blue** boxes are outside DEM's own code: external systems and the shared framework scheduler.
 - The receiver and the site jobs are separate: one receiver serves every site, and each site keeps its own state.
 - Not drawn: the retention worker and the browser runtime store (see [Storage and retention](#storage-and-retention)).
@@ -123,7 +123,7 @@ DEM splits responsibility between three kinds of owner. Most contracts at the en
 |---|---|---|---|
 | Framework (`plugin/agent`) | The process; jobs come and go | Desired configuration, preflight, scheduling, admission, retries, status and DynCfg | Enabling a site; calling `Collect` every `update_every` |
 | Collector jobs (`collector/*`) | One job run | The runtime objects of that job and the metrics it publishes | The receiver's listener; a site's aggregator |
-| Command (`cmd/demplugin`) | The whole process | Shared stores and services: journal, captures, browser runtime, execution admission, retention | The journal survives every job reload |
+| Process (`dem.Process`, opened by the command) | The whole process | Shared stores and services: journal, captures, browser runtime and its updater, execution admission, retention | The journal survives every job reload |
 
 Two **registries** connect running jobs to each other and to Functions. `rum/registry` and `synthetic/registry` hold
 only what is actually running (admitted sites, receiver availability, active synthetic jobs). `rum/registry` also leases
@@ -259,7 +259,7 @@ The first failing step decides the response. The body is read only after step 5 
 | 5 | Bot user agent or `?bot=1`, unless the site includes bots | 204, intentional exclusion |
 | 6 | Body reads completely within the limit | 413 or 400 |
 | 7 | The site's `measure_sample_rate` is 0 | 204, nothing decoded |
-| 8 | GeoIP lookup for public client addresses, unless geolocation is `off` | Never rejects; location fields stay absent |
+| 8 | GeoIP lookup for every client address except loopback and private ones, unless geolocation is `off` | Never rejects; location fields stay absent |
 | 9 | Faro payload decodes and normalizes | 400 |
 | 10 | The site processor ingests the beacon | 202 Accepted |
 
@@ -407,7 +407,7 @@ What makes this layer predictable:
 |---|---|---|---|---|
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots, trace ZIPs and HTML reports, one set per run | Retention worker, at startup and hourly |
-| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for most recently used unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer |
+| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for most recently used unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer; automatic updater, which prepares and selects newer releases after install consent |
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
@@ -449,8 +449,9 @@ flowchart TD
 
 - The journal opens first, and the configured history budget applies before any producer can append.
 - The browser runtime is either a host holding the managed or native startup selection or an administrator preload.
-  The host maintains storage but never downloads or changes its selection. The runner owns the shared configured
-  admission allowance.
+  The host maintains storage and never changes the running process's release. On a managed host, the attached updater
+  (after explicit install consent) downloads and qualifies newer releases and changes the selection the next process
+  starts with. The runner owns the shared configured admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
 - Browser runtime setup problems (missing installation, unsupported platform, bad preload) never stop startup. Synthetic
@@ -500,7 +501,7 @@ Synthetic packages:
 
 | Package | Responsibility |
 |---|---|
-| `synthetic` | Shared request, run, event, capture and optional-output status values with their vocabularies, plus request and job ID validation |
+| `synthetic` | Shared request, run, event, capture and optional-output status values with their vocabularies, their clone helpers and presentation summaries (failure, stop and browser-error summaries), plus request and job ID validation |
 | `synthetic/monitor` | One active job's cadence and state: schedule status, current state, latest run, freshness and queue age |
 | `synthetic/registry` | Index of active monitor sessions for Functions; keeps no copy of their state |
 | `synthetic/query` | Active-first run lookup, retained runs and manifest-owned artifact membership/availability |
@@ -508,7 +509,7 @@ Synthetic packages:
 | `synthetic/syntheticfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
 | `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
-| `synthetic/browserruntime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement and native package admission |
+| `synthetic/browserruntime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement, preload sealing and reading, and native package building (used by `src/go/tools/dem-runtime-release`) and admission |
 | `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
@@ -530,21 +531,22 @@ flowchart LR
     Q --> H("*/history")
     Q --> A("synthetic/artifacts")
     H --> J("journalstore")
+    HF("historyfunc") -->|"status"| J
     Col("collector/*") --> Reg
     Col -->|"site history writer"| H
     Col --> Dom("domain packages<br/>aggregate · httpapi · otlp · geoip · monitor")
     Reg --> Dom
 
     classDef pkg fill:#fef3c7,stroke:#d97706,color:#0b1021;
-    class Fn,Q,Reg,H,A,J,Col,Dom pkg;
+    class Fn,Q,Reg,H,A,J,HF,Col,Dom pkg;
 ```
 
 Dependency direction:
 
 - RUM and synthetic Function adapters call only query services. They also use shared value types: RUM values come
-  through `rum/query`, while synthetic Functions use the domain values directly: `synthetic` runs and events,
-  `registry.Job`, `history.RunFilter`/`RunPage`, `artifacts.Filter`/`Set`/`Cursor`/`Status` and
-  `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status
+  through `rum/query`, plus the `rum/beacon` vital names, while synthetic Functions use the domain values directly:
+  `synthetic` runs and events, `registry.Job`, `history.RunFilter`/`RunPage`, `artifacts.Filter`/`Set`/`Cursor`/`Status`
+  and `query.CataloguePage`/`Evidence`/`Artifact`. `dem-history-status` (`historyfunc`) instead reads journal status
   through its narrow store dependency. All three use `internal/rawfunc` for request and response plumbing; it imports
   no domain package.
 - Query services combine registry snapshots, domain history and artifact reads. They do not import Function adapters
@@ -554,7 +556,8 @@ Dependency direction:
   snapshots. RUM and synthetic record fields and their decoding stay with the history adapters.
 - Shared Go interfaces live with their consumers. Pure synthetic values do not define executor, persistence or
   transport interfaces.
-- HTTP never imports the registry or collectors; its small `Processor` and `Routes` interfaces describe its consumers.
+- HTTP never imports the registry or collectors; its small `Routes`, `Processor` and `Locator` interfaces describe
+  what it depends on (site routes, the site processor and the GeoIP lookup).
 - Faro is an I/O-free protocol adapter that owns input policy. Its embedded bootstrap template requires no frontend
   build.
 - Configuration policy does not read the hostname or generate UI prose. The sites query derives the fallback install
@@ -575,13 +578,15 @@ File layout within packages:
 
 ### Process and framework ownership
 
-Command-owned resources:
+Process-owned resources:
 
-- The command owns the investigation journal and the plugin-wide retention service.
-- It closes the journal only after `agenthost.Result` reports `Err == nil` and `ExitRequired == false`.
+- `dem.Open` opens the investigation journal and composes the plugin-wide retention service; `Process.Close` closes the
+  journal.
+- The command calls `Process.Close` only after `agenthost.Result` reports `Err == nil` and `ExitRequired == false`.
 - An error or a recovery requiring process exit may leave consumers alive; process exit owns their handles.
 - Process-service finalizers run before job retirement and cannot close resources used by jobs.
-- The command creates its history directory as the service account under the existing writable Agent state root.
+- `journalstore.Open` creates the history directory as the service account under the existing writable Agent state
+  root.
 
 Framework-owned behavior:
 
@@ -913,8 +918,9 @@ Alerts:
 - Live queries merge per-site stream heads by receipt time while preserving each stream's sequence prefix; concurrent
   receipt and ingestion order can differ.
 - All-site Errors, Pages and Sessions use a separate site-scoped row key without replacing their filter values.
-- Session events merge the live ring with persisted history by counting equal rows. Both sources project the same
-  history record through one function, so an event present in both compares equal.
+- Session events merge the session's in-memory event ring (the latest 100 events per tracked session) with persisted
+  history by counting equal rows. Both sources project the same history record through one function, so an event
+  present in both compares equal.
 
 ### Site retirement and history writes
 
@@ -1042,7 +1048,7 @@ Job ownership:
   flow.
 - They share an executor, pure request validation and the common outcome/duration instrument helper.
 - `synthetic/monitor` owns due times in native `Run`; framework scheduling only refreshes metric snapshots.
-  The command owns shared execution admission, artifact store and journal.
+  `dem.Open` builds the runner, which owns shared execution admission, and opens the artifact store and journal.
 - A session has one executor call in flight and one latest pending occurrence. A new due replaces the pending
   occurrence without requeuing a waiting call. Elapsed occurrences are counted arithmetically in constant time.
   The admission callback consumes the latest due time and preserves the original queue timestamp in the run.
@@ -1121,8 +1127,10 @@ Fixed startup selection (`synthetic/runtimehost`):
   the plugin process restarts, even after an administrator installs a runtime.
 - Enabling or validating a monitor never downloads executables. Contained structural configuration validation remains
   required before a malformed binding can become a named-dependency waiter; no per-monitor runtime claim is reserved.
-- Readiness reads the fixed process state. There is no preparation worker, download retry, import polling or
-  installation-driven readiness notification.
+- Readiness reads the fixed process state. There is no import polling or installation-driven readiness notification.
+  The automatic updater (`runtimehost.Updater`, managed hosts only) is the one preparation worker: after explicit
+  install consent it checks within five minutes of startup and then every 23-25 hours, retries a failed check at the
+  next scheduled check, and changes only the next process's selection.
 - Startup and hourly maintenance retire unprotected old versions independently of enabled monitors. Maintenance
   errors do not invalidate an otherwise usable runtime or change website outcomes.
 
@@ -1236,7 +1244,7 @@ Retention:
 
 | Order | Selection rule |
 |---|---|
-| 1 | Age expiry |
+| 1 | Age expiry, and any single set larger than the whole allowance |
 | 2 | Size pressure removes older non-preferred sets before each JobID's newest eligible set |
 | 3 | If preferred sets still exceed the allowance, they expire oldest first as well |
 
