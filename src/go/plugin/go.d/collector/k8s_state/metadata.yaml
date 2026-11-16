@@ -32,14 +32,31 @@ modules:
     overview:
       data_collection:
         metrics_description: |
-          This collector monitors Kubernetes Nodes, Pods and Containers.
+          This collector monitors Kubernetes Nodes, Pods, Containers, Deployments, CronJobs and PersistentVolumeClaims.
         method_description: ""
       supported_platforms:
         include: []
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: ""
+        description: |
+          The collector reads cluster state from the Kubernetes API with the permissions below, granted cluster-wide (all namespaces). It only reads cluster objects; the access review is a query that stores nothing.
+
+          | Resource | API group | Verbs | Used for |
+          |:---------|:----------|:------|:---------|
+          | `nodes` | core (`""`) | `list`, `watch` | Node metrics. |
+          | `pods` | core (`""`) | `list`, `watch` | Pod and container metrics, and the pod and container counts of each Node. |
+          | `deployments` | `apps` | `list`, `watch` | Deployment metrics. |
+          | `cronjobs` | `batch` | `list`, `watch` | CronJob metrics. |
+          | `jobs` | `batch` | `list`, `watch` | The Job runs behind the CronJob metrics (status, failure reason, duration). |
+          | `persistentvolumeclaims` | core (`""`) | `list`, `watch` | PVC metrics. Optional, see below. |
+          | `namespaces` | core (`""`) | `get` | The UID of the `kube-system` Namespace, used as the `k8s_cluster_id` label. Without it the label is empty and a warning is logged. |
+          | `selfsubjectaccessreviews` | `authorization.k8s.io` | `create` | A check at startup that the `persistentvolumeclaims` permissions are granted. The default `system:basic-user` ClusterRole gives it to every authenticated account. |
+          | `/version` (non-resource URL) | n/a | `get` | The connection check when the job starts. The default `system:public-info-viewer` ClusterRole gives it to every account. |
+
+          The official Netdata Helm chart grants every row down to `namespaces` (`persistentvolumeclaims` from the release that adds PVC metrics). With your own ClusterRole, add those rows; the last two are allowed by the default Kubernetes ClusterRoles.
+
+          Without the `persistentvolumeclaims` permissions the PVC metrics are skipped with one warning and all other metrics work. They are checked once, at startup, so permissions granted later take effect after the collector is restarted.
       default_behavior:
         auto_detection:
           description: ""
@@ -171,7 +188,7 @@ modules:
             - name: k8s_state.node_pods_readiness_state
               description: Pods readiness state
               unit: pods
-              chart_type: line
+              chart_type: stacked
               dimensions:
                 - name: ready
                 - name: unready
@@ -493,3 +510,39 @@ modules:
                 - name: Evicted
                 - name: OOMKilled
                 - name: Other
+        - name: persistent volume claim
+          description: |
+            These metrics refer to the PersistentVolumeClaim.
+
+            - Requested Storage shows the storage requested by the PVC. Capacity shows the capacity reported in its status. These are Kubernetes allocation values, not filesystem usage or free space.
+            - Capacity Shortfall is `max(requested - capacity, 0)`. It is positive while reported capacity is below the request and zero when capacity meets or exceeds the request. A persistent shortfall can indicate an expansion that is pending or failed; it does not identify the cause.
+            - Each chart has one dimension. Summing across PVCs gives total requested storage, total reported capacity, or total outstanding requested capacity. Excess capacity on one PVC does not cancel another PVC's shortfall.
+            - Unknown values are gaps, not zero. For example, a Pending PVC without reported capacity has no Capacity or Capacity Shortfall values.
+          labels:
+            - name: k8s_cluster_id
+              description: Cluster ID. This is equal to the kube-system namespace UID.
+            - name: k8s_cluster_name
+              description: Cluster name. Cluster name discovery only works in GKE.
+            - name: k8s_namespace
+              description: Namespace.
+            - name: k8s_pvc_name
+              description: PersistentVolumeClaim name.
+          metrics:
+            - name: k8s_state.pvc_requested_storage
+              description: PVC Requested Storage
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: requested
+            - name: k8s_state.pvc_capacity
+              description: PVC Capacity
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: capacity
+            - name: k8s_state.pvc_capacity_shortfall
+              description: PVC Capacity Shortfall
+              unit: B
+              chart_type: line
+              dimensions:
+                - name: shortfall
