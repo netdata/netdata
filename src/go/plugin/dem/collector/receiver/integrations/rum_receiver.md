@@ -105,6 +105,13 @@ location /rum/ {
 Forward every path under `/rum/`, not only the script. Then set `public_url` to the proxy's public
 address and `trusted_proxies` to the address the proxy connects from (see the first example).
 
+If several Agents answer for the same public address, run the same Agent version on all of them: a page
+loads its SDK files from whichever server answers, and each must serve the files its script refers to.
+
+To check the route, open `https://rum.example.org/rum/ping` in a browser; it only shows that this browser
+reaches the receiver. `/rum/demo?key=SITE` serves a test page with a site's script. Neither proves that
+your website loads the script.
+
 
 #### Optional - provide a location database
 
@@ -173,9 +180,14 @@ trusted address can claim any visitor IP.
 ##### geoip_db
 
 With an empty path, the receiver tries `topology-ip-intel/topology-ip-geo.mmdb` in the Agent's cache
-directory, then in its stock data directory. A path uses only that file. The database is checked when
-the receiver starts and every minute after. To update it, write a new file and rename it over the old
-one; never edit or truncate the file in use.
+directory, then in its stock data directory (`NETDATA_CACHE_DIR` and `NETDATA_STOCK_DATA_DIR` override
+the built-in directories). A path uses only that file. The database is checked when the receiver starts
+and every minute after. To update it, write a new file and rename it over the old one; never edit or
+truncate the file in use.
+
+DEM never downloads a database. Agent packaging, the topology IP intelligence downloader or you provide
+and update it, and not every installation has one. Give the Netdata service account read access to the
+file and its directories.
 
 
 
