@@ -100,7 +100,7 @@ modules:
           - title: Install the browser runtime
             description: |
               Journeys and Lighthouse audits run in a separately installed browser runtime (Node.js, Chromium,
-              Playwright and Lighthouse). Netdata never downloads it on its own, and a job waits until it is
+              Playwright and Lighthouse). Netdata never installs it on its own, and a job waits until it is
               installed. It needs Linux on amd64 or arm64.
 
               | Netdata installation | Install the runtime with |
@@ -300,6 +300,21 @@ modules:
     troubleshooting:
       errors:
         list:
+          - &error_machine_id
+            error: 'opening DEM history: load journal identity: journalhost: machine id: no machine id found'
+            when: |
+              The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+              whichever modules are enabled.
+            cause: |
+              DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+              `/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, which is common in minimal containers.
+            fix: |
+              On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+              `sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+              In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+              `-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+              Compose, then recreate the container.
           - &error_runtime_missing
             error: 'install a browser runtime and restart dem.plugin: matching browser runtime is not prepared'
             when: Static, source or Docker installation. The job stays waiting and never runs.
@@ -505,6 +520,11 @@ modules:
         To narrow the results to one virtual node, pass `vnode` with its configured name, or `vnode_guid` with its GUID
         for a virtual node that was renamed or removed. Without either, every job is included, with or without a
         virtual node.
+
+        The plugin-wide `dem-history-status` Function covers the history that RUM and synthetic monitoring share. It is
+        available whenever the plugin runs, needs the same access and takes no parameters. It shows the retention in
+        effect (`history` in `dem.conf`), how much disk the history files use, and the latest cleanup, write or
+        configuration reload error.
       list:
         - &function_checks
           id: synthetics-checks
@@ -843,7 +863,15 @@ modules:
               default: ''
               options: []
           returns:
-            description: One row per recorded test, step or audit event. The response also carries the full run record, including what was captured; a missing completion time means the run has not finished or its end was not recorded.
+            description: |
+              One row per recorded test, step or audit event. The response also carries the full run record, including
+              what was captured; a missing completion time means the run has not finished or its end was not recorded.
+
+              A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
+              reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
+              says why), `not_eligible` (taken while the run was being stopped; such captures are kept only when it
+              stopped with `execution_budget`) or `not_in_final_report` (named in the run's capture details but missing
+              from its final report).
             columns:
               - name: at_ms
                 type: timestamp
@@ -1172,6 +1200,7 @@ modules:
     troubleshooting:
       errors:
         list:
+          - *error_machine_id
           - *error_runtime_missing
           - *error_runtime_package_missing
           - *error_runtime_root
