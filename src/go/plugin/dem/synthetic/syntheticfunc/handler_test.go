@@ -176,6 +176,15 @@ func TestInfoNeverReadsDependencies(t *testing.T) {
 	}
 }
 
+// Capture bytes need administrator access (checked below); the help says so.
+func TestArtifactHelpStatesDownloadAccess(t *testing.T) {
+	info := newHandler(&source{}).HandleRaw(context.Background(), funcapi.RawMethodRequest{
+		Method: "synthetics-artifact",
+		Info:   true,
+	})
+	assert.Contains(t, info.Help, "administrator access")
+}
+
 func TestPermissionsAndInvalidRequests(t *testing.T) {
 	for name, tc := range map[string]struct {
 		request funcapi.RawMethodRequest

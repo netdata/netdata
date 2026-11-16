@@ -12,9 +12,11 @@ import (
 
 var sessionEventsMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-session-events",
-		Title:       "RUM Session Events",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Full retained and pending timeline for one session, ordered by Agent receipt time; includes observations outside the history picker range",
+		ID:    "rum-session-events",
+		Title: "RUM Session Events",
+		Help: "The timeline of one session (session_id) in the order the Agent received its events, with trace " +
+			"IDs of traced requests. It ignores the time range and includes events not saved yet. Pass site to " +
+			"show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "ts",
 		UpdateEvery: 10,
 		History:     true,

@@ -15,9 +15,13 @@ import (
 
 var sitesMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-sites",
-		Title:       "RUM Sites",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. RUM admitted runtime facts and receipt-window activity. Generation identifies the receiving runtime, not the browser policy version. A vnode GUID change starts a fresh measurement window while retained investigation and live evidence keep their original GUID. Collection enabled is independent of receiver serving state. Install Script URL and Snippet are null without explicit site or receiver public_url; configure public_url to generate installation instructions. Last accepted payload and last rejected-origin timestamps are Unix microseconds, null when never observed in this runtime. Silence is not an installation or health verdict. Rejected/min counts origin, rate and size refusals only; origin observations can include OPTIONS preflight. Last rejected origin is historical evidence even after accepted traffic. Observed sessions count measured browser identities, not people or concurrent visitors; null means collection or receiver availability prevents measurement. Tracked investigated sessions count the bounded detail cache, independently of the measurement window. Capture columns show current policy; retained history may reflect earlier policies. City locations are approximate live activity only; frustration signals are optional interaction heuristics. collector.geoip reports source availability separately from site capture policy: selection is auto or explicit; state is loaded, unavailable or using_previous. Loaded means a supported declared database format and available reader, not complete validation, freshness, accuracy or address coverage. Optional source and database_type identify the active source; build_at, loaded_at and last_checked_at are Unix microseconds omitted when unseen. Build time is database metadata, not provider freshness. Reason is a bounded status code. lookup_errors counts errors for the active source generation, not ordinary unmatched addresses. Worker publication refreshes source and fault changes; receiver collection refreshes the copied lookup count",
+		ID:    "rum-sites",
+		Title: "RUM Sites",
+		Help: "Setup and status of each RUM site: the script tag to install, allowed origins, sampling and " +
+			"capture settings, and recent traffic, including the last accepted report and the last refused origin. " +
+			"Start here when a site shows no data. The script URL and tag stay empty until the site or the receiver " +
+			"has a public_url. The response's collector object shows the receiver's state and GeoIP database. " +
+			"Pass site to show one site. " + rawfunc.VnodeHelp,
 		Sort:        "site",
 		UpdateEvery: 10,
 		Params:      []string{"site", "vnode", "vnode_guid"},

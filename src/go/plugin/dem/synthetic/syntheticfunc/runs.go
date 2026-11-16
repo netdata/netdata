@@ -5,7 +5,6 @@ package syntheticfunc
 import (
 	"context"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
@@ -20,21 +19,25 @@ var (
 		model.Journey,
 		"synthetics-journey-runs",
 		"Journey runs",
-		"Retained journey attempts with test counts and failure evidence. Missing test counts are null.",
+		"Journey runs, newest first, with test counts, the first failure, the last step reached and browser "+
+			"errors. Use it to see when a journey started failing and why.",
 		journeyRunsColumns,
 	)
 	lighthouseRunsMethod = runsMethod(
 		model.Lighthouse,
 		"synthetics-lighthouse-runs",
 		"Lighthouse runs",
-		"Retained Lighthouse audits with their lab measurements. Missing measurements are null.",
+		"Lighthouse audits, newest first, with the performance score and lab timings of each. Use it to see "+
+			"when a page got slower.",
 		lighthouseRunsColumns,
 	)
 )
 
-var runsHelp = " Attempts are selected by admission/start time, with their latest retained outcome even when completion is outside the range. after and before include their entire Unix second or accept negative offsets from now; omitted bounds cover retained history through now. Results are capped at " + strconv.Itoa(
-	rawfunc.MaxRows,
-) + " and disclose truncation. Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned."
+// runsHelp follows each run history summary.
+var runsHelp = " Runs are selected by start time and show their latest outcome. Pass after and before (Unix " +
+	"seconds, or negative seconds from now) to set the time range; before defaults to now, and without after the " +
+	"range starts at the oldest saved run. Pass job_id to show one job and outcome (such as failed or timeout) to " +
+	"show runs with that outcome. " + limitHelp + " " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp
 
 func runsMethod(kind model.Kind, id, title, summary string, columns rawfunc.Columns[model.Run]) method {
 	return method{

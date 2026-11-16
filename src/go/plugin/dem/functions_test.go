@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	syntheticcollector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
@@ -110,6 +112,27 @@ func methodIDs(methods []funcapi.FunctionConfig) []string {
 		ids = append(ids, method.ID)
 	}
 	return ids
+}
+
+// The Cloud Function table offers no input for accepted parameters, so the help
+// is where an operator learns them. Every help introduces each parameter its
+// method accepts ("Pass site", "and kind (", "as cursor", "(session_id)"), so a
+// common word such as site elsewhere in the prose does not count, and the
+// methods with vnode selectors share one wording of their rule.
+func TestFunctionHelpNamesAcceptedParameters(t *testing.T) {
+	for provider, methods := range declared {
+		for _, method := range methods {
+			t.Run(provider+"/"+method.ID, func(t *testing.T) {
+				for _, param := range method.AcceptedParams {
+					introduced := regexp.MustCompile(`(?:[Pp]ass |and |or |as |\()` + regexp.QuoteMeta(param) + `\b`)
+					assert.Regexp(t, introduced, method.Help, "help must introduce accepted parameter %q", param)
+				}
+				if slices.Contains(method.AcceptedParams, "vnode") {
+					assert.Contains(t, method.Help, rawfunc.VnodeHelp)
+				}
+			})
+		}
+	}
 }
 
 func assertAvailability(t *testing.T, components dem.Components, rum, synthetics bool) {

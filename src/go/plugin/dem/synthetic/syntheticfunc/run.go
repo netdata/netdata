@@ -12,9 +12,11 @@ import (
 
 var runMethod = method{
 	Method: rawfunc.Method{
-		ID:          "synthetics-run",
-		Title:       "Synthetic run detail",
-		Help:        "One retained or latest active attempt, independent of picker bounds, with original test phases, errors, counts, nullable lab measurements and bounded reporter events. Missing completion means no verified terminal observation.",
+		ID:    "synthetics-run",
+		Title: "Synthetic run detail",
+		Help: "Everything recorded about one run (job_id and run_id), including one still in progress: outcome, " +
+			"errors, test counts or Lighthouse measurements, captures and the event timeline. A run without a " +
+			"completion time has no verified result. Long timelines are capped; dropped_events counts the rest.",
 		Sort:        "at_ms",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "run_id"},

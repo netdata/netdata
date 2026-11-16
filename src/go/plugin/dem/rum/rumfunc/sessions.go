@@ -12,22 +12,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 )
 
-var sessionsMethod = method{
+var sessionsMethod = sampled(method{
 	Method: rawfunc.Method{
 		ID:    "rum-sessions",
 		Title: "RUM Sessions",
-		Help: "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Sessions with retained activity originally received by the Agent in the selected inclusive Unix-second range; counts and duration cover selected observations, not lifetime totals. Results are capped at " + strconv.Itoa(
-			rawfunc.MaxRows,
-		) + " and disclose truncation. Late-saved context can change an earlier range. user_id matches an exact stored, normalized ID observed in that range and returns the complete session summary. Credential-masked display values are not reliable lookup keys; redacted original IDs cannot be recovered",
+		Help: "Saved RUM sessions with activity received by the Agent in the time range, most recent first; " +
+			"counts and durations cover only that range. " + historyRangeHelp + " Pass user_id to find the " +
+			"sessions where that exact ID was seen in the range; a masked ID shown in the table may not match. " +
+			"Returns up to " + strconv.Itoa(rawfunc.MaxRows) + " sessions; truncated is true when more match. " +
+			"Pass site to show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
 		Sort:        "last_observed_us",
 		UpdateEvery: 10,
 		History:     true,
 		Params:      []string{"site", "vnode", "vnode_guid", "after", "before", "user_id"},
 		Columns:     sessionsColumns.Build(),
 	},
-	samplingHelp: true,
-	rows:         (*Handler).sessionsRows,
-}
+	rows: (*Handler).sessionsRows,
+})
 
 // sessionRow is one session summary with the request time.
 type sessionRow struct {

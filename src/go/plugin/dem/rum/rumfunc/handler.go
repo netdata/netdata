@@ -49,7 +49,8 @@ func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funca
 
 type method struct {
 	rawfunc.Method
-	// samplingHelp adds the selected sites' current sampling policy to the help.
+	// samplingHelp adds the selected sites' current sampling policy to the help;
+	// sampled sets it together with the sampling caveat.
 	samplingHelp bool
 	// rows reads the method's rows and may add method-specific response fields.
 	rows func(h *Handler, ctx context.Context, args map[string]string, response map[string]any) ([][]any, error)

@@ -68,7 +68,6 @@ func TestSiteMeasurementAvailabilityAndDetailPopulation(t *testing.T) {
 			require.Equal(t, tc.documents, value("pageviews_window"))
 			require.Equal(t, tc.views, value("application_views_window"))
 			require.Equal(t, 7, value("investigated_sessions"), "bounded detail cache is a distinct population")
-			require.Contains(t, response["help"], "not people or concurrent visitors")
 		})
 	}
 }

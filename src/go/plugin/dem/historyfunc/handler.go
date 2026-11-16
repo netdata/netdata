@@ -41,8 +41,9 @@ func (h *Handler) Handle(context.Context, string, funcapi.ResolvedParams) *funca
 var method = rawfunc.Method{
 	ID:    "dem-history-status",
 	Title: "DEM History Status",
-	Help: "Current shared DEM history policy, journal file bytes including preallocation, and maintenance health. " +
-		"These facts do not establish complete history or an exact retained time window.",
+	Help: "Status of the history storage shared by RUM and synthetic monitoring: retention policy, journal " +
+		"size (including preallocated space) and file count, cleanup times, and any inventory, cleanup, writer " +
+		"or configuration reload error. It cannot show whether history is complete or how far back it reaches.",
 	Sort:        "observed_us",
 	UpdateEvery: 60,
 	Columns:     statusColumns.Build(),
