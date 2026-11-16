@@ -122,7 +122,7 @@ modules:
               A running Agent keeps the runtime it found when it started. After the first installation, restart the
               Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
               does this for you. On static, source and Docker installations, runtime updates are prepared daily
-              (unless you installed with `--manual-updates`) and also take effect at the next restart.
+              (unless your last install or repair used `--manual-updates`) and also take effect at the next restart.
 
               To check the runtime, run as the Netdata service account:
 
