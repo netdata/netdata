@@ -28,6 +28,8 @@ jobs:
         id: prepare
         run: |
           pip3 install requests python-dateutil
+      - name: Test PackageCloud Cleanup
+        run: python3 .github/scripts/test-pkgcloud-cleanup.py
       - name: Run PackageCloud Cleanup
         id: cleanup
         env:
