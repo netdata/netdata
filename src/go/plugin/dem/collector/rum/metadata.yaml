@@ -57,7 +57,9 @@ modules:
           Before anything is charted, saved or exported, URLs lose their query strings, fragments and credentials, and path
           segments that look like email addresses, IDs or tokens are replaced. Client IP addresses are used to enforce rate
           limits and look up the visitor's location, and are not stored. This is not full anonymization: error messages, page
-          paths, user IDs that your application sets and exported event attributes can still identify people.
+          paths, user IDs that your application sets and exported event attributes can still identify people. Credentials
+          from the site's configuration, such as an export `auth_token`, are masked in that text when they are at least
+          4 bytes long; a shorter value is masked only when it looks like a credential (`token=...` or `Bearer ...`).
       supported_platforms:
         include:
           - Linux
@@ -80,8 +82,11 @@ modules:
               10 error fingerprints and 10 resource hosts. The `rum-pages` Function lists every page.
             - The Web Vital alerts need at least 30 observations of that vital in the window, so a quiet site never triggers them.
               No stock alert fires when traffic stops.
-            - Session history is shared with the synthetic monitors and kept up to 30 days or 1 GiB (`history` in `dem.conf`);
-              when the size limit is reached, the oldest records go first. Only sessions selected by `investigate` are saved.
+            - Session history is shared with the synthetic monitors and kept for about 30 days or until it reaches 1 GiB
+              (`history` in `dem.conf`). Files of up to a day expire together, so records can stay about a day longer; when the
+              size limit is reached, the oldest records go first. Only sessions selected by `investigate` are saved.
+            - Up to 2,000 sessions per site are tracked in memory. A session that goes quiet or is pushed out loses the details
+              held for it, so a later error can no longer save them.
             - City locations appear only in the live feed. History and exports keep the country at most.
         performance_impact:
           description: |
@@ -119,18 +124,25 @@ modules:
               <script async src="https://rum.example.org/rum/shop.js"></script>
               ```
 
-              - Add it to every page as an external script tag. A tag manager must insert the tag itself; pasting the script's
-                contents inline does not work.
-              - If the website has a Content Security Policy, allow the receiver's address in `script-src` and `connect-src`.
+              - Add it to every page as a classic external script tag, with the address exactly as shown. The SDK and the reports
+                use addresses relative to the tag's `src`, so a redirect of only the script does not carry over to them. A tag
+                manager must insert the tag itself; pasting the script's contents inline, loading it as a module or evaluating it
+                does not work.
+              - If the website has a Content Security Policy, allow the receiver's script address in `script-src-elem` (or
+                `script-src`) and its `/rum/` address in `connect-src`. A `nonce` on the tag is passed on to the SDK scripts, and
+                `strict-dynamic` works as usual. A policy that requires Trusted Types for script URLs needs your own integration:
+                the script creates no permissive policy. HTTPS pages need an HTTPS receiver address.
               - Optionally, set `data-version="1.4.2"` on the tag to compare application releases, call
                 `window.netdataRum.setUser({ id: '...' })` to find a user's sessions later, and, once the SDK has loaded, report
                 single-page application routes with `GrafanaFaroWebSdk.faro.api.setView({ name: '/checkout' })`. Use an internal,
-                non-personal user ID: it is stored without hashing.
+                non-personal user ID of at most 128 bytes, and clear it when the user logs out: it is stored without hashing. It
+                appears in session history only, not in the live feed, the charts or the exports.
           - title: Check that reports arrive
             description: |
               Open the website in a regular browser (automated and headless browsers are excluded by default) and look at the
               browser's Network panel: the script and SDK load from the receiver, and a `POST` to `/rum/shop/collect` returns `202`.
               `rum-sites` then shows a recent last accepted report for the site. Charts appear within the next `update_every`.
+              A `202` means the report reached the live measurements; it does not prove that it was saved or exported.
           - title: Optional - send event logs and traces to OpenTelemetry
             description: |
               Event logs (browser events, custom event attributes and optionally console messages) and browser request traces are
@@ -261,6 +273,10 @@ modules:
               default_value: 1
               required: false
               group: Sampling
+              detailed_description: |
+                Reports that carry no session ID still count in the measurements. They are saved and exported only when
+                `sample_rate` is 1 or they match `always_keep`; their JavaScript errors are then saved as standalone errors,
+                outside any session.
             - name: investigate.always_keep
               description: Sessions to save whatever the sample rate - `errors` (a JavaScript error) and `poor_vitals` (a
                 poor Web Vital). An empty list adds none.
@@ -269,8 +285,8 @@ modules:
               group: Sampling
               detailed_description: |
                 To save details only for problem sessions, set `sample_rate` to 0 and keep the default list. When a session starts to
-                match, the details already held for it are saved, and so is everything after, while the Agent still tracks the
-                session.
+                match, the details already held for it (up to 100 entries) are saved, and so is everything after, while the Agent
+                still tracks the session (up to 2,000 per site; quiet sessions expire).
                 Event logs and spans sent before the session matched are not exported afterwards.
             - name: event_logs
               description: Export browser events, including custom event attributes, as OpenTelemetry logs. Session history
@@ -278,11 +294,23 @@ modules:
               default_value: ''
               required: false
               group: Event logs
+              detailed_description: |
+                With the default destination, open the Logs tab of the receiving node, select the `otel-logs` source and the
+                `netdata-rum` service (`resource.attributes.service.name`), then filter by `resource.attributes.rum.site` (the
+                site key) and `attributes.session.id`. Each record's `attributes.rum.type` is `console`, `event`, `error`,
+                `pageview` or `vital`; look at `attributes.console.level`, `attributes.event.name`, `attributes.event.attr.KEY`,
+                and for errors `attributes.error.type` and `attributes.error.stack`. Viewing logs needs Netdata Cloud sign-in.
             - name: event_logs.enabled
               description: Send event logs to their destination.
               default_value: 'no'
               required: false
               group: Event logs
+              detailed_description: |
+                Export never blocks measurements or history. On the `rum.otlp` chart, `sent` counts records the receiver accepted
+                (not proof that it stored them), `errors` counts records whose delivery failed or was refused (a timeout can
+                leave the outcome unknown), and `dropped` counts records lost locally because the queue was full or the job
+                stopped first. Failed records are not retried. Turning the export off keeps its saved settings without checking
+                them.
             - name: event_logs.include_console_logs
               description: Also export the console info, warning and error messages of saved sessions. Requires event logs.
               default_value: 'no'
@@ -303,6 +331,9 @@ modules:
               default_value: http://127.0.0.1:4317
               required: false
               group: Event logs
+              detailed_description: |
+                Omit the key to use the default; an explicitly empty value is rejected while the export is on. Write IPv6
+                addresses in brackets, such as `https://[2001:db8::1]:4317`.
             - name: event_logs.destination.auth_token
               description: Bearer token for the receiver. Use a secret reference such as `${env:OTLP_TOKEN}`. Leave empty
                 for no authentication.
@@ -332,11 +363,18 @@ modules:
               default_value: ''
               required: false
               group: Browser tracing
+              detailed_description: |
+                Browser spans show the browser's side of each request; they do not prove what the backend did. A session can
+                contain several traces, and event logs are not linked to traces automatically: look up a trace ID from the
+                browser in your tracing system.
             - name: tracing.enabled
               description: Send browser spans to their destination. Independent of event logs.
               default_value: 'no'
               required: false
               group: Browser tracing
+              detailed_description: |
+                The `rum.spans` chart counts spans with the same `sent`, `errors` and `dropped` meaning as the event log chart
+                (see `event_logs.enabled`). Turning tracing off keeps its saved settings without checking them.
             - name: tracing.propagate_to
               description: Origins of other APIs, such as `https://api.example.org`, whose requests also get the `traceparent`
                 header. Requests to the page's own origin always get it.
@@ -355,6 +393,9 @@ modules:
               default_value: http://127.0.0.1:4317
               required: false
               group: Browser tracing
+              detailed_description: |
+                Omit the key to use the default; an explicitly empty value is rejected while tracing is on. Write IPv6
+                addresses in brackets, such as `https://[2001:db8::1]:4317`.
             - name: tracing.destination.auth_token
               description: Bearer token for the receiver. Use a secret reference such as `${env:OTLP_TOKEN}`. Leave empty
                 for no authentication.
@@ -520,6 +561,12 @@ modules:
               does not forward the whole `/rum/` path, or the page''s Content Security Policy blocks the receiver''s address.'
             fix: Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver,
               and allow the receiver's address in `script-src` and `connect-src`.
+          - error: 'Netdata RUM: cannot load the tracing SDK. Check the browser Network and CSP errors for the RUM script requests.'
+            when: '`tracing` is enabled for the site.'
+            cause: The page could not load the tracing bundle from the receiver, for the same reasons as the core SDK. RUM keeps
+              working without browser spans.
+            fix: Check the failing request in the browser's Network panel. Forward every path under `/rum/` to the receiver,
+              and allow the receiver's address in the page's Content Security Policy.
           - error: 'Netdata RUM: cannot determine receiver URL. Use the external script tag from RUM setup.'
             cause: The script's contents were pasted into the page, or a tag manager runs them as code, instead of loading
               them with an external script tag.
@@ -530,10 +577,15 @@ modules:
               Trusted Types) blocks it.
             fix: Read the browser console errors logged just before this message and adjust the page's policy for the receiver's
               scripts.
-          - error: The `collect` request returns 403
+          - error: The `collect` request or its `OPTIONS` request returns 403
             cause: The page's origin is not in `allowed_origins`. Scheme, host and port must match, and `*.example.org` does
-              not cover `example.org` itself.
-            fix: '`rum-sites` shows the last refused origin. If it is your website, add it to `allowed_origins`.'
+              not cover `example.org` itself. A refused `OPTIONS` (preflight) request stops the browser from sending the report.
+            fix: '`rum-sites` shows the last refused origin, which can come from a preflight and stays after later reports
+              succeed. If it is your website, add it to `allowed_origins`.'
+          - error: The `collect` request returns 400
+            cause: The receiver could not decode the report. This usually means the page loaded its script or SDK from a
+              receiver of another Agent version, for example while an upgrade rolls out across the servers behind your proxy.
+            fix: Make every server that answers for the public `/rum/` address run the same Agent version, then reload the page.
           - error: The script or `collect` request returns 404
             cause: 'The receiver has no running site job with the key in the URL: the job is disabled or failed to start,
               its `name` differs from the key in the script tag, or the reverse proxy changes the path.'
@@ -621,6 +673,11 @@ modules:
         - Percentile and count charts describe the reports received in the last `window`. Each page view counts once per Web
           Vital, with its latest value; percentiles cannot be averaged across sites or breakdown values.
         - A vital with no observations in the window leaves a gap in its percentile chart; a measured zero is a real value.
+        - A page view is a document load or a return from the browser's back-forward cache. Single-page application route
+          changes are application views, and Web Vitals stay with the page view even when reported after a route change.
+        - Same-site fetch timing covers the fetch and XHR requests the browser reports for the page's own site, not every
+          backend request; the RUM script's own requests are excluded. JavaScript errors are events, so errors per page view
+          is not a failure rate.
         - Breakdown charts exist for the busiest values in the window, plus `other` for the rest (the `bucket` label).
         - While the receiver is not serving, or `measure_sample_rate` is 0, the measurement charts stop; the receiver
           availability, history and export charts continue.
@@ -1285,8 +1342,13 @@ modules:
               default: ''
               options: &id006 []
           returns:
-            description: One row per active site. The response also shows whether the receiver is serving, its public URL
-              and the state of its location database (`collector.geoip`).
+            description: |
+              One row per active site. The response also shows whether the receiver is serving, its public URL and the state
+              of its location database (`collector.geoip`). In that object, `state` is `loaded`, `unavailable` or
+              `using_previous`, `source` is `cache`, `stock` or `explicit`, and `reason` explains a missing database without
+              paths (the Agent log has the details). `lookup_errors` counts failed lookups, not unmatched addresses, and
+              `loaded` does not mean the database is current or complete. Its times (`build_at`, `loaded_at`,
+              `last_checked_at`) are Unix microseconds.
             columns:
               - name: site
                 type: string
@@ -1622,7 +1684,8 @@ modules:
             - *id003
             - id: user_id
               name: User ID (`user_id`)
-              description: Only sessions in which the application set this user ID during the time range.
+              description: Only sessions in which the application set this user ID during the time range. The match is exact,
+                on the ID as stored after cleanup, so a displayed `[REDACTED]` value cannot be used to look a user up.
               type: string
               required: false
               default: ''
