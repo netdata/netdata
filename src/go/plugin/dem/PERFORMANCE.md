@@ -9,7 +9,62 @@ offered-load interval but shed 43 requests in the generator and coalesced five o
 not meet the same lossless-load and zero-coalescing targets. Both runs use fresh browsers. Browser reuse remains
 deferred, and the production default remains one shared browser slot.
 
-## Qualification workload
+:::info
+
+These are dated measurements, not a description of current master. Each section names the date it measured and, where
+recorded, the commit or source snapshot. Later changes, including the November 2026 cleanup of the RUM ingest,
+aggregation, Faro, journal and runner code, were not re-measured. Release qualification re-runs the mixed workload and
+the component benchmarks before DEM leaves experimental status.
+
+:::
+
+## Sizing guidance
+
+### Choosing browser concurrency
+
+Set the process allowance in `dem.conf`, and restart the plugin to apply it:
+
+```yaml
+browser:
+  concurrency: 12
+```
+
+This is the setting used in both mixed runs, not a new default or a guarantee of lossless activation. The repeat
+coalesced five initial occurrences at this allowance. The default remains 1. Choose it together
+with CPU, memory and Lighthouse measurement quality. A browser slot can own several child processes and is not
+a hard memory limit. Rehearsals and in-process runtime qualification share the allowance with monitoring.
+
+Measure both activation and recurring work. Activation queues all first checks immediately; recurring checks are
+spread over their configured cadence. In the eight-slot comparison, 12 queued initial journeys were replaced by
+newer due occurrences. Its later steady throughput did not make that startup result acceptable.
+
+Use scheduled, admitted and coalesced counts, admission delay and observation age to detect insufficient capacity.
+Changing `update_every` only changes chart publication; `check_every` changes browser execution frequency. A
+coalesced occurrence never ran and is not evidence of website failure. For workload estimates, combine checks per
+second with observed admission-to-completion time, then allow for startup bursts and variation. That time excludes
+final history synchronization and slot release, so it is a lower bound on slot occupancy.
+
+Higher concurrency can increase contention and change Lighthouse measurements. The small serial fixture control
+does not establish statistical equivalence with concurrent audits. Recheck the workload and measurement quality
+when changing scripts, audited pages, runtime, hardware, frequency or concurrency.
+
+### RUM and query costs
+
+Size RUM using new document, session, vital and resource identities as well as bytes and beacons per second.
+Canonical measurements retain their receipt window; replay identities remain for 30 minutes. Restarting or replacing
+the site job, or changing its vnode association, resets these in-memory windows. Repeated reports and revisions have
+a different memory cost from entirely new documents. Session detail sampling controls investigation history, not the
+population used for live measurement.
+
+The qualification reads live sites/pages and two concurrent, bounded recent session-history ranges every 15 seconds,
+while also observing browser status/history. This is a specific query mix. Broad history ranges, more concurrent
+readers, richer payloads, always-kept errors, exports and captures require their own measurements.
+
+## Mixed qualification
+
+The mixed runs below exercise browser and RUM work together in one Agent and DEM plugin process.
+
+### Qualification workload
 
 The mixed runs use shared browser admission, independent check and chart cadences, and exact time-based RUM
 retention. They run the native Agent, DEM plugin, real Chromium executions, HTTP receiver and retained-history
@@ -46,7 +101,7 @@ are disabled. Receiver admission settings explicitly allow the single-address lo
 test inputs, not recommended public ingress limits. The history age setting is subject to the shared byte budget;
 this test does not establish 30 days of retention at this rate.
 
-## Original mixed result — 2026-11-10
+### Original mixed result on `dd7e27768d` — 2026-11-10
 
 On 2026-11-10, this workload completed with the following results. The result covers the specific fixture and
 resource envelope above; it is not a capacity guarantee for arbitrary websites or beacon contents.
@@ -99,7 +154,7 @@ control audits of the same page. Maximum total blocking time was 85 ms for recur
 activation, versus 51–71 ms in the serial control. These observed tails matter when interpreting lab measurements;
 the test does not establish equivalence to an unloaded runner.
 
-## Repeat on `d2c037a448` — 2026-11-11
+### Repeat on `d2c037a448` — 2026-11-11
 
 The same fixture was repeated on master `d2c037a448`, including the merged history-query, snapshot,
 bot-classification and retained-state changes. **This repeat did not qualify the complete target.** The generator's
@@ -160,7 +215,46 @@ SHA-256 is `92ad1006cd112847631f7dff16000d90b723dd573703ba06e76bfbf5a6d068b5`. N
 runtime or default changed. The private Agent drained successfully, all 43,477 tracked process identities exited,
 and the installed Agent/runtime remained unchanged.
 
-## DEM CPU attribution on `d2c037a448` — 2026-11-11
+### Mixed-qualification measurement boundaries
+
+The test uses Debian 13.7, Linux 6.12.111, x86_64 and an exposed AMD EPYC 7713 CPU model. The VM has 16 virtual
+CPUs and about 64 GiB of RAM; the test unit is limited to 16 CPUs and 32 GiB. The virtual CPU model does not identify
+an allocation of exclusive physical cores.
+The Linux test places the native Agent, plugin, browsers, fixture server, HTTP generator, observers and offline
+audits in one cgroup. Its memory includes charged file cache and kernel memory; it is not the Go heap or a sum of
+process RSS. An additional conservative catalog accounts for immutable files that could have been warmed outside
+the cgroup. CPU and memory measurements therefore include test overhead. In the original run, peak charged memory
+was 16,410,107,904 bytes; the additional immutable-file bound was 1,184,989,141 bytes, not a measurement of externally
+charged pages.
+The sum remained within 32 GiB. Ordinary Go GC policy was unchanged; no `GOGC` or `GOMEMLIMIT` override was used.
+
+Runtime 2026.10.29.1 supplies the browser tools. Chromium sandboxing stays enabled. The installed Agent service and
+runtime remain untouched; the test uses private state, HOME, temporary storage and a runtime clone mounted at its
+required absolute path. No public network load is generated.
+
+The generator records every offered request without application retries. Independent oracles check actual HTTP
+acceptance, rolling populations and percentiles, final cumulative counters, and sampled retained identities.
+Closed synthetic history checks actual initial and recurring runs, captured vnode/runtime identity and terminal
+outcomes. An HTTP 202 response alone is not proof of durable history.
+
+The original live observer reported five admission/history mismatches. Review and raw-record reconciliation
+confirmed that admission counters preceded start-history publication for five cooldown attempts. The observer was
+corrected to defer its upper-bound check to complete closed history; the lower bound and all target-work checks
+remain enforced. The strict closed audit passed before and after that correction. The original failed observer
+verdict is preserved with the test evidence; no workload result was fabricated or retried to obtain the result.
+
+Shutdown validation signals and joins the private DEM plugin while its Agent protocol pipes remain open, verifies
+browser/runtime ownership is drained, then stops the private Agent. It does not qualify ordinary Agent-initiated
+shutdown. A 35-minute load plus cooldown is a bounded capacity result, not a long-duration soak or a guarantee for
+arbitrary site behavior.
+
+The original tested development source snapshot is `dd7e27768d`; its Linux plugin SHA-256 is
+`a6bcdee58e2575d474d1b075c72809085b0749a4f56f17a2722dcf958fcccd08`. The managed runtime generation is
+`79bb9a948aa20f006d000edbe92081e910c1a8cd3538cc7d1a3be66a2aa1d0c2`. Revalidate after material source or runtime changes.
+
+## Component measurements
+
+### DEM CPU attribution on `d2c037a448` — 2026-11-11
 
 A 180-second CPU profile at minutes 20–23 of the `d2c037a448` repeat recorded 118.22 sampled CPU-seconds in the
 DEM Go process, about **0.66 core**. The profile PID matched the native Agent's DEM child; it completed without
@@ -181,47 +275,7 @@ I/O time. It precedes the 30-minute replay-retention turnover; the full workload
 profile does not attribute its mature expiry costs. No original-run CPU profile exists, so these figures establish
 attribution on `d2c037a448`, not a causal CPU reduction.
 
-## Choosing browser concurrency
-
-Set the process allowance in `dem.conf`, and restart the plugin to apply it:
-
-```yaml
-browser:
-  concurrency: 12
-```
-
-This is the setting used in both mixed runs, not a new default or a guarantee of lossless activation. The repeat
-coalesced five initial occurrences at this allowance. The default remains 1. Choose it together
-with CPU, memory and Lighthouse measurement quality. A browser slot can own several child processes and is not
-a hard memory limit. Rehearsals and in-process runtime qualification share the allowance with monitoring.
-
-Measure both activation and recurring work. Activation queues all first checks immediately; recurring checks are
-spread over their configured cadence. In the eight-slot comparison, 12 queued initial journeys were replaced by
-newer due occurrences. Its later steady throughput did not make that startup result acceptable.
-
-Use scheduled, admitted and coalesced counts, admission delay and observation age to detect insufficient capacity.
-Changing `update_every` only changes chart publication; `check_every` changes browser execution frequency. A
-coalesced occurrence never ran and is not evidence of website failure. For workload estimates, combine checks per
-second with observed admission-to-completion time, then allow for startup bursts and variation. That time excludes
-final history synchronization and slot release, so it is a lower bound on slot occupancy.
-
-Higher concurrency can increase contention and change Lighthouse measurements. The small serial fixture control
-does not establish statistical equivalence with concurrent audits. Recheck the workload and measurement quality
-when changing scripts, audited pages, runtime, hardware, frequency or concurrency.
-
-## RUM and query costs
-
-Size RUM using new document, session, vital and resource identities as well as bytes and beacons per second.
-Canonical measurements retain their receipt window; replay identities remain for 30 minutes. Restarting or replacing
-the site job, or changing its vnode association, resets these in-memory windows. Repeated reports and revisions have
-a different memory cost from entirely new documents. Session detail sampling controls investigation history, not the
-population used for live measurement.
-
-The qualification reads live sites/pages and two concurrent, bounded recent session-history ranges every 15 seconds,
-while also observing browser status/history. This is a specific query mix. Broad history ranges, more concurrent
-readers, richer payloads, always-kept errors, exports and captures require their own measurements.
-
-## Subsequent RUM component measurements
+### Subsequent RUM component measurements
 
 After the original mixed qualification, [PR #24677](https://github.com/netdata/netdata/pull/24677) reduced history-query
 string allocations and [PR #24680](https://github.com/netdata/netdata/pull/24680) reduced snapshot and Pages read
@@ -297,7 +351,7 @@ outcome, process-drainage and live/reopened journal-equality checks, without OOM
 This includes the Go fixture server and journal work, while previously charged immutable pages can still be excluded.
 It qualifies these final-path fixtures, not broad mixed-workload capacity or a universal overhead percentage.
 
-## Browser reuse experiment — deferred
+## Decision record: browser reuse deferred
 
 On 2026-11-11, [PR #24684](https://github.com/netdata/netdata/pull/24684) compared fresh browsers with supervised
 Chromium reuse while retaining fresh Playwright Test processes and isolated contexts per attempt. This experiment
@@ -351,39 +405,10 @@ The experiment also retains browsers for up to one idle minute, so a sparse five
 time and gain no reuse benefit. A demonstrated CPU-budget or cadence shortfall with fresh execution would provide
 a stronger reason to reconsider this trade-off. The 12-slot test setting does not change the production default of 1.
 
-## Mixed-qualification measurement boundaries
+### What reuse would need
 
-The test uses Debian 13.7, Linux 6.12.111, x86_64 and an exposed AMD EPYC 7713 CPU model. The VM has 16 virtual
-CPUs and about 64 GiB of RAM; the test unit is limited to 16 CPUs and 32 GiB. The virtual CPU model does not identify
-an allocation of exclusive physical cores.
-The Linux test places the native Agent, plugin, browsers, fixture server, HTTP generator, observers and offline
-audits in one cgroup. Its memory includes charged file cache and kernel memory; it is not the Go heap or a sum of
-process RSS. An additional conservative catalog accounts for immutable files that could have been warmed outside
-the cgroup. CPU and memory measurements therefore include test overhead. In the original run, peak charged memory
-was 16,410,107,904 bytes; the additional immutable-file bound was 1,184,989,141 bytes, not a measurement of externally
-charged pages.
-The sum remained within 32 GiB. Ordinary Go GC policy was unchanged; no `GOGC` or `GOMEMLIMIT` override was used.
-
-Runtime 2026.10.29.1 supplies the browser tools. Chromium sandboxing stays enabled. The installed Agent service and
-runtime remain untouched; the test uses private state, HOME, temporary storage and a runtime clone mounted at its
-required absolute path. No public network load is generated.
-
-The generator records every offered request without application retries. Independent oracles check actual HTTP
-acceptance, rolling populations and percentiles, final cumulative counters, and sampled retained identities.
-Closed synthetic history checks actual initial and recurring runs, captured vnode/runtime identity and terminal
-outcomes. An HTTP 202 response alone is not proof of durable history.
-
-The original live observer reported five admission/history mismatches. Review and raw-record reconciliation
-confirmed that admission counters preceded start-history publication for five cooldown attempts. The observer was
-corrected to defer its upper-bound check to complete closed history; the lower bound and all target-work checks
-remain enforced. The strict closed audit passed before and after that correction. The original failed observer
-verdict is preserved with the test evidence; no workload result was fabricated or retried to obtain the result.
-
-Shutdown validation signals and joins the private DEM plugin while its Agent protocol pipes remain open, verifies
-browser/runtime ownership is drained, then stops the private Agent. It does not qualify ordinary Agent-initiated
-shutdown. A 35-minute load plus cooldown is a bounded capacity result, not a long-duration soak or a guarantee for
-arbitrary site behavior.
-
-The original tested development source snapshot is `dd7e27768d`; its Linux plugin SHA-256 is
-`a6bcdee58e2575d474d1b075c72809085b0749a4f56f17a2722dcf958fcccd08`. The managed runtime generation is
-`79bb9a948aa20f006d000edbe92081e910c1a8cd3538cc7d1a3be66a2aa1d0c2`. Revalidate after material source or runtime changes.
+Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
+state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
+appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
+drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
+need measurement and validation, not promises made by vnode placement.

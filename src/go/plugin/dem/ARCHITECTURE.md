@@ -214,12 +214,10 @@ Netdata configuration directory's `vnodes/` YAML format; DEM supports static con
   latest observations, so skipped framework publication ticks never lose due occurrences.
 - **Clean replacement.** Retirement cancels and joins the session before the native predecessor is released; a
   replacement cannot inherit its pending work or completed observation.
-
-Warm browser reuse additionally needs explicit worker lifetime, runtime leases, per-attempt cancellation and browser
-state cleanup. A live shared worker cannot be considered reaped after each attempt. Preserve verified completion at the
-appropriate boundary and qualify Playwright and Lighthouse separately. The current fail-stop on unverified process
-drainage also stops RUM; independent jobs do not provide process isolation. These are separate execution changes that
-need measurement and validation, not promises made by vnode placement.
+- **Shared fate.** The fail-stop on unverified process drainage also stops RUM; independent jobs do not provide process
+  isolation.
+- **Fresh browsers.** Every attempt starts a fresh browser. Warm browser reuse is deferred; what it would need and why it
+  was deferred are in the [decision record](PERFORMANCE.md#decision-record-browser-reuse-deferred).
 
 ## Journey 1: a browser report
 
