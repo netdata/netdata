@@ -93,8 +93,6 @@ func TestPagePopulationCountsAndAbsentPercentiles(t *testing.T) {
 			require.Equal(t, tc.n, value("cls_samples"))
 			require.Equal(t, 2, value("sessions"))
 			require.Equal(t, "12345678-1234-4234-8234-123456789abc", value("vnode_guid"))
-			require.Contains(t, response["help"], "outside chart top-N")
-			require.Contains(t, response["help"], "not people or concurrency")
 		})
 	}
 }

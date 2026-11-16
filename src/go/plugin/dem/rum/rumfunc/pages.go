@@ -13,9 +13,11 @@ import (
 
 var pagesMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-pages",
-		Title:       "RUM Pages",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. All retained document-entry groups in the receipt window, including groups outside chart top-N. Vitals use the latest report per document experience; sample counts describe the exact retained populations. Percentiles are null when there are no observations. Sessions are observed browser identities, not people or concurrency. Frustration signals are unavailable when capture is disabled",
+		ID:    "rum-pages",
+		Title: "RUM Pages",
+		Help: "Every page of each site seen in the site's window (5 minutes by default), with views, sessions, " +
+			"errors, Web Vital p75 values and the element most involved in each vital. It lists all pages, not only " +
+			"the busiest ones that get breakdown charts. Pass site for one site. " + rawfunc.VnodeHelp,
 		Sort:        "pageviews_window",
 		UpdateEvery: 10,
 		Params:      []string{"site", "vnode", "vnode_guid"},

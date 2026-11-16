@@ -12,6 +12,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
 )
 
+// limitHelp describes the limit argument of rowLimit and the truncated response field.
+var limitHelp = "limit caps the rows (1 to " + strconv.Itoa(rawfunc.MaxRows) + ", default " +
+	strconv.Itoa(rawfunc.MaxRows) + "); truncated is true when more match."
+
 func rowLimit(value string) (int, error) {
 	if value == "" {
 		return rawfunc.MaxRows, nil

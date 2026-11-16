@@ -15,9 +15,12 @@ import (
 
 var checksMethod = method{
 	Method: rawfunc.Method{
-		ID:          "synthetics-checks",
-		Title:       "Synthetic monitors",
-		Help:        "Active native monitors and their latest observation. Disabled and failed-startup configuration remains in native job status. Freshness belongs to the last observation, independently of a waiting or running attempt. Check interval controls browser execution. Occurrence counters reset on native activation and continue across vnode changes; coalesced occurrences never ran. Queue age preserves the oldest admission wait, while admission delay describes the selected due occurrence. Optional vnode selects a configured name; vnode_guid selects the current canonical GUID instead. Omit both to select all sites; the selectors are mutually exclusive. Blank Vnode GUID cells are unassigned.",
+		ID:    "synthetics-checks",
+		Title: "Synthetic monitors",
+		Help: "The current status of every active journey and Lighthouse job: its latest result and whether it " +
+			"is still fresh, its last success and failure, and whether its checks are waiting for a free browser. " +
+			"Disabled jobs and jobs that failed to start are not listed. Pass job_id for one job or kind (journey " +
+			"or lighthouse) for one kind. " + limitHelp + " " + rawfunc.VnodeHelp,
 		Sort:        "job_id",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "kind", "limit", "vnode", "vnode_guid"},

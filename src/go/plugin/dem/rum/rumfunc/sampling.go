@@ -46,8 +46,13 @@ func percent(rate float64) string {
 	return strconv.FormatFloat(rate*100, 'g', 15, 64) + "%"
 }
 
+// samplingCaveat is part of the help of the methods that read saved sessions:
+// sampling decides what history holds, so it is not a population count.
+const samplingCaveat = "Saved history may follow an earlier sampling policy and be incomplete, so it does not " +
+	"estimate all visitors or errors."
+
 // samplingHelp follows the method help with the current sampling policy of the
-// selected sites, separately from what historical evidence may reflect.
+// selected sites.
 func (h *Handler) samplingHelp(ctx context.Context, help string, args map[string]string) (string, error) {
 	sites, err := h.deps.Sites(ctx, args["site"], args["vnode_guid"])
 	if err != nil {
@@ -62,12 +67,10 @@ func (h *Handler) samplingHelp(ctx context.Context, help string, args map[string
 			problemBiased = true
 		}
 	}
-	help += ". Historical evidence may reflect earlier policies, bounded context, retention and delivery loss. " +
-		"These rows do not estimate all visitors or errors."
 	if len(notes) > 0 {
 		help += " Current sampling policy: " + strings.Join(notes, "; ") + "."
 		if problemBiased {
-			help += " Problem overrides bias retained detail toward failures."
+			help += " Sessions with the listed problems are kept beyond the baseline, so failures are over-represented."
 		}
 	}
 	return help, nil

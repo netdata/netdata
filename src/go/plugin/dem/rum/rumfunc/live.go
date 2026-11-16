@@ -13,9 +13,12 @@ import (
 
 var liveMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-live",
-		Title:       "RUM Live",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Recent observations with an opaque per-site generation cursor: pass the previous response's next unchanged as cursor. Changing the selected GUID restarts pagination from the retained view for that selection. Row kind distinguishes document activations, application views, vital updates and errors. Multiple rows can belong to one experience; vital updates retain metric ID and revision",
+		ID:    "rum-live",
+		Title: "RUM Live",
+		Help: "Recent events of each site in arrival order: page views, application views, Web Vital reports " +
+			"and errors. Each request returns up to " + strconv.Itoa(rawfunc.MaxRows) + " events; pass the " +
+			"response's next value as cursor to get the events that arrived after them (changing the virtual node " +
+			"selection starts over). Pass site for one site. " + rawfunc.VnodeHelp,
 		Sort:        "seq",
 		UpdateEvery: 2,
 		Params:      []string{"site", "vnode", "vnode_guid", "cursor"},

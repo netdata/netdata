@@ -201,7 +201,7 @@ func TestSessionsDiscloseTruncationAtTheRowCap(t *testing.T) {
 			assert.Equal(t, "0", rows[0][1], "the newest session stays first")
 			assert.Equal(t, tc.truncated, response["truncated"])
 			assert.Equal(t, rawfunc.MaxRows, response["limit"])
-			assert.Contains(t, response["help"], "capped at "+strconv.Itoa(rawfunc.MaxRows)+" and disclose truncation")
+			assert.Contains(t, response["help"], "up to "+strconv.Itoa(rawfunc.MaxRows)+" sessions; truncated is true")
 		})
 	}
 }

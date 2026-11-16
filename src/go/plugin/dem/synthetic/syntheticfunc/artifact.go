@@ -15,9 +15,13 @@ import (
 
 var artifactMethod = method{
 	Method: rawfunc.Method{
-		ID:          "synthetics-artifact",
-		Title:       "Synthetic artifacts",
-		Help:        "Retained capture metadata for one run; file bytes are verified when fetched. Test identifies the associated test, not a page, failing step or screenshot time. Missing-capture observations and publication decisions are in synthetics-run while history remains. Supplying artifact_id requests base64-encoded bytes and requires administrator-equivalent permissions. Screenshots, traces and HTML reports may contain sensitive content. Missing retained files are expired or unavailable; fetches are limited to 5 MiB.",
+		ID:    "synthetics-artifact",
+		Title: "Synthetic artifacts",
+		Help: "The captures of one run (job_id and run_id): screenshots, Playwright traces and Lighthouse HTML " +
+			"reports, with their availability. Pass artifact_id to download one as base64, up to 5 MiB, checked " +
+			"against its recorded SHA-256; downloading requires administrator access. Captures may contain " +
+			"sensitive page content. Why a capture is missing is shown by synthetics-run while the run's history " +
+			"is kept.",
 		Sort:        "artifact_id",
 		UpdateEvery: 10,
 		Params:      []string{"job_id", "run_id", "artifact_id"},

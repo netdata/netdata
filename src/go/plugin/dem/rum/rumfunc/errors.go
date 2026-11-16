@@ -14,9 +14,12 @@ import (
 
 var errorsMethod = method{
 	Method: rawfunc.Method{
-		ID:          "rum-errors",
-		Title:       "RUM Errors",
-		Help:        "Optional vnode selects a configured name; vnode_guid selects a recorded canonical GUID instead. Omit both to select all jobs; the selectors are mutually exclusive. Retained errors originally received by the Agent in the selected inclusive Unix-second range; select fingerprint for affected-session, page and browser statistics",
+		ID:    "rum-errors",
+		Title: "RUM Errors",
+		Help: "Saved JavaScript errors received by the Agent in the time range, grouped by fingerprint, with " +
+			"counts and a sample stack. " + samplingCaveat + " Pass fingerprint to show only that error, with its " +
+			"affected sessions, top page and browsers. " + historyRangeHelp + " Pass site for one site. " +
+			rawfunc.VnodeHelp,
 		Sort:        "count_window",
 		UpdateEvery: 10,
 		History:     true,

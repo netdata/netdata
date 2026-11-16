@@ -97,12 +97,12 @@ func TestHistoryHelpExplainsBiasOnlyForSelectedProblemSampling(t *testing.T) {
 						help = response.RawResponse["help"].(string)
 					}
 					assert.Contains(t, help, "Current sampling policy:")
-					assert.Contains(t, help, "earlier policies")
-					assert.Contains(t, help, "do not estimate all visitors or errors")
+					assert.Contains(t, help, "earlier sampling policy")
+					assert.Contains(t, help, "does not estimate all visitors or errors")
 					if tc.biased {
-						assert.Contains(t, help, "Problem overrides bias retained detail toward failures")
+						assert.Contains(t, help, "failures are over-represented")
 					} else {
-						assert.NotContains(t, help, "Problem overrides bias retained detail toward failures")
+						assert.NotContains(t, help, "failures are over-represented")
 					}
 				}
 			})
@@ -127,8 +127,8 @@ func TestHistoryHelpWithoutActiveSites(t *testing.T) {
 				require.NotNil(t, response.RawResponse)
 				help = response.RawResponse["help"].(string)
 			}
-			assert.Contains(t, help, "earlier policies")
-			assert.Contains(t, help, "do not estimate all visitors or errors")
+			assert.Contains(t, help, "earlier sampling policy")
+			assert.Contains(t, help, "does not estimate all visitors or errors")
 			assert.NotContains(t, help, "Current sampling policy:")
 		}
 	}

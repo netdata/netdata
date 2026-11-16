@@ -620,7 +620,7 @@ func TestFunctionsDescribeCurrentSamplingPolicy(t *testing.T) {
 				help := response.RawResponse["help"]
 				assert.Contains(t, help, "Current sampling policy:")
 				assert.Contains(t, help, "Shop: collection "+tc.measured+"; retained/exported detail "+tc.investigated)
-				assert.Contains(t, help, "earlier policies")
+				assert.Contains(t, help, "earlier sampling policy")
 			}
 			response := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
 				Method:      "rum-sites",
@@ -877,8 +877,8 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 		})
 		require.NotEmpty(t, response.RawResponse["data"].([][]any))
 		help := response.RawResponse["help"].(string)
-		assert.Contains(t, help, "earlier policies", "historical caveat must survive current-identity reassignment")
-		assert.Contains(t, help, "do not estimate all visitors or errors")
+		assert.Contains(t, help, "earlier sampling policy", "historical caveat must survive current-identity reassignment")
+		assert.Contains(t, help, "does not estimate all visitors or errors")
 	}
 	// Actual Function requests carry both selectors and expose the stored group.
 	handler := rumfunc.New(service, nil)
