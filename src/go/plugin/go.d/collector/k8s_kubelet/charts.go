@@ -266,7 +266,6 @@ var (
 		Dims: Dims{
 			{ID: "pvc_%s_space_available", Name: "available"},
 			{ID: "pvc_%s_space_used", Name: "used"},
-			{ID: "pvc_%s_space_reserved", Name: "reserved"},
 		},
 	}
 	pvcSpaceUtilizationChartTmpl = Chart{
@@ -289,7 +288,6 @@ var (
 		Dims: Dims{
 			{ID: "pvc_%s_inodes_available", Name: "available"},
 			{ID: "pvc_%s_inodes_used", Name: "used"},
-			{ID: "pvc_%s_inodes_reserved", Name: "reserved"},
 		},
 	}
 )

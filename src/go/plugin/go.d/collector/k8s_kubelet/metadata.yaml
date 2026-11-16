@@ -362,10 +362,10 @@ modules:
             These metrics refer to a PersistentVolumeClaim mounted on this node, one instance per PVC.
 
             - A chart is created only while the kubelet reports real data for it. The kubelet reports 0 for values a volume does not provide, so volumes without filesystem statistics (for example block volumes) have no PVC charts, and volumes without inode accounting (for example SMB shares) have no inode chart.
-            - `reserved` is the space or inodes the filesystem holds back (capacity minus used minus available, usually root-reserved blocks). It is never negative: if a storage driver reports more used and available space than capacity, `reserved` is 0.
-            - Space utilization is used / (used + available), like `df`.
+            - `used` and `available` are reported by the storage driver. Depending on the driver, they can describe a dedicated volume, a claim directory, or a shared backing filesystem. Some drivers combine directory-level usage with filesystem-wide availability, so the stacked total need not equal the volume's capacity.
+            - Space utilization is `used / (used + available) * 100`, calculated from the reported values. It matches `df` only when both values describe the same filesystem. It is not the percentage of the PVC's requested size consumed.
             - A PVC mounted on several nodes (for example ReadWriteMany or ReadOnlyMany) is reported by each of them. Aggregate PVC charts across nodes with `max`, not `sum`.
-            - `hostPath` volumes (the default type of the upstream `local-path` provisioner) report no usage, so they get no PVC charts. `local` volumes (for example the bundled `local-path` class of k3s) report the usage of the whole host filesystem that holds them, so they show the same values on a node.
+            - `hostPath` volumes (the default type of the upstream `local-path` provisioner) report no usage, so they get no PVC charts. Directory-backed `local` volumes report the usage of the whole filesystem that holds them; claims on the same filesystem therefore show the same values rather than their exclusive usage.
           labels:
             - name: k8s_namespace
               description: Namespace of the PersistentVolumeClaim.
@@ -379,7 +379,6 @@ modules:
               dimensions:
                 - name: available
                 - name: used
-                - name: reserved
             - name: k8s_kubelet.pvc_space_utilization
               description: PVC Space Utilization
               unit: "%"
@@ -393,4 +392,3 @@ modules:
               dimensions:
                 - name: available
                 - name: used
-                - name: reserved

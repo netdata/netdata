@@ -190,13 +190,11 @@ func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
 	for id, st := range stats {
 		var pvc pvcMetrics
 
-		// reserved is clamped at 0: drivers whose used + available exceed capacity would draw a negative area
 		if st.hasSpace() {
 			withSpace[id] = st
 			pvc.Space = &pvcSpaceMetrics{}
 			pvc.Space.Available.Set(st.available)
 			pvc.Space.Used.Set(st.used)
-			pvc.Space.Reserved.Set(max(0, st.capacity-st.used-st.available))
 			pvc.Space.Utilization.Set(st.used / (st.used + st.available) * 100)
 		}
 		if st.hasInodes() {
@@ -204,7 +202,6 @@ func (c *Collector) collectVolumeStats(raw prometheus.Series, mx *metrics) {
 			pvc.Inodes = &pvcInodesMetrics{}
 			pvc.Inodes.Available.Set(st.inodesFree)
 			pvc.Inodes.Used.Set(st.inodesUsed)
-			pvc.Inodes.Reserved.Set(max(0, st.inodes-st.inodesUsed-st.inodesFree))
 		}
 
 		if pvc.Space != nil || pvc.Inodes != nil {

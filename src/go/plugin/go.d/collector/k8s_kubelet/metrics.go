@@ -127,12 +127,10 @@ type pvcMetrics struct {
 type pvcSpaceMetrics struct {
 	Available   mtx.Gauge `stm:"available"`
 	Used        mtx.Gauge `stm:"used"`
-	Reserved    mtx.Gauge `stm:"reserved"`
 	Utilization mtx.Gauge `stm:"utilization,100"`
 }
 
 type pvcInodesMetrics struct {
 	Available mtx.Gauge `stm:"available"`
 	Used      mtx.Gauge `stm:"used"`
-	Reserved  mtx.Gauge `stm:"reserved"`
 }
