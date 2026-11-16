@@ -69,6 +69,8 @@ class PackageCloudCleanupTest(unittest.TestCase):
         self.assertIn('HTTP 404', output)
         self.assertIn('HTTP 500', output)
         self.assertIn('HTTP 302', output)
+        for call in delete.call_args_list:
+            self.assertIs(call.kwargs.get('allow_redirects'), False)
         self.assertIn('3 package(s) could not be deleted', errors)
 
     def test_request_errors_are_reported_and_the_run_continues(self):

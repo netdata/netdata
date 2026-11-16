@@ -64,7 +64,8 @@ class PackageCloud:
             print(f"         - Deleting package: {destroy_url}")
             url = f"https://packagecloud.io{destroy_url}"
             try:
-                response = requests.delete(url, auth=self.auth, headers=self.headers, timeout=60)
+                response = requests.delete(url, auth=self.auth, headers=self.headers, timeout=60,
+                                           allow_redirects=False)
             except requests.RequestException as e:
                 self.failed_deletes += 1
                 print(f"           Failed deleting package: {e}")
