@@ -69,7 +69,7 @@ class PackageCloud:
                 self.failed_deletes += 1
                 print(f"           Failed deleting package: {e}")
                 return
-            if response.ok:
+            if 200 <= response.status_code < 300:
                 print(f"           Package deleted successfully.")
             else:
                 self.failed_deletes += 1
