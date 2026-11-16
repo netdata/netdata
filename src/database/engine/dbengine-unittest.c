@@ -824,6 +824,7 @@ struct in_memory_race_state {
     bool other_entered;
     bool other_done;
 
+    bool paused;                // the hook paused the callback of paused_start_s
     size_t errors;
 };
 
@@ -863,17 +864,24 @@ static void in_memory_race_hook(const PGC_ENTRY *entry, RAM_CACHE_RETENTION_HOOK
     if(entry->start_time_s != in_memory_race.paused_start_s)
         return;
 
+    in_memory_race.paused = true;
+
     if(in_memory_race.collect_rd)
         in_memory_test_store_pages(in_memory_race.collect_rd, in_memory_race.collect_from_s, 1);
 
     else if(in_memory_race.other_start_s) {
-        in_memory_race.other_thread = nd_thread_create("UTIMRACE", NETDATA_THREAD_OPTION_MANUAL_JOIN, in_memory_race_evict_other, NULL);
+        // no retries: this runs under the decision lock
+        in_memory_race.other_thread = nd_thread_create("UTIMRACE", NETDATA_THREAD_OPTION_MANUAL_JOIN | NETDATA_THREAD_OPTION_NO_RETRY,
+                                                       in_memory_race_evict_other, NULL);
         if(!in_memory_race.other_thread || !in_memory_race_wait(&in_memory_race.other_entered, 10 * USEC_PER_SEC)) {
             fprintf(stderr, " >>> DBENGINE: in memory: the callback of the other page did not start\n");
             in_memory_race.errors++;
             return;
         }
-        in_memory_race_wait(&in_memory_race.other_done, 200 * USEC_PER_MS);
+        if(in_memory_race_wait(&in_memory_race.other_done, 200 * USEC_PER_MS)) {
+            fprintf(stderr, " >>> DBENGINE: in memory: the callback of the other page decided while this one was deciding\n");
+            in_memory_race.errors++;
+        }
     }
 }
 
@@ -891,6 +899,11 @@ static size_t in_memory_race_evict(time_t start_s) {
 
     if(in_memory_race.other_thread)
         nd_thread_join(in_memory_race.other_thread);
+
+    if(!in_memory_race.paused) {
+        fprintf(stderr, " >>> DBENGINE: in memory: the callback of the page at %jd was not paused\n", (intmax_t)start_s);
+        in_memory_race.errors++;
+    }
 
     return in_memory_race.errors;
 }
