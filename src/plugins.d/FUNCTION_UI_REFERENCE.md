@@ -1428,7 +1428,8 @@ Frontend handles 304 responses gracefully without showing errors to users.
 
 **Common Optional Fields:**
 - `has_history`: Default false
-- `help`: Documentation text
+- `help`: Documentation text. The Cloud Functions UI shows it as plain text (no Markdown) in the tooltip of the
+  information icon next to the Function title, so keep it short.
 - `update_every`: Default 1
 - `expires`: Cache control
 - `default_sort_column`: Initial sort
