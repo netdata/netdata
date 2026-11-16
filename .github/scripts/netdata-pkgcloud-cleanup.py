@@ -23,6 +23,7 @@ class PackageCloud:
             "Content-Type" : "application/json",
         }
         self.dry_run = dry_run
+        self.failed_deletes = 0
         self.repo_type = repo_type
         if repo_type == "stable":
             repo = "netdata/netdata"
@@ -62,12 +63,17 @@ class PackageCloud:
         else:
             print(f"         - Deleting package: {destroy_url}")
             url = f"https://packagecloud.io{destroy_url}"
-            response = requests.delete(url, auth=self.auth, headers=self.headers).json()
-            response = None
-            if not response:
+            try:
+                response = requests.delete(url, auth=self.auth, headers=self.headers, timeout=60)
+            except requests.RequestException as e:
+                self.failed_deletes += 1
+                print(f"           Failed deleting package: {e}")
+                return
+            if response.ok:
                 print(f"           Package deleted successfully.")
             else:
-                print(f"           Failed deleting package!")
+                self.failed_deletes += 1
+                print(f"           Failed deleting package: HTTP {response.status_code}: {response.text[:200]}")
 
     def get_destroy_url(self, pkg_url):
         url = f"https://packagecloud.io{pkg_url}"
@@ -184,6 +190,9 @@ def main():
     config = configure()
     pkg_cloud = PackageCloud(config['repo_type'], config['dry_run'], config['token'])
     pkg_cloud.cleanup_repo()
+    if pkg_cloud.failed_deletes:
+        print(f"ERROR: {pkg_cloud.failed_deletes} package(s) could not be deleted!", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":
