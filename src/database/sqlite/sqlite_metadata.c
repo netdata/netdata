@@ -653,15 +653,15 @@ done:
     return result;
 }
 
-// Returns false when this build cannot run a recovery at all. The outcome of a recovery that did
-// run is only logged, as before.
-static bool recover_database(const char *sqlite_database, const char *new_sqlite_database)
+// Returns 0 when a recovery was attempted and 1 when this build cannot run one at all. The outcome
+// of a recovery that did run is only logged, as before.
+static int recover_database(const char *sqlite_database, const char *new_sqlite_database)
 {
 #ifdef ENABLE_BUNDLED_SQLITE
     sqlite3 *database;
     int rc = sqlite3_open(sqlite_database, &database);
     if (rc != SQLITE_OK)
-        return true;
+        return 0;
 
     netdata_log_info("Recover %s", sqlite_database);
     netdata_log_info("     to %s", new_sqlite_database);
@@ -696,13 +696,13 @@ static bool recover_database(const char *sqlite_database, const char *new_sqlite
     else
         (void) sqlite3_close_v2(database);
 
-    return true;
+    return 0;
 #else
     // The recover extension is not part of the SQLite library and is not built in this mode
     (void) new_sqlite_database;
     netdata_log_error("Cannot recover %s, this agent is built with the system SQLite library and without the SQLite recover extension",
                       sqlite_database);
-    return false;
+    return 1;
 #endif
 }
 
@@ -813,9 +813,9 @@ int sql_init_meta_database(db_check_action_type_t rebuild, int memory)
         if (rc == 0 || (rebuild & DB_CHECK_RECOVER)) {
             char new_sqlite_database[FILENAME_MAX + 1];
             snprintfz(new_sqlite_database, sizeof(new_sqlite_database) - 1, "%s/netdata-meta-recover.db", netdata_configured_cache_dir);
-            bool recover_available = recover_database(sqlite_database, new_sqlite_database);
+            int recover_rc = recover_database(sqlite_database, new_sqlite_database);
             if (rebuild & DB_CHECK_RECOVER)
-                return recover_available ? 0 : 1;
+                return recover_rc;
         }
 
         snprintfz(sqlite_database, sizeof(sqlite_database) - 1, "%s/.netdata-meta.db.delete", netdata_configured_cache_dir);
