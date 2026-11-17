@@ -205,6 +205,22 @@ class ReleaseStorageTests(unittest.TestCase):
             self.assertEqual(self.objects[self.key], path.read_bytes())
             self.assertIn(('HEAD', '/bucket/' + self.key), self.requests)
 
+    def test_failed_existing_object_inspection_never_overwrites(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'release.json'
+            path.write_bytes(b'RECORDED BYTES')
+            args = SimpleNamespace(remote='demtest:bucket')
+            for method, target in (('HEAD', '/bucket/' + self.key), ('GET', '/bucket')):
+                for status in (403, 500):
+                    with self.subTest(method=method, status=status):
+                        self.objects = {self.key: b'recorded bytes'}
+                        self.requests.clear()
+                        self.errors = {('PUT', '/bucket'): 403, (method, target): status}
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            release.upload(args, path, self.key)
+                        self.assertEqual(self.objects, {self.key: b'recorded bytes'})
+                        self.assertNotIn(('PUT', '/bucket/' + self.key), self.requests)
+
 
 if __name__ == '__main__':
     unittest.main()

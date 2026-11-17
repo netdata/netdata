@@ -117,12 +117,14 @@ class PublicationTests(unittest.TestCase):
                 self.assertEqual(request.full_url, 'https://example.invalid/runtime')
                 self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
 
-    def test_upload_rejects_filename_changes(self):
+    def test_upload_rejects_filename_changes_and_globs(self):
         args = SimpleNamespace(remote='s3:bucket')
-        with patch.object(release, 'run') as run:
-            with self.assertRaisesRegex(ValueError, 'preserve its filename'):
-                release.upload(args, Path('/tmp/archive'), 'dem-runtime/stable/v1.0.0/amd64/hash.tar.zst')
-            run.assert_not_called()
+        for source, target in (('archive', 'hash.tar.zst'), ('[r]elease.json', '[r]elease.json'),
+                               ('*.json', '*.json'), ('{release,other}.json', '{release,other}.json')):
+            with self.subTest(source=source, target=target), patch.object(release, 'run') as run:
+                with self.assertRaisesRegex(ValueError, 'literal filename'):
+                    release.upload(args, Path('/tmp') / source, 'dem-runtime/stable/v1.0.0/amd64/' + target)
+                run.assert_not_called()
 
     def test_inventory_rejects_changes_extras_links_and_path_escape(self):
         with tempfile.TemporaryDirectory() as temporary:

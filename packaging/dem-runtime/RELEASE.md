@@ -128,6 +128,7 @@ Immutable upload uses `rclone copy --immutable --checksum` with a directory sour
 filtered to exactly one filename, never synchronization or deletion. This avoids
 rclone 1.60's single-file `copyto` path, which can overwrite changed contents despite
 `--immutable`. Only the selected file is copied, preserving descriptor-last ordering.
+Filenames must be literal, and failed destination listings stop the upload.
 It also sets `--s3-no-check-bucket` because the destination bucket is
 already provisioned: publishing must not require bucket-creation permission.
 Object checksums, post-upload verification and public readback remain enabled.
