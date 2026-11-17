@@ -11,7 +11,7 @@ This document states what we believe about observability and how Netdata's desig
 - **It is expensive, so it is partial.** When every metric, log line, span and flow costs money to move and store, teams choose what to keep, and incidents happen in what they left out.
 - **It is centralized, so it strains at scale.** Moving all data to one place makes that place the bottleneck, the single point of failure and the largest line in the bill.
 - **It belongs to experts.** Query languages, hand-built dashboards and databases to run keep understanding in the hands of a few people, and incidents wait for them.
-- **Its intelligence adds noise.** Machine learning used as an alarm engine produces more alerts to tune, not more understanding.
+- **Its intelligence adds noise.** Machine learning used as an alert engine produces more alerts to tune, not more understanding.
 - **Its data lives somewhere else.** Data held outside your infrastructure is data you pay to reach and cannot easily take back.
 
 ## What we are building
@@ -82,9 +82,9 @@ How the design delivers it:
 - **One data model, [NIDL](/docs/NIDL-Framework.md),** behind every chart, alert and query, so a wrong chart is a bug we fix, not a mistake you made.
 - **Your own data gets the same treatment.** Prometheus and OpenTelemetry metrics are structured through profiles, and application traces become per-service performance charts and a service map, with no dashboard work.
 
-### Machine learning as evidence, not alarms
+### Machine learning as evidence, not alerts
 
-**Machine learning failed in observability as an alarm engine: it needs more time tuning than the alerts it raises are worth. We use it for what it does uniquely well: evidence of what changed, what changed together and how strongly.**
+**Machine learning failed in observability as an alert engine: it needs more time tuning than the alerts it raises are worth. We use it for what it does uniquely well: evidence of what changed, what changed together and how strongly.**
 
 How the design delivers it:
 
@@ -145,7 +145,7 @@ How the design delivers it:
 - **We move the code to the data, not the data to the code.** A fleet-wide query fans out to the hubs and comes back already aggregated, so nothing has to be shipped, ingested and indexed in one place first.
 - **We collect everything and engineer the cost down,** instead of asking you to predict which data the next incident will need.
 - **We give data its meaning when it is collected,** so Netdata carries the knowledge of each technology instead of leaving every team to rebuild it.
-- **We keep machine learning out of the alarm path,** and use it where it has no equal: as evidence for people and AI.
+- **We keep machine learning out of the alert path,** and use it where it has no equal: as evidence for people and AI.
 - **We keep the engine open,** so the core of your observability never depends on a vendor's goodwill.
 
 ## What it means for you

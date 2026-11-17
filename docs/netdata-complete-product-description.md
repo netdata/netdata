@@ -840,7 +840,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 **Value**
 
 - **Anomaly detection on everything, without configuration.** Every metric of every system, container, application and device is monitored for unusual behavior from the moment it is collected.
-- **Fewer false alarms.** A sample is flagged only when all 18 models, trained over the last ~54 hours, agree, which removes about 99% of false positives.
+- **Fewer false alerts.** A sample is flagged only when all 18 models, trained over the last ~54 hours, agree, which removes about 99% of false positives.
 - **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole infrastructure.
 - **Investigations in minutes.** Netdata AI produces troubleshooting and root-cause reports, capacity and performance reviews, and alert explanations from live observability data.
 - **AI grounded in the customer's environment.** Infrastructure Knowledge, AI Memory and MCP Connections combine monitoring data with the customer's own context, code and incidents.

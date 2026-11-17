@@ -57,7 +57,7 @@ Netdata is distributed and real-time. Netdata Agents collect, store and analyze 
 * **Everything, every second, affordably** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
 * **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
 * **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
-* **Machine learning as evidence, not alarms** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
+* **Machine learning as evidence, not alerts** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
 * **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
 * **Observability for everyone** – No query language and nothing to administer: the expertise is built into the product, so everyone on the team can investigate.
 * **Configured your way** – Automatic first, then as code, from the dashboard, or both.
