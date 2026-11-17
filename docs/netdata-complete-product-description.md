@@ -1246,8 +1246,6 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 
 ### Enterprise Deployment
 
-**Learn more:** [Enterprise evaluation guide](/docs/netdata-enterprise-evaluation.md)
-
 **5 Steps:**
 
 1. **Design Topology** (1 day)

@@ -6,7 +6,7 @@ Install it, and every system and application you run is collected, charted, scor
 
 Instead of centralizing the data, Netdata **distributes the monitoring code** to each system, **keeping data local** while providing **unified access**. This architecture enables **linear scaling** to millions of metrics per second and terabytes of logs, **automated root cause analysis**, a faster experience and significantly **lower total cost of ownership**.
 
-This page explains what Netdata is and the principles behind it. [Netdata Design](/docs/netdata-design.md), the [Complete Product Description](/docs/netdata-complete-product-description.md) and the [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) go deeper on each part.
+This page explains what Netdata is and the principles behind it. [Netdata Design](/docs/netdata-design.md) and the [Complete Product Description](/docs/netdata-complete-product-description.md) go deeper on each part.
 
 ## What it covers
 
@@ -221,7 +221,7 @@ Netdata configurations are infrastructure-as-code friendly, and provisioning sys
 | How to size Agents and Parents | [Scalability](/docs/scalability.md) and [Sizing Netdata Agents](/docs/netdata-agent/sizing-netdata-agents/README.md) |
 | How high availability works | [Clustering and high availability of Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md) |
 | How Netdata handles security and privacy | [Security and privacy design](/docs/security-and-privacy-design/README.md) |
-| How to evaluate Netdata for an enterprise | [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md) |
+| How to evaluate Netdata for an enterprise | [Complete Product Description](/docs/netdata-complete-product-description.md) |
 | Which features need a paid plan | [Access control and feature availability](/docs/netdata-oss-limitations.md) |
 
 ## Questions buyers ask

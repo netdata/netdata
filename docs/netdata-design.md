@@ -162,6 +162,5 @@ How the design delivers it:
 - [Welcome to Netdata](/docs/welcome-to-netdata.md): outcomes and principles.
 - [Complete Product Description](/docs/netdata-complete-product-description.md): every capability.
 - [Scalability](/docs/scalability.md): sizing, placement, high availability and benchmarks.
-- [Enterprise Evaluation Guide](/docs/netdata-enterprise-evaluation.md): evaluation questions and answers.
 - [Security and privacy design](/docs/security-and-privacy-design/README.md).
 - [NIDL framework](/docs/NIDL-Framework.md).

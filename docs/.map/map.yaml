@@ -36,13 +36,6 @@ sidebar:
             - synthetic monitoring
             - log management
       - meta:
-          label: Enterprise Evaluation Guide
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation.md
-          description: Evaluate Netdata architecture, deployment models, infrastructure requirements, security, integrations, and operational capabilities.
-          keywords:
-            - real-time observability
-            - infrastructure monitoring
-      - meta:
           label: Real-time Monitoring
           edit_url: https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md
           description: Learn how Netdata delivers one-second collection and sub-two-second visibility without sacrificing fidelity as infrastructure scales.
