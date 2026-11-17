@@ -33,6 +33,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-signatures:
+    name: Release signatures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install signature test tools
+        run: sudo apt-get update && sudo apt-get install -y gnupg
+      - name: Run release signature tests
+        run: python3 packaging/installer/tests/test_kickstart_signatures.py -v
+
   posix:
     name: Support Bundle POSIX sanitization (${{ matrix.shell }}, ${{ matrix.awk }})
     runs-on: ubuntu-latest

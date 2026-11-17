@@ -6,7 +6,7 @@ sh -x .github/scripts/ci-support-pkgs.sh || exit 1
 echo "::endgroup::"
 mkdir -p /etc/cron.daily # Needed to make auto-update checking work correctly on some platforms.
 echo "::group::>>> Installing Netdata..."
-sh -x packaging/installer/kickstart.sh --dont-wait --static-only --dont-start-it --disable-telemetry || exit 1
+sh -x packaging/installer/kickstart.sh --dont-wait --static-only --dont-start-it --disable-telemetry ${MANIFEST_UNSIGNED:+--no-release-signature-verification} || exit 1
 echo "::endgroup::"
 echo "::group::>>> Pre-Update Environment File Contents"
 cat /opt/netdata/etc/netdata/.environment
