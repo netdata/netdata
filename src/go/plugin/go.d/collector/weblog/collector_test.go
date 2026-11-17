@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strconv"
 	"strings"
@@ -255,6 +256,21 @@ func TestCollector_Collect(t *testing.T) {
 		"url_ptn_com_req_method_GET":                              38,
 		"url_ptn_com_req_method_HEAD":                             39,
 		"url_ptn_com_req_method_POST":                             43,
+		"url_ptn_com_req_method_proc_time_GET_avg":                203,
+		"url_ptn_com_req_method_proc_time_GET_count":              37,
+		"url_ptn_com_req_method_proc_time_GET_max":                495,
+		"url_ptn_com_req_method_proc_time_GET_min":                20,
+		"url_ptn_com_req_method_proc_time_GET_sum":                7521,
+		"url_ptn_com_req_method_proc_time_HEAD_avg":               205,
+		"url_ptn_com_req_method_proc_time_HEAD_count":             31,
+		"url_ptn_com_req_method_proc_time_HEAD_max":               477,
+		"url_ptn_com_req_method_proc_time_HEAD_min":               11,
+		"url_ptn_com_req_method_proc_time_HEAD_sum":               6368,
+		"url_ptn_com_req_method_proc_time_POST_avg":               219,
+		"url_ptn_com_req_method_proc_time_POST_count":             37,
+		"url_ptn_com_req_method_proc_time_POST_max":               455,
+		"url_ptn_com_req_method_proc_time_POST_min":               5,
+		"url_ptn_com_req_method_proc_time_POST_sum":               8121,
 		"url_ptn_com_req_proc_time_avg":                           209,
 		"url_ptn_com_req_proc_time_count":                         105,
 		"url_ptn_com_req_proc_time_max":                           495,
@@ -273,6 +289,21 @@ func TestCollector_Collect(t *testing.T) {
 		"url_ptn_net_req_method_GET":                              51,
 		"url_ptn_net_req_method_HEAD":                             33,
 		"url_ptn_net_req_method_POST":                             32,
+		"url_ptn_net_req_method_proc_time_GET_avg":                272,
+		"url_ptn_net_req_method_proc_time_GET_count":              44,
+		"url_ptn_net_req_method_proc_time_GET_max":                496,
+		"url_ptn_net_req_method_proc_time_GET_min":                39,
+		"url_ptn_net_req_method_proc_time_GET_sum":                11969,
+		"url_ptn_net_req_method_proc_time_HEAD_avg":               250,
+		"url_ptn_net_req_method_proc_time_HEAD_count":             33,
+		"url_ptn_net_req_method_proc_time_HEAD_max":               497,
+		"url_ptn_net_req_method_proc_time_HEAD_min":               10,
+		"url_ptn_net_req_method_proc_time_HEAD_sum":               8251,
+		"url_ptn_net_req_method_proc_time_POST_avg":               232,
+		"url_ptn_net_req_method_proc_time_POST_count":             27,
+		"url_ptn_net_req_method_proc_time_POST_max":               464,
+		"url_ptn_net_req_method_proc_time_POST_min":               17,
+		"url_ptn_net_req_method_proc_time_POST_sum":               6290,
 		"url_ptn_net_req_proc_time_avg":                           254,
 		"url_ptn_net_req_proc_time_count":                         104,
 		"url_ptn_net_req_proc_time_max":                           497,
@@ -298,6 +329,21 @@ func TestCollector_Collect(t *testing.T) {
 		"url_ptn_org_req_method_GET":                              29,
 		"url_ptn_org_req_method_HEAD":                             46,
 		"url_ptn_org_req_method_POST":                             38,
+		"url_ptn_org_req_method_proc_time_GET_avg":                288,
+		"url_ptn_org_req_method_proc_time_GET_count":              25,
+		"url_ptn_org_req_method_proc_time_GET_max":                493,
+		"url_ptn_org_req_method_proc_time_GET_min":                71,
+		"url_ptn_org_req_method_proc_time_GET_sum":                7216,
+		"url_ptn_org_req_method_proc_time_HEAD_avg":               240,
+		"url_ptn_org_req_method_proc_time_HEAD_count":             42,
+		"url_ptn_org_req_method_proc_time_HEAD_max":               492,
+		"url_ptn_org_req_method_proc_time_HEAD_min":               19,
+		"url_ptn_org_req_method_proc_time_HEAD_sum":               10101,
+		"url_ptn_org_req_method_proc_time_POST_avg":               265,
+		"url_ptn_org_req_method_proc_time_POST_count":             35,
+		"url_ptn_org_req_method_proc_time_POST_max":               497,
+		"url_ptn_org_req_method_proc_time_POST_min":               2,
+		"url_ptn_org_req_method_proc_time_POST_sum":               9282,
 		"url_ptn_org_req_proc_time_avg":                           260,
 		"url_ptn_org_req_proc_time_count":                         102,
 		"url_ptn_org_req_proc_time_max":                           497,
@@ -719,6 +765,111 @@ func TestCollector_IISLogs(t *testing.T) {
 	assert.Equal(t, expected, mx)
 }
 
+func TestCollector_Collect_URLPatternReqProcTimeByHTTPMethod(t *testing.T) {
+	tests := map[string]struct {
+		format        string
+		log           string
+		wantChart     bool
+		wantMetrics   map[string]int64
+		wantNoMetrics []string
+	}{
+		"method and processing time": {
+			format: `"$request" $request_time`,
+			log: strings.Join([]string{
+				`"GET /api/users HTTP/1.1" 0.010`,
+				`"GET /api/users HTTP/1.1" 0.030`,
+				`"POST /api/users HTTP/1.1" 0.200`,
+				`"DELETE /api/users/1 HTTP/1.1" 0.500`,
+				`"GET /static/app.js HTTP/1.1" 0.900`,
+			}, "\n"),
+			wantChart: true,
+			wantMetrics: map[string]int64{
+				"url_ptn_api_req_method_proc_time_GET_avg":      20000,
+				"url_ptn_api_req_method_proc_time_GET_min":      10000,
+				"url_ptn_api_req_method_proc_time_GET_max":      30000,
+				"url_ptn_api_req_method_proc_time_GET_count":    2,
+				"url_ptn_api_req_method_proc_time_POST_avg":     200000,
+				"url_ptn_api_req_method_proc_time_POST_count":   1,
+				"url_ptn_api_req_method_proc_time_DELETE_avg":   500000,
+				"url_ptn_api_req_method_proc_time_DELETE_count": 1,
+				"url_ptn_api_req_proc_time_avg":                 185000,
+				"url_ptn_api_req_proc_time_count":               4,
+			},
+		},
+		"no processing time field": {
+			format: `"$request"`,
+			log: strings.Join([]string{
+				`"GET /api/users HTTP/1.1"`,
+				`"POST /api/users HTTP/1.1"`,
+			}, "\n"),
+			wantChart: false,
+			wantNoMetrics: []string{
+				"url_ptn_api_req_method_proc_time_GET_avg",
+				"url_ptn_api_req_method_proc_time_POST_avg",
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			collr := New()
+			collr.Config = Config{
+				ParserConfig: logs.ParserConfig{
+					LogType: logs.TypeCSV,
+					CSV: logs.CSVConfig{
+						FieldsPerRecord:  -1,
+						Delimiter:        " ",
+						TrimLeadingSpace: false,
+						Format:           test.format,
+						CheckField:       checkCSVFormatField,
+					},
+				},
+				Path:        filepath.Join(t.TempDir(), "access.log"),
+				URLPatterns: []userPattern{{Name: "api", Match: "~ ^/api/"}},
+			}
+			require.NoError(t, os.WriteFile(collr.Path, []byte(test.log+"\n"), 0o644))
+			require.NoError(t, collr.Init(context.Background()))
+			require.NoError(t, collr.Check(context.Background()))
+			defer collr.Cleanup(context.Background())
+
+			p, err := logs.NewCSVParser(collr.ParserConfig.CSV, strings.NewReader(test.log))
+			require.NoError(t, err)
+			collr.parser = p
+
+			mx := collr.Collect(context.Background())
+
+			for k, v := range test.wantMetrics {
+				assert.Equalf(t, v, mx[k], "metric '%s'", k)
+			}
+			for _, k := range test.wantNoMetrics {
+				assert.NotContainsf(t, mx, k, "metric '%s' is collected", k)
+			}
+
+			id := fmt.Sprintf(urlPatternReqMethodProcTime.ID, "api")
+			assert.Equal(t, test.wantChart, collr.Charts().Has(id))
+			if test.wantChart {
+				chart := collr.Charts().Get(id)
+				for _, method := range []string{"GET", "POST", "DELETE"} {
+					dimID := fmt.Sprintf("url_ptn_api_req_method_proc_time_%s_avg", method)
+					assert.Truef(t, chart.HasDim(dimID), "chart '%s' has no dim '%s'", id, dimID)
+				}
+				assert.Len(t, chart.Dims, 3)
+			}
+			collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+
+			// an interval with no new log lines keeps the dimensions and reports zeros
+			collr.parser, err = logs.NewCSVParser(collr.ParserConfig.CSV, strings.NewReader(""))
+			require.NoError(t, err)
+			mx = collr.Collect(context.Background())
+			if test.wantChart {
+				assert.Equal(t, int64(0), mx["url_ptn_api_req_method_proc_time_GET_avg"])
+				assert.Equal(t, int64(0), mx["url_ptn_api_req_method_proc_time_GET_count"])
+				collecttest.TestMetricsHasAllChartsDims(t, collr.Charts(), mx)
+			}
+		})
+	}
+}
+
 func testCharts(t *testing.T, c *Collector, mx map[string]int64) {
 	testVhostChart(t, c)
 	testPortChart(t, c)
@@ -1045,6 +1196,30 @@ func testURLPatternStatsCharts(t *testing.T, collr *Collector) {
 			assert.Falsef(t, collr.Charts().Has(id), "chart '%s' is created", id)
 		} else {
 			assert.Truef(t, collr.Charts().Has(id), "chart '%s' is not created", id)
+		}
+	}
+
+	for _, p := range collr.URLPatterns {
+		id := fmt.Sprintf(urlPatternReqMethodProcTime.ID, p.Name)
+		if isEmptySummary(collr.mx.ReqProcTime) || isEmptyCounterVec(collr.mx.ReqMethod) {
+			assert.Falsef(t, collr.Charts().Has(id), "chart '%s' is created", id)
+			continue
+		}
+
+		chart := collr.Charts().Get(id)
+		assert.NotNilf(t, chart, "chart '%s' is not created", id)
+		if chart == nil {
+			continue
+		}
+
+		stats, ok := collr.mx.URLPatternStats[p.Name]
+		assert.Truef(t, ok, "url pattern '%s' has no metric in w.mx.URLPatternStats", p.Name)
+		if !ok {
+			continue
+		}
+		for v := range stats.ReqMethodProcTime {
+			dimID := fmt.Sprintf("url_ptn_%s_req_method_proc_time_%s_avg", p.Name, v)
+			assert.Truef(t, chart.HasDim(dimID), "chart '%s' has no dim for '%s' method, expected '%s'", id, v, dimID)
 		}
 	}
 }
