@@ -86,6 +86,16 @@ struct command {
         },
     },
     {
+        .name = "sv-status-all",
+        // Params are split on spaces only, so tabs separate words inside the `sh -c` script.
+        // Quoted "$0" keeps spaces in serviceDir intact, while the glob still expands.
+        .params = "-c exec\tsv\tstatus\t\"$0\"/* {{serviceDir}}",
+        .search = {
+            [0] = "sh",
+            [1] = NULL,
+        },
+    },
+    {
         .name = "dmsetup-status-cache",
         .params = "status --target cache --noflush",
         .search = {
