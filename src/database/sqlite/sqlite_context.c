@@ -288,18 +288,13 @@ done:
 
 // Delete a context
 #define CTX_DELETE_CONTEXT "DELETE FROM context WHERE host_id = @host_id AND id = @context"
-int ctx_delete_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+static int ctx_delete_context_row(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
 {
     int rc_stored = 1;
     sqlite3_stmt *res = NULL;
 
-    if (unlikely(!context_data || !context_data->id))
-        return 0;
-
     if (!PREPARE_STATEMENT(db_context_meta, CTX_DELETE_CONTEXT, &res))
         return 1;
-
-    metadata_queue_ctx_host_cleanup(host_uuid, context_data->id);
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, host_uuid, sizeof(*host_uuid), SQLITE_STATIC));
@@ -315,6 +310,188 @@ done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
     return (rc_stored != SQLITE_DONE);
+}
+
+int ctx_delete_context(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+{
+    if (unlikely(!context_data || !context_data->id))
+        return 0;
+
+    metadata_queue_ctx_host_cleanup(host_uuid, context_data->id);
+    return ctx_delete_context_row(host_uuid, context_data);
+}
+
+// ----------------------------------------------------------------------------
+// Context write queue
+//
+// rrdcontext decides context writes while it holds rrdcontext_lock(rc), where SQLite must not run: a slow or stuck
+// database would keep the context locked and, through rrdcontext_conflict_callback(), stall every collector that
+// sets a context of the host. Writes are queued with copies of their data and executed by ctx_sql_flush(): every
+// metasync cycle, before a host loads its contexts from the table, and once more at shutdown.
+//
+// Only the newest write of a (host, context) pair is kept, since both writes replace the whole row. A store that
+// replaces a pending delete keeps the metadata cleanup the delete would have scheduled.
+
+typedef enum __attribute__((packed)) {
+    CTX_SQL_STORE,
+    CTX_SQL_DELETE,
+} CTX_SQL_OP;
+
+typedef struct ctx_sql_write {
+    CTX_SQL_OP op;
+    bool cleanup;                   // a store that replaced a pending delete
+    nd_uuid_t host_uuid;
+    VERSIONED_CONTEXT_DATA data;    // owns its strings
+    struct ctx_sql_write *prev, *next;
+} CTX_SQL_WRITE;
+
+static struct {
+    SPINLOCK spinlock;              // protects the fields below; never held across SQLite
+    Pvoid_t JudyHS;                 // host uuid + context id -> its pending CTX_SQL_WRITE
+    CTX_SQL_WRITE *head;            // pending writes, oldest first
+    bool closed;                    // set by the final flush; later writes are dropped
+    size_t dropped;
+    bool flush_mutex_initialized;
+
+    netdata_mutex_t flush_mutex;    // one flusher at a time, so batches execute in queueing order
+} ctx_sql_queue = {
+    .spinlock = SPINLOCK_INITIALIZER,
+};
+
+static const char *ctx_sql_strdupz_or_null(const char *s)
+{
+    return s ? strdupz(s) : NULL;
+}
+
+static void ctx_sql_write_free(CTX_SQL_WRITE *w)
+{
+    freez((void *)w->data.id);
+    freez((void *)w->data.title);
+    freez((void *)w->data.chart_type);
+    freez((void *)w->data.units);
+    freez((void *)w->data.family);
+    freez(w);
+}
+
+static void ctx_sql_queue_write(CTX_SQL_OP op, nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+{
+    if (unlikely(!host_uuid || !context_data || !context_data->id))
+        return;
+
+    CTX_SQL_WRITE *w = callocz(1, sizeof(*w));
+    w->op = op;
+    uuid_copy(w->host_uuid, *host_uuid);
+    w->data = *context_data;
+    w->data.id = strdupz(context_data->id);
+    w->data.title = ctx_sql_strdupz_or_null(context_data->title);
+    w->data.chart_type = ctx_sql_strdupz_or_null(context_data->chart_type);
+    w->data.units = ctx_sql_strdupz_or_null(context_data->units);
+    w->data.family = ctx_sql_strdupz_or_null(context_data->family);
+
+    size_t id_len = strlen(w->data.id);
+    size_t key_len = sizeof(nd_uuid_t) + id_len;
+    char *key = mallocz(key_len);
+    memcpy(key, w->host_uuid, sizeof(nd_uuid_t));
+    memcpy(key + sizeof(nd_uuid_t), w->data.id, id_len);
+
+    CTX_SQL_WRITE *replaced = NULL;
+    size_t dropped = 0;
+
+    spinlock_lock(&ctx_sql_queue.spinlock);
+    if (unlikely(ctx_sql_queue.closed)) {
+        dropped = ++ctx_sql_queue.dropped;
+        replaced = w;
+    }
+    else {
+        Pvoid_t *PValue = JudyHSIns(&ctx_sql_queue.JudyHS, key, key_len, PJE0);
+        if (unlikely(PValue == PJERR))
+            fatal("CONTEXT SQL: failed to index a queued context write");
+
+        replaced = *PValue;
+        if (replaced) {
+            w->cleanup = (replaced->op == CTX_SQL_DELETE || replaced->cleanup);
+            DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(ctx_sql_queue.head, replaced, prev, next);
+        }
+
+        *PValue = w;
+        DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ctx_sql_queue.head, w, prev, next);
+    }
+    spinlock_unlock(&ctx_sql_queue.spinlock);
+
+    freez(key);
+
+    if (replaced)
+        ctx_sql_write_free(replaced);
+
+    if (unlikely(dropped == 1))
+        nd_log_daemon(NDLP_WARNING, "CONTEXT SQL: dropping context writes queued after the final flush at shutdown");
+}
+
+void ctx_sql_queue_store(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+{
+    ctx_sql_queue_write(CTX_SQL_STORE, host_uuid, context_data);
+}
+
+void ctx_sql_queue_delete(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_data)
+{
+    ctx_sql_queue_write(CTX_SQL_DELETE, host_uuid, context_data);
+}
+
+// Executes the pending context writes, in queueing order. final = metasync's last flush at shutdown: it closes the
+// queue, and does not wait for a flusher that outlived metasync's shutdown wait (the pending writes are dropped).
+void ctx_sql_flush(bool final)
+{
+    // netdata_mutex_t has no static initializer
+    spinlock_lock(&ctx_sql_queue.spinlock);
+    if (unlikely(!ctx_sql_queue.flush_mutex_initialized)) {
+        netdata_mutex_init(&ctx_sql_queue.flush_mutex);
+        ctx_sql_queue.flush_mutex_initialized = true;
+    }
+    spinlock_unlock(&ctx_sql_queue.spinlock);
+
+    bool locked;
+    if (final)
+        locked = (netdata_mutex_trylock(&ctx_sql_queue.flush_mutex) == 0);
+    else {
+        netdata_mutex_lock(&ctx_sql_queue.flush_mutex);
+        locked = true;
+    }
+
+    spinlock_lock(&ctx_sql_queue.spinlock);
+    CTX_SQL_WRITE *batch = ctx_sql_queue.head;
+    ctx_sql_queue.head = NULL;
+    (void)JudyHSFreeArray(&ctx_sql_queue.JudyHS, PJE0);
+    if (final)
+        ctx_sql_queue.closed = true;
+    spinlock_unlock(&ctx_sql_queue.spinlock);
+
+    size_t dropped = 0;
+    while (batch) {
+        CTX_SQL_WRITE *w = batch;
+        DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(batch, w, prev, next);
+
+        if (unlikely(!locked))
+            dropped++;
+        else {
+            // flushers run where SQLite may run: schedule the cleanup directly, never through metasync's queue,
+            // which a flusher on metasync's worker could wait on while metasync is shutting down
+            if (w->op == CTX_SQL_DELETE || w->cleanup)
+                metadata_schedule_ctx_cleanup_now(&w->host_uuid, w->data.id);
+
+            if (w->op == CTX_SQL_DELETE)
+                (void)ctx_delete_context_row(&w->host_uuid, &w->data);
+            else
+                (void)ctx_store_context(&w->host_uuid, &w->data);
+        }
+
+        ctx_sql_write_free(w);
+    }
+
+    if (locked)
+        netdata_mutex_unlock(&ctx_sql_queue.flush_mutex);
+    else if (dropped)
+        nd_log_daemon(NDLP_WARNING,
+                      "CONTEXT SQL: dropped %zu context writes at shutdown, another flush is still running", dropped);
 }
 
 // returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
@@ -364,6 +541,91 @@ static void dict_ctx_get_context_list_cb(VERSIONED_CONTEXT_DATA *context_data, v
          context_data->last_time_s,
          context_data->deleted,
          context_data->family);
+}
+
+struct ctx_sql_queue_unittest_row {
+    const char *id;
+    size_t found;
+    uint64_t version;
+};
+
+static void ctx_sql_queue_unittest_cb(VERSIONED_CONTEXT_DATA *context_data, void *data)
+{
+    struct ctx_sql_queue_unittest_row *row = data;
+    if (context_data->id && strcmp(context_data->id, row->id) == 0) {
+        row->found++;
+        row->version = context_data->version;
+    }
+}
+
+// the stored version of a context, 0 when it has no row
+static uint64_t ctx_sql_queue_unittest_version(nd_uuid_t *host_uuid, const char *id, size_t *found)
+{
+    struct ctx_sql_queue_unittest_row row = { .id = id };
+    ctx_get_context_list(host_uuid, ctx_sql_queue_unittest_cb, &row);
+    *found = row.found;
+    return row.version;
+}
+
+static int ctx_sql_queue_unittest(nd_uuid_t *host_uuid)
+{
+    VERSIONED_CONTEXT_DATA d = {
+        .title = "title", .chart_type = "line", .units = "units", .family = "family",
+        .priority = 1000, .first_time_s = 1657781000, .last_time_s = 1657781100,
+    };
+    size_t found;
+    int errors = 0;
+
+#define CTX_SQL_QUEUE_CHECK(id, exp_found, exp_version) do {                                                          \
+        uint64_t _v = ctx_sql_queue_unittest_version(host_uuid, (id), &found);                                         \
+        if (found != (exp_found) || (found && _v != (exp_version))) {                                                  \
+            netdata_log_error("CONTEXT SQL QUEUE TEST: '%s' expected %zu row(s) version %" PRIu64                     \
+                              ", found %zu version %" PRIu64, (id), (size_t)(exp_found), (uint64_t)(exp_version),      \
+                              found, _v);                                                                              \
+            errors++;                                                                                                  \
+        }                                                                                                              \
+    } while (0)
+
+    // nothing is written before a flush; the newest of two stores wins
+    d.id = "queue.store"; d.version = 1; ctx_sql_queue_store(host_uuid, &d);
+    d.version = 2; ctx_sql_queue_store(host_uuid, &d);
+    CTX_SQL_QUEUE_CHECK("queue.store", 0, 0);
+    ctx_sql_flush(false);
+    CTX_SQL_QUEUE_CHECK("queue.store", 1, 2);
+
+    // a delete then a store: the store wins
+    d.id = "queue.store"; ctx_sql_queue_delete(host_uuid, &d);
+    d.version = 3; ctx_sql_queue_store(host_uuid, &d);
+    ctx_sql_flush(false);
+    CTX_SQL_QUEUE_CHECK("queue.store", 1, 3);
+
+    // a store then a delete: the row is gone
+    ctx_sql_queue_delete(host_uuid, &d);
+    d.id = "queue.other"; d.version = 7; ctx_sql_queue_store(host_uuid, &d);
+    ctx_sql_flush(false);
+    CTX_SQL_QUEUE_CHECK("queue.store", 0, 0);
+    CTX_SQL_QUEUE_CHECK("queue.other", 1, 7);
+
+    // the final flush closes the queue: later writes are dropped
+    ctx_sql_flush(true);
+    d.id = "queue.late"; d.version = 9; ctx_sql_queue_store(host_uuid, &d);
+    ctx_sql_flush(false);
+    CTX_SQL_QUEUE_CHECK("queue.late", 0, 0);
+
+    // reopen the queue for the rest of this process
+    spinlock_lock(&ctx_sql_queue.spinlock);
+    ctx_sql_queue.closed = false;
+    ctx_sql_queue.dropped = 0;
+    spinlock_unlock(&ctx_sql_queue.spinlock);
+
+#undef CTX_SQL_QUEUE_CHECK
+
+    if (errors)
+        netdata_log_error("CONTEXT SQL QUEUE TEST: %d check(s) failed", errors);
+    else
+        netdata_log_info("CONTEXT SQL QUEUE TEST: passed");
+
+    return errors ? 1 : 0;
 }
 
 int ctx_unittest(void)
@@ -456,10 +718,12 @@ int ctx_unittest(void)
     ctx_get_context_list(&host_uuid, dict_ctx_get_context_list_cb, NULL);
     netdata_log_info("List context end after delete");
 
+    int queue_errors = ctx_sql_queue_unittest(&host_uuid);
+
     sql_close_database(db_context_meta, "CONTEXT");
     db_context_meta = saved_db_context_meta;
     if (owns_sqlite_lifecycle)
         sqlite_library_shutdown();
 
-    return 0;
+    return queue_errors;
 }
