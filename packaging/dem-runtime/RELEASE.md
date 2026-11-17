@@ -36,7 +36,7 @@ different or empty release stamps; this does not change publication pairing or c
    process drainage. Assembly and Node wire tests are not browser smoke evidence.
    Installation/transaction tests remain separate acceptance evidence. Explicit
    local `runtime qualify` is optional and reports its calling environment.
-5. The protected publisher uses the existing package OpenPGP signer and fetches
+5. The publisher uses the existing package OpenPGP signer and fetches
    public trust from `https://repository.netdata.cloud/netdatabot.gpg.key`.
    `release.py stage` checks both architecture inventories before signing format-2
    descriptors containing the exact Agent tuple, runtime digest/bounds and sources.
@@ -49,7 +49,10 @@ different or empty release stamps; this does not change publication pairing or c
    Agent pipeline and its repository routing. Repository ingestion is asynchronous.
 
 `dem-runtime-release.yml` is a reusable prerequisite of the central release and
-manual Agent lanes. It emits `dem-runtime-publication-receipt` only after successful
+manual Agent lanes. It uses the normal Agent release access model: shared secrets
+inherited from its callers and repository or organization configuration variables,
+without a separate GitHub deployment environment.
+It emits `dem-runtime-publication-receipt` only after successful
 publication. The shared companion check verifies the publishing job,
 both architectures and exact identity. Ordinary source/static/Docker lanes consume
 this small receipt; native jobs additionally consume and verify the actual payload.
@@ -147,6 +150,17 @@ or establish fresh key state through a stale cache.
 The installation-owner upgrade matrix runs on amd64. Native ARM CI covers build/package checks, focused pair and
 recovery lifecycle tests, and genuine signed-runtime installation with sandboxed browser smoke tests. The shared
 upgrade matrix is not duplicated under ARM emulation.
+
+PR checks follow the changed inputs. `dem-runtime-tests.yml` selects workflow behavior, Python packaging/native
+fixtures, Go runtime integration, installer ownership and Node wire checks separately. The installer identity
+container runs only for its helper/caller tests. Prose changes skip execution tests; metadata, alert definitions and
+Function schemas consumed by Go contract tests remain inputs. Test-only changes run their suite without rebuilding
+Agent packages, images or browser bundles. Go/security checks retain their own repository-wide selection rules.
+
+Agent builds follow Agent build inputs. Release orchestration changes run workflow checks; changes to the runtime
+builder workflow still build and qualify both browser architectures. Scheduled and manual releases always run the
+complete companion build, wire checks, signing and public verification before Agent publication, regardless of the
+PR filters. The reusable Node workflow defaults to running its tests for release callers.
 
 ```sh
 cd src/go

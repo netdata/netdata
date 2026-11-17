@@ -79,6 +79,7 @@ jobs:
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
           files: |
             **/*.c
             **/*.cc
@@ -98,6 +99,7 @@ jobs:
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
           files: |
             .dockerignore
             CMakeLists.txt
@@ -110,11 +112,7 @@ jobs:
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
             .github/scripts/modules/release_versions.py
-            .github/workflows/release.yml
-            .github/workflows/dem-runtime-release.yml
-            .github/workflows/dem-runtime-companion-check.yml
             .github/scripts/prepare-release-base.sh
-            .github/scripts/tests/test_dem_paired_workflows.py
             packaging/release_info.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/cmake/
@@ -124,6 +122,7 @@ jobs:
             packaging/*.version
             packaging/*.checksums
           files_ignore: |
+            packaging/installer/tests/**
             **/*.md
             packaging/repoconfig/
       - name: Check Docker files
@@ -132,6 +131,7 @@ jobs:
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
         with:
           since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
           files: |
             .dockerignore
             .github/data/distros.yml
@@ -140,11 +140,7 @@ jobs:
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
             .github/scripts/modules/release_versions.py
-            .github/workflows/release.yml
-            .github/workflows/dem-runtime-release.yml
-            .github/workflows/dem-runtime-companion-check.yml
             .github/scripts/prepare-release-base.sh
-            .github/scripts/tests/test_dem_paired_workflows.py
             packaging/release_info.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/docker/

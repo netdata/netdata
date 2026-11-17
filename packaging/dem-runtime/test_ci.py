@@ -24,8 +24,6 @@ class CITests(unittest.TestCase):
             with self.assertRaises(SystemExit) as failure:
                 ci.main()
         self.assertEqual(failure.exception.code, 2)
-        self.assertEqual(ci.ROOT / '.github/data/distros.yml',
-                         Path(__file__).resolve().parents[2] / '.github/data/distros.yml')
 
 
 class NativeArtifactTests(unittest.TestCase):

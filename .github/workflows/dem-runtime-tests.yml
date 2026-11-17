@@ -1,135 +1,143 @@
 ---
 name: DEM Runtime Tests
+# Select test groups below so file dependencies have one owner and check names remain available.
 on:
-  pull_request:
-    paths:
-      - '.github/workflows/dem-runtime-tests.yml'
-      - '.github/workflows/dem-runtime-node-tests.yml'
-      - '.github/workflows/dem-runtime-release.yml'
-      - '.github/workflows/dem-runtime-companion-check.yml'
-      - '.github/workflows/release.yml'
-      - '.github/workflows/build.yml'
-      - '.github/workflows/packaging.yml'
-      - '.github/workflows/docker.yml'
-      - '.github/scripts/prepare-release-base.sh'
-      - '.github/scripts/tests/test_dem_paired_workflows.py'
-      - '.github/data/distros.yml'
-      - '.github/scripts/package-upload.sh'
-      - '.github/scripts/pkg-test.sh'
-      - 'packaging/cmake/Modules/Packaging.cmake'
-      - 'src/collectors/utils/nd-run.c'
-      - 'src/collectors/utils/nd-process-tree.*'
-      - 'src/collectors/utils/supervisor-pipes.h'
-      - 'src/collectors/utils/nd-file-reader.*'
-      - 'src/collectors/utils/exec-signals.h'
-      - 'packaging/dem-runtime/**'
-      - 'packaging/release_info.py'
-      - 'packaging/test_release_info.py'
-      - 'packaging/build-package.sh'
-      - 'packaging/cmake/Modules/NetdataVersion.cmake'
-      - 'packaging/cmake/Modules/NetdataGoTools.cmake'
-      - 'packaging/makeself/**'
-      - 'netdata-installer.sh'
-      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
-      - 'packaging/installer/kickstart.sh'
-      - 'packaging/docker/netdata-dem-docker-host.sh'
-      - 'packaging/docker/Dockerfile'
-      - 'packaging/docker/netdata-dem-docker'
-      - 'packaging/installer/netdata-dem-runtime.sh'
-      - 'packaging/installer/netdata-dem-pair.sh'
-      - 'packaging/installer/netdata-updater.sh'
-      - 'packaging/installer/netdata-uninstaller.sh'
-      - 'packaging/installer/tests/test_dem*.py'
-      - 'packaging/installer/tests/test_updater_dem.py'
-      - 'packaging/installer/tests/test_updater_artifacts.py'
-      - 'packaging/installer/tests/test_static_install_callers.py'
-      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
-      - 'src/dem-runtime/**'
-      - 'src/go/tools/dem-runtime-release/**'
-      - 'src/go/internal/pgptest/**'
-      - 'src/go/internal/browserruntimetest/**'
-      - 'src/go/pkg/buildinfo/**'
-      - 'src/go/cmd/demplugin/**'
-      - 'src/go/plugin/dem/**'
-      - 'src/go/plugin/agent/jobmgr/**'
-      - 'src/go/plugin/framework/collectorapi/**'
-      - 'src/go/plugin/go.d/pkg/ndexec/**'
-      - 'src/go/go.mod'
-      - 'src/go/go.sum'
+  pull_request: null
   push:
     branches: [master]
-    paths:
-      - '.github/workflows/dem-runtime-tests.yml'
-      - '.github/workflows/dem-runtime-node-tests.yml'
-      - '.github/workflows/dem-runtime-release.yml'
-      - '.github/workflows/dem-runtime-companion-check.yml'
-      - '.github/workflows/release.yml'
-      - '.github/workflows/build.yml'
-      - '.github/workflows/packaging.yml'
-      - '.github/workflows/docker.yml'
-      - '.github/scripts/prepare-release-base.sh'
-      - '.github/scripts/tests/test_dem_paired_workflows.py'
-      - '.github/data/distros.yml'
-      - '.github/scripts/package-upload.sh'
-      - '.github/scripts/pkg-test.sh'
-      - 'packaging/cmake/Modules/Packaging.cmake'
-      - 'src/collectors/utils/nd-run.c'
-      - 'src/collectors/utils/nd-process-tree.*'
-      - 'src/collectors/utils/supervisor-pipes.h'
-      - 'src/collectors/utils/nd-file-reader.*'
-      - 'src/collectors/utils/exec-signals.h'
-      - 'packaging/dem-runtime/**'
-      - 'packaging/release_info.py'
-      - 'packaging/test_release_info.py'
-      - 'packaging/build-package.sh'
-      - 'packaging/cmake/Modules/NetdataVersion.cmake'
-      - 'packaging/cmake/Modules/NetdataGoTools.cmake'
-      - 'packaging/makeself/**'
-      - 'netdata-installer.sh'
-      - 'packaging/cmake/pkg-files/deb/netdata/prerm'
-      - 'packaging/installer/kickstart.sh'
-      - 'packaging/docker/netdata-dem-docker-host.sh'
-      - 'packaging/docker/Dockerfile'
-      - 'packaging/docker/netdata-dem-docker'
-      - 'packaging/installer/netdata-dem-runtime.sh'
-      - 'packaging/installer/netdata-dem-pair.sh'
-      - 'packaging/installer/netdata-updater.sh'
-      - 'packaging/installer/netdata-uninstaller.sh'
-      - 'packaging/installer/tests/test_dem*.py'
-      - 'packaging/installer/tests/test_updater_dem.py'
-      - 'packaging/installer/tests/test_updater_artifacts.py'
-      - 'packaging/installer/tests/test_static_install_callers.py'
-      - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
-      - 'src/dem-runtime/**'
-      - 'src/go/tools/dem-runtime-release/**'
-      - 'src/go/internal/pgptest/**'
-      - 'src/go/internal/browserruntimetest/**'
-      - 'src/go/pkg/buildinfo/**'
-      - 'src/go/cmd/demplugin/**'
-      - 'src/go/plugin/dem/**'
-      - 'src/go/plugin/agent/jobmgr/**'
-      - 'src/go/plugin/framework/collectorapi/**'
-      - 'src/go/plugin/go.d/pkg/ndexec/**'
-      - 'src/go/go.mod'
-      - 'src/go/go.sum'
 permissions:
   contents: read
 concurrency:
   group: dem-runtime-tests-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      workflow: ${{ steps.files.outputs.workflow_any_modified }}
+      packaging: ${{ steps.files.outputs.packaging_any_modified }}
+      go: ${{ steps.files.outputs.go_any_modified }}
+      installer: ${{ steps.files.outputs.installer_any_modified }}
+      identity: ${{ steps.files.outputs.identity_any_modified }}
+      node: ${{ steps.files.outputs.node_any_modified }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        id: files
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
+          files_yaml: |
+            workflow:
+              - .github/workflows/dem-runtime-tests.yml
+              - .github/workflows/dem-runtime-release.yml
+              - .github/workflows/dem-runtime-companion-check.yml
+              - .github/workflows/release.yml
+              - .github/workflows/build.yml
+              - .github/workflows/packaging.yml
+              - .github/workflows/docker.yml
+              - .github/scripts/prepare-release-base.sh
+              - .github/scripts/tests/test_dem_paired_workflows.py
+              - packaging/docker/Dockerfile
+            packaging:
+              - .github/workflows/dem-runtime-tests.yml
+              - .github/workflows/dem-runtime-release.yml
+              - .github/data/distros.yml
+              - .github/scripts/package-upload.sh
+              - .github/scripts/pkg-test.sh
+              - packaging/dem-runtime/**
+              - packaging/release_info.py
+              - packaging/test_release_info.py
+              - packaging/build-package.sh
+              - packaging/cmake/Modules/Packaging.cmake
+              - packaging/cmake/Modules/NetdataVersion.cmake
+              - packaging/cmake/Modules/NetdataGoTools.cmake
+              - packaging/cmake/Modules/NetdataPluginDem.cmake
+              - packaging/cmake/pkg-files/deb/netdata/prerm
+              - src/dem-runtime/manifest.json
+              - src/dem-runtime/runtime.json
+              - src/dem-runtime/package*.json
+              - src/go/tools/dem-runtime-release/**
+              - src/go/plugin/dem/synthetic/browserruntime/**
+              - src/go/go.mod
+              - src/go/go.sum
+              - '!src/go/**/*_test.go'
+              - '!**/*.md'
+              - '!**/metadata.yaml'
+            go:
+              - .github/workflows/dem-runtime-tests.yml
+              - src/go/tools/dem-runtime-release/**
+              - src/go/internal/pgptest/**
+              - src/go/internal/browserruntimetest/**
+              - src/go/pkg/buildinfo/**
+              - src/go/cmd/demplugin/**
+              - src/go/plugin/dem/**
+              - src/go/plugin/agent/jobmgr/**
+              - src/go/plugin/framework/collectorapi/**
+              - src/go/plugin/go.d/pkg/ndexec/**
+              - src/go/go.mod
+              - src/go/go.sum
+              - src/health/health.d/dem.conf
+              - src/plugins.d/FUNCTION_UI_SCHEMA.json
+              - src/collectors/utils/nd-run.c
+              - src/collectors/utils/nd-process-tree.*
+              - src/collectors/utils/nd-file-reader.*
+              - src/collectors/utils/supervisor-pipes.h
+              - src/collectors/utils/exec-signals.h
+              - '!**/*.md'
+            installer:
+              - .github/workflows/dem-runtime-tests.yml
+              - packaging/makeself/**
+              - netdata-installer.sh
+              - packaging/installer/kickstart.sh
+              - packaging/installer/netdata-dem-*.sh
+              - packaging/installer/netdata-updater.sh
+              - packaging/installer/netdata-uninstaller.sh
+              - packaging/installer/tests/test_dem_pair.py
+              - packaging/installer/tests/test_dem_docker_pair.py
+              - packaging/installer/tests/test_updater_dem.py
+              - packaging/installer/tests/test_updater_artifacts.py
+              - packaging/installer/tests/test_static_install_callers.py
+              - packaging/docker/netdata-dem-docker*
+              - packaging/docker/Dockerfile
+              - '!**/*.md'
+            identity:
+              - .github/workflows/dem-runtime-tests.yml
+              - packaging/docker/netdata-dem-docker
+              - packaging/docker/netdata-dem-docker-host.sh
+              - packaging/installer/kickstart.sh
+              - packaging/installer/netdata-dem-runtime.sh
+              - packaging/installer/netdata-uninstaller.sh
+              - packaging/installer/tests/test_dem_runtime*.py
+            node:
+              - .github/workflows/dem-runtime-tests.yml
+              - .github/workflows/dem-runtime-node-tests.yml
+              - src/dem-runtime/**
+              - '!**/*.md'
   runtime-wire:
+    needs: changes
     uses: ./.github/workflows/dem-runtime-node-tests.yml
+    with:
+      run_tests: ${{ needs.changes.outputs.node == 'true' }}
   contracts:
+    needs: changes
+    if: >-
+      needs.changes.outputs.workflow == 'true' || needs.changes.outputs.packaging == 'true' ||
+      needs.changes.outputs.go == 'true' || needs.changes.outputs.installer == 'true' ||
+      needs.changes.outputs.identity == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+      - if: needs.changes.outputs.go == 'true' || needs.changes.outputs.packaging == 'true'
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
           cache-dependency-path: src/go/go.sum
       - name: Build the real supervisor
+        if: needs.changes.outputs.go == 'true'
         shell: bash
         run: |
           set -euxo pipefail
@@ -145,25 +153,50 @@ jobs:
             src/collectors/utils/nd-run.c src/collectors/utils/nd-file-reader.c \
             src/collectors/utils/nd-process-tree.c -o "$helper_dir/nd-run"
           echo "DEM_RUNTIME_TEST_HELPER=$helper_dir/nd-run" >> "$GITHUB_ENV"
-      - name: Install signing and native package inspection tools
+      - name: Install integration tools
+        if: needs.changes.outputs.go == 'true' || needs.changes.outputs.packaging == 'true'
+        env:
+          PACKAGE_TESTS: ${{ needs.changes.outputs.packaging }}
         run: |
+          packages=(gnupg)
+          if [ "$PACKAGE_TESTS" = true ]; then
+            packages+=(cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml)
+          fi
           sudo apt-get update
-          sudo apt-get install -y gnupg cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml
-          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node; do command -v "$tool"; done
+          sudo apt-get install -y "${packages[@]}"
+          command -v gpg
+          command -v node
+          if [ "$PACKAGE_TESTS" = true ]; then
+            for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node; do command -v "$tool"; done
+          fi
       - name: Store lifecycle and supervisor integration
+        if: needs.changes.outputs.go == 'true'
         working-directory: src/go
         run: |
           go test -race -count=1 ./pkg/buildinfo ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
           go vet ./pkg/buildinfo ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+      - name: Build the signer for packaging integration tests
+        if: needs.changes.outputs.packaging == 'true'
+        working-directory: src/go
+        run: |
           go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release
           echo "DEM_RELEASE_TEST_TOOL=$RUNNER_TEMP/dem-runtime-release" >> "$GITHUB_ENV"
+      - name: Install the workflow test parser
+        if: needs.changes.outputs.workflow == 'true' && needs.changes.outputs.packaging != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-ruamel.yaml
+      - name: Release workflow behavior
+        if: needs.changes.outputs.workflow == 'true'
+        run: python3 -m unittest discover -s .github/scripts/tests -p test_dem_paired_workflows.py -v
       - name: Builder, source assembly, and native package contracts
+        if: needs.changes.outputs.packaging == 'true'
         run: |
           python3 -m unittest discover -s packaging -p test_release_info.py -v
-          python3 -m unittest discover -s .github/scripts/tests -p test_dem_paired_workflows.py -v
           python3 -m unittest discover -s packaging/dem-runtime -v
           python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
       - name: Paired installation owners and recovery
+        if: needs.changes.outputs.installer == 'true'
         run: |
           python3 -m unittest discover -s packaging/installer/tests -p test_dem_pair.py -v
           python3 -m unittest discover -s packaging/installer/tests -p test_dem_docker_pair.py -v
@@ -173,6 +206,7 @@ jobs:
           # These root cases use only private fixture paths, not host services.
           sudo python3 -B -m unittest discover -s packaging/installer/tests -p test_dem_pair.py -v
       - name: Explicit installer and service identity contracts
+        if: needs.changes.outputs.identity == 'true'
         run: |
           docker pull python:3.13-bookworm
           docker run --rm --network none \
