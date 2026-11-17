@@ -51,7 +51,7 @@ Netdata is a full-stack observability platform: infrastructure, application perf
 
 Netdata is distributed and real-time. Netdata Agents collect, store and analyze data where it is generated, per second, with machine learning anomaly detection on every metric. Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data. Netdata scales to 100,000+ nodes, and its Agent is open source.
 
-**Core Design Decisions:**
+**Netdata Design:**
 
 * **Understanding over traffic lights** – Monitoring tells you that something is wrong; observability tells you why. Netdata gives you both, from the same data.
 * **Everything, every second, affordably** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
