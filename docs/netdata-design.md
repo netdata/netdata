@@ -62,6 +62,7 @@ How the design delivers it:
 
 - **Hubs for every kind of data.** Netdata Parents concentrate metrics. Netdata Agents concentrate network devices over SNMP, server hardware over Redfish, logs, traces and traffic flows. You decide where each hub goes: per site, data center, region, team or customer.
 - **Hubs are independent.** They share nothing and never wait for each other. Capacity grows by adding hubs, and a problem in one hub stays in that hub.
+- **Scale by adding hubs.** Netdata scales to 100,000+ nodes. A Parent handles about 500 nodes or 2 million metrics per second, and you grow by adding Parents.
 - **Netdata Cloud makes them one.** It routes every question to the hubs that hold the answer and correlates the results into one view of metrics, logs, traces, flows, topology and devices. It is not in the data path: the hubs keep collecting, storing, analyzing and alerting without it.
 - **Queries run where the data is,** in parallel across all hubs, so adding hubs adds query capacity too.
 - **Missing data is shown as data.** Every chart states which sources answered and which did not, so a partial answer is never mistaken for a complete one.
@@ -96,7 +97,7 @@ Alerting stays with rules people can read and reason about. Anomaly rates are da
 
 ### AI at the core
 
-**AI is not an add-on to Netdata. Machine learning runs inside every Agent and Parent, a scoring engine ranks what matters, and AI reasons over that evidence. Together they deliver accurate, fully automated root-cause and impact analysis.**
+**AI is not an add-on to Netdata. Machine learning runs inside every Agent and Parent, a scoring engine ranks what matters, and AI reasons over that evidence. Together they deliver automated root-cause and impact analysis.**
 
 How the design delivers it:
 
