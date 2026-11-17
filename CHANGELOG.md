@@ -583,6 +583,7 @@
 - Docs(functions): use repository-absolute links to the Functions guides ([#24831](https://github.com/netdata/netdata/issues/24831))
 - Ci(dem): simplify publication and select checks by changed inputs ([#24829](https://github.com/netdata/netdata/issues/24829))
 - Fix(dem): identify publisher HTTP requests ([#24832](https://github.com/netdata/netdata/issues/24832))
+- Fix(dem): handle missing descriptors during first publication ([#24833](https://github.com/netdata/netdata/issues/24833))
 
 ## [2.12.0] - 2026-09-30
 
