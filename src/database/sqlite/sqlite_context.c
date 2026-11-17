@@ -578,7 +578,8 @@ static uint64_t ctx_sql_queue_unittest_version(nd_uuid_t *host_uuid, const char 
 
 static void ctx_sql_queue_unittest_final_flush(void *arg)
 {
-    (void)arg;
+    bool *started = arg;
+    __atomic_store_n(started, true, __ATOMIC_RELEASE);
     ctx_sql_flush(true);
 }
 
@@ -632,9 +633,13 @@ static int ctx_sql_queue_unittest(nd_uuid_t *host_uuid)
     // the final flush waits for a flusher that is still running, executes what was queued before it, and closes the
     // queue: later writes are dropped
     d.id = "queue.final"; d.version = 8; ctx_sql_queue_store(host_uuid, &d);
+    bool final_flusher_started = false;
     netdata_mutex_lock(&ctx_sql_queue.flush_mutex);
     ND_THREAD *final_flusher = nd_thread_create(
-        "CTXSQL_TEST", NETDATA_THREAD_OPTION_DONT_LOG, ctx_sql_queue_unittest_final_flush, NULL);
+        "CTXSQL_TEST", NETDATA_THREAD_OPTION_DONT_LOG, ctx_sql_queue_unittest_final_flush, &final_flusher_started);
+    while (!__atomic_load_n(&final_flusher_started, __ATOMIC_ACQUIRE))
+        sleep_usec(USEC_PER_MS);
+    // hold the mutex well past the helper's first trylock
     sleep_usec(200 * USEC_PER_MS);
     netdata_mutex_unlock(&ctx_sql_queue.flush_mutex);
     nd_thread_join(final_flusher);
