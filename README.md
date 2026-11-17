@@ -246,8 +246,6 @@ flowchart LR
   H2 <--> C
   H3 <--> C
 
-  style Sources fill:#f7f7f7,stroke:#999
-  style Hubs fill:#f7f7f7,stroke:#999
   classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
 ```
 
