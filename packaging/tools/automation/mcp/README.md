@@ -122,15 +122,15 @@ netdata_agent_query_metrics(agent_id="agent", metric="system.cpu", after=-60, be
   agent is claimed). A missing token, or a failed mint, is a hard error —
   there is no anonymous path.
 
-## OTel logs: configure, feed, query
+## OTel: configure, feed, query
 
-A dedicated surface for iterating on the OTel-logs path against a ready agent:
+A dedicated surface for iterating on the OTel plugin (logs and traces) against a ready agent:
 
 | Tool | What |
 |------|------|
-| `netdata_agent_otel_config(agent_id, …)` | Set otel-plugin knobs applied on the next start. REPLACES prior config. Tuning is per-signal: `logs_*` (WAL rotation, index retention, catalog) and `traces_*` knobs are independent; remote storage is global (`remote_storage_*`). Knobs without a first-class param (auth, ingest windows, retention `max_age`/`horizon`, per-tenant overrides) are reachable via the `extra_yaml` raw-YAML passthrough. An endpoint pinned to the agent's declared web port on `127.0.0.1` or a wildcard address is refused. |
+| `netdata_agent_otel_config(agent_id, config, extra_yaml)` | Set the otel-plugin config applied on the next start. REPLACES prior config. `config` is the user `otel.yaml` as a typed nested object (`receivers`, `auth`, `metrics`, `remote_storage`, `logs`, `traces`; rotation/retention keyed by tenant), mirroring the plugin's override types in [`netdata_mcp/otel_settings.py`](netdata_mcp/otel_settings.py) — unknown keys are refused before launch. `extra_yaml` is a raw-YAML passthrough only for configs the typed object refuses on purpose (strict-config refusal tests). Pinned by the harness: `base_dir` under the run dir; unset endpoints auto-assign free loopback ports; the HTTP listener is on unless `enabled: false`; remote storage enabled without `uri` uses a per-agent `fs://` dir. An endpoint on the agent's declared web port (`127.0.0.1` or a wildcard address) is refused. |
 | `netdata_agent_otel_push_logs(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP LOG corpus (`otel-streams synth`) to the agent. `service_name`/`service_namespace` set the resource identity (one stream per batch; query by literal `service.name`/`service.namespace`). `service_name` is always emitted (queryable even when `""`); an omitted `service_namespace` emits no token (not queryable — reachable via `service.name`), while `service_namespace=""` emits a queryable empty value. |
-| `netdata_agent_otel_push_traces(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP TRACE corpus (`otel-streams synth-traces`) to the agent. Like the logs push but with `duration_nanos` (per-span duration), no `field_cardinality`, and a distinct default `service.name` (`otel-streams-synth-traces`). Pair with small `traces_*` config thresholds to seal the traces pipeline without an additional restart (the thresholds applied at the prior run_start make rotation automatic). |
+| `netdata_agent_otel_push_traces(agent_id, count, …)` | One-shot: send a deterministic synthetic OTLP TRACE corpus (`otel-streams synth-traces`) to the agent. Like the logs push but with `duration_nanos` (per-span duration), no `field_cardinality`, and a distinct default `service.name` (`otel-streams-synth-traces`). Pair with small `traces` rotation thresholds to seal the traces pipeline without an additional restart (the thresholds applied at the prior run_start make rotation automatic). |
 | `netdata_agent_otel_stream_{start,status,stop,list}(…)` | Run a live source (`source=certstream\|jetstream\|github\|ris`) as a daemon; `list` enumerates all streams. |
 | `netdata_agent_otel_logs(agent_id, …)` | Query the `otel-logs` function (typed params; mints a Cloud bearer when `NETDATA_CLOUD_TOKEN` is set). |
 | `netdata_agent_otel_files(agent_id, …)` | List the storage files the otel-ledger is tracking (WAL / SFST / catalog) per tenant, with sizes, time ranges, record counts, and the `rotated`/`uploaded`/`remote_cataloged`/`pending_deletion` flags not visible on disk. Inventory, not content (use `netdata_agent_otel_logs` for rows). Same SIGNED_ID gate (mints a bearer). |
@@ -142,11 +142,12 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
   demand from `<worktree>/src/crates`; the stream sources as a release build,
   whose first build takes minutes); they target the agent's local OTLP
   receiver, so no Cloud token is needed.
-- **otel_logs** is access-gated (`SIGNED_ID`): on a claimed agent with a Cloud
-  token it auto-mints a bearer; otherwise it returns 412 with a hint.
+- **otel_logs / otel_files / otel_traces / otel_service_map** are access-gated
+  (`SIGNED_ID`): on a claimed agent with a Cloud token they auto-mint a bearer;
+  otherwise they return 412 with a hint.
 - Typical loop: `otel_config` (tiny per-signal thresholds) → `otel_push_logs` /
-  `otel_push_traces` → `otel_logs` / `otel_files` to assert rotation/retention
-  over a known corpus.
+  `otel_push_traces` → `otel_logs` / `otel_traces` / `otel_service_map` /
+  `otel_files` to assert queries, rotation and retention over a known corpus.
 
 ## Cloud claiming
 
@@ -193,7 +194,7 @@ Both profiles share one curated plugin set: common system-monitoring features on
 (apps, cgroups, network-viewer, systemd-journal/units, local-listeners, debugfs,
 dbengine, dashboard); heavy-to-build (go.d, ML, NetFlow, eBPF) and rarely used
 plugins off. The OTEL plugin is the deliberate exception — always on, despite its
-build cost, because this tool exists for OTel-logs development. Definitions live in
+build cost, because this tool exists for OTel plugin development. Definitions live in
 [`netdata_mcp/profiles.py`](netdata_mcp/profiles.py).
 
 ## Transports: stdio (default) vs http
@@ -310,7 +311,8 @@ netdata_mcp/
   runner.py        # async subprocess + bounded log buffer         ── core
   jobs.py          # Job + JobRegistry (build/configure lifecycle) ── core
   runtime.py       # agent run dir + netdata.conf gen, port, readiness probe ── core
-  agents.py        # AgentRegistry (agent-id -> worktree/profile)  ── core
+  agents.py      # AgentRegistry (agent-id -> worktree/profile)  ── core
+  otel_settings.py # typed user otel.yaml (mirrors the plugin's config override types) ── core
   run.py           # Run + RunRegistry (launch/readiness/stop)     ── core
   bearer.py        # Cloud per-agent bearer minting/cache (agent forwarding + otel-logs auth) ── core
   agentmcp.py      # forward a call to a running agent's own /mcp  ── core
