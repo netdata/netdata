@@ -37,6 +37,7 @@ include(Packaging)
             'CPACK_DEBIAN_NETDATA_PACKAGE_DEPENDS', 'CPACK_DEBIAN_NETDATA_PACKAGE_RECOMMENDS',
             'CPACK_RPM_NETDATA_PACKAGE_REQUIRES', 'CPACK_RPM_NETDATA_PACKAGE_RECOMMENDS',
             'CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SUGGESTS', 'CPACK_RPM_PLUGIN-DEM_PACKAGE_SUGGESTS',
+            'CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_BREAKS', 'CPACK_RPM_PLUGIN-DEM_PACKAGE_CONFLICTS',
         ]
         inspect = root / 'inspect.cmake'
         inspect.write_text('include("' + str(build / 'CPackConfig.cmake') + '")\n' +
@@ -59,6 +60,10 @@ include(Packaging)
                 self.assertEqual(metadata['CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SUGGESTS'], 'netdata-dem-runtime')
                 self.assertEqual(metadata['CPACK_RPM_PLUGIN-DEM_PACKAGE_SUGGESTS'],
                                  'netdata-dem-runtime' if weak else '')
+                self.assertEqual(metadata['CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_BREAKS'],
+                                 'netdata-dem-runtime (<< 1:0)')
+                self.assertEqual(metadata['CPACK_RPM_PLUGIN-DEM_PACKAGE_CONFLICTS'],
+                                 'netdata-dem-runtime < 1:0')
 
     def test_disabled_dem_adds_no_relationships(self):
         with tempfile.TemporaryDirectory() as temp:

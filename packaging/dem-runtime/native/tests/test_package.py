@@ -10,6 +10,8 @@ import subprocess
 import tempfile
 import unittest
 
+from test_recipe import configure_agent
+
 SOURCE = Path(__file__).resolve().parents[1]
 
 
@@ -30,7 +32,9 @@ class PackageTests(unittest.TestCase):
             self.skipTest('requires a supported native architecture')
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            payload, build, extracted = root / 'payload', root / 'build', root / 'extracted'
+            configured, build, payload = configure_agent(root, fmt=fmt, architecture=arch)
+            self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+            extracted = root / 'extracted'
             (payload / 'lib').mkdir(parents=True)
             extracted.mkdir()
             # Match stage-native permissions; only CMake-created ancestors inherit umask.
@@ -43,21 +47,37 @@ class PackageTests(unittest.TestCase):
             (payload / 'lib/loader-link').symlink_to('loader')
             (payload / 'native.json').write_text(json.dumps({
                 'format': 1, 'path': '/usr/lib/netdata/dem-runtime',
-                'manifest': {'platform': 'linux/' + arch, 'version': '1.2.3'}}))
+                'manifest': {'platform': 'linux/' + arch, 'version': 'v2.12.0'}}))
             (payload / 'native.json').chmod(0o644)
-            self.run_command('cmake', '-S', SOURCE, '-B', build,
-                             '-DDEM_PAYLOAD_DIR=' + str(payload), '-DDEM_ARCH=' + arch,
-                             '-DDEM_VERSION=1.2.3', '-DDEM_RELEASE=1', '-DDEM_PACKAGE_FORMAT=' + fmt)
-            self.run_command('cpack', '--config', build / 'CPackConfig.cmake')
-            packages = list((build / 'packages').glob('*.' + fmt.lower()))
+            ordinary_options = []
+            if fmt == 'RPM':
+                # This fixture stages two marker files rather than Agent binaries.
+                ordinary_options = ['-D', 'CPACK_RPM_NETDATA_USER_FILELIST=',
+                                    '-D', 'CPACK_RPM_PLUGIN-DEM_USER_FILELIST=']
+            self.run_command('cpack', '-G', fmt, '--config', build / 'CPackConfig.cmake', *ordinary_options)
+            self.assertFalse(list((build / 'packages').glob('netdata-dem-runtime*')))
+            self.run_command('cpack', '-G', fmt, '--config', build / 'CPackDEMRuntimeConfig.cmake')
+            packages = list((build / 'packages').glob('netdata-dem-runtime*.' + fmt.lower()))
             self.assertEqual(len(packages), 1)
             package = packages[0]
             if fmt == 'DEB':
+                self.assertEqual(package.name, 'netdata-dem-runtime_2.12.0_' + arch + '.deb')
                 self.run_command('dpkg-deb', '--extract', package, extracted)
                 metadata = self.run_command('dpkg-deb', '--field', package, 'Pre-Depends')
+                self.assertEqual(self.run_command('dpkg-deb', '--field', package, 'Architecture').strip(), arch)
                 self.assertIn('netdata-dem-runtime-api (= 1)', metadata)
+                self.assertEqual(self.run_command('dpkg-deb', '--field', package, 'Version').strip(), '1:2.12.0')
+                self.assertIn('netdata-plugin-dem (= 2.12.0)',
+                              self.run_command('dpkg-deb', '--field', package, 'Depends'))
+                agent = next(path for path in (build / 'packages').glob('netdata_*.deb'))
+                self.assertEqual(self.run_command('dpkg-deb', '--field', agent, 'Version').strip(), '2.12.0')
+                plugin = next((build / 'packages').glob('netdata-plugin-dem_*.deb'))
+                self.assertEqual(self.run_command('dpkg-deb', '--field', plugin, 'Breaks').strip(),
+                                 'netdata-dem-runtime (<< 1:0)')
                 control = root / 'control'
                 self.run_command('dpkg-deb', '--control', package, control)
+                for hook in ('preinst', 'postinst', 'prerm', 'postrm'):
+                    self.assertEqual((control / hook).stat().st_mode & 0o777, 0o755)
                 self.assertIn('/etc/apparmor.d/netdata-dem-browser', (control/'conffiles').read_text().splitlines())
                 listing = self.run_command('dpkg-deb', '--contents', package)
                 self.assertNotIn('/var/lib/netdata-dem-runtime', listing)
@@ -76,7 +96,24 @@ class PackageTests(unittest.TestCase):
                                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 dependencies = self.run_command('rpm', '-qp', '--requires', package)
+                self.assertEqual(self.run_command('rpm', '-qp', '--qf', '%{ARCH}', package),
+                                 {'amd64': 'x86_64', 'arm64': 'aarch64'}[arch])
                 self.assertIn('netdata-dem-runtime-api = 1', dependencies)
+                self.assertIn('netdata-plugin-dem = 2.12.0', dependencies)
+                flags = self.run_command('rpm', '-qp', '--qf', '[%{REQUIRENAME} %{REQUIREFLAGS}\n]', package)
+                requirements = [line.rsplit(' ', 1) for line in flags.splitlines()]
+                helper_flags = [int(value) for name, value in requirements if name == 'netdata-dem-runtime-api']
+                target_flags = [int(value) for name, value in requirements if name == 'netdata-plugin-dem']
+                # RPM's script-pre, script-preun and script-posttrans sense bits.
+                self.assertTrue(any(value & (1 << 9) for value in helper_flags))
+                self.assertTrue(any(value & (1 << 11) for value in helper_flags))
+                self.assertTrue(any(value & (1 << 5) for value in target_flags))
+                self.assertEqual(self.run_command('rpm', '-qp', '--qf', '%{EPOCH}:%{VERSION}', package), '1:2.12.0')
+                agent = next(path for path in (build / 'packages').glob('netdata-2*.rpm'))
+                self.assertEqual(self.run_command('rpm', '-qp', '--qf', '%{EPOCH}', agent), '(none)')
+                plugin = next((build / 'packages').glob('netdata-plugin-dem-*.rpm'))
+                self.assertIn('netdata-dem-runtime < 1:0',
+                              self.run_command('rpm', '-qp', '--conflicts', plugin).splitlines())
                 ownership = self.run_command('rpm', '-qp', '--qf', '[%{FILEUSERNAME}:%{FILEGROUPNAME}\n]', package)
                 self.assertEqual(set(ownership.splitlines()), {'root:root'})
                 modes = self.run_command('rpm', '-qp', '--qf', '[%{FILEMODES:octal}\n]', package)
@@ -104,6 +141,22 @@ class PackageTests(unittest.TestCase):
 
     def test_deb_preserves_fixed_payload(self):
         self.check_package('DEB')
+
+    @unittest.skipUnless(shutil.which('dpkg-deb') and shutil.which('dpkg'), 'requires Debian package tools')
+    def test_deb_filenames_omit_epoch_but_control_preserves_it(self):
+        architecture = self.run_command('dpkg', '--print-architecture').strip()
+        for version in ('2.12.0', '2.12.0.9.nightly', '2.12.0~rc1'):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                configured, build, _ = configure_agent(root, native_version=version,
+                                                       architecture=architecture)
+                self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+                self.run_command('cpack', '-G', 'DEB', '--config', build / 'CPackDEMRuntimeConfig.cmake')
+                packages = list((build / 'packages').glob('netdata-dem-runtime*.deb'))
+                self.assertEqual([path.name for path in packages],
+                                 ['netdata-dem-runtime_' + version + '_' + architecture + '.deb'])
+                self.assertEqual(self.run_command('dpkg-deb', '--field', packages[0], 'Version').strip(),
+                                 '1:' + version)
 
     def test_rpm_preserves_fixed_payload(self):
         self.check_package('RPM')
