@@ -53,6 +53,7 @@ src/collectors/ebpf.plugin/reset_netdata_trace.sh
 src/libnetdata/ebpf/includes/
 
 # installation artifacts
+/packaging/release-info
 packaging/installer/.environment.sh
 *.tar.*
 *.run

@@ -1274,16 +1274,16 @@ update_build() {
 
   # We got the sources, run the update now
   if [ ${RUN_INSTALLER} -eq 1 ]; then
-    # signal netdata to start saving its database
-    # this is handy if your database is big
-    possible_pids=$(pidof netdata)
+    # Query this installation instead of signalling every process named netdata.
+    # The installation owner performs its normal graceful shutdown before writes.
     do_not_start=
-    if [ -n "${possible_pids}" ]; then
-      # shellcheck disable=SC2086
-      kill -USR1 ${possible_pids}
-    else
-      # netdata is currently not running, so do not start it after updating
-      do_not_start="--dont-start-it"
+    if "${NETDATA_PREFIX}/usr/sbin/netdatacli" ping >/dev/null 2>&1; then :; else
+      source_ping_status=$?
+      case "$source_ping_status" in
+        1) ;; # The Agent is still initializing.
+        255) do_not_start=--dont-start-it ;;
+        *) error "Cannot observe source Agent service intent (status ${source_ping_status})"; return "$source_ping_status" ;;
+      esac
     fi
 
     env="env TMPDIR=${TMPDIR}"
@@ -1314,17 +1314,19 @@ update_build() {
     export NETDATA_WARNINGS="${NETDATA_WARNINGS}"
     export NETDATA_SCRIPT_STATUS_PATH="${NETDATA_SCRIPT_STATUS_PATH}"
     # shellcheck disable=SC2086
-    if ! ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then
+    if ${env} ./netdata-installer.sh ${REINSTALL_OPTIONS} --dont-wait ${do_not_start} >&3 2>&3; then :; else
+      source_install_status=$?
       if [ -r "${NETDATA_SCRIPT_STATUS_PATH}" ]; then
         # shellcheck disable=SC1090
         . "${NETDATA_SCRIPT_STATUS_PATH}"
         rm -f "${NETDATA_SCRIPT_STATUS_PATH}"
       fi
       if [ -n "${EXIT_REASON}" ]; then
-        fatal "Failed to rebuild existing netdata install: ${EXIT_REASON}" "U${EXIT_CODE}"
+        error "Failed to rebuild existing netdata install: ${EXIT_REASON}"
       else
-        fatal "Failed to rebuild existing netdata reinstall." UI0000
+        error "Failed to rebuild existing netdata reinstall."
       fi
+      return "$source_install_status"
     fi
 
     restore_preview_channel
@@ -1367,13 +1369,24 @@ update_static() {
       install_type="INSTALL_TYPE='legacy-static'"
     fi
 
-    # Do not pass any options other than the accept, for now
+    # Preserve an inactive installation, including on the static path.
+    static_do_not_start=
+    if /opt/netdata/bin/netdatacli ping >/dev/null 2>&1; then :; else
+      static_ping_status=$?
+      case "$static_ping_status" in
+        1) ;;
+        255) static_do_not_start=--dont-start-it ;;
+        *) error "Cannot observe static Agent service intent (status ${static_ping_status})"; return "$static_ping_status" ;;
+      esac
+    fi
     # shellcheck disable=SC2086
-    if sh "${ndtmpdir}/${archive_name}" --accept -- ${REINSTALL_OPTIONS} >&3 2>&3; then
+    if env "TMPDIR=${ndtmpdir}" sh "${ndtmpdir}/${archive_name}" --accept -- ${REINSTALL_OPTIONS} ${static_do_not_start} >&3 2>&3; then
       restore_preview_channel
       rm -r "${ndtmpdir}"
     else
-      info "NOTE: did not remove: ${ndtmpdir}"
+      static_install_status=$?
+      error "Static installation failed with status ${static_install_status}"
+      return "$static_install_status"
     fi
 
     echo "${install_type}" > /opt/netdata/etc/netdata/.install-type
@@ -1395,6 +1408,53 @@ get_new_binpkg_major() {
     dnf) dnf check-update netdata | grep -E '^netdata ' | awk '{print $2}' | cut -f 1 -d '.' ;;
     zypper) zypper list-updates | grep '| netdata |' | cut -f 5 -d '|' | tr -d ' ' | cut -f 1 -d '.' ;;
   esac
+}
+
+native_dem_enrolled() {
+  if [ "$INSTALL_TYPE" = binpkg-deb ]; then
+    if native_dem_state=$(dpkg-query -W -f='${db:Status-Status}' netdata-dem-runtime 2>/dev/null); then
+      case "$native_dem_state" in
+        installed|unpacked|half-configured|half-installed|triggers-awaited|triggers-pending) return 0 ;;
+        not-installed|config-files) return 1 ;;
+        *) return 2 ;;
+      esac
+    else
+      native_dem_status=$?
+      [ "$native_dem_status" -eq 1 ] && return 1
+      return 2
+    fi
+  fi
+  if rpm -q netdata-dem-runtime >/dev/null 2>&1; then return 0; else
+    native_dem_status=$?
+    [ "$native_dem_status" -eq 1 ] && return 1
+    return 2
+  fi
+}
+
+update_native_agent_packages() {
+  set -- netdata
+  native_dem_pair=0
+  native_dem_options=
+  if native_dem_enrolled; then
+    native_dem_pair=1
+    set -- "$@" netdata-plugin-dem netdata-dem-runtime
+    # APT may otherwise solve an unavailable/held companion by removing it.
+    [ "$pm_cmd" != apt-get ] || native_dem_options=--no-remove
+  else
+    native_dem_status=$?
+    [ "$native_dem_status" -eq 1 ] || return "$native_dem_status"
+  fi
+  # Use the existing package manager and exact package dependencies as the solver.
+  # shellcheck disable=SC2086
+  if env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} ${native_dem_options} "$@" >&3 2>&3; then :; else
+    return $?
+  fi
+  if [ "$native_dem_pair" -eq 1 ]; then
+    native_dem_enrolled || return $?
+    # RPM can report success despite a failed posttrans. Check actual admission
+    # with the installed helper as its configured service account, without smoke tests.
+    /usr/libexec/netdata/plugins.d/dem.plugin runtime native-status >&3 2>&3 || return $?
+  fi
 }
 
 update_binpkg() {
@@ -1624,8 +1684,7 @@ update_binpkg() {
     fi
   fi
 
-  # shellcheck disable=SC2086
-  env ${env} ${pm_cmd} ${upgrade_subcmd} ${pkg_install_opts} netdata >&3 2>&3 || fatal "Failed to update Netdata package." U000F
+  update_native_agent_packages || fatal "Failed to update the installed Netdata package set or validate its browser runtime; retry the matching packages with the system package manager." U000F
 
   if ${pkg_installed_check} systemd > /dev/null 2>&1; then
     if [ "${NETDATA_NO_SYSTEMD_JOURNAL}" -eq 0 ]; then
@@ -1685,8 +1744,8 @@ update_binpkg() {
 update_legacy() {
   set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
   case "${IS_NETDATA_STATIC_BINARY}" in
-    yes) update_static && exit 0 ;;
-    *) update_build && exit 0 ;;
+    yes) update_static; exit $? ;;
+    *) update_build; exit $? ;;
   esac
 }
 
@@ -1827,12 +1886,12 @@ case "${INSTALL_TYPE}" in
     *-build)
       validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL:-nightly}" "${IS_NETDATA_STATIC_BINARY}"
-      update_build && exit 0
+      update_build; exit $?
       ;;
     *-static*)
       validate_environment_file
       set_tarball_urls "${RELEASE_CHANNEL:-nightly}" yes
-      update_static && exit 0
+      update_static; exit $?
       ;;
     *binpkg*) update_binpkg && exit 0 ;;
     "") # Fallback case for no `.install-type` file. This just works like the old install type detection.

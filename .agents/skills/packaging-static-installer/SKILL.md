@@ -84,7 +84,7 @@ The container then runs `packaging/makeself/run-all-jobs.sh`, which executes `pa
 | 90 | `prepare-archive-source` | Copies post-installer scripts into the install tree |
 | 91 | `copy-ca-certificates` | Bundles a CA bundle |
 | 97 | `create-package-manifest` | Inventories shipped paths before archive creation |
-| 98 | `create-archive` | Runs `makeself.sh --gzip --complevel 9 --notemp --needroot` to build the `.gz.run` |
+| 98 | `create-archive` | Runs `makeself.sh --gzip --complevel 9 --needroot` to build the temporarily staged `.gz.run` |
 | 99 | `copy-archives` | Renames the archive to `netdata-<arch>-<version>.gz.run` and copies aliases |
 
 Source files: `packaging/makeself/build-static.sh`, `packaging/makeself/build.sh`, `packaging/makeself/run-all-jobs.sh`, `packaging/makeself/functions.sh`, `packaging/makeself/jobs/`.
@@ -304,7 +304,11 @@ sudo sh /tmp/netdata-x86_64-latest.gz.run
 and `--no-updates` is an unknown option. Check existing updater scheduling separately when testing updates.
 For state preservation and its regression suite, see `packaging/makeself/README.md#state-permissions-during-updates`.
 
-The installer always installs into `/opt/netdata` (hard-coded; `--target` would change it but the in-archive paths assume `/opt/netdata`, do not override).
+The installer always installs into `/opt/netdata`. It extracts to temporary staging before the installation owner
+changes live files. Executing with `--target` or `--keep` is refused; those options are for `--noexec` inspection only.
+For enrolled DEM installations, `packaging/installer/DEM-RUNTIME.md#paired-agent-updates` owns companion verification
+and activation. Both routes use the same static payload overlay; a failed Agent installation needs normal repair,
+not a DEM executable snapshot. Verify this separately from extraction and retain the runtime ownership checks.
 
 Read-only archive metadata/listing:
 

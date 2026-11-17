@@ -3,7 +3,6 @@
 package browserruntime
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -151,7 +150,8 @@ func createNativeControl(config NativeConfig, uid, gid int) error {
 // readNativePayload admits an installed package only when its record names this
 // prefix and platform, the whole tree is root-controlled, the bound layout is
 // intact, and interpreter slots and generated configuration name this prefix.
-func readNativePayload(path string) (Paths, Manifest, error) {
+func readNativePayload(config NativeConfig) (Paths, Manifest, error) {
+	path := config.PayloadPath
 	if err := nativeProtectedPath(path); err != nil {
 		return Paths{}, Manifest{}, err
 	}
@@ -167,10 +167,10 @@ func readNativePayload(path string) (Paths, Manifest, error) {
 	if err := verifyNativeImmutable(root); err != nil {
 		return Paths{}, Manifest{}, err
 	}
-	if err := verifyBoundPayload(root, m, nonOwnerExecute); err != nil {
+	if err := verifyBoundPayload(root, path, m, nonOwnerExecute); err != nil {
 		return Paths{}, Manifest{}, err
 	}
-	if err := verifyNativeBinding(root, path, m); err != nil {
+	if err := checkPayloadAgent(root, m, config.Agent); err != nil {
 		return Paths{}, Manifest{}, err
 	}
 	return boundPaths(path, m.Layout), m, nil
@@ -218,48 +218,4 @@ func verifyNativeImmutable(root *os.Root) error {
 		}
 		return nil
 	})
-}
-
-// The package was bound at build time; slots and generated configuration must
-// name the installed prefix, never a builder staging path.
-func verifyNativeBinding(root *os.Root, path string, m Manifest) error {
-	interpreter := boundInterpreter(path, m.Layout)
-	for _, binding := range m.Bindings {
-		if err := plainExistingParents(root, binding.Path); err != nil {
-			return err
-		}
-		if err := nativeProtectedFile(root, binding.Path, false); err != nil {
-			return err
-		}
-		bound, ok := boundSlot(binding, interpreter)
-		if !ok {
-			return errors.New("native interpreter prefix exceeds binding capacity")
-		}
-		f, err := root.Open(binding.Path)
-		if err != nil {
-			return err
-		}
-		actual := make([]byte, len(binding.Expected))
-		_, readErr := f.ReadAt(actual, binding.Offset)
-		if err := errors.Join(readErr, f.Close()); err != nil {
-			return err
-		}
-		if !bytes.Equal(actual, bound) {
-			return errors.New("native interpreter is not bound to its package prefix")
-		}
-	}
-	fonts, launcher, err := boundConfiguration(path, m.Layout)
-	if err != nil {
-		return err
-	}
-	for name, expected := range map[string][]byte{fontConfigName: fonts, launcherName: launcher} {
-		actual, err := root.ReadFile(name)
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(actual, expected) {
-			return fmt.Errorf("native configuration is not bound to its package prefix: %s", name)
-		}
-	}
-	return nil
 }

@@ -29,6 +29,17 @@ func runFixedRuntimeCommand(
 	cfg runtimehost.Config,
 	report *runtimeCommandReport,
 ) error {
+	// Installation owners require an exact target pair, independently of the
+	// compatibility checks used by ordinary status and execution.
+	if command == "preload-validate" && cfg.Mode == runtimehost.ModePreloaded {
+		_, manifest, err := browserruntime.ReadPreload(cfg.PreloadPath, new(runtimehost.AgentRelease()))
+		if err == nil {
+			report.setRuntime(manifest.Identity())
+			report.PreloadPath = cfg.PreloadPath
+			report.State = "installed"
+		}
+		return err
+	}
 	if command != "status" && command != "qualify" {
 		if cfg.Mode == runtimehost.ModeNative {
 			return errors.New(
@@ -49,6 +60,10 @@ func inspectFixedRuntime(
 	report *runtimeCommandReport,
 ) error {
 	if handle.SetupError != nil {
+		if errors.Is(handle.SetupError, browserruntime.ErrIncompatible) {
+			report.State = "incompatible"
+			report.Notice = "The installed runtime is incompatible with this plugin's execution contract or lacks required provenance. Install or restore a compatible runtime through the installation owner."
+		}
 		return handle.SetupError
 	}
 	// Without a setup error the handle knows the release it runs.
@@ -76,6 +91,9 @@ func runManagedCommand(
 	report *runtimeCommandReport,
 	stderr io.Writer,
 ) error {
+	if command == "preload-validate" {
+		return errors.New("preload-validate requires runtime.mode: preloaded")
+	}
 	if command == "preload" {
 		entries, err := os.ReadDir(f.root)
 		if err != nil && !errors.Is(err, os.ErrNotExist) {
@@ -131,6 +149,19 @@ func runManagedCommand(
 		err = reportStatus(store, report)
 	case "uninstall":
 		err = uninstallRuntime(ctx, store, report)
+	case "activate", "rollback":
+		if command == "activate" {
+			err = store.ActivatePair(ctx)
+			report.Notice = "Selected runtime pair verified and any pending activation completed. The installation owner must start the matching Agent."
+		} else if f.preparedOnly {
+			err = store.CancelPreparation(ctx)
+			report.Notice = "Pending preparation canceled, if present. The installation owner must ensure the selected runtime matches the Agent before restarting."
+		} else {
+			err = store.RollbackPair(ctx)
+			report.Notice = "Previous runtime selected. Restore its matching Agent before restarting; this command does not restore Agent files or images."
+		}
+		status, _ := report.inventory(store)
+		report.selectedInstallation(status)
 	case "qualify":
 		err = qualifySelected(ctx, store, report)
 	case "ensure":
@@ -153,7 +184,15 @@ func reportStatus(store *browserruntime.Store, report *runtimeCommandReport) err
 	if status.Release == nil {
 		return browserruntime.ErrUnavailable
 	}
-	return nil
+	consumer, err := store.AcquireSelected()
+	if err != nil {
+		if errors.Is(err, browserruntime.ErrIncompatible) {
+			report.State = "incompatible"
+			report.Notice = "The selected runtime is incompatible with this plugin's execution contract. Install or restore a compatible runtime through the installation owner."
+		}
+		return err
+	}
+	return consumer.Close()
 }
 
 func uninstallRuntime(ctx context.Context, store *browserruntime.Store, report *runtimeCommandReport) error {
@@ -207,7 +246,7 @@ func ensureRuntime(
 		func(ctx context.Context) (browserruntime.VerifiedRelease, error) {
 			fmt.Fprintln(
 				stderr,
-				"First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.",
+				"First runtime enrollment acquires the matching signed release and permits paired companion downloads. Restart running DEM processes to activate the selection.",
 			)
 			return load(ctx)
 		},
@@ -273,13 +312,13 @@ func installCandidate(
 	options := browserruntime.ReleaseInstallOptions{
 		Operation: operation,
 	}
-	// install and repair set the update policy; update preserves the installed one.
-	if operation != browserruntime.UpdateRelease {
+	// Install and repair set the update policy; preparation preserves it.
+	if operation != browserruntime.PrepareRelease {
 		options.Updates = browserruntime.AutomaticUpdates
 		if manualUpdates {
 			options.Updates = browserruntime.ManualUpdates
 		} else {
-			fmt.Fprintln(stderr, "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.")
+			fmt.Fprintln(stderr, "Runtime installation permits companion downloads during Agent updates. First activation requires a DEM restart; use --manual-updates to require explicit acquisition.")
 		}
 	}
 	candidate, err := store.BeginPublishedInstall(ctx, options, load)
@@ -288,7 +327,19 @@ func installCandidate(
 	}
 	if candidate == nil {
 		report.Notice = unchangedReleaseNotice
+		report.Outcome = "unchanged"
 		return nil
+	}
+	if operation == browserruntime.PrepareRelease {
+		err = prepareCandidate(ctx, candidate, archive, report)
+		if err == nil {
+			err = candidate.PreparePair()
+		}
+		if err == nil {
+			report.Outcome = "prepared"
+			report.Notice = "Matching target is retained without changing selection. The installation owner must stop consumers, install the matching Agent and activate the pair."
+		}
+		return closeUnlessUndrained(err, candidate)
 	}
 	return closeUnlessUndrained(selectCandidate(ctx, candidate, archive, report), candidate)
 }
@@ -299,8 +350,8 @@ func releaseOperation(command string) (browserruntime.ReleaseOperation, error) {
 	switch command {
 	case "install":
 		return browserruntime.InstallRelease, nil
-	case "update":
-		return browserruntime.UpdateRelease, nil
+	case "prepare":
+		return browserruntime.PrepareRelease, nil
 	case "repair":
 		return browserruntime.RepairRelease, nil
 	}
@@ -326,7 +377,7 @@ func preloadRuntime(
 	return err
 }
 
-// sealPreload begins a candidate without automatic updates, qualifies it and
+// sealPreload begins a candidate without automatic updates, verifies it and
 // seals it as the preload root. sealed reports a completed seal even when
 // closing the candidate fails afterwards.
 func sealPreload(
@@ -349,7 +400,7 @@ func sealPreload(
 		report.Notice = unchangedReleaseNotice
 		return false, nil
 	}
-	err = qualifyCandidate(ctx, candidate, archive, report)
+	err = prepareCandidate(ctx, candidate, archive, report)
 	if err == nil {
 		err = candidate.SealPreload()
 	}
@@ -362,19 +413,19 @@ func sealPreload(
 		report.PreloadedConfig = map[string]any{
 			"runtime": map[string]any{"mode": runtimehost.ModePreloaded, "preload_path": root},
 		}
-		report.Notice = "Preload is qualified for this CLI user/environment and bound to this final root. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
+		report.Notice = "Preload integrity is verified and bound to this final root. Browser execution has not been tested; use runtime qualify for an optional local diagnostic. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
 	}
 	return sealed, closeUnlessUndrained(err, candidate)
 }
 
-// selectCandidate qualifies the candidate and selects it.
+// selectCandidate verifies the candidate and selects it.
 func selectCandidate(
 	ctx context.Context,
 	candidate *browserruntime.Candidate,
 	archive string,
 	report *runtimeCommandReport,
 ) error {
-	if err := qualifyCandidate(ctx, candidate, archive, report); err != nil {
+	if err := prepareCandidate(ctx, candidate, archive, report); err != nil {
 		return err
 	}
 	if err := candidate.Select(); err != nil {
@@ -386,10 +437,10 @@ func selectCandidate(
 	return nil
 }
 
-// qualifyCandidate imports or downloads the candidate and qualifies it in a
-// standalone execution scope. A cancellation after qualification stops the
-// command before the candidate is published.
-func qualifyCandidate(
+// prepareCandidate imports or downloads authenticated bytes and verifies their
+// bounds, layout and final-path binding without executing the browser. A
+// cancellation stops the command before the candidate is published.
+func prepareCandidate(
 	ctx context.Context,
 	candidate *browserruntime.Candidate,
 	archive string,
@@ -407,9 +458,5 @@ func qualifyCandidate(
 		return err
 	}
 	report.CandidateState = "prepared"
-	report.Qualification, err = runner.Qualify(ctx, runtimehost.Borrow(candidate))
-	if err != nil {
-		return err
-	}
 	return ctx.Err()
 }

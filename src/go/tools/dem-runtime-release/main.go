@@ -55,7 +55,9 @@ func sign(args []string, diagnostics io.Writer) error {
 	sources := fs.String("sources", "", "local source archive")
 	archiveURL := fs.String("archive-url", "", "immutable HTTPS runtime archive publication URL")
 	sourcesURL := fs.String("sources-url", "", "immutable HTTPS source archive publication URL")
-	sequence := fs.Uint64("sequence", 0, "positive publication sequence in the shared release channel")
+	agentVersion := fs.String("agent-version", "", "canonical paired Agent release version")
+	agentChannel := fs.String("agent-channel", "", "paired Agent release channel: stable, nightly or devel")
+	agentSource := fs.String("agent-source", "", "full lowercase paired Agent source commit SHA")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -66,10 +68,18 @@ func sign(args []string, diagnostics io.Writer) error {
 		return errors.New("key and descriptor paths are required")
 	}
 	if *publicKey == "" || *manifest == "" || *archive == "" || *sources == "" || *archiveURL == "" ||
-		*sourcesURL == "" || *sequence == 0 {
+		*sourcesURL == "" || *agentVersion == "" || *agentChannel == "" || *agentSource == "" {
 		return errors.New(
-			"sign requires public-key, manifest, archive, sources, archive-url, sources-url, and a positive sequence",
+			"sign requires public-key, manifest, archive, sources, archive-url, sources-url, agent-version, agent-channel and agent-source",
 		)
+	}
+	agent := browserruntime.AgentRelease{
+		Version: *agentVersion,
+		Channel: *agentChannel,
+		Source:  *agentSource,
+	}
+	if err := agent.Validate(); err != nil {
+		return err
 	}
 	m, err := readBuilderManifest(*manifest)
 	if err != nil {
@@ -90,14 +100,17 @@ func sign(args []string, diagnostics io.Writer) error {
 		return fmt.Errorf("source archive: %w", err)
 	}
 	release := browserruntime.Release{
-		Format:   1,
-		Sequence: *sequence,
+		Format:   2,
+		Agent:    &agent,
 		Manifest: m,
 		Sources: browserruntime.ReleaseSource{
 			URL:    *sourcesURL,
 			SHA256: hash,
 			Bytes:  size,
 		},
+	}
+	if err := release.ValidateForAgent(agent); err != nil {
+		return err
 	}
 	trusted, err := browserruntime.ReadReleaseKeyring(*publicKey)
 	if err != nil {

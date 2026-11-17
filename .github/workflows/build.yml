@@ -16,12 +16,42 @@ on:
         description: Version Tag
         default: nightly
         required: true
+      source_sha:
+        description: Frozen Agent commit (defaults to the dispatch commit)
+        required: false
+        type: string
+      companion_run_id:
+        description: Published companion run (omit to build and publish the paired companion)
+        required: false
+        type: string
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 env:
   DISABLE_TELEMETRY: 1 # Disable telemetry reporting from the agent in our CI.
 jobs:
+  runtime-companion:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && !inputs.companion_run_id
+    uses: ./.github/workflows/dem-runtime-release.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      channel: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      publish: true
+    secrets: inherit
+
+  release-companion:
+    needs: runtime-companion
+    if: always() && !cancelled() && (needs.runtime-companion.result == 'success' || needs.runtime-companion.result == 'skipped')
+    uses: ./.github/workflows/dem-runtime-companion-check.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
+      channel: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      version: ${{ inputs.version }}
+
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
     runs-on: ubuntu-latest
@@ -29,11 +59,13 @@ jobs:
       run: ${{ steps.check-run.outputs.run }}
       skip-go: ${{ steps.check-go.outputs.skip-go }}
       static-native: ${{ steps.check-static.outputs.static-native }}
+      runtime: ${{ steps.check-runtime-files.outputs.any_modified }}
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
       - name: Check source files
@@ -67,6 +99,12 @@ jobs:
             .github/data/distros.yml
             .github/workflows/build.yml
             .github/scripts/modules/release_versions.py
+            .github/workflows/release.yml
+            .github/workflows/dem-runtime-release.yml
+            .github/workflows/dem-runtime-companion-check.yml
+            .github/scripts/prepare-release-base.sh
+            .github/scripts/tests/test_dem_paired_workflows.py
+            packaging/release_info.py
             .github/scripts/build-static.sh
             .github/scripts/get-static-cache-key.sh
             .github/scripts/gen-matrix-static.py
@@ -86,6 +124,48 @@ jobs:
             packaging/**/*.md
             packaging/repoconfig/
             src/go/tools/topology-ip-intel-downloader/README.md
+      - name: Check runtime release and execution files
+        id: check-runtime-files
+        uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          files: |
+            .github/workflows/release.yml
+            .github/workflows/dem-runtime-release.yml
+            .github/workflows/dem-runtime-node-tests.yml
+            .github/workflows/dem-runtime-companion-check.yml
+            .github/workflows/build.yml
+            .github/workflows/packaging.yml
+            .github/workflows/docker.yml
+            .github/data/distros.yml
+            .github/scripts/prepare-release-base.sh
+            .github/scripts/tests/test_dem_paired_workflows.py
+            packaging/release_info.py
+            packaging/dem-runtime/**
+            packaging/installer/netdata-dem-runtime.sh
+            packaging/cmake/Modules/NetdataVersion.cmake
+            packaging/cmake/Modules/NetdataGoTools.cmake
+            packaging/cmake/Modules/Packaging.cmake
+            packaging/cmake/Modules/NetdataPluginDem.cmake
+            src/dem-runtime/**
+            src/go/cmd/demplugin/**
+            src/go/plugin/dem/**
+            src/go/plugin/go.d/pkg/ndexec/**
+            src/go/pkg/buildinfo/**
+            src/go/tools/dem-runtime-release/**
+            src/go/go.mod
+            src/go/go.sum
+            src/collectors/utils/nd-run.c
+            src/collectors/utils/nd-process-tree.*
+            src/collectors/utils/nd-file-reader.*
+            src/collectors/utils/supervisor-pipes.h
+            src/collectors/utils/exec-signals.h
+          files_ignore: |
+            **/*.md
+            **/metadata.yaml
+            **/*_test.go
+            **/test_*.py
+            **/tests/**
       - name: Check static build files
         id: check-static-build-files
         uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
@@ -149,6 +229,15 @@ jobs:
             echo 'static-native=0' >> "${GITHUB_OUTPUT}"
           fi
 
+  runtime-companion-ci:
+    needs: file-check
+    if: github.event_name != 'workflow_dispatch' && needs.file-check.outputs.runtime == 'true'
+    uses: ./.github/workflows/dem-runtime-release.yml
+    with:
+      source_sha: ${{ github.sha }}
+      channel: devel
+      publish: false
+
   build-dist: # Build the distribution tarball and store it as an artifact.
     name: Build Distribution Tarball
     runs-on: ubuntu-latest
@@ -164,8 +253,16 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Fix tags
         id: fix-tags
         if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
@@ -225,6 +322,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Prepare tools
         id: prepare
         run: |
@@ -273,6 +372,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
       - name: Setup Go
@@ -353,8 +453,16 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Fix tags
         id: fix-tags
         if: github.event_name != 'push' && needs.file-check.outputs.run == 'true'
@@ -523,8 +631,16 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
           lfs: true
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Set Up Go
         id: golang
         if: needs.file-check.outputs.run == 'true'
@@ -631,6 +747,7 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           submodules: false
           lfs: false
       - name: Retrieve Windows Artifacts
@@ -681,9 +798,17 @@ jobs:
           }}
 
   prepare-upload: # Consolidate the artifacts for uploading or releasing.
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.release-companion.result == 'success'
+          && needs.build-dist.result == 'success'
+          && needs.build-static.result == 'success'
+          && needs.windows-build.result == 'success'
+          && needs.file-check.result == 'success' }}
     name: Prepare Artifacts
     runs-on: ubuntu-latest
     needs:
+      - release-companion
       - build-dist
       - build-static
       - windows-build
@@ -697,6 +822,15 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ (inputs.type == 'release' || inputs.type == 'release-candidate') && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Prepare Environment
         id: prepare
         if: needs.file-check.outputs.run == 'true'
@@ -783,6 +917,10 @@ jobs:
           }}
 
   artifact-verification-dist: # Verify the regular installer works with the consolidated artifacts.
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.file-check.result == 'success' }}
     name: Test Consolidated Artifacts (Source)
     runs-on: ubuntu-latest
     needs:
@@ -804,6 +942,8 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
@@ -847,6 +987,10 @@ jobs:
           }}
 
   artifact-verification-static: # Verify the static installer works with the consolidated artifacts.
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.file-check.result == 'success' }}
     name: Test Consolidated Artifacts (Static)
     runs-on: ubuntu-latest
     needs:
@@ -868,6 +1012,8 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Fetch artifacts
         id: fetch
         if: needs.file-check.outputs.run == 'true'
@@ -911,6 +1057,10 @@ jobs:
           }}
 
   artifact-verification-updater: # Test the generated dist archive using the updater code.
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.file-check.result == 'success' }}
     name: Test Consolidated Artifacts (Updater)
     runs-on: ubuntu-latest
     needs:
@@ -932,6 +1082,8 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Fetch artifacts
         id: fetch-artifacts
         if: needs.file-check.outputs.run == 'true'
@@ -982,7 +1134,15 @@ jobs:
   create-nightly: # Create a nightly build release in netdata/netdata-nightlies
     name: Create Nightly Release
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.windows-test.result == 'success'
+          && needs.artifact-verification-dist.result == 'success'
+          && needs.artifact-verification-static.result == 'success'
+          && github.event_name == 'workflow_dispatch'
+          && github.event.inputs.type == 'nightly'
+          && github.repository == 'netdata/netdata' }}
     needs:
       - prepare-upload
       - windows-test
@@ -993,6 +1153,7 @@ jobs:
         id: checkout-main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           path: main
       - name: Checkout Nightly Repo
         id: checkout-nightly
@@ -1032,6 +1193,7 @@ jobs:
         id: checkout-netdata
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Init python environment for publish release metadata
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -1097,7 +1259,15 @@ jobs:
   publish-nightly-artifacts:
     name: Publish Nightly Release Artifacts
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'nightly' && github.repository == 'netdata/netdata'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.windows-test.result == 'success'
+          && needs.artifact-verification-dist.result == 'success'
+          && needs.artifact-verification-static.result == 'success'
+          && github.event_name == 'workflow_dispatch'
+          && github.event.inputs.type == 'nightly'
+          && github.repository == 'netdata/netdata' }}
     needs:
       - prepare-upload
       - windows-test
@@ -1168,7 +1338,15 @@ jobs:
   upload-release: # Create the draft release and upload the build artifacts.
     name: Create Release Draft
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.artifact-verification-dist.result == 'success'
+          && needs.artifact-verification-static.result == 'success'
+          && needs.windows-test.result == 'success'
+          && needs.normalize-tag.result == 'success'
+          && github.event_name == 'workflow_dispatch'
+          && github.event.inputs.type == 'release'
+          && github.repository == 'netdata/netdata' }}
     needs:
       - artifact-verification-dist
       - artifact-verification-static
@@ -1178,6 +1356,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Retrieve Artifacts
         id: fetch
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -1232,7 +1412,15 @@ jobs:
   publish-stable-artifacts:
     name: Publish Stable Release Artifacts
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.type == 'release' && github.repository == 'netdata/netdata'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.prepare-upload.result == 'success'
+          && needs.windows-test.result == 'success'
+          && needs.artifact-verification-dist.result == 'success'
+          && needs.artifact-verification-static.result == 'success'
+          && github.event_name == 'workflow_dispatch'
+          && github.event.inputs.type == 'release'
+          && github.repository == 'netdata/netdata' }}
     needs:
       - prepare-upload
       - windows-test
@@ -1242,6 +1430,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Select Artifact Prefixes
         id: prefixes
         env:
@@ -1328,6 +1518,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Prepare tools
         id: prepare
         run: |
@@ -1382,6 +1574,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
       - name: Setup Buildx
         id: buildx
@@ -1453,6 +1646,7 @@ jobs:
         id: checkout
         if: needs.file-check.outputs.run == 'true'
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
       - name: Install latest bash
         id: install-bash

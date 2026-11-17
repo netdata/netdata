@@ -52,16 +52,17 @@ See the [configure section](#configure-agent-containers) for details. If you wan
 
 DEM journeys and Lighthouse require a browser runtime. For local, rootful Docker on Linux, start the container
 with the configuration below, including persistent storage at `/var/lib/netdata` and, on AppArmor hosts,
-`--security-opt apparmor=unconfined`. Currently, you must also set `runtime.release_url` in the container's
-`dem.conf` to the signed release metadata URL for its architecture. Then run this command on the daemon host:
+`--security-opt apparmor=unconfined`. Release images default to the signed runtime for their exact Agent identity and
+architecture; `runtime.release_url` in `dem.conf` can override it. Then run this command on the daemon host:
 
 ```sh
 sudo sh ./kickstart.sh --install-dem-runtime --docker-container netdata
 ```
 
-Keep the Agent running while kickstart downloads and qualifies the runtime. After the command succeeds,
+Keep the Agent running while kickstart downloads and verifies the runtime. After the command succeeds,
 run `docker restart netdata` to activate it. Replace `netdata` with your container name.
-RUM works without the runtime. For qualification results, rootless, nested or remote deployments, and removal,
+Later image updates must switch the matching runtime selection and pinned image together. RUM works without the
+runtime. For paired updates, optional local qualification, rootless, nested or remote deployments, and removal,
 see [Docker browser runtime setup](/packaging/installer/DEM-RUNTIME.md#docker-host-preparation).
 
 :::info If you remove `pid: host`

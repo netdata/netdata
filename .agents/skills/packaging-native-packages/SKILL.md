@@ -1,6 +1,6 @@
 ---
 name: packaging-native-packages
-description: Change, review or troubleshoot native DEB/RPM packages, CPack component dependencies, independently versioned payloads, account creation, scriptlet ordering and installed ownership. For repository submission or promotion use packaging-component-releases. Static makeself builds use packaging-static-installer.
+description: Change, review or troubleshoot native DEB/RPM packages, CPack component dependencies, paired or independently versioned payloads, account creation, scriptlet ordering and installed ownership. For repository submission or promotion use packaging-component-releases. Static makeself builds use packaging-static-installer.
 ---
 
 # Native Package Changes
@@ -18,7 +18,7 @@ its distro; a build request alone does not authorize installing packages on the 
 | Task | Read |
 |---|---|
 | Add a component or change default plugin delivery | `./SKILL.md#preserve-dependency-policy`; component registry and plugin install rules |
-| Package an independently released runtime or helper | `./SKILL.md#independently-versioned-payloads` and the component recipe |
+| Package a versioned runtime or helper | `./SKILL.md#versioned-payloads` and the component recipe |
 | Diagnose a missing account or wrong installed owner | `./SKILL.md#account-creation-and-payload-ownership`; selected scriptlets and transaction log |
 | Validate a native packaging change | `./SKILL.md#validate-at-the-relevant-layer`; metadata and transaction evidence |
 
@@ -49,17 +49,19 @@ its distro; a build request alone does not authorize installing packages on the 
 - Preserve package-family conventions: the DEB suggestions list and conditional, versioned RPM suggestions have
   different forms. Validate both with the feature enabled and disabled; do not impose symmetry without evidence.
 
-## Independently Versioned Payloads
+## Versioned Payloads
 
 - Model the three dependency edges separately. In DEM the Agent recommends the plugin, the plugin suggests the
-  optional browser runtime, and the runtime requires the helper capability provided by a compatible plugin.
+  optional browser runtime, and the runtime requires the exact final plugin version. Hook capabilities separately
+  establish which already-installed helper can drain before unpack or erasure.
   The suggestion records the relationship for package-manager retention decisions without installing the browser
   for every plugin user. Check effective DEB and RPM metadata, including the RPM tier without weak dependencies.
-  The capability lets runtime security releases ship on their own schedule.
-- In a standalone CPack project, validate the staged payload's format, install root, architecture and version
-  before `project()`. Derive CMake's numeric project version from that identity and preserve the complete version
-  and package revision in CPack. Include a suffix and a staged/requested version mismatch in the checks.
-  See `packaging/dem-runtime/native/CMakeLists.txt` and `packaging/dem-runtime/native/tests/test_recipe.py`.
+- Follow the established release model. DEM is an optional Agent CPack component with explicit verified staging;
+  `packaging/dem-runtime/native/README.md` owns identity checks, epoch migration and the runtime-only second pass.
+  Do not add a second version encoder or native publisher. Validate package epoch/revision/suffix behavior and
+  staged/requested identity mismatch using `packaging/dem-runtime/native/tests/test_recipe.py`.
+- A genuinely standalone CPack project still needs staged format, root, architecture and version validation before
+  `project()`. Its numeric project version must preserve complete release/revision identity in emitted packages.
 - If hooks call an installed helper, require its capability at each phase that needs it, including before unpack
   and before erasure. Pre-install hooks cannot rely on files that the incoming package has yet to install.
   Keep package-owned files distinct from persistent application state. Check that packaging preserves any bound

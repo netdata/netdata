@@ -44,7 +44,11 @@ func installBundle(t *testing.T, store *browserruntime.Store, version string) br
 // qualification.
 func publishedBundle(t *testing.T, version string, sequence uint64) (browserruntime.Release, []byte) {
 	t.Helper()
-	b := browserruntimetest.NewBundle(t, version)
+	agent := fixtureAgent(version)
+	b := browserruntimetest.NewBundle(t, version, browserruntimetest.Entry{
+		Name: "release-info", Mode: 0644,
+		Contents: []byte("version=" + agent.Version + "\nchannel=" + agent.Channel + "\nsource=" + agent.Source + "\n"),
+	})
 	m := browserruntime.Manifest{
 		Format:   1,
 		Contract: 2,
@@ -280,6 +284,8 @@ func TestHandleIdentityNamesTheRunningRelease(t *testing.T) {
 			store, err := browserruntime.Open(browserruntime.DefaultConfig(path))
 			require.NoError(t, err)
 			release, data := publishedBundle(t, "handle", installSequence.Add(1))
+			agent := useFixtureAgent(t, "handle")
+			release.Format, release.Sequence, release.Agent = 2, 0, &agent
 			cfg := DefaultConfig()
 			cfg.Mode = mode
 			if mode == ModeManaged {

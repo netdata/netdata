@@ -21,9 +21,11 @@ go run ./tools/dem-runtime-release sign \
   --manifest /build/manifest.json \
   --archive /build/runtime.tar.zst \
   --sources /build/sources.tar.zst \
-  --archive-url https://artifacts.example.invalid/dem-runtime/1/arm64/runtime.tar.zst \
-  --sources-url https://artifacts.example.invalid/dem-runtime/1/arm64/sources.tar.zst \
-  --sequence 17 \
+  --archive-url https://artifacts.example.invalid/dem-runtime/stable/v2.12.0/arm64/runtime.tar.zst \
+  --sources-url https://artifacts.example.invalid/dem-runtime/stable/v2.12.0/arm64/sources.tar.zst \
+  --agent-version v2.12.0 \
+  --agent-channel stable \
+  --agent-source 0123456789abcdef0123456789abcdef01234567 \
   --output /build/release.json
 
 go run ./tools/dem-runtime-release verify \
@@ -44,13 +46,16 @@ unchanged throughout signing and subsequent publication. The tool verifies the
 resulting detached signature before creating the envelope; the public keyring must
 authorize the selected GPG signer.
 
-`--sequence` is required, positive and explicitly allocated by the publisher in
-one shared channel namespace across architectures and contract changes. The tool
-cannot establish sequence uniqueness or source completeness. A new release
-identity must not reuse published bytes or a prior sequence for changed content.
-Qualification, complete source/license assembly, and checking publication
-availability remain release workflow obligations. Signing does not establish any
-of them. Package/repository signing is a separate operation.
+The three `--agent-*` fields are required and must match the Agent's generated
+`packaging/release-info`. The manifest version must match `--agent-version`.
+Signing emits a format-2 descriptor for that exact version, channel and source
+commit; there is no independently allocated runtime sequence. The publisher
+rejects conflicting content at an existing release identity. Browser smoke tests,
+complete source/license assembly and public availability remain release workflow
+obligations. Signing does not establish any of them. The example uses placeholder
+artifact locations; the publisher chooses the final immutable archive names.
+See [the release workflow guide](../../../../packaging/dem-runtime/RELEASE.md)
+for publication order and retries. Package/repository signing is a separate operation.
 
 Output is a complete descriptor created atomically under the requested name.
 Existing output paths are always rejected, even if identical; inspect and reuse
@@ -103,7 +108,7 @@ selection or lifetime-proof records. Directories and executable files have mode
 DEB/RPM recipe MUST normalize all ownership, including symlinks, to root and install
 the tree at exactly that final prefix. The installed native reader additionally
 checks root ownership and protected ancestors, so a staging directory alone is
-not an installed or qualified runtime.
+not an installed or admitted runtime.
 
 The builder API is
 `browserruntime.PrepareNativePackage(ctx, manifest, archivePath, outputPath) error`.
@@ -112,5 +117,7 @@ for inspection and explicit cleanup; no completed `native.json` is emitted after
 a digest, extraction, binding or permission failure. Existing nonempty outputs
 are refused. Build workspaces must provide exclusive access to each staging
 output. A package lifecycle hook must still close admission, stop/drain consumers,
-and qualify the installed payload before reopening admission. This command does
-not perform those operations or replace package/repository authentication.
+and verify the installed payload's integrity and exact Agent identity before
+reopening admission. Local browser qualification is optional; it is not part of
+normal native installation. This command does not perform those lifecycle
+operations or replace package/repository authentication.

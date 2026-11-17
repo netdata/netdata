@@ -42,8 +42,8 @@ RELEASE_CHANNEL="nightly"
 while [ "${1}" ]; do
   case "${1}" in
     "--dont-start-it")
+      # Invocation-only: paired activation also uses this to defer the start.
       STARTIT=0
-      REINSTALL_OPTIONS="${REINSTALL_OPTIONS} ${1}"
       ;;
     "--auto-update" | "-u") ;;
     "--stable-channel")
@@ -442,12 +442,14 @@ if [ ${STARTIT} -eq 0 ]; then
 else
   progress "starting netdata"
 
-  if ! restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
-    create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+  if restart_netdata "${NETDATA_PREFIX}/bin/netdata"; then
+    create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
     netdata_banner "is installed and running now!"
   else
-    create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf" "http://localhost:19999/netdata.conf"
-    netdata_banner "is installed now!"
+    static_start_status=$?
+    create_netdata_conf "${NETDATA_PREFIX}/etc/netdata/netdata.conf"
+    printf 'Netdata failed to start (status %s).\n' "$static_start_status" >&2
+    exit "$static_start_status"
   fi
 fi
 run chmod 0644 "${NETDATA_PREFIX}/etc/netdata/netdata.conf"

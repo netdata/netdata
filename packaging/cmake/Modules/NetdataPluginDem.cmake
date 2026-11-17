@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # dem.plugin: the experimental digital experience monitoring plugin and config.
-# Browser execution assets are delivered by the independent DEM runtime.
+# Browser execution assets are delivered by the optional paired DEM runtime.
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.

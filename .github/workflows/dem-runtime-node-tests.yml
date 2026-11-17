@@ -2,6 +2,11 @@
 name: DEM runtime wire compatibility
 on:
   workflow_call:
+    inputs:
+      source_sha:
+        description: Frozen source commit; defaults to the caller checkout
+        type: string
+        default: ''
 permissions:
   contents: read
 jobs:
@@ -11,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
       - name: Read the runtime Node pin
         id: runtime

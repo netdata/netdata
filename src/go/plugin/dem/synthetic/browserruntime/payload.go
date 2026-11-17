@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -61,10 +62,10 @@ func bindPrefix(root *os.Root, final string, m Manifest) error {
 		return err
 	}
 	// Staging is owned and, for managed generations, later executed by this account.
-	return verifyBoundPayload(root, m, ownerExecute)
+	return verifyBoundPayload(root, final, m, ownerExecute)
 }
 
-// payloadLayoutError records a directly observed structural violation.
+// payloadLayoutError records a directly observed structural or binding violation.
 type payloadLayoutError string
 
 func (e payloadLayoutError) Error() string { return string(e) }
@@ -74,7 +75,7 @@ func (e payloadLayoutError) Error() string { return string(e) }
 // is in the file's group, and the other bits otherwise. Managed generations are
 // owned and executed by the service account. Native payloads are root-owned and
 // executed by the non-root service UID, so their owner bit never authorizes it;
-// qualification, which runs the payload as that UID, remains the full proof.
+// optional qualification tests actual execution as that UID.
 const (
 	ownerExecute    os.FileMode = 0100
 	nonOwnerExecute os.FileMode = 0011
@@ -84,8 +85,9 @@ const (
 // walking or executing it: every path has plain directory parents, the declared
 // executables and the generated launcher are regular files with the execute bit
 // of the class that runs them, the entrypoint and generated font configuration
-// are regular files, and the data paths are directories.
-func verifyBoundPayload(root *os.Root, m Manifest, execute os.FileMode) error {
+// are regular files, and the data paths are directories. Interpreter slots and
+// generated configuration must contain the exact binding to the final prefix.
+func verifyBoundPayload(root *os.Root, prefix string, m Manifest, execute os.FileMode) error {
 	for _, name := range []string{m.Layout.Node, m.Layout.Browser, m.Layout.Loader, launcherName} {
 		info, err := lstatPlain(root, name)
 		if err != nil {
@@ -111,6 +113,63 @@ func verifyBoundPayload(root *os.Root, m Manifest, execute os.FileMode) error {
 		}
 		if !info.IsDir() {
 			return payloadLayoutError(fmt.Sprintf("runtime directory is missing: %s", name))
+		}
+	}
+	return verifyPayloadBinding(root, prefix, m)
+}
+
+// Only deterministic binding output is compared here, with reads bounded by the
+// authenticated slots and generated configuration. Payload authentication and
+// native ownership protection remain the installation owners' responsibility.
+func verifyPayloadBinding(root *os.Root, prefix string, m Manifest) error {
+	interpreter := boundInterpreter(prefix, m.Layout)
+	for _, binding := range m.Bindings {
+		info, err := lstatPlain(root, binding.Path)
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || binding.Offset > info.Size() ||
+			int64(len(binding.Expected)) > info.Size()-binding.Offset {
+			return payloadLayoutError("interpreter binding lies outside a regular file")
+		}
+		bound, ok := boundSlot(binding, interpreter)
+		if !ok {
+			return payloadLayoutError("runtime prefix exceeds authenticated interpreter capacity")
+		}
+		f, err := root.Open(binding.Path)
+		if err != nil {
+			return err
+		}
+		actual := make([]byte, len(bound))
+		_, readErr := f.ReadAt(actual, binding.Offset)
+		if errors.Is(readErr, io.EOF) {
+			readErr = payloadLayoutError("interpreter binding is truncated")
+		}
+		if err := errors.Join(readErr, f.Close()); err != nil {
+			return err
+		}
+		if !bytes.Equal(actual, bound) {
+			return payloadLayoutError("runtime interpreter is not bound to its prefix")
+		}
+	}
+	fonts, launcher, err := boundConfiguration(prefix, m.Layout)
+	if err != nil {
+		return err
+	}
+	for _, config := range []struct {
+		name     string
+		expected []byte
+	}{{fontConfigName, fonts}, {launcherName, launcher}} {
+		f, err := root.Open(config.name)
+		if err != nil {
+			return err
+		}
+		actual, readErr := io.ReadAll(io.LimitReader(f, int64(len(config.expected))+1))
+		if err := errors.Join(readErr, f.Close()); err != nil {
+			return err
+		}
+		if !bytes.Equal(actual, config.expected) {
+			return payloadLayoutError("runtime configuration is not bound to its prefix: " + config.name)
 		}
 	}
 	return nil

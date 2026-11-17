@@ -274,6 +274,13 @@ else
     add_cmake_option ENABLE_SENTRY Off
 fi
 
+if [ -n "${DEM_RUNTIME_PAYLOAD_DIR:-}" ]; then
+    add_cmake_option DEM_RUNTIME_PAYLOAD_DIR "${DEM_RUNTIME_PAYLOAD_DIR}"
+else
+    # Reconfiguring a reused build directory must not retain a prior opt-in.
+    add_cmake_option DEM_RUNTIME_PAYLOAD_DIR ""
+fi
+
 run_cmake
 cmake --build "${BUILD_DIR}" --parallel "$(nproc)" -- -k 1
 
@@ -283,3 +290,6 @@ fi
 
 cd "${BUILD_DIR}" || exit 1
 cpack -V -G "${PKG_TYPE}"
+if [ -n "${DEM_RUNTIME_PAYLOAD_DIR:-}" ]; then
+    cpack -V -G "${PKG_TYPE}" --config CPackDEMRuntimeConfig.cmake
+fi

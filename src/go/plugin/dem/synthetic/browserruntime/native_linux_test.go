@@ -143,11 +143,11 @@ func (f *nativeFixture) inspect(t *testing.T) NativeInspector {
 	}
 }
 
-func (f *nativeFixture) qualify(t *testing.T, action string) NativeQualifier {
+func (f *nativeFixture) validate(t *testing.T, action string) NativeValidator {
 	return func(_ context.Context, target Manifest) error {
 		data, err := f.command(t, action, &target).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("service qualifier: %w: %s", err, data)
+			return fmt.Errorf("service validator: %w: %s", err, data)
 		}
 		return nil
 	}
@@ -201,12 +201,14 @@ func nativeServiceProcess(action string) error {
 		return nil
 	}
 	var consumer *NativeConsumer
-	if action == "qualify" || action == "qualify-fail" || action == "hold-candidate" {
+	if action == "validate" || action == "validate-fail" || action == "hold-candidate" {
 		var target Manifest
 		if err := json.Unmarshal([]byte(os.Getenv("DEM_NATIVE_TARGET")), &target); err != nil {
 			return err
 		}
 		consumer, err = native.AcquireCandidate(target)
+	} else if action == "pair-status" {
+		consumer, err = native.AcquireSelectedPair()
 	} else {
 		consumer, err = native.AcquireSelected()
 	}
@@ -214,6 +216,12 @@ func nativeServiceProcess(action string) error {
 		return err
 	}
 	defer consumer.Close()
+	if action == "validate" {
+		return nil // AcquireCandidate verifies the complete payload without execution.
+	}
+	if action == "validate-fail" {
+		return errors.New("validation fixture failed")
+	}
 	if action == "hold" || action == "hold-candidate" {
 		fmt.Fprintln(os.Stdout, "ready")
 		_, err := bufio.NewReader(os.Stdin).ReadByte()
@@ -251,9 +259,6 @@ func nativeServiceProcess(action string) error {
 		} else if err := use.Finish(true); err != nil {
 			return err
 		}
-		if action == "qualify-fail" {
-			return errors.New("qualification fixture failed")
-		}
 	}
 	return nil
 }
@@ -290,16 +295,16 @@ func TestNativeAdmissionLifecycle(t *testing.T) {
 	data, err := f.command(t, "expect-closed", nil).CombinedOutput()
 	require.NoError(t, err, "%s", data)
 	calls := 0
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), func(ctx context.Context, target Manifest) error {
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), func(ctx context.Context, target Manifest) error {
 		calls++
 		data, err := f.command(t, "expect-closed", nil).CombinedOutput()
 		if err != nil {
-			return fmt.Errorf("ordinary admission during qualification: %w: %s", err, data)
+			return fmt.Errorf("ordinary admission during validation: %w: %s", err, data)
 		}
 		stop := f.hold(t, "hold-candidate", &target)
 		require.ErrorIs(t, f.control.CloseAdmission(ctx, f.inspect(t)), ErrInUse)
 		stop()
-		return f.qualify(t, "qualify")(ctx, target)
+		return f.validate(t, "validate")(ctx, target)
 	}))
 	require.Equal(t, 1, calls)
 	stop := f.hold(t, "hold", nil)
@@ -313,13 +318,13 @@ func TestNativeAdmissionLifecycle(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, nativeClosed, state.Phase)
 	require.Nil(t, state.Target)
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate")))
 }
 
-func TestNativeFailedQualificationCannotOpenAdmission(t *testing.T) {
+func TestNativeFailedValidationCannotOpenAdmission(t *testing.T) {
 	f := newNativeFixture(t)
 	ctx := context.Background()
-	require.Error(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify-fail")))
+	require.Error(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate-fail")))
 	data, err := f.command(t, "expect-closed", nil).CombinedOutput()
 	require.NoError(t, err, "%s", data)
 	status, err := f.inspect(t)(ctx)
@@ -327,14 +332,14 @@ func TestNativeFailedQualificationCannotOpenAdmission(t *testing.T) {
 	require.NoError(t, status.empty())
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
-	require.Equal(t, nativeQualifying, state.Phase, "empty proof does not establish qualification success")
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	require.Equal(t, nativeQualifying, state.Phase, "empty proof does not establish validation success")
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate")))
 }
 
 func TestNativePendingExecutionPreventsMutation(t *testing.T) {
 	f := newNativeFixture(t)
 	ctx := context.Background()
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate")))
 	data, err := f.command(t, "pending", nil).CombinedOutput()
 	require.NoError(t, err, "%s", data)
 	status, err := f.inspect(t)(ctx)
@@ -347,7 +352,7 @@ func TestNativePendingExecutionPreventsMutation(t *testing.T) {
 func TestNativeGateSerializesNewAdmission(t *testing.T) {
 	f := newNativeFixture(t)
 	ctx := context.Background()
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate")))
 	command := f.command(t, "expect-closed", nil)
 	output, err := command.StdoutPipe()
 	require.NoError(t, err)
@@ -395,7 +400,7 @@ func TestNativeIncompleteOwnershipProofIsNamed(t *testing.T) {
 }
 
 func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
-	for _, damage := range []string{"writable-file", "writable-ancestor", "foreign-owner", "misbound", "external-link", "owner-only-execute"} {
+	for _, damage := range []string{"writable-file", "writable-ancestor", "foreign-owner", "misbound", "external-link", "owner-only-execute", fontConfigName, "node interpreter", "browser interpreter"} {
 		t.Run(damage, func(t *testing.T) {
 			f := newNativeFixture(t)
 			switch damage {
@@ -418,9 +423,14 @@ func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
 			case "owner-only-execute":
 				// Only root could execute it; the service UID never can.
 				require.NoError(t, os.Chmod(filepath.Join(f.config.PayloadPath, f.manifest.Layout.Browser), 0744))
+			default:
+				root, err := os.OpenRoot(f.config.PayloadPath)
+				require.NoError(t, err)
+				corruptBoundPayload(t, root, f.manifest, damage)
+				require.NoError(t, root.Close())
 			}
 			called := false
-			err := f.control.QualifyAndReady(
+			err := f.control.ValidateAndReady(
 				context.Background(),
 				f.inspect(t),
 				func(context.Context, Manifest) error { called = true; return nil },
@@ -431,11 +441,11 @@ func TestNativeRejectsWritableOrMisboundPayload(t *testing.T) {
 	}
 }
 
-func TestNativeQualificationRequiresReleasedCandidate(t *testing.T) {
+func TestNativeValidationRequiresReleasedCandidate(t *testing.T) {
 	f := newNativeFixture(t)
 	ctx := context.Background()
 	var stop func()
-	err := f.control.QualifyAndReady(ctx, f.inspect(t), func(_ context.Context, target Manifest) error {
+	err := f.control.ValidateAndReady(ctx, f.inspect(t), func(_ context.Context, target Manifest) error {
 		stop = f.hold(t, "hold-candidate", &target)
 		return nil
 	})
@@ -447,7 +457,7 @@ func TestNativeQualificationRequiresReleasedCandidate(t *testing.T) {
 	state, err := readNativeControl(f.config)
 	require.NoError(t, err)
 	require.Equal(t, nativeQualifying, state.Phase)
-	require.NoError(t, f.control.QualifyAndReady(ctx, f.inspect(t), f.qualify(t, "qualify")))
+	require.NoError(t, f.control.ValidateAndReady(ctx, f.inspect(t), f.validate(t, "validate")))
 }
 
 func TestNativeClosedInspectionDoesNotNeedPayload(t *testing.T) {
@@ -457,7 +467,7 @@ func TestNativeClosedInspectionDoesNotNeedPayload(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, status.empty())
 	called := false
-	err = f.control.QualifyAndReady(
+	err = f.control.ValidateAndReady(
 		context.Background(),
 		f.inspect(t),
 		func(context.Context, Manifest) error { called = true; return nil },
@@ -550,4 +560,33 @@ func TestNativeMissingPackageIsUnavailable(t *testing.T) {
 	_, err = OpenNative(config)
 	require.Error(t, err)
 	require.NotErrorIs(t, err, ErrUnavailable)
+}
+
+// A newer helper must read and close healthy old-contract admission state even
+// when that target is ineligible for execution by this Agent.
+func TestNativeIncompatibleTargetRemainsReadableAndCanClose(t *testing.T) {
+	for _, phase := range []nativePhase{nativeQualifying, nativeReady} {
+		t.Run(string(phase), func(t *testing.T) {
+			f := newNativeFixture(t)
+			ctx := context.Background()
+			target := f.manifest
+			target.Contract++
+			require.NoError(t, target.ValidateMetadata())
+			require.ErrorIs(t, target.Validate(), ErrIncompatible)
+			state, err := readNativeControl(f.config)
+			require.NoError(t, err)
+			state.Phase, state.Target = phase, &target
+			require.NoError(t, writeNativeControl(f.config, state))
+			control, err := OpenNativeControl(f.config)
+			require.NoError(t, err)
+			status, err := f.inspect(t)(ctx)
+			require.NoError(t, err)
+			require.NoError(t, status.empty())
+			require.NoError(t, control.CloseAdmission(ctx, f.inspect(t)))
+			state, err = readNativeControl(f.config)
+			require.NoError(t, err)
+			require.Equal(t, nativeClosed, state.Phase)
+			require.Nil(t, state.Target)
+		})
+	}
 }

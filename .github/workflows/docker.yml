@@ -20,13 +20,43 @@ on:
         description: Version Tag
         default: nightly
         required: true
+      source_sha:
+        description: Frozen Agent commit (defaults to the dispatch commit)
+        required: false
+        type: string
+      companion_run_id:
+        description: Published companion run (omit to build and publish the paired companion)
+        required: false
+        type: string
 env:
   DISABLE_TELEMETRY: 1
   NIGHTLY_COUNT: 4
 concurrency:
   group: docker-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
+  runtime-companion:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && !inputs.companion_run_id
+    uses: ./.github/workflows/dem-runtime-release.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      publish: true
+    secrets: inherit
+
+  release-companion:
+    needs: runtime-companion
+    if: always() && !cancelled() && (needs.runtime-companion.result == 'success' || needs.runtime-companion.result == 'skipped')
+    uses: ./.github/workflows/dem-runtime-companion-check.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      version: ${{ inputs.version }}
+
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
     runs-on: ubuntu-latest
@@ -40,6 +70,7 @@ jobs:
         if: github.event_name != 'workflow_dispatch'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
       - name: Check source files
@@ -79,6 +110,12 @@ jobs:
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
             .github/scripts/modules/release_versions.py
+            .github/workflows/release.yml
+            .github/workflows/dem-runtime-release.yml
+            .github/workflows/dem-runtime-companion-check.yml
+            .github/scripts/prepare-release-base.sh
+            .github/scripts/tests/test_dem_paired_workflows.py
+            packaging/release_info.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/cmake/
             packaging/docker/
@@ -103,6 +140,12 @@ jobs:
             .github/scripts/gen-matrix-docker.py
             .github/scripts/gen-docker-tags.py
             .github/scripts/modules/release_versions.py
+            .github/workflows/release.yml
+            .github/workflows/dem-runtime-release.yml
+            .github/workflows/dem-runtime-companion-check.yml
+            .github/scripts/prepare-release-base.sh
+            .github/scripts/tests/test_dem_paired_workflows.py
+            packaging/release_info.py
             .github/scripts/gen-docker-imagetool-args.py
             packaging/docker/
             packaging/runtime-check.sh
@@ -163,6 +206,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Prepare tools
         id: prepare
         run: |
@@ -216,8 +261,19 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+        run: |
+          python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
+          echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
@@ -242,6 +298,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          context: .
           platforms: ${{ matrix.platform }}
           tags: netdata/netdata:test
           load: true
@@ -250,7 +307,9 @@ jobs:
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_ARCH=${{ matrix.arch }}
-            BUILD_VERSION=test
+            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
+            BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || 'test' }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Test Image
         id: test
@@ -309,6 +368,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Generate Tags
         id: tag
         run: |
@@ -320,8 +381,15 @@ jobs:
 
   build-images-docker-hub:
     name: Push Images to Docker Hub
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.release-companion.result == 'success'
+          && needs.build-images.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && needs.matrix.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
+      - release-companion
       - build-images
       - gen-tags
       - matrix
@@ -333,8 +401,19 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+        run: |
+          python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
+          echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -366,13 +445,16 @@ jobs:
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          context: .
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           outputs: type=image,name=netdata/netdata,push-by-digest=true,name-canonical=true,push=true
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            BUILD_VERSION=${{ github.event.inputs.version }}
+            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
+            BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
       - name: Export Digest
         id: export-digest
@@ -419,7 +501,11 @@ jobs:
 
   publish-docker-hub:
     name: Consolidate and tag images for DockerHub
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.build-images-docker-hub.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
       - build-images-docker-hub
       - gen-tags
@@ -428,6 +514,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -480,8 +568,15 @@ jobs:
 
   build-images-quay:
     name: Push Images to Quay.io
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.release-companion.result == 'success'
+          && needs.build-images.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && needs.matrix.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
+      - release-companion
       - build-images
       - gen-tags
       - matrix
@@ -493,8 +588,19 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+        run: |
+          python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
+          echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -527,12 +633,15 @@ jobs:
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          context: .
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            BUILD_VERSION=${{ github.event.inputs.version }}
+            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
+            BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=quay.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
@@ -580,7 +689,11 @@ jobs:
 
   publish-quay:
     name: Consolidate and tag images for Quay.io
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.build-images-quay.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
       - build-images-quay
       - gen-tags
@@ -589,6 +702,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -642,8 +757,15 @@ jobs:
 
   build-images-ghcr:
     name: Push Images to GHCR
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.release-companion.result == 'success'
+          && needs.build-images.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && needs.matrix.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
+      - release-companion
       - build-images
       - gen-tags
       - matrix
@@ -655,8 +777,19 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+        run: |
+          python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
+          echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -689,12 +822,15 @@ jobs:
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
+          context: .
           platforms: ${{ matrix.platform }}
           cache-from: type=local,src=/tmp/build-cache
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            BUILD_VERSION=${{ github.event.inputs.version }}
+            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
+            BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
           outputs: type=image,name=ghcr.io/netdata/netdata,push-by-digest=true,name-canonical=true,push=true
       - name: Export Digest
@@ -742,7 +878,11 @@ jobs:
 
   publish-ghcr:
     name: Consolidate and tag images for GHCR
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.build-images-ghcr.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     needs:
       - build-images-ghcr
       - gen-tags
@@ -751,6 +891,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Download digests
         id: fetch-digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -803,7 +945,11 @@ jobs:
           }}
 
   trigger-subsequent-workflows:
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.publish-docker-hub.result == 'success'
+          && needs.gen-tags.result == 'success'
+          && github.event_name == 'workflow_dispatch' }}
     name: Trigger subsquent workflows for newly added versions
     needs:
       - publish-docker-hub
@@ -814,6 +960,7 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           submodules: recursive
       - name: Trigger Helmchart PR
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != 'nightly' && github.repository == 'netdata/netdata'

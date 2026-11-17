@@ -200,7 +200,7 @@ func TestReadPreloadReportsDamageWithPreloadAdvice(t *testing.T) {
 			default:
 				damageGeneration(t, s, m.Archive.SHA256, damage)
 			}
-			_, _, err = ReadPreload(s.path)
+			_, _, err = ReadPreload(s.path, nil)
 			require.ErrorIs(t, err, errPreloadDamaged)
 			require.NotErrorIs(t, err, ErrDamaged, "managed repair refuses sealed preloads")
 			require.NotErrorIs(t, err, os.ErrNotExist, "damage hides ordinary sentinels")

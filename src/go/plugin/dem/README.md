@@ -137,7 +137,7 @@ artifacts:
 | `enabled` | `yes` | Runs the plugin. `no` stops every DEM module and Function. | Restart |
 | `default_run` | `yes` | Runs every module that `modules` does not turn off. | Restart |
 | `modules` | empty | Per-module switches, such as `journey: no` under `modules:`. A module turned off keeps its saved history readable. | Restart |
-| `browser.concurrency` | `1` | Maximum simultaneous browser attempts in the plugin process. Monitoring, journey **Test** runs and the automatic updater's runtime qualification share it. A positive integer. | Restart |
+| `browser.concurrency` | `1` | Maximum simultaneous browser attempts in the plugin process, shared by monitoring and journey **Test** runs. A positive integer. | Restart |
 | `history.days` | `30` | Age target of the shared investigation history, 1-365 days. | Next hourly sweep |
 | `history.max_bytes` | `1073741824` (1 GiB) | Size target of the shared investigation history; at least 8 MiB. | Next hourly sweep |
 | `artifacts.days` | `7` | Age target of retained screenshots, traces and reports, 1-365 days. | Next hourly sweep |
@@ -244,11 +244,12 @@ To adjust them for one site, use normal Netdata health configuration with the `_
 
 Journey and Lighthouse jobs need a separately installed browser runtime: one signed bundle with its own Node, Chromium,
 Playwright and Lighthouse. RUM does not. Enabling a browser job never downloads it; without it, browser jobs wait and
-report no website failures. Restart the Agent after installing or updating it; the native package's hooks restart a
-running Agent themselves.
+report no website failures. Restart the Agent after first setup. Subsequent updates keep the runtime and Agent at the
+same release; native and source/static installation owners coordinate activation, while Docker/preload deployments
+retain explicit control of switching.
 
 [Browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) covers installation for native packages, static and
-source installations, Docker and protected preloads, plus automatic updates and the `dem.plugin runtime` command
+source installations, Docker and protected preloads, plus paired updates/recovery and the `dem.plugin runtime` command
 reference.
 
 ## Further reading

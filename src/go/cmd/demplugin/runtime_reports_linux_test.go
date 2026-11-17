@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	automaticUpdatesNotice = "Runtime installation enables daily automatic update preparation. Activation requires a DEM restart; use --manual-updates to disable automatic preparation.\n"
-	enrollmentNotice       = "First runtime enrollment acquires a signed release and enables daily automatic update preparation. Running DEM processes require a restart to activate the selection.\n"
+	automaticUpdatesNotice = "Runtime installation permits companion downloads during Agent updates. First activation requires a DEM restart; use --manual-updates to require explicit acquisition.\n"
+	enrollmentNotice       = "First runtime enrollment acquires the matching signed release and permits paired companion downloads. Restart running DEM processes to activate the selection.\n"
 	statusNotice           = "Selected installation is shown; already running DEM processes may retain an older release until restart. Metadata damage requires explicit repair after stopping and draining consumers."
 	unchangedNotice        = "Selected release is unchanged. Already running processes keep their startup release until restart."
-	repairFailedNotice     = "Repair failed; selected installation state is shown separately from candidate progress. A cleared selection is not restored. Stop and drain all consumers before retrying repair."
 	uninstalledNotice      = "Runtime files removed. This command does not change administrator-owned host policy; netdata-dem-runtime.sh handles high-level policy cleanup."
+	installedNotice        = "Runtime installed and selected. Running DEM processes keep their acquired release; restart DEM to activate this selection."
+	preloadedNotice        = "Preload integrity is verified and bound to this final root. Browser execution has not been tested; use runtime qualify for an optional local diagnostic. Keep it immutable and private. Stop all consumers before replacement or removal; this is not a native package transaction. Restart DEM to activate it."
 	alreadySelectedNotice  = "A usable runtime is already selected; no download, qualification or update policy change was performed. A new DEM process uses this selection. Running processes may require a restart; their active release was not inspected."
 )
 
@@ -52,8 +53,8 @@ func reportFields(t *testing.T, stdout string) ([]string, map[string]any) {
 }
 
 // Each command's report fields, states and notices over the authenticated fixture.
-// The fixture never qualifies, so qualification failures carry an
-// environment-specific setup_error that is checked for presence only.
+// Ordinary lifecycle operations succeed without executing this fixture. Explicit
+// qualification fails with an environment-specific setup_error.
 func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("ensure and qualification run as the nonroot service identity")
@@ -108,15 +109,15 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 				}
 			},
 		},
-		"update unchanged": {
+		"prepare unchanged": {
 			selected: true,
 			args: func(root, cache, release, archive string) []string {
-				return []string{"runtime", "update", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
+				return []string{"runtime", "prepare", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
 			want: func(cache, generation string) expected {
 				return expected{
-					keys:    []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "storage", "notice"},
-					scalars: map[string]any{"download_allowed": false, "command": "update", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "notice": unchangedNotice},
+					keys:    []string{"outcome", "download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "storage", "notice"},
+					scalars: map[string]any{"download_allowed": false, "command": "prepare", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "notice": unchangedNotice, "outcome": "unchanged"},
 				}
 			},
 		},
@@ -127,8 +128,8 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			},
 			want: func(cache, generation string) expected {
 				return expected{
-					keys:    []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "storage", "notice"},
-					scalars: map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "notice": unchangedNotice},
+					keys:    []string{"outcome", "download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "storage", "notice"},
+					scalars: map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "notice": unchangedNotice, "outcome": "unchanged"},
 					stderr:  automaticUpdatesNotice,
 				}
 			},
@@ -138,12 +139,11 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "repair", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
-			want: func(cache, _ string) expected {
+			want: func(cache, generation string) expected {
 				return expected{
-					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "candidate", "candidate_state", "setup_error", "storage", "qualification", "notice"},
-					scalars:   map[string]any{"download_allowed": false, "command": "repair", "mode": "managed", "state": "unavailable", "cache_path": cache, "candidate_state": "prepared", "notice": repairFailedNotice},
+					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "candidate", "candidate_state", "storage", "notice"},
+					scalars:   map[string]any{"download_allowed": false, "command": "repair", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "candidate_state": "selected", "notice": installedNotice},
 					stderr:    automaticUpdatesNotice,
-					failed:    true,
 					candidate: true,
 				}
 			},
@@ -164,12 +164,11 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "install", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
-			want: func(cache, _ string) expected {
+			want: func(cache, generation string) expected {
 				return expected{
-					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "candidate", "candidate_state", "setup_error", "storage", "qualification"},
-					scalars:   map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "unavailable", "cache_path": cache, "candidate_state": "prepared"},
+					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "candidate", "candidate_state", "storage", "notice"},
+					scalars:   map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "candidate_state": "selected", "notice": installedNotice},
 					stderr:    automaticUpdatesNotice,
-					failed:    true,
 					candidate: true,
 				}
 			},
@@ -178,23 +177,22 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "install", "--manual-updates", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
-			want: func(cache, _ string) expected {
+			want: func(cache, generation string) expected {
 				return expected{
-					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "candidate", "candidate_state", "setup_error", "storage", "qualification"},
-					scalars:   map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "unavailable", "cache_path": cache, "candidate_state": "prepared"},
-					failed:    true,
+					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "candidate", "candidate_state", "storage", "notice"},
+					scalars:   map[string]any{"download_allowed": false, "command": "install", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "candidate_state": "selected", "notice": installedNotice},
 					candidate: true,
 				}
 			},
 		},
-		"update without installation": {
+		"prepare without installation": {
 			args: func(root, cache, release, archive string) []string {
-				return []string{"runtime", "update", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
+				return []string{"runtime", "prepare", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
 			want: func(cache, _ string) expected {
 				return expected{
 					keys:    []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "setup_error", "storage"},
-					scalars: map[string]any{"download_allowed": false, "command": "update", "mode": "managed", "state": "unavailable", "cache_path": cache, "setup_error": "install an authenticated runtime release before checking updates"},
+					scalars: map[string]any{"download_allowed": false, "command": "prepare", "mode": "managed", "state": "unavailable", "cache_path": cache, "setup_error": "install an authenticated runtime release before paired preparation"},
 				}
 			},
 		},
@@ -202,11 +200,10 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "preload", "--config-dir", root, "--root", cache, "--release", release, "--archive", archive}
 			},
-			want: func(cache, _ string) expected {
+			want: func(cache, generation string) expected {
 				return expected{
-					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "cache_path", "candidate", "candidate_state", "setup_error", "storage", "qualification"},
-					scalars:   map[string]any{"download_allowed": false, "command": "preload", "mode": "managed", "state": "unavailable", "cache_path": cache, "candidate_state": "prepared"},
-					failed:    true,
+					keys:      []string{"download_allowed", "command", "mode", "state", "release_path", "generation", "runtime", "candidate", "candidate_state", "preloaded_config", "preload_path", "notice"},
+					scalars:   map[string]any{"download_allowed": false, "command": "preload", "mode": "managed", "state": "installed", "generation": generation, "candidate_state": "prepared", "preload_path": cache, "notice": preloadedNotice},
 					candidate: true,
 				}
 			},
@@ -215,12 +212,11 @@ func TestRuntimeCommandReportsOverFixture(t *testing.T) {
 			args: func(root, cache, release, archive string) []string {
 				return []string{"runtime", "ensure", "--config-dir", root, "--cache", cache, "--release", release, "--archive", archive}
 			},
-			want: func(cache, _ string) expected {
+			want: func(cache, generation string) expected {
 				return expected{
-					keys:      []string{"outcome", "download_allowed", "command", "mode", "state", "release_path", "cache_path", "candidate", "candidate_state", "setup_error", "qualification"},
-					scalars:   map[string]any{"outcome": "failed", "download_allowed": false, "command": "ensure", "mode": "managed", "state": "unavailable", "cache_path": cache, "candidate_state": "prepared"},
+					keys:      []string{"outcome", "download_allowed", "command", "mode", "state", "release_path", "cache_path", "generation", "runtime", "candidate", "candidate_state", "notice"},
+					scalars:   map[string]any{"outcome": "newly-selected", "download_allowed": false, "command": "ensure", "mode": "managed", "state": "installed", "cache_path": cache, "generation": generation, "candidate_state": "selected", "notice": installedNotice},
 					stderr:    enrollmentNotice,
-					failed:    true,
 					candidate: true,
 				}
 			},

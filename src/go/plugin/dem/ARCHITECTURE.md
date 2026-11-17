@@ -344,8 +344,9 @@ Key points of this path:
   time is separate from execution time, and cancellation while waiting starts no browser. Qualification uses a
   separate internal identity, so a user job name cannot collide with it.
 - **A fresh browser per run.** Runs share no browser state.
-- **Installation is explicit.** An administrator installs and qualifies a complete runtime, or supplies a sealed
-  preload. The process acquires its release at startup; each run pins that already prepared release for its duration.
+- **Installation is explicit.** An administrator installs and verifies a complete runtime, or supplies a sealed
+  preload. Browser qualification is an optional explicit diagnostic. The process acquires its release at startup;
+  each run pins that already prepared release for its duration.
 - **Proof of completion.** The Node adapter and its browser start through `nd-run`, the Agent's unprivileged launcher,
   acting as a Linux subreaper. A run finishes only when that supervision proves the whole child process tree has
   exited. Only then are captures published and the admission slot released.
@@ -426,7 +427,7 @@ What makes this layer predictable:
 |---|---|---|---|---|
 | Investigation journal | `${NETDATA_LIB_DIR}/dem/journal` | 30 days, 1 GiB | RUM investigation entries and synthetic run records | Retention worker, at startup and hourly |
 | Captures | `${NETDATA_LIB_DIR}/dem/artifacts` | 7 days, 2 GiB | Screenshots, trace ZIPs and HTML reports, one set per run | Retention worker, at startup and hourly |
-| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selected release retained until uninstall/replacement; 7-day soft grace for most recently used unprotected obsolete release | Complete browser runtimes and preparation workspace | Runtime host worker, at startup and hourly; explicit installer; automatic updater, which prepares and selects newer releases after install consent |
+| Browser runtime store | `${NETDATA_LIB_DIR}/dem/runtime` | 4 GiB; selection and pair recovery references protected; 7-day soft grace for other obsolete releases | Complete browser runtimes and preparation workspace | Runtime host GC at startup and hourly; installation owner prepares and activates matching Agent/runtime pairs |
 | In-memory site state | Memory | Measurements: per-site `window` (5 minutes by default); investigation context: bounded session and entry counts | Rolling populations, live feed, investigation context | The site job; lost on restart |
 
 - The journal and capture budgets live in `dem.conf`. The retention worker reloads them before each sweep, so valid
@@ -469,9 +470,9 @@ flowchart TD
 
 - The journal opens first, and the configured history budget applies before any producer can append.
 - The browser runtime is either a host holding the managed or native startup selection or an administrator preload.
-  The host maintains storage and never changes the running process's release. On a managed host, the attached updater
-  (after explicit install consent) downloads and qualifies newer releases and changes the selection the next process
-  starts with. The runner owns the shared configured admission allowance.
+  The host maintains storage and never changes the running process's release. The installation owner coordinates
+  matching Agent/runtime updates; no process service downloads a newer runtime. The runner owns the shared
+  configured admission allowance.
 - Unusable retained history stops the plugin at startup, before any Function registers.
 - An initial capture cleanup failure does not stop startup; the retention worker retries it.
 - Browser runtime setup problems (missing installation, unsupported platform, bad preload) never stop startup. Synthetic
@@ -528,9 +529,9 @@ Synthetic packages:
 | `synthetic/history` | Synthetic record encoding and run reduction |
 | `synthetic/syntheticfunc` | Function methods: declarations, method arguments, column lists and responses over `internal/rawfunc` |
 | `synthetic/runner` | Prepared browser execution, admission, process supervision and private reporter protocol |
-| `src/dem-runtime` (outside the Go plugin) | Independently versioned adapters, component pins and semantic conformance tests |
+| `src/dem-runtime` (outside the Go plugin) | Browser adapters, component pins and semantic conformance tests |
 | `synthetic/browserruntime` | Signed release and archive verification, installation inventory, process/execution protection, automatic retirement, preload sealing and reading, and native package building (used by `src/go/tools/dem-runtime-release`) and admission |
-| `synthetic/runtimehost` | `runtime:` configuration and modes, process runtime opening, fixed startup selection, runner sources, dependency readiness, process maintenance and automatic update preparation |
+| `synthetic/runtimehost` | `runtime:` configuration and modes, exact Agent release identity/default URL, process runtime opening, fixed startup selection, runner sources, dependency readiness and process maintenance |
 | `synthetic/artifacts` | Work directories, verified publication, immutable captures, reads and retention |
 
 Package guides own the rules internal to their package:
@@ -538,7 +539,7 @@ Package guides own the rules internal to their package:
 | Guide | Owns |
 |---|---|
 | [Runtime store](synthetic/browserruntime/README.md) | Release trust, the managed store, protection, repair and uninstall, preloads, native packages |
-| [Runtime host](synthetic/runtimehost/README.md) | Runtime modes, fixed startup selection, maintenance, the automatic updater |
+| [Runtime host](synthetic/runtimehost/README.md) | Runtime modes, fixed startup selection, maintenance and installation-owner boundaries |
 | [Capture store](synthetic/artifacts/README.md) | Work directories, publication, manifests, catalogue, fetch, retention |
 | [Faro assets](rum/faro/assets/README.md) | The pinned browser SDK files, their verification and update procedure |
 | [DEM runtime contract](../../../dem-runtime/README.md) | The journey runner protocol, outcomes, evidence and capture eligibility (JavaScript side) |
@@ -1175,7 +1176,7 @@ Node adapter and supervision:
 ### Browser runtime ownership
 
 The runtime packages own their internal rules: [`synthetic/runtimehost`](synthetic/runtimehost/README.md) (modes,
-fixed startup selection, maintenance, the updater) and [`synthetic/browserruntime`](synthetic/browserruntime/README.md)
+fixed startup selection and maintenance) and [`synthetic/browserruntime`](synthetic/browserruntime/README.md)
 (release trust, the managed store, protection, repair and uninstall, preloads, native packages). The operator procedure
 is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md). The cross-package rules:
 
@@ -1187,20 +1188,44 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   claim is reserved. Contained structural configuration validation still runs before a malformed binding can become a
   named-dependency waiter. Packages: `collector/internal/syntheticjob`, `runtimehost`.
 - **Fixed readiness.** Readiness reads the fixed process state: there is no import polling or installation-driven
-  readiness notification. The managed-host updater (`runtimehost.Updater`) is the only preparation worker, and it
-  changes only the next process's selection. Packages: `runtimehost`.
+  readiness notification. Installation owners prepare and select the next pair after drainage; no runtime updater
+  service runs inside DEM. Packages: `runtimehost`, `browserruntime`.
 - **A use per execution.** The runner acquires a use (`BeginUse`) before inspecting runtime files, passes its completion
   handle to `nd-run`, and releases it after supervised drainage and local reader joins. Packages: `runner`,
   `browserruntime`.
-- **Explicit installation.** Install, update and repair verify and prepare the trusted archive, qualify a sandboxed
-  journey and a Lighthouse audit, then publish the selection. Installation accepts only a `VerifiedRelease`. Packages:
-  `cmd/demplugin`, `browserruntime`, `runner`.
+- **Explicit installation.** CLI install, update, ensure, repair and preload verify and prepare authenticated artifacts
+  without starting Node or a browser. Installation accepts only a `VerifiedRelease`. Explicit `runtime qualify` runs
+  the contract checks, sandboxed journey and Lighthouse audit against the installed release, with supervised drainage;
+  its calling account and environment are reported and its failure does not undo installation. Release CI runs browser
+  smoke tests before publication. Packages: `cmd/demplugin`, `browserruntime`, `runner`,
+  `runtimehost`.
+- **Metadata and eligibility.** Structural validation keeps healthy selections, retained generations and native
+  admission records readable across execution-contract changes. Acquisition and execution remain strict and return
+  `ErrIncompatible` for another contract. Status reports an incompatible selection separately from metadata damage;
+  neither condition permits discarding uncertain ownership evidence. Packages: `browserruntime`, `cmd/demplugin`.
+- **Exact release pairs.** Signed descriptors bind Agent version, channel and source commit; generation manifests
+  bind those bytes to the execution contract. The configured URL can change the source, not relax installation pairing.
+  Execution checks contract/platform compatibility and payload integrity/provenance without comparing plugin release
+  stamps. This same rule permits ordinary development builds to use an installed compatible runtime; no bypass exists.
+  Normal Agent updates acquire the exact companion only for enrolled installations. Native package dependencies
+  bind the final versions, while helper capabilities separately cover pre-unpack/pre-erasure hooks. Packages:
+  `browserruntime`, `runtimehost`, `packaging/dem-runtime`, Agent release/packaging workflows.
+- **Durable recovery.** Managed `recovery.json` records one pending before/after transition and one previous pair;
+  strict legacy selection metadata remains unchanged. These references protect generations across helper exit and GC.
+  Beginning B→C replaces the recovery point with B; older A may retire, including on failed attempts. Unchanged preparation verifies the existing runtime without replacing the recovery point.
+  Repeated recovery restores B without walking back through older pairs.
+  Reimport after an older binary's GC requires the installation owner to supply authenticated inputs again.
+  Source/static owners stage authenticated inputs temporarily and use normal Agent installation/repair; they do not
+  snapshot or restore Agent executable files. Docker/preload owners retain their image/configuration/root artifacts. The CLI reads
+  persisted recovery state without claiming another process's active identity. Packages: `browserruntime`,
+  `cmd/demplugin`, `packaging/installer`, `packaging/docker`.
 - **Maintenance is not monitoring.** Startup and hourly maintenance retire unprotected old releases independently of
   enabled monitors. Maintenance and CLI errors never become website observations or invalidate a usable runtime.
   Packages: `runtimehost`, `cmd/demplugin`.
 - **Package-owned payloads.** Native payloads have a root-owned admission gate and service-owned execution proof.
-  Package hooks close admission and require drainage before replacing files, then qualify both browser workloads before
-  reopening it. DEM never retires or replaces them. Packages: `browserruntime`, `packaging/dem-runtime/native`.
+  Package hooks close admission and require drainage before replacing files, then validate the complete target as the
+  service UID before reopening it. Configure does not run browser smoke tests. DEM never retires or replaces them.
+  Packages: `browserruntime`, `packaging/dem-runtime/native`.
 - **Preloads are borrowed.** A sealed preload is private, service-account-owned and outside managed retirement; managed
   operations refuse its root. Replacing one needs every consumer stopped and a DEM restart. Packages: `browserruntime`,
   `runtimehost`.

@@ -28,7 +28,10 @@ func selectedAdminFixture(t *testing.T) (root, cache, manifest, archive string, 
 	cfg := runtimehost.DefaultConfig()
 	cfg.OfflineKeyring = filepath.Join(root, "release-public.gpg")
 	cache = filepath.Join(root, "cache")
-	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
+	cfg.CachePath = cache
+	storeConfig, err := cfg.StoreConfig("")
+	require.NoError(t, err)
+	store, err := browserruntime.Open(storeConfig)
 	require.NoError(t, err)
 	options := browserruntime.ReleaseInstallOptions{
 		Operation: browserruntime.InstallRelease,
@@ -79,6 +82,10 @@ func TestRuntimeFailedRepairReportsSelectedStateSeparately(t *testing.T) {
 		t.Run(target, func(t *testing.T) {
 			root, cache, manifest, archive, selected := selectedAdminFixture(t)
 			requested := selected
+			if target == "same release" {
+				// Repair must validate the payload even when the signed identity is unchanged.
+				require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
+			}
 			if target == "different release" {
 				requested.Archive.SHA256 = strings.Repeat("b", 64)
 				writeAdminRelease(t, manifest, requested)
@@ -102,14 +109,12 @@ func TestRuntimeFailedRepairReportsSelectedStateSeparately(t *testing.T) {
 			require.NotNil(t, report.Storage)
 			assert.Contains(t, report.Notice, "A cleared selection is not restored")
 			if target == "same release" {
-				assert.Equal(t, "prepared", report.CandidateState)
+				assert.Equal(t, "requested", report.CandidateState)
 				assert.Equal(t, "unavailable", report.State)
 				assert.Nil(t, report.Runtime)
 				assert.Empty(t, report.Generation)
 				assert.Nil(t, report.Storage.Release)
-				require.NotNil(t, report.Qualification)
-				assert.False(t, report.Qualification.SandboxedLocalJourney)
-				assert.False(t, report.Qualification.SandboxedLocalLighthouse)
+				assert.Nil(t, report.Qualification)
 			} else {
 				assert.Equal(t, "requested", report.CandidateState)
 				assert.Equal(t, "installed", report.State)
@@ -189,12 +194,13 @@ func realAdminInputs(t *testing.T) (manifest, archive, publicKey string) {
 			"requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER",
 		)
 	}
+	require.NoError(t, runtimehost.AgentRelease().Validate(), "real runtime tests require compiled matching ReleaseVersion, ReleaseChannel and ReleaseRef linker metadata")
 	require.NotZero(t, os.Geteuid())
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	return manifest, archive, publicKey
 }
 
-func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
+func TestRealRuntimeRepairAndExplicitQualification(t *testing.T) {
 	manifest, archive, publicKey := realAdminInputs(t)
 	root := t.TempDir()
 	writeRuntimeTrustConfig(t, root, "", publicKey)
@@ -221,7 +227,13 @@ func TestRealRuntimeRepairQualifiesBothWorkloads(t *testing.T) {
 	assert.Equal(t, "selected", report.CandidateState)
 	require.NotNil(t, report.Runtime)
 	assert.Equal(t, report.Candidate, report.Runtime)
+	assert.Nil(t, report.Qualification)
+	installed := report.Runtime
+	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root, "--cache", cache)
+	require.NoError(t, err)
 	require.NotNil(t, report.Qualification)
+	assert.Equal(t, "qualified", report.State)
+	assert.Equal(t, installed, report.Runtime)
 	assert.True(t, report.Qualification.ExecutionContract)
 	assert.True(t, report.Qualification.SandboxedLocalJourney)
 	assert.True(t, report.Qualification.SandboxedLocalLighthouse)
@@ -247,6 +259,15 @@ func TestRealRuntimePreloadReportsPreparedCandidate(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(data, &selection))
 	assert.Nil(t, selection.Manifest)
+	assert.Nil(t, report.Qualification)
+	config, err := json.Marshal(map[string]any{
+		"runtime": map[string]any{"mode": "preloaded", "preload_path": final},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), config, 0600))
+	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root)
+	require.NoError(t, err)
+	assert.Equal(t, "qualified", report.State)
 	require.NotNil(t, report.Qualification)
 	assert.True(t, report.Qualification.SandboxedLocalJourney)
 	assert.True(t, report.Qualification.SandboxedLocalLighthouse)
@@ -274,4 +295,39 @@ func TestRuntimeStatusReportsIncompleteOwnershipInventory(t *testing.T) {
 	require.NotNil(t, report.Storage)
 	assert.NotEmpty(t, report.Storage.InventoryError)
 	assert.NotEmpty(t, report.StorageError)
+}
+
+// This simulates the internally consistent records left by a previous Agent;
+// execution eligibility must not turn readable installation metadata into damage.
+func TestRuntimeStatusReportsIncompatibleSelection(t *testing.T) {
+	root, cache, _, _, selected := selectedAdminFixture(t)
+	for _, path := range []string{
+		filepath.Join(cache, "selection.json"),
+		filepath.Join(cache, "generations", selected.Archive.SHA256, "prepared.json"),
+	} {
+		data, err := os.ReadFile(path)
+		require.NoError(t, err)
+		var record map[string]any
+		require.NoError(t, json.Unmarshal(data, &record))
+		owner := record
+		if release, ok := record["release"].(map[string]any); ok {
+			owner = release
+		}
+		owner["manifest"].(map[string]any)["contract"] = 1
+		data, err = json.Marshal(record)
+		require.NoError(t, err)
+		require.NoError(t, os.WriteFile(path, data, 0600))
+	}
+	report, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
+	require.ErrorIs(t, err, browserruntime.ErrIncompatible)
+	require.NotErrorIs(t, err, browserruntime.ErrDamaged)
+	assert.Equal(t, "incompatible", report.State)
+	assert.Equal(t, selected.Archive.SHA256, report.Generation)
+	require.NotNil(t, report.Runtime)
+	assert.Equal(t, 1, report.Runtime.Contract)
+	require.NotNil(t, report.Storage)
+	assert.Empty(t, report.Storage.SelectionError)
+	assert.Empty(t, report.StorageError)
+	assert.Contains(t, report.Notice, "execution contract")
+	assert.Nil(t, report.Qualification)
 }
