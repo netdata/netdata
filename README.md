@@ -257,19 +257,16 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  A[Netdata Agent]:::mainNode
-  A1(Collect):::green --> A
-  A2(Store):::green --> A
-  A3(Learn):::green --> A
-  A4(Detect):::green --> A
-  A5(Check):::green --> A
-  A6(Stream):::green --> A
-  A7(Archive):::green --> A
-  A8(Query):::green --> A
-  A9(Score):::green --> A
-
-  classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px,color:#000
-  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+  A[Netdata Agent]
+  A1(Collect) --> A
+  A2(Store) --> A
+  A3(Learn) --> A
+  A4(Detect) --> A
+  A5(Check) --> A
+  A6(Stream) --> A
+  A7(Archive) --> A
+  A8(Query) --> A
+  A9(Score) --> A
 ```
 
 With each Agent you can:
