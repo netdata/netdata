@@ -1066,7 +1066,7 @@ Prices are per month, in USD, excluding taxes. The billing choice (annual subscr
 |---|---|---|---|---|
 | **Infrastructure** | $7/node | $8.75/node | Metrics and system logs (Logs Monitoring) with no volume charge, checks, AI conversations (fair use); adds 20M application log events to the pooled log quota | $0.10 per 1M log events ($0.125 monthly) |
 | **APM** (includes Infrastructure) | $15/node | $18.75/node | Adds 25M application log events and 25M trace spans to the pooled quotas | $0.10 per 1M log events or trace spans ($0.125 monthly) |
-| **Network Device Monitoring** (SNMP) | $2/device | $2.50/device | SNMP monitoring and topology; adds 2M syslog events to the pooled log quota | Pooled log rate |
+| **Network Device Monitoring** (SNMP) | $2/device | $2.50/device | Each device is a node at this rate; SNMP monitoring and topology; adds 2M syslog events to the pooled log quota | Pooled log rate |
 | **NetFlow Monitoring** | $200 | $250 | 5,000 flows/sec, any number of exporters | $40 per 1,000 flows/sec ($50 monthly) |
 | **Real User Monitoring** | From $250 (500K sessions) | $0.625 per 1K sessions, no minimum | Annual: 500,000 sessions | $0.50 per 1K sessions |
 | **Synthetic Browser Tests** | From $250 (125K runs) | $2.50 per 1K runs, no minimum | Annual: 125,000 runs | $2 per 1K runs |
@@ -1081,7 +1081,7 @@ Netdata is also available on [AWS Marketplace](https://aws.amazon.com/marketplac
 
 ### What is billed
 
-- **Billable node:** each running Netdata Agent connected to Netdata Cloud, plus each virtual node. Sub-entities a collector discovers (hosts and VMs behind a hypervisor, cloud resources, containers) are labeled instances of the collecting Agent's node and are not billed separately; an explicit virtual node attached to a collector job adds one node for that job. Collectors that create a virtual node per resource (e.g., one per SNMP device by default, or Azure workload virtual nodes) bill each such virtual node. Containers on a monitored host are included at no extra cost.
+- **Billable node:** each running Netdata Agent connected to Netdata Cloud, plus each virtual node. Sub-entities a collector discovers (hosts and VMs behind a hypervisor, cloud resources, containers) are labeled instances of the collecting Agent's node and are not billed separately; an explicit virtual node attached to a collector job adds one node for that job. Collectors that create a virtual node per resource (e.g., one per SNMP device by default, or Azure workload virtual nodes) bill each such virtual node. An SNMP device's virtual node is priced at the Network Device Monitoring rate ($2/device), not the Infrastructure rate. Containers on a monitored host are included at no extra cost.
 - **Active nodes only:** offline and stale nodes (history still queryable on Parents) are not billed.
 - **P90 billing (nodes and flow rates):** daily, the node count at the 90th percentile of time-weighted usage; monthly, the 90th percentile of daily values (the top 3 days of a 30-day month are excluded). Short spikes and occasional high-usage days do not increase the bill.
 - **Not billed:** metrics volume, System Logs Monitoring (querying logs in place), users, data retention, containers, and API, uptime and other checks run from your own nodes.
