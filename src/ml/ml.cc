@@ -405,7 +405,7 @@ ml_dimension_add_model(const nd_uuid_t *metric_uuid, const ml_kmeans_inlined_t *
 
     for (const DSample &ds : inlined_km->cluster_centers) {
         for (calculated_number_t cn : ds) {
-            int rc = sqlite3_bind_double(res, ++param, cn);
+            rc = sqlite3_bind_double(res, ++param, cn);
             if (unlikely(rc != SQLITE_OK))
                 goto bind_fail;
         }

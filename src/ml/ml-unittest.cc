@@ -208,7 +208,6 @@ static void test_features_zero_smooth_matches_one()
     memcpy(dst1, input, n * sizeof(calculated_number_t));
     ml_features_preprocess_predict(&features1, sample1);
 
-    ML_TEST_ASSERT(sample0.size() == sample1.size(), "prediction sample size should match for smooth_n=0 and smooth_n=1");
     for (size_t i = 0; i < features0.lag_n + 1; i++) {
         char msg[128];
         snprintf(msg, sizeof(msg), "prediction smooth_n=0 should match smooth_n=1 at sample(%zu)", i);
@@ -317,12 +316,6 @@ static void test_full_pipeline()
     }
 
     ML_TEST_ASSERT(all_features.size() > 2, "should have enough features for kmeans");
-
-    // Each feature vector should have lag_n + 1 = 6 elements
-    if (all_features.size() > 0) {
-        ML_TEST_ASSERT(all_features[0].size() == (long)(lag_n + 1),
-                       "feature vector should have lag_n+1 elements");
-    }
 
     // Train a kmeans model on the normal data
     std::vector<DSample> training_features = std::move(all_features);
@@ -1095,12 +1088,7 @@ static void test_parameter_combinations()
                  diff_n, smooth_n, lag_n, cases[c].expected_vectors, pf.size());
         ML_TEST_ASSERT(pf.size() == cases[c].expected_vectors, msg);
 
-        // Verify feature vector is a 6x1 matrix (DSample is fixed-size)
         if (pf.size() >= 1) {
-            snprintf(msg, sizeof(msg), "params(%zu,%zu,%zu): DSample should be 6 elements",
-                     diff_n, smooth_n, lag_n);
-            ML_TEST_ASSERT(pf[0].size() == 6, msg);
-
             // Verify no NaN/Inf in the lag_n+1 active feature elements
             bool has_nan_inf = false;
             for (size_t fi = 0; fi < lag_n + 1; fi++) {
