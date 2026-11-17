@@ -36,7 +36,7 @@ different or empty release stamps; this does not change publication pairing or c
    process drainage. Assembly and Node wire tests are not browser smoke evidence.
    Installation/transaction tests remain separate acceptance evidence. Explicit
    local `runtime qualify` is optional and reports its calling environment.
-5. The protected publisher uses the existing package OpenPGP signer and fetches
+5. The publisher uses the existing package OpenPGP signer and fetches
    public trust from `https://repository.netdata.cloud/netdatabot.gpg.key`.
    `release.py stage` checks both architecture inventories before signing format-2
    descriptors containing the exact Agent tuple, runtime digest/bounds and sources.
@@ -49,7 +49,10 @@ different or empty release stamps; this does not change publication pairing or c
    Agent pipeline and its repository routing. Repository ingestion is asynchronous.
 
 `dem-runtime-release.yml` is a reusable prerequisite of the central release and
-manual Agent lanes. It emits `dem-runtime-publication-receipt` only after successful
+manual Agent lanes. It uses the normal Agent release access model: shared secrets
+inherited from its callers and repository or organization configuration variables,
+without a separate GitHub deployment environment.
+It emits `dem-runtime-publication-receipt` only after successful
 publication. The shared companion check verifies the publishing job,
 both architectures and exact identity. Ordinary source/static/Docker lanes consume
 this small receipt; native jobs additionally consume and verify the actual payload.

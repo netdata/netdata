@@ -297,6 +297,14 @@ class CoupledWorkflowTests(unittest.TestCase):
                 if 'actions/checkout@' in step.get('uses', ''):
                     self.assertEqual(step['with']['ref'], '${{ inputs.source_sha }}')
 
+    def test_companion_uses_normal_agent_release_access(self):
+        publisher = load('dem-runtime-release.yml')['jobs']['publish']
+        self.assertNotIn('environment', publisher)
+        for filename in ('release.yml', 'build.yml', 'packaging.yml', 'docker.yml'):
+            with self.subTest(workflow=filename):
+                caller = load(filename)['jobs']['runtime-companion']
+                self.assertEqual(caller['secrets'], 'inherit')
+
     def test_real_smoke_is_mandatory_for_both_architecture_artifacts(self):
         build = load('dem-runtime-release.yml')['jobs']['build']
         self.assertEqual(build['strategy']['matrix'], '${{ fromJson(needs.matrix.outputs.matrix) }}')
