@@ -10,19 +10,22 @@ typedef enum {
 
 // A node filter (scope_nodes or nodes) is often a long list of exact node ids: Cloud sends every node of the room
 // on every query. Walking that list for every host and identifier costs hosts x entries compares, so a long list of
-// exact strings is matched through a hash instead. Any other pattern is matched as before.
+// exact strings is matched through a hash instead, when the agent has enough hosts to repay building it. Any other
+// pattern is matched as before.
 #define QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES 12
+#define QUERY_SCOPE_HOSTS_SET_MIN_HOSTS 32
 
 typedef struct {
     SIMPLE_PATTERN *sp;
     Pvoid_t set;            // JudyHS of the entries of sp, when sp is a long list of exact strings
 } QUERY_SCOPE_HOSTS_FILTER;
 
-static void query_scope_hosts_filter_init(QUERY_SCOPE_HOSTS_FILTER *f, SIMPLE_PATTERN *sp) {
+// hosts: the number of hosts the walk will match against the filter
+static void query_scope_hosts_filter_init(QUERY_SCOPE_HOSTS_FILTER *f, SIMPLE_PATTERN *sp, size_t hosts) {
     f->sp = sp;
     f->set = NULL;
 
-    if(simple_pattern_exact_entries(sp) < QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES)
+    if(hosts < QUERY_SCOPE_HOSTS_SET_MIN_HOSTS || simple_pattern_exact_entries(sp) < QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES)
         return;
 
     SIMPLE_PATTERN *it = sp;
@@ -128,9 +131,10 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     if(!host_node_id_str) host_node_id_str = uuid;
     host_node_id_str[0] = '\0';
 
+    size_t entries = dictionary_entries(rrdhost_root_index);
     QUERY_SCOPE_HOSTS_FILTER scope_hosts, hosts;
-    query_scope_hosts_filter_init(&scope_hosts, scope_hosts_sp);
-    query_scope_hosts_filter_init(&hosts, hosts_sp);
+    query_scope_hosts_filter_init(&scope_hosts, scope_hosts_sp, entries);
+    query_scope_hosts_filter_init(&hosts, hosts_sp, entries);
 
     RRDHOST *host;
     ssize_t added = 0;
@@ -176,15 +180,17 @@ size_t query_scope_hosts_pin(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN *hos
     struct query_versions v = { 0 };
     size_t count = 0;
 
-    // built before taking the lock, so a long list does not lengthen the time rrd_rdlock() is held
+    // built before taking the lock, so a long list does not lengthen the time rrd_rdlock() is held;
+    // the host count may change before the lock is taken, which only moves the choice between set and pattern
+    size_t entries = dictionary_entries(rrdhost_root_index);
     QUERY_SCOPE_HOSTS_FILTER scope_hosts, hosts_filter;
-    query_scope_hosts_filter_init(&scope_hosts, scope_hosts_sp);
-    query_scope_hosts_filter_init(&hosts_filter, hosts_sp);
+    query_scope_hosts_filter_init(&scope_hosts, scope_hosts_sp, entries);
+    query_scope_hosts_filter_init(&hosts_filter, hosts_sp, entries);
 
     rrd_rdlock();
 
     // hosts are added under rrd_wrlock(), so the index cannot grow while we hold the read lock
-    size_t entries = dictionary_entries(rrdhost_root_index);
+    entries = dictionary_entries(rrdhost_root_index);
     RRDHOST **array = mallocz((entries ? entries : 1) * sizeof(*array));
 
     RRDHOST *host;
@@ -336,7 +342,7 @@ static void qsu_put_escaped(BUFFER *wb, const char *s) {
 // a token that names one identifier of a host, or nothing known
 static void qsu_token(BUFFER *wb, struct qsu_host *hosts, bool plain) {
     struct qsu_host *h = &hosts[qsu_rand() % QSU_HOSTS];
-    size_t kind = qsu_rand() % (plain ? 5 : 10);
+    size_t kind = qsu_rand() % (plain ? 6 : 10);
 
     switch(kind) {
         case 0:  qsu_put_escaped(wb, h->hostname ? string2str(h->hostname) : "missing-host"); break;
@@ -349,15 +355,15 @@ static void qsu_token(BUFFER *wb, struct qsu_host *hosts, bool plain) {
             break;
         }
         case 4:  buffer_strcat(wb, "host\\|with\\,separators"); break;   // escaped separators, unescaped by the parser
-        case 5:  buffer_sprintf(wb, "!%s", h->machine_guid); break;
-        case 6:  buffer_strcat(wb, "host-1*"); break;
-        case 7:  buffer_strcat(wb, "*"); break;
-        case 8: {
-            // the same node id in upper case: must not match a case sensitive pattern
+        case 5: {
+            // the same node id in upper case: must not match a case sensitive pattern, nor the set
             const char *s = *h->node_id ? h->node_id : h->machine_guid;
             for(; *s; s++) buffer_putc(wb, (char)toupper((unsigned char)*s));
             break;
         }
+        case 6:  buffer_sprintf(wb, "!%s", h->machine_guid); break;
+        case 7:  buffer_strcat(wb, "host-1*"); break;
+        case 8:  buffer_strcat(wb, "*"); break;
         default:
             buffer_putc(wb, '!');
             qsu_put_escaped(wb, h->hostname ? string2str(h->hostname) : "missing-host");
@@ -365,16 +371,17 @@ static void qsu_token(BUFFER *wb, struct qsu_host *hosts, bool plain) {
     }
 }
 
-static int qsu_check(const char *list, struct qsu_host *hosts, bool expect_set) {
+// agent_hosts: the host count the filter is built for; the check itself always matches the QSU_HOSTS hosts
+static int qsu_check(const char *list, struct qsu_host *hosts, size_t agent_hosts, bool expect_set) {
     int errors = 0;
 
     SIMPLE_PATTERN *sp = string_to_simple_pattern(list);
     QUERY_SCOPE_HOSTS_FILTER f;
-    query_scope_hosts_filter_init(&f, sp);
+    query_scope_hosts_filter_init(&f, sp, agent_hosts);
 
     if(sp && (f.set != NULL) != expect_set) {
-        fprintf(stderr, "QUERY SCOPE UNITTEST: pattern of %zu exact entries %s the set, expected %s: %s\n",
-                simple_pattern_exact_entries(sp), f.set ? "uses" : "does not use",
+        fprintf(stderr, "QUERY SCOPE UNITTEST: pattern of %zu exact entries for %zu hosts %s the set, expected %s: %s\n",
+                simple_pattern_exact_entries(sp), agent_hosts, f.set ? "uses" : "does not use",
                 expect_set ? "set" : "pattern", list);
         errors++;
     }
@@ -493,14 +500,20 @@ int query_scope_unittest(void) {
                 }
 
                 bool expect_set = !has_non_exact && sizes[s] >= QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES;
-                errors += qsu_check(buffer_tostring(wb), hosts, expect_set);
+                errors += qsu_check(buffer_tostring(wb), hosts, QSU_HOSTS, expect_set);
+
+                // too few hosts to repay the set: the same list stays on the pattern
+                if(expect_set) {
+                    errors += qsu_check(buffer_tostring(wb), hosts, QUERY_SCOPE_HOSTS_SET_MIN_HOSTS - 1, false);
+                    errors += qsu_check(buffer_tostring(wb), hosts, QUERY_SCOPE_HOSTS_SET_MIN_HOSTS, true);
+                }
             }
         }
     }
     buffer_free(wb);
 
     // no pattern at all
-    errors += qsu_check(NULL, hosts, false);
+    errors += qsu_check(NULL, hosts, QSU_HOSTS, false);
 
     for(size_t i = 0; i < QSU_HOSTS; i++)
         string_freez(hosts[i].hostname);
