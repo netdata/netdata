@@ -220,7 +220,40 @@ You can centralize dashboards, alerts, and storage with Netdata Parents:
 
 ## How It Works
 
-With Netdata you can run a modular pipeline for metrics collection, processing, and visualization.
+Netdata Agents collect, store, analyze and alert where data is created. Hubs concentrate each kind of data where you choose, and Netdata Cloud unifies them into one view.
+
+```mermaid
+flowchart LR
+  subgraph Sources[What you monitor]
+    S1[Servers, VMs, containers, Kubernetes]
+    S2[Network devices: SNMP, flows, traps]
+    S3[Hardware: IPMI, Redfish]
+    S4[Applications: OpenTelemetry traces and logs]
+    S5[Browsers and synthetic checks]
+  end
+  subgraph Hubs[Hubs you place per site, region or team]
+    H1[Parents: metrics]
+    H2[Agents: network devices and hardware]
+    H3[Agents: logs, traces, flows, RUM]
+  end
+  C[Netdata Cloud: one view, correlated]:::mainNode
+  S1 --> H1
+  S2 --> H2
+  S3 --> H2
+  S4 --> H3
+  S5 --> H3
+  H1 <--> C
+  H2 <--> C
+  H3 <--> C
+
+  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+```
+
+* **Agents** run on every system and collect, store, analyze and alert where the data is created.
+* **Hubs** concentrate each kind of data where you choose. They are independent: capacity grows by adding hubs, and a problem in one hub stays in that hub.
+* **Netdata Cloud** routes every query to the hubs that hold the answer and correlates the results into one view. It is not in the data path.
+
+### Inside every Agent
 
 ```mermaid
 flowchart TB
