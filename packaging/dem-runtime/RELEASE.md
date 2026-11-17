@@ -124,8 +124,16 @@ its exact Agent target. Runtime publication has no mutable latest aliases or
 version-order promotion. Normal Agent latest channels and release cadence remain
 owned by the Agent release lanes.
 
-Immutable upload uses `rclone copyto --immutable --checksum`, never synchronization
-or deletion. Public readback checks exact serving bytes.
+Immutable upload uses `rclone copy --immutable --checksum` with a directory source
+filtered to exactly one filename, never synchronization or deletion. This avoids
+rclone 1.60's single-file `copyto` path, which can overwrite changed contents despite
+`--immutable`. Only the selected file is copied, preserving descriptor-last ordering.
+Filenames must be literal, and failed destination listings stop the upload.
+It also sets `--s3-no-check-bucket` because the destination bucket is
+already provisioned: publishing must not require bucket-creation permission.
+Object checksums, post-upload verification and public readback remain enabled.
+Cloudflare documents this requirement for
+[object-level credentials](https://developers.cloudflare.com/r2/examples/rclone/).
 Sources remain beside their exact runtime identity. Storage retention is
 infrastructure policy; these helpers implement no publisher garbage collection.
 
@@ -192,7 +200,8 @@ remote state and is not an ordinary test command. Source assembly and transport
 archives use zstd level 19, one worker and an 8 MiB window.
 
 The storage regression tests run real `rclone` against a local S3 HTTP fixture,
-covering absent/existing descriptors, size limits and failed listings/reads. They
+covering absent/existing descriptors, size limits, failed listings/reads, uploads
+with bucket creation denied, immutable retries and object write/verification failures. They
 require `rclone` (installed by the packaging CI job) and no external service or
 credentials. Local runs without it report an explicit skip.
 
