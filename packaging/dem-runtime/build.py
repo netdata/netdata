@@ -10,7 +10,7 @@ import sys
 import shutil
 import tempfile
 
-from bundle import run, validate_url_prefix
+from bundle import SHARED_SOURCES, read_release_info, run, validate_url_prefix
 from locked import download
 
 
@@ -18,6 +18,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', required=True, choices=('amd64', 'arm64'))
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--release-info', type=Path, default=Path(__file__).resolve().parent.parent / 'release-info',
+                        help='generated canonical Agent release identity')
     parser.add_argument('--cache', type=Path, help='reusable hash-verified binary input cache')
     parser.add_argument('--url-prefix', default='', help='approved HTTPS base; empty creates an offline-only manifest')
     args = parser.parse_args()
@@ -27,6 +29,8 @@ def main():
         parser.error(str(error))
     recipe = Path(__file__).resolve().parent
     repo = recipe.parent.parent
+    release_info = args.release_info.resolve()
+    read_release_info(release_info)  # Refuse missing/developer identity before acquisition.
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     if any(output.iterdir()):
@@ -58,9 +62,12 @@ def main():
                '--mount', f'type=bind,src={recipe},dst=/recipe,readonly',
                '--mount', f'type=bind,src={repo / "src/dem-runtime"},dst=/assets,readonly',
                '--mount', f'type=bind,src={output},dst=/out',
+               '--mount', f'type=bind,src={release_info},dst=/agent-release-info,readonly',
                '-e', f'OUTPUT_UID={os.getuid()}', '-e', f'OUTPUT_GID={os.getgid()}',
                donor, 'python3', '/recipe/bundle.py', '--arch', args.arch,
-               '--url-prefix', args.url_prefix]
+               '--url-prefix', args.url_prefix, '--release-info', '/agent-release-info']
+    for name in SHARED_SOURCES:
+        command[2:2] = ['--mount', f'type=bind,src={repo / name},dst=/{name},readonly']
     run(command)
 
 

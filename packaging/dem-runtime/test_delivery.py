@@ -52,7 +52,7 @@ class DeliveryTests(unittest.TestCase):
             payload = archive.getvalue()
             digest = hashlib.sha256(payload).hexdigest()
             chromium = {'source': 'debian', 'version': 'fixture'}
-            inputs = {'version': 'fixture', 'node_version': '24.0.0', 'patchelf_version': '0.15.0',
+            inputs = {'node_version': '24.0.0', 'patchelf_version': '0.15.0',
                       'architectures': {'arm64': {'node_arch': 'arm64', 'node_sha256': digest,
                                                   'patchelf_arch': 'aarch64', 'patchelf_sha256': digest}}}
             (recipe / 'inputs.json').write_text(json.dumps(inputs))
@@ -68,13 +68,14 @@ class DeliveryTests(unittest.TestCase):
 
             with patch.object(bundle, 'Path', side_effect=lambda value: paths.get(str(value), Path(value))), \
                     patch.object(locked, 'check_inventory'), \
-                    patch.object(bundle, 'install_runner'), \
+                    patch.object(bundle, 'install_runner', return_value=('runner/run.mjs', {'version': 'fixture'})), \
                     patch.object(tarfile.TarFile, 'extractall'), \
                     patch.object(locked, 'download', wraps=locked.download) as download, \
                     patch.object(locked.HTTPS_OPENER, 'open', side_effect=response) as opened, \
                     patch.object(bundle, 'run', side_effect=RuntimeError('execution boundary')):
                 with self.assertRaisesRegex(RuntimeError, 'execution boundary'):
-                    bundle.prepare(type('Arguments', (), {'url_prefix': '', 'arch': 'arm64'})())
+                    bundle.prepare(type('Arguments', (), {'url_prefix': '',
+                                   'arch': 'arm64', 'release_info': Path('/unused')})())
             self.assertEqual(download.call_count, 2)
             self.assertEqual([call.args[0]['name'] for call in download.call_args_list],
                              ['node.tar.xz', 'patchelf.tar.gz'])
@@ -143,6 +144,10 @@ class DeliveryTests(unittest.TestCase):
             path = recipe / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text('# exact recipe')
+        for name in bundle.SHARED_SOURCES:
+            helper = base / name
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text('# exact shared helper')
         assets = base / 'src/dem-runtime'
         assets.mkdir(parents=True)
         for name, data in [('manifest.json', {}), ('runtime.json', {}), ('README.md', {}), ('package.json', {}),
@@ -152,7 +157,12 @@ class DeliveryTests(unittest.TestCase):
         (assets / 'runner/run.mjs').write_text('// exact runtime adapter')
         runtime = base / 'runtime'
         runtime.mkdir()
-        provenance = {'recipe_sha256': {name: bundle.sha256(recipe / name) for name in bundle.recipe_sources()},
+        agent = {'version': 'fixture', 'channel': 'nightly', 'source': 'a' * 40}
+        (runtime / 'release-info').write_text(''.join(k + '=' +
+                                                      agent[k] + '\n' for k in ('version', 'channel', 'source')))
+        provenance = {'agent': agent,
+                      'shared_sha256': {name: bundle.sha256(base / name) for name in bundle.SHARED_SOURCES},
+                      'recipe_sha256': {name: bundle.sha256(recipe / name) for name in bundle.recipe_sources()},
                       'source_sha256': {path.relative_to(assets).as_posix(): bundle.sha256(path)
                                         for path in assets.rglob('*') if path.is_file()},
                       'debian_sources': {}, 'inputs': {'sources': {}}}
@@ -195,6 +205,9 @@ class DeliveryTests(unittest.TestCase):
             output = base / 'output'
             self.assemble(recipe, runtime, output)
             self.assertEqual((output / 'runtime-source/runner/run.mjs').read_text(), '// exact runtime adapter')
+            for name in bundle.SHARED_SOURCES:
+                self.assertEqual((output / 'shared' / name).read_bytes(), (base / name).read_bytes())
+            self.assertEqual((output / 'release-info').read_bytes(), (runtime / 'release-info').read_bytes())
             first = (output / 'source-assembly.json').read_bytes()
             self.assemble(recipe, runtime, output)
             self.assertEqual(first, (output / 'source-assembly.json').read_bytes())
@@ -210,6 +223,15 @@ class DeliveryTests(unittest.TestCase):
             base = Path(directory).resolve()
             recipe, runtime = self.fixture(base)
             (base / 'src/dem-runtime/runner/run.mjs').write_text('// changed after assembly')
+            with self.assertRaisesRegex(ValueError, 'source input differs'):
+                self.assemble(recipe, runtime, base / 'output')
+            self.assertFalse((base / 'output').exists())
+
+    def test_source_assembly_rejects_changed_shared_identity_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory).resolve()
+            recipe, runtime = self.fixture(base)
+            (base / 'packaging/release_info.py').write_text('# changed after runtime build')
             with self.assertRaisesRegex(ValueError, 'source input differs'):
                 self.assemble(recipe, runtime, base / 'output')
             self.assertFalse((base / 'output').exists())
@@ -335,6 +357,44 @@ class ReleaseToolSourcesTests(unittest.TestCase):
             (recipe / 'native/lifecycle.sh').write_text('changed')
             with self.assertRaisesRegex(ValueError, 'source input differs'):
                 helper.assemble(recipe, runtime, base / 'sources')
+
+
+class AgentBuildIdentityTests(unittest.TestCase):
+    def test_builder_requires_release_identity_before_any_acquisition(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            argv = ['build.py', '--arch', 'amd64', '--output', str(root / 'output'),
+                    '--release-info', str(root / 'missing')]
+            with patch.object(sys, 'argv', argv), patch.object(build, 'download') as download:
+                with self.assertRaises(FileNotFoundError):
+                    build.main()
+                download.assert_not_called()
+            self.assertFalse((root / 'output').exists())
+
+    def test_builder_passes_canonical_file_and_shared_sources_readonly(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            info = root / 'release-info'
+            info.write_text('version=v2.12.0-607-nightly\nchannel=nightly\nsource=' + 'a' * 40 + '\n')
+            binary = root / 'input.deb'
+            binary.write_bytes(b'fixture input')
+            commands = []
+
+            def run(command):
+                commands.append(command)
+                if command[:2] == ['docker', 'build']:
+                    Path(command[command.index('--iidfile') + 1]).write_text('sha256:fixture')
+            argv = ['build.py', '--arch', 'amd64', '--output', str(root / 'output'), '--release-info', str(info)]
+            with patch.object(sys, 'argv', argv), patch.object(build, 'download', return_value=binary), \
+                    patch.object(build, 'run', side_effect=run):
+                build.main()
+            donor = commands[-1]
+            self.assertEqual(donor[:2], ['docker', 'run'])
+            self.assertIn('type=bind,src=' + str(info.resolve()) + ',dst=/agent-release-info,readonly', donor)
+            self.assertEqual(donor[-2:], ['--release-info', '/agent-release-info'])
+            for name in bundle.SHARED_SOURCES:
+                self.assertTrue(any(str(value).endswith(',dst=/' + name + ',readonly') for value in donor))
+            self.assertNotIn('version', json.loads((Path(build.__file__).parent / 'inputs.json').read_text()))
 
 
 if __name__ == '__main__':

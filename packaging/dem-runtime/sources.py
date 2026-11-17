@@ -8,7 +8,8 @@ import os
 from pathlib import Path, PurePosixPath
 import shutil
 
-from bundle import package_archive, recipe_sources, run, runtime_sources, sha256, write_json
+from bundle import (SHARED_SOURCES, package_archive, read_release_info, recipe_sources, run,
+                    runtime_sources, sha256, write_json)
 from locked import checksums, download, paragraphs
 
 
@@ -142,6 +143,9 @@ def main():
     assets = recipe.parent.parent / 'src/dem-runtime'
     provenance = json.loads((args.runtime_output / 'provenance.json').read_text())
     verified_sources(recipe, provenance['recipe_sha256'], recipe_sources(), 'recipe')
+    verified_sources(recipe.parent.parent, provenance['shared_sha256'], SHARED_SOURCES, 'shared helper')
+    if read_release_info(args.runtime_output / 'release-info') != provenance['agent']:
+        raise ValueError('runtime release-info differs from its provenance')
     verified_sources(assets, provenance['source_sha256'], runtime_sources(assets), 'runner')
     module = recipe.parent.parent / 'src/go'
     tool_sources = release_tool_sources(module)
@@ -160,6 +164,9 @@ def main():
     destination = output / 'recipe'
     for name in provenance['recipe_sha256']:
         copies.append((recipe / name, destination / name))
+    for name in provenance['shared_sha256']:
+        copies.append((recipe.parent.parent / name, output / 'shared' / name))
+    copies.append((args.runtime_output / 'release-info', output / 'release-info'))
     for name in provenance['source_sha256']:
         copies.append((assets / name, output / 'runtime-source' / name))
     for name in tool_sources:
@@ -174,8 +181,8 @@ def main():
         if path.exists() and not path.is_file():
             raise ValueError('unexpected source assembly entry: ' + str(path.relative_to(output)))
     for path in output.rglob('*'):
-        if path.is_symlink() or (not path.is_dir() and path not in expected
-                                 and path != output / 'source-assembly.json'):
+        if path.is_symlink() or (not path.is_dir() and path not in expected and
+                                 path != output / 'source-assembly.json'):
             raise ValueError('unexpected source assembly entry: ' + str(path.relative_to(output)))
     output.mkdir(parents=True, exist_ok=True)
     for item, directory in downloads:
@@ -186,6 +193,7 @@ def main():
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
     verified_sources(output / 'recipe', provenance['recipe_sha256'], recipe_sources(), 'recipe')
+    verified_sources(output / 'shared', provenance['shared_sha256'], SHARED_SOURCES, 'shared helper')
     verified_sources(output / 'runtime-source', provenance['source_sha256'],
                      runtime_sources(assets), 'runner')
     verified_sources(output / 'release-tool', tool_sources, tool_sources, 'release tool')

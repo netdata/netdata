@@ -17,14 +17,20 @@ import tarfile
 from urllib.parse import urlsplit, urlunsplit
 
 
+ROOT = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(ROOT / 'packaging'))
+# Bootstrap the shared module and re-export its validator for release consumers.
+from release_info import read_release_info, validate_release_info  # noqa: E402,F401
+
+SHARED_SOURCES = ('packaging/release_info.py',)
 RESERVED = {'chrome', 'fonts.conf', 'prepared.json', 'native.json'}
 
 
 def credential_free_https(value):
     try:
         url = urlsplit(value)
-        valid = (url.scheme == 'https' and url.hostname and url.username is None
-                 and url.password is None)
+        valid = (url.scheme == 'https' and url.hostname and url.username is None and
+                 url.password is None)
         url.port  # Parsing the authority alone does not validate its port.
         return bool(valid)
     except ValueError:
@@ -97,7 +103,7 @@ def recipe_sources():
             'native/tests/test_package.py')
 
 
-def install_runner(assets, root, version):
+def install_runner(assets, root, release_info):
     metadata = json.loads((assets / 'runtime.json').read_text())
     pins = json.loads((assets / 'manifest.json').read_text())
     if metadata['contract'] != 2 or pins['protocol_version'] != metadata['contract']:
@@ -105,14 +111,14 @@ def install_runner(assets, root, version):
     if pins['entrypoint'] != 'runner/run.mjs' or metadata['paths'] != {
             'dependencies': 'dependencies', 'browser': 'chrome'}:
         raise ValueError('unsupported runtime release layout')
-    if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', version):
-        raise ValueError('invalid runtime release version')
+    agent = read_release_info(release_info)
     shutil.copytree(assets / 'runner', root / 'runner')
     shutil.copyfile(assets / 'manifest.json', root / 'manifest.json')
     shutil.copyfile(assets / 'README.md', root / 'README.md')
-    metadata['version'] = version
+    metadata['version'] = agent['version']
     write_json(root / 'runtime.json', metadata)
-    return pins['entrypoint']
+    shutil.copyfile(release_info, root / 'release-info')
+    return pins['entrypoint'], agent
 
 
 def elf_headers(path, machine):
@@ -296,7 +302,7 @@ def prepare(args):
     work.mkdir()
     root = work / 'payload'
     root.mkdir()
-    entrypoint = install_runner(assets, root, inputs['version'])
+    entrypoint, agent = install_runner(assets, root, args.release_info)
     node_name = f'node-v{inputs["node_version"]}-linux-{arch["node_arch"]}'
     node_tar = work / 'node.tar.xz'
     download({'url': f'https://nodejs.org/dist/v{inputs["node_version"]}/{node_name}.tar.xz',
@@ -306,7 +312,7 @@ def prepare(args):
     node = work / node_name
     patch_tar = work / 'patchelf.tar.gz'
     download({'url': f'https://github.com/NixOS/patchelf/releases/download/{inputs["patchelf_version"]}/'
-                     f'patchelf-{inputs["patchelf_version"]}-{arch["patchelf_arch"]}.tar.gz',
+              f'patchelf-{inputs["patchelf_version"]}-{arch["patchelf_arch"]}.tar.gz',
               'sha256': arch['patchelf_sha256'], 'name': patch_tar.name}, work)
     patch_dir = work / 'patchelf'
     patch_dir.mkdir()
@@ -469,7 +475,8 @@ def prepare(args):
     components.append({'type': 'application', 'name': 'node', 'version': inputs['node_version']})
     write_json(root / 'sbom.cdx.json', {'bomFormat': 'CycloneDX',
                'specVersion': '1.5', 'version': 1, 'components': components})
-    provenance = {'inputs': inputs, 'platform': 'linux/' + args.arch,
+    provenance = {'inputs': inputs, 'platform': 'linux/' + args.arch, 'agent': agent,
+                  'shared_sha256': {name: sha256(ROOT / name) for name in SHARED_SOURCES},
                   'runtime_manifest': contract,
                   'source_sha256': {name: sha256(assets / name)
                                     for name in runtime_sources(assets)},
@@ -482,9 +489,9 @@ def prepare(args):
                {path.relative_to(root).as_posix(): {'sha256': sha256(path),
                                                     'bytes': path.stat().st_size} for path in regular_files(root)})
     compressed, archive = package_archive(root, output, inputs['source_date_epoch'])
-    relative = f'dem-runtime/{inputs["version"]}/{args.arch}/{archive["sha256"]}.tar.zst'
+    relative = f'dem-runtime/{agent["channel"]}/{agent["version"]}/{args.arch}/{archive["sha256"]}.tar.zst'
     archive['url'] = args.url_prefix.rstrip('/') + '/' + relative if args.url_prefix else ''
-    manifest = {'format': 1, 'contract': contract['protocol_version'], 'version': inputs['version'],
+    manifest = {'format': 1, 'contract': contract['protocol_version'], 'version': agent['version'],
                 'platform': 'linux/' + args.arch,
                 'archive': archive, 'layout': layout, 'bindings': bindings}
     final = output / (archive['sha256'] + '.tar.zst')
@@ -492,6 +499,7 @@ def prepare(args):
     write_json(output / 'manifest.json', manifest)
     write_json(output / 'provenance.json', provenance)
     shutil.copyfile(root / 'sbom.cdx.json', output / 'sbom.cdx.json')
+    shutil.copyfile(root / 'release-info', output / 'release-info')
     print(json.dumps({'archive': final.name, 'manifest': 'manifest.json', 'bounds': archive}), flush=True)
     for path in output.iterdir():
         os.chown(path, int(os.environ['OUTPUT_UID']), int(os.environ['OUTPUT_GID']))
@@ -501,6 +509,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--arch', required=True, choices=('arm64', 'amd64'))
     parser.add_argument('--url-prefix', default='')
+    parser.add_argument('--release-info', required=True, type=Path)
     try:
         prepare(parser.parse_args())
     except subprocess.CalledProcessError as error:
