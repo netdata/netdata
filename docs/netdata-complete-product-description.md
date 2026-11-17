@@ -1,4 +1,4 @@
-# Netdata Full-Stack Observability: Complete Product Description
+# Netdata Features (2026): Full-Stack Observability Platform
 
 ## Executive Summary
 
