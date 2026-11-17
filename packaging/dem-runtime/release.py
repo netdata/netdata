@@ -123,18 +123,21 @@ def fetch_public_key(args):
 
 def read_stored_descriptor(remote):
     # Authenticate retry state from storage rather than a possibly stale CDN.
-    try:
-        stat = json.loads(run(['rclone', 'lsjson', '--stat', remote], capture=True))
-    except subprocess.CalledProcessError as error:
-        if error.returncode in (3, 4):  # rclone directory/file not found; other failures are fatal.
-            return None
-        raise
-    if stat['IsDir'] or not 0 < stat['Size'] <= METADATA_LIMIT:
-        raise ValueError('stored descriptor exceeds the protocol limit')
-    body = run(['rclone', 'cat', '--count', str(METADATA_LIMIT + 1), remote], capture=True).encode()
-    if len(body) != stat['Size'] or len(body) > METADATA_LIMIT:
-        raise ValueError('stored descriptor changed during publication inspection')
-    return body
+    # A bucket stat can report an absent object as a directory. List its parent
+    # with a trailing slash to avoid probing an object as the filesystem root.
+    parent, name = remote.rsplit('/', 1)
+    entries = json.loads(run(['rclone', 'lsjson', '--files-only', '--include', '/' + name,
+                              '--no-mimetype', '--no-modtime', parent + '/'], capture=True))
+    for stat in entries:
+        if stat['Path'] != name:
+            continue
+        if stat['IsDir'] or not 0 < stat['Size'] <= METADATA_LIMIT:
+            raise ValueError('stored descriptor exceeds the protocol limit')
+        body = run(['rclone', 'cat', '--count', str(METADATA_LIMIT + 1), remote], capture=True).encode()
+        if len(body) != stat['Size'] or len(body) > METADATA_LIMIT:
+            raise ValueError('stored descriptor changed during publication inspection')
+        return body
+    return None  # Only a successful listing can establish absence.
 
 
 def signed_agent(release, arch):

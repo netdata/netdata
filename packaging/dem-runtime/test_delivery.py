@@ -137,6 +137,10 @@ class DeliveryTests(unittest.TestCase):
                         (Path(__file__).parent / 'native/tests').glob('test_*.py'))
         self.assertEqual({name for name in bundle.recipe_sources() if name.startswith('native/')}, expected)
 
+    def test_recipe_inventory_covers_publisher_and_builder_tests(self):
+        expected = {path.name for path in Path(__file__).parent.glob('test_*.py')}
+        self.assertEqual({name for name in bundle.recipe_sources() if name.startswith('test_')}, expected)
+
     def fixture(self, base):
         recipe = base / 'packaging/dem-runtime'
         recipe.mkdir(parents=True)

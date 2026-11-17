@@ -160,14 +160,14 @@ jobs:
         run: |
           packages=(gnupg)
           if [ "$PACKAGE_TESTS" = true ]; then
-            packages+=(cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml)
+            packages+=(cmake rpm cpio dpkg-dev zstd rclone python3-ruamel.yaml)
           fi
           sudo apt-get update
           sudo apt-get install -y "${packages[@]}"
           command -v gpg
           command -v node
           if [ "$PACKAGE_TESTS" = true ]; then
-            for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node; do command -v "$tool"; done
+            for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node rclone; do command -v "$tool"; done
           fi
       - name: Store lifecycle and supervisor integration
         if: needs.changes.outputs.go == 'true'

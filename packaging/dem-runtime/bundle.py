@@ -94,7 +94,8 @@ def recipe_sources():
     """Release-owned recipe files only; never recurse into caches or local outputs."""
     return ('build.py', 'bundle.py', 'locked.py', 'sources.py', 'refresh-lock.py', 'snapshot.py', 'test_snapshot.py',
             'inputs.json', 'Dockerfile', 'README.md', 'RELEASE.md', 'test_bundle.py',
-            'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py', 'ci.py', 'test_ci.py',
+            'test_delivery.py', 'test_locked.py', 'release.py', 'test_release.py', 'test_release_storage.py',
+            'ci.py', 'test_ci.py',
             'locks/amd64.json', 'locks/arm64.json',
             'native/CMakeLists.txt', 'native/netdata-dem-browser', 'native/hook.sh.in', 'native/lifecycle.sh',
             'native/README.md',

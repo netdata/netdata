@@ -153,6 +153,13 @@ trust recovery requires the release owner's explicit procedure.
 Signature validity does not detect withheld releases, certify every host policy,
 or establish fresh key state through a stale cache.
 
+The publisher checks for an existing descriptor by listing its parent storage
+prefix and selecting the exact filename. A successful empty listing permits first
+publication; failed listings, including a missing bucket, stop publication.
+Do not use an object-root `rclone lsjson --stat` to establish absence: bucket
+backends can report a missing object as an empty directory. Existing descriptors
+still require bounded reads and signature/payload verification before any upload.
+
 ## Local validation and limits
 
 The installation-owner upgrade matrix runs on amd64. Native ARM CI covers build/package checks, focused pair and
@@ -183,6 +190,11 @@ python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
 explicit signing key but performs no publication. `publish` mutates
 remote state and is not an ordinary test command. Source assembly and transport
 archives use zstd level 19, one worker and an 8 MiB window.
+
+The storage regression tests run real `rclone` against a local S3 HTTP fixture,
+covering absent/existing descriptors, size limits and failed listings/reads. They
+require `rclone` (installed by the packaging CI job) and no external service or
+credentials. Local runs without it report an explicit skip.
 
 Tests cover identity consistency, signed staging/tampering, immutable retry,
 stable/nightly/devel paths, partial publication, public digest checks,
