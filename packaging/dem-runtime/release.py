@@ -333,6 +333,11 @@ def main():
         args.public_base = args.public_base.rstrip('/')
     if args.command == 'publish' and not re.fullmatch(r'[A-Za-z0-9_-]+:[A-Za-z0-9_./-]+', args.remote):
         parser.error('remote must be a named rclone remote and bucket path')
+    if args.command == 'publish':
+        version = json.loads(Path(__file__).with_name('rclone.json').read_text())['version']
+        if run(['rclone', 'version'], capture=True).splitlines()[:1] != ['rclone v' + version]:
+            raise ValueError('publishing requires rclone ' + version +
+                             '; install it with .github/scripts/install-rclone.sh')
     {'assemble': assemble, 'stage': stage, 'publish': publish}[args.command](args)
 
 

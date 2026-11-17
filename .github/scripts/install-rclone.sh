@@ -4,8 +4,9 @@
 set -euo pipefail
 
 : "${RUNNER_TEMP:?}" "${GITHUB_PATH:?}"
-rclone_version=1.76.0
-rclone_sha256=b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7
+rclone_pin="$(python3 -c 'import json, sys; p = json.load(open(sys.argv[1])); print(p["version"], p["linux_amd64_sha256"])' \
+    "$(dirname "$0")/../../packaging/dem-runtime/rclone.json")"
+read -r rclone_version rclone_sha256 <<< "$rclone_pin"
 rclone_archive="rclone-v${rclone_version}-linux-amd64.zip"
 rclone_workdir="$(mktemp -d "${RUNNER_TEMP}/rclone-download.XXXXXX")"
 cleanup() {

@@ -135,9 +135,11 @@ Cloudflare documents this requirement for
 [object-level credentials](https://developers.cloudflare.com/r2/examples/rclone/).
 
 Publication and its integration tests install the same pinned rclone release through
-`.github/scripts/install-rclone.sh`. The script verifies the Linux amd64 archive
-against a repository-pinned SHA-256 before extracting or running it. Update the
-version and checksum together and run the real-client storage tests when upgrading.
+`.github/scripts/install-rclone.sh`, using `packaging/dem-runtime/rclone.json` as the
+version/checksum owner. The script verifies the Linux amd64 archive against the
+pinned SHA-256 before extracting or running it. The `publish` command requires that
+exact client version before accessing storage, including when invoked manually.
+Update the version and checksum together and run the real-client storage tests when upgrading.
 The older distro rclone 1.60.1 sends versioned post-upload HEAD requests that R2
 rejects; the pinned client retains HEAD verification without requesting object versions.
 Its `copyto` also enforces immutability, unlike 1.60.1. Directory copy is unsuitable

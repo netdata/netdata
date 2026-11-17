@@ -29,6 +29,23 @@ def candidate(arch, version='v2.12.0-2-nightly', channel='nightly', source='a' *
 
 
 class PublicationTests(unittest.TestCase):
+    def test_publish_cli_requires_pinned_client_before_storage(self):
+        version = json.loads(Path(release.__file__).with_name('rclone.json').read_text())['version']
+        argv = ['release.py', 'publish', '--publication', 'unused', '--release-tool', 'unused',
+                '--public-key', 'unused', '--public-base', 'https://example.invalid', '--remote', 'unused:prefix']
+        for actual in ('rclone v1.60.1-DEV', '', 'rclone v99.0.0', 'rclone v' + version):
+            with self.subTest(actual=actual), patch.object(sys, 'argv', argv), \
+                    patch.object(release, 'run', return_value=actual + '\n') as run, \
+                    patch.object(release, 'publish') as publish:
+                if actual == 'rclone v' + version:
+                    release.main()
+                    publish.assert_called_once()
+                else:
+                    with self.assertRaisesRegex(ValueError, 'publishing requires rclone'):
+                        release.main()
+                    publish.assert_not_called()
+                run.assert_called_once_with(['rclone', 'version'], capture=True)
+
     def test_cli_reports_http_status_without_untrusted_details(self):
         with tempfile.TemporaryDirectory() as temporary:
             output = Path(temporary) / 'public.gpg'
@@ -49,13 +66,15 @@ class PublicationTests(unittest.TestCase):
     def test_cli_reports_sanitized_failure_without_secondary_exception(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run([
-                sys.executable, str(Path(release.__file__)), 'publish',
-                '--publication', str(Path(temporary) / 'missing'),
+                sys.executable, str(Path(release.__file__)), 'stage',
+                '--artifacts', str(Path(temporary) / 'missing'), '--output', str(Path(temporary) / 'output'),
+                '--signing-key', 'unused',
                 '--release-tool', 'unused', '--public-key', 'unused',
-                '--public-base', 'https://example.invalid', '--remote', 'unused:prefix',
+                '--public-base', 'https://example.invalid',
             ], capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
-            self.assertEqual(result.stderr.strip(), 'runtime release operation failed: FileNotFoundError')
+            self.assertEqual(result.stderr.splitlines()[-1], 'runtime release operation failed: FileNotFoundError')
+            self.assertNotIn('Traceback', result.stderr)
 
     def test_canonical_key_acquisition_is_bounded_and_has_no_failure_fallback(self):
         with tempfile.TemporaryDirectory() as temporary:
