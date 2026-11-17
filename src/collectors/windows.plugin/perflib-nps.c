@@ -244,12 +244,14 @@ static void nps_chart_update(
         collected_number value = (collected_number)d->cd.current.Data;
 
         // The chart kept advancing while this dimension was missing, so the delta against its stale value would
-        // be charged to a single interval. Rebaseline it to emit zero for this interval instead of a spike.
+        // be charged to a single interval. Leave a gap for this interval and rebaseline, so the next sample yields
+        // a one-interval rate.
         if (d->discontinuous && def->units_total)
             rrddim_set_last_collected_int(d->rd, value);
+        else
+            rrddim_set_by_pointer(ch->st, d->rd, value);
         d->discontinuous = false;
 
-        rrddim_set_by_pointer(ch->st, d->rd, value);
         if (ch->st_total)
             rrddim_set_by_pointer(ch->st_total, d->rd_total, value);
     }
