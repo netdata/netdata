@@ -723,7 +723,7 @@ create_tmp_directory() {
     fi
   fi
 
-  mktemp -d -t netdata-kickstart-XXXXXXXXXX
+  TMPDIR="${TMPDIR}" mktemp -d -t netdata-kickstart-XXXXXXXXXX
 }
 
 set_tmpdir() {
@@ -898,6 +898,8 @@ download() {
   fi
 
   if [ -n "${CURL}" ]; then
+    # Positional arguments expand in the child shell.
+    # shellcheck disable=SC2016
     "${runcmd}" sh -c '"${1}" --fail -q -sSL --connect-timeout 10 --retry 3 --write-out "%{http_code}" --output "${2}" "${3}" > "${4}"' _ "${CURL}" "${dest}" "${url}" "${dl_log}"
 
     handle_curl_result "$?" "${url}" "${dl_log}" "downloading" "${dest}"
@@ -944,6 +946,8 @@ get_redirect() {
   rm -f "${output}"
 
   if [ -n "${CURL}" ]; then
+    # Positional arguments expand in the child shell.
+    # shellcheck disable=SC2016
     always_run sh -c '"${1}" "${2}" -s -L -I -o /dev/null -w "%{url_effective}" > "${3}"' _ "${CURL}" "${url}" "${output}"
 
     ret="$?"
@@ -1465,7 +1469,7 @@ handle_existing_install() {
       success_banner
       cleanup
       trap - EXIT
-      exit $ret
+      exit "$ret"
       ;;
     oci)
       fatal "This is an OCI container, use the regular container lifecycle management commands for your container tools instead of this script for managing it." F0203
@@ -1774,6 +1778,8 @@ dem_trusted_dir() {
 
 dem_path_stat() {
   # An absent path is ordinary. Preserve privilege or stat failures separately.
+  # Positional arguments expand in the privileged child shell.
+  # shellcheck disable=SC2016
   run_as_root env -i PATH="$PATH" LC_ALL=C /bin/sh -c '
     if [ -L "$1" ] || [ -e "$1" ]; then exec stat -c "%F:%u:%a" -- "$1"; fi
     echo absent
@@ -2039,7 +2045,7 @@ setup_dem_runtime() {
       dem_action=status
       ;;
     kickstart-static|manual-static|legacy-static|kickstart-build|legacy-build)
-      progress "Explicit DEM setup prepares host browser policy, downloads signed release metadata and the browser archive, then enables daily automatic preparation. Activation requires an operator Agent restart."
+      progress "Explicit DEM setup prepares host browser policy, downloads the matching signed runtime, and permits companion downloads during Agent updates. First activation requires an operator Agent restart."
       dem_action=install
       ;;
     *)
@@ -2061,7 +2067,7 @@ setup_dem_runtime() {
       return 1
     fi
     if run_as_root "${dem_helper}" install --agent "${ndpath}" --allow-download; then
-      progress "DEM runtime prepared with daily automatic preparation enabled. Restart the Agent explicitly to activate it; kickstart does not restart it for managed runtime activation."
+      progress "Matching DEM runtime installed. Restart the Agent explicitly for first activation; future Agent updates use the paired installation owner."
       return 0
     else
       dem_cli_status=$?
@@ -2704,17 +2710,29 @@ try_static_install() {
     opts="${opts} --accept"
   fi
 
-  env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=check"
+  static_cert_mode=check
 
   if [ -n "${NETDATA_OFFLINE_INSTALL_SOURCE}" ]; then
-    env_cmd="env NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL} NETDATA_CERT_MODE=auto"
+    static_cert_mode=auto
   fi
 
+  static_prefix_existed=0
+  if [ -e /opt/netdata ] || [ -L /opt/netdata ]; then
+    static_prefix_existed=1
+  fi
   progress "Installing netdata"
   # shellcheck disable=SC2086
-  if ! run_as_root ${env_cmd} /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
-    warning "Failed to install static build of Netdata on ${SYSARCH}."
-    run rm -rf /opt/netdata
+  if run_as_root env "TMPDIR=${tmpdir}" "NETDATA_CERT_TEST_URL=${NETDATA_CLAIM_URL}" \
+      "NETDATA_CERT_MODE=${static_cert_mode}" /bin/sh "./${archive_name}" ${opts} -- ${NETDATA_INSTALLER_OPTIONS}; then
+    :
+  else
+    static_install_status=$?
+    warning "Failed to install static build of Netdata on ${SYSARCH} (status ${static_install_status})."
+    # Fresh partial installs must not interfere with the source fallback. An
+    # existing prefix also contains configuration, history and runtime proof.
+    if [ "${static_prefix_existed}" -eq 0 ]; then
+      run rm -rf /opt/netdata
+    fi
     return 2
   fi
 

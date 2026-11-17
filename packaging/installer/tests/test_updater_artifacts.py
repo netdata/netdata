@@ -34,6 +34,12 @@ class UpdaterArtifacts(unittest.TestCase):
             manifest.write(f'{name} {len(content)} {hashlib.sha256(content).hexdigest()}\n')
         return hashlib.sha256(content).hexdigest()
 
+    def stopped_cli(self, prefix, static=False):
+        cli = prefix / ('bin' if static else 'usr/sbin') / 'netdatacli'
+        cli.parent.mkdir(parents=True, exist_ok=True)
+        cli.write_text('#!/bin/sh\n[ "$#" = 1 ] && [ "$1" = ping ] || exit 93\nexit 255\n')
+        cli.chmod(0o755)
+
     def run_shell(self, body, success=True, extra='', functions=FUNCTIONS):
         setup = f'''
 set -e
@@ -152,6 +158,7 @@ set_tarball_urls stable no
         archive = io.BytesIO()
         with tarfile.open(fileobj=archive, mode='w:gz') as tar:
             data = (f'#!/bin/sh\necho installed > "{self.root}/installed"\n'
+                    f'printf "%s\\n" "$@" > "{self.root}/installer-args"\n'
                     f'echo \'RELEASE_CHANNEL="nightly"\' > "{self.root}/prefix/etc/netdata/.environment"\n').encode()
             info = tarfile.TarInfo('netdata-v2.8.0/netdata-installer.sh')
             info.size, info.mode = len(data), 0o755
@@ -173,11 +180,11 @@ set_tarball_urls stable no
         prefix = self.root / 'prefix'
         (prefix / 'etc/netdata').mkdir(parents=True)
         (prefix / 'var/lib/netdata').mkdir(parents=True)
+        self.stopped_cli(prefix)
         envfile = prefix / 'etc/netdata/.environment'
         envfile.touch()
         self.run_shell(f'''
 install_build_dependencies() {{ :; }}
-pidof() {{ return 0; }}
 NETDATA_FORCE_UPDATE={'0' if mode == 'cached' else '1'}
 NETDATA_TARBALL_CHECKSUM={'"' + digest + '"' if mode == 'cached' else ''}
 get_netdata_latest_tag() {{ echo v2.8.0; }}
@@ -193,6 +200,7 @@ update_build
             self.assertFalse((self.root / 'installed').exists())
         else:
             self.assertEqual((self.root / 'installed').read_text().strip(), 'installed')
+            self.assertIn('--dont-start-it', (self.root / 'installer-args').read_text().splitlines())
             if channel == 'preview':
                 self.assertEqual(envfile.read_text(), 'RELEASE_CHANNEL="preview"\n')
             self.assertEqual((prefix / 'var/lib/netdata/netdata.tarball.checksum').read_text().strip(), digest)
@@ -202,6 +210,7 @@ update_build
         # verification, and installer invocation use the actual shell functions.
         prefix = self.root / 'opt/netdata'
         (prefix / 'etc/netdata').mkdir(parents=True)
+        self.stopped_cli(prefix, static=True)
         functions = FUNCTIONS.replace('/opt/netdata', str(prefix))
         name = 'netdata-aarch64-v2.8.0.gz.run'
         payload = f'#!/bin/sh\necho "$*" > "{self.root}/static-installed"\n'.encode()
@@ -213,7 +222,7 @@ set_tarball_urls stable yes
 update_static
 """
         self.run_shell(body, functions=functions)
-        self.assertEqual((self.root / 'static-installed').read_text().strip(), '--accept --')
+        self.assertEqual((self.root / 'static-installed').read_text().strip(), '--accept -- --dont-start-it')
         self.assertIn('legacy-static', (prefix / 'etc/netdata/.install-type').read_text())
         self.work.mkdir()
         (self.root / 'static-installed').unlink()
@@ -247,7 +256,10 @@ create_exec_tmp_directory() {{
 INTERACTIVE=1
 env() {{ "$@"; }}
 apt-get() {{ :; }}
-dpkg-query() {{ :; }}
+dpkg-query() {{
+  if [ "$1" = -W ] && [ "$3" = netdata-dem-runtime ]; then return 1; fi
+  [ "$1" = -s ]
+}}
 get_current_version() {{ echo 002008000300000000; }}
 get_new_binpkg_major() {{ echo 2; }}
 check_for_remote_file() {{ return 0; }}
@@ -598,10 +610,12 @@ self_update
     def test_preview_static_update_preserves_channel(self):
         prefix = self.root / 'opt/netdata'
         (prefix / 'etc/netdata').mkdir(parents=True)
+        self.stopped_cli(prefix, static=True)
         envfile = prefix / 'etc/netdata/.environment'
         envfile.write_text('RELEASE_CHANNEL="preview"\n')
         functions = FUNCTIONS.replace('/opt/netdata', str(prefix))
-        payload = f'#!/bin/sh\necho \'RELEASE_CHANNEL="nightly"\' > "{envfile}"\n'.encode()
+        payload = (f'#!/bin/sh\necho \'RELEASE_CHANNEL="nightly"\' > "{envfile}"\n'
+                   f'printf "%s\\n" "$@" > "{self.root}/installer-args"\n').encode()
         self.artifact('netdata-aarch64-v2.9.0-rc.2.gz.run', payload)
         self.run_shell(f'''
 RELEASE_CHANNEL=preview
@@ -612,6 +626,7 @@ set_tarball_urls preview yes
 update_static
 ''', functions=functions)
         self.assertEqual(envfile.read_text(), 'RELEASE_CHANNEL="preview"\n')
+        self.assertIn('--dont-start-it', (self.root / 'installer-args').read_text().splitlines())
 
 
 if __name__ == '__main__':

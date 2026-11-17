@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise fleet preparation with offline fixtures; never execute an installer."""
+"""Exercise fleet preparation with offline payloads and harmless archive startup fixtures."""
 import errno
 import gzip
 import hashlib
@@ -8,8 +8,10 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import runpy
 import shutil
+import shlex
 import struct
 import subprocess
 import tarfile
@@ -748,6 +750,55 @@ class PrepareFleetTests(unittest.TestCase):
             self.assertNotIn('./usr/libexec/netdata/plugins.d/go.d.plugin', tf.getnames())
             self.assertEqual(tf.getmember('./bin/srv/netdata').mode,
                              (self.source / 'bin/srv/netdata').stat().st_mode & 0o7777)
+
+    def test_production_staged_archive_round_trip_and_bootstrap(self):
+        package = self.root / 'netdata'
+        self.source.rename(package)
+        self.source = package
+        self.put('bin/bash', '#!/bin/sh\nexec ' + shlex.quote(shutil.which('bash')) + ' "$@"\n').chmod(0o755)
+        self.put('system/post-installer.sh', '''#!/bin/sh
+if [ "${NETDATA_DEM_STATIC_OWNER_BASH:-0}" != 1 ]; then
+    export NETDATA_DEM_STATIC_OWNER_BASH=1
+    exec ./bin/bash "$0" "$@"
+fi
+printf '%s\\n' "$PWD" "$TMPDIR" "$*" > "$FLEET_TEST_RESULT"
+''').chmod(0o755)
+        makeself = ROOT / 'packaging/makeself'
+        archive = self.root / 'official.gz.run'
+        result = subprocess.run([
+            'sh', str(makeself / 'makeself.sh'), '--gzip', '--complevel', '9', '--needroot',
+            '--header', str(makeself / 'makeself-header.sh'), '--lsm', str(makeself / 'makeself.lsm'),
+            '--license', str(makeself / 'makeself-license.txt'),
+            '--help-header', str(makeself / 'makeself-help-header.txt'),
+            str(package), str(archive), 'Netdata fixture', './system/post-installer.sh',
+        ], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        target = self.root / 'reduced.gz.run'
+        self.run_script('--input', archive, '--sha256', hashlib.sha256(archive.read_bytes()).hexdigest(),
+                        '--keep', 'none', '--strip-mode', 'none', '--apply', '--output', target)
+        header = target.read_bytes()[:65536].decode(errors='replace')
+        self.assertEqual(re.search(r'^targetdir="([^"\n]*)"$', header, re.M)[1], 'netdata')
+        self.assertEqual(re.search(r'^keep="([^"\n]*)"$', header, re.M)[1], 'n')
+        # Only the harmless marker runs; the shim satisfies the archive root guard
+        # without host account changes or touching the real installation prefix.
+        commands = self.root / 'commands'
+        commands.mkdir()
+        identity = commands / 'id'
+        identity.write_text('#!/bin/sh\nif [ "$1" = -u ]; then echo 0; else exec /usr/bin/id "$@"; fi\n')
+        identity.chmod(0o755)
+        scratch = self.root / 'private scratch'
+        scratch.mkdir(mode=0o700)
+        marker = self.root / 'bootstrap-result'
+        result = subprocess.run(['sh', str(target), '--accept', '--nox11', '--', '--dont-start-it'],
+                                capture_output=True, text=True, env=dict(
+                                    os.environ, PATH=str(commands) + ':' + os.environ['PATH'],
+                                    TMPDIR=str(scratch), FLEET_TEST_RESULT=str(marker)))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        directory, temporary, arguments = marker.read_text().splitlines()
+        self.assertEqual(Path(directory).parent.resolve(), scratch.resolve())
+        self.assertEqual(temporary, str(scratch))
+        self.assertEqual(arguments, '--dont-start-it')
+        self.assertFalse(Path(directory).exists())
 
     def test_archive_with_implicit_directories_keeps_directory_capabilities(self):
         path, sha = self.installer(omit_directories=True)
