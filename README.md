@@ -246,7 +246,13 @@ flowchart LR
   H2 <--> C
   H3 <--> C
 
+  class S1,S2,S3,S4,S5 source
+  class H1,H2,H3 green
+  classDef source fill:#ffffff,stroke:#333,stroke-width:1px,color:#000
+  classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px,color:#000
   classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+  style Sources fill:#f7f7f7,stroke:#999,color:#000
+  style Hubs fill:#f7f7f7,stroke:#999,color:#000
 ```
 
 * **Agents** run on every system and collect, store, analyze and alert where the data is created.
