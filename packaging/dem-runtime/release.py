@@ -167,17 +167,15 @@ def public_identity(url, digest, size):
 
 
 def upload(args, path, relative):
-    parent, name = relative.rsplit('/', 1)
+    _, name = relative.rsplit('/', 1)
     if path.name != name or not re.fullmatch(r'[A-Za-z0-9._-]+', name):
         raise ValueError('publication upload must preserve a literal filename')
     # The bucket is provisioned by SRE; publishing needs only object-level access.
-    # rclone 1.60 copyto ignores --immutable for changed contents. Directory copy
-    # enforces it; select only this file so descriptors cannot upload early.
-    # Keep destination listing: 1.60's --no-traverse ignores failed object HEADs.
-    run(['rclone', 'copy', '--s3-no-check-bucket', '--checksum', '--immutable',
-         '--include', '/' + name, '--header-upload',
+    # The pinned client enforces immutable single-object copies and fails on
+    # destination HEAD errors. Avoid directory traversal and its partial listings.
+    run(['rclone', 'copyto', '--s3-no-check-bucket', '--checksum', '--immutable', '--header-upload',
          'Cache-Control: public, max-age=31536000, immutable, no-transform',
-         path.parent, args.remote.rstrip('/') + '/' + parent + '/'])
+         path, args.remote.rstrip('/') + '/' + relative])
 
 
 def validate_inventory(directory, arch):
