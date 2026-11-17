@@ -3,7 +3,8 @@ import io
 import urllib.error
 
 from netdata_mcp import agentfn
-from netdata_mcp.tools.otel_logs import build_payload, classify_status
+from netdata_mcp.tools.gated_function import classify_status
+from netdata_mcp.tools.otel_logs import build_payload
 
 
 def _payload(**kw):
@@ -147,11 +148,16 @@ def test_call_function_http_error_empty_body(monkeypatch):
 
 
 def test_classify_status():
-    assert classify_status(200) == (None, "ok")
-    assert classify_status(204) == (None, "ok")
-    err412, msg412 = classify_status(412)
+    assert classify_status("otel-logs", 200) == (None, "ok")
+    assert classify_status("otel-logs", 204) == (None, "ok")
+    err412, msg412 = classify_status("otel-logs", 412)
     assert err412 is not None and "SIGNED_ID" in err412 and msg412 == err412
-    err500, _ = classify_status(500)
+    err500, _ = classify_status("otel-logs", 500)
     assert err500 is not None and "500" in err500
-    err_none, _ = classify_status(None)
+    err_none, _ = classify_status("otel-logs", None)
     assert err_none is not None  # unknown status is an error, not success
+
+
+def test_classify_status_appends_error_message():
+    err, msg = classify_status("topology:tracing", 413, {"status": 413, "errorMessage": "answer too large"})
+    assert err == msg == "topology:tracing returned HTTP 413: answer too large"

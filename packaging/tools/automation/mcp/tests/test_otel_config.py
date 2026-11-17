@@ -1,11 +1,12 @@
-from netdata_mcp.tools.otel_config import _endpoint_error
+import pytest
+from pydantic import ValidationError
+
+from netdata_mcp.otel_settings import OtelSettings, endpoint_error
 
 
 def test_endpoint_error_accepts_ip_port():
-    assert _endpoint_error("a", "127.0.0.1:4317") is None
-    assert _endpoint_error("a", "0.0.0.0:65535") is None
-    assert _endpoint_error("a", "[::1]:4317") is None
-    assert _endpoint_error("a", "[::ffff:127.0.0.1]:4317") is None
+    for value in ("127.0.0.1:4317", "0.0.0.0:65535", "[::1]:4317", "[::ffff:127.0.0.1]:4317"):
+        assert endpoint_error(value) is None, value
 
 
 def test_endpoint_error_rejects_what_the_plugin_cannot_parse():
@@ -19,50 +20,92 @@ def test_endpoint_error_rejects_what_the_plugin_cannot_parse():
         "[fe80::1%eth0]:4317",
         "[::1[]:4317",
         "127.0.0.1:\uff11\uff12\uff13",
+        "127.0.0.1",
+        "not-a-host-port",
+        ":",
+        "127.0.0.1:abc",
+        # `$` matches before a final newline; the plugin's SocketAddr parse would not.
+        "127.0.0.1:4317\n",
     ):
-        err = _endpoint_error("a", value)
-        assert err is not None and err.state == "error", value
-
-
-def test_endpoint_error_rejects_missing_port():
-    err = _endpoint_error("a", "127.0.0.1")
-    assert err is not None and err.state == "error" and "ip:port" in err.message
-
-
-def test_endpoint_error_rejects_garbage():
-    assert _endpoint_error("a", "not-a-host-port") is not None
-    assert _endpoint_error("a", ":") is not None
-    assert _endpoint_error("a", "127.0.0.1:abc") is not None
+        err = endpoint_error(value)
+        assert err is not None and "ip:port" in err, value
 
 
 def test_endpoint_error_rejects_port_out_of_range():
-    err = _endpoint_error("a", "127.0.0.1:70000")
-    assert err is not None and "range" in err.message
+    err = endpoint_error("127.0.0.1:70000")
+    assert err is not None and "range" in err
 
 
-def test_http_endpoint_error_accepts_an_ip_and_rejects_a_hostname():
-    assert _endpoint_error("a", "127.0.0.1:4318", name="otlp_http_endpoint") is None
-    err = _endpoint_error("a", "localhost:4318", name="otlp_http_endpoint")
-    assert err is not None and "not a hostname" in err.message and "otlp_http_endpoint" in err.message
+def test_settings_validate_endpoints():
+    ok = OtelSettings.model_validate({"receivers": {"otlp": {"protocols": {"http": {"endpoint": "[::1]:4318"}}}}})
+    assert ok.protocol("http").endpoint == "[::1]:4318"
+    with pytest.raises(ValidationError) as exc:
+        OtelSettings.model_validate({"receivers": {"otlp": {"protocols": {"grpc": {"endpoint": "localhost:4317"}}}}})
+    assert "not a hostname" in str(exc.value)
 
 
-def test_http_endpoint_error_names_the_parameter():
-    # The message must say which knob is malformed once two endpoints exist.
-    err = _endpoint_error("a", "not-a-host-port", name="otlp_http_endpoint")
-    assert err is not None and err.state == "error" and "otlp_http_endpoint" in err.message
-    err = _endpoint_error("a", "127.0.0.1:70000", name="otlp_http_endpoint")
-    assert err is not None and "otlp_http_endpoint" in err.message and "range" in err.message
+def test_settings_refuse_unknown_and_misplaced_keys():
+    for bad in (
+        {"some_future_option": True},
+        {"base_dir": "/x"},
+        {"endpoint": {"path": "127.0.0.1:4317"}},
+        {"traces": {"journal_dir": "/x"}},
+        {"logs": {"rotation": {"default": {"max_file_szie": "1MB"}}}},
+    ):
+        with pytest.raises(ValidationError):
+            OtelSettings.model_validate(bad)
 
 
-def test_endpoint_error_rejects_trailing_newline():
-    # `$` matches before a final newline; the plugin's SocketAddr parse would not.
-    assert _endpoint_error("a", "127.0.0.1:4317\n") is not None
-    assert _endpoint_error("a", "127.0.0.1:4318\n", name="otlp_http_endpoint") is not None
+def test_settings_document_keeps_only_set_keys():
+    doc = {
+        "auth": {"enabled": True},
+        "metrics": {"interval_secs": 5},
+        "remote_storage": {"enabled": True, "read_cache_max_size": "64MB", "startup_op_timeout": "5s"},
+        "logs": {
+            "journal_dir": "/j",
+            "rotation": {"default": {"max_entries": 10}, "t1": {"max_file_size": 4096}},
+            "retention": {"default": {"max_age": "1h", "horizon": "2 days"}},
+            "catalog": {"rotation_count": 2, "rotation_period": "10m"},
+            "ingest": {"max_age": "1d", "future_skew": "5m"},
+        },
+        "traces": {"crc_enabled": False, "compression_enabled": True},
+        "receivers": {"otlp": {"protocols": {"grpc": {"enabled": True, "tls": {"cert_file": "/c", "key_file": "/k"}}}}},
+    }
+    assert OtelSettings.model_validate(doc).document() == doc
 
 
-def test_http_endpoint_error_rejects_garbage():
-    assert _endpoint_error("a", "127.0.0.1", name="otlp_http_endpoint") is not None
-    assert _endpoint_error("a", "http://127.0.0.1:4318", name="otlp_http_endpoint") is not None
+def test_settings_refuse_negative_counts_and_sizes():
+    # The plugin reads these as unsigned integers; a negative value would only
+    # surface as a startup refusal.
+    for bad in (
+        {"metrics": {"interval_secs": -1}},
+        {"traces": {"rotation": {"default": {"max_entries": -1}}}},
+        {"logs": {"rotation": {"default": {"max_file_size": -1}}}},
+        {"logs": {"retention": {"t1": {"max_files": -1}}}},
+        {"traces": {"catalog": {"rotation_count": -1}}},
+        {"remote_storage": {"read_cache_max_size": -5}},
+    ):
+        with pytest.raises(ValidationError):
+            OtelSettings.model_validate(bad)
+
+
+def test_settings_refuse_coercible_values_of_the_wrong_type():
+    # Lax coercion would write a different valid value (true -> 1 entry per
+    # file) where the plugin would refuse the config.
+    for bad in (
+        {"traces": {"rotation": {"default": {"max_entries": True}}}},
+        {"traces": {"rotation": {"default": {"max_entries": "10"}}}},
+        {"logs": {"rotation": {"default": {"max_file_size": True}}}},
+        {"traces": {"crc_enabled": "yes"}},
+        {"auth": {"enabled": 1}},
+    ):
+        with pytest.raises(ValidationError):
+            OtelSettings.model_validate(bad)
+
+
+def test_settings_refuse_a_remote_uri_without_scheme():
+    with pytest.raises(ValidationError):
+        OtelSettings.model_validate({"remote_storage": {"uri": "/abs/path"}})
 
 
 def test_extra_yaml_error_accepts_mapping_and_empty():

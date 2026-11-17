@@ -52,7 +52,7 @@ class Run:
     port: int
     run_dir: Path
     conf_path: Path
-    otlp_endpoint: str = ""  # where the otel plugin listens for OTLP/gRPC data
+    otlp_endpoint: str = ""  # where the otel plugin listens for OTLP/gRPC data; "" = disabled
     otlp_http_endpoint: str = ""  # where it listens for OTLP/HTTP data; "" = disabled
     port_pinned: bool = False  # port came from the agent's declaration, not free_port()
     buffer: LogBuffer = field(default_factory=LogBuffer)
@@ -63,6 +63,8 @@ class Run:
     cloud_connected: bool | None = None  # ACLK online / live in the Cloud UI
     current_phase: str | None = None
     created_at: float = field(default_factory=time.monotonic)
+    # Wall clock of the same moment, to scope journal reads to this run.
+    created_wall: float = field(default_factory=time.time)
 
     _proc: asyncio.subprocess.Process | None = field(default=None, repr=False)
     _task: asyncio.Task | None = field(default=None, repr=False)
@@ -174,7 +176,7 @@ class RunRegistry:
                 agent_id=agent_id, worktree=worktree, profile=profile,
                 port=web_port,
                 port_pinned=port is not None,
-                run_dir=rd, conf_path=conf, otlp_endpoint=otlp_endpoint,
+                run_dir=rd, conf_path=conf, otlp_endpoint=otlp_endpoint or "",
                 otlp_http_endpoint=otlp_http_endpoint or "",
             )
             self._runs[agent_id] = run

@@ -7,6 +7,7 @@ import pytest_asyncio
 from netdata_mcp import buildcfg, runtime
 from netdata_mcp import run as runmod
 from netdata_mcp.locks import build_dir_lock
+from netdata_mcp.otel_settings import OtelSettings
 from netdata_mcp.run import RunRegistry
 
 
@@ -322,7 +323,9 @@ async def test_unpinned_port_is_auto_assigned(reg, tmp_path):
 async def test_auto_web_port_avoids_a_pinned_otlp_port(reg, tmp_path, monkeypatch):
     picks = iter([4317, 9000, 9001])
     monkeypatch.setattr(runtime, "free_port", lambda: next(picks))
-    otel = runtime.OtelConfig(otlp_endpoint="127.0.0.1:4317", otlp_http_endpoint="")
+    otel = runtime.OtelConfig(settings=OtelSettings.model_validate(
+        {"receivers": {"otlp": {"protocols": {"grpc": {"endpoint": "127.0.0.1:4317"}, "http": {"enabled": False}}}}}
+    ))
     run, _ = await reg.start("a", str(tmp_path), "debug", otel=otel, probe=_always_ready)
     assert run.port == 9000 and run.otlp_endpoint == "127.0.0.1:4317"
     await reg.stop("a")

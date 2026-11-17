@@ -1,13 +1,13 @@
 """Unit tests for the netdata_agent_otel_files tool: registration + the
-result model. The network path (bearer mint + agentfn.call_function +
-classify_status) is shared with otel_logs and covered by test_otel_logs.py."""
+result model. The network path lives in gated_function and is covered by
+test_otel_logs.py and test_gated_function.py."""
 
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
 from netdata_mcp.tools import otel_files
-from netdata_mcp.tools.otel_files import OtelFilesResult
+from netdata_mcp.tools.gated_function import FunctionResult
 
 
 async def test_tool_registered():
@@ -29,7 +29,7 @@ async def test_tool_schema_takes_agent_id_and_timeout():
 
 
 def test_result_model_defaults():
-    out = OtelFilesResult(agent_id="a")
+    out = FunctionResult(agent_id="a", function="otel-logs")
     assert out.agent_id == "a"
     assert out.response is None
     assert out.http_status is None
@@ -39,6 +39,6 @@ def test_result_model_defaults():
 
 def test_result_model_carries_inventory():
     inv = {"version": 1, "status": 200, "tenants": [{"tenant": "default", "wal": [], "sfst": [], "catalog": []}]}
-    out = OtelFilesResult(agent_id="a", http_status=200, response=inv, message="ok")
+    out = FunctionResult(agent_id="a", function="otel-logs", http_status=200, response=inv, message="ok")
     assert out.response["tenants"][0]["tenant"] == "default"
     assert out.http_status == 200

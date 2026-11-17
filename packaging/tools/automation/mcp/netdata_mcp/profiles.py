@@ -3,7 +3,7 @@
 Two profiles, differing only in build type/flags; both share one curated plugin
 set: the common system-monitoring features ON, the heavy-to-build and rarely-used
 ones OFF. The otel plugin is the deliberate exception — kept ON despite its build
-cost because this tool exists for OTel-logs development. Each profile is a dict of
+cost because this tool exists for OTel plugin development. Each profile is a dict of
 CMAKE_CACHE variables, values exactly as they appear in ``-DVAR:TYPE=VALUE``.
 Special keys ``CFLAGS``/``CXXFLAGS`` append to ``CMAKE_C_FLAGS``/``CMAKE_CXX_FLAGS``.
 """
@@ -20,7 +20,7 @@ _PLUGINS_ON = {
     "ENABLE_PLUGIN_LOCAL_LISTENERS": "On",  # service auto-discovery
     "ENABLE_PLUGIN_DEBUGFS": "On",          # extra kernel metrics
     # Heavy to build (pulls the Rust/arrow cone), but kept ON: this tool
-    # targets OTel-logs development, so the otel plugin must always be present
+    # targets OTel plugin development, so the otel plugin must always be present
     # to build/run/verify against.
     "ENABLE_PLUGIN_OTEL": "On",
 }
