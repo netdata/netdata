@@ -787,7 +787,7 @@ and the rule for adding one; each skill's frontmatter description is the authori
   - `tests-query-corpus`: running, extending or reviewing `tests/query-corpus/`; fixtures, oracles, red/green cases for
     query-engine bugs, formatter byte-pins, validating a fix branch
 - Packaging.
-  - `packaging-component-releases`: independent component release workflows, native repository coverage, managed
+  - `packaging-component-releases`: component and paired Agent/runtime release workflows, native coverage, managed
     archive signing and promotion, platform qualification and SRE review handoff
   - `packaging-native-packages`: native DEB/RPM component dependencies, account creation, transaction ordering and
     installed ownership; CPack metadata and native packaging validation
