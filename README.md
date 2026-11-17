@@ -59,7 +59,7 @@ Netdata is distributed and real-time. Netdata Agents collect, store and analyze 
 * **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
 * **Machine learning as evidence, not alerts** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
 * **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
-* **Observability for everyone** – No query language and nothing to administer: the expertise is built into the product, so everyone on the team can investigate.
+* **Expertise built in** – No query language and nothing to administer: the expertise is built into the product, so the whole team can investigate.
 * **Configured your way** – Automatic first, then as code, from the dashboard, or both.
 * **Open, and yours** – The engine is open source, speaks open standards and runs on your infrastructure.
 

@@ -107,7 +107,7 @@ How the design delivers it:
 - **Automated root-cause and impact analysis.** Netdata AI investigations trace any question or time window from symptom to cause and to everything it affected, in minutes, on demand or on a schedule.
 - **Open to any AI.** Every Agent, Parent and Netdata Cloud runs an [MCP server](/docs/netdata-ai/mcp/README.md), so the same evidence and the same scoring are available to the AI assistants your team already uses, under the same access controls as the dashboard.
 
-### Observability for everyone
+### Expertise built in
 
 **Healthy systems need everyone who builds and runs them to see what is happening, not only a few specialists. Netdata moves the expertise into the product.**
 
@@ -115,7 +115,7 @@ How the design delivers it:
 
 - **No query language.** Every chart is an analysis tool you operate by pointing and clicking: group, filter, compare periods, drill down and correlate. Any question can also be asked in plain language, through Netdata AI or any AI assistant.
 - **Nothing to administer.** The database is part of every Agent and Parent, retention manages itself, and every Agent updates on its own. Teams run Netdata like any other service, without dedicated specialists.
-- **Expertise built in.** Stock alerts, collection profiles and dashboards carry the knowledge of each technology, so a team can operate components it is not expert in.
+- **Knowledge of every technology.** Stock alerts, collection profiles and dashboards carry the knowledge of each technology, so a team can operate components it is not expert in.
 
 ### Configured your way
 

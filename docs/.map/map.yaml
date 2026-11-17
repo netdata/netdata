@@ -13,7 +13,7 @@ sidebar:
       - meta:
           label: Netdata Design
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-design.md
-          description: What Netdata believes about observability and how its design delivers it. Understanding over traffic lights, everything every second, independent hubs unified by Netdata Cloud, meaning at collection time, machine learning as evidence, AI at the core, and observability for everyone.
+          description: What Netdata believes about observability and how its design delivers it. Understanding over traffic lights, everything every second, independent hubs unified by Netdata Cloud, meaning at collection time, machine learning as evidence, AI at the core, and expertise built in.
           keywords:
             - netdata design
             - observability architecture
