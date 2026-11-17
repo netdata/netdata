@@ -42,11 +42,11 @@ Because Netdata evaluates every metric every second, anomalies such as traffic f
 
 Your metrics, logs and traces leave your servers only when someone views them. Netdata Cloud routes queries to the nodes that hold the data and merges the answers, and it is not in the data path. Every Agent keeps working without Cloud and without internet access. Netdata meets data-sovereignty and residency requirements by design, and keeping data at the edge means no egress charges for monitoring data.
 
-### Ready for AI
+### AI at the core
 
-**Machine learning and AI start from complete, well-described data.**
+**Machine learning, a scoring engine and AI work together to find the root cause and impact of problems automatically.**
 
-Anomaly detection runs on every metric. The Anomaly Advisor ranks the metrics that behaved unusually in a window you select. Netdata AI performs root-cause and blast-radius analysis and writes AI reports. The MCP server connects any AI assistant to your infrastructure. You can install Netdata in the middle of a crisis and get real-time insights and AI-assisted troubleshooting immediately.
+Machine learning runs inside every Agent and Parent and scores every metric for anomalies as it is collected. A scoring engine ranks the metrics that behaved unusually or changed in any time window you select. Netdata AI investigates from that evidence, performs root-cause and impact analysis and writes AI reports. The MCP server gives any AI assistant the same evidence. You can install Netdata in the middle of a crisis and get real-time insights and AI-assisted troubleshooting immediately.
 
 ## The principles behind it
 
@@ -74,7 +74,7 @@ Selecting what to collect ties the quality of your visibility to what someone th
 
 **Every Agent is a full monitoring system, and a larger fleet is the same architecture with more Parents.**
 
-An Agent collects, stores, queries, visualizes, runs machine learning and evaluates alerts on its own. Parents are the same software, centralizing the data of many Agents, and they form active-active clusters, so one Parent can be lost without losing the view. Adding Agents or Parents does not change the ones that exist. Each Parent cluster is an independent shard, so adding Parents adds capacity: about one Parent per 500 nodes, so 2,000 nodes run on 4 Parents and 20,000 on about 40 (see [Netdata Design](/docs/netdata-design.md#sizing)). See also [Scalability](/docs/scalability.md).
+An Agent collects, stores, queries, visualizes, runs machine learning and evaluates alerts on its own. Parents are the same software, centralizing the data of many Agents, and they form active-active clusters, so one Parent can be lost without losing the view. Adding Agents or Parents does not change the ones that exist. Each Parent cluster is an independent shard, so adding Parents adds capacity: about one Parent per 500 nodes, so 2,000 nodes run on 4 Parents and 20,000 on about 40 (see [Parent sizing guidelines](/docs/scalability.md#parent-sizing-guidelines)). See also [Scalability](/docs/scalability.md).
 
 - **No re-architecture as you grow:** the engine that runs on one node runs on a very large fleet.
 - **High availability without a separate product.**

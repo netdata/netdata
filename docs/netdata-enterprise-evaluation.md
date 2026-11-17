@@ -139,7 +139,7 @@ Netdata scales out: each Parent cluster is an independent shard, so you add capa
 
 Ingestion and storage have no central component that caps them. When using standalone agents, each agent is independent of the others. When using parent-child agents, each Parent is sized on its own, and the system grows by adding Parents.
 
-Queries run where the data is. Netdata Cloud sends each Parent one request for all the nodes it holds, and the Parents work in parallel: each aggregates its own nodes and returns partial results that Cloud merges without loss. A fleet of dozens of Parents brings far more combined compute to a query than a centralized cluster can, in exchange for one network round trip, and adding Parents adds query capacity too. See [Fleet-wide queries](/docs/netdata-design.md#fleet-wide-queries).
+Queries run where the data is. Netdata Cloud sends each Parent one request for all the nodes it holds, and the Parents work in parallel: each aggregates its own nodes and returns partial results that Cloud merges without loss. A fleet of dozens of Parents brings far more combined compute to a query than a centralized cluster can, in exchange for one network round trip, and adding Parents adds query capacity too. See [Netdata Design](/docs/netdata-design.md#independent-hubs-not-a-central-database).
 
 ## Impact on the Monitored Infrastructure
 

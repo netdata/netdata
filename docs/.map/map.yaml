@@ -13,7 +13,7 @@ sidebar:
       - meta:
           label: Netdata Design
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-design.md
-          description: Why Netdata is built the way it is. Metrics get their meaning at collection time, data stays where it is created, Parent clusters scale out, fleet-wide queries run on the Parents, missing data is shown as data, and the values behind the design are stated up front.
+          description: What Netdata believes about observability and how its design delivers it. Understanding over traffic lights, everything every second, independent hubs unified by Netdata Cloud, meaning at collection time, machine learning as evidence, AI at the core, and observability for everyone.
           keywords:
             - netdata design
             - observability architecture
