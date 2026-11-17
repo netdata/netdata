@@ -169,7 +169,15 @@ async function main() {
               chromiumSandbox: true,
             },
             screenshot: r.capture ? "only-on-failure" : "off",
-            trace: "off",
+            trace: selected?.includes(extensions.FAILURE_TRACE)
+              ? {
+                  mode: "retain-on-failure",
+                  snapshots: true,
+                  screenshots: true,
+                  sources: false,
+                  attachments: false,
+                }
+              : "off",
             video: "off",
           },
         },

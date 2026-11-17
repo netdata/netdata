@@ -8,64 +8,77 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
-var defaultRedactor = redact.NewRedactor()
-
 var viewURLScheme = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9+.-]*:`)
 
-// Text is normalized before it becomes an aggregation key or retained evidence.
-// Opaque protocol IDs use their own validation and are not generalized as paths.
-func (o Options) apply(value string) string {
-	r := o.Redactor
-	if r == nil {
-		r = defaultRedactor
+// redactor is the site redactor, or the credential patterns alone for a route
+// built without one.
+func (o Options) redactor() *redact.Redactor {
+	if o.Redactor == nil {
+		return redact.Patterns
 	}
-	return r.Apply(value)
+	return o.Redactor
 }
 
+// redacted removes control characters, as clean does, and every credential the
+// site redactor finds in the received or in the cleaned text. Callers bound the
+// result, so truncation cannot leave a credential prefix the patterns miss.
+func (o Options) redacted(value string) string {
+	return strings.TrimSpace(o.redactor().ApplyRemoving(value, unicode.IsControl))
+}
+
+// text normalizes free text before it becomes an aggregation key or retained
+// evidence. Opaque protocol IDs use their own validation and are not
+// generalized as paths.
 func (o Options) text(value string, limit int) string {
-	return beacon.Clean(o.apply(value), limit)
+	return truncate(o.redacted(value), limit)
 }
 
 func (o Options) cleanURL(value string) string {
 	if value == "" {
 		return ""
 	}
-	value = o.apply(beacon.RedactURL(value, o.PathRules))
 	// Keep the full URL until callers separate host and path or bound an attribute.
-	return beacon.Clean(value, len(value))
+	return o.redacted(o.redactURL(value))
 }
 
 func (o Options) url(value string, limit int) string {
-	return beacon.Truncate(o.cleanURL(value), limit)
+	return truncate(o.cleanURL(value), limit)
 }
 
 func (o Options) view(value string) string {
-	value = beacon.Clean(value, len(value))
-	if strings.Contains(value, "/") || viewURLScheme.MatchString(strings.TrimSpace(value)) {
-		value = o.url(value, maxPathLen)
+	cleaned := clean(value, len(value))
+	if strings.Contains(cleaned, "/") || viewURLScheme.MatchString(cleaned) {
+		// A URL view follows the page URL rules: reduce the URL, then redact it.
+		value = o.url(cleaned, maxPathLen)
 		if value != "" {
-			value = beacon.Path(value)
+			value = urlPath(value)
 		}
-	} else {
-		for _, rule := range o.PathRules {
-			value = rule.Re.ReplaceAllString(value, rule.Replace)
-		}
+		return o.text(value, maxNameLen)
 	}
-	return o.text(value, maxNameLen)
+	// A view name is text. Site path rules read the cleaned name, as for URL
+	// views, unless it holds a credential in either form: then they read the
+	// redacted name, so a rule cannot split the credential and expose the rest.
+	named := o.redacted(value)
+	source := cleaned
+	if named != cleaned {
+		source = named
+	}
+	ruled := applyPathRules(source, o.PathRules)
+	if ruled == source {
+		return truncate(named, maxNameLen)
+	}
+	return o.text(ruled, maxNameLen)
 }
 
 func (o Options) selector(value string) string {
-	// Apply credential patterns before the selector and size transformations.
-	r := o.Redactor
-	if r == nil {
-		r = defaultRedactor
-	}
-	return beacon.Clean(beacon.RedactSelector(r.Apply(value)), maxSelector)
+	// Selector patterns read the cleaned text; the size bound comes last.
+	return truncate(redactSelector(o.redacted(value)), maxSelector)
 }
 
 type stackFrame struct {
@@ -77,66 +90,141 @@ type stackFrame struct {
 
 func (o Options) appendFrame(stack *strings.Builder, frame stackFrame) string {
 	function := o.text(frame.Function, maxStackLen)
-	filename := o.text(beacon.RedactSourceURL(frame.Filename, o.PathRules), maxStackLen)
+	filename := o.text(o.redactSourceURL(frame.Filename), maxStackLen)
 	fmt.Fprintf(stack, "%s (%s:%d:%d)\n", function, filename, frame.Lineno, frame.Colno)
 	return function + "@" + filename
 }
 
-// Typed event attributes serve native measurements even with optional logs off.
-func keepEventAttr(kind beacon.EventKind, name, key string) bool {
-	if key == "observation_id" || key == "observation_sequence" {
-		return kind == beacon.EventDocument || kind == beacon.EventView || kind == beacon.EventNavigation ||
-			kind == beacon.EventResource || kind == beacon.EventSession
-	}
-	switch kind {
-	case beacon.EventNavigation:
-		return key == "pageLoadTime" || key == "domContentLoadHandlerTime"
-	case beacon.EventResource:
-		return key == "name" || key == "httpHost" || key == "duration" || key == "transferSize" || key == "initiatorType"
-	case beacon.EventRequest:
-		return key == "url.full" || key == "http.request.method" || key == "http.response.status_code" || key == "duration_ns"
-	case beacon.EventView:
-		return key == "fromView" || key == "toView"
-	default:
-		return beacon.IsFrustration(name) && key == "target"
+// attrSemantic is how an event attribute value is read.
+type attrSemantic uint8
+
+const (
+	attrByKey    attrSemantic = iota // by its key, like any attribute (cleanAttr)
+	attrID                           // opaque observation identity
+	attrRevision                     // observation sequence
+	attrNumber                       // finite non-negative number
+	attrURL                          // URL without query or fragment
+)
+
+// attrRule says how to read one event attribute. A native attribute serves
+// measurements: it is kept with optional event logs off and its key is never
+// rewritten as free text.
+type attrRule struct {
+	semantic attrSemantic
+	native   bool
+}
+
+func nativeAttr(semantic attrSemantic) attrRule {
+	return attrRule{
+		semantic: semantic,
+		native:   true,
 	}
 }
 
-// Numeric protocol values are measurements, not free text. Interpret each field
-// by its original key, before custom-key redaction can change that meaning.
-func (o Options) eventAttr(kind beacon.EventKind, key, value string) (string, bool) {
-	if keepEventAttr(kind, "", key) {
-		if key == "observation_id" {
-			id := observationID(value)
-			return id, id != ""
+// eventAttrRule declares, per event kind, the protocol attributes measurements
+// read. Values are interpreted by their original key, before custom-key
+// redaction can change its meaning. Every other attribute is diagnostic text.
+func eventAttrRule(kind beacon.EventKind, name, key string) attrRule {
+	if key == "observation_id" || key == "observation_sequence" {
+		switch kind {
+		case beacon.EventDocument, beacon.EventView, beacon.EventNavigation, beacon.EventResource, beacon.EventSession:
+			if key == "observation_id" {
+				return nativeAttr(attrID)
+			}
+			return nativeAttr(attrRevision)
 		}
-		if key == "observation_sequence" {
-			return value, observationRevision(value) != 0
-		}
+		return attrRule{}
 	}
-
-	if (kind == beacon.EventResource || kind == beacon.EventNavigation) && key == "name" {
-		return o.url(value, maxAttrLen), true
-	}
-	numeric := false
 	switch kind {
 	case beacon.EventNavigation:
-		numeric = key == "pageLoadTime" || key == "domContentLoadHandlerTime"
+		switch key {
+		case "pageLoadTime", "domContentLoadHandlerTime":
+			return nativeAttr(attrNumber)
+		case "name":
+			return attrRule{
+				semantic: attrURL,
+			}
+		}
 	case beacon.EventResource:
-		numeric = key == "duration" || key == "transferSize"
+		switch key {
+		case "name":
+			return nativeAttr(attrURL)
+		case "duration", "transferSize":
+			return nativeAttr(attrNumber)
+		case "httpHost", "initiatorType":
+			return nativeAttr(attrByKey)
+		}
 	case beacon.EventRequest:
-		numeric = key == "http.response.status_code" || key == "duration_ns"
+		switch key {
+		case beacon.AttrHTTPStatusCode, beacon.AttrDurationNS:
+			return nativeAttr(attrNumber)
+		case beacon.AttrURLFull, beacon.AttrHTTPMethod:
+			return nativeAttr(attrByKey)
+		}
+	case beacon.EventView:
+		switch key {
+		case beacon.AttrFromView, beacon.AttrToView:
+			return nativeAttr(attrByKey)
+		}
+	case beacon.EventCustom:
+		// Frustration signals are custom events; their target is the element.
+		if key == beacon.AttrTarget && beacon.IsFrustration(name) {
+			return nativeAttr(attrByKey)
+		}
 	}
-	if numeric {
-		value = beacon.Clean(value, len(value))
-		n, err := strconv.ParseFloat(value, 64)
-		if err != nil || n < 0 || math.IsNaN(n) || math.IsInf(n, 0) {
+	return attrRule{}
+}
+
+// eventAttr reads value under rule. Malformed identities and numbers are
+// dropped: numeric protocol values are measurements, not free text.
+func (o Options) eventAttr(rule attrRule, key, value string) (string, bool) {
+	switch rule.semantic {
+	case attrID:
+		id := observationID(value)
+		return id, id != ""
+	case attrRevision:
+		return value, observationRevision(value) != 0
+	case attrNumber:
+		value = clean(value, len(value))
+		if _, ok := parseNonNegative(value); !ok {
 			return "", false
 		}
-		return beacon.Truncate(value, maxAttrLen), true
+		return truncate(value, maxAttrLen), true
+	case attrURL:
+		return o.url(value, maxAttrLen), true
+	default:
+		return o.cleanAttr(key, value), true
 	}
-	return o.cleanAttr(key, value), true
 }
+
+// urlAttrKeys hold URLs; they lose query and fragment like page URLs.
+var urlAttrKeys = map[string]bool{beacon.AttrURLFull: true, "http.url": true, "url": true, "name": true}
+
+// cleanAttr applies field semantics before text bounds and shared ingestion.
+func (o Options) cleanAttr(key, value string) string {
+	switch {
+	case urlAttrKeys[key] && (key != "name" || strings.Contains(value, "://") || strings.HasPrefix(value, "/")):
+		return o.url(value, maxAttrLen)
+	case key == beacon.AttrTarget:
+		return o.selector(value)
+	case key == beacon.AttrFromView || key == beacon.AttrToView:
+		return o.view(value)
+	default:
+		return o.text(value, maxAttrLen)
+	}
+}
+
+// parseNonNegative reads a finite, non-negative protocol number; anything else
+// is absent.
+func parseNonNegative(s string) (float64, bool) {
+	v, err := strconv.ParseFloat(s, 64)
+	if err != nil || !nonNegativeFinite(v) {
+		return 0, false
+	}
+	return v, true
+}
+
+func nonNegativeFinite(v float64) bool { return v >= 0 && !math.IsNaN(v) && !math.IsInf(v, 0) }
 
 // IDs are opaque and must survive unchanged. Reject, rather than truncate or
 // redact, malformed values so unrelated observations cannot collapse together.
@@ -145,7 +233,8 @@ func observationID(value string) string {
 		return ""
 	}
 	for _, c := range value {
-		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_' || c == '-' || c == '.' || c == ':') {
+		if !(c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' ||
+			c == '_' || c == '-' || c == '.' || c == ':') {
 			return ""
 		}
 	}

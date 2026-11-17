@@ -51,14 +51,23 @@ test("one detail budget accommodates multi-page suites and explicitly ends cover
     feature.test(
       subject("t" + t),
       failed,
-      Array.from({ length: 4 }, (_, i) => ({ id: `s${t}_${i}` })),
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `s${t}_${i}`,
+        kind: "screenshot",
+      })),
       0,
       0,
     );
   assert.equal(records.length, 160);
   assert(!records.some((r) => r.record === "truncated"));
   for (let t = 32; t < 500; t++)
-    feature.test(subject("t" + t), failed, [{ id: "s" + t }], 0, 1);
+    feature.test(
+      subject("t" + t),
+      failed,
+      [{ id: "s" + t, kind: "screenshot" }],
+      0,
+      1,
+    );
   feature.complete();
   feature.complete();
   feature.test(subject("late"), failed, [], 0, 0);
@@ -87,7 +96,13 @@ test("test titles are redacted before clipping and oversized identity is omitted
   assert(records[0].test.title.includes("[REDACTED]"));
   assert(!records[0].test.title.includes("synthetic-secret"));
   assert.equal(records[0].test.text_truncated, true);
-  feature.test(subject("x".repeat(128)), failed, [{ id: "s1" }], 0, 0);
+  feature.test(
+    subject("x".repeat(128)),
+    failed,
+    [{ id: "s1", kind: "screenshot" }],
+    0,
+    0,
+  );
   assert.equal(records.at(-1).record, "truncated");
   assert(!records.some((r) => r.record === "capture"));
 });

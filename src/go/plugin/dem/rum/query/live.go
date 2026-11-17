@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package query
 
 import (
@@ -15,13 +16,19 @@ type livePosition struct {
 	Generation string `json:"g"`
 	Sequence   uint64 `json:"s"`
 }
+
 type liveCursor struct {
 	VnodeGUID string                  `json:"vnode_guid,omitempty"`
 	Version   int                     `json:"v"`
 	Sites     map[string]livePosition `json:"sites"`
 }
 
-func (s *Service) Live(ctx context.Context, filter, after string, limit int, vnodeGUID string) ([]LiveEvent, string, error) {
+func (s *Service) Live(
+	ctx context.Context,
+	filter, after string,
+	limit int,
+	vnodeGUID string,
+) ([]LiveEvent, string, error) {
 	cursor := liveCursor{
 		Version: 1,
 		Sites:   map[string]livePosition{},
@@ -67,7 +74,7 @@ func (s *Service) Live(ctx context.Context, filter, after string, limit int, vno
 			}
 		}
 		cursor.Sites[key] = pos
-		batch, _ := site.Aggregator.Live(pos.Sequence, limit, vnodeGUID)
+		batch := site.Aggregator.Live(pos.Sequence, limit, vnodeGUID)
 		redact := siteRedactor(site)
 		stream := make([]LiveEvent, 0, len(batch))
 		for _, row := range batch {
@@ -128,6 +135,7 @@ func (s liveStreams) Less(i, j int) bool {
 	}
 	return a.Seq < b.Seq
 }
+
 func (s liveStreams) Swap(i, j int)    { s[i], s[j] = s[j], s[i] }
 func (s *liveStreams) Push(stream any) { *s = append(*s, stream.([]LiveEvent)) }
 func (s *liveStreams) Pop() any {

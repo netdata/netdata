@@ -148,7 +148,11 @@ function captureState(enabled, status, artifacts) {
     ? "unavailable"
     : "not_needed";
 }
-function screenshotCandidate(file, workDir, index) {
+function captureCandidate(file, workDir, index, kind) {
+  const signature =
+    kind === "trace"
+      ? Buffer.from([80, 75, 3, 4])
+      : Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   const actualWork = fs.realpathSync(workDir);
   const output = fs.realpathSync(path.join(actualWork, "output"));
   const resolved = fs.realpathSync(file);
@@ -161,22 +165,22 @@ function screenshotCandidate(file, workDir, index) {
   )
     return null;
   const fd = fs.openSync(resolved, "r");
-  const header = Buffer.alloc(8);
+  const header = Buffer.alloc(signature.length);
   try {
     if (
       !fs.fstatSync(fd).isFile() ||
-      fs.readSync(fd, header, 0, 8, 0) !== 8 ||
-      !header.equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))
+      fs.readSync(fd, header, 0, header.length, 0) !== header.length ||
+      !header.equals(signature)
     )
       return null;
   } finally {
     fs.closeSync(fd);
   }
   return {
-    id: "screenshot-" + index,
-    kind: "screenshot",
+    id: kind + "-" + index,
+    kind,
     path: path.relative(actualWork, resolved),
-    mime: "image/png",
+    mime: kind === "trace" ? "application/zip" : "image/png",
   };
 }
 module.exports = {
@@ -185,7 +189,7 @@ module.exports = {
   event,
   write,
   captureState,
-  screenshotCandidate,
+  captureCandidate,
   configureSecrets,
   secretStream,
 };

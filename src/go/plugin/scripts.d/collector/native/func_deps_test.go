@@ -51,7 +51,7 @@ func TestCollector_ExecuteFunction(t *testing.T) {
 	for _, mode := range []string{modeOneshot, modePersistent} {
 		t.Run(mode, func(t *testing.T) {
 			registry, dir := functionFixture(t, mode, true)
-			c := initFunctionCollector(t, registry)
+			c := initFunctionCollectorWithLimit(t, registry, testMessageLimit)
 			requireNoFile(t, filepath.Join(dir, "starts"))
 			if mode == modePersistent {
 				startRuntime(t, c).waitReady(t)
@@ -90,7 +90,7 @@ func TestCollector_ExecuteFunction(t *testing.T) {
 			assert.Equal(t, 503, result.Status)
 			_, err = c.executeFunction(ctx, funcapi.RawMethodRequest{
 				Method:  "items",
-				Payload: make([]byte, maxMessageBytes*3/4),
+				Payload: make([]byte, testMessageLimit*3/4),
 			})
 			require.ErrorContains(t, err, "exceeds 64 MiB", "oversized requests are rejected before reaching the peer")
 			_, err = c.executeFunction(ctx, funcapi.RawMethodRequest{
@@ -162,7 +162,7 @@ func TestCollector_ExecuteFunctionOneshotDiagnostics(t *testing.T) {
 			wantDiagnostic: "command exited with status 7",
 		},
 		"oversized": {
-			peerBody:       fmt.Sprintf(`print("x" * %d); sys.exit(0)`, maxMessageBytes+1),
+			peerBody:       fmt.Sprintf(`print("x" * %d); sys.exit(0)`, testMessageLimit+1),
 			wantDiagnostic: "response exceeds 64 MiB",
 		},
 		"invalid": {
@@ -175,7 +175,7 @@ func TestCollector_ExecuteFunctionOneshotDiagnostics(t *testing.T) {
 			registry, dir := functionFixture(t, modeOneshot, true)
 			peer := strings.Replace(functionPeer, "count = config[\"count\"]", tc.peerBody, 1)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "peer.py"), []byte(peer), 0644))
-			c := initFunctionCollector(t, registry)
+			c := initFunctionCollectorWithLimit(t, registry, testMessageLimit)
 			var logs bytes.Buffer
 			c.Logger = logger.NewWithWriter(&logs)
 			router := nativefunc.NewRouter(funcDeps{

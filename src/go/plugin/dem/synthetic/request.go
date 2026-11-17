@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 // Package synthetic defines shared workflow values and pure request validation.
 package synthetic
 
@@ -41,9 +42,17 @@ type Request struct {
 	Timeout             time.Duration
 	BrowserErrorSummary bool
 	Capture             bool
+	Trace               bool
 }
 
+// JobID is the job's history and artifact identity: "<kind>:<name>".
 func (r Request) JobID() string { return string(r.Kind) + ":" + r.Name }
+
+// ValidJobID reports whether id is a JobID of a journey or Lighthouse job.
+func ValidJobID(id string) bool {
+	kind, name, ok := strings.Cut(id, ":")
+	return ok && (Kind(kind) == Journey || Kind(kind) == Lighthouse) && strings.TrimSpace(name) != ""
+}
 
 // ValidateRequest checks the execution contract without acquiring resources or reading files.
 func ValidateRequest(r Request) error {
@@ -55,6 +64,9 @@ func ValidateRequest(r Request) error {
 	}
 	if strings.TrimSpace(r.Name) == "" {
 		return errors.New("synthetic job name is required")
+	}
+	if r.Trace && (r.Kind != Journey || !r.Capture) {
+		return errors.New("trace requires a journey with capture enabled")
 	}
 	switch r.Kind {
 	case Journey:

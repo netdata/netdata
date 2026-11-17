@@ -321,6 +321,11 @@ go test ./plugin/go.d/collector/snmp/ddsnmp/ddsnmpcollector
 go test ./plugin/go.d/collector/snmp_topology
 ```
 
+For fixed concrete-stock discovery setup, `stockProfilesForTest` in
+`src/go/plugin/go.d/collector/snmp/ddsnmp/stock_fixture_test.go` returns caller-owned clones of one shared load.
+Assert its error in every caller. Direct decoder, abstract-definition, raw/effective accessibility and synthetic
+inheritance checks MUST retain their independent inputs rather than using this fixture.
+
 `TestStockProfiles_PollingAccessibility` is always on. Its exact module/object/access evidence and source-file hashes
 are pinned in `src/go/plugin/go.d/collector/snmp/ddsnmp/testdata/profile-mib-access.json`. New unknown polling sources
 fail; unresolved existing source roles remain an explicit bounded baseline, never proof of readability.

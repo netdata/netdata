@@ -47,6 +47,9 @@ module.exports = class CaptureDetails {
         : test.title,
       256,
     );
+    let accepted = 0;
+    for (let i = first; i < candidates.length; i++)
+      if (candidates[i].kind === "screenshot") accepted++;
     if (
       !this.detail({
         record: "test",
@@ -56,7 +59,7 @@ module.exports = class CaptureDetails {
           ...(title.truncated ? { text_truncated: true } : {}),
           status: result.status,
           expected_status: test.expectedStatus,
-          accepted: candidates.length - first,
+          accepted,
           unaccepted,
         },
       })

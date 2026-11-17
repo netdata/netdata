@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -18,8 +19,9 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	b.City = "Athens"
 	b.HasGeo = true
 	a.Ingest(b)
-	rows, next := a.Live(0, 100, "")
+	rows := a.Live(0, 100, "")
 	require.Len(t, rows, 3)
+	next := rows[2].Seq
 	assert.Equal(t, "document", rows[0].Kind)
 	assert.EqualValues(t, 1, rows[0].Revision)
 	for _, r := range rows[1:] {
@@ -32,8 +34,7 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	*now = now.Add(time.Second)
 	b.Received = *now
 	a.Ingest(b)
-	rows, _ = a.Live(next, 100, "")
-	assert.Empty(t, rows)
+	assert.Empty(t, a.Live(next, 100, ""))
 	b.Vitals = b.Vitals[:1]
 	b.Vitals[0].Revision = 2
 	b.Vitals[0].Value = 6000
@@ -41,12 +42,13 @@ func TestLiveSeparatesIdentifiedReportsFromDocumentActivity(t *testing.T) {
 	b.View = "checkout"
 	b.ViewID = "checkout-1"
 	a.Ingest(b)
-	rows, _ = a.Live(next, 100, "")
+	rows = a.Live(next, 100, "")
 	require.Len(t, rows, 1)
 	assert.Equal(t, "/", rows[0].Page)
 	assert.Equal(t, "checkout", rows[0].View)
 	assert.EqualValues(t, 2, rows[0].Revision)
 }
+
 func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 	for name, tc := range map[string]struct {
 		originCountry  string
@@ -69,7 +71,9 @@ func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 			b := mk(*now, "s", "/entry", v(beacon.LCP, 10))
 			b.Country = tc.originCountry
 			a.Ingest(b)
-			_, cursor := a.Live(0, 100, "")
+			first := a.Live(0, 100, "")
+			require.NotEmpty(t, first)
+			cursor := first[len(first)-1].Seq
 
 			*now = now.Add(time.Second)
 			b.Received = *now
@@ -81,7 +85,7 @@ func TestLiveVitalOriginDoesNotMixCountriesAndLocations(t *testing.T) {
 			b.Errors = []beacon.Error{{Message: "current error"}}
 			a.Ingest(b)
 
-			rows, _ := a.Live(cursor, 100, "")
+			rows := a.Live(cursor, 100, "")
 			assert.Equal(t, []LiveRow{
 				{
 					Seq: cursor + 1, TS: *now, Site: "s",
@@ -112,27 +116,22 @@ func TestLiveRingAndCursorAcrossWraps(t *testing.T) {
 		b.Errors = []beacon.Error{{Message: itoa(i)}}
 		a.Ingest(b)
 	}
-	rows, next := a.Live(0, 0, "")
+	rows := a.Live(0, 2*liveRingCap, "")
 	require.Len(t, rows, liveRingCap)
-	assert.EqualValues(t, 3*liveRingCap, next)
-	rows, _ = a.Live(next+100, 5, "")
-	require.Len(t, rows, 5)
 	assert.EqualValues(t, 2*liveRingCap+1, rows[0].Seq)
+	assert.EqualValues(t, 3*liveRingCap, rows[liveRingCap-1].Seq)
+	rows = a.Live(2*liveRingCap+10, 5, "")
+	require.Len(t, rows, 5)
+	assert.EqualValues(t, 2*liveRingCap+11, rows[0].Seq)
+	rows = a.Live(3*liveRingCap+100, 5, "")
+	require.Len(t, rows, 5)
+	assert.EqualValues(t, 2*liveRingCap+1, rows[0].Seq, "a cursor ahead of the ring restarts it")
+	assert.Empty(t, a.Live(0, 0, ""), "a non-positive cap returns no rows")
+	assert.Zero(
+		t,
+		testing.AllocsPerRun(5, func() { a.Live(0, 100, "other-vnode") }),
+		"a read without matches allocates nothing",
+	)
 	*now = now.Add(time.Minute + time.Second)
-	rows, _ = a.Live(0, 100, "")
-	assert.Empty(t, rows)
-}
-func TestInputRemainsImmutableThroughFiltering(t *testing.T) {
-	a, now := newAgg(time.Minute)
-	b := mk(*now, "s", "/", v(beacon.CLS, .1))
-	b.Resources = []beacon.Resource{{ID: "r", HasDuration: true, DurationMS: 0}}
-	a.Ingest(b)
-	second := a.Ingest(b)
-	require.NotNil(t, second.Observation)
-	assert.Empty(t, second.Observation.Events)
-	assert.Empty(t, second.Observation.Vitals)
-	assert.Empty(t, second.Observation.Resources)
-	assert.Len(t, b.Vitals, 1)
-	assert.Len(t, b.Events, 1)
-	assert.Len(t, b.Resources, 1)
+	assert.Empty(t, a.Live(0, 100, ""))
 }

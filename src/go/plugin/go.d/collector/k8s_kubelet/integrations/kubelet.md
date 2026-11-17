@@ -215,11 +215,11 @@ Metrics:
 |:------|:------------|:----------|:----|
 | k8s_kubelet.apiserver_audit_requests_rejected | API Server Audit Requests | rejected | requests/s |
 | k8s_kubelet.apiserver_storage_data_key_generation_failures | API Server Failed Data Encryption Key(DEK) Generation Operations | failures | events/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies | API Server Latencies Of Data Encryption Key(DEK) Generation Operations | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | observes/s |
-| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | API Server Latencies Of Data Encryption Key(DEK) Generation Operations Percentage | 5_µs, 10_µs, 20_µs, 40_µs, 80_µs, 160_µs, 320_µs, 640_µs, 1280_µs, 2560_µs, 5120_µs, 10240_µs, 20480_µs, 40960_µs, +Inf | percentage |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies | API Server Latencies Of Data Encryption Key(DEK) Generation Operations | 5 µs, 10 µs, 20 µs, 40 µs, 80 µs, 160 µs, 320 µs, 640 µs, 1280 µs, 2560 µs, 5120 µs, 10240 µs, 20480 µs, 40960 µs, +Inf | observes/s |
+| k8s_kubelet.apiserver_storage_data_key_generation_latencies_percent | API Server Latencies Of Data Encryption Key(DEK) Generation Operations Percentage | 5 µs, 10 µs, 20 µs, 40 µs, 80 µs, 160 µs, 320 µs, 640 µs, 1280 µs, 2560 µs, 5120 µs, 10240 µs, 20480 µs, 40960 µs, +Inf | % |
 | k8s_kubelet.apiserver_storage_envelope_transformation_cache_misses | API Server Storage Envelope Transformation Cache Misses | cache misses | events/s |
-| k8s_kubelet.kubelet_containers_running | Number Of Containers Currently Running | total | running_containers |
-| k8s_kubelet.kubelet_pods_running | Number Of Pods Currently Running | total | running_pods |
+| k8s_kubelet.kubelet_containers_running | Number Of Containers Currently Running | total | running containers |
+| k8s_kubelet.kubelet_pods_running | Number Of Pods Currently Running | total | running pods |
 | k8s_kubelet.kubelet_pods_log_filesystem_used_bytes | Bytes Used By The Pod Logs On The Filesystem | a dimension per namespace and pod | B |
 | k8s_kubelet.kubelet_runtime_operations | Runtime Operations By Type | a dimension per operation type | operations/s |
 | k8s_kubelet.kubelet_runtime_operations_errors | Runtime Operations Errors By Type | a dimension per operation type | errors/s |
@@ -228,7 +228,7 @@ Metrics:
 | k8s_kubelet.kubelet_node_config_error | Node Configuration-Related Error | experiencing_error | bool |
 | k8s_kubelet.kubelet_pleg_relist_interval_microseconds | PLEG Relisting Interval Summary | 0.5, 0.9, 0.99 | microseconds |
 | k8s_kubelet.kubelet_pleg_relist_latency_microseconds | PLEG Relisting Latency Summary | 0.5, 0.9, 0.99 | microseconds |
-| k8s_kubelet.kubelet_token_requests | Token() Requests To The Alternate Token Source | total, failed | token_requests/s |
+| k8s_kubelet.kubelet_token_requests | Token() Requests To The Alternate Token Source | total, failed | token requests/s |
 | k8s_kubelet.rest_client_requests_by_code | HTTP Requests By Status Code | a dimension per HTTP status code | requests/s |
 | k8s_kubelet.rest_client_requests_by_method | HTTP Requests By Status Method | a dimension per HTTP method | requests/s |
 
@@ -244,6 +244,33 @@ Metrics:
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
 | k8s_kubelet.volume_manager_total_volumes | Volume Manager State Of The World | actual, desired | state |
+
+
+### Per persistent volume claim
+
+These metrics refer to a PersistentVolumeClaim mounted on this node, one instance per PVC.
+
+- A chart is created only while the kubelet reports real data for it. The kubelet reports 0 for values a volume does not provide, so volumes without filesystem statistics (for example block volumes) have no PVC charts, and volumes without inode accounting (for example SMB shares) have no inode chart.
+- `used` and `available` are reported by the storage driver. Depending on the driver, they can describe a dedicated volume, a claim directory, or a shared backing filesystem. Some drivers combine directory-level usage with filesystem-wide availability, so the stacked total need not equal the volume's capacity.
+- Space utilization is `used / (used + available) * 100`, calculated from the reported values. It matches `df` only when both values describe the same filesystem. It is not the percentage of the PVC's requested size consumed.
+- A PVC mounted on several nodes (for example ReadWriteMany or ReadOnlyMany) is reported by each of them. Aggregate PVC charts across nodes with `max`, not `sum`.
+- `hostPath` volumes (the default type of the upstream `local-path` provisioner) report no usage, so they get no PVC charts. Directory-backed `local` volumes report the usage of the whole filesystem that holds them; claims on the same filesystem therefore show the same values rather than their exclusive usage.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| k8s_namespace | Namespace of the PersistentVolumeClaim. |
+| k8s_pvc_name | PersistentVolumeClaim name. |
+
+Metrics:
+
+| Metric | Description | Dimensions | Unit |
+|:------|:------------|:----------|:----|
+| k8s_kubelet.pvc_space_usage | PVC Space Usage | available, used | B |
+| k8s_kubelet.pvc_space_utilization | PVC Space Utilization | utilization | % |
+| k8s_kubelet.pvc_inodes_usage | PVC Inodes Usage | available, used | inodes |
 
 
 

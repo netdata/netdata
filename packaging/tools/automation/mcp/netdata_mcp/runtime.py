@@ -16,12 +16,13 @@ import re
 import socket
 import urllib.request
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
 from . import journal, profiles
+from .otel_settings import OtelSettings
 
 # Cloud claim credentials, read from the environment and injected into a launched
 # agent's process env (never its command line). Only a non-empty token enables
@@ -173,62 +174,44 @@ def _default_conf(agent_id: str, rd: Path) -> dict[str, dict[str, str]]:
 
 @dataclass
 class OtelConfig:
-    """Caller-tunable otel-plugin options, mapped onto ``otel.yaml`` at launch.
+    """The otel-plugin config an agent launches with, written as its user
+    ``otel.yaml`` (the plugin merges it over its stock file).
 
-    Every field is optional: ``None`` means "leave the plugin default" and the
-    key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own stock defaults), except the two endpoint fields, which are
-    always resolved: ``otlp_endpoint`` to a free loopback port and
-    ``otlp_http_endpoint`` to another one (or to a disable when set to ``""``),
-    so parallel agents never collide on the stock 4317/4318 — the plugin fails
-    fast on an occupied port. The local storage layout is derived from a
-    single ``base_dir`` that is always pinned under the run dir for per-agent
-    isolation (re-pinned after the ``extra_yaml`` merge, alongside the gRPC
-    endpoint, the HTTP listener's ``enabled``, and its endpoint while it is
-    enabled). Caller-supplied paths do
-    exist beyond the pin: ``remote_storage_uri``, ``journal_dir``, and whatever
-    ``extra_yaml`` reaches — the server is a localhost-only developer tool, so
-    the caller is trusted. The rotation/retention knobs are the edge-case
-    drivers (tiny thresholds force multi-file splits and evictions over small,
-    deterministic corpora). ``journal_dir`` is a read-only path (the legacy
-    viewer's fixture).
+    ``settings`` holds the caller's keys (see ``otel_settings``); unset keys keep
+    the stock values. ``extra_yaml`` is a raw YAML mapping deep-merged on top, for
+    configs the typed model refuses on purpose (unknown keys for strict-config
+    refusal tests). After both, the harness pins what per-agent isolation needs:
+    ``base_dir`` under the run dir and each listener's ``enabled`` and endpoint. An
+    unset endpoint auto-assigns a free loopback port so parallel agents never
+    collide on 4317/4318; both listeners are on (HTTP too, unlike stock) unless
+    ``settings`` sets ``enabled: false``, which leaves that listener with no port
+    and no reported endpoint.
     """
 
-    otlp_endpoint: str | None = None          # receivers.otlp.protocols.grpc.endpoint; None → auto free loopback port
-    otlp_http_endpoint: str | None = None     # receivers.otlp.protocols.http.endpoint; None → auto free loopback port, "" → enabled: false
-    # Per-signal tuning (dirs are derived from base_dir, not set here). Each
-    # signal has an independent set; an omitted knob keeps the plugin's stock
-    # default for that signal. logs.* and traces.* are symmetric.
-    logs_rotation_max_file_size: str | None = None      # logs.rotation.default.max_file_size
-    logs_rotation_max_entries: int | None = None    # logs.rotation.default.max_entries
-    logs_rotation_max_file_duration: str | None = None  # logs.rotation.default.max_file_duration
-    logs_crc_enabled: bool | None = None                # logs.crc_enabled
-    logs_compression_enabled: bool | None = None        # logs.compression_enabled
-    logs_retention_max_files: int | None = None         # logs.retention.default.max_files
-    logs_retention_max_total_size: str | None = None    # logs.retention.default.max_total_size
-    logs_catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
-    traces_rotation_max_file_size: str | None = None      # traces.rotation.default.max_file_size
-    traces_rotation_max_entries: int | None = None    # traces.rotation.default.max_entries
-    traces_rotation_max_file_duration: str | None = None  # traces.rotation.default.max_file_duration
-    traces_crc_enabled: bool | None = None                # traces.crc_enabled
-    traces_compression_enabled: bool | None = None        # traces.compression_enabled
-    traces_retention_max_files: int | None = None         # traces.retention.default.max_files
-    traces_retention_max_total_size: str | None = None    # traces.retention.default.max_total_size
-    traces_catalog_rotation_count: int | None = None  # traces.catalog.rotation_count; entries per catalog before it rotates+uploads
-    remote_storage_enabled: bool | None = None # remote_storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
-    remote_storage_uri: str | None = None      # remote_storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
-    journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
-    # Raw-YAML escape hatch: a YAML MAPPING deep-merged over the generated
-    # document (passthrough wins on conflicts; nested mappings merge, any other
-    # value replaces). Reaches knobs without first-class fields (auth, ingest
-    # windows, retention max_age/horizon, catalog rotation_period, per-tenant
-    # override blocks, startup_op_timeout) and deliberately-invalid keys for
-    # strict-config refusal tests. base_dir, both listener endpoints, and the HTTP
-    # listener's enabled flag stay pinned (the harness' per-agent isolation
-    # invariants) — see _otel_doc.
-    # Validated as parseable YAML at the tool boundary; a semantically bad config
-    # surfaces as the plugin's own refuse-to-start (that IS the test).
+    settings: OtelSettings = field(default_factory=OtelSettings)
     extra_yaml: str | None = None
+
+    @property
+    def grpc_disabled(self) -> bool:
+        grpc = self.settings.protocol("grpc")
+        return bool(grpc and grpc.enabled is False)
+
+    @property
+    def grpc_endpoint(self) -> str | None:
+        """The pinned OTLP/gRPC endpoint, or None (auto-assigned or disabled)."""
+        grpc = self.settings.protocol("grpc")
+        return None if self.grpc_disabled or grpc is None else grpc.endpoint
+
+    @property
+    def http_disabled(self) -> bool:
+        http = self.settings.protocol("http")
+        return bool(http and http.enabled is False)
+
+    @property
+    def http_endpoint(self) -> str | None:
+        """The pinned OTLP/HTTP endpoint, or None (auto-assigned or disabled)."""
+        http = self.settings.protocol("http")
+        return None if self.http_disabled or http is None else http.endpoint
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -244,135 +227,28 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
-def _signal_tuning(
-    *,
-    crc_enabled: bool | None,
-    compression_enabled: bool | None,
-    rotation_max_file_size: str | None,
-    rotation_max_entries: int | None,
-    rotation_max_file_duration: str | None,
-    retention_max_files: int | None,
-    retention_max_total_size: str | None,
-    catalog_rotation_count: int | None,
-) -> dict:
-    """Build one signal's flat tuning sub-document (``crc_enabled``,
-    ``compression_enabled``, ``rotation``, ``retention``, ``catalog`` — the
-    plugin's public per-signal schema) from the caller-set knobs. Returns ``{}``
-    when nothing was set (the plugin then keeps its stock per-signal defaults).
-    Signal-neutral: logs and traces share it.
-    """
-    out: dict = {}
-    if crc_enabled is not None:
-        out["crc_enabled"] = crc_enabled
-    if compression_enabled is not None:
-        out["compression_enabled"] = compression_enabled
-    rotation = {
-        k: v
-        for k, v in (
-            ("max_file_size", rotation_max_file_size),
-            ("max_entries", rotation_max_entries),
-            ("max_file_duration", rotation_max_file_duration),
-        )
-        if v is not None
-    }
-    if rotation:
-        out["rotation"] = {"default": rotation}
-    retention = {
-        k: v
-        for k, v in (
-            ("max_files", retention_max_files),
-            ("max_total_size", retention_max_total_size),
-        )
-        if v is not None
-    }
-    if retention:
-        out["retention"] = {"default": retention}
-    if catalog_rotation_count is not None:
-        out["catalog"] = {"rotation_count": catalog_rotation_count}
-    return out
+def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str | None, otlp_http_endpoint: str | None) -> dict:
+    """The user otel.yaml: the caller's settings, then ``extra_yaml``, then the pins.
 
-
-def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
-    """The otel.yaml override document: pinned per-agent base_dir + listener pins, plus any set knobs.
-
-    Apart from ``base_dir``, the gRPC endpoint and the HTTP listener's
-    ``enabled`` (plus its endpoint while it is enabled), which are always
-    emitted, only fields the caller set are emitted; the plugin keeps its stock
-    defaults for the rest. ``base_dir`` is always pinned under the run dir, so every
-    derived dir (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared
-    download cache ``{base_dir}/remote-read``, ``{base_dir}/shared/seq_highwater``)
-    lands in isolation — one pin isolates both signals. ``otlp_http_endpoint``
-    arrives already resolved (a host:port string, or ``None``/``""`` which both
-    serialize to the HTTP listener's ``enabled: false``).
+    ``base_dir`` is pinned under the run dir, so every derived dir
+    (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared download cache,
+    the seq high-water file) lands in isolation for both signals. Remote storage
+    enabled without a URI defaults to a per-agent ``fs://`` dir, so the upload
+    path runs end to end without external storage. Both endpoints arrive
+    resolved: an address, or None for a disabled listener.
     """
     base_dir = str(rd / "lib" / "otel")
+    doc: dict = {"base_dir": base_dir, **cfg.settings.document()}
 
-    # Per-signal tuning (dirs are derived from base_dir, not set here). logs and
-    # traces are symmetric and independent; each emits only the knobs the caller
-    # set, leaving the plugin's stock per-signal defaults for the rest.
-    logs = _signal_tuning(
-        crc_enabled=cfg.logs_crc_enabled,
-        compression_enabled=cfg.logs_compression_enabled,
-        rotation_max_file_size=cfg.logs_rotation_max_file_size,
-        rotation_max_entries=cfg.logs_rotation_max_entries,
-        rotation_max_file_duration=cfg.logs_rotation_max_file_duration,
-        retention_max_files=cfg.logs_retention_max_files,
-        retention_max_total_size=cfg.logs_retention_max_total_size,
-        catalog_rotation_count=cfg.logs_catalog_rotation_count,
-    )
-    traces = _signal_tuning(
-        crc_enabled=cfg.traces_crc_enabled,
-        compression_enabled=cfg.traces_compression_enabled,
-        rotation_max_file_size=cfg.traces_rotation_max_file_size,
-        rotation_max_entries=cfg.traces_rotation_max_entries,
-        rotation_max_file_duration=cfg.traces_rotation_max_file_duration,
-        retention_max_files=cfg.traces_retention_max_files,
-        retention_max_total_size=cfg.traces_retention_max_total_size,
-        catalog_rotation_count=cfg.traces_catalog_rotation_count,
-    )
+    remote = cfg.settings.remote_storage
+    if remote and remote.enabled and remote.uri is None:
+        doc["remote_storage"]["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
 
-    # Remote object-storage upload is GLOBAL (one switch + backend for the
-    # plugin). When enabled without an explicit URI, default to a per-agent
-    # fs:// directory under the run dir (opendal fs = `fs://` + absolute path),
-    # isolated like the local dirs, so the upload path can be exercised
-    # end-to-end without external storage.
-    remote_storage: dict = {}
-    if cfg.remote_storage_enabled is not None:
-        remote_storage["enabled"] = cfg.remote_storage_enabled
-    if cfg.remote_storage_uri is not None:
-        remote_storage["uri"] = cfg.remote_storage_uri
-    elif cfg.remote_storage_enabled:
-        remote_storage["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
-
-    # Read-only legacy viewer: point it at the former plugin's journal files.
-    # This is the FORMER schema's `logs.journal_dir`, read by a separate tolerant
-    # probe (the current `logs` SignalConfig ignores it). The plugin only reads
-    # this directory. Truthy check: omit when unset or empty.
-    if cfg.journal_dir:
-        logs["journal_dir"] = cfg.journal_dir
-
-    # receivers is filled by the pin below (it must also survive extra_yaml).
-    doc: dict = {"receivers": {}, "base_dir": base_dir}
-    if remote_storage:
-        doc["remote_storage"] = remote_storage
-    if logs:
-        doc["logs"] = logs
-    if traces:
-        doc["traces"] = traces
-
-    # Raw-YAML escape hatch (see OtelConfig.extra_yaml): deep-merge the caller's
-    # mapping over the generated doc — passthrough wins — then RE-PIN base_dir,
-    # both listener endpoints and the HTTP listener's enabled flag. Those are
-    # harness invariants (per-agent isolation; the reported OTLP endpoints; no
-    # undeclared 4318 bind), not plugin knobs to reach; everything else,
-    # including keys the plugin will refuse, passes through untouched. That
-    # covers grpc.enabled (a caller may run the plugin HTTP-only, which leaves
-    # the reported OTLP/gRPC endpoint and the gRPC push tools without a
-    # listener), every tls key, and a deprecated `endpoint:` block (the plugin
-    # warns and the pinned receivers.* value wins). A disabled HTTP section
-    # keeps only its enabled pin, so it never shows an address that is not
-    # bound (a gRPC section disabled by the passthrough still carries the
-    # pinned gRPC address).
+    # The pins below must survive the passthrough: they are harness invariants
+    # (isolation, the reported OTLP endpoints, no undeclared 4318 bind), not
+    # plugin knobs. Everything else in extra_yaml, keys the plugin will refuse
+    # included, passes through untouched. A disabled listener's section keeps
+    # only its enabled pin, so it never shows an address that is not bound.
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -380,9 +256,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
             raise ValueError(f"extra_yaml is not valid YAML: {exc}") from exc
         if extra is not None:
             if not isinstance(extra, dict):
-                raise ValueError(
-                    f"extra_yaml must be a YAML mapping, got {type(extra).__name__}"
-                )
+                raise ValueError(f"extra_yaml must be a YAML mapping, got {type(extra).__name__}")
             doc = _deep_merge(doc, extra)
             doc["base_dir"] = base_dir
 
@@ -394,13 +268,13 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     for key in ("grpc", "http"):
         if not isinstance(protocols.get(key), dict):
             protocols[key] = {}
-    protocols["grpc"]["endpoint"] = otlp_endpoint
-    if otlp_http_endpoint:
-        protocols["http"]["enabled"] = True
-        protocols["http"]["endpoint"] = otlp_http_endpoint
-    else:
-        protocols["http"]["enabled"] = False
-        protocols["http"].pop("endpoint", None)
+    for key, endpoint in (("grpc", otlp_endpoint), ("http", otlp_http_endpoint)):
+        if endpoint:
+            protocols[key]["enabled"] = True
+            protocols[key]["endpoint"] = endpoint
+        else:
+            protocols[key]["enabled"] = False
+            protocols[key].pop("endpoint", None)
     return doc
 
 
@@ -426,10 +300,10 @@ def generate_runtime(
     overrides: dict[str, dict[str, str]] | None = None,
     otel: OtelConfig | None = None,
     reserved_ports: Iterable[int] = (),
-) -> tuple[Path, Path, str, str | None]:
+) -> tuple[Path, Path, str | None, str | None]:
     """Create the isolated run dir, write netdata.conf + otel.yaml; return
-    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — the HTTP
-    endpoint is None when the config disables the OTLP/HTTP listener.
+    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — an endpoint
+    is None when the config disables that listener.
 
     ``overrides`` is the per-agent extension point ({section: {key: value}}),
     deep-merged over the defaults — the hook for runtime overrides (db mode,
@@ -442,7 +316,7 @@ def generate_runtime(
     ``-c`` flag only loads the file, not the dir). ``otlp_endpoint`` defaults to a
     free loopback port so parallel agents don't collide on 4317; the OTLP/HTTP
     listener gets its own free port for the same reason (the plugin fails fast on
-    an occupied port), unless the config disables it (``otlp_http_endpoint=""``)
+    an occupied port), unless the config disables it (``http.enabled: false``)
     or pins it; ``reserved_ports`` (the web port) are never auto-assigned, and a
     pinned endpoint that overlaps one raises ``ValueError`` (``web_port_clash``).
     Both endpoints are returned so the caller can report where to push OTLP data.
@@ -471,30 +345,28 @@ def generate_runtime(
     # socket, so two calls can return the same port, and the plugin refuses
     # to start when its two listeners collide.
     taken = reserved | pinned_ports(cfg)
-    if cfg.otlp_endpoint:
-        otlp_endpoint = cfg.otlp_endpoint
-    else:
+    otlp_endpoint: str | None = None
+    if cfg.grpc_endpoint:
+        otlp_endpoint = cfg.grpc_endpoint
+    elif not cfg.grpc_disabled:
         port = free_port_except(taken)
         taken.add(port)
         otlp_endpoint = f"127.0.0.1:{port}"
-    # "" (disable) must survive intact: only None auto-assigns.
-    otlp_http_endpoint = (
-        cfg.otlp_http_endpoint
-        if cfg.otlp_http_endpoint is not None
-        else f"127.0.0.1:{free_port_except(taken)}"
-    )
+    otlp_http_endpoint: str | None = None
+    if not cfg.http_disabled:
+        otlp_http_endpoint = cfg.http_endpoint or f"127.0.0.1:{free_port_except(taken)}"
     otel_yaml = yaml.safe_dump(
         _otel_doc(cfg, rd, otlp_endpoint, otlp_http_endpoint), sort_keys=False
     )
     (rd / "etc" / "otel.yaml").write_text(otel_yaml, encoding="utf-8")
 
-    return rd, conf_path, otlp_endpoint, otlp_http_endpoint or None
+    return rd, conf_path, otlp_endpoint, otlp_http_endpoint
 
 
 def pinned_ports(cfg: OtelConfig | None) -> set[int]:
     """The ports of the OTLP endpoints ``cfg`` pins (none when auto-assigned)."""
     ports = set()
-    for pinned in (cfg.otlp_endpoint, cfg.otlp_http_endpoint) if cfg else ():
+    for pinned in (cfg.grpc_endpoint, cfg.http_endpoint) if cfg else ():
         if pinned and (port := _endpoint_port(pinned)) is not None:
             ports.add(port)
     return ports
@@ -510,7 +382,7 @@ def web_port_clash(cfg: OtelConfig | None, web_port: int | None) -> str | None:
     """
     if cfg is None or web_port is None:
         return None
-    for name, endpoint in (("otlp_endpoint", cfg.otlp_endpoint), ("otlp_http_endpoint", cfg.otlp_http_endpoint)):
+    for name, endpoint in (("grpc endpoint", cfg.grpc_endpoint), ("http endpoint", cfg.http_endpoint)):
         if endpoint and _endpoint_port(endpoint) == web_port and _overlaps_web_address(endpoint):
             return f"{name} {endpoint} uses the agent's web port {web_port}; pin another port"
     return None

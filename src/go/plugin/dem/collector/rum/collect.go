@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
@@ -18,10 +19,10 @@ func (c *Collector) Collect(context.Context) error {
 		state = "available"
 	}
 	c.metrics.ingress.Enable(state)
-	s := c.aggregator.Snapshot()
 	for _, counter := range c.metrics.diagnostics {
-		counter.instrument.ObserveTotal(float64(s.Counters[counter.name]))
+		counter.instrument.ObserveTotal(float64(c.transport.get(counter.name)))
 	}
+	s := c.aggregator.Snapshot()
 	// Inability or intentional disablement is not an observed quiet window.
 	if !available || c.MeasureRate() == 0 {
 		return nil
@@ -54,16 +55,13 @@ func (c *Collector) Collect(context.Context) error {
 				Value: g.Value,
 			}, bucketLabel(g.Other))
 			prefix := "breakdown_" + kind + "_"
-			if kind != aggregate.KindView {
-				gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
-			}
-			gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 			if kind == aggregate.KindView {
+				gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 				gm.Gauge(prefix + "application_views").Observe(float64(g.ApplicationViews))
-			}
-			if kind == aggregate.KindView {
 				continue
 			}
+			gm.Gauge(prefix + "document_views").Observe(float64(g.Pageviews))
+			gm.Gauge(prefix + "js_errors").Observe(float64(g.JSErrors))
 			for _, vital := range beacon.Vitals {
 				st := g.Vitals[vital]
 				name := prefix + strings.ToLower(vital)

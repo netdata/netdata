@@ -43,7 +43,10 @@ func runtimeInputContext(parent context.Context, input *os.File) (context.Contex
 		}
 	}
 	if mode != unix.S_IFIFO && mode != unix.S_IFSOCK {
-		return nil, nil, errors.Join(errors.New("runtime stdin control channel must be a pipe or stream socket"), unix.Close(fd))
+		return nil, nil, errors.Join(
+			errors.New("runtime stdin control channel must be a pipe or stream socket"),
+			unix.Close(fd),
+		)
 	}
 	var wakeup [2]int
 	if err := unix.Pipe2(wakeup[:], unix.O_CLOEXEC); err != nil {

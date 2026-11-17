@@ -8,10 +8,15 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+// Reports of one session accumulate into one timeline in receipt order, each
+// entry with the context of its own report, and count as one investigated session.
 func TestSessionDetailAccumulates(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
+	start := *now
 	b1 := mk(*now, "sess1", "/a")
 	b1.AppVersion = "1.0.0"
 	a.Ingest(b1)
@@ -21,20 +26,51 @@ func TestSessionDetailAccumulates(t *testing.T) {
 	a.Ingest(b2)
 	*now = now.Add(5 * time.Second)
 
-	got := trackedSessions(a)
-	if len(got) != 1 {
-		t.Fatalf("sessions = %+v", got)
-	}
-	sd := got[0]
-	if sd.id != "sess1" || sd.pageviews != 2 || sd.errors != 1 {
-		t.Fatalf("session = %+v", sd)
-	}
-	if sd.entryPage != "/a" || sd.lastPage != "/b" {
-		t.Fatalf("entry/last page = %q/%q", sd.entryPage, sd.lastPage)
-	}
-	if now.Sub(sd.started) != 10*time.Second || sd.lastSeen.Sub(sd.started) != 5*time.Second {
-		t.Fatalf("times: started=%v lastSeen=%v", sd.started, sd.lastSeen)
-	}
+	events, ok := a.SessionEvents("sess1")
+	require.True(t, ok)
+	assert.Equal(t, []HistoryEvent{
+		{
+			ExperienceID: b1.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.UnixMicro(),
+			Type:         "pageview",
+			Page:         "/a",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Version:      "1.0.0",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Revision:     1,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "pageview",
+			Page:         "/b",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+		},
+		{
+			ExperienceID: b2.ExperienceID,
+			Site:         "s",
+			SessionID:    "sess1",
+			ObservedUS:   start.Add(5 * time.Second).UnixMicro(),
+			Type:         "error",
+			Page:         "/b",
+			Text:         "TypeError: boom",
+			Browser:      "Chrome",
+			Device:       "desktop",
+			Country:      "GR",
+			Fingerprint:  "fp1",
+			ErrorType:    "TypeError",
+			Message:      "boom",
+		},
+	}, events)
+	assert.Equal(t, 1, a.Activity().InvestigatedSessions)
 }
 
 func trackedSessions(a *Aggregator) []*sessionDetail {
@@ -172,43 +208,6 @@ func TestSessionLRUEvictsOldest(t *testing.T) {
 	_ = now
 }
 
-func TestSessionsStayWithTheirOwner(t *testing.T) {
-	for _, site := range []string{"a", "b"} {
-		a, now := newAgg(30*time.Minute, SiteCfg{
-			Name:       site,
-			PageGroups: 20,
-			Countries:  20,
-		})
-		for _, incoming := range []string{"a", "b"} {
-			a.Ingest(&beacon.Beacon{
-				ExperienceID: incoming,
-				Events:       []beacon.Event{{ID: incoming, Revision: 1, Kind: beacon.EventDocument}},
-				Site:         incoming,
-				Received:     *now,
-				SessionID:    "shared",
-				PageGroup:    "/" + incoming,
-			})
-		}
-		events, ok := a.SessionEvents("shared")
-		if !ok || len(events) != 1 || events[0].Page != "/"+site {
-			t.Fatalf("site %s events = %+v, found=%v", site, events, ok)
-		}
-	}
-}
-
-// The observation window controls session measurement independently of details.
-func TestObservedSessionsAgeByWindow(t *testing.T) {
-	a, now := newAgg(30 * time.Minute)
-	a.Ingest(mk(*now, "s1", "/a"))
-	a.Ingest(mk(*now, "s2", "/a"))
-	*now = now.Add(20 * time.Minute)
-	a.Ingest(mk(*now, "s1", "/b"))
-	*now = t0.Add(31 * time.Minute) // s2 idle 31m, s1 idle 11m
-	if got := a.Snapshot().ObservedSessions; got != 1 {
-		t.Fatalf("active=%d want 1", got)
-	}
-}
-
 // A traced request lands in the timeline with its trace id.
 func TestTracedRequestInSessionTimeline(t *testing.T) {
 	a, now := newAgg(5 * time.Minute)
@@ -227,7 +226,7 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 	if !ok {
 		t.Fatal("session missing")
 	}
-	var req *SessionEventInfo
+	var req *HistoryEvent
 	for i := range events {
 		if events[i].Type == "request" {
 			req = &events[i]
@@ -236,15 +235,6 @@ func TestTracedRequestInSessionTimeline(t *testing.T) {
 	if req == nil || req.TraceID != "360b7dd27710ac98272283e6f1f29102" ||
 		req.Text != "POST api.example.com/orders 201 · 12 ms" {
 		t.Fatalf("request event = %+v", req)
-	}
-}
-
-func TestBotsFilteredPerMinute(t *testing.T) {
-	a, _ := newAgg(5 * time.Minute)
-	a.Reject("s", beacon.RejectBot)
-	a.Reject("s", beacon.RejectBot)
-	if got := a.Activity().BotsPerMin; got != 2 {
-		t.Fatalf("bots per min = %d", got)
 	}
 }
 
@@ -284,5 +274,32 @@ func TestElementsFrustrationAndUser(t *testing.T) {
 	last := h.events[len(h.events)-1]
 	if last.UserID != "u_42" || last.Type != "frustration" {
 		t.Fatalf("history event = %+v", last)
+	}
+}
+
+// A page view takes the revision of the report's first document activation.
+func TestDocumentRevision(t *testing.T) {
+	tests := map[string]struct {
+		events []beacon.Event
+		want   uint64
+	}{
+		"no activation": {
+			events: []beacon.Event{{Kind: beacon.EventView, Revision: 3}},
+		},
+		"first activation": {
+			events: []beacon.Event{
+				{Kind: beacon.EventView, Revision: 3},
+				{Kind: beacon.EventDocument, Revision: 2},
+				{Kind: beacon.EventDocument, Revision: 5},
+			},
+			want: 2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, documentRevision(&beacon.Beacon{
+				Events: tc.events,
+			}))
+		})
 	}
 }

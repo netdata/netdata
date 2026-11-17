@@ -10,61 +10,55 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
 const nativeProtocolLimit = 1 << 20
-const nativeDiagnosticLimit = 16 << 10
 
-// These verbs are the installed package helper interface, not runtime source or
-// path overrides. Package hooks own service stop/restart and transaction ordering.
-func runNativeRuntimeCommand(ctx context.Context, args []string, stdout, stderr io.Writer) (bool, error) {
-	if len(args) < 2 || args[0] != "runtime" || !strings.HasPrefix(args[1], "native-") {
-		return false, nil
-	}
-	command := args[1]
+// runNativeCommand serves the installed package helper interface. These verbs
+// take no runtime source or path overrides; package hooks own service
+// stop/restart and transaction ordering.
+func runNativeCommand(ctx context.Context, command string, args []string, stdout, stderr io.Writer) error {
 	root := false
 	switch command {
 	case "native-prepare", "native-configure":
 		root = true
 	case "native-initialize", "native-inspect", "native-qualify":
 	default:
-		return true, fmt.Errorf("unknown internal native runtime command %q", command)
+		return fmt.Errorf("unknown internal native runtime command %q", command)
 	}
-	if len(args) != 2 {
-		return true, errors.New("internal native runtime commands accept no flags or positional arguments")
+	if len(args) != 0 {
+		return errors.New("internal native runtime commands accept no flags or positional arguments")
 	}
 	if err := nativeCommandPlatform(); err != nil {
-		return true, err
+		return err
 	}
 	if root && os.Geteuid() != 0 {
-		return true, errors.New("native package preparation/configuration requires root")
+		return errors.New("native package preparation/configuration requires root")
 	}
 	if !root && os.Geteuid() == 0 {
-		return true, errors.New("native proof and qualification commands must run as the configured service UID")
+		return errors.New("native proof and qualification commands must run as the configured service UID")
 	}
 	if root {
-		return true, runNativeRootCommand(ctx, command, stdout, stderr)
+		return runNativeRootCommand(ctx, command, stdout, stderr)
 	}
-	return true, runNativeServiceCommand(ctx, command, os.Stdin, stdout)
+	return runNativeServiceCommand(ctx, command, os.Stdin, stdout)
 }
 
-func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reader, stdout io.Writer) (result error) {
-	config := runtime.DefaultNativeConfig()
+func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reader, stdout io.Writer) error {
+	config := browserruntime.DefaultNativeConfig()
 	if command == "native-initialize" {
-		if err := runtime.InitializeNativeProof(config); err != nil {
+		if err := browserruntime.InitializeNativeProof(config); err != nil {
 			return err
 		}
-		return json.NewEncoder(stdout).Encode(struct {
-			Initialized bool `json:"initialized"`
-		}{true})
+		return json.NewEncoder(stdout).Encode(nativeInitialized{
+			Initialized: true,
+		})
 	}
-	var target runtime.Manifest
+	var target browserruntime.Manifest
 	if command == "native-qualify" {
 		if err := decodeNativeProtocol(stdin, &target); err != nil {
 			return err
@@ -73,46 +67,46 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 			return err
 		}
 	}
-	native, err := runtime.OpenNative(config)
+	native, err := browserruntime.OpenNative(config)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		// An undrained execution retains its proof and work. Process exit releases
-		// local locks; the persistent receipt remains the authority for recovery.
-		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
-			result = errors.Join(result, native.Close())
-		}
-	}()
 	if command == "native-inspect" {
-		if err := native.Sweep(); err != nil {
-			return err
-		}
-		status, err := native.Inspect()
-		if err != nil {
-			return err
-		}
-		return json.NewEncoder(stdout).Encode(status)
+		err = inspectNative(native, stdout)
+	} else {
+		err = qualifyNative(ctx, native, target, stdout)
 	}
+	// An undrained execution retains its proof and work. Process exit releases
+	// local locks; the persistent receipt remains the authority for recovery.
+	return closeUnlessUndrained(err, native)
+}
+
+func inspectNative(native *browserruntime.Native, stdout io.Writer) error {
+	if err := native.Sweep(); err != nil {
+		return err
+	}
+	status, err := native.Inspect()
+	if err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(status)
+}
+
+func qualifyNative(
+	ctx context.Context,
+	native *browserruntime.Native,
+	target browserruntime.Manifest,
+	stdout io.Writer,
+) error {
 	candidate, err := native.AcquireCandidate(target)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
-			result = errors.Join(result, candidate.Close())
-		}
-	}()
-	source := runtimehost.Borrow(candidate)
-	executor, err := runner.New(source, nil, nil, 1)
-	if err != nil {
-		return err
+	qualification, err := runner.Qualify(ctx, runtimehost.Borrow(candidate))
+	if err == nil {
+		err = json.NewEncoder(stdout).Encode(qualification)
 	}
-	qualification, err := executor.Qualify(ctx, source)
-	if err != nil {
-		return err
-	}
-	return json.NewEncoder(stdout).Encode(qualification)
+	return closeUnlessUndrained(err, candidate)
 }
 
 func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
@@ -124,23 +118,51 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 	if err != nil {
 		return err
 	}
-	config := runtime.DefaultNativeConfig()
-	inspect := func(ctx context.Context) (runtime.NativeStatus, error) {
+	config := browserruntime.DefaultNativeConfig()
+	inspect := func(ctx context.Context) (browserruntime.NativeStatus, error) {
 		data, err := child.run(ctx, "native-inspect", nil)
 		if err != nil {
-			return runtime.NativeStatus{}, err
+			return browserruntime.NativeStatus{}, err
 		}
 		return decodeNativeStatus(data)
 	}
 	if command == "native-prepare" {
-		control, err := runtime.InitializeNativeControl(ctx, config, int(identity.uid), int(identity.gid), func(ctx context.Context) error {
+		return closeNativeAdmission(ctx, config, identity, child, inspect, stdout)
+	}
+	return configureNative(ctx, config, child, inspect, stdout)
+}
+
+// nativeInitialized is the service child's native-initialize reply.
+type nativeInitialized struct {
+	Initialized bool `json:"initialized"`
+}
+
+// nativePhase is the root helper's result for package scriptlets.
+type nativePhase struct {
+	Phase string `json:"phase"`
+}
+
+// closeNativeAdmission initializes the service proof through the service child
+// and closes package admission.
+func closeNativeAdmission(
+	ctx context.Context,
+	config browserruntime.NativeConfig,
+	identity nativeIdentity,
+	child *nativeChild,
+	inspect browserruntime.NativeInspector,
+	stdout io.Writer,
+) error {
+	control, err := browserruntime.InitializeNativeControl(
+		ctx,
+		config,
+		int(identity.uid),
+		int(identity.gid),
+		func(ctx context.Context) error {
 			data, err := child.run(ctx, "native-initialize", nil)
 			if err != nil {
 				return err
 			}
-			var reply struct {
-				Initialized bool `json:"initialized"`
-			}
+			var reply nativeInitialized
 			if err := decodeNativeProtocol(bytes.NewReader(data), &reply); err != nil {
 				return err
 			}
@@ -148,22 +170,33 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 				return errors.New("native service proof initialization was not confirmed")
 			}
 			return nil
-		})
-		if err != nil {
-			return err
-		}
-		if err := control.CloseAdmission(ctx, inspect); err != nil {
-			return err
-		}
-		return json.NewEncoder(stdout).Encode(struct {
-			Phase string `json:"phase"`
-		}{"closed"})
-	}
-	control, err := runtime.OpenNativeControl(config)
+		},
+	)
 	if err != nil {
 		return err
 	}
-	if err := control.QualifyAndReady(ctx, inspect, func(ctx context.Context, target runtime.Manifest) error {
+	if err := control.CloseAdmission(ctx, inspect); err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(nativePhase{
+		Phase: "closed",
+	})
+}
+
+// configureNative qualifies the admitted target as the service UID and marks
+// the native runtime ready.
+func configureNative(
+	ctx context.Context,
+	config browserruntime.NativeConfig,
+	child *nativeChild,
+	inspect browserruntime.NativeInspector,
+	stdout io.Writer,
+) error {
+	control, err := browserruntime.OpenNativeControl(config)
+	if err != nil {
+		return err
+	}
+	if err := control.QualifyAndReady(ctx, inspect, func(ctx context.Context, target browserruntime.Manifest) error {
 		input, err := json.Marshal(target)
 		if err != nil {
 			return err
@@ -176,9 +209,9 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 	}); err != nil {
 		return err
 	}
-	return json.NewEncoder(stdout).Encode(struct {
-		Phase string `json:"phase"`
-	}{"ready"})
+	return json.NewEncoder(stdout).Encode(nativePhase{
+		Phase: "ready",
+	})
 }
 
 func decodeNativeProtocol(reader io.Reader, value any) error {
@@ -201,8 +234,8 @@ func decodeNativeProtocol(reader io.Reader, value any) error {
 	return nil
 }
 
-func decodeNativeStatus(data []byte) (runtime.NativeStatus, error) {
-	var status runtime.NativeStatus
+func decodeNativeStatus(data []byte) (browserruntime.NativeStatus, error) {
+	var status browserruntime.NativeStatus
 	if err := decodeNativeProtocol(bytes.NewReader(data), &status); err != nil {
 		return status, err
 	}
@@ -220,16 +253,18 @@ func decodeNativeStatus(data []byte) (runtime.NativeStatus, error) {
 	return status, nil
 }
 
-func verifyNativeQualification(data []byte, target runtime.Manifest) error {
+func verifyNativeQualification(data []byte, target browserruntime.Manifest) error {
 	var qualification runner.Qualification
 	if err := decodeNativeProtocol(bytes.NewReader(data), &qualification); err != nil {
 		return err
 	}
-	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney || !qualification.SandboxedLocalLighthouse || !qualification.ProcessTreeDrained || qualification.Runtime == nil {
+	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney ||
+		!qualification.SandboxedLocalLighthouse ||
+		!qualification.ProcessTreeDrained ||
+		qualification.Runtime == nil {
 		return errors.New("native service did not confirm complete, drained qualification")
 	}
-	identity := qualification.Runtime
-	if identity.Version != target.Version || identity.SHA256 != target.Archive.SHA256 || identity.Contract != target.Contract {
+	if *qualification.Runtime != target.Identity() {
 		return errors.New("native qualification identity differs from admitted target")
 	}
 	return nil

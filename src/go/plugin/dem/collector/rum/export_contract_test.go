@@ -16,9 +16,10 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,6 +73,7 @@ func (s *contractTraces) Export(
 	}
 	return &coltraces.ExportTraceServiceResponse{}, nil
 }
+
 func contractReceiver(t *testing.T, reject bool) (string, *contractLogs, *contractTraces) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
@@ -87,9 +89,10 @@ func contractReceiver(t *testing.T, reject bool) (string, *contractLogs, *contra
 	t.Cleanup(func() { srv.Stop(); <-done })
 	return "http://" + ln.Addr().String(), logs, traces
 }
+
 func contractSite(t *testing.T) (*rum.Collector, *rumregistry.Registry, *history.Store) {
 	t.Helper()
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub, store := rumregistry.New(), history.NewStore(db)
@@ -100,6 +103,7 @@ func contractSite(t *testing.T) (*rum.Collector, *rumregistry.Registry, *history
 	site.Name, site.AllowedOrigins = "shop", []string{"https://example.org"}
 	return site, hub, store
 }
+
 func sendContractBeacon(t *testing.T, hub *rumregistry.Registry, body []byte) {
 	t.Helper()
 	req, err := http.NewRequest(
@@ -115,6 +119,7 @@ func sendContractBeacon(t *testing.T, hub *rumregistry.Registry, body []byte) {
 	require.NoError(t, res.Body.Close())
 	require.Equal(t, http.StatusAccepted, res.StatusCode)
 }
+
 func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 	for _, tc := range []struct {
 		name                 string
@@ -179,22 +184,31 @@ func TestOptionalExportsThroughNativeJobs(t *testing.T) {
 			counters := a.Snapshot().Counters
 			assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
 			if !tc.logs {
-				assert.Zero(t, counters[aggregate.CounterOTLPSent])
-				assert.Zero(t, counters[aggregate.CounterOTLPDropped])
-				assert.Zero(t, counters[aggregate.CounterOTLPErrors])
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsSent))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsDropped))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsErrors))
 			}
 			if !tc.traces {
-				assert.Zero(t, counters[aggregate.CounterSpansSent])
-				assert.Zero(t, counters[aggregate.CounterSpansDropped])
-				assert.Zero(t, counters[aggregate.CounterSpansErrors])
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansSent))
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansDropped))
+				assert.Zero(t, site.TransportCounter(otlp.CounterSpansErrors))
 			} else {
-				assert.EqualValues(t, 2, counters[aggregate.CounterSpansSent])
+				assert.EqualValues(t, 2, site.TransportCounter(otlp.CounterSpansSent))
 			}
 			if tc.reject {
-				assert.Positive(t, counters[aggregate.CounterOTLPErrors])
-				assert.Zero(t, counters[aggregate.CounterOTLPSent])
+				assert.Positive(t, site.TransportCounter(otlp.CounterLogsErrors))
+				assert.Zero(t, site.TransportCounter(otlp.CounterLogsSent))
 			}
-			rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+			rows, err := store.QuerySessions(
+				context.Background(),
+				history.SessionFilter{
+					Filter: history.Filter{
+						Site:   "shop",
+						Before: time.Now().Unix() + 10,
+					},
+					Limit: 10,
+				},
+			)
 			require.NoError(t, err)
 			require.Len(t, rows, 1)
 			assert.EqualValues(t, 1, rows[0].Pageviews)
@@ -234,10 +248,19 @@ func TestOTLPReceiverStorageSmoke(t *testing.T) {
 	stop()
 	counters := a.Snapshot().Counters
 	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
-	require.EqualValues(t, 4, counters[aggregate.CounterOTLPSent])
-	require.Zero(t, counters[aggregate.CounterOTLPErrors])
+	require.EqualValues(t, 4, site.TransportCounter(otlp.CounterLogsSent))
+	require.Zero(t, site.TransportCounter(otlp.CounterLogsErrors))
 	require.Zero(t, counters[aggregate.CounterJSErrors])
-	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+	rows, err := store.QuerySessions(
+		context.Background(),
+		history.SessionFilter{
+			Filter: history.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 }
@@ -272,7 +295,7 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	send("first")
 	require.Eventually(
 		t,
-		func() bool { return a.Snapshot().Counters[aggregate.CounterOTLPErrors] > 0 },
+		func() bool { return site.TransportCounter(otlp.CounterLogsErrors) > 0 },
 		4*time.Second,
 		10*time.Millisecond,
 	)
@@ -282,17 +305,26 @@ func TestEventExportRecoveryKeepsNativeHistory(t *testing.T) {
 	send("second")
 	require.Eventually(
 		t,
-		func() bool { return a.Snapshot().Counters[aggregate.CounterOTLPSent] > 0 },
+		func() bool { return site.TransportCounter(otlp.CounterLogsSent) > 0 },
 		4*time.Second,
 		10*time.Millisecond,
 	)
 	stop()
 	counters := a.Snapshot().Counters
 	assert.Zero(t, counters[aggregate.CounterInvalidMeasurements])
-	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPErrors])
-	assert.EqualValues(t, 1, counters[aggregate.CounterOTLPSent])
-	assert.Zero(t, counters[aggregate.CounterOTLPDropped])
-	rows, err := store.QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsErrors))
+	assert.EqualValues(t, 1, site.TransportCounter(otlp.CounterLogsSent))
+	assert.Zero(t, site.TransportCounter(otlp.CounterLogsDropped))
+	rows, err := store.QuerySessions(
+		context.Background(),
+		history.SessionFilter{
+			Filter: history.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)

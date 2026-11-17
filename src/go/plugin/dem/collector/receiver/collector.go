@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package receiver implements the single-instance receiver module. It owns the RUM HTTP listener and the GeoIP
+// sources, hands each browser request to the site route admitted in the RUM registry, and publishes request metrics.
 package receiver
 
 import (
@@ -8,7 +10,6 @@ import (
 	_ "embed"
 	"errors"
 	"sync"
-	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
@@ -27,6 +28,7 @@ type Config struct {
 	UpdateEvery     int `yaml:"update_every,omitempty" json:"update_every"`
 	config.Receiver `    yaml:",inline"                json:""`
 }
+
 type Dependencies struct {
 	Registry   *rumregistry.Registry
 	GeoIPPaths geoip.Paths
@@ -43,7 +45,7 @@ type Collector struct {
 	geoPaths      geoip.Paths
 	publicationMu sync.Mutex
 	publication   *rumregistry.ReceiverRegistration
-	requests      [3]atomic.Uint64
+	requests      requestCounts
 }
 
 func Creator(deps Dependencies) collectorapi.Creator {
@@ -58,6 +60,7 @@ func Creator(deps Dependencies) collectorapi.Creator {
 		StoreFirst:      true,
 	}
 }
+
 func New(deps Dependencies) *Collector {
 	c := &Collector{
 		Config: Config{
@@ -77,6 +80,7 @@ func New(deps Dependencies) *Collector {
 	c.metrics = newCollectorMetrics(c.store.Write().SnapshotMeter(""))
 	return c
 }
+
 func (c *Collector) Configuration() any                 { return c.Config }
 func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
 func (c *Collector) ChartTemplateYAML() string          { return charts }

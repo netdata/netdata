@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/faro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-type fakeHistorySink struct{ events []HistoryEvent }
-
-func (f *fakeHistorySink) Event(rec HistoryEvent) { f.events = append(f.events, rec) }
 
 func TestHistoryEventsAreSelfContained(t *testing.T) {
 	a, now := newAgg(30 * time.Minute)
@@ -34,6 +34,7 @@ func TestHistoryEventsAreSelfContained(t *testing.T) {
 	assert.Empty(t, last.UserID)
 	assert.Equal(t, now.UnixMicro(), last.ObservedUS)
 }
+
 func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 	for _, session := range []string{"sess1", ""} {
 		t.Run(session, func(t *testing.T) {
@@ -72,6 +73,69 @@ func TestErrorHistoryNeedsNoParentRecord(t *testing.T) {
 		})
 	}
 }
+
+// Session and sessionless errors persist the same complete record: the site's
+// configured vnode, the arrival context and the decoder-bounded error detail.
+// Only a session timeline defaults an empty page group to "/".
+func TestErrorHistoryRecordIsComplete(t *testing.T) {
+	message, stack := strings.Repeat("m", 250), strings.Repeat("s", 4096)
+	tests := map[string]struct {
+		session, page string
+	}{
+		"session":     {session: "session", page: "/"},
+		"sessionless": {session: "", page: ""},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			a, _ := newAgg(30 * time.Minute)
+			a.SetVnodeGUID(vnodeA)
+			sink := &fakeHistorySink{}
+			a.SetHistorySink(sink)
+			a.Ingest(&beacon.Beacon{
+				Site:         "s",
+				Received:     t0,
+				SessionID:    tc.session,
+				VnodeGUID:    "untrusted",
+				ExperienceID: "document",
+				View:         "checkout",
+				ViewID:       "view-1",
+				Browser:      "Firefox",
+				Device:       "mobile",
+				Country:      "GR",
+				AppVersion:   "1.2",
+				UserID:       "user",
+				Errors: []beacon.Error{{
+					Fingerprint: "fingerprint",
+					Type:        "TypeError",
+					Message:     message,
+					Stack:       stack,
+				}},
+			})
+			require.Equal(t, []HistoryEvent{{
+				VnodeGUID:    vnodeA,
+				ExperienceID: "document",
+				View:         "checkout",
+				ViewID:       "view-1",
+				Site:         "s",
+				SessionID:    tc.session,
+				ObservedUS:   t0.UnixMicro(),
+				Type:         "error",
+				Page:         tc.page,
+				Text:         ("TypeError: " + message)[:sessionEventTextMax],
+				Browser:      "Firefox",
+				Device:       "mobile",
+				Country:      "GR",
+				Version:      "1.2",
+				UserID:       "user",
+				Fingerprint:  "fingerprint",
+				ErrorType:    "TypeError",
+				Message:      message,
+				SampleStack:  stack,
+			}}, sink.events)
+		})
+	}
+}
+
 func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	a, now := newAgg(time.Minute)
 	sink := &fakeHistorySink{}
@@ -89,6 +153,40 @@ func TestHistoryRecordsActivityWithoutTimelineEvents(t *testing.T) {
 	require.Len(t, timeline, 1)
 	assert.Equal(t, "pageview", timeline[0].Type)
 }
+
+func TestHistoryRecordsAcceptedGoodVitalActivity(t *testing.T) {
+	a, now := newAgg(time.Minute)
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	b := mk(*now, "session", "/entry")
+	a.Ingest(b)
+	require.Len(t, sink.events, 1)
+
+	*now = now.Add(10 * time.Second)
+	b.Received = *now
+	b.Events = nil
+	b.Vitals = []beacon.Vital{v(beacon.LCP, 100)}
+	result := a.Ingest(b)
+	require.Len(t, result.Observation.Vitals, 1)
+	require.Len(t, sink.events, 2)
+	activity := sink.events[1]
+	assert.Equal(t, "activity", activity.Type)
+	assert.Equal(t, now.UnixMicro(), activity.ObservedUS)
+	assert.Equal(t, b.SessionID, activity.SessionID)
+	assert.Equal(t, b.ExperienceID, activity.ExperienceID)
+	assert.Equal(t, "/entry", activity.Page)
+
+	*now = now.Add(10 * time.Second)
+	b.Received = *now
+	result = a.Ingest(b)
+	assert.Empty(t, result.Observation.Vitals)
+	assert.Len(t, sink.events, 2, "replayed vital does not write fresh activity")
+	timeline, ok := a.SessionEvents(b.SessionID)
+	require.True(t, ok)
+	require.Len(t, timeline, 1)
+	assert.Equal(t, "pageview", timeline[0].Type)
+}
+
 func TestNilHistorySinkIsSafe(t *testing.T) {
 	a, _ := newAgg(30 * time.Minute)
 	a.Ingest(mk(t0, "sess1", "/a"))
@@ -97,4 +195,66 @@ func TestNilHistorySinkIsSafe(t *testing.T) {
 		Message:     "m",
 		Fingerprint: "fp1",
 	}))
+}
+
+// Decoded text reaches history as normalized: a credential that removing a
+// control character joins is redacted before it is recorded.
+func TestHistoryRecordsNoCredentialJoinedByCleaning(t *testing.T) {
+	a, now := newAgg(30 * time.Minute)
+	sink := &fakeHistorySink{}
+	a.SetHistorySink(sink)
+	raw, err := json.Marshal(map[string]any{
+		"meta": map[string]any{
+			"session": map[string]string{"id": "session"},
+			"page":    map[string]string{"id": "document", "url": "https://example.org/checkout"},
+			"view":    map[string]string{"name": "tok\x00en=hunter2"},
+			"app":     map[string]string{"version": "Bea\x00rer abcdef.ghi"},
+			"user":    map[string]string{"id": "tok\x00en=hunter2"},
+		},
+		"exceptions": []any{map[string]any{
+			"type":  "Error",
+			"value": "request failed tok\x00en=hunter2",
+			"stacktrace": map[string]any{
+				"frames": []any{
+					map[string]any{
+						"function": "Bea\x00rer abcdef.ghi",
+						"filename": "https://example.org/app.js",
+						"lineno":   1,
+						"colno":    2,
+					},
+				},
+			},
+		}},
+		"events": []any{map[string]any{"name": "Bea\x00rer abcdef.ghi"}},
+	})
+	require.NoError(t, err)
+	b, err := faro.Decode(raw, faro.Options{
+		Site: "s",
+		Now:  *now,
+	})
+	require.NoError(t, err)
+	a.Ingest(b)
+	require.Len(t, sink.events, 2)
+	context := HistoryEvent{
+		ExperienceID: "document",
+		View:         "token=[REDACTED]",
+		Site:         "s",
+		SessionID:    "session",
+		ObservedUS:   now.UnixMicro(),
+		Page:         "/checkout",
+		Device:       beacon.DeviceDesktop,
+		Version:      "[REDACTED]",
+		UserID:       "token=[REDACTED]",
+	}
+	errorEvent := context
+	errorEvent.Type = "error"
+	errorEvent.Text = "Error: request failed token=[REDACTED]"
+	errorEvent.Fingerprint = sink.events[0].Fingerprint // a hash of the normalized error, not under test
+	errorEvent.ErrorType = "Error"
+	errorEvent.Message = "request failed token=[REDACTED]"
+	errorEvent.SampleStack = "[REDACTED] (https://example.org/app.js:1:2)\n"
+	customEvent := context
+	customEvent.Type = "event"
+	customEvent.Text = "[REDACTED]"
+	assert.Equal(t, []HistoryEvent{errorEvent, customEvent}, sink.events)
 }

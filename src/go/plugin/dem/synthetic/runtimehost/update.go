@@ -9,23 +9,25 @@ import (
 	"sync"
 	"time"
 
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
-type UpdateStatus struct {
-	Checking      bool  `json:"checking"`
-	LastCheckUS   int64 `json:"last_check_us,omitempty"`
-	LastSuccessUS int64 `json:"last_success_us,omitempty"`
+type Qualifier interface {
+	Qualify(context.Context, runner.Source) (*runner.Qualification, error)
 }
 
 // Updater is a process service, independent of monitor configuration and storage
 // maintenance. It prepares selections; it never restarts or switches consumers.
 type Updater struct {
-	host      *Host
+	store     *browserruntime.Store
 	qualifier Qualifier
-	load      func(context.Context) (runtime.Release, error)
+	load      func(context.Context) (browserruntime.VerifiedRelease, error)
 	delay     func(bool) time.Duration
+	log       *logger.Logger
+	err       error // last completed check, owned by the checking goroutine
 	mu        sync.Mutex
 	started   bool
 	closed    bool
@@ -33,13 +35,33 @@ type Updater struct {
 	done      chan struct{}
 }
 
-func NewUpdater(host *Host, qualifier Qualifier, load func(context.Context) (runtime.Release, error)) *Updater {
-	return &Updater{host: host, qualifier: qualifier, load: load, done: make(chan struct{}), delay: func(initial bool) time.Duration {
-		if initial {
-			return time.Duration(rand.Int64N(int64(5 * time.Minute)))
-		}
-		return 23*time.Hour + time.Duration(rand.Int64N(int64(2*time.Hour)))
-	}}
+// NewUpdater attaches automatic release preparation to a managed host, at most
+// once. Check failures and recoveries are logged; Host.Close joins it before
+// releasing process protection. Hosts without a managed store return nil.
+func (h *Host) NewUpdater(
+	qualifier Qualifier,
+	load func(context.Context) (browserruntime.VerifiedRelease, error),
+) *Updater {
+	if h.store == nil {
+		return nil
+	}
+	u := &Updater{
+		store:     h.store,
+		qualifier: qualifier,
+		load:      load,
+		log:       h.log,
+		done:      make(chan struct{}),
+		delay: func(initial bool) time.Duration {
+			if initial {
+				return time.Duration(rand.Int64N(int64(5 * time.Minute)))
+			}
+			return 23*time.Hour + time.Duration(rand.Int64N(int64(2*time.Hour)))
+		},
+	}
+	h.mu.Lock()
+	h.updater = u
+	h.mu.Unlock()
+	return u
 }
 
 func (u *Updater) Run(ctx context.Context) {
@@ -68,34 +90,41 @@ func (u *Updater) Run(ctx context.Context) {
 	}
 }
 
+// check runs one update and logs a change of its outcome. A cancelled check
+// leaves the last completed outcome in place; only a later success clears it.
 func (u *Updater) check(ctx context.Context) error {
-	if u.host == nil || u.host.store == nil {
-		return nil
-	}
-	u.host.mu.Lock()
-	u.host.update.Checking = true
-	u.host.mu.Unlock()
-	discovered := false
-	_, err := PrepareRelease(ctx, u.host.store, runtime.ReleaseInstallOptions{Operation: runtime.AutomaticReleaseUpdate}, func(ctx context.Context) (runtime.Release, error) {
-		discovered = true
-		u.host.mu.Lock()
-		u.host.update.LastCheckUS = time.Now().UnixMicro()
-		u.host.mu.Unlock()
-		if u.load == nil {
-			return runtime.Release{}, errors.New("runtime release discovery is not configured")
-		}
-		return u.load(ctx)
-	}, "", u.qualifier)
-	u.host.mu.Lock()
-	u.host.update.Checking = false
-	if discovered && err == nil {
-		u.host.update.LastSuccessUS = time.Now().UnixMicro()
-	}
-	u.host.mu.Unlock()
+	err := u.prepare(ctx)
 	if ctx.Err() == nil {
-		u.host.setMaintenance("update", err)
+		change := trackHealth("update", u.err, err)
+		u.err = err
+		change.log(u.log)
 	}
 	return err
+}
+
+// prepare runs one complete managed transaction. Qualification uses the
+// process's existing execution owner. Without consent or a newer release no
+// candidate is begun.
+func (u *Updater) prepare(ctx context.Context) (result error) {
+	options := browserruntime.ReleaseInstallOptions{
+		Operation: browserruntime.AutomaticReleaseUpdate,
+	}
+	candidate, err := u.store.BeginPublishedInstall(ctx, options, u.load)
+	if err != nil || candidate == nil {
+		return err
+	}
+	defer func() {
+		if !errors.Is(result, ndexec.ErrTreeNotDrained) {
+			result = errors.Join(result, candidate.Close())
+		}
+	}()
+	if err := candidate.Download(ctx); err != nil {
+		return err
+	}
+	if _, err := u.qualifier.Qualify(ctx, Borrow(candidate)); err != nil {
+		return err
+	}
+	return candidate.Select()
 }
 
 // Close cancels acquisition and joins qualification before its caller closes

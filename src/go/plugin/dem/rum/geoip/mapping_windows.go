@@ -38,8 +38,11 @@ func mapFile(f *os.File, size int) (*mapping, error) {
 		_ = windows.CloseHandle(handle)
 		return nil, err
 	}
+	// The view is OS-mapped memory owned by this mapping, not Go heap, so its
+	// address is reinterpreted rather than converted from uintptr.
+	view := *(*unsafe.Pointer)(unsafe.Pointer(&address))
 	return &mapping{
-		data:    unsafe.Slice((*byte)(unsafe.Pointer(address)), size),
+		data:    unsafe.Slice((*byte)(view), size),
 		release: func() error { return errors.Join(windows.UnmapViewOfFile(address), windows.CloseHandle(handle)) },
 	}, nil
 }

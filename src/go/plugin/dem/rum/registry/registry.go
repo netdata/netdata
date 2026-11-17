@@ -9,20 +9,19 @@ import (
 	"errors"
 	"sync"
 
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/diagnostics"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 )
 
+// Site is one admitted site runtime. Its Route carries the immutable policy,
+// the site redactor and the last rejected origin.
 type Site struct {
-	Route       *httpapi.Route
-	Diagnostics *diagnostics.State
-	Aggregator  *aggregate.Aggregator
-	Generation  string
-	Redactor    *redact.Redactor
+	Route      *httpapi.Route
+	Aggregator *aggregate.Aggregator
+	Generation string
 }
+
 type Availability struct {
 	// Listen is the actual bound socket, never an advertised browser address.
 	Listen    string
@@ -30,30 +29,39 @@ type Availability struct {
 	PublicURL string
 	GeoIP     geoip.Status
 }
+
 type registration struct {
 	data   *Site
 	ctx    context.Context
 	cancel context.CancelFunc
 	users  sync.WaitGroup
 }
-type receiver struct{ availability Availability }
 
 type Registry struct {
-	mu           sync.Mutex
-	sites        map[string]*registration
-	receiver     *receiver
-	lastReceiver Availability
+	mu    sync.Mutex
+	sites map[string]*registration
+	// receiver fences updates to the serving receiver; nil when none serves.
+	receiver *ReceiverRegistration
+	// availability is the serving receiver's state, or the last one's after it
+	// stopped serving.
+	availability Availability
 }
 
 func New() *Registry {
 	return &Registry{
 		sites: map[string]*registration{},
-		lastReceiver: Availability{
-			GeoIP: geoip.Status{
-				State:  "unavailable",
-				Reason: "receiver_stopped",
-			},
+		availability: Availability{
+			GeoIP: stoppedGeoIP(""),
 		},
+	}
+}
+
+// stoppedGeoIP reports the lookup source as unavailable while no receiver serves.
+func stoppedGeoIP(selection string) geoip.Status {
+	return geoip.Status{
+		Selection: selection,
+		State:     geoip.StateUnavailable,
+		Reason:    "receiver_stopped",
 	}
 }
 
@@ -84,6 +92,7 @@ func (h *Registry) Register(key string, site *Site) (func(), error) {
 		entry.users.Wait()
 	}, nil
 }
+
 func (h *Registry) AcquireSite(key string) (*Site, context.Context, func(), bool) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -94,6 +103,7 @@ func (h *Registry) AcquireSite(key string) (*Site, context.Context, func(), bool
 	entry.users.Add(1)
 	return entry.data, entry.ctx, entry.users.Done, true
 }
+
 func (h *Registry) Acquire(key string) (*httpapi.Route, context.Context, func(), bool) {
 	data, ctx, release, ok := h.AcquireSite(key)
 	if !ok {
@@ -101,6 +111,7 @@ func (h *Registry) Acquire(key string) (*httpapi.Route, context.Context, func(),
 	}
 	return data.Route, ctx, release, true
 }
+
 func (h *Registry) Keys() []string {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -114,52 +125,43 @@ func (h *Registry) Keys() []string {
 // ReceiverRegistration fences diagnostic updates and retirement to one receiver.
 type ReceiverRegistration struct {
 	registry *Registry
-	entry    *receiver
 }
 
 func (h *Registry) PublishReceiver(state Availability) *ReceiverRegistration {
-	entry := &receiver{
-		availability: state,
+	r := &ReceiverRegistration{
+		registry: h,
 	}
 	h.mu.Lock()
-	h.receiver = entry
-	h.lastReceiver = state
+	h.receiver = r
+	h.availability = state
 	h.mu.Unlock()
-	return &ReceiverRegistration{
-		registry: h,
-		entry:    entry,
-	}
+	return r
 }
+
 func (r *ReceiverRegistration) SetGeoIP(status geoip.Status) {
 	h := r.registry
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.receiver == r.entry {
-		r.entry.availability.GeoIP = status
-		h.lastReceiver = r.entry.availability
+	if h.receiver == r {
+		h.availability.GeoIP = status
 	}
 }
+
 func (r *ReceiverRegistration) Close() {
 	h := r.registry
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.receiver == r.entry {
+	if h.receiver == r {
 		h.receiver = nil
-		h.lastReceiver.Serving = false
-		h.lastReceiver.GeoIP = geoip.Status{
-			Selection: h.lastReceiver.GeoIP.Selection,
-			State:     "unavailable",
-			Reason:    "receiver_stopped",
-		}
+		h.availability.Serving = false
+		h.availability.GeoIP = stoppedGeoIP(h.availability.GeoIP.Selection)
 	}
 }
+
 func (h *Registry) Availability() Availability {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	if h.receiver != nil {
-		return h.receiver.availability
-	}
-	return h.lastReceiver
+	return h.availability
 }
 
 // HasSites reports whether any runtime is currently admitted.

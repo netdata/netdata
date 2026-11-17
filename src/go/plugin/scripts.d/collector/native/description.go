@@ -31,7 +31,7 @@ var descriptionShape = strictjson.Optional(strictjson.Fields{
 // loadDescribedPackage runs a self-contained package's describe operation once
 // and validates its output.
 func loadDescribedPackage(ctx context.Context, command []string) (packageDefinition, error) {
-	data, err := runDescribe(ctx, command)
+	data, err := runDescribe(ctx, command, maxDescriptionBytes)
 	if err != nil {
 		return packageDefinition{}, err
 	}

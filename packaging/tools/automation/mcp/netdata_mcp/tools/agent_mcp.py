@@ -28,7 +28,7 @@ from .vendored import register_forwarding_tool
 # Per-hop ceiling for bearer minting: applied to each of the two sequential
 # HTTP hops (loopback /api/v3/info, then the Cloud round-trip), so the worst-case
 # wall time before the forwarded call is <=2x this. Bounds per-call overhead.
-# Deliberately independent of tools/otel_logs.py's own _MINT_TIMEOUT: that tool
+# Deliberately independent of tools/gated_function.py's _MINT_TIMEOUT: that path
 # clamps the mint to its user-supplied function timeout, whereas the wrapper has
 # no such knob, so it caps the mint on its own.
 _MINT_TIMEOUT = 15

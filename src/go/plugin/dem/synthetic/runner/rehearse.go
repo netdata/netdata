@@ -6,9 +6,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 )
 
@@ -19,64 +19,50 @@ func (e *Engine) Rehearse(ctx context.Context, request synthetic.Request) error 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	captures, err := artifacts.Open("")
+	view, finish, err := e.temporaryView(e.source)
 	if err != nil {
 		return fmt.Errorf("prepare rehearsal workspace: %w", err)
 	}
 	request.Capture = false
-	execution := e.unrecordedView(e.source, captures).Execute(ctx, request, nil)
+	request.Trace = false
+	return finish(rehearsalResult(ctx, view.execute(ctx, request)))
+}
+
+// rehearsalResult reports an undrained, cancelled or unsuccessful rehearsal.
+func rehearsalResult(ctx context.Context, execution synthetic.Execution) error {
 	if !execution.Drained {
 		// The shared fatal owner stops the process; uncertain live work must remain.
 		return ndexec.ErrTreeNotDrained
 	}
-	cleanupErr := captures.Close()
 	if err := ctx.Err(); err != nil {
-		return errors.Join(err, cleanupErr)
+		return err
 	}
-	if execution.Run.Outcome != synthetic.Success || execution.Run.Error != "" {
-		outcome := string(execution.Run.Outcome)
-		if execution.Run.TerminationReason != "" {
-			outcome += " (" + string(execution.Run.TerminationReason) + ")"
-		}
-		err := fmt.Errorf("rehearsal %s: %s", outcome, rehearsalFailureText(execution.Run))
-		if execution.Run.Outcome == synthetic.Timeout {
-			err = errors.Join(err, context.DeadlineExceeded)
-		}
-		return errors.Join(err, cleanupErr)
+	run := execution.Run
+	if run.Outcome == synthetic.Success && run.Error == "" {
+		return nil
 	}
-	return cleanupErr
+	outcome := string(run.Outcome)
+	if run.TerminationReason != "" {
+		outcome += " (" + string(run.TerminationReason) + ")"
+	}
+	err := fmt.Errorf("rehearsal %s: %s", outcome, rehearsalFailureText(run))
+	if run.Outcome == synthetic.Timeout {
+		err = errors.Join(err, context.DeadlineExceeded)
+	}
+	return err
 }
 
 // rehearsalFailureText preserves the core error and adds the same diagnostic
 // summaries shown in run history without assigning them outcome authority.
 func rehearsalFailureText(run synthetic.Run) string {
-	text := run.Error
-	if e := run.FailureEvidence; e != nil && e.FirstFailure != nil && e.FirstFailure.Message == text {
-		text = "" // The same core error is preserved in the contextual failure summary.
+	var lines []string
+	// The contextual first-failure summary already carries an identical core error.
+	if e := run.FailureEvidence; run.Error != "" &&
+		(e == nil || e.FirstFailure == nil || e.FirstFailure.Message != run.Error) {
+		lines = append(lines, run.Error)
 	}
-	if failure := run.FailureEvidence.FailureSummary(); failure != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "First unexpected failure: " + failure
+	for _, d := range run.Diagnostics() {
+		lines = append(lines, d.Label+": "+d.Text)
 	}
-	if step := run.FailureEvidence.LastObservedStepSummary(); step != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Last observed running step: " + step
-	}
-	if stop := run.FailureEvidence.StopSummary(); stop != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Pending before cleanup: " + stop
-	}
-	if summary := run.BrowserSummary.Summary(); summary != "" {
-		if text != "" {
-			text += "\n"
-		}
-		text += "Browser errors: " + summary
-	}
-	return text
+	return strings.Join(lines, "\n")
 }

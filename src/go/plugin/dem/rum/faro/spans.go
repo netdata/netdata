@@ -55,9 +55,6 @@ const (
 	maxSpanAttrs = 32
 )
 
-// urlAttrKeys hold URLs; they lose query and fragment like page URLs.
-var urlAttrKeys = map[string]bool{"url.full": true, "http.url": true, "url": true, "name": true}
-
 // parseSpans keeps well-formed spans, bounded and with URLs stripped, and
 // the first resource's service.name. Browser resource attributes (user
 // agent, brands, language) are dropped; the exporter sets its own.
@@ -91,11 +88,8 @@ func parseSpans(rs []otlpResourceSpans, opt Options) ([]beacon.Span, string) {
 					Attrs:         spanAttrs(sp.Attributes, opt),
 					StatusCode:    sp.Status.Code,
 					StatusMessage: opt.text(sp.Status.Message, maxAttrLen),
-					Scope: opt.text(
-						ss.Scope.Name,
-						maxNameLen,
-					),
-					ScopeVersion: opt.text(ss.Scope.Version, maxNameLen),
+					Scope:         opt.text(ss.Scope.Name, maxNameLen),
+					ScopeVersion:  opt.text(ss.Scope.Version, maxNameLen),
 				})
 			}
 		}
@@ -109,8 +103,8 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 		if len(out) >= maxSpanAttrs {
 			break
 		}
-		semanticKey := beacon.Clean(kv.Key, len(kv.Key))
-		key := opt.text(semanticKey, maxNameLen)
+		semanticKey := clean(kv.Key, len(kv.Key))
+		key := opt.text(kv.Key, maxNameLen)
 		if key == "" {
 			continue
 		}
@@ -142,20 +136,6 @@ func spanAttrs(kvs []otlpKV, opt Options) []beacon.SpanAttr {
 		}
 	}
 	return out
-}
-
-// cleanAttr applies field semantics before text bounds and shared ingestion.
-func (o Options) cleanAttr(key, value string) string {
-	switch {
-	case urlAttrKeys[key] && (key != "name" || strings.Contains(value, "://") || strings.HasPrefix(value, "/")):
-		return o.url(value, maxAttrLen)
-	case key == "target":
-		return o.selector(value)
-	case key == "fromView" || key == "toView":
-		return o.view(value)
-	default:
-		return o.text(value, maxAttrLen)
-	}
 }
 
 // hexID returns id lowercased when it is n hex digits and not all zero.

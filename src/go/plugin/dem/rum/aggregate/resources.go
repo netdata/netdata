@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package aggregate
 
 import (
@@ -15,10 +16,12 @@ type hostKey struct {
 	host    string
 	unknown bool
 }
+
 type resourcePopulation struct {
 	count  uint64
 	values []float64
 }
+
 type ResourceHostGroup struct {
 	Host     string
 	Other    bool
@@ -28,13 +31,10 @@ type ResourceHostGroup struct {
 }
 
 // isFirstParty reports whether resHost is the same registrable domain as
-// pageHost. publicsuffix is already a transitive
-// dependency (golang.org/x/net, via grpc) so no new module is added.
-// Hosts publicsuffix cannot classify (bare IPs, "localhost") fall back to
-// an exact host match, which is the strictest possible definition of
-// "same site" for those inputs. Faro's httpHost carries a non-default
-// port ("www.example.com:8443") while pageHost never does, so ports are
-// ignored: the registrable domain decides, as for cookies.
+// pageHost. Hosts publicsuffix cannot classify (bare IPs, "localhost") fall back
+// to an exact host match, the strictest "same site" for those inputs. Faro's
+// httpHost carries a non-default port ("www.example.com:8443") while pageHost
+// never does, so ports are ignored: the registrable domain decides, as for cookies.
 func isFirstParty(pageHost, resHost string) bool {
 	if pageHost == "" || resHost == "" {
 		return false
@@ -83,6 +83,7 @@ func (r *windowRead) addResource(v *activityObservation) {
 		r.api = append(r.api, resource.DurationMS)
 	}
 }
+
 func (r *windowRead) rankResourceHosts() []ResourceHostGroup {
 	var keys []hostKey
 	for key := range r.resourceGroups {

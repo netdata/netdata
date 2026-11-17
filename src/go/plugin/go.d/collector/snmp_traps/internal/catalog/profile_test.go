@@ -2666,65 +2666,61 @@ func TestStockProfileCatalogueMatchesDefaultFiles(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, entries)
 
+	vendorsByFile := make(map[string][]string, len(catalogue))
+	for vendor, entry := range catalogue {
+		require.NotEmpty(t, entry.File, "catalogue entry %q has no file", vendor)
+		vendorsByFile[entry.File] = append(vendorsByFile[entry.File], vendor)
+	}
+
 	routesByFile := make(map[string]profileTrapRoutes, len(entries))
-	totalFiles := 0
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || !isProfileFileName(name) || strings.HasPrefix(name, "_") {
+	totalFiles, totalTraps := 0, 0
+	// Parse every physical file once, including files missing from the catalogue.
+	// Keep the line scanner and byte digest independent of the production parser.
+	for _, file := range entries {
+		name := file.Name()
+		if file.IsDir() || !isProfileFileName(name) || strings.HasPrefix(name, "_") {
 			continue
 		}
 		require.False(t, strings.HasSuffix(name, ".zst"), "stock profiles must stay uncompressed in the repository")
 		require.False(t, strings.HasSuffix(name, ".gz"), "stock profiles must stay uncompressed in the repository")
-		routes := profileTrapRoutesFromFile(t, filepath.Join(stockDir, name))
+		path := filepath.Join(stockDir, name)
+		routes := profileTrapRoutesFromFile(t, path)
 		routesByFile[name] = routes
 		totalFiles += len(routes.oids)
+
+		bundle, err := loadProfileBundle(path)
+		require.NoError(t, err, "stock profile %s", name)
+		require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", name)
+		totalTraps += len(bundle.traps)
+		profileData, err := os.ReadFile(path)
+		require.NoError(t, err)
+		for _, vendor := range vendorsByFile[name] {
+			entry := catalogue[vendor]
+			assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(profileData)), entry.SHA256,
+				"catalogue sha256 mismatch for %s", name)
+			assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", name)
+			assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", name)
+			expected := stockProfileRoutes{
+				trapOIDs:        append([]string(nil), entry.TrapOIDs...),
+				mibs:            append([]string(nil), entry.MIBs...),
+				metricRuleNames: append([]string(nil), entry.MetricRuleNames...),
+			}
+			slices.Sort(expected.trapOIDs)
+			slices.Sort(expected.mibs)
+			slices.Sort(expected.metricRuleNames)
+			require.NoError(t, validateStockProfileRoutes(vendor, expected, bundle), "stock profile %s", name)
+		}
 	}
+	require.Positive(t, totalTraps)
 	require.Len(t, routesByFile, len(catalogue), "catalogue and default profile file count must match")
 
 	totalCatalogue := 0
 	for vendor, entry := range catalogue {
-		require.NotEmpty(t, entry.File, "catalogue entry %q has no file", vendor)
-		routes, ok := routesByFile[entry.File]
+		_, ok := routesByFile[entry.File]
 		require.True(t, ok, "catalogue entry %q references missing profile file %q", vendor, entry.File)
-		profileData, err := os.ReadFile(filepath.Join(stockDir, entry.File))
-		require.NoError(t, err)
-		assert.Equal(t, fmt.Sprintf("%x", sha256.Sum256(profileData)), entry.SHA256,
-			"catalogue sha256 mismatch for %s", entry.File)
-		assert.Equal(t, entry.TrapCount, len(routes.oids), "catalogue trap_count mismatch for %s", entry.File)
-		assert.Equal(t, routes.oids, entry.TrapOIDs, "catalogue trap_oids mismatch for %s", entry.File)
-		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.File))
-		require.NoError(t, err, "stock profile %s", entry.File)
-		expected := stockProfileRoutes{
-			trapOIDs:        append([]string(nil), entry.TrapOIDs...),
-			mibs:            append([]string(nil), entry.MIBs...),
-			metricRuleNames: append([]string(nil), entry.MetricRuleNames...),
-		}
-		slices.Sort(expected.trapOIDs)
-		slices.Sort(expected.mibs)
-		slices.Sort(expected.metricRuleNames)
-		require.NoError(t, validateStockProfileRoutes(vendor, expected, bundle), "stock profile %s", entry.File)
 		totalCatalogue += entry.TrapCount
 	}
 	assert.Equal(t, totalFiles, totalCatalogue, "catalogue trap_count sum must match profile files")
-}
-
-func TestStockProfileDefaultFilesParse(t *testing.T) {
-	stockDir := testStockProfilesDir(t)
-	entries, err := os.ReadDir(stockDir)
-	require.NoError(t, err)
-	require.NotEmpty(t, entries)
-
-	totalTraps := 0
-	for _, entry := range entries {
-		if entry.IsDir() || !isProfileFileName(entry.Name()) || strings.HasPrefix(entry.Name(), "_") {
-			continue
-		}
-		bundle, err := loadProfileBundle(filepath.Join(stockDir, entry.Name()))
-		require.NoError(t, err, "stock profile %s", entry.Name())
-		require.NotEmpty(t, bundle.traps, "stock profile %s parsed without traps", entry.Name())
-		totalTraps += len(bundle.traps)
-	}
-	require.Positive(t, totalTraps)
 }
 
 func testStockProfilesDir(t *testing.T) string {

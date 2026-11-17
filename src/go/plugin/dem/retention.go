@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package dem
 
 import (
@@ -7,7 +8,6 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
 )
 
@@ -20,13 +20,13 @@ type artifactRetention interface {
 }
 
 // Retention is process-owned so disabling every collector cannot stop history
-// expiry. It never releases the store: jobs retire after process services join.
+// expiry. It never releases the stores: jobs retire after process services join.
 type Retention struct {
-	store          historyRetention
-	policy         RetentionConfig
-	artifactStore  artifactRetention
+	history        historyRetention
+	historyPolicy  RetentionConfig
+	artifacts      artifactRetention
 	artifactPolicy RetentionConfig
-	loadConfig     func() (Config, error)
+	reloadConfig   func() (Config, error)
 	log            *logger.Logger
 	policyErrorMu  sync.RWMutex
 	policyError    string
@@ -38,12 +38,12 @@ func (r *Retention) Run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		historyPolicy, artifactPolicy := r.policy, r.artifactPolicy
+		historyPolicy, artifactPolicy := r.historyPolicy, r.artifactPolicy
 		r.reloadPolicy()
 		now := time.Now()
-		if !now.Before(historyDue) || r.policy != historyPolicy {
+		if !now.Before(historyDue) || r.historyPolicy != historyPolicy {
 			delay := time.Hour
-			if err := r.store.EnforceHistoryRetention(ctx, r.policy.Days, r.policy.MaxBytes); err != nil &&
+			if err := r.history.EnforceHistoryRetention(ctx, r.historyPolicy.Days, r.historyPolicy.MaxBytes); err != nil &&
 				ctx.Err() == nil {
 				r.log.Warningf("DEM history retention failed: %v", err)
 				// Retry cleanup promptly; healthy appends remain independent.
@@ -51,9 +51,9 @@ func (r *Retention) Run(ctx context.Context) {
 			}
 			historyDue = time.Now().Add(delay)
 		}
-		if r.artifactStore != nil && (!now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy) {
+		if !now.Before(artifactsDue) || r.artifactPolicy != artifactPolicy {
 			delay := time.Hour
-			_, err := r.artifactStore.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
+			_, err := r.artifacts.Enforce(ctx, r.artifactPolicy.Days, r.artifactPolicy.MaxBytes)
 			if err != nil && ctx.Err() == nil {
 				r.log.Warningf("DEM artifact retention failed: %v", err)
 				delay = 5 * time.Second
@@ -61,7 +61,7 @@ func (r *Retention) Run(ctx context.Context) {
 			artifactsDue = time.Now().Add(delay)
 		}
 		next := historyDue
-		if r.artifactStore != nil && artifactsDue.Before(next) {
+		if artifactsDue.Before(next) {
 			next = artifactsDue
 		}
 		timer := time.NewTimer(time.Until(next))
@@ -74,19 +74,14 @@ func (r *Retention) Run(ctx context.Context) {
 	}
 }
 
-// reloadPolicy runs on the retention goroutine before each sweep. Invalid
-// edits leave the last validated policy in force; there is no config watcher.
+// reloadPolicy runs on the retention goroutine before each sweep. ReloadConfig
+// returns validated configuration (LoadConfig); a failed load leaves the last
+// policy in force. There is no config watcher.
 func (r *Retention) reloadPolicy() {
-	if r.loadConfig == nil {
+	if r.reloadConfig == nil {
 		return
 	}
-	cfg, err := r.loadConfig()
-	if err == nil {
-		err = cfg.History.validate(journal.MinHistoryBytes)
-		if err == nil {
-			err = cfg.Artifacts.validate(1)
-		}
-	}
+	cfg, err := r.reloadConfig()
 	r.policyErrorMu.Lock()
 	r.policyError = ""
 	if err != nil {
@@ -97,7 +92,7 @@ func (r *Retention) reloadPolicy() {
 		r.log.Warningf("reloading DEM retention policies failed; retaining previous policy: %v", err)
 		return
 	}
-	r.policy = cfg.History
+	r.historyPolicy = cfg.History
 	r.artifactPolicy = cfg.Artifacts
 }
 

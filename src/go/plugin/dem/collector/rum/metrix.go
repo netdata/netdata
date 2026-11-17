@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
@@ -7,17 +8,21 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/otlp"
 )
 
 type counterMetric struct {
 	name       string
 	instrument metrix.SnapshotCounter
 }
+
 type percentileMetrics struct{ p50, p75, p95, observations metrix.SnapshotGauge }
 type vitalMetrics struct {
 	percentileMetrics
 	good, needsImprovement, poor metrix.SnapshotGauge
 }
+
 type collectorMetrics struct {
 	meter                                                                         metrix.SnapshotMeter
 	ingress                                                                       metrix.StateSetInstrument
@@ -30,8 +35,12 @@ type collectorMetrics struct {
 
 func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignals bool) collectorMetrics {
 	metrics := collectorMetrics{
-		meter:                  m,
-		ingress:                m.StateSet("ingress_state", metrix.WithStateSetStates("available", "unavailable"), metrix.WithStateSetMode(metrix.ModeEnum)),
+		meter: m,
+		ingress: m.StateSet(
+			"ingress_state",
+			metrix.WithStateSetStates("available", "unavailable"),
+			metrix.WithStateSetMode(metrix.ModeEnum),
+		),
 		observedSessions:       m.Gauge("observed_sessions"),
 		windowDocumentViews:    m.Gauge("window_document_views"),
 		windowApplicationViews: m.Gauge("window_application_views"),
@@ -44,12 +53,12 @@ func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignal
 		crossSiteResources:     m.Counter("resources_cross_site"),
 		unknownResources:       m.Counter("resources_unknown"),
 	}
-	diagnostics := []string{aggregate.CounterHistoryWritten, aggregate.CounterHistoryDropped}
+	diagnostics := []string{history.CounterWritten, history.CounterDropped}
 	if logs {
-		diagnostics = append(diagnostics, aggregate.CounterOTLPSent, aggregate.CounterOTLPDropped, aggregate.CounterOTLPErrors)
+		diagnostics = append(diagnostics, otlp.CounterLogsSent, otlp.CounterLogsDropped, otlp.CounterLogsErrors)
 	}
 	if traces {
-		diagnostics = append(diagnostics, aggregate.CounterSpansSent, aggregate.CounterSpansDropped, aggregate.CounterSpansErrors)
+		diagnostics = append(diagnostics, otlp.CounterSpansSent, otlp.CounterSpansDropped, otlp.CounterSpansErrors)
 	}
 	for _, name := range diagnostics {
 		metrics.diagnostics = append(metrics.diagnostics, counterMetric{
@@ -57,9 +66,25 @@ func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignal
 			instrument: m.Counter(name),
 		})
 	}
-	traffic := []string{aggregate.CounterPageviews, aggregate.CounterApplicationViews, aggregate.CounterJSErrors, aggregate.CounterAccepted, beacon.RejectOrigin, beacon.RejectRate, beacon.RejectSize, beacon.RejectInvalid, beacon.RejectBot, aggregate.CounterInvalidMeasurements}
+	traffic := []string{
+		aggregate.CounterPageviews,
+		aggregate.CounterApplicationViews,
+		aggregate.CounterJSErrors,
+		aggregate.CounterAccepted,
+		beacon.RejectOrigin,
+		beacon.RejectRate,
+		beacon.RejectSize,
+		beacon.RejectInvalid,
+		beacon.RejectBot,
+		aggregate.CounterInvalidMeasurements,
+	}
 	if frustrationSignals {
-		traffic = append(traffic, aggregate.CounterRageClicks, aggregate.CounterDeadClicks, aggregate.CounterErrorClicks)
+		traffic = append(
+			traffic,
+			aggregate.CounterRageClicks,
+			aggregate.CounterDeadClicks,
+			aggregate.CounterErrorClicks,
+		)
 	}
 	for _, name := range traffic {
 		metrics.traffic = append(metrics.traffic, counterMetric{
@@ -78,6 +103,7 @@ func newCollectorMetrics(m metrix.SnapshotMeter, logs, traces, frustrationSignal
 	}
 	return metrics
 }
+
 func newPercentileMetrics(m metrix.SnapshotMeter, name string) percentileMetrics {
 	return percentileMetrics{
 		p50:          m.Gauge(name+"_p50", metrix.WithFloat(true)),
@@ -86,6 +112,7 @@ func newPercentileMetrics(m metrix.SnapshotMeter, name string) percentileMetrics
 		observations: m.Gauge(name + "_observations"),
 	}
 }
+
 func (m percentileMetrics) observe(st aggregate.VitalStats) {
 	m.observations.Observe(float64(st.N))
 	if st.N == 0 {

@@ -322,9 +322,13 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
         0,
         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
-    health_alarm_log_add_entry(host, ae, true);
-    health_log_alert(host, ae);
-    rrdcalc_runtime_snapshot_publish(rc, ae->global_id, &ae->transition_id);
+    // set when the entry is created; ae must not be used after health_alarm_log_add_entry()
+    usec_t global_id = ae->global_id;
+    nd_uuid_t transition_id;
+    uuid_copy(transition_id, ae->transition_id);
+
+    health_alarm_log_add_entry(host, ae);
+    rrdcalc_runtime_snapshot_publish(rc, global_id, &transition_id);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
@@ -349,8 +353,7 @@ static void rrdcalc_unlink_from_rrdset(RRDCALC *rc, bool having_ll_wrlock) {
                     0,
                     0);
 
-            health_alarm_log_add_entry(host, ae, true);
-            health_log_alert(host, ae);
+            health_alarm_log_add_entry(host, ae);
         }
     }
 

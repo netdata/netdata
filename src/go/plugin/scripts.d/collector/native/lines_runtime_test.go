@@ -21,11 +21,16 @@ import (
 )
 
 func linesCollector(t *testing.T, mode, body string) (*Collector, string) {
+	return linesCollectorWithLimit(t, mode, body, maxMessageBytes)
+}
+
+func linesCollectorWithLimit(t *testing.T, mode, body string, limit int) (*Collector, string) {
 	t.Helper()
 	dir := t.TempDir()
 	script := filepath.Join(dir, "collect.sh")
 	require.NoError(t, os.WriteFile(script, []byte("#!/bin/bash\nset -eu\n"+body), 0755))
 	c := New()
+	c.messageLimit = limit
 	c.validateExecutable = statExecutable
 	c.Command = []string{script}
 	c.Mode = confopt.Enum[jobModeSpec](mode)
@@ -143,7 +148,7 @@ func TestLines_PersistentWireLimit(t *testing.T) {
 		{name: "exact"}, {name: "terminator pushes over", extra: 1}, {name: "crlf pushes over", extra: 1, crlf: true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c, dir := linesCollector(t, modePersistent, fmt.Sprintf("exec %q \"$(dirname \"$0\")/peer.py\"\n", python))
+			c, dir := linesCollectorWithLimit(t, modePersistent, fmt.Sprintf("exec %q \"$(dirname \"$0\")/peer.py\"\n", python), testMessageLimit)
 			ending := `b"\n"`
 			if tc.crlf {
 				ending = `b"\r\n"`
@@ -158,7 +163,7 @@ for size in [%d, %d-len(term)]:
 sys.stdout.buffer.write(term)
 sys.stdout.buffer.flush()
 sys.stdin.readline()
-`, ending, maxMessageBytes/2, maxMessageBytes/2+tc.extra)
+`, ending, testMessageLimit/2, testMessageLimit/2+tc.extra)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "peer.py"), []byte(peer), 0644))
 			c.Timeout = confopt.Duration(15 * time.Second)
 			r := startRuntime(t, c)

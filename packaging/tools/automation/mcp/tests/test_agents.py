@@ -19,23 +19,20 @@ def test_declare_registers_and_get_returns_it():
 
 def test_set_otel_stores_config_and_unknown_returns_none():
     reg = AgentRegistry()
-    assert reg.set_otel("missing", OtelConfig(logs_rotation_max_entries=5)) is None
+    assert reg.set_otel("missing", OtelConfig(extra_yaml="x: 1\n")) is None
     reg.declare("a", "/wt", "debug")
-    spec = reg.set_otel(
-        "a", OtelConfig(logs_rotation_max_entries=5, logs_retention_max_files=2)
-    )
-    assert spec is not None
-    assert spec.otel.logs_rotation_max_entries == 5
-    assert spec.otel.logs_retention_max_files == 2
-    assert reg.get("a").otel.logs_rotation_max_entries == 5
+    cfg = OtelConfig(extra_yaml="auth: {enabled: true}\n")
+    spec = reg.set_otel("a", cfg)
+    assert spec is not None and spec.otel == cfg
+    assert reg.get("a").otel == cfg
 
 
 def test_re_declare_preserves_otel_config():
     reg = AgentRegistry()
     reg.declare("a", "/wt", "debug")
-    reg.set_otel("a", OtelConfig(logs_rotation_max_entries=10))
+    reg.set_otel("a", OtelConfig(extra_yaml="x: 2\n"))
     reg.declare("a", "/wt2", "optimized")  # idempotent update of worktree/profile
-    assert reg.get("a").otel.logs_rotation_max_entries == 10  # otel survived
+    assert reg.get("a").otel == OtelConfig(extra_yaml="x: 2\n")  # otel survived
 
 
 def test_declare_is_idempotent_and_updates_spec():

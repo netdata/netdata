@@ -4,6 +4,8 @@ const { FEATURE } = require("./failure-evidence.cjs");
 const { FEATURE: BROWSER_SUMMARY } = require("./browser-summary.cjs");
 const { FEATURE: CAPTURE_DETAILS } = require("./capture-details.cjs");
 
+const FAILURE_TRACE = "failure_trace.v1";
+
 function selection(request) {
   if (
     !Array.isArray(request.extensions) ||
@@ -13,10 +15,11 @@ function selection(request) {
   )
     return undefined;
   return request.kind === "journey"
-    ? [FEATURE, BROWSER_SUMMARY, CAPTURE_DETAILS].filter(
+    ? [FEATURE, BROWSER_SUMMARY, CAPTURE_DETAILS, FAILURE_TRACE].filter(
         (feature) =>
           request.extensions.includes(feature) &&
-          (feature !== CAPTURE_DETAILS || request.capture),
+          (![CAPTURE_DETAILS, FAILURE_TRACE].includes(feature) ||
+            request.capture),
       )
     : [];
 }
@@ -44,4 +47,4 @@ function optional(record, selected, terminal) {
   }
   return true;
 }
-module.exports = { selection, family, optional };
+module.exports = { selection, family, optional, FAILURE_TRACE };

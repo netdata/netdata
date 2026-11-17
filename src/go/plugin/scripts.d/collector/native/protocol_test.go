@@ -155,7 +155,7 @@ func TestEncodeFunctionRequest(t *testing.T) {
 		Permissions: "0xFFFF",
 		Source:      "synthetic",
 	}
-	frame, err := encodeFunctionRequest(ctx, "7", request)
+	frame, err := encodeFunctionRequest(ctx, "7", request, maxMessageBytes)
 	require.NoError(t, err)
 	require.True(t, strings.HasSuffix(string(frame), "}\n"))
 	type encodedRequest struct {
@@ -189,18 +189,38 @@ func TestEncodeFunctionRequest(t *testing.T) {
 
 // The limit covers the complete encoded frame, including the terminating LF.
 func TestEncodeFunctionRequest_SizeLimit(t *testing.T) {
+	const limit = 1024
 	ctx := context.Background()
 	request := funcapi.RawMethodRequest{
 		Method: "items",
 		Args:   []string{""},
 	}
-	frame, err := encodeFunctionRequest(ctx, "7", request)
+	frame, err := encodeFunctionRequest(ctx, "7", request, limit)
 	require.NoError(t, err)
-	request.Args[0] = strings.Repeat("x", maxMessageBytes-len(frame))
-	frame, err = encodeFunctionRequest(ctx, "7", request)
+	request.Args[0] = strings.Repeat("x", limit-len(frame))
+	frame, err = encodeFunctionRequest(ctx, "7", request, limit)
 	require.NoError(t, err)
-	assert.Len(t, frame, maxMessageBytes)
+	assert.Len(t, frame, limit)
 	request.Args[0] += "x"
-	_, err = encodeFunctionRequest(ctx, "7", request)
+	_, err = encodeFunctionRequest(ctx, "7", request, limit)
 	require.ErrorContains(t, err, "exceeds 64 MiB")
+}
+
+func TestEncodeFunctionRequest_EncodedLimit(t *testing.T) {
+	const limit = 1024
+	for name, request := range map[string]funcapi.RawMethodRequest{
+		"escaped arguments": {
+			Method: "items",
+			Args:   []string{strings.Repeat("\n", limit/2)},
+		},
+		"base64 payload": {
+			Method:  "items",
+			Payload: make([]byte, limit*3/4),
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := encodeFunctionRequest(context.Background(), "7", request, limit)
+			require.ErrorContains(t, err, "exceeds 64 MiB")
+		})
+	}
 }

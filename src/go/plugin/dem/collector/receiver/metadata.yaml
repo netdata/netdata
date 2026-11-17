@@ -1,172 +1,331 @@
-modules:
-    - meta:
-        id: collector-dem.plugin-receiver
-        info_provided_to_referring_integrations:
-            description: ""
-        keywords:
-            - rum
-            - browser
-            - web-vitals
-            - dem
-        module_name: receiver
-        monitored_instance:
-            categories:
-                - data-collection.applications
-            icon_filename: netdata.png
-            link: https://www.netdata.cloud/
-            name: RUM Receiver
-        plugin_name: dem.plugin
-        related_resources:
-            integrations:
-                list: []
-      metrics:
-        availability: []
-        description: The availability state distinguishes an unavailable receiver from measured request outcomes.
-        folding:
-            enabled: false
-            title: Metrics
-        scopes:
-            - description: One configured receiver; breakdowns appear when matching observations are available.
-              labels: []
-              metrics:
-                - chart_type: stacked
-                  description: RUM receiver availability
-                  dimensions:
-                    - name: serving
-                    - name: unavailable
-                  name: dem_receiver.state
-                  unit: state
-                - chart_type: stacked
-                  description: RUM HTTP requests
-                  dimensions:
-                    - name: success
-                    - name: client_errors
-                    - name: server_errors
-                  name: dem_receiver.requests
-                  unit: requests/s
-              name: receiver
-      overview:
-        additional_permissions:
-            description: The Netdata service needs write access to its DEM state directory. Configured TLS and GeoIP files must be readable by the Netdata service account.
-        data_collection:
-            method_description: Netdata accepts browser telemetry over HTTP or HTTPS and routes each request to its configured site. One receiver serves all sites; a receiver outage creates measurement gaps while site jobs remain available.
-            metrics_description: Monitor the availability and HTTP request outcomes of the browser telemetry receiver.
-        default_behavior:
-            auto_detection:
-                description: The stock receiver starts on loopback. Sites require explicit configuration.
-            limits:
-                description: Browser payloads and request rates are limited by receiver settings.
-            performance_impact:
-                description: Resource usage depends on accepted browser traffic and the configured measurement window. Optional OTLP export and investigation history add network and local disk work.
-        multi_instance: false
-        supported_platforms:
-            exclude: []
-            include:
-                - Linux
-                - macOS
-      setup:
-        configuration:
-            examples:
-                folding:
-                    enabled: true
-                    title: Examples
-                list:
-                    - config: |
-                        jobs:
-                          - name: receiver
-                            listen: 127.0.0.1:19938
-                      description: Minimal native configuration.
-                      name: Local receiver
-            file:
-                name: dem/receiver.conf
-            options:
-                description: Options apply to the canonical receiver.
-                folding:
-                    enabled: true
-                    title: Configuration options
-                list:
-                    - default_value: 127.0.0.1:19938
-                      description: Address and port that accept browser telemetry. The default accepts connections from this host only.
-                      group: Connection
-                      name: listen
-                      required: false
-                    - default_value: ""
-                      description: Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered.
-                      group: Connection
-                      name: public_url
-                      required: false
-                    - default_value: ""
-                      description: Server certificate file. Leave empty with TLS key to serve HTTP.
-                      group: Connection
-                      name: tls_cert
-                      required: false
-                    - default_value: ""
-                      description: Server private key file. Set together with TLS certificate to serve HTTPS.
-                      group: Connection
-                      name: tls_key
-                      required: false
-                    - default_value: ""
-                      description: Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers.
-                      group: Connection
-                      name: trusted_proxies
-                      required: false
-                    - default_value: 262144
-                      description: Maximum accepted browser payload size, in bytes. Larger requests are rejected.
-                      group: Limits
-                      name: max_body_bytes
-                      required: false
-                    - default_value: ""
-                      description: Limits for browser telemetry requests.
-                      group: Limits
-                      name: rate_limit
-                      required: false
-                    - default_value: 120
-                      description: Maximum requests per client IP per minute.
-                      group: Limits
-                      name: rate_limit.per_ip_per_min
-                      required: false
-                    - default_value: 500
-                      description: Maximum requests per site per second.
-                      group: Limits
-                      name: rate_limit.per_site_per_sec
-                      required: false
-                    - default_value: 10
-                      description: Data collection interval, in seconds.
-                      group: Collection
-                      name: update_every
-                      required: false
-                    - default_value: ""
-                      description: Geographic MMDB file; an explicit path uses only that file. Leave empty to try the Agent cache and then stock IP intelligence database; unavailable geography does not stop collection.
-                      group: Collection
-                      detailed_description: |
-                        With an empty path, DEM tries `topology-ip-intel/topology-ip-geo.mmdb` under the Agent cache directory, then under its stock data directory. A rejected cache file does not hide an accepted stock file. An explicit path disables this automatic fallback. Sources are checked when the receiver starts and every 60 seconds, so a later provision or atomic replacement is adopted without restarting the receiver.
-                      name: geoip_db
-                      required: false
-        prerequisites:
-            list:
-                - description: Linux builds include DEM by default. Native installations include the `netdata-plugin-dem` package. RUM does not require the optional browser runtime.
-                  title: Install the DEM plugin
-                - description: Expose the listener through an HTTPS reverse proxy before sending traffic from remote websites. Set `public_url` and restrict `trusted_proxies` to that proxy. The default listener is local to this host.
-                  title: Expose the receiver
-                - description: |
-                    Geography is optional. Provision an MMDB readable by the Netdata service account through Agent packaging, the topology IP intelligence downloader, or your own database update process. Some installations package these files with NetFlow; they are not present in every installation, and DEM does not require a running NetFlow plugin or download databases itself.
-
-                    Supported database types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`, `GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`. ASN and other database types are rejected. A country database supplies countries without city coordinates; an accepted type does not guarantee coverage for an address.
-
-                    Publish updates by writing a separate complete file and atomically renaming it over the destination. Do not truncate or overwrite the active file: atomic replacement is required for consistent lookups. Check `collector.geoip` in `rum-sites` after provisioning.
-                  title: Provision optional geography data
-        single_job: true
-      troubleshooting:
-        problems:
-            list:
-                - description: Check the serving state in `rum-sites`, the configured public URL and the site allowed origins. In the website browser, follow the script and SDK requests through the collect POST. Last accepted payload and rejected-origin timestamps are observations; silence alone does not prove failure.
-                  name: No browser measurements
-        errors:
-            list:
-                - error: Missing or unexpected geography
-                  cause: A site's capture policy can disable geography or limit it to country. The selected database may be unavailable, lack a matching address or field, or contain a record that cannot be decoded.
-                  fix: |
-                    Check the site's `capture.geolocation` and `collector.geoip` in `rum-sites`. `loaded` means a supported declared database type and available reader, not full record validation, freshness, accuracy or coverage. `using_previous` means current candidates failed and a previous usable snapshot remains; confirmed source removal revokes it. `unavailable` does not stop browser collection.
-
-                    Use `reason` and the local Agent logs to identify source failures. Make a supported MMDB readable by the Netdata service account, then publish it by atomic rename. A snapshot with a detected mapped-memory fault is never reused. `lookup_errors` counts errors for the active source generation, not unmatched addresses or missing fields. Refresh and fault changes are published by the receiver worker; lookup counts update at the receiver collection interval.
 plugin_name: dem.plugin
+modules:
+  - meta:
+      id: collector-dem.plugin-receiver
+      plugin_name: dem.plugin
+      module_name: receiver
+      monitored_instance:
+        name: RUM Receiver
+        link: https://www.netdata.cloud/
+        icon_filename: netdata.png
+        categories:
+          - data-collection.applications
+      keywords:
+        - rum receiver
+        - rum
+        - real user monitoring
+        - beacon
+        - faro
+        - browser telemetry
+        - dem
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: dem.plugin
+              module_name: rum
+      info_provided_to_referring_integrations:
+        description: Shows whether the endpoint that receives browser reports is serving, and how its requests end.
+    overview:
+      data_collection:
+        metrics_description: |
+          Monitor the endpoint that receives browser reports for Real User Monitoring: whether it serves and how its
+          requests end.
+
+          The RUM receiver is the HTTP listener that websites load the RUM script from and send their visitors' reports
+          to. One receiver serves every RUM site on the Agent, and its charts show:
+
+          - Whether the receiver is serving.
+          - Requests per second that succeed, are refused (client errors, such as a refused origin, a rate limit or an
+            unknown site) or fail on the server side.
+        method_description: |
+          The receiver starts with the DEM plugin and listens on `127.0.0.1:19938` by default, so only this host can
+          reach it. To accept reports from visitors, put an HTTPS reverse proxy in front of it, or give it a TLS
+          certificate and a public address. It serves the RUM script and the [Grafana Faro](https://grafana.com/oss/faro/)
+          Web SDK under `/rum/`, accepts each site's reports at `/rum/` followed by the site key and `/collect`, and
+          contacts no external service.
+
+          The visitor's IP address is taken from the connection, or from the `X-Forwarded-For` or `X-Real-IP` header
+          when the connection comes from a trusted proxy. It is used for the rate limits and to look up the visitor's
+          location in a local database, and is not stored.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: |
+          | Permission | Needed when |
+          |:--|:--|
+          | The Netdata service account (usually `netdata`) can read `tls_cert` and `tls_key`. | The receiver serves HTTPS itself. |
+          | The Netdata service account can read the location database. | `geoip_db` is set, or the Agent provides a database. |
+      default_behavior:
+        auto_detection:
+          description: |
+            The receiver starts with the stock `dem/receiver.conf`, listening on `127.0.0.1:19938`. It receives nothing
+            until a RUM site is configured and its script is on a website.
+        limits:
+          description: |
+            - One receiver serves every RUM site on the Agent, and its settings apply to all of them.
+            - Each visitor IP address can send 120 requests per minute and each site 500 per second (`rate_limit`);
+              requests beyond that get HTTP 429.
+            - Reports larger than 256 KiB get HTTP 413 (`max_body_bytes`).
+            - Visitors arriving from loopback or private addresses get no location.
+        performance_impact:
+          description: |
+            The receiver parses and decodes every report, so its CPU use grows with the number of reports per second. In
+            Netdata's tests, receiving 1,000 reports per second took about a quarter of a CPU core. On busy websites,
+            lower `measure_sample_rate` in the RUM site jobs to receive fewer reports.
+    setup:
+      prerequisites:
+        list:
+          - title: Make the receiver reachable over HTTPS
+            description: |
+              Visitors' browsers must reach the receiver at a public HTTPS address; browsers do not let HTTPS pages send
+              reports to plain HTTP. The usual setup keeps the default `listen` and adds the `/rum/` path to an HTTPS
+              reverse proxy on the same host. For NGINX:
+
+              ```nginx
+              location /rum/ {
+                  proxy_pass http://127.0.0.1:19938;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+              ```
+
+              Forward every path under `/rum/`, not only the script. Then set `public_url` to the proxy's public
+              address and `trusted_proxies` to the address the proxy connects from (see the first example).
+
+              If several Agents answer for the same public address, run the same Agent version on all of them: a page
+              loads its SDK files from whichever server answers, and each must serve the files its script refers to.
+
+              To check the route, open `https://rum.example.org/rum/ping` in a browser; it only shows that this browser
+              reaches the receiver. `/rum/demo?key=SITE` serves a test page with a site's script. Neither proves that
+              your website loads the script.
+          - title: Optional - provide a location database
+            description: |
+              Countries and cities come from a local MMDB database. The receiver reads the file in `geoip_db` when it is
+              set, and otherwise the database the Agent provides, if there is one. Without a database, reports are still
+              collected, without location.
+              Supported types are `Netdata-Topology-GEO`, `GeoLite2-City`, `GeoLite2-Country`, `GeoIP2-City`,
+              `GeoIP2-Country`, `DBIP-City-Lite` and `DBIP-Country-Lite`; a country database gives no cities.
+
+              The `collector.geoip` object in the response of the `rum-sites` Function shows whether a database is
+              loaded.
+      configuration:
+        file:
+          name: dem/receiver.conf
+        options:
+          description: The receiver is a single job named `receiver`; there is one per Agent.
+          folding:
+            enabled: true
+            title: Configuration options
+          list:
+            - name: listen
+              description: Address and port to listen on. The default accepts connections from this host only.
+              default_value: 127.0.0.1:19938
+              required: false
+              group: Connection
+              detailed_description: |
+                Keep the default behind a reverse proxy on the same host. To accept connections from other hosts
+                directly, listen on this host's external address or on `0.0.0.0:19938`, and set `tls_cert` and
+                `tls_key`. The address
+                is opened when the receiver starts; the job editor's Test does not check that the port is free.
+            - name: public_url
+              description: Public base URL of the receiver, such as `https://rum.example.org`, used in the sites' script tags. Leave empty and no script tag is offered unless a site sets its own.
+              default_value: ''
+              required: false
+              group: Connection
+              detailed_description: |
+                Use the address that visitors' browsers reach, including any path prefix of your reverse proxy, such as
+                `https://www.example.org/edge`. The receiver never derives it from the listen address or from request
+                headers.
+            - name: tls_cert
+              description: Certificate file for serving HTTPS directly. Set together with `tls_key`; leave both empty to serve plain HTTP.
+              default_value: ''
+              required: false
+              group: Connection
+            - name: tls_key
+              description: Private key file of the certificate. Set together with `tls_cert`.
+              default_value: ''
+              required: false
+              group: Connection
+            - name: trusted_proxies
+              description: IP addresses or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Real-IP` headers are trusted for the visitor's address. Leave empty to use the connection's address.
+              default_value: ''
+              required: false
+              group: Connection
+              detailed_description: |
+                Behind a proxy, set this to the address the proxy connects from, such as `127.0.0.1/32` for a proxy on
+                the same host. Without it, every visitor appears to come from the proxy, so they all share one rate
+                limit and get no location. List only the proxies that actually connect to the receiver, because a
+                trusted address can claim any visitor IP.
+            - name: max_body_bytes
+              description: Largest report accepted, in bytes. Larger reports are refused with HTTP 413.
+              default_value: 262144
+              required: false
+              group: Limits
+            - name: rate_limit
+              description: Request limits that protect the Agent from floods of reports.
+              default_value: ''
+              required: false
+              group: Limits
+            - name: rate_limit.per_ip_per_min
+              description: Requests accepted per visitor IP address per minute. More are refused with HTTP 429.
+              default_value: 120
+              required: false
+              group: Limits
+            - name: rate_limit.per_site_per_sec
+              description: Requests accepted per site per second, from all visitors together. More are refused with HTTP 429.
+              default_value: 500
+              required: false
+              group: Limits
+            - name: update_every
+              description: Data collection interval, in seconds.
+              default_value: 10
+              required: false
+              group: Collection
+            - name: geoip_db
+              description: Location database (MMDB file) for looking up visitors' countries and cities. Leave empty to use the database the Agent provides, if there is one.
+              default_value: ''
+              required: false
+              group: Collection
+              detailed_description: |
+                With an empty path, the receiver tries `topology-ip-intel/topology-ip-geo.mmdb` in the Agent's cache
+                directory, then in its stock data directory (`NETDATA_CACHE_DIR` and `NETDATA_STOCK_DATA_DIR` override
+                the built-in directories). A path uses only that file. The database is checked when the receiver starts
+                and every minute after. To update it, write a new file and rename it over the old one; never edit or
+                truncate the file in use.
+
+                DEM never downloads a database. Agent packaging, the topology IP intelligence downloader or you provide
+                and update it, and not every installation has one. Give the Netdata service account read access to the
+                file and its directories.
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Behind a reverse proxy on the same host
+              description: The usual setup. The proxy serves `https://rum.example.org` and forwards `/rum/` to the receiver.
+              config: |
+                jobs:
+                  - name: receiver
+                    listen: 127.0.0.1:19938
+                    public_url: https://rum.example.org
+                    trusted_proxies:
+                      - 127.0.0.1/32
+            - name: Serve HTTPS directly
+              description: Accepts reports from other hosts on port 19938 with the receiver's own certificate.
+              config: |
+                jobs:
+                  - name: receiver
+                    listen: 0.0.0.0:19938
+                    public_url: https://rum.example.org:19938
+                    tls_cert: /etc/netdata/ssl/rum.crt
+                    tls_key: /etc/netdata/ssl/rum.key
+            - name: Use your own location database
+              description: Reads visitor locations from a GeoLite2 City database that you keep up to date.
+              config: |
+                jobs:
+                  - name: receiver
+                    public_url: https://rum.example.org
+                    trusted_proxies:
+                      - 127.0.0.1/32
+                    geoip_db: /var/lib/geoip/GeoLite2-City.mmdb
+            - name: Allow more requests per visitor
+              description: Raises the per-IP limit for websites whose visitors share an address, such as offices behind one gateway.
+              config: |
+                jobs:
+                  - name: receiver
+                    public_url: https://rum.example.org
+                    trusted_proxies:
+                      - 127.0.0.1/32
+                    rate_limit:
+                      per_ip_per_min: 600
+                      per_site_per_sec: 500
+      single_job: true
+    troubleshooting:
+      errors:
+        list:
+          - error: 'opening DEM history: load journal identity: journalhost: machine id: no machine id found'
+            when: |
+              The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+              whichever modules are enabled.
+            cause: |
+              DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+              `/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, and neither file exists under the
+              Netdata host prefix (`/host` in the official Docker image). This is common in minimal containers.
+            fix: |
+              On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+              `sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+              In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+              `-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+              Compose, then recreate the container. Check first that the host has `/etc/machine-id`: Docker creates a
+              missing source path as an empty directory, which DEM rejects.
+          - error: 'listen tcp 127.0.0.1:19938: bind: address already in use'
+            cause: Another process, or another Netdata Agent, already listens on that address and port.
+            fix: |
+              Find the process with `sudo ss -ltnp | grep 19938`, then stop it or change `listen` to a free port, and
+              update the reverse proxy to match.
+          - error: 'listen tcp 0.0.0.0:443: bind: permission denied'
+            cause: '`listen` uses a port below 1024, which the Netdata service account is not allowed to bind.'
+            fix: Use a port above 1024, such as the default `19938`, and serve port 443 from a reverse proxy.
+          - error: 'listen: address 19938: missing port in address'
+            cause: '`listen` has no host part.'
+            fix: Use `127.0.0.1:19938`, or `:19938` to listen on all addresses.
+          - error: tls_cert and tls_key must be set together
+            cause: Only one of `tls_cert` and `tls_key` is set.
+            fix: Set both to serve HTTPS, or neither to serve plain HTTP.
+          - error: 'listener TLS: could not read certificate `"/etc/netdata/ssl/rum.crt"`: open `"/etc/netdata/ssl/rum.crt"`: permission denied'
+            cause: The certificate or key file does not exist or the Netdata service account cannot read it. A similar message names the key file.
+            fix: Check the path, and make the files readable by the Netdata service account (usually `netdata`).
+          - error: body and rate limits must be positive
+            cause: '`max_body_bytes`, `rate_limit.per_ip_per_min` or `rate_limit.per_site_per_sec` is zero or negative.'
+            fix: Set them to positive values, or remove them to use the defaults.
+          - error: 'trusted proxy `"10.0.0.0/33"`: `<parse error>`'
+            cause: A `trusted_proxies` entry is not a valid IP address or CIDR range.
+            fix: Use addresses such as `127.0.0.1` or ranges such as `10.0.0.0/8`.
+          - error: public_url must be an http(s) base URL without credentials, query or fragment
+            cause: '`public_url` is not an absolute `http://` or `https://` URL, or it has a username, a query string or a fragment. A RUM site''s own `public_url` reports the same message.'
+            fix: Use a URL such as `https://rum.example.org`, with an optional path prefix.
+          - error: 'GeoIP refresh: `<error>`; provision a supported database using atomic file replacement'
+            when: The message is a warning in the Agent's log; collection continues without location or with the previous database.
+            cause: The location database could not be loaded - it is missing, unreadable, of an unsupported type, or was changed while in use.
+            fix: Make a supported database readable by the Netdata service account, and update it by writing a new file and renaming it over the old one. `collector.geoip` in the `rum-sites` Function shows the state and a reason code.
+          - error: RUM charts have no country breakdown
+            cause: |
+              There is no usable location database (`collector.geoip.state` is `unavailable` in `rum-sites`), the site
+              sets `capture.geolocation: 'off'`, or visitors arrive from loopback or private addresses - which is what a
+              reverse proxy looks like when `trusted_proxies` is not set.
+            fix: Provide a location database (see Prerequisites), and set `trusted_proxies` to the reverse proxy's address.
+          - error: Every visitor gets HTTP 429 behind a reverse proxy
+            cause: Without `trusted_proxies`, all requests appear to come from the proxy's address and share the per-IP limit.
+            fix: Set `trusted_proxies` to the address the proxy connects from.
+    metrics:
+      description: |
+        The receiver's charts are on this Agent's host. Requests count every HTTP response of the receiver: success
+        is a status below 400, including the 204 sent for reports that are excluded on purpose; client errors are 4xx,
+        such as refused origins, rate limits, oversized reports and unknown sites; server errors are 5xx.
+      availability: []
+      folding:
+        enabled: false
+        title: Metrics
+      scopes:
+        - name: global
+          description: The Agent's RUM receiver.
+          labels: []
+          metrics:
+            - name: dem_receiver.state
+              description: RUM receiver availability
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: serving
+                - name: unavailable
+            - name: dem_receiver.requests
+              description: RUM HTTP requests
+              unit: requests/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: client_errors
+                - name: server_errors

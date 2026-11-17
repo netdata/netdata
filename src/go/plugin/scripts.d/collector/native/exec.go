@@ -30,8 +30,8 @@ func operationArgs(command []string, operation string) []string {
 
 // runOneshot runs one collect or function invocation. Input is configuration, a
 // Function request, both, or EOF for schema-free collection.
-func runOneshot(ctx context.Context, command []string, operation string, input []byte) ([]byte, error) {
-	data, err := runOwned(ctx, command, operation, input, maxMessageBytes)
+func runOneshot(ctx context.Context, command []string, operation string, input []byte, limit int) ([]byte, error) {
+	data, err := runOwned(ctx, command, operation, input, limit)
 	if err != nil && !errors.Is(err, errResponseTooLarge) {
 		return nil, fmt.Errorf("script command: %w", err)
 	}
@@ -40,10 +40,10 @@ func runOneshot(ctx context.Context, command []string, operation string, input [
 
 // runDescribe runs a self-contained package's describe operation within its own
 // startup budget. Errors carry fixed categories only.
-func runDescribe(ctx context.Context, command []string) ([]byte, error) {
+func runDescribe(ctx context.Context, command []string, limit int) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, describeTimeout)
 	defer cancel()
-	data, err := runOwned(ctx, command, opDescribe, nil, maxDescriptionBytes)
+	data, err := runOwned(ctx, command, opDescribe, nil, limit)
 	switch {
 	case err == nil:
 		return data, nil

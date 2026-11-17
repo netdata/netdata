@@ -137,13 +137,6 @@ int rrdset2value_api_v1(
     return ret;
 }
 
-static inline void buffer_json_member_add_key_only(BUFFER *wb, const char *key) {
-    buffer_print_json_comma_newline_spacing(wb);
-    buffer_print_json_key(wb, key);
-    buffer_fast_strcat(wb, ":", 1);
-    wb->json.stack[wb->json.depth].count++;
-}
-
 static inline void buffer_json_member_add_string_open(BUFFER *wb, const char *key) {
     buffer_json_member_add_key_only(wb, key);
     buffer_strcat(wb, wb->json.value_quote);

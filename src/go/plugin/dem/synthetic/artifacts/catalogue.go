@@ -1,38 +1,29 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts
 
 import (
+	"cmp"
 	"context"
-	"errors"
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-// Manifest is Go-authored capture membership, independent of run history.
-type Manifest struct {
-	VnodeGUID   string               `json:"vnode_guid,omitempty"`
-	JobID       string               `json:"job_id"`
-	RunID       string               `json:"run_id"`
-	PublishedUS int64                `json:"published_us"`
-	Artifacts   []synthetic.Artifact `json:"artifacts"`
-}
-
 type Set struct {
-	VnodeGUID   string `json:"vnode_guid,omitempty"`
-	JobID       string `json:"job_id"`
-	RunID       string `json:"run_id"`
-	PublishedUS int64  `json:"published_us"`
-	Bytes       int64  `json:"bytes"`
-	Artifacts   int    `json:"artifact_count"`
+	VnodeGUID   string
+	JobID       string
+	RunID       string
+	PublishedUS int64
+	Bytes       int64
+	Artifacts   int
 }
 
 type Cursor struct {
-	PublishedUS int64  `json:"published_us"`
-	RunID       string `json:"run_id"`
+	PublishedUS int64
+	RunID       string
 }
 
 type Filter struct {
@@ -42,42 +33,10 @@ type Filter struct {
 	Limit     int
 }
 
-type ByteObservation struct {
-	Bytes *int64 `json:"bytes"`
-	Error string `json:"error,omitempty"`
-}
-
-type Inventory struct {
-	ObservedUS   int64           `json:"observed_us"`
-	Retained     ByteObservation `json:"retained"`
-	Workspace    ByteObservation `json:"workspace"`
-	Unclassified ByteObservation `json:"unclassified"`
-	Deleting     ByteObservation `json:"deleting"`
-	KnownSets    int             `json:"known_sets"`
-	KnownJobs    int             `json:"known_jobs"`
-	Error        string          `json:"error,omitempty"`
-}
-
-type Policy struct {
-	Days     int   `json:"days"`
-	MaxBytes int64 `json:"max_bytes"`
-}
-type Cleanup struct {
-	AttemptedUS  int64  `json:"attempted_us"`
-	SuccessfulUS int64  `json:"successful_us"`
-	Error        string `json:"error,omitempty"`
-}
-
-type Status struct {
-	Policy    *Policy   `json:"policy"`
-	Inventory Inventory `json:"inventory"`
-	Cleanup   Cleanup   `json:"cleanup"`
-}
-
 type Page struct {
-	Sets   []Set   `json:"sets"`
-	Next   *Cursor `json:"next,omitempty"`
-	Status Status  `json:"storage"`
+	Sets   []Set
+	Next   *Cursor
+	Status Status
 }
 
 // Catalogue reads current metadata/file sizes, never payload contents. Errors
@@ -92,7 +51,8 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	if err := ctx.Err(); err != nil {
 		return Page{}, err
 	}
-	if vnodeguid.Validate(filter.VnodeGUID) != nil || filter.Limit < 1 || (filter.JobID != "" && !validJobID(filter.JobID)) ||
+	if vnodeguid.Validate(filter.VnodeGUID) != nil || filter.Limit < 1 ||
+		(filter.JobID != "" && !synthetic.ValidJobID(filter.JobID)) ||
 		(filter.Before != nil && (filter.Before.PublishedUS <= 0 || !runIDPattern.MatchString(filter.Before.RunID))) {
 		return Page{}, fmt.Errorf("%w: invalid artifact catalogue filter", ErrInvalidID)
 	}
@@ -100,7 +60,7 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	if err := ctx.Err(); err != nil {
 		return Page{}, err
 	}
-	sort.Slice(entries, func(i, j int) bool { return newer(entries[i], entries[j]) })
+	slices.SortFunc(entries, newestFirst)
 	page := Page{
 		Sets:   []Set{},
 		Status: s.status(inv),
@@ -129,40 +89,7 @@ func (s *Store) Catalogue(ctx context.Context, filter Filter) (Page, error) {
 	return page, nil
 }
 
-func newer(a, b Set) bool {
-	if a.PublishedUS != b.PublishedUS {
-		return a.PublishedUS > b.PublishedUS
-	}
-	return a.RunID > b.RunID
-}
-func (s *Store) status(inv Inventory) Status {
-	var policy *Policy
-	if s.policy != nil {
-		copy := *s.policy
-		policy = &copy
-	}
-	return Status{
-		Policy:    policy,
-		Inventory: inv,
-		Cleanup:   s.cleanup,
-	}
-}
-func observation(bytes int64, err error) ByteObservation {
-	if err != nil {
-		return ByteObservation{
-			Error: err.Error(),
-		}
-	}
-	return ByteObservation{
-		Bytes: &bytes,
-	}
-}
-func inventoryError(inv Inventory) error {
-	var result error
-	for _, e := range []string{inv.Error, inv.Retained.Error, inv.Workspace.Error, inv.Unclassified.Error, inv.Deleting.Error} {
-		if e != "" {
-			result = errors.Join(result, errors.New(e))
-		}
-	}
-	return result
+// newestFirst orders sets by publication time, then run ID, newest first.
+func newestFirst(a, b Set) int {
+	return cmp.Or(cmp.Compare(b.PublishedUS, a.PublishedUS), cmp.Compare(b.RunID, a.RunID))
 }

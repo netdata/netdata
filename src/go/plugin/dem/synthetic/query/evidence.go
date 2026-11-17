@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package query
 
 import (
@@ -7,6 +8,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+)
+
+// Availability of retained capture bytes; an expired artifact reports its
+// run's expired capture state.
+const (
+	available            = "available"
+	expiredOrUnavailable = string(synthetic.CaptureExpired)
 )
 
 type Artifact struct {
@@ -18,7 +26,7 @@ type Evidence struct {
 	JobID        string
 	VnodeGUID    string
 	RunID        string
-	CaptureState string
+	CaptureState synthetic.CaptureState
 	Artifacts    []Artifact
 	Body         []byte
 }
@@ -28,9 +36,6 @@ type Evidence struct {
 func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string) (Evidence, error) {
 	if err := ctx.Err(); err != nil {
 		return Evidence{}, err
-	}
-	if s.artifacts == nil {
-		return Evidence{}, errors.New("artifact store unavailable")
 	}
 	manifest, err := s.artifacts.Manifest(ctx, jobID, runID)
 	if errors.Is(err, artifacts.ErrNotFound) {
@@ -43,13 +48,13 @@ func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string)
 		JobID:        manifest.JobID,
 		VnodeGUID:    manifest.VnodeGUID,
 		RunID:        manifest.RunID,
-		CaptureState: "available",
+		CaptureState: synthetic.CaptureAvailable,
 	}
 	if artifactID == "" {
 		for _, item := range manifest.Artifacts {
 			result.Artifacts = append(result.Artifacts, Artifact{
 				Artifact:     item,
-				Availability: "available",
+				Availability: available,
 			})
 		}
 		return result, nil
@@ -66,13 +71,13 @@ func (s *Service) Evidence(ctx context.Context, jobID, runID, artifactID string)
 	}
 	metadata, body, err := s.artifacts.Fetch(ctx, jobID, runID, artifactID)
 	if errors.Is(err, artifacts.ErrNotFound) {
-		result.CaptureState = "expired_or_unavailable"
+		result.CaptureState = synthetic.CaptureExpired
 		return result, ErrExpired
 	}
 	if err != nil {
 		return result, artifactError(err)
 	}
-	result.Artifacts = []Artifact{{Artifact: metadata, Availability: "available"}}
+	result.Artifacts = []Artifact{{Artifact: metadata, Availability: available}}
 	result.Body = body
 	return result, nil
 }
@@ -81,9 +86,6 @@ func (s *Service) absentEvidence(ctx context.Context, jobID, runID, artifactID s
 	// Active observations remain useful when history publication failed.
 	run, err := s.Run(ctx, jobID, runID)
 	if err != nil {
-		if s.history == nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			return Evidence{}, ErrNotFound
-		}
 		return Evidence{}, err
 	}
 	result := Evidence{
@@ -97,11 +99,11 @@ func (s *Service) absentEvidence(ctx context.Context, jobID, runID, artifactID s
 		recorded = recorded || item.ID == artifactID
 		result.Artifacts = append(result.Artifacts, Artifact{
 			Artifact:     item,
-			Availability: "expired_or_unavailable",
+			Availability: expiredOrUnavailable,
 		})
 	}
 	if len(run.Artifacts) > 0 {
-		result.CaptureState = "expired_or_unavailable"
+		result.CaptureState = synthetic.CaptureExpired
 	}
 	if artifactID != "" {
 		if !recorded {

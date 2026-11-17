@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/pkg/web"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/meraki/merakiapi"
 	"github.com/stretchr/testify/require"
 )
 
@@ -116,8 +118,32 @@ func newTestCollector(t *testing.T, server *httptest.Server) *Collector {
 	t.Helper()
 	c := configuredCollector(server)
 	require.NoError(t, c.Init(t.Context()))
+	c.Cleanup(context.Background())
+	// Data fixtures exercise real HTTP and API parsing without provider pacing.
+	// TestInitPacesRequests covers the production Init wiring separately.
+	httpClient, err := web.NewHTTPClient(t.Context(), web.ClientConfig{
+		Timeout:   c.Timeout,
+		ProxyURL:  c.ProxyURL,
+		TLSConfig: c.TLSConfig,
+	})
+	require.NoError(t, err)
+	t.Cleanup(httpClient.CloseIdleConnections)
+	client, err := merakiapi.New(merakiapi.Config{
+		BaseURL:         c.URL,
+		APIKey:          c.APIKey,
+		BearerTokenFile: c.BearerTokenFile,
+	}, httpClient)
+	require.NoError(t, err)
+	c.httpClient, c.client = httpClient, client
 	t.Cleanup(func() { c.Cleanup(context.Background()) })
 	return c
+}
+
+// Deadline tests retain the real pacing that exhausts their operation budget.
+func useProductionPacing(t *testing.T, c *Collector) {
+	t.Helper()
+	c.Cleanup(context.Background())
+	require.NoError(t, c.initClient(t.Context()))
 }
 
 // collectCycle runs one metric-store cycle and reports the commit result too.

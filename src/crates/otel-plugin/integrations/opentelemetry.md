@@ -341,22 +341,22 @@ The charts of the index files (`netdata.otel.index_files`, `netdata.otel.index_s
 
 Three charts exist only when `remote_storage.enabled` is `true`. `netdata.otel.index_files_waiting_for_remote` shows the files that are over a retention limit while remote storage did not confirm their catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable. `netdata.otel.uploads` and `netdata.otel.uploads_finished` count the uploads of index files and of catalog files together. An upload is `in_progress` from the moment the plugin starts it until it ends; the plugin runs a few uploads at the same time and the others wait for their turn. An upload that fails shows as `failed` each time it fails, and as `waiting_for_retry` until the plugin tries it again.
 
-The plugin also makes charts for each service, from the traces and the logs that it receives: requests, failed requests and request durations from traces, and log records by severity from logs. A service is the `service.namespace` and `service.name` resource attributes, kept apart by tenant and deployment environment. These charts have no settings. They count as follows:
+The plugin also makes charts for each service, from the traces and the logs that it receives: requests, failed requests and request durations from traces, and log records by severity from logs. A service is the `service.namespace` and `service.name` resource attributes, kept apart by tenant and deployment environment. The contexts of these charts start with `otel.derived_metrics.`. These charts have no settings. They count as follows:
 
 - A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends.
 - Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
 - A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number. A record without a severity number counts as `unspecified`, also when it has a severity text. The sender or the OpenTelemetry Collector must set the severity number.
 - The average request duration is the mean duration of the requests that ended in each second. Over a longer time, the chart shows the mean of these per-second values. This is not the mean duration of all the requests in that time.
 - The charts count only the spans and the log records that the plugin stores. When an SDK or a Collector drops spans by sampling and does not write a sampling threshold, the request rates are lower than the real rates, and the share of failed requests can change.
-- The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Records counted in another time slot or chart set" chart shows these records as `late` and `future`.
+- The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Adjusted log records" and "Adjusted requests" charts show this data as `late` and `future`.
 
-At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived charts" and "Services removed after 15 minutes without data" charts count the overflow chart set as one service. The "Records counted in another time slot or chart set" chart shows its records as `overflowed`. Such a record can also count as `late` or `future`.
+At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived metrics" and "Expired services" charts count the overflow chart set as one service. The "Adjusted log records" and "Adjusted requests" charts show its data as `overflowed`. Such a record or request can also count as `late` or `future`. The "Adjusted requests" chart counts each stored request span as one, also when a sampling threshold makes it count for more on the request charts.
 
 
 
 ### Per OpenTelemetry instance
 
-The plugin itself, with charts of the metric data points, log records and spans that it receives, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
+The plugin itself, with charts of the metric data points, log records and spans that it receives, of the per-service charts that it makes from logs and traces, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
 
 This scope has no labels.
 
@@ -364,38 +364,23 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| netdata.otel.metric_data_points | OpenTelemetry metric data points received | accepted, rejected | data points/s |
-| netdata.otel.log_records | OpenTelemetry log records received | accepted, rejected, failed | records/s |
-| netdata.otel.spans | OpenTelemetry spans received | accepted, rejected, failed | spans/s |
+| netdata.otel.metric_data_points | Metric data points received | accepted, rejected | data points/s |
+| netdata.otel.log_records | Log records received | accepted, rejected, failed | records/s |
+| netdata.otel.spans | Spans received | accepted, rejected, failed | spans/s |
 | netdata.otel.wal_events_queued | WAL file events waiting to be sent to the ledger | events | events |
-| netdata.otel.indexing_operations | Indexing operations running and waiting | running, waiting | operations |
-| netdata.otel.indexing_operations_oldest_wait | Longest wait of an indexing operation that has not started | wait | seconds |
-| netdata.otel.indexing_operations_finished | Indexing operations finished | succeeded, failed | operations/s |
-| netdata.otel.index_files | Index files on the local disk | logs, traces | files |
-| netdata.otel.index_size | Size of the index files on the local disk | logs, traces | bytes |
-| netdata.otel.tenants | Tenants known to the plugin | logs, traces | tenants |
-| netdata.otel.index_files_waiting_for_remote | Index files over the retention limits that wait for remote storage | logs, traces | files |
-| netdata.otel.uploads | Uploads to remote storage in progress and waiting for a retry | in_progress, waiting_for_retry | operations |
-| netdata.otel.uploads_finished | Uploads to remote storage finished | succeeded, failed | operations/s |
-
-
-### Per signal
-
-One signal, logs or traces, that the per-service charts are made from.
-
-Labels:
-
-| Label      | Description     |
-|:-----------|:----------------|
-| signal | The signal that the per-service metrics are made from, `logs` or `traces`. |
-
-Metrics:
-
-| Metric | Description | Dimensions | Unit |
-|:------|:------------|:----------|:----|
-| netdata.otel.derived_services | Services with derived charts | services | services |
-| netdata.otel.derived_expired_services | Services removed after 15 minutes without data | expired | services/s |
-| netdata.otel.derived_adjusted_records | Records counted in another time slot or chart set | late, future, overflowed | records/s |
+| netdata.otel.derived_services | Services with derived metrics | logs, traces | services |
+| netdata.otel.derived_expired_services | Expired services | logs, traces | services/s |
+| netdata.otel.derived_adjusted_log_records | Adjusted log records | late, future, overflowed | records/s |
+| netdata.otel.derived_adjusted_requests | Adjusted requests | late, future, overflowed | requests/s |
+| netdata.otel.indexing_operations | Indexing operations | running, waiting | operations |
+| netdata.otel.indexing_operations_oldest_wait | Longest wait of a waiting indexing operation | wait | seconds |
+| netdata.otel.indexing_operations_finished | Finished indexing operations | succeeded, failed | operations/s |
+| netdata.otel.index_files | Local index files | logs, traces | files |
+| netdata.otel.index_size | Local index size | logs, traces | bytes |
+| netdata.otel.tenants | Tenants | logs, traces | tenants |
+| netdata.otel.index_files_waiting_for_remote | Index files waiting for remote storage | logs, traces | files |
+| netdata.otel.uploads | Uploads to remote storage | in_progress, waiting_for_retry | operations |
+| netdata.otel.uploads_finished | Finished uploads to remote storage | succeeded, failed | operations/s |
 
 
 ### Per service
@@ -416,11 +401,11 @@ Metrics:
 
 | Metric | Description | Dimensions | Unit |
 |:------|:------------|:----------|:----|
-| otel_service.log_records | Service log records by severity | fatal, error, warn, info, debug, trace, unspecified | records/s |
-| otel_service.requests | Service requests | success, error | requests/s |
-| otel_service.request_duration_avg | Service request duration average | avg | seconds |
-| otel_service.request_duration_max | Service request duration maximum | max | seconds |
-| otel_service.request_duration_histogram | Service request duration histogram | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10, +Inf | requests/s |
+| otel.derived_metrics.log_records | Log records | fatal, error, warn, info, debug, trace, unspecified | records/s |
+| otel.derived_metrics.requests | Requests | success, error | requests/s |
+| otel.derived_metrics.request_duration_avg | Request duration average | avg | seconds |
+| otel.derived_metrics.request_duration_max | Request duration maximum | max | seconds |
+| otel.derived_metrics.request_duration_histogram | Request duration histogram | 0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1, 2.5, 5, 7.5, 10, +Inf | requests/s |
 
 
 

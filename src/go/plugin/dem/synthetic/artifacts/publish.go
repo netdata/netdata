@@ -22,6 +22,9 @@ import (
 // outside the child's work folder durably records that permission. Failures before
 // publication clean drained work; an attempted publication stays protected until
 // both parent directories are synced or a later store owner reconciles disk.
+// On success, the returned artifacts contain every candidate except valid files
+// whose initial size exceeds FetchMaxBytes, in input order. Other failures abort
+// the set; no published artifacts are returned with an error.
 func (s *Store) Finalize(
 	ctx context.Context,
 	runID string,
@@ -99,7 +102,7 @@ func (s *Store) Finalize(
 			return nil, fmt.Errorf("%w: duplicate or invalid ID", ErrInvalidCapture)
 		}
 		ids[capture.ID] = true
-		if !((capture.Kind == "screenshot" && capture.MIME == "image/png") || (capture.Kind == "report" && capture.MIME == "text/html")) {
+		if !validCaptureKind(capture.Kind, capture.MIME) {
 			return nil, fmt.Errorf("%w: unsupported kind or MIME", ErrInvalidCapture)
 		}
 		if !strings.HasPrefix(capture.Path, "output/") || path.Clean(capture.Path) != capture.Path ||
@@ -114,13 +117,10 @@ func (s *Store) Finalize(
 		if err != nil {
 			return nil, errors.Join(err, source.Close())
 		}
-		if info.Size() > FetchMaxBytes {
-			return nil, &CaptureError{ID: capture.ID, Err: errors.Join(ErrTooLarge, source.Close())}
-		}
-		if capture.Kind == "screenshot" {
-			var header [8]byte
-			_, err = io.ReadFull(source, header[:])
-			if err == nil && string(header[:]) != "\x89PNG\r\n\x1a\n" {
+		if signature := captureSignature(capture.Kind); signature != "" {
+			header := make([]byte, len(signature))
+			_, err = io.ReadFull(source, header)
+			if err == nil && string(header) != signature {
 				err = ErrInvalidCapture
 			}
 			if err == nil {
@@ -128,8 +128,17 @@ func (s *Store) Finalize(
 			}
 			if err != nil {
 				_ = source.Close()
-				return nil, fmt.Errorf("%w: invalid PNG", ErrInvalidCapture)
+				return nil, fmt.Errorf("%w: invalid %s signature", ErrInvalidCapture, capture.Kind)
 			}
+		}
+		if info.Size() > FetchMaxBytes {
+			if err := source.Close(); err != nil {
+				return nil, &CaptureError{
+					ID:  capture.ID,
+					Err: errors.Join(ErrTooLarge, err),
+				}
+			}
+			continue
 		}
 		dest, err := s.root.OpenFile(stage+"/"+capture.ID, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 		if err != nil {
@@ -147,7 +156,10 @@ func (s *Store) Finalize(
 			}, FetchMaxBytes+1),
 		)
 		if count > FetchMaxBytes {
-			copyErr = &CaptureError{ID: capture.ID, Err: errors.Join(copyErr, ErrTooLarge)}
+			copyErr = &CaptureError{
+				ID:  capture.ID,
+				Err: errors.Join(copyErr, ErrTooLarge),
+			}
 		}
 		closeErr := errors.Join(dest.Sync(), dest.Close(), source.Close())
 		if err = errors.Join(copyErr, closeErr); err != nil {
@@ -167,6 +179,12 @@ func (s *Store) Finalize(
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if len(m.Artifacts) == 0 {
+		if err := s.cleanupDrained(runID); err != nil {
+			s.recordCleanupError(err)
+		}
+		return nil, nil
 	}
 	raw, err := json.Marshal(m)
 	if err != nil {
@@ -196,4 +214,20 @@ func (s *Store) Finalize(
 		s.recordCleanupError(err)
 	}
 	return m.Artifacts, nil
+}
+
+func validCaptureKind(kind synthetic.CaptureKind, mime string) bool {
+	return mime != "" && kind.MIME() == mime
+}
+
+// captureSignature is the magic prefix of a kind's file format, or "".
+func captureSignature(kind synthetic.CaptureKind) string {
+	switch kind {
+	case synthetic.ScreenshotCapture:
+		return "\x89PNG\r\n\x1a\n"
+	case synthetic.TraceCapture:
+		return "PK\x03\x04"
+	default:
+		return ""
+	}
 }

@@ -6,8 +6,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"strings"
-
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 // Version is the pinned Faro web SDK served by the bootstrap.
@@ -34,7 +32,7 @@ func Bootstrap(key string, opts BootstrapOptions) string {
 	k, _ := json.Marshal(key)
 	opt := map[string]any{
 		"sampling":           opts.MeasureRate,
-		"bots":               beacon.BotPatternJS(),
+		"bots":               botPatternJS,
 		"includeBots":        opts.IncludeBots,
 		"consoleLogs":        opts.ConsoleLogs,
 		"eventLogs":          opts.EventLogs,
@@ -45,6 +43,10 @@ func Bootstrap(key string, opts BootstrapOptions) string {
 		opt["tracing"] = append([]string{}, opts.Propagate...)
 	}
 	o, _ := json.Marshal(opt)
-	return strings.NewReplacer("__KEY__", string(k), "__OPT__", string(o), "__SDK_PATH__", SDKPath, "__TRACING_PATH__", TracingPath).
-		Replace(bootstrapTemplate)
+	return strings.NewReplacer(
+		"__KEY__", string(k),
+		"__OPT__", string(o),
+		"__SDK_PATH__", SDKPath,
+		"__TRACING_PATH__", TracingPath,
+	).Replace(bootstrapTemplate)
 }
