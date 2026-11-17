@@ -1262,8 +1262,10 @@ static time_t ram_cache_metric_pages_retention(PGC *cache, Word_t section, Word_
         method = PGC_SEARCH_NEXT;
         start_s = pgc_page_start_time_s(page);
         time_t end_s = pgc_page_end_time_s(page);
-        // a gap marker (pgc_inject_gap()) or a page of gaps only (discarded when the collector closes it) holds no data
-        bool has_data = !pgd_is_empty(pgc_page_data(page));
+        // a gap marker (pgc_inject_gap()) holds no data. A hot page counts as data without being read, because its
+        // collector appends to it meanwhile: if it holds only gaps, the collector discards it when it closes it, and
+        // the free callback of that discard decides again from the pages that remain
+        bool has_data = pgc_is_page_hot(page) || !pgd_is_empty(pgc_page_data(page));
         // no inline eviction on release in this cache (PGC_OPTIONS_EVICT_PAGES_NO_INLINE)
         pgc_page_release(cache, page);
 

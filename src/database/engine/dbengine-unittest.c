@@ -1032,6 +1032,25 @@ static size_t test_dbengine_in_memory(void) {
     pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
     unittest_storage_engine_store_flush(rd4->tiers[0].sch);
     errors += in_memory_test_latest(ctx, rd4, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1, "after the newest data page was evicted under a page of gaps");
+    // the scan counts the hot page as data while it is open: once it is discarded, both times are the data page's
+    errors += in_memory_test_retention(ctx, rd4, base_s, base_s + IN_MEMORY_TEST_PAGE_POINTS - 1,
+                                       "after the newest data page was evicted under a page of gaps,");
+
+    // 6b. the last data page is evicted while the collector's hot page holds only gaps: once that page is discarded,
+    //     no data is left, so no retention may be left either
+    RRDDIM *rd7 = dbengine_cadence_test_create_metric(host, "unittest-in-memory-gaps-last", 1);
+    if(!rd7)
+        return errors + 1;
+
+    in_memory_test_store_pages(rd7, base_s, 1);
+    for(time_t t = base_s + IN_MEMORY_TEST_PAGE_POINTS; t < base_s + IN_MEMORY_TEST_PAGE_POINTS + 5; t++)
+        unittest_storage_engine_store_metric(rd7->tiers[0].sch, (usec_t)t * USEC_PER_SEC, NAN, NAN, NAN, 1, 0, SN_EMPTY_SLOT);
+
+    f.metric_id = (Word_t)rd7->uuid;
+    f.start_time_s = base_s;
+    pgc_evict_clean_pages_matching(ram_cache, in_memory_test_page_match, &f);
+    unittest_storage_engine_store_flush(rd7->tiers[0].sch);
+    errors += in_memory_test_retention(ctx, rd7, 0, 0, "after the last data page was evicted under a page of gaps,");
 
     // 7. a page closed because it is full: no hot time is left at its end (it would outlive the page), and evicting it
     //    moves the latest time back to the older page (a host with a longer retention, so the retention pass does not
@@ -1115,6 +1134,7 @@ static size_t test_dbengine_in_memory(void) {
     rrdset_free(rd6->rrdset);
     rrdset_free(rd5->rrdset);
     rrdset_free(rd3->rrdset);
+    rrdset_free(rd7->rrdset);
     rrdset_free(rd4->rrdset);
     rrdset_free(rd2->rrdset);
     rrdset_free(rd->rrdset);
