@@ -327,6 +327,7 @@ netdata_mcp/
     agent_mcp.py   # netdata_agent_<name> forwarding tools (Querying a running agent)
     models.py      # shared response models (JobInfo, RunInfo, AgentLogs, ...)
     vendored.py    # register_forwarding_tool() (vendored-schema tool registration)
+    gated_function.py # shared call path for the SIGNED_ID-gated OTel Functions (bearer mint + status)
     mint_bearer.py # netdata_agent_mint_bearer (per-agent bearer for the Playwright MCP)
     otel_config.py # netdata_agent_otel_config
     otel_logs.py   # netdata_agent_otel_logs
