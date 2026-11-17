@@ -750,7 +750,8 @@ static size_t in_memory_test_query(RRDDIM *rd, time_t start_s, time_t end_s, tim
             continue;
 
         NETDATA_DOUBLE expected = unpack_storage_number(pack_storage_number((NETDATA_DOUBLE)(sp.end_time_s - base_s + 1), SN_DEFAULT_FLAGS));
-        if(sp.count != 1 || sp.sum != expected) {
+        // not ==: on 32-bit x86 the expected value is computed with the x87 extended precision (0.99999... for 1)
+        if(sp.count != 1 || !considered_equal_ndd(sp.sum, expected)) {
             fprintf(stderr, " >>> DBENGINE: in memory, %s: point at %jd is %f (count %u), expected %f\n",
                     what, (intmax_t)sp.end_time_s, sp.sum, sp.count, expected);
             errors++;
