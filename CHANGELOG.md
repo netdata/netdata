@@ -558,6 +558,23 @@
 - Fix(dem): redact credentials hidden by percent-escapes in RUM URL paths ([#24799](https://github.com/netdata/netdata/issues/24799))
 - Refactor(dem): one name per composition concept, one owner for redaction policies ([#24803](https://github.com/netdata/netdata/issues/24803))
 - Test(dem): move whole-stack tests to their owners, tabulate publication modes, use synctest in monitor tests ([#24802](https://github.com/netdata/netdata/issues/24802))
+- Docs(dem): rewrite the DEM integration pages for operators ([#24805](https://github.com/netdata/netdata/issues/24805))
+- Refactor(dem): show real package docs and finish the Go formatting sweep ([#24804](https://github.com/netdata/netdata/issues/24804))
+- Regenerate integrations docs ([#24791](https://github.com/netdata/netdata/issues/24791))
+- Docs(dem): correct false and stale DEM doc claims and fill integration-page gaps ([#24809](https://github.com/netdata/netdata/issues/24809))
+- Docs(dem): rewrite the DEM Function help texts for operators ([#24810](https://github.com/netdata/netdata/issues/24810))
+- Fix(dem): resolve the history machine id through the Netdata host prefix ([#24808](https://github.com/netdata/netdata/issues/24808))
+- Regenerate integrations docs ([#24811](https://github.com/netdata/netdata/issues/24811))
+- Docs: correct the claim that go.d jobs support per-job labels ([#24715](https://github.com/netdata/netdata/issues/24715))
+- Docs(dem): give every DEM doc one role and every fact one owner ([#24812](https://github.com/netdata/netdata/issues/24812))
+- Regenerate integrations docs ([#24814](https://github.com/netdata/netdata/issues/24814))
+- Health: release health log and alert index locks before SQLite saves ([#24756](https://github.com/netdata/netdata/issues/24756))
+- Health: escape strings in the alarms and silencers JSON ([#24694](https://github.com/netdata/netdata/issues/24694))
+- Feat(go.d/k8s_kubelet,k8s_state): add PVC usage and capacity metrics ([#24507](https://github.com/netdata/netdata/issues/24507))
+- Regenerate integrations docs ([#24819](https://github.com/netdata/netdata/issues/24819))
+- Updater: fix native package publication paths for Oracle Linux and Tumbleweed ([#24742](https://github.com/netdata/netdata/issues/24742))
+- Log2journal: keep nested JSON key paths inside the key buffer ([#24818](https://github.com/netdata/netdata/issues/24818))
+- Gorilla: do not skip values when a hot-page reader moves to the next buffer ([#24768](https://github.com/netdata/netdata/issues/24768))
 
 ## [2.12.0] - 2026-09-30
 
