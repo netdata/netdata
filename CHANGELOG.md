@@ -575,6 +575,13 @@
 - Updater: fix native package publication paths for Oracle Linux and Tumbleweed ([#24742](https://github.com/netdata/netdata/issues/24742))
 - Log2journal: keep nested JSON key paths inside the key buffer ([#24818](https://github.com/netdata/netdata/issues/24818))
 - Gorilla: do not skip values when a hot-page reader moves to the next buffer ([#24768](https://github.com/netdata/netdata/issues/24768))
+- Netdata-build-mcp: typed OTel traces, service-map and config tools ([#24825](https://github.com/netdata/netdata/issues/24825))
+- Docs: rework the core documents: Welcome, Netdata Design and the Complete Product Description ([#24729](https://github.com/netdata/netdata/issues/24729))
+- Regenerate integrations docs ([#24827](https://github.com/netdata/netdata/issues/24827))
+- Feat(dem): pair browser runtime upgrades with Agent releases ([#24821](https://github.com/netdata/netdata/issues/24821))
+- Regenerate integrations docs ([#24828](https://github.com/netdata/netdata/issues/24828))
+- Docs(functions): use repository-absolute links to the Functions guides ([#24831](https://github.com/netdata/netdata/issues/24831))
+- Ci(dem): simplify publication and select checks by changed inputs ([#24829](https://github.com/netdata/netdata/issues/24829))
 
 ## [2.12.0] - 2026-09-30
 
