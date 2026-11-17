@@ -420,8 +420,9 @@ for the real-browser summary and native trace cases. Tests also use real non-bro
 and synthetic fixture runtimes, without adding component path overrides to the
 execution request. Fixtures stamp the test Node version; production archives use
 the release pin. Real Linux browser/audit and process-tree cancellation validation
-belongs to the Go-to-Node integration checks. Candidate installation qualification
-must exercise both journeys and Lighthouse with deterministic local content.
+belongs to the Go-to-Node integration checks. Release validation and optional local
+qualification exercise both journeys and Lighthouse with deterministic local content; ordinary installation does
+not execute these browser tests.
 
 `tests/contract-2.mjs` freezes baseline wire fields, types and enum values from
 `7278241848caed20c5a5d59b82e343bac5dbb037`. It checks real runner output without

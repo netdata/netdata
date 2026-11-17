@@ -6,6 +6,8 @@ FROM netdata/builder:v3 AS builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
+ARG BUILD_VERSION
+ARG RELEASE_SOURCE
 
 ARG CFLAGS
 
@@ -28,6 +30,13 @@ COPY --exclude='**/.git' \
      --exclude='**/Dockerfile' \
      . /opt/netdata.git
 WORKDIR /opt/netdata.git
+
+# Official builds carry identity explicitly; generated host metadata is Git-ignored.
+RUN if [ -n "$RELEASE_SOURCE" ]; then \
+      test -n "$BUILD_VERSION" && \
+      printf 'version=%s\nchannel=%s\nsource=%s\n' \
+        "$BUILD_VERSION" "$RELEASE_CHANNEL" "$RELEASE_SOURCE" > packaging/release-info; \
+    fi
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \

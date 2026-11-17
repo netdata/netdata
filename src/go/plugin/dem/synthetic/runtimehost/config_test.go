@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -84,13 +85,29 @@ func trustedFixture() browserruntime.Manifest {
 	}
 }
 
+func fixtureAgent(version string) browserruntime.AgentRelease {
+	return browserruntime.AgentRelease{Version: version, Channel: "devel", Source: strings.Repeat("a", 40)}
+}
+
+func useFixtureAgent(t *testing.T, version string) browserruntime.AgentRelease {
+	t.Helper()
+	previous := AgentRelease()
+	agent := fixtureAgent(version)
+	buildinfo.ReleaseVersion, buildinfo.ReleaseChannel, buildinfo.ReleaseRef = agent.Version, agent.Channel, agent.Source
+	t.Cleanup(func() {
+		buildinfo.ReleaseVersion, buildinfo.ReleaseChannel, buildinfo.ReleaseRef = previous.Version, previous.Channel, previous.Source
+	})
+	return agent
+}
+
 func signedSetupFixture(t *testing.T) (Config, browserruntime.Release, []byte) {
 	t.Helper()
 	manifest := trustedFixture()
+	agent := useFixtureAgent(t, manifest.Version)
 	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
 	release := browserruntime.Release{
-		Format:   1,
-		Sequence: 1,
+		Format:   2,
+		Agent:    &agent,
 		Manifest: manifest,
 		Sources: browserruntime.ReleaseSource{
 			URL:    "https://example.invalid/sources.tar.zst",
@@ -106,6 +123,44 @@ func signedSetupFixture(t *testing.T) (Config, browserruntime.Release, []byte) {
 	cfg := DefaultConfig()
 	cfg.OfflineKeyring = path
 	return cfg, release, raw
+}
+
+func TestDefaultRuntimeURLNamesExactAgentAndArchitecture(t *testing.T) {
+	for _, channel := range []string{"stable", "nightly"} {
+		for _, arch := range []string{"amd64", "arm64"} {
+			agent := fixtureAgent("v2.12.0")
+			agent.Channel = channel
+			if channel == "nightly" {
+				agent.Version = "v2.12.0-9-nightly"
+			}
+			assert.Equal(t, "https://artifacts.netdata.cloud/dem-runtime/"+channel+"/"+agent.Version+"/"+arch+"/release.json",
+				defaultReleaseURL(agent, arch))
+		}
+	}
+	assert.Empty(t, defaultReleaseURL(browserruntime.AgentRelease{}, "amd64"), "developer builds must not guess a published release")
+	assert.Empty(t, defaultReleaseURL(fixtureAgent("v2.12.0"), "386"))
+}
+
+func TestReleaseLoaderRejectsAuthenticatedWrongAgentPair(t *testing.T) {
+	for _, field := range []string{"version", "channel", "source"} {
+		t.Run(field, func(t *testing.T) {
+			cfg, release, _ := signedSetupFixture(t)
+			switch field {
+			case "version":
+				release.Agent.Version, release.Manifest.Version = "another-Agent", "another-Agent"
+			case "channel":
+				release.Agent.Channel = "stable"
+			case "source":
+				release.Agent.Source = strings.Repeat("b", 40)
+			}
+			raw, err := pgptest.Release(release, pgptest.Key(t, 19))
+			require.NoError(t, err)
+			path := filepath.Join(t.TempDir(), "release.json")
+			require.NoError(t, os.WriteFile(path, raw, 0600))
+			_, err = cfg.ReleaseLoader(path, false)(context.Background())
+			require.ErrorIs(t, err, browserruntime.ErrIncompatible)
+		})
+	}
 }
 
 func TestInstalledReleaseTrust(t *testing.T) {

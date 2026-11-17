@@ -42,6 +42,28 @@ func TestCandidateProtectionAndSerializedUninstall(t *testing.T) {
 	require.ErrorContains(t, err, "closed")
 }
 
+func TestReusedPreparedPayloadMustBeIntactBeforePublication(t *testing.T) {
+	for _, operation := range []string{"select", "preload"} {
+		t.Run(operation, func(t *testing.T) {
+			s, _ := testStore(t)
+			m := importFixture(t, s, "canceled-preparation")
+			require.NoError(t, os.Remove(filepath.Join(s.path, "generations", m.Archive.SHA256, m.Layout.Node)))
+			candidate, err := s.beginFixture(t, context.Background(), m, InstallRelease)
+			require.NoError(t, err)
+			defer candidate.Close()
+			if operation == "select" {
+				err = candidate.Select()
+			} else {
+				err = candidate.SealPreload()
+			}
+			require.ErrorIs(t, err, ErrDamaged)
+			require.NoFileExists(t, filepath.Join(s.path, "preload.json"))
+			_, err = s.AcquireSelected()
+			require.ErrorIs(t, err, ErrUnavailable)
+		})
+	}
+}
+
 func TestPreparationReportsOneCandidateClaim(t *testing.T) {
 	s, _ := testStore(t)
 	m, archive := bundleFixture(t, "status")
@@ -92,92 +114,11 @@ func TestUnsupportedContractKeepsInstalledSelection(t *testing.T) {
 	candidate, err := s.beginFixture(t, context.Background(), unsupported, InstallRelease)
 	require.Nil(t, candidate)
 	require.ErrorContains(t, err, "unsupported runtime execution contract 1")
-	require.ErrorContains(t, err, "upgrade the Agent")
+	require.ErrorIs(t, err, ErrIncompatible)
+	require.ErrorContains(t, err, "matching Agent/runtime pair")
 	status, err := s.Inspect()
 	require.NoError(t, err)
 	require.Equal(t, selected, status.Release.Manifest)
-}
-
-func TestPublishedInstallationConsentAndSequenceAreAtomic(t *testing.T) {
-	s, _ := testStore(t)
-	current := installPublishedFixture(t, s, 2, AutomaticUpdates)
-	status, err := s.Inspect()
-	require.NoError(t, err)
-	require.Equal(t, current, *status.Release)
-	require.True(t, status.AutomaticUpdates)
-	old, err := s.AcquireSelected()
-	require.NoError(t, err)
-	defer old.Close()
-	next, archive, load := publishedFixture(t, 3)
-	candidate, err := s.BeginPublishedInstall(
-		context.Background(),
-		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
-		},
-		load,
-	)
-	require.NoError(t, err)
-	require.NoError(t, candidate.Import(context.Background(), archive))
-	before, err := s.Inspect()
-	require.NoError(t, err)
-	require.Equal(t, current, *before.Release)
-	require.NoError(t, candidate.Select())
-	require.NoError(t, candidate.Close())
-	status, err = s.Inspect()
-	require.NoError(t, err)
-	require.Equal(t, next, *status.Release)
-	require.Equal(t, next.Manifest, status.Release.Manifest)
-	require.True(t, status.AutomaticUpdates)
-	require.Equal(t, current.Manifest, old.Manifest(), "running processes activate only on restart")
-	_, _, older := publishedFixture(t, 1)
-	_, err = s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{
-		Operation: UpdateRelease,
-	}, older)
-	require.ErrorContains(t, err, "regress")
-	_, err = s.BeginPublishedInstall(
-		context.Background(),
-		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
-		},
-		older,
-	)
-	require.ErrorContains(t, err, "regress")
-	unchanged, err := s.BeginPublishedInstall(
-		context.Background(),
-		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
-		},
-		load,
-	)
-	require.NoError(t, err)
-	require.Nil(t, unchanged)
-}
-
-func TestAutomaticReleaseDoesNotDiscoverWithoutConsent(t *testing.T) {
-	for _, state := range []string{"absent", "manual", "uninstalled"} {
-		t.Run(state, func(t *testing.T) {
-			s, _ := testStore(t)
-			switch state {
-			case "manual":
-				installPublishedFixture(t, s, 1, ManualUpdates)
-			case "uninstalled":
-				installPublishedFixture(t, s, 1, AutomaticUpdates)
-				require.NoError(t, s.Uninstall(context.Background()))
-			}
-			candidate, err := s.BeginPublishedInstall(
-				context.Background(),
-				ReleaseInstallOptions{
-					Operation: AutomaticReleaseUpdate,
-				},
-				func(context.Context) (VerifiedRelease, error) {
-					t.Fatal("automatic update discovered a release without installed consent")
-					return VerifiedRelease{}, nil
-				},
-			)
-			require.NoError(t, err)
-			require.Nil(t, candidate)
-		})
-	}
 }
 
 func TestPublishedDiscoverySerializesUninstallAndCancellation(t *testing.T) {
@@ -194,7 +135,8 @@ func TestPublishedDiscoverySerializesUninstallAndCancellation(t *testing.T) {
 		_, err := s.BeginPublishedInstall(
 			ctx,
 			ReleaseInstallOptions{
-				Operation: AutomaticReleaseUpdate,
+				Operation: InstallRelease,
+				Updates:   ManualUpdates,
 			},
 			func(ctx context.Context) (VerifiedRelease, error) {
 				close(entered)
@@ -215,18 +157,18 @@ func TestPublishedDiscoverySerializesUninstallAndCancellation(t *testing.T) {
 	cancel()
 	require.ErrorIs(t, <-done, context.Canceled)
 	require.NoError(t, other.Uninstall(context.Background()))
-	// A check starting after uninstall cannot resurrect the previous consent.
+	// Pair preparation after uninstall fails before release discovery.
 	_, err = s.BeginPublishedInstall(
 		context.Background(),
 		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
+			Operation: PrepareRelease,
 		},
 		func(context.Context) (VerifiedRelease, error) {
 			t.Fatal("discovered after uninstall")
 			return VerifiedRelease{}, nil
 		},
 	)
-	require.NoError(t, err)
+	require.ErrorContains(t, err, "install an authenticated runtime release before paired preparation")
 }
 
 func TestPublishedInstallRefusesUnverifiedRelease(t *testing.T) {
@@ -283,7 +225,7 @@ func TestCandidateManifestChangesDoNotReachSelection(t *testing.T) {
 
 // A mirror may move the archive without changing executable identity: the
 // prepared generation is reused and the selection stays healthy.
-func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
+func TestExplicitInstallAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 	s, _ := testStore(t)
 	first := installPublishedFixture(t, s, 2, ManualUpdates)
 	moved := first
@@ -297,7 +239,8 @@ func TestPublishedUpdateAcrossArchiveMirrorReusesGeneration(t *testing.T) {
 	})
 	t.Cleanup(func() { http.DefaultTransport = previous })
 	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{
-		Operation: UpdateRelease,
+		Operation: InstallRelease,
+		Updates:   ManualUpdates,
 	},
 		func(context.Context) (VerifiedRelease, error) { return verifyFixture(t, moved) })
 	require.NoError(t, err)
@@ -446,7 +389,8 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	candidate, err := store.BeginPublishedInstall(
 		context.Background(),
 		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
+			Operation: InstallRelease,
+			Updates:   ManualUpdates,
 		},
 		load,
 	)
@@ -462,7 +406,8 @@ func TestPublishedOnlineTrustFailurePreservesInstalledSelection(t *testing.T) {
 	candidate, err = store.BeginPublishedInstall(
 		context.Background(),
 		ReleaseInstallOptions{
-			Operation: AutomaticReleaseUpdate,
+			Operation: InstallRelease,
+			Updates:   ManualUpdates,
 		},
 		load,
 	)
@@ -672,4 +617,15 @@ func TestPublishedEnsureCancellationDuringDiscoveryDoesNotEnroll(t *testing.T) {
 	candidate, _, err := s.BeginPublishedEnsure(context.Background(), load)
 	require.NoError(t, err)
 	require.NoError(t, candidate.Close())
+}
+
+func TestIndependentUpdateOperationIsRejectedBeforeDiscovery(t *testing.T) {
+	s, _ := testStore(t)
+	candidate, err := s.BeginPublishedInstall(context.Background(), ReleaseInstallOptions{Operation: "update"},
+		func(context.Context) (VerifiedRelease, error) {
+			t.Fatal("retired independent update attempted discovery")
+			return VerifiedRelease{}, nil
+		})
+	require.ErrorIs(t, err, errInvalidOperation)
+	require.Nil(t, candidate)
 }

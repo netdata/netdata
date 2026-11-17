@@ -120,11 +120,11 @@ const slotOffset = 32
 // dependency tree with an internal symlink, an entrypoint and fonts. The
 // entrypoint contains label, so each label has its own digest and a test can
 // tell which generation a path belongs to.
-func NewBundle(t testing.TB, label string) Bundle {
+func NewBundle(t testing.TB, label string, extra ...Entry) Bundle {
 	t.Helper()
 	slot := func() []byte { return append([]byte("/not-prepared/"), make([]byte, 1010)...) }
 	program := append([]byte(strings.Repeat("H", slotOffset)), slot()...)
-	archive := NewArchive(t, []Entry{
+	entries := []Entry{
 		{Name: "node/bin/node", Contents: program, Mode: 0755},
 		{Name: "browser/browser", Contents: program, Mode: 0755},
 		{Name: "lib/loader.so", Contents: []byte("loader"), Mode: 0755},
@@ -133,7 +133,8 @@ func NewBundle(t testing.TB, label string) Bundle {
 		{Name: "dependencies/node_modules/package/tool.js", Contents: []byte("tool"), Mode: 0644},
 		{Name: "runner/run.mjs", Contents: []byte(label), Mode: 0644},
 		{Name: "fonts/font.ttf", Contents: []byte("font"), Mode: 0644},
-	})
+	}
+	archive := NewArchive(t, append(entries, extra...))
 	return Bundle{
 		Archive: archive,
 		Layout: Layout{

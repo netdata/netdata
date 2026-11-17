@@ -20,10 +20,14 @@ class BuilderTests(unittest.TestCase):
         assets = Path(__file__).resolve().parents[2] / 'src/dem-runtime'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            entrypoint = bundle.install_runner(assets, root, '2026.10.29.2')
+            release_info = root / 'input-release-info'
+            release_info.write_text('version=v2.12.0-607-nightly\nchannel=nightly\nsource=' + 'a' * 40 + '\n')
+            entrypoint, agent = bundle.install_runner(assets, root, release_info)
+            self.assertEqual(agent['source'], 'a' * 40)
+            self.assertEqual((root / 'release-info').read_bytes(), release_info.read_bytes())
             self.assertEqual(entrypoint, 'runner/run.mjs')
             self.assertEqual(json.loads((root / 'runtime.json').read_text()), {
-                'contract': 2, 'version': '2026.10.29.2',
+                'contract': 2, 'version': 'v2.12.0-607-nightly',
                 'paths': {'dependencies': 'dependencies', 'browser': 'chrome'}})
             names = {'runner/run.mjs', 'runner/reporter.cjs', 'runner/protocol.cjs',
                      'runner/lighthouse.mjs', 'runner/runtime.mjs', 'runner/journey.mjs',

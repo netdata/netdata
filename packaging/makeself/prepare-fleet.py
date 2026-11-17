@@ -205,7 +205,8 @@ def header_info(path, expected):
         if len(found) != 1:
             fail(f'unsupported Makeself assignment: {key}')
         values[key] = found[0]
-    if (values['SIGNATURE'] or values['decrypt_cmd'] or values['targetdir'] != '/opt/netdata'
+    # Official archives formerly extracted directly; current archives stage first.
+    if (values['SIGNATURE'] or values['decrypt_cmd'] or values['targetdir'] not in ('/opt/netdata', 'netdata')
             or values['script'] != './system/post-installer.sh'
             or 'eval "gzip -cd"' not in text):
         fail('only unsigned, unencrypted, single-gzip static Netdata installers are supported')

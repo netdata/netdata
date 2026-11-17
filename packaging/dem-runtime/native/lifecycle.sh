@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
+# shellcheck shell=sh
 # Embedded in each maintscript: pre-unpack hooks cannot load new package files.
 NATIVE_HELPER=/usr/libexec/netdata/plugins.d/dem.plugin
 NATIVE_INTENT_DIR=/run/netdata-dem-runtime
@@ -206,7 +207,7 @@ native_apparmor() {
 
 native_configure() {
     # Also stop a RUM-only Agent restored after an earlier failed configuration,
-    # so a successful retry activates the newly qualified startup selection.
+    # so a successful retry activates the newly validated startup selection.
     native_prepare || return $?
     if native_apparmor load; then :; else
         native_configure_status=$?
@@ -218,7 +219,7 @@ native_configure() {
         native_restore
     else
         native_configure_status=$?
-        native_error 'qualification failed; admission remains closed; restoring eligible non-browser monitoring'
+        native_error 'runtime validation failed; admission remains closed; restoring eligible non-browser monitoring'
         native_restore || :
         return "$native_configure_status"
     fi

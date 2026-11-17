@@ -22,8 +22,9 @@ type nativePhase string
 const (
 	nativeInitializing nativePhase = "initializing"
 	nativeClosed       nativePhase = "closed"
-	nativeQualifying   nativePhase = "qualifying"
-	nativeReady        nativePhase = "ready"
+	// Keep the persisted phase for older helpers and interrupted transactions.
+	nativeQualifying nativePhase = "qualifying"
+	nativeReady      nativePhase = "ready"
 )
 
 type nativeControlRecord struct {
@@ -40,9 +41,9 @@ type nativeControlRecord struct {
 // the root gate: the caller holds that gate continuously through inspection.
 type NativeInspector func(context.Context) (NativeStatus, error)
 
-// NativeQualifier invokes service-UID qualification for this exact target. It
-// returns success only after all checks pass and its candidate/uses are closed.
-type NativeQualifier func(context.Context, Manifest) error
+// NativeValidator verifies this exact payload as the service UID without browser
+// execution. It returns success only after its candidate claim is closed.
+type NativeValidator func(context.Context, Manifest) error
 
 // NativeControl is hook-internal root administration. The package manager must
 // serialize the complete lifecycle, including the interval between closing
@@ -155,35 +156,35 @@ func (c *NativeControl) CloseAdmission(ctx context.Context, inspect NativeInspec
 	return writeNativeControl(c.config, state)
 }
 
-// QualifyAndReady validates complete package files, admits only a candidate for
-// their exact target, and opens ordinary admission after successful qualification
-// and a second empty-proof check. Failed/interrupted qualification remains closed
-// to ordinary consumers; retry reruns qualification, never infers success.
-func (c *NativeControl) QualifyAndReady(ctx context.Context, inspect NativeInspector, qualify NativeQualifier) error {
+// ValidateAndReady validates complete package files, admits only a candidate for
+// their exact target, and opens ordinary admission after successful validation
+// and a second empty-proof check. Failed/interrupted validation remains closed
+// to ordinary consumers; retry reruns validation, never infers success.
+func (c *NativeControl) ValidateAndReady(ctx context.Context, inspect NativeInspector, validate NativeValidator) error {
 	if err := nativeRootIdentity(); err != nil {
 		return err
 	}
-	if qualify == nil {
-		return errors.New("native qualification callback is required")
+	if validate == nil {
+		return errors.New("native validation callback is required")
 	}
-	target, qualifying, err := c.beginQualification(ctx, inspect)
-	if err != nil || !qualifying {
+	target, validating, err := c.beginValidation(ctx, inspect)
+	if err != nil || !validating {
 		return err
 	}
-	// The gate is released during qualification: the service-UID checks take it
+	// The gate is released during validation: the service-UID checks take it
 	// shared for their candidate and uses.
-	if err := qualify(ctx, target); err != nil {
+	if err := validate(ctx, target); err != nil {
 		return err
 	}
-	return c.finishQualification(ctx, inspect, target)
+	return c.finishValidation(ctx, inspect, target)
 }
 
-// beginQualification records the installed payload as the qualifying target
-// under the exclusive gate. An unchanged ready package needs no qualification.
-func (c *NativeControl) beginQualification(
+// beginValidation records the installed payload as the validating target
+// under the exclusive gate. An unchanged ready package needs no validation.
+func (c *NativeControl) beginValidation(
 	ctx context.Context,
 	inspect NativeInspector,
-) (_ Manifest, qualifying bool, result error) {
+) (_ Manifest, validating bool, result error) {
 	gate, err := lockNativeGate(ctx, c.config, true)
 	if err != nil {
 		return Manifest{}, false, err
@@ -199,7 +200,7 @@ func (c *NativeControl) beginQualification(
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
 		return Manifest{}, false, err
 	}
-	_, target, err := readNativePayload(c.config.PayloadPath)
+	_, target, err := readNativePayload(c.config)
 	if err != nil {
 		return Manifest{}, false, err
 	}
@@ -213,9 +214,9 @@ func (c *NativeControl) beginQualification(
 	return target, true, writeNativeControl(c.config, state)
 }
 
-// finishQualification opens ordinary admission only while the gate and payload
-// still name the qualified target and qualification left no proof behind.
-func (c *NativeControl) finishQualification(
+// finishValidation opens ordinary admission only while the gate and payload
+// still name the validated target and validation left no proof behind.
+func (c *NativeControl) finishValidation(
 	ctx context.Context,
 	inspect NativeInspector,
 	target Manifest,
@@ -230,14 +231,14 @@ func (c *NativeControl) finishQualification(
 		return err
 	}
 	if state.Phase != nativeQualifying || state.Target == nil || !sameManifest(*state.Target, target) {
-		return errors.New("native qualification admission changed before completion")
+		return errors.New("native validation admission changed before completion")
 	}
-	_, actual, err := readNativePayload(c.config.PayloadPath)
+	_, actual, err := readNativePayload(c.config)
 	if err != nil {
 		return err
 	}
 	if !sameManifest(actual, target) {
-		return errors.New("native payload changed during qualification")
+		return errors.New("native payload changed during validation")
 	}
 	if err := inspectNativeEmpty(ctx, inspect); err != nil {
 		return err
@@ -320,7 +321,7 @@ func readNativeControl(config NativeConfig) (nativeControlRecord, error) {
 		if state.Target == nil {
 			return state, errors.New("native gate is missing its target")
 		}
-		if err := state.Target.Validate(); err != nil {
+		if err := state.Target.ValidateMetadata(); err != nil {
 			return state, err
 		}
 	default:

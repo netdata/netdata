@@ -132,10 +132,10 @@ func TestBoundPayloadRequiresExecuteBitOfRunningClass(t *testing.T) {
 			for _, executable := range executables {
 				require.NoError(t, root.Chmod(executable, test.base))
 			}
-			require.NoError(t, verifyBoundPayload(root, m, test.execute))
+			require.NoError(t, verifyBoundPayload(root, "/prepared/runtime", m, test.execute))
 			for _, executable := range executables {
 				require.NoError(t, root.Chmod(executable, test.mode))
-				err := verifyBoundPayload(root, m, test.execute)
+				err := verifyBoundPayload(root, "/prepared/runtime", m, test.execute)
 				if test.valid {
 					require.NoError(t, err, executable)
 				} else {
@@ -174,9 +174,82 @@ func TestBoundPayloadStructuralDamageIsDamage(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			root, m := boundPayloadFixture(t)
 			damage(t, root, m)
-			err := verifyBoundPayload(root, m, ownerExecute)
+			err := verifyBoundPayload(root, "/prepared/runtime", m, ownerExecute)
 			require.Error(t, err)
 			require.ErrorIs(t, selectedPayloadError(err), ErrDamaged)
+		})
+	}
+}
+
+// corruptBoundPayload changes deterministic binding output without changing
+// file kinds, permissions, prepared metadata or authenticated release identity.
+func corruptBoundPayload(t *testing.T, root *os.Root, m Manifest, fault string) {
+	t.Helper()
+	name := fault
+	data := []byte("damaged binding\n")
+	switch fault {
+	case "node interpreter", "browser interpreter", "truncated interpreter":
+		name = m.Layout.Node
+		if fault == "browser interpreter" {
+			name = m.Layout.Browser
+		}
+		var binding Binding
+		for _, b := range m.Bindings {
+			if b.Path == name {
+				binding = b
+			}
+		}
+		original, err := root.ReadFile(name)
+		require.NoError(t, err)
+		if fault == "truncated interpreter" {
+			data = original[:binding.Offset+1]
+		} else {
+			data = original
+			data[binding.Offset] = '!'
+		}
+	case "extended configuration":
+		name = fontConfigName
+		original, err := root.ReadFile(name)
+		require.NoError(t, err)
+		data = append(original, '!')
+	}
+	info, err := root.Stat(name)
+	require.NoError(t, err)
+	require.NoError(t, root.Chmod(name, info.Mode().Perm()|0200))
+	require.NoError(t, root.WriteFile(name, data, info.Mode().Perm()))
+	require.NoError(t, root.Chmod(name, info.Mode().Perm()))
+}
+
+func TestBoundPayloadRejectsCorruptedBinding(t *testing.T) {
+	for _, fault := range []string{launcherName, fontConfigName, "node interpreter", "browser interpreter", "truncated interpreter", "extended configuration"} {
+		t.Run(fault, func(t *testing.T) {
+			root, m := boundPayloadFixture(t)
+			corruptBoundPayload(t, root, m, fault)
+			err := verifyBoundPayload(root, "/prepared/runtime", m, ownerExecute)
+			require.Error(t, err)
+			require.ErrorIs(t, selectedPayloadError(err), ErrDamaged)
+		})
+	}
+}
+
+func TestBoundPayloadKeepsBindingReadFailures(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission failure requires an unprivileged identity")
+	}
+	for _, name := range []string{launcherName, fontConfigName, "node"} {
+		t.Run(name, func(t *testing.T) {
+			root, m := boundPayloadFixture(t)
+			if name == "node" {
+				name = m.Layout.Node
+			}
+			info, err := root.Stat(name)
+			require.NoError(t, err)
+			require.NoError(t, root.Chmod(name, info.Mode().Perm()&^0400))
+			t.Cleanup(func() { require.NoError(t, root.Chmod(name, info.Mode().Perm())) })
+			err = verifyBoundPayload(root, "/prepared/runtime", m, ownerExecute)
+			require.ErrorIs(t, err, os.ErrPermission)
+			require.ErrorIs(t, selectedPayloadError(err), os.ErrPermission)
+			require.NotErrorIs(t, selectedPayloadError(err), ErrDamaged)
 		})
 	}
 }

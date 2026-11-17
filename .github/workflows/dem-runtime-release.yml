@@ -1,49 +1,65 @@
 ---
-name: DEM Runtime Release
+name: DEM Runtime Companion
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
+      source_sha:
+        description: Frozen Agent source commit
+        required: true
+        type: string
+      channel:
+        description: Agent release channel (stable, nightly or devel)
+        required: true
+        type: string
       publish:
-        description: Publish after protected-environment qualification approval
+        description: Publish the tested companion before Agent release fanout
         type: boolean
         default: false
-      sequence:
-        description: Positive independent channel sequence (required to publish)
-        type: string
-        default: '0'
-      package_release:
-        description: Positive native package revision
-        type: string
-        default: '1'
+    outputs:
+      run_id:
+        description: Parent run containing the exact architecture artifacts
+        value: ${{ jobs.matrix.outputs.run_id }}
 permissions:
   contents: read
-# Never cancel a publisher or run two writers to the latest channel together.
 concurrency:
-  group: dem-runtime-release
+  group: dem-runtime-companion-${{ inputs.publish && inputs.channel || github.run_id }}
   cancel-in-progress: false
 jobs:
-  runtime-wire:
-    uses: ./.github/workflows/dem-runtime-node-tests.yml
   matrix:
     name: Select native runners from the shared distro catalog
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
+      run_id: ${{ github.run_id }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha }}
           persist-credentials: false
+      - name: Stamp the exact Agent identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Install catalog reader
         run: |
           sudo apt-get update
           sudo apt-get install -y python3-ruamel.yaml
+      - name: Check the coupled workflow contracts
+        run: python3 -m unittest discover -s .github/scripts/tests -p test_dem_paired_workflows.py -v
       - id: matrix
         run: |
           matrix="$(python3 packaging/dem-runtime/ci.py build-matrix)"
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
+  runtime-wire:
+    name: Test the frozen runtime wire contract
+    uses: ./.github/workflows/dem-runtime-node-tests.yml
+    with:
+      source_sha: ${{ inputs.source_sha }}
+
   build:
-    name: Build ${{ matrix.arch }} portable/native runtime and sources
+    name: Build and qualify ${{ matrix.arch }} companion
     needs: [matrix, runtime-wire]
     strategy:
       fail-fast: false
@@ -53,56 +69,159 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha }}
           persist-credentials: false
+      - name: Stamp the exact Agent identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
           cache-dependency-path: src/go/go.sum
-      - name: Install packaging tools
+      - name: Install build and smoke-test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake rpm zstd
-      - name: Build the release tool and portable runtime
+          sudo apt-get install -y gnupg zstd jq apparmor
+      - name: Install ARM package inspection tools
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get install -y cmake rpm cpio dpkg-dev python3-ruamel.yaml
+          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio; do command -v "$tool"; done
+      - name: Check ARM package bytes
+        if: matrix.arch == 'arm64'
+        run: python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
+      - name: Check ARM paired lifecycle
+        if: matrix.arch == 'arm64'
+        working-directory: src/go
+        run: |
+          go test -count=1 -run 'Pair|Recovery|RuntimeFetchPrepareActivateAndRollback' \
+            ./plugin/dem/synthetic/browserruntime ./cmd/demplugin
+      - name: Build portable runtime and matching sources
         env:
           DEM_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
           python3 packaging/dem-runtime/build.py --arch "$DEM_ARCH" --output "$RUNNER_TEMP/runtime"
-      - name: Assemble complete corresponding sources and native packages
-        env:
-          DEM_ARCH: ${{ matrix.arch }}
-          DEM_PACKAGE_RELEASE: ${{ inputs.package_release }}
-        run: |
-          set -euo pipefail
           python3 packaging/dem-runtime/sources.py --runtime-output "$RUNNER_TEMP/runtime" \
             --output "$RUNNER_TEMP/sources" --archive-output "$RUNNER_TEMP/source-archive"
           python3 packaging/dem-runtime/release.py assemble --arch "$DEM_ARCH" \
             --runtime-output "$RUNNER_TEMP/runtime" --source-archive "$RUNNER_TEMP/source-archive" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --package-release "$DEM_PACKAGE_RELEASE" \
-            --output "$RUNNER_TEMP/artifacts"
+            --release-tool "$RUNNER_TEMP/dem-runtime-release" --output "$RUNNER_TEMP/artifacts"
+      - name: Compile the exact Agent CLI and supervisor for qualification
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          helper_dir="$RUNNER_TEMP/runtime-smoke/bin"
+          mkdir -p "$helper_dir"
+          cat > "$helper_dir/config.h" <<'CONFIG'
+          #define _GNU_SOURCE 1
+          #define NETDATA_USER "nobody"
+          #define HAVE_SETRESUID 1
+          #define HAVE_SETRESGID 1
+          CONFIG
+          cc -std=gnu11 -Wall -Wextra -Werror \
+            -I "$helper_dir" -I src/collectors/utils \
+            src/collectors/utils/nd-run.c src/collectors/utils/nd-file-reader.c \
+            src/collectors/utils/nd-process-tree.c -o "$helper_dir/nd-run"
+          version="$(sed -n 's/^version=//p' packaging/release-info)"
+          buildinfo=github.com/netdata/netdata/go/plugins/pkg/buildinfo
+          (cd src/go && go build -trimpath \
+            -ldflags "-X $buildinfo.ReleaseVersion=$version -X $buildinfo.ReleaseChannel=$CHANNEL -X $buildinfo.ReleaseRef=$SOURCE_SHA -X $buildinfo.NetdataBinDir=$helper_dir" \
+            -o "$helper_dir/dem.plugin" ./cmd/demplugin)
+      - name: Sign a disposable candidate and run real sandboxed browser workloads
+        env:
+          DEM_ARCH: ${{ matrix.arch }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -euo pipefail
+          export GNUPGHOME="$RUNNER_TEMP/smoke-gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          gpg --batch --passphrase '' --quick-gen-key 'Runtime CI <runtime-ci@example.invalid>' ed25519 sign 0
+          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" {print $10; exit}')"
+          gpg --batch --export "$fingerprint" > "$RUNNER_TEMP/smoke-public.gpg"
+          version="$(sed -n 's/^version=//p' packaging/release-info)"
+          archive="$RUNNER_TEMP/artifacts/$(jq -r '.archive.sha256' "$RUNNER_TEMP/artifacts/manifest.json").tar.zst"
+          sources="$RUNNER_TEMP/artifacts/$(jq -r '.file' "$RUNNER_TEMP/artifacts/source-archive.json")"
+          "$RUNNER_TEMP/dem-runtime-release" sign --key "$fingerprint" --public-key "$RUNNER_TEMP/smoke-public.gpg" \
+            --manifest "$RUNNER_TEMP/artifacts/manifest.json" --archive "$archive" --sources "$sources" \
+            --archive-url "https://example.invalid/$DEM_ARCH/runtime.tar.zst" \
+            --sources-url "https://example.invalid/$DEM_ARCH/sources.tar.zst" \
+            --agent-version "$version" --agent-channel "$CHANNEL" --agent-source "$SOURCE_SHA" \
+            --output "$RUNNER_TEMP/smoke-release.json"
+          mkdir -p "$RUNNER_TEMP/runtime-smoke/config"
+          printf 'runtime:\n  offline_keyring: "%s"\n' "$RUNNER_TEMP/smoke-public.gpg" > "$RUNNER_TEMP/runtime-smoke/config/dem.conf"
+          sudo sh packaging/installer/netdata-dem-runtime.sh policy-prepare \
+            --deployment "runtime-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$DEM_ARCH" \
+            --runtime-root "$RUNNER_TEMP/runtime-smoke/cache"
+          touch "$RUNNER_TEMP/runtime-policy-registered"
+          "$RUNNER_TEMP/runtime-smoke/bin/dem.plugin" runtime install \
+            --config-dir "$RUNNER_TEMP/runtime-smoke/config" --cache "$RUNNER_TEMP/runtime-smoke/cache" \
+            --release "$RUNNER_TEMP/smoke-release.json" --archive "$archive"
+          touch "$RUNNER_TEMP/runtime-smoke-execution-attempted"
+          "$RUNNER_TEMP/runtime-smoke/bin/dem.plugin" runtime qualify \
+            --config-dir "$RUNNER_TEMP/runtime-smoke/config" --cache "$RUNNER_TEMP/runtime-smoke/cache" \
+            > "$RUNNER_TEMP/qualification.json"
+          jq -e '.state == "qualified" and .qualification.execution_contract and
+            .qualification.sandboxed_local_journey and .qualification.sandboxed_local_lighthouse and
+            .qualification.process_tree_drained and .runtime == .qualification.runtime' "$RUNNER_TEMP/qualification.json"
+      - name: Retire smoke installation and its host allowance
+        if: always()
+        env:
+          DEM_ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          if [ -f "$RUNNER_TEMP/runtime-policy-registered" ]; then
+            if [ -d "$RUNNER_TEMP/runtime-smoke/cache" ]; then
+              "$RUNNER_TEMP/runtime-smoke/bin/dem.plugin" runtime uninstall \
+                --config-dir "$RUNNER_TEMP/runtime-smoke/config" --cache "$RUNNER_TEMP/runtime-smoke/cache"
+            elif [ -e "$RUNNER_TEMP/runtime-smoke/cache" ] || [ -L "$RUNNER_TEMP/runtime-smoke/cache" ] || \
+                 [ -f "$RUNNER_TEMP/runtime-smoke-execution-attempted" ]; then
+              echo 'Cannot prove smoke execution drained; retain its host allowance' >&2
+              exit 1
+            fi
+            # No cache before qualification means install never executed a browser.
+            # Otherwise the successful uninstall above supplied the drain proof.
+            sudo sh packaging/installer/netdata-dem-runtime.sh policy-remove \
+              --deployment "runtime-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$DEM_ARCH" --deployments-stopped
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dem-runtime-${{ matrix.arch }}
+          overwrite: true
           path: ${{ runner.temp }}/artifacts/
           compression-level: 0
           retention-days: 30
           if-no-files-found: error
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: dem-qualification-${{ matrix.arch }}
+          overwrite: true
+          path: ${{ runner.temp }}/qualification.json
+          if-no-files-found: ignore
 
   publish:
-    name: Sign, publish and promote the qualified release
+    name: Publish the tested Agent companion
     needs: build
-    if: inputs.publish && github.repository == 'netdata/netdata' && github.ref == 'refs/heads/master'
+    if: inputs.publish && github.repository == 'netdata/netdata'
     runs-on: ubuntu-latest
     timeout-minutes: 90
-    # Configure required reviewers/branch restrictions before enabling this job.
-    # Reviewers verify both architecture artifacts, source/license completeness,
-    # real target qualification and confirmed publication routes/key custody.
-    environment: dem-runtime-release
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha }}
           persist-credentials: false
+      - name: Stamp the exact Agent identity
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          CHANNEL: ${{ inputs.channel }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: src/go/go.mod
@@ -111,38 +230,41 @@ jobs:
         with:
           pattern: dem-runtime-*
           path: ${{ runner.temp }}/artifacts
+      - name: Prepare the exact publication receipt
+        run: |
+          mkdir "$RUNNER_TEMP/publication-receipt"
+          cp packaging/release-info "$RUNNER_TEMP/publication-receipt/release-info"
+          for arch in amd64 arm64; do
+            cp "$RUNNER_TEMP/artifacts/dem-runtime-$arch/artifacts.json" "$RUNNER_TEMP/publication-receipt/$arch.json"
+          done
+          python3 packaging/dem-runtime/ci.py verify-publication-receipt \
+            --receipt "$RUNNER_TEMP/publication-receipt" --release-info packaging/release-info
       - name: Require confirmed publication configuration
         env:
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
-        run: |
-          set -eu
-          test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE"
+        run: test -n "$PUBLIC_BASE" && test -n "$R2_REMOTE"
       - name: Install publication tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnupg rclone rsync debsigs rpm python3-ruamel.yaml
+          sudo apt-get install -y gnupg rclone zstd
           (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
-      - name: Import package and runtime signing key
+      - name: Import the existing package signing key
         id: package-key
         uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.NETDATABOT_PACKAGE_SIGNING_KEY }}
-      - name: Fetch current package-signing public keyring
-        run: |
-          python3 packaging/dem-runtime/release.py fetch-public-key --output "$RUNNER_TEMP/release-public.gpg"
-      - name: Sign complete runtime descriptors
+      - name: Fetch the canonical package-signing public keyring
+        run: python3 packaging/dem-runtime/release.py fetch-public-key --output "$RUNNER_TEMP/release-public.gpg"
+      - name: Sign the complete paired descriptors
         env:
           PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
-          SEQUENCE: ${{ inputs.sequence }}
         run: |
-          set -euo pipefail
           python3 packaging/dem-runtime/release.py stage --artifacts "$RUNNER_TEMP/artifacts" \
-            --output "$RUNNER_TEMP/publication" --sequence "$SEQUENCE" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --signing-key "$PACKAGE_KEY" \
-            --public-key "$RUNNER_TEMP/release-public.gpg" --public-base "$PUBLIC_BASE"
-      - name: Publish and verify immutable R2 runtime/source objects
+            --output "$RUNNER_TEMP/publication" --release-tool "$RUNNER_TEMP/dem-runtime-release" \
+            --signing-key "$PACKAGE_KEY" --public-key "$RUNNER_TEMP/release-public.gpg" --public-base "$PUBLIC_BASE"
+      - name: Publish immutable payloads and descriptors
         env:
           PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
           R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
@@ -157,42 +279,12 @@ jobs:
           python3 packaging/dem-runtime/release.py publish --publication "$RUNNER_TEMP/publication" \
             --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
             --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
-      - name: Authenticate package upload
-        uses: shimataro/ssh-key-action@87a8f067114a8ce263df83e9ed5c849953548bc3 # v2.8.1
+
+      - name: Record successful companion publication
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          key: ${{ secrets.NETDATABOT_PACKAGES_SSH_KEY }}
-          name: id_ecdsa
-          known_hosts: ${{ secrets.PACKAGES_KNOWN_HOSTS }}
-      - name: Sign native packages and submit to the existing repositories
-        env:
-          PACKAGE_KEY: ${{ steps.package-key.outputs.fingerprint }}
-        run: |
-          set -euo pipefail
-          for arch in amd64 arm64; do
-            artifacts="$RUNNER_TEMP/artifacts/dem-runtime-$arch"
-            debsigs --sign=origin --default-key="$PACKAGE_KEY" "$artifacts"/*.deb
-            rpmsign --define "_gpg_name $PACKAGE_KEY" --define '__gpg /usr/bin/gpg' --addsign "$artifacts"/*.rpm
-          done
-          python3 packaging/dem-runtime/ci.py upload-native --artifacts "$RUNNER_TEMP/artifacts"
-      - name: Promote latest after all immutable objects are publicly verified
-        env:
-          PUBLIC_BASE: ${{ vars.DEM_RUNTIME_PUBLIC_BASE_URL }}
-          R2_REMOTE: ${{ vars.DEM_RUNTIME_R2_REMOTE }}
-          RCLONE_CONFIG_S3_TYPE: s3
-          RCLONE_CONFIG_S3_PROVIDER: Cloudflare
-          RCLONE_CONFIG_S3_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY }}
-          RCLONE_CONFIG_S3_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_KEY }}
-          RCLONE_CONFIG_S3_ENDPOINT: ${{ secrets.CLOUDFLARE_R2_RELEASE_ENDPOINT }}
-          RCLONE_CONFIG_S3_REGION: auto
-        run: |
-          python3 packaging/dem-runtime/release.py promote --publication "$RUNNER_TEMP/publication" \
-            --release-tool "$RUNNER_TEMP/dem-runtime-release" --public-key "$RUNNER_TEMP/release-public.gpg" \
-            --public-base "$PUBLIC_BASE" --remote "$R2_REMOTE"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: always()
-        with:
-          name: dem-runtime-publication
-          path: ${{ runner.temp }}/publication/
-          compression-level: 0
+          name: dem-runtime-publication-receipt
+          overwrite: true
+          path: ${{ runner.temp }}/publication-receipt/
+          if-no-files-found: error
           retention-days: 30
-          if-no-files-found: ignore

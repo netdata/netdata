@@ -212,13 +212,15 @@ managed
     docker_identity_check || return $?
     if [ "$docker_dry" = yes ]; then
         docker_error "dry-run: target=$docker_id service=$docker_credentials root=/var/lib/netdata/dem/runtime host-policy=$docker_policy registration-token=$docker_token"
-        docker_error 'Would ensure a signed runtime with daily automatic preparation on first enrollment; no host policy or runtime was changed.'
+        docker_error 'Would install the matching signed runtime and permit paired companion downloads on first enrollment; no host policy or runtime was changed.'
         return 0
     fi
-    docker_error 'Ensuring a signed browser runtime; first enrollment permits network acquisition and daily automatic preparation. Existing selection and update consent are preserved.'
+    docker_error 'Ensuring the matching signed browser runtime; first enrollment permits paired network acquisition. Existing selection and update consent are preserved.'
     if [ "$docker_policy" = needed ]; then
         docker_policy=attempted
         docker_partial
+        # The sourced host-policy implementation reads this registration path.
+        # shellcheck disable=SC2034
         if (host_docker_policy_helper=$0; host_main policy-prepare --deployment "$docker_token" --runtime-root /var/lib/netdata/dem/runtime); then docker_policy=ready;
         else docker_rc=$?; docker_partial; return "$docker_rc"; fi
     elif [ -e "$HOST_STATE/registrations/deployment-$docker_token" ]; then

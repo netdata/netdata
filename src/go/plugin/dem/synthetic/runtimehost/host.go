@@ -43,7 +43,6 @@ type Host struct {
 	sweepInterval   time.Duration
 	closeOnce       sync.Once
 	closeErr        error
-	updater         *Updater
 }
 
 type processConsumer interface {
@@ -206,17 +205,11 @@ func (h *Host) sweep() {
 	change.log(h.log)
 }
 
-// Close follows joined jobs, joins the updater and the maintenance worker,
+// Close follows joined jobs, joins the maintenance worker,
 // releases process protection, and leaves the caller-supplied store open.
 // Uncertain executions retain their own receipts.
 func (h *Host) Close() error {
 	h.closeOnce.Do(func() {
-		h.mu.Lock()
-		updater := h.updater
-		h.mu.Unlock()
-		if updater != nil {
-			h.closeErr = updater.Close()
-		}
 		h.mu.Lock()
 		h.closed = true
 		if h.cancel != nil {
@@ -228,7 +221,7 @@ func (h *Host) Close() error {
 			<-h.done
 		}
 		if h.consumer != nil {
-			h.closeErr = errors.Join(h.closeErr, h.consumer.Close())
+			h.closeErr = h.consumer.Close()
 		}
 	})
 	return h.closeErr

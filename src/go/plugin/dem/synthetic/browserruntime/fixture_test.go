@@ -15,9 +15,19 @@ import (
 )
 
 // bundleFixture is the shared payload described by a manifest for this host.
-func bundleFixture(t testing.TB, label string) (Manifest, []byte) {
+func bundleFixture(t testing.TB, label string, extra ...browserruntimetest.Entry) (Manifest, []byte) {
 	t.Helper()
-	b := browserruntimetest.NewBundle(t, label)
+	hasReleaseInfo := false
+	for _, entry := range extra {
+		hasReleaseInfo = hasReleaseInfo || entry.Name == releaseInfoName
+	}
+	if !hasReleaseInfo {
+		extra = append(extra, browserruntimetest.Entry{
+			Name: releaseInfoName, Mode: 0644,
+			Contents: []byte("version=test-1\nchannel=stable\nsource=" + strings.Repeat("a", 40) + "\n"),
+		})
+	}
+	b := browserruntimetest.NewBundle(t, label, extra...)
 	m := Manifest{
 		Format:   1,
 		Contract: 2,

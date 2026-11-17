@@ -36,6 +36,7 @@ type reservation struct {
 type inventory struct {
 	ownershipInventory
 	release          *Release // selected release; nil when nothing is selected
+	recovery         pairRecovery
 	automaticUpdates bool
 	selectionError   error
 	generationErrors map[string]error
@@ -64,10 +65,15 @@ func (s *Store) lenientInventoryLocked(reconcile bool) (inventory, error) {
 			return inventory{}, err
 		}
 	}
+	recovery, err := s.readPairRecovery()
+	if err != nil {
+		return inventory{}, err
+	}
 	inv, err := s.ownershipInventoryLocked(reconcile)
 	if err != nil {
 		return inv, err
 	}
+	inv.recovery = recovery
 	inv.generationErrors = make(map[string]error)
 	record, err := s.readSelectionRecord()
 	if err != nil {
@@ -203,7 +209,7 @@ func (inv inventory) selected() *Manifest {
 }
 
 func (inv inventory) protected(id string) bool {
-	return inv.isSelected(id) || inv.processes[id] > 0 ||
+	return inv.isSelected(id) || inv.recovery.protects(id) || inv.processes[id] > 0 ||
 		inv.candidates[id] > 0 ||
 		inv.preparing[id] > 0 ||
 		inv.uses[id] > 0

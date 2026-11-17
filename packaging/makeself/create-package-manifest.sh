@@ -8,6 +8,8 @@ inventory_failed() {
 }
 trap 'inventory_failed "$?" "$BASH_COMMAND"' ERR
 printf 'Creating package path inventory in %q\n' "${1:?package tree required}" >&2
+# Ship the same bounded owner helper used by the source installer.
+install -m 755 "$(dirname "$0")/../installer/netdata-dem-pair.sh" "$1/system/netdata-dem-pair.sh"
 cd "$1"
 # Service roots and their contents have explicit initialization/migration policies.
 find . \

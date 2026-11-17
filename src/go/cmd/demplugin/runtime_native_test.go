@@ -11,12 +11,11 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNativeRuntimeDispatchRejectsOverrides(t *testing.T) {
-	for _, args := range [][]string{{"native-unknown"}, {"native-prepare", "--root", "/other"}, {"native-configure", "--service", "root"}, {"native-inspect", "stray"}, {"native-qualify", "--no-sandbox"}} {
+	for _, args := range [][]string{{"native-unknown"}, {"native-prepare", "--root", "/other"}, {"native-configure", "--service", "root"}, {"native-inspect", "stray"}, {"native-validate", "--no-sandbox"}, {"native-status", "--root", "/other"}} {
 		var output bytes.Buffer
 		err := runRuntimeCommand(context.Background(), args, nil, &output, &output)
 		require.Error(t, err)
@@ -45,48 +44,35 @@ func TestNativeProtocolIsBoundedAndStrict(t *testing.T) {
 	require.Equal(t, 2, status.UncertainPins)
 }
 
-func TestNativeQualificationRequiresEveryProofAndExactIdentity(t *testing.T) {
+func TestNativeValidationRequiresAcknowledgementAndExactIdentity(t *testing.T) {
 	target := browserruntime.Manifest{
 		Version:  "fixture",
-		Contract: 1,
-		Archive: browserruntime.Archive{
-			SHA256: strings.Repeat("a", 64),
-		},
+		Contract: 2,
+		Archive:  browserruntime.Archive{SHA256: strings.Repeat("a", 64)},
 	}
-	qualified := runner.Qualification{
-		ExecutionContract:        true,
-		SandboxedLocalJourney:    true,
-		SandboxedLocalLighthouse: true,
-		ProcessTreeDrained:       true,
-		Runtime: &synthetic.RuntimeIdentity{
-			Version:  target.Version,
-			Contract: target.Contract,
-			SHA256:   target.Archive.SHA256,
-		},
-	}
-	encode := func(value runner.Qualification) []byte {
+	identity := target.Identity()
+	validated := nativeValidation{Validated: true, Runtime: &identity}
+	encode := func(value nativeValidation) []byte {
 		data, err := json.Marshal(value)
 		require.NoError(t, err)
 		return data
 	}
-	require.NoError(t, verifyNativeQualification(encode(qualified), target))
-	for _, change := range []func(*runner.Qualification){
-		func(q *runner.Qualification) { q.ExecutionContract = false },
-		func(q *runner.Qualification) { q.SandboxedLocalJourney = false },
-		func(q *runner.Qualification) { q.SandboxedLocalLighthouse = false },
-		func(q *runner.Qualification) { q.ProcessTreeDrained = false },
-		func(q *runner.Qualification) { q.Runtime = nil },
-		func(q *runner.Qualification) {
-			q.Runtime = &synthetic.RuntimeIdentity{
-				Version:  "different",
-				Contract: 1,
-				SHA256:   target.Archive.SHA256,
+	require.NoError(t, verifyNativeValidation(encode(validated), target))
+	for _, change := range []func(*nativeValidation){
+		func(v *nativeValidation) { v.Validated = false },
+		func(v *nativeValidation) { v.Runtime = nil },
+		func(v *nativeValidation) {
+			v.Runtime = &synthetic.RuntimeIdentity{
+				Version: "different", Contract: target.Contract, SHA256: target.Archive.SHA256,
 			}
 		},
 	} {
-		value := qualified
+		value := validated
 		change(&value)
-		require.Error(t, verifyNativeQualification(encode(value), target))
+		require.Error(t, verifyNativeValidation(encode(value), target))
 	}
-	require.Error(t, verifyNativeQualification([]byte("{}"), target))
+	for _, value := range []string{"{}", "null", `{"validated":true}`, `{"validated":true,"runtime":null}`,
+		`{"validated":true,"runtime":{},"sandboxed_local_journey":true}`} {
+		require.Error(t, verifyNativeValidation([]byte(value), target))
+	}
 }

@@ -174,11 +174,13 @@ async def read_logs(
     lines: int,
     grep: str | None,
     priority: str | None,
+    since: float | None = None,
 ) -> str:
     """Run ``journalctl`` read-only and return its combined output.
 
     Scopes to ``SYSLOG_IDENTIFIER=<identifier>`` and, when ``pid`` is given, to
-    that process. Field matches and options may be freely mixed.
+    that process, and when ``since`` (unix seconds) is given, to entries from
+    then on. Field matches and options may be freely mixed.
     """
     cmd = [
         "journalctl",
@@ -190,6 +192,8 @@ async def read_logs(
         cmd += ["-p", priority]
     if grep:
         cmd += ["--grep", grep]
+    if since is not None:
+        cmd += ["--since", f"@{int(since)}"]
     cmd.append(f"SYSLOG_IDENTIFIER={identifier}")
     if pid is not None:
         cmd.append(f"_PID={pid}")

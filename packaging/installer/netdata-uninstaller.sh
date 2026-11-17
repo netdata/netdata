@@ -803,18 +803,19 @@ remove_dem_runtime() {
     if [ "${DEM_DEPLOYMENTS_STOPPED:-0}" = 1 ]; then
       set -- "$@" --deployments-stopped
     fi
-    run "${dem_helper}" "$@"
+    run "${dem_helper}" "$@" || return $?
   elif [ -e "${dem_prefix}/usr/libexec/netdata/plugins.d/dem.plugin" ] ||
        [ -L "${dem_helper}" ]; then
     error "DEM host setup helper is missing or unusable; runtime drainage cannot be established. Repair the installation before removing it."
     return 1
   fi
+  return 0
 }
 
 remove_dem_runtime_or_exit() {
   if remove_dem_runtime "$@"; then :; else
     dem_remove_status=$?
-    error "DEM runtime removal refused or failed. No Agent files were erased; stop standalone consumers and resolve the reported runtime/policy state before retrying."
+    error "DEM runtime removal refused or failed. No Agent files were erased; resolve the reported runtime/policy/ownership state before retrying."
     # Keep the original helper failure instead of the generic incomplete-removal trap.
     trap - EXIT
     exit "${dem_remove_status}"

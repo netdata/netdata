@@ -6,12 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -138,6 +140,45 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 			report, err = runtimeCommand(t, append(args, "--cache", override)...)
 			require.Error(t, err)
 			require.Equal(t, override, report.CachePath)
+		})
+	}
+}
+
+func TestRuntimeConfigurationUsesExactReleaseDefaultAndPreservesOverrides(t *testing.T) {
+	for name, tc := range map[string]struct {
+		agent    browserruntime.AgentRelease
+		stock    bool
+		body     string
+		override *string
+	}{
+		"stable default":  {agent: fixtureAgent("v2.12.0")},
+		"stock default":   {agent: fixtureAgent("v2.12.0"), stock: true},
+		"nightly default": {agent: browserruntime.AgentRelease{Version: "v2.12.0-9-nightly", Channel: "nightly", Source: fixtureAgent("").Source}},
+		"explicit empty":  {agent: fixtureAgent("v2.12.0"), body: "runtime:\n  release_url: ''\n", override: new("")},
+		"explicit URL": {agent: fixtureAgent("v2.12.0"), body: "runtime:\n  release_url: https://example.invalid/offline-release.json\n",
+			override: new("https://example.invalid/offline-release.json")},
+		"developer": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setRuntimeAgent(t, tc.agent)
+			root := t.TempDir()
+			if tc.stock {
+				body, err := os.ReadFile("../../plugin/dem/config/dem.conf")
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), body, 0600))
+			} else if tc.body != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), []byte(tc.body), 0600))
+			}
+			config, err := dem.LoadConfig([]string{root})
+			require.NoError(t, err)
+			want := ""
+			if tc.agent.Version != "" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") {
+				want = "https://artifacts.netdata.cloud/dem-runtime/" + tc.agent.Channel + "/" + tc.agent.Version + "/" + runtime.GOARCH + "/release.json"
+			}
+			if tc.override != nil {
+				want = *tc.override
+			}
+			require.Equal(t, want, config.Runtime.ReleaseURL)
 		})
 	}
 }

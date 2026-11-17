@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"syscall"
 )
 
 // errPreloadDamaged reports damage in a sealed preload. Managed repair refuses
@@ -20,7 +21,7 @@ type preloadRecord struct {
 	Path     string   `json:"path"`
 }
 
-// SealPreload finishes a new administrator-owned root after qualification. The
+// SealPreload finishes a new administrator-owned root after preparation. The
 // administrator must keep it immutable and stop every consumer before removal.
 // Native package replacement coordination is a separate delivery contract.
 func (c *Candidate) SealPreload() error {
@@ -42,6 +43,12 @@ func (c *Candidate) SealPreload() error {
 		if _, err := c.store.prepared(c.manifest); err != nil {
 			return err
 		}
+		if err := c.store.validatePreparedPayload(c.manifest); err != nil {
+			return err
+		}
+		if err := c.store.verifyPreparedAgent(c.manifest, c.agent); err != nil {
+			return err
+		}
 		if err := c.store.removeOwned(c.claim.name); err != nil {
 			return err
 		}
@@ -58,7 +65,21 @@ func (c *Candidate) SealPreload() error {
 // ReadPreload reads administrator-controlled metadata from the immutable root.
 // It creates no state, so read-only mounts work. This service-account-owned
 // preload does not claim native package lifecycle or same-account isolation.
-func ReadPreload(path string) (Paths, Manifest, error) {
+// A nil agent checks execution compatibility and integrity; installation owners
+// supply the target Agent to additionally require an exact release pair.
+func ReadPreload(path string, agent *AgentRelease) (Paths, Manifest, error) {
+	if !SupportedHost() {
+		return Paths{}, Manifest{}, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
+	}
+	if !filepath.IsAbs(path) {
+		return Paths{}, Manifest{}, errors.New("runtime.preload_path must be absolute")
+	}
+	// Admission and the binding comparison use the same canonical final prefix,
+	// including when runtime.preload_path names a symlink to the sealed root.
+	path, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return Paths{}, Manifest{}, err
+	}
 	paths, m, err := readPreload(path)
 	if isMetadataDamage(err) {
 		// The cause is kept as text only, as for ErrDamaged.
@@ -67,21 +88,31 @@ func ReadPreload(path string) (Paths, Manifest, error) {
 	if err != nil {
 		return Paths{}, Manifest{}, err
 	}
+	if err := m.Validate(); err != nil {
+		return Paths{}, m, err
+	}
+	prefix := filepath.Join(path, "generations", m.Archive.SHA256)
+	root, err := os.OpenRoot(prefix)
+	if err == nil {
+		err = verifyBoundPayload(root, prefix, m, ownerExecute)
+		if err == nil {
+			err = checkPayloadAgent(root, m, agent)
+		}
+		err = errors.Join(err, root.Close())
+	}
+	if err != nil {
+		var invalid payloadLayoutError
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ENOTDIR) || errors.As(err, &invalid) {
+			err = fmt.Errorf("%w: %v", errPreloadDamaged, err)
+		}
+		return Paths{}, m, err
+	}
 	return paths, m, nil
 }
 
+// path is the canonical absolute preload root checked by ReadPreload.
 func readPreload(path string) (Paths, Manifest, error) {
 	var empty Manifest
-	if !SupportedHost() {
-		return Paths{}, empty, errors.New("preloaded browser runtime requires Linux amd64 or arm64")
-	}
-	if !filepath.IsAbs(path) {
-		return Paths{}, empty, errors.New("runtime.preload_path must be absolute")
-	}
-	path, err := filepath.EvalSymlinks(path)
-	if err != nil {
-		return Paths{}, empty, err
-	}
 	if err := privatePreloadDirectory(path); err != nil {
 		return Paths{}, empty, err
 	}
@@ -97,7 +128,7 @@ func readPreload(path string) (Paths, Manifest, error) {
 	if err := readJSON(root, "preload.json", &record); err != nil {
 		return Paths{}, empty, err
 	}
-	if err := record.Manifest.Validate(); err != nil {
+	if err := record.Manifest.ValidateMetadata(); err != nil {
 		return Paths{}, empty, damagedMetadata("preload.json", err)
 	}
 	if record.Path != path || !record.Manifest.MatchesHost() {

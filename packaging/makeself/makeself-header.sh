@@ -533,6 +533,14 @@ EOLSM
     esac
 done
 
+# Netdata's startup owns a staged overlay. Explicit extraction overrides are
+# available for artifact inspection only, never for executing the installer.
+if test "x\$label" = "xNetdata, X-Ray Vision for your infrastructure" &&
+   test "x\$script" = x./system/post-installer.sh && test "x\$keep" = xy; then
+    echo 'Netdata installer execution requires temporary staging. Use --noexec with --target/--keep for artifact inspection.' >&2
+    exit 1
+fi
+
 if test x"\$quiet" = xy -a x"\$verbose" = xy; then
 	echo Cannot be verbose and quiet at the same time. >&2
 	exit 1

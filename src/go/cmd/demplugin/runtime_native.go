@@ -11,8 +11,8 @@ import (
 	"io"
 	"os"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runner"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 )
 
@@ -26,7 +26,9 @@ func runNativeCommand(ctx context.Context, command string, args []string, stdout
 	switch command {
 	case "native-prepare", "native-configure":
 		root = true
-	case "native-initialize", "native-inspect", "native-qualify":
+	case "native-status":
+		root = os.Geteuid() == 0
+	case "native-initialize", "native-inspect", "native-validate":
 	default:
 		return fmt.Errorf("unknown internal native runtime command %q", command)
 	}
@@ -40,7 +42,7 @@ func runNativeCommand(ctx context.Context, command string, args []string, stdout
 		return errors.New("native package preparation/configuration requires root")
 	}
 	if !root && os.Geteuid() == 0 {
-		return errors.New("native proof and qualification commands must run as the configured service UID")
+		return errors.New("native proof and validation commands must run as the configured service UID")
 	}
 	if root {
 		return runNativeRootCommand(ctx, command, stdout, stderr)
@@ -49,7 +51,7 @@ func runNativeCommand(ctx context.Context, command string, args []string, stdout
 }
 
 func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reader, stdout io.Writer) error {
-	config := browserruntime.DefaultNativeConfig()
+	config := runtimehost.NativeConfig()
 	if command == "native-initialize" {
 		if err := browserruntime.InitializeNativeProof(config); err != nil {
 			return err
@@ -59,7 +61,7 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 		})
 	}
 	var target browserruntime.Manifest
-	if command == "native-qualify" {
+	if command == "native-validate" {
 		if err := decodeNativeProtocol(stdin, &target); err != nil {
 			return err
 		}
@@ -71,14 +73,28 @@ func runNativeServiceCommand(ctx context.Context, command string, stdin io.Reade
 	if err != nil {
 		return err
 	}
-	if command == "native-inspect" {
+	if command == "native-status" {
+		err = reportNativeAdmission(native, stdout)
+	} else if command == "native-inspect" {
 		err = inspectNative(native, stdout)
 	} else {
-		err = qualifyNative(ctx, native, target, stdout)
+		err = validateNative(ctx, native, target, stdout)
 	}
-	// An undrained execution retains its proof and work. Process exit releases
-	// local locks; the persistent receipt remains the authority for recovery.
-	return closeUnlessUndrained(err, native)
+	return errors.Join(err, native.Close())
+}
+
+// The updater verifies exact pairing through the service-account admission path.
+// Reading ownership counters alone cannot establish that a posttrans succeeded.
+func reportNativeAdmission(native *browserruntime.Native, stdout io.Writer) error {
+	consumer, err := native.AcquireSelectedPair()
+	if err != nil {
+		return err
+	}
+	identity := consumer.Manifest().Identity()
+	if err := consumer.Close(); err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(nativeValidation{Validated: true, Runtime: &identity})
 }
 
 func inspectNative(native *browserruntime.Native, stdout io.Writer) error {
@@ -92,21 +108,38 @@ func inspectNative(native *browserruntime.Native, stdout io.Writer) error {
 	return json.NewEncoder(stdout).Encode(status)
 }
 
-func qualifyNative(
+// validateNative acquires the admitted payload through the service reader. Its
+// complete identity and integrity checks run without starting Node or Chromium.
+func validateNative(
 	ctx context.Context,
 	native *browserruntime.Native,
 	target browserruntime.Manifest,
 	stdout io.Writer,
 ) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	candidate, err := native.AcquireCandidate(target)
 	if err != nil {
 		return err
 	}
-	qualification, err := runner.Qualify(ctx, runtimehost.Borrow(candidate))
-	if err == nil {
-		err = json.NewEncoder(stdout).Encode(qualification)
+	identity := candidate.Manifest().Identity()
+	if err := candidate.Close(); err != nil {
+		return err
 	}
-	return closeUnlessUndrained(err, candidate)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return json.NewEncoder(stdout).Encode(nativeValidation{
+		Validated: true,
+		Runtime:   &identity,
+	})
+}
+
+// nativeValidation acknowledges integrity validation, never browser qualification.
+type nativeValidation struct {
+	Validated bool                       `json:"validated"`
+	Runtime   *synthetic.RuntimeIdentity `json:"runtime"`
 }
 
 func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io.Writer) error {
@@ -118,7 +151,21 @@ func runNativeRootCommand(ctx context.Context, command string, stdout, stderr io
 	if err != nil {
 		return err
 	}
-	config := browserruntime.DefaultNativeConfig()
+	if command == "native-status" {
+		data, err := child.run(ctx, command, nil)
+		if err != nil {
+			return err
+		}
+		var status nativeValidation
+		if err := decodeNativeProtocol(bytes.NewReader(data), &status); err != nil {
+			return err
+		}
+		if !status.Validated || status.Runtime == nil {
+			return errors.New("native service did not confirm runtime admission")
+		}
+		return json.NewEncoder(stdout).Encode(status)
+	}
+	config := runtimehost.NativeConfig()
 	inspect := func(ctx context.Context) (browserruntime.NativeStatus, error) {
 		data, err := child.run(ctx, "native-inspect", nil)
 		if err != nil {
@@ -183,7 +230,7 @@ func closeNativeAdmission(
 	})
 }
 
-// configureNative qualifies the admitted target as the service UID and marks
+// configureNative validates the admitted target as the service UID and marks
 // the native runtime ready.
 func configureNative(
 	ctx context.Context,
@@ -196,16 +243,16 @@ func configureNative(
 	if err != nil {
 		return err
 	}
-	if err := control.QualifyAndReady(ctx, inspect, func(ctx context.Context, target browserruntime.Manifest) error {
+	if err := control.ValidateAndReady(ctx, inspect, func(ctx context.Context, target browserruntime.Manifest) error {
 		input, err := json.Marshal(target)
 		if err != nil {
 			return err
 		}
-		data, err := child.run(ctx, "native-qualify", input)
+		data, err := child.run(ctx, "native-validate", input)
 		if err != nil {
 			return err
 		}
-		return verifyNativeQualification(data, target)
+		return verifyNativeValidation(data, target)
 	}); err != nil {
 		return err
 	}
@@ -253,19 +300,16 @@ func decodeNativeStatus(data []byte) (browserruntime.NativeStatus, error) {
 	return status, nil
 }
 
-func verifyNativeQualification(data []byte, target browserruntime.Manifest) error {
-	var qualification runner.Qualification
-	if err := decodeNativeProtocol(bytes.NewReader(data), &qualification); err != nil {
+func verifyNativeValidation(data []byte, target browserruntime.Manifest) error {
+	var validation nativeValidation
+	if err := decodeNativeProtocol(bytes.NewReader(data), &validation); err != nil {
 		return err
 	}
-	if !qualification.ExecutionContract || !qualification.SandboxedLocalJourney ||
-		!qualification.SandboxedLocalLighthouse ||
-		!qualification.ProcessTreeDrained ||
-		qualification.Runtime == nil {
-		return errors.New("native service did not confirm complete, drained qualification")
+	if !validation.Validated || validation.Runtime == nil {
+		return errors.New("native service did not confirm payload integrity validation")
 	}
-	if *qualification.Runtime != target.Identity() {
-		return errors.New("native qualification identity differs from admitted target")
+	if *validation.Runtime != target.Identity() {
+		return errors.New("native validation identity differs from admitted target")
 	}
 	return nil
 }

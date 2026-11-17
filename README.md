@@ -6,8 +6,12 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">X-Ray Vision for your infrastructure!</h3>
-<h4 align="center">Every Metric, Every Second. No BS.</h4>
+<h3 align="center">Full-stack observability. Every metric, every second.</h3>
+<p align="center">
+  <b>Metrics · Logs · Traces · Flows · Topology</b><br/>
+  Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI<br/>
+  OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 800+ integrations
+</p>
 
 <br />
 <p align="center">
@@ -47,32 +51,23 @@ MENU: **[WHO WE ARE](#who-we-are)** | **[KEY FEATURES](#key-features)** | **[GET
 
 ## WHO WE ARE
 
-Netdata is an open-source, real-time infrastructure monitoring platform. Monitor, detect, and act across your entire infrastructure.
+Netdata is a full-stack observability platform: infrastructure, application performance monitoring (OpenTelemetry traces, service maps, RED), digital experience (real user monitoring, synthetic monitoring), network performance monitoring (SNMP, topology, NetFlow/IPFIX/sFlow, traps, BGP), databases, logs (monitoring and management) and cloud, with AI troubleshooting over all of it.
 
-**Core Advantages:**
+Netdata is distributed and real-time. Netdata Agents collect, store and analyze data where it is generated, per second, with machine learning anomaly detection on every metric. Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data. Netdata scales to 100,000+ nodes, and its Agent is open source.
 
-* **Instant Insights** – With Netdata you can access per-second metrics and visualizations.
-* **Zero Configuration** – You can deploy immediately without complex setup.
-* **ML-Powered** – You can detect anomalies, predict issues, and automate analysis.
-* **Efficient** – You can monitor with minimal resource usage and maximum scalability.
-* **Secure & Distributed** – You can keep your data local with no central collection needed.
+**Netdata Design:**
 
-With Netdata, you get real-time, per-second updates. Clear **insights at a glance**, no complexity.
+* **Understanding over traffic lights** – Monitoring tells you that something is wrong; observability tells you why. Netdata gives you both, from the same data.
+* **Everything, every second, affordably** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
+* **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
+* **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
+* **Machine learning as evidence, not alerts** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
+* **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
+* **Expertise built in** – No query language and nothing to administer: the expertise is built into the product, so the whole team can investigate.
+* **Configured your way** – Automatic first, then as code, from the dashboard, or both.
+* **Open, and yours** – The engine is open source, speaks open standards and runs on your infrastructure.
 
-<details>
-  <summary><strong>All heroes have a great origin story. Click to discover ours.</strong></summary>
-  <br/>
-
-In 2013, at the company where Costa Tsaousis was COO, a significant percentage of their cloud-based transactions failed silently, severely impacting business performance.
-
-Costa and his team tried every troubleshooting tool available at the time. None could identify the root cause. As Costa later wrote:
-
-“*I couldn’t believe that monitoring systems provide so few metrics and with such low resolution, scale so badly, and cost so much to run.*”
-
-Frustrated, he decided to build his own monitoring tool, starting from scratch.
-
-That decision led to countless late nights and weekends. It also sparked a fundamental shift in how infrastructure monitoring and troubleshooting are approached, both in method and in cost.
-</details>
+Read [Netdata Design](https://learn.netdata.cloud/docs/welcome-to-netdata/netdata-design) for the reasoning behind each decision, and the [Complete Product Description](https://learn.netdata.cloud/docs/welcome-to-netdata/complete-product-description) for every capability.
 
 ### Most Energy-Efficient Monitoring Tool
 
@@ -91,32 +86,33 @@ According to the [University of Amsterdam study](https://www.ivanomalavolta.com/
 
 ## Key Features
 
-| Feature                    | Description                               | What Makes It Unique                                     |
-|----------------------------|-------------------------------------------|----------------------------------------------------------|
-| **Real-Time**              | Per-second data collection and processing | Works in a beat – click and see results instantly        |
-| **Zero-Configuration**     | Automatic detection and discovery         | Auto-discovers everything on the nodes it runs           |
-| **ML-Powered**             | Unsupervised anomaly detection            | Trains multiple ML models per metric at the edge         |
-| **Long-Term Retention**    | High-performance storage                  | ~0.5 bytes per sample with tiered storage for archiving  |
-| **Advanced Visualization** | Rich, interactive dashboards              | Slice and dice data without query language               |
-| **Extreme Scalability**    | Native horizontal scaling                 | Parent-Child centralization with multi-million samples/s |
-| **Complete Visibility**    | From infrastructure to applications       | Simplifies operations and eliminates silos               |
-| **Edge-Based**             | Processing at your premises               | Distributes code instead of centralizing data            |
-
-> [!NOTE]  
-> Want to put Netdata to the test against Prometheus?
-> Explore the [full comparison](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/).
+| Area                                    | What you get                                                                                                     |
+|-----------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| **Infrastructure monitoring**           | Systems, containers, Kubernetes, virtualization and hardware through 800+ integrations, per second               |
+| **Application performance monitoring**  | Find any trace by ID, filter traces by any attribute, and see latency percentiles and errors for any slice of traffic, with service maps and browser sessions linked to backend traces. Traces stay on your infrastructure. |
+| **Digital experience monitoring**       | Real user monitoring with Core Web Vitals and JavaScript errors, Playwright journeys, Lighthouse audits, uptime   |
+| **Network performance monitoring**      | Zero-configuration SNMP with 1,700+ device profiles, L2/L3 topology, NetFlow/IPFIX/sFlow, SNMP traps, BGP         |
+| **Database monitoring**                 | 50+ databases and managed services, with live top-query views on 12 engines                                     |
+| **Logs monitoring**                     | systemd-journal, Windows Event Log and macOS unified logs queried in place on every node, with no shipping or extra storage |
+| **Logs management**                      | Collect logs from any source through OpenTelemetry and syslog, search every field, and explore with facets and histograms. Logs are acknowledged only once safely on disk and are searchable as they arrive, with retention and offload to your own S3 storage. |
+| **Cloud monitoring**                    | 31 AWS services and 38 Azure services through their native monitoring APIs                                       |
+| **Endpoint and edge monitoring**        | Windows, macOS, IoT and embedded devices with the same Agent                                                     |
+| **Alerting**                            | 1,100+ stock alerts, your own alerts as code, from the UI or generated by AI, 30+ notification integrations      |
+| **Machine learning and AI**             | Anomaly detection on every metric, Netdata AI investigations, MCP servers for any AI assistant                   |
+| **Long-term retention**                 | About 0.6 bytes per sample, with tiered storage that keeps per-second, per-minute and per-hour history            |
+| **Scalability**                         | Independent hubs (Parents for metrics; Agents for devices, logs, traces and flows) unified by Netdata Cloud, 100,000+ nodes |
 
 ---
 
 ## Netdata Ecosystem
 
-This three-part architecture enables you to scale from single nodes to complex multi-cloud environments:
+This three-part architecture scales from a single node to fleets of 100,000+ nodes:
 
-| Component         | Description                                                                                                                                                 | License                                         |
-|-------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
-| **Netdata Agent** | • Core monitoring engine<br>• Handles collection, storage, ML, alerts, exports<br>• Runs on servers, cloud, K8s, IoT<br>• Zero production impact            | [GPL v3+](https://www.gnu.org/licenses/gpl-3.0) |
-| **Netdata Cloud** | • Enterprise features<br>• User management, RBAC, horizontal scaling<br>• Centralized alerts<br>• Free community tier<br>• No metric storage centralization |                                                 |
-| **Netdata UI**    | • Dashboards and visualizations<br>• Free to use<br>• Included in standard packages<br>• Latest version via CDN                                             | [NCUL1](https://app.netdata.cloud/LICENSE.txt)  |
+| Component         | Description                                                                                                                                                                                         | License                                         |
+|-------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|
+| **Netdata Agent** | • Core engine: collection, storage, machine learning, alerting, streaming, export<br>• Also a hub: Parents for metrics; Agents for SNMP, flows, traps, logs and traces<br>• Runs on servers, cloud, Kubernetes, Windows, macOS and edge devices<br>• MCP server built in | [GPL v3+](https://www.gnu.org/licenses/gpl-3.0) |
+| **Netdata Cloud** | • Unifies and correlates all hubs in one view<br>• Netdata AI, traces explorer, Network Monitor, digital experience and uptime views<br>• RBAC, SSO, SCIM<br>• SaaS or Enterprise On-Prem<br>• Free community tier<br>• Data stays on your infrastructure |                                                 |
+| **Netdata UI**    | • Dashboards and visualizations<br>• Free to use<br>• Included in standard packages<br>• Latest version via CDN                                                                                     | [NCUL1](https://app.netdata.cloud/LICENSE.txt)  |
 
 ## What You Can Monitor
 
@@ -126,18 +122,22 @@ With Netdata you can monitor all these components across platforms:
 |------------------------------------------------------------------------------------------------------------:|:--------------------------------:|:-------:|:-----:|:-------------------------------------------------:|
 |                             **System Resources**<small><br/>CPU, Memory and system shared resources</small> |               Full               |   Yes   |  Yes  |                        Yes                        |
 |                                **Storage**<small><br/>Disks, Mount points, Filesystems, RAID arrays</small> |               Full               |   Yes   |  Yes  |                        Yes                        |
-|                                 **Network**<small><br/>Network Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |                        Yes                        |
+|                                 **Network**<small><br/>Interfaces, Protocols, Firewall, etc</small> |               Full               |   Yes   |  Yes  |                        Yes                        |
 |                        **Hardware & Sensors**<small><br/>Fans, Temperatures, Controllers, GPUs, etc</small> |               Full               |  Some   | Some  |                       Some                        |
-|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |                         -                         |
+|                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |         Yes<small><br/>`Windows Services`</small>         |
 |                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                                                                             System and Application **Logs** | Yes<small><br/>`systemd`-journal |    -    |   -   | Yes<small><br/>`Windows Event Log`, `ETW`</small> |
-|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |    -    |   -   |                         -                         |
+|                                                                             **Logs Monitoring**<small><br/>Logs queried where the OS stores them</small> | Yes<small><br/>`systemd`-journal |    -    | Yes<small><br/>unified logs</small> | Yes<small><br/>`Windows Event Log`, `ETW`</small> |
+|                **Logs Management**<small><br/>OpenTelemetry logs and syslog, collected and indexed</small> |               Yes                |    -    |  Yes  |                         -                         |
+|                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|        **Network Performance Monitoring**<small><br/>SNMP devices, Topology, Traps, BGP</small> |               Full               |  Full   | Full  |                       Full                        |
+|                                 **Network Flows**<small><br/>NetFlow, IPFIX, sFlow</small> |               Yes                |    -    |   -   |                         -                         |
 |                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                         -                         |
 |                                 **VMs** (from the host)<small><br/>KVM, qemu, libvirt, Proxmox, etc</small> | Yes<small><br/>`cgroups`</small> |    -    |   -   |         Yes<small><br/>`Hyper-V`</small>          |
 |                       **Synthetic Checks**<small><br/>Test APIs, TCP ports, Ping, Certificates, etc</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 | **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                              **Cloud Provider Infrastructure**<small><br/>AWS, GCP, Azure, and more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                       **Custom Applications**<small><br/>OpenMetrics, StatsD and soon OpenTelemetry</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                              **Cloud Services**<small><br/>AWS and Azure native monitoring</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                       **Custom Applications**<small><br/>OpenMetrics and StatsD</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
+|                      **OpenTelemetry (OTLP)**<small><br/>Metrics, logs and traces over gRPC and HTTP</small>|               Yes                |    -    |  Yes  |                         -                         |
 
 On Linux, you can continuously monitor all kernel features and hardware sensors for errors, including Intel/AMD/Nvidia GPUs, PCI AER, RAM EDAC, IPMI, S.M.A.R.T, Intel RAPL, NVMe, fans, power supplies, and voltage readings.
 
@@ -170,7 +170,7 @@ Netdata auto-discovers most metrics, but you can manually configure some collect
 
 ### 3. Configure Alerts
 
-You can use hundreds of built-in alerts and integrate with:
+You can use 1,100+ stock alerts, add your own, and send notifications to:
 
 `email`, `Slack`, `Telegram`, `PagerDuty`, `Discord`, `Microsoft Teams`, and more.
 
@@ -220,23 +220,53 @@ You can centralize dashboards, alerts, and storage with Netdata Parents:
 
 ## How It Works
 
-With Netdata you can run a modular pipeline for metrics collection, processing, and visualization.
+Netdata Agents collect, store, analyze and alert where data is created. Hubs concentrate each kind of data where you choose, and Netdata Cloud unifies them into one view.
+
+```mermaid
+flowchart LR
+  subgraph Sources[What you monitor]
+    S1[Servers, VMs, containers, Kubernetes]
+    S2[Network devices: SNMP, flows, traps]
+    S3[Hardware: IPMI, Redfish]
+    S4[Applications: OpenTelemetry traces and logs]
+    S5[Browsers and synthetic checks]
+  end
+  subgraph Hubs[Hubs you place per site, region or team]
+    H1[Agents and Parents: metrics]
+    H2[Agents: network devices and hardware]
+    H3[Agents: logs, traces, flows, RUM]
+  end
+  C[Netdata Cloud: one view, correlated]:::mainNode
+  S1 --> H1
+  S2 --> H2
+  S3 --> H2
+  S4 --> H3
+  S5 --> H3
+  H1 <--> C
+  H2 <--> C
+  H3 <--> C
+
+  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+```
+
+* **Agents** run on every system and collect, store, analyze and alert where the data is created.
+* **Hubs** concentrate each kind of data where you choose. They are independent: capacity grows by adding hubs, and a problem in one hub stays in that hub.
+* **Netdata Cloud** routes every query to the hubs that hold the answer and correlates the results into one view. It is not in the data path.
+
+### Inside every Agent
 
 ```mermaid
 flowchart TB
-  A[Netdata Agent]:::mainNode
-  A1(Collect):::green --> A
-  A2(Store):::green --> A
-  A3(Learn):::green --> A
-  A4(Detect):::green --> A
-  A5(Check):::green --> A
-  A6(Stream):::green --> A
-  A7(Archive):::green --> A
-  A8(Query):::green --> A
-  A9(Score):::green --> A
-
-  classDef green fill:#bbf3bb,stroke:#333,stroke-width:1px,color:#000
-  classDef mainNode fill:#f0f0f0,stroke:#333,stroke-width:1px,color:#333
+  A[Netdata Agent]
+  A1(Collect) --> A
+  A2(Store) --> A
+  A3(Learn) --> A
+  A4(Detect) --> A
+  A5(Check) --> A
+  A6(Stream) --> A
+  A7(Archive) --> A
+  A8(Query) --> A
+  A9(Score) --> A
 ```
 
 With each Agent you can:
@@ -260,15 +290,18 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 | Capability                   | Description                                                                                                                                   |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Comprehensive Collection** | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• OpenMetrics, StatsD, and logs<br>• OpenTelemetry support coming soon |
-| **Performance & Precision**  | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
-| **Edge-Based ML**            | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Pattern recognition based on historical behavior             |
-| **Advanced Log Management**  | • Direct systemd-journald and Windows Event Log integration<br>• Process logs at the edge<br>• Rich log visualization                         |
-| **Observability Pipeline**   | • Parent-Child relationships<br>• Flexible centralization<br>• Multi-level replication and retention                                          |
-| **Automated Visualization**  | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
-| **Smart Alerting**           | • Pre-configured alerts<br>• Multiple notification methods<br>• Proactive detection                                                           |
-| **Low Maintenance**          | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
-| **Open & Extensible**        | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
+| **Collection**               | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• SNMP devices, NetFlow/IPFIX/sFlow, SNMP traps<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Real user monitoring and synthetic checks |
+| **Resolution**               | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
+| **Machine Learning**         | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Scoring engine that ranks what changed in any time window     |
+| **Logs Monitoring**          | • systemd-journal, Windows Event Log and macOS unified logs queried in place<br>• No log shipping, pipelines or extra storage<br>• Rich log visualization |
+| **Logs Management**          | • OpenTelemetry logs and syslog from any source<br>• Every field searchable, with facets and histograms<br>• Acknowledged only once safely on disk<br>• Searchable as logs arrive<br>• Retention by size, age and count; offload to your own S3 storage |
+| **APM and Traces**           | • Find any trace by ID<br>• Filter by any attribute<br>• Latency percentiles and errors for any slice of traffic<br>• Per-service request rate, errors and duration<br>• Service map |
+| **Streaming and Replication** | • Parent-Child relationships<br>• Flexible centralization<br>• Multi-level replication and retention                                          |
+| **Visualization**            | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
+| **Alerting**                 | • 1,100+ stock alerts and your own<br>• Multiple notification methods<br>• Evaluated on every Agent, without Netdata Cloud                    |
+| **AI and MCP**               | • MCP server on every Agent and Parent<br>• Any AI assistant can query metrics, logs, alerts and live views                                   |
+| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
+| **Extensibility**            | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
 
 ---
 
@@ -284,6 +317,25 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
   Netdata actively supports and is a member of the Cloud Native Computing Foundation (CNCF).<br />
   It is one of the most starred projects in the <a href="https://landscape.cncf.io/?item=observability-and-analysis--observability--netdata">CNCF landscape</a>.
 </p>
+
+---
+
+## Our Story
+
+<details>
+  <summary><strong>All heroes have a great origin story. Click to discover ours.</strong></summary>
+  <br/>
+
+In 2013, at the company where Costa Tsaousis was COO, a significant percentage of their cloud-based transactions failed silently, severely impacting business performance.
+
+Costa and his team tried every troubleshooting tool available at the time. None could identify the root cause. As Costa later wrote:
+
+“*I couldn’t believe that monitoring systems provide so few metrics and with such low resolution, scale so badly, and cost so much to run.*”
+
+Frustrated, he decided to build his own monitoring tool, starting from scratch.
+
+That decision led to countless late nights and weekends. It also sparked a fundamental shift in how infrastructure monitoring and troubleshooting are approached, both in method and in cost.
+</details>
 
 ---
 
@@ -306,9 +358,9 @@ Yes. Netdata follows [OpenSSF best practices](https://bestpractices.coreinfrastr
 
 No. Even with ML and per-second metrics, Netdata uses minimal resources.
 
-* \~5% CPU and 150MiB RAM by default on production systems
-* <1% CPU and \~100MiB RAM when ML and alerts are disabled and using ephemeral storage
-* Parents scale to millions of metrics per second with appropriate hardware
+* Under 5% of one CPU core and about 200 MB of RAM on a typical server, with machine learning enabled
+* About 30 MiB of RAM on edge devices configured as a lightweight Child
+* A Parent handles about 500 nodes or 2 million metrics per second; add Parents to grow
 
 > You can use the **Netdata Monitoring** section in the dashboard to inspect its resource usage.
 
@@ -335,11 +387,11 @@ These are queried automatically based on the zoom level.
 
 Yes. With Netdata you can:
 
-* Scale horizontally with many Agents
-* Scale vertically with powerful Parents
-* Scale infinitely via Netdata Cloud
+* Scale out with independent hubs: Parents for metrics, and Agents for network devices, logs, traces and flows
+* Add capacity by adding hubs; queries run in parallel where the data is
+* Scale to 100,000+ nodes; Netdata Cloud SaaS serves more than 100,000 reachable nodes
 
-> You can use Netdata Cloud to merge many independent infrastructures into one logical view.
+> Netdata Cloud unifies and correlates all hubs into one view.
 
 </details>
 
@@ -358,16 +410,14 @@ No. Netdata minimizes disk usage:
 </details>
 
 <details>
-<summary><strong>How is Netdata different from Prometheus + Grafana?</strong></summary>
+<summary><strong>Can Netdata replace my current monitoring stack?</strong></summary>
 <br/>
 
-With Netdata you get a complete monitoring solution—not just tools.
+Yes. Netdata is one product for infrastructure, applications, digital experience, networks, databases, logs and cloud.
 
 * No manual setup or dashboards needed
-* Built-in ML, alerts, dashboards, and correlations
-* More efficient and easier to deploy
-
-> [Performance comparison](https://blog.netdata.cloud/netdata-vs-prometheus-performance-analysis/)
+* Built-in machine learning, alerts, dashboards, correlations and AI
+* Takes in Prometheus, OpenTelemetry, Nagios and StatsD data, so existing exporters and instrumentation keep working
 
 </details>
 
@@ -380,20 +430,6 @@ With Netdata you can store all metrics on your infrastructure—no sampling, no 
 * High-resolution metrics by default
 * ML per metric, not shared models
 * Unlimited scalability without skyrocketing cost
-
-</details>
-
-<details>
-<summary><strong>Can Netdata run alongside Nagios, Zabbix, etc.?</strong></summary>
-<br/>
-
-Yes. You can use Netdata together with traditional tools.
-
-With Netdata you get:
-
-* Real-time, high-resolution monitoring
-* Zero configuration and auto-generated dashboards
-* Anomaly detection and advanced visualization
 
 </details>
 
@@ -459,7 +495,11 @@ You'll join users including:
 
 ## \:book: Documentation
 
-Visit [Netdata Learn](https://learn.netdata.cloud) for full documentation and guides.
+Visit [Netdata Learn](https://learn.netdata.cloud) for full documentation and guides. Start with the core documents:
+
+* [Welcome to Netdata](https://learn.netdata.cloud/docs/welcome-to-netdata): what Netdata is and the outcomes it delivers
+* [Netdata Design](https://learn.netdata.cloud/docs/welcome-to-netdata/netdata-design): what Netdata believes about observability and how its design delivers it
+* [Complete Product Description](https://learn.netdata.cloud/docs/welcome-to-netdata/complete-product-description): every capability
 
 > [!NOTE]  
 > Includes deployment, configuration, alerting, exporting, troubleshooting, and more.

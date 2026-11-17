@@ -13,6 +13,8 @@ on:
       - 'packaging/makeself/**'
       - 'packaging/cmake/**'
       - 'netdata-installer.sh'
+      - 'packaging/runtime-check.sh'
+      - 'system/systemd/tmpfiles.conf.in'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
   pull_request:
     paths:
@@ -23,6 +25,8 @@ on:
       - 'packaging/makeself/**'
       - 'packaging/cmake/**'
       - 'netdata-installer.sh'
+      - 'packaging/runtime-check.sh'
+      - 'system/systemd/tmpfiles.conf.in'
       - 'src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst'
 
 permissions:
@@ -33,7 +37,42 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.files.outputs.any_modified }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: step-security/changed-files@2e07db73e5ccdb319b9a6c7766bd46d39d304bad # v47.0.5
+        id: files
+        with:
+          since_last_remote_commit: ${{ github.event_name != 'pull_request' }}
+          output_renamed_files_as_deleted_and_added: true
+          files: |
+            .github/workflows/installer-tests.yml
+            .github/ISSUE_TEMPLATE/BUG_REPORT.yml
+            packaging/installer/netdata-support-bundle*
+            packaging/installer/functions.sh
+            packaging/installer/tests/test_support_bundle.py
+            packaging/installer/tests/test_snmp_diagnostics.py
+            packaging/installer/tests/test_install_state.py
+            packaging/installer/tests/test_prepare_fleet.py
+            packaging/installer/tests/test_*ipmi*.py
+            packaging/docker/**
+            packaging/makeself/**
+            packaging/cmake/**
+            packaging/runtime-check.sh
+            netdata-installer.sh
+            src/go/plugin/go.d/collector/snmp_topology/testdata/*.zst
+            system/systemd/tmpfiles.conf.in
+          files_ignore: |
+            **/*.md
+            packaging/docker/netdata-dem-*
   posix:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Support Bundle POSIX sanitization (${{ matrix.shell }}, ${{ matrix.awk }})
     runs-on: ubuntu-latest
     strategy:
@@ -75,6 +114,8 @@ jobs:
           python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   posix-e2e:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Support Bundle POSIX end-to-end bundle
     runs-on: ubuntu-latest
     steps:
@@ -205,6 +246,8 @@ jobs:
           VALIDATE
 
   macos-posix:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Support Bundle macOS sanitization
     runs-on: macos-latest
     steps:
@@ -219,6 +262,8 @@ jobs:
           python3 -m unittest discover packaging/installer/tests test_support_bundle.py -v
 
   powershell-core:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Support Bundle PowerShell 7 sanitization
     runs-on: ubuntu-latest
     steps:
@@ -232,6 +277,8 @@ jobs:
         run: python3 packaging/installer/tests/test_snmp_diagnostics.py -v
 
   windows-powershell:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Support Bundle Windows PowerShell 5.1 sanitization
     runs-on: windows-latest
     steps:
@@ -410,6 +457,8 @@ jobs:
           }
 
   install-state:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Install State
     runs-on: ubuntu-latest
     steps:
@@ -419,6 +468,8 @@ jobs:
           python3 -m unittest discover packaging/installer/tests test_install_state.py -v
 
   ipmi-delivery:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: IPMI delivery
     runs-on: ubuntu-latest
     steps:
@@ -434,6 +485,8 @@ jobs:
         run: python3 -m unittest discover packaging/installer/tests 'test_*ipmi*.py' -v
 
   prepare-fleet:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: Prepare Fleet
     runs-on: ubuntu-latest
     steps:
@@ -443,6 +496,8 @@ jobs:
           python3 -m unittest discover packaging/installer/tests test_prepare_fleet.py -v
 
   snmp-diagnostics:
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
     name: SNMP diagnostics
     runs-on: ubuntu-latest
     steps:

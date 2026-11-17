@@ -19,7 +19,7 @@ func TestFinishFailureAppearsInStorageHealthUntilSweep(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-health")
-	use, err := s.beginUse(manifest)
+	use, err := s.beginUse(manifest, nil)
 	require.NoError(t, err)
 	trash := filepath.Join(path, "trash")
 	require.NoError(t, os.Rename(trash, trash+".saved"))
@@ -44,7 +44,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 	require.NoError(t, err)
 	defer s.Close()
 	manifest := importFixture(t, s, "finish-during-sweep")
-	use, err := s.beginUse(manifest)
+	use, err := s.beginUse(manifest, nil)
 	require.NoError(t, err)
 	// Run the inventory phase, then interleave the real failed Finish before the
 	// older sweep publishes its result after deleting trash.
@@ -77,7 +77,7 @@ func TestOlderSweepDoesNotClearConcurrentFinishFailure(t *testing.T) {
 func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 	s, _ := testStore(t)
 	manifest := importFixture(t, s, "finish-coordination")
-	use, err := s.beginUse(manifest)
+	use, err := s.beginUse(manifest, nil)
 	require.NoError(t, err)
 	coordination := filepath.Join(s.path, "coordination.lock")
 	require.NoError(t, os.Rename(coordination, coordination+".saved"))
@@ -97,7 +97,7 @@ func TestFinishCoordinationFailureRetainsDrainedProof(t *testing.T) {
 func TestExecutionOwnerDamageAppearsInStorageHealthWithoutReleasingPin(t *testing.T) {
 	s, _ := testStore(t)
 	manifest := importFixture(t, s, "owner-health")
-	use, err := s.beginUse(manifest)
+	use, err := s.beginUse(manifest, nil)
 	require.NoError(t, err)
 	owner := filepath.Join(s.path, use.name, "owner.lock")
 	require.NoError(t, os.Chmod(owner, 0644))
@@ -229,7 +229,7 @@ func TestTerminalOwnerCloseFailureRetriedBySweep(t *testing.T) {
 				}
 				s.finishPreparation(name, closer)
 			default:
-				use, err := s.beginUse(m)
+				use, err := s.beginUse(m, nil)
 				require.NoError(t, err)
 				closer = &retryOwnerClose{
 					Closer: use.lock,
@@ -285,7 +285,7 @@ func TestBeginUseConstructorCleanupFailureReportsHealth(t *testing.T) {
 		require.NoError(t, os.Rename(path, path+".saved"))
 		require.NoError(t, os.WriteFile(path, nil, 0600))
 	}
-	use, err := s.beginUse(m)
+	use, err := s.beginUse(m, nil)
 	require.Error(t, err)
 	require.Nil(t, use)
 	for _, dir := range []string{"uses", "trash"} {

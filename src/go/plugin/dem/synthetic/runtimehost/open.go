@@ -55,7 +55,7 @@ func Open(cfg Config, varLibPath string) *Handle {
 
 func (h *Handle) openPreload(path string) {
 	if h.SetupError == nil {
-		paths, manifest, err := browserruntime.ReadPreload(path)
+		paths, manifest, err := browserruntime.ReadPreload(path, nil)
 		if err == nil {
 			h.identity = manifest.Identity()
 			h.Source = preloadedSource{runnerPaths(paths, h.identity)}
@@ -68,7 +68,7 @@ func (h *Handle) openPreload(path string) {
 
 func (h *Handle) openNative() {
 	if h.SetupError == nil {
-		h.native, h.SetupError = browserruntime.OpenNative(browserruntime.DefaultNativeConfig())
+		h.native, h.SetupError = browserruntime.OpenNative(NativeConfig())
 	}
 	if h.SetupError != nil {
 		h.Host = newUnavailable(ModeNative, h.SetupError)

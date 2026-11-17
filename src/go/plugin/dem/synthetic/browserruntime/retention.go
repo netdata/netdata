@@ -20,35 +20,37 @@ import (
 // uncertain bytes are a subset of execution bytes. PreparingBytes and TrashBytes
 // describe written workspace, not extra disk usage.
 type Status struct {
-	SelectionError        string            `json:"selection_error,omitempty"`
-	GenerationErrors      map[string]string `json:"generation_errors,omitempty"`
-	InventoryError        string            `json:"inventory_error,omitempty"`
-	Release               *Release          `json:"release,omitempty"`
-	AutomaticUpdates      bool              `json:"automatic_updates"`
-	SelectedBytes         int64             `json:"selected_bytes"`
-	ProcessClaims         int               `json:"process_claims"`
-	UsedBytes             int64             `json:"used_bytes"`
-	ReservedBytes         int64             `json:"reserved_bytes"`
-	LimitBytes            int64             `json:"limit_bytes"`
-	ProtectedBytes        int64             `json:"protected_bytes"`
-	ReclaimableBytes      int64             `json:"reclaimable_bytes"`
-	CandidateBytes        int64             `json:"candidate_bytes"`
-	CandidateClaims       int               `json:"candidate_claims"`
-	ProcessBytes          int64             `json:"process_bytes"`
-	ExecutionBytes        int64             `json:"execution_bytes"`
-	UncertainBytes        int64             `json:"uncertain_bytes"`
-	PreparingBytes        int64             `json:"preparing_bytes"`
-	TrashBytes            int64             `json:"trash_bytes"`
-	ProcessGenerations    int               `json:"process_generations"`
-	ExecutionPins         int               `json:"execution_pins"`
-	UncertainPins         int               `json:"uncertain_pins"`
-	BootRecoveryAvailable bool              `json:"boot_recovery_available"`
-	CleanupError          string            `json:"cleanup_error,omitempty"`
+	SelectionError        string              `json:"selection_error,omitempty"`
+	GenerationErrors      map[string]string   `json:"generation_errors,omitempty"`
+	InventoryError        string              `json:"inventory_error,omitempty"`
+	Release               *Release            `json:"release,omitempty"`
+	Recovery              *PairRecoveryStatus `json:"recovery,omitempty"`
+	AutomaticUpdates      bool                `json:"automatic_updates"`
+	SelectedBytes         int64               `json:"selected_bytes"`
+	ProcessClaims         int                 `json:"process_claims"`
+	UsedBytes             int64               `json:"used_bytes"`
+	ReservedBytes         int64               `json:"reserved_bytes"`
+	LimitBytes            int64               `json:"limit_bytes"`
+	ProtectedBytes        int64               `json:"protected_bytes"`
+	ReclaimableBytes      int64               `json:"reclaimable_bytes"`
+	CandidateBytes        int64               `json:"candidate_bytes"`
+	CandidateClaims       int                 `json:"candidate_claims"`
+	ProcessBytes          int64               `json:"process_bytes"`
+	ExecutionBytes        int64               `json:"execution_bytes"`
+	UncertainBytes        int64               `json:"uncertain_bytes"`
+	PreparingBytes        int64               `json:"preparing_bytes"`
+	TrashBytes            int64               `json:"trash_bytes"`
+	ProcessGenerations    int                 `json:"process_generations"`
+	ExecutionPins         int                 `json:"execution_pins"`
+	UncertainPins         int                 `json:"uncertain_pins"`
+	BootRecoveryAvailable bool                `json:"boot_recovery_available"`
+	CleanupError          string              `json:"cleanup_error,omitempty"`
 }
 
 func (s *Store) statusLocked(inv inventory) (Status, error) {
 	status := Status{
 		Release:               inv.release,
+		Recovery:              inv.recovery.status(selection{Release: inv.release, AutomaticUpdates: inv.automaticUpdates}),
 		AutomaticUpdates:      inv.automaticUpdates,
 		LimitBytes:            s.config.MaxBytes,
 		ProcessGenerations:    len(inv.processes),

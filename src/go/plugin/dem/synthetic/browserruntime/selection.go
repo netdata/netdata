@@ -43,10 +43,10 @@ func (s selection) validate() error {
 		}
 		return nil
 	}
-	return s.Release.Validate()
+	return s.Release.ValidateMetadata()
 }
 
-func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
+func (s *Store) selectedLocked(reconcile bool) (*Release, error) {
 	// A prior writer may have died after rename but before directory fsync. No
 	// dependent deletion or executable admission precedes this durability barrier.
 	if reconcile {
@@ -54,9 +54,9 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 			return nil, err
 		}
 	}
-	m, err := s.readSelection()
-	if err == nil && m != nil {
-		_, err = s.prepared(*m)
+	record, err := s.readSelectionRecord()
+	if err == nil && record.Release != nil {
+		_, err = s.prepared(record.Release.Manifest)
 		if errors.Is(err, ErrUnavailable) {
 			err = damagedMetadata("selection.json", err)
 		}
@@ -69,7 +69,7 @@ func (s *Store) selectedLocked(reconcile bool) (*Manifest, error) {
 	if err != nil {
 		return nil, err
 	}
-	return m, nil
+	return record.Release, nil
 }
 
 func (s *Store) readSelection() (*Manifest, error) {
@@ -128,6 +128,7 @@ func (s *Store) selectLocked(record selection) error {
 type Consumer struct {
 	store    *Store
 	manifest Manifest
+	agent    *AgentRelease
 	claim    *claim
 	// selected consumers acquired a prepared generation that their claim
 	// protects, so its later absence is damage. A candidate's generation does not
@@ -145,7 +146,7 @@ func (c *Consumer) BeginUse() (*Use, error) {
 	if c.closed {
 		return nil, errors.New("runtime consumer is closed")
 	}
-	use, err := c.store.beginUse(c.manifest)
+	use, err := c.store.beginUse(c.manifest, c.agent)
 	if c.selected && errors.Is(err, ErrUnavailable) {
 		err = damagedMetadata(filepath.Join("generations", c.manifest.Archive.SHA256), err)
 	}
@@ -162,18 +163,26 @@ func (c *Consumer) Close() error {
 func (s *Store) AcquireSelected() (*Consumer, error) {
 	var consumer *Consumer
 	err := s.withLock(func() error {
-		m, err := s.selectedLocked(true)
+		release, err := s.selectedLocked(true)
 		if err != nil {
 			return err
 		}
-		if m == nil {
+		if release == nil {
 			return ErrUnavailable
+		}
+		if err := release.Validate(); err != nil {
+			return err
+		}
+		m := release.Manifest
+		if err := s.verifyPreparedAgent(m, release.Agent); err != nil {
+			return err
 		}
 		owner, err := s.ledger.claimLocked(m.Archive.SHA256, processClaim)
 		if err == nil {
 			consumer = &Consumer{
 				store:    s,
-				manifest: *m,
+				manifest: m,
+				agent:    release.Agent,
 				claim:    owner,
 				selected: true,
 			}

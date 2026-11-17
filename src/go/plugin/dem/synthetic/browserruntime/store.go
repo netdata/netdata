@@ -47,6 +47,9 @@ type Config struct {
 	Path              string
 	MaxBytes          int64
 	PreviousRetention time.Duration
+	// Agent is the exact installation target. Storage-only tools may omit it.
+	// Execution checks the contract and payload integrity independently of it.
+	Agent *AgentRelease
 }
 
 func DefaultConfig(path string) Config {
@@ -78,6 +81,19 @@ type generation struct {
 }
 
 func Open(config Config) (*Store, error) {
+	return openStore(config, true)
+}
+
+// OpenExisting inspects an initialized installation without creating roots or
+// completing interrupted initialization. Install planning must not enroll users.
+func OpenExisting(config Config) (*Store, error) {
+	return openStore(config, false)
+}
+
+func openStore(config Config, create bool) (*Store, error) {
+	if config.Agent != nil {
+		config.Agent = new(*config.Agent)
+	}
 	if !SupportedHost() {
 		return nil, errors.New("managed browser runtimes require Linux amd64 or arm64")
 	}
@@ -87,7 +103,11 @@ func Open(config Config) (*Store, error) {
 	if !filepath.IsAbs(config.Path) {
 		return nil, errors.New("runtime store requires an absolute path")
 	}
-	path, root, err := openRuntimeRoot(config.Path, managedRootLayout)
+	openRoot := openRuntimeRoot
+	if !create {
+		openRoot = readRuntimeRoot
+	}
+	path, root, err := openRoot(config.Path, managedRootLayout)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +183,7 @@ func loadGeneration(root *os.Root, id string) (generation, error) {
 		}
 		return g, err
 	}
-	if err := g.Manifest.Validate(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
+	if err := g.Manifest.ValidateMetadata(); err != nil || g.Manifest.Archive.SHA256 != id || g.LastUsed.IsZero() {
 		return g, damagedMetadata(metadata, errors.New("invalid prepared generation metadata"))
 	}
 	return g, nil
@@ -196,7 +216,7 @@ type Use struct {
 	Paths Paths
 }
 
-func (s *Store) beginUse(m Manifest) (*Use, error) {
+func (s *Store) beginUse(m Manifest, agent *AgentRelease) (*Use, error) {
 	if err := m.Validate(); err != nil {
 		return nil, err
 	}
@@ -204,6 +224,9 @@ func (s *Store) beginUse(m Manifest) (*Use, error) {
 	err := s.withLock(func() (result error) {
 		paths, err := s.prepared(m)
 		if err != nil {
+			return err
+		}
+		if err := s.verifyPreparedAgent(m, agent); err != nil {
 			return err
 		}
 		lease, err := s.ledger.newUseLocked(m.Archive.SHA256)

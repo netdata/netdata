@@ -113,6 +113,7 @@ func TestRuntimeEnsureRejectsRoot(t *testing.T) {
 // the command returns; finishing must join the reader without waiting for EOF.
 func TestRuntimeEnsurePrivateStdinSubprocess(t *testing.T) {
 	if os.Getenv("NETDATA_TEST_ENSURE_STDIN") == "child" {
+		setRuntimeAgent(t, fixtureAgent("cli-fixture"))
 		os.Args = []string{
 			"dem.plugin",
 			"runtime",

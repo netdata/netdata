@@ -21,12 +21,13 @@ const ReleaseEnvelopeLimit = 1 << 20
 
 const releaseSignatureDomain = "netdata-dem-runtime-release-v1\x00"
 
-// Release is the complete authenticated preparation contract. Sequence is
-// publisher order across architectures and execution-contract changes, not a
-// component version or a claim that the components are more secure.
+// Release is the complete authenticated preparation contract. Format 2 names
+// its exact Agent pair. Format 1 retains its former publication sequence only
+// as metadata for inspection and recovery of older installations.
 type Release struct {
 	Format   int           `json:"format"`
-	Sequence uint64        `json:"sequence"`
+	Sequence uint64        `json:"sequence,omitempty"`
+	Agent    *AgentRelease `json:"agent,omitempty"`
 	Manifest Manifest      `json:"manifest"`
 	Sources  ReleaseSource `json:"sources"`
 }
@@ -44,10 +45,34 @@ type releaseEnvelope struct {
 }
 
 func (r Release) Validate() error {
-	if r.Format != 1 || r.Sequence == 0 {
-		return errors.New("invalid runtime release format or publication sequence")
+	if err := r.ValidateMetadata(); err != nil {
+		return err
 	}
-	if err := r.Manifest.Validate(); err != nil {
+	return r.Manifest.Validate()
+}
+
+// ValidateMetadata permits authenticated inspection of another Agent's release
+// without allowing its execution or weakening structural validation.
+func (r Release) ValidateMetadata() error {
+	switch r.Format {
+	case 1:
+		if r.Sequence == 0 || r.Agent != nil {
+			return errors.New("legacy runtime release requires a positive publication sequence and no Agent identity")
+		}
+	case 2:
+		if r.Sequence != 0 || r.Agent == nil {
+			return errors.New("paired runtime release requires an Agent identity and no publication sequence")
+		}
+		if err := r.Agent.Validate(); err != nil {
+			return err
+		}
+		if r.Manifest.Version != r.Agent.Version {
+			return errors.New("runtime manifest version differs from its Agent release version")
+		}
+	default:
+		return errors.New("invalid runtime release format")
+	}
+	if err := r.Manifest.ValidateMetadata(); err != nil {
 		return err
 	}
 	if r.Manifest.Archive.URL == "" {
@@ -59,9 +84,27 @@ func (r Release) Validate() error {
 	return nil
 }
 
+// ValidateForAgent requires the exact installed or target Agent pair as well as
+// this Agent's execution contract. Legacy releases remain readable for recovery.
+func (r Release) ValidateForAgent(expected AgentRelease) error {
+	if err := expected.Validate(); err != nil {
+		return fmt.Errorf("expected Agent release: %w", err)
+	}
+	if err := r.Validate(); err != nil {
+		return err
+	}
+	if r.Agent == nil || *r.Agent != expected {
+		return fmt.Errorf(
+			"%w: runtime release does not name the expected Agent version, channel and source; install a matching Agent/runtime pair",
+			ErrIncompatible,
+		)
+	}
+	return nil
+}
+
 // ReleaseSigningPayload returns the exact domain-separated bytes signed by GPG.
 func ReleaseSigningPayload(release Release) ([]byte, error) {
-	if err := release.Validate(); err != nil {
+	if err := release.ValidateMetadata(); err != nil {
 		return nil, err
 	}
 	payload, err := json.Marshal(release)
@@ -97,13 +140,20 @@ func EncodeRelease(signedPayload, signature []byte) ([]byte, error) {
 // VerifiedRelease is a Release whose signature VerifyRelease checked against
 // administrator-provided keys. Installation accepts only this type, so an
 // unauthenticated release cannot be selected. The zero value is refused.
-type VerifiedRelease struct{ release Release }
+type VerifiedRelease struct {
+	release  Release
+	envelope []byte
+	keyring  []byte
+}
 
 // Release returns a copy of the authenticated release; changing the copy never
 // changes what an installation selects.
 func (v VerifiedRelease) Release() Release {
 	r := v.release
 	r.Manifest = r.Manifest.clone()
+	if r.Agent != nil {
+		r.Agent = new(*r.Agent)
+	}
 	return r
 }
 
@@ -127,11 +177,13 @@ func VerifyRelease(data []byte, trusted *ReleaseTrust) (VerifiedRelease, error) 
 	if err := decodeReleaseJSON(envelope.Payload, &result); err != nil {
 		return VerifiedRelease{}, fmt.Errorf("signed runtime release: %w", err)
 	}
-	if err := result.Validate(); err != nil {
+	if err := result.ValidateMetadata(); err != nil {
 		return VerifiedRelease{}, err
 	}
 	return VerifiedRelease{
-		release: result,
+		release:  result,
+		envelope: append([]byte(nil), data...),
+		keyring:  append([]byte(nil), trusted.binary...),
 	}, nil
 }
 
@@ -147,12 +199,11 @@ func decodeReleaseJSON(data []byte, target any) error {
 	return nil
 }
 
-// releaseUpdate checks normal latest-based updates, including explicitly
-// requested latest checks. Choosing an older authenticated offline release is a
-// separate administrator recovery operation. Compare with selected state only;
-// this is not a historical high-water mark or proof of newest availability.
-func releaseUpdate(current, next Release) (bool, error) {
-	if err := current.Validate(); err != nil {
+// releaseChanged compares explicit authenticated installation targets. The owner
+// decides the target; legacy publication sequences remain readable metadata and
+// do not drive discovery or advancement. Paired identities are immutable.
+func releaseChanged(current, next Release) (bool, error) {
+	if err := current.ValidateMetadata(); err != nil {
 		return false, fmt.Errorf("installed runtime release: %w", err)
 	}
 	if err := next.Validate(); err != nil {
@@ -161,16 +212,22 @@ func releaseUpdate(current, next Release) (bool, error) {
 	if current.Manifest.Platform != next.Manifest.Platform {
 		return false, errors.New("runtime update platform differs from the installation")
 	}
-	if next.Sequence < current.Sequence {
-		return false, errors.New("runtime latest would regress the installed publication sequence")
-	}
-	if next.Sequence == current.Sequence {
-		if !sameJSON(current, next) {
-			return false, errors.New("runtime release publication sequence was reused for different content")
+	if next.Format == 2 {
+		if current.Agent != nil && *current.Agent == *next.Agent {
+			if !sameJSON(current, next) {
+				return false, errors.New("Agent release identity was reused for different runtime content")
+			}
+			return false, nil
 		}
-		return false, nil
+		return true, nil
 	}
-	return true, nil
+	if current.Format == 2 {
+		return false, fmt.Errorf(
+			"%w: a paired runtime cannot update to an independent legacy release; install a matching Agent/runtime pair",
+			ErrIncompatible,
+		)
+	}
+	return !sameJSON(current, next), nil
 }
 
 // FetchRelease authenticates bounded metadata before any archive acquisition.

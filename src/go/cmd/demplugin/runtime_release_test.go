@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	openpgp "github.com/ProtonMail/go-crypto/openpgp/v2"
 	"github.com/netdata/netdata/go/plugins/internal/pgptest"
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/require"
 )
@@ -20,12 +22,32 @@ func adminSigningKey(t *testing.T) *openpgp.Entity {
 
 func writeAdminRelease(t *testing.T, path string, manifest browserruntime.Manifest) {
 	t.Helper()
+	writeAdminPairedRelease(t, path, manifest, fixtureAgent(manifest.Version))
+}
+
+func fixtureAgent(version string) browserruntime.AgentRelease {
+	return browserruntime.AgentRelease{Version: version, Channel: "stable", Source: strings.Repeat("a", 40)}
+}
+
+// These tests run serially; each simulated installed helper restores its build
+// metadata before the next test or parent scope continues.
+func setRuntimeAgent(t *testing.T, agent browserruntime.AgentRelease) {
+	t.Helper()
+	version, channel, source := buildinfo.ReleaseVersion, buildinfo.ReleaseChannel, buildinfo.ReleaseRef
+	t.Cleanup(func() {
+		buildinfo.ReleaseVersion, buildinfo.ReleaseChannel, buildinfo.ReleaseRef = version, channel, source
+	})
+	buildinfo.ReleaseVersion, buildinfo.ReleaseChannel, buildinfo.ReleaseRef = agent.Version, agent.Channel, agent.Source
+}
+
+func writeAdminPairedRelease(t *testing.T, path string, manifest browserruntime.Manifest, agent browserruntime.AgentRelease) {
+	t.Helper()
 	if manifest.Archive.URL == "" {
 		manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
 	}
 	release := browserruntime.Release{
-		Format:   1,
-		Sequence: 1,
+		Format:   2,
+		Agent:    &agent,
 		Manifest: manifest,
 		Sources: browserruntime.ReleaseSource{
 			URL:    "https://example.invalid/sources.tar.zst",

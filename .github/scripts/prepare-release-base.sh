@@ -115,6 +115,7 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
         echo "message=Update changelog and version for nightly build: ${NEW_VERSION}." >> "${GITHUB_OUTPUT}"
         echo "ref=master" >> "${GITHUB_OUTPUT}"
         echo "type=nightly" >> "${GITHUB_OUTPUT}"
+        echo "channel=nightly" >> "${GITHUB_OUTPUT}"
         echo "branch=master" >> "${GITHUB_OUTPUT}"
         echo "version=nightly" >> "${GITHUB_OUTPUT}"
     fi
@@ -136,6 +137,7 @@ elif [ "${EVENT_TYPE}" = 'patch' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "message=Patch release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "channel=stable" >> "${GITHUB_OUTPUT}"
     echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
 elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
@@ -156,6 +158,7 @@ elif [ "${EVENT_TYPE}" = 'minor' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "message=Minor release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "channel=stable" >> "${GITHUB_OUTPUT}"
     echo "branch=master" >> "${GITHUB_OUTPUT}"
     echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
@@ -177,6 +180,7 @@ elif [ "${EVENT_TYPE}" = 'major' ] && [ "${EVENT_VERSION}" != "nightly" ]; then
     echo "message=Major release ${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=release" >> "${GITHUB_OUTPUT}"
+    echo "channel=stable" >> "${GITHUB_OUTPUT}"
     echo "branch=master" >> "${GITHUB_OUTPUT}"
     echo "new-branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     echo "version=$(tr -d 'v' < packaging/version)" >> "${GITHUB_OUTPUT}"
