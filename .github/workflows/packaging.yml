@@ -20,13 +20,43 @@ on:
       version:
         description: Package version
         required: false
+      source_sha:
+        description: Frozen Agent commit (defaults to the dispatch commit)
+        required: false
+        type: string
+      companion_run_id:
+        description: Published companion run (omit to build and publish the paired companion)
+        required: false
+        type: string
 env:
   DISABLE_TELEMETRY: 1
   REPO_PREFIX: netdata/netdata
 concurrency:
   group: packages-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
+  runtime-companion:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata' && !inputs.companion_run_id
+    uses: ./.github/workflows/dem-runtime-release.yml
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      publish: true
+    secrets: inherit
+
+  release-companion:
+    needs: runtime-companion
+    if: always() && !cancelled() && (needs.runtime-companion.result == 'success' || needs.runtime-companion.result == 'skipped')
+    uses: ./.github/workflows/dem-runtime-companion-check.yml
+    permissions:
+      contents: read
+      actions: read
+    with:
+      source_sha: ${{ inputs.source_sha || github.sha }}
+      companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
+      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      version: ${{ inputs.version }}
+
   file-check: # Check what files changed if we’re being run in a PR or on a push.
     name: Check Modified Files
     runs-on: ubuntu-latest
@@ -37,6 +67,7 @@ jobs:
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
       - name: Check files
@@ -59,6 +90,12 @@ jobs:
             .github/scripts/gen-matrix-packaging.py
             .github/scripts/gen-package-repos.py
             .github/scripts/modules/release_versions.py
+            .github/workflows/release.yml
+            .github/workflows/dem-runtime-release.yml
+            .github/workflows/dem-runtime-companion-check.yml
+            .github/scripts/prepare-release-base.sh
+            .github/scripts/tests/test_dem_paired_workflows.py
+            packaging/release_info.py
             .github/scripts/package-upload.sh
             .github/scripts/prepare-topology-ip-intel-stock.sh
             .github/scripts/pkg-test.sh
@@ -104,6 +141,8 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Prepare tools
         id: prepare
         run: |
@@ -152,10 +191,13 @@ jobs:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
       - name: Check Version
         id: check-version
         env:
           RELEASE_VERSION: ${{ github.event.inputs.version }}
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             case "${{ github.event.inputs.type }}" in
@@ -172,7 +214,7 @@ jobs:
                 ;;
               *)
                 echo "repos=${REPO_PREFIX}-devel" >> "${GITHUB_OUTPUT}"
-                echo "version=0.${GITHUB_SHA}" >> "${GITHUB_OUTPUT}"
+                echo "version=0.${SOURCE_SHA}" >> "${GITHUB_OUTPUT}"
                 echo "retention=30" >> "${GITHUB_OUTPUT}"
                 ;;
             esac
@@ -215,6 +257,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 1
           submodules: false
       - name: Fetch IBM MQ libs
@@ -266,6 +309,7 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0
           submodules: recursive
       - name: Setup Go
@@ -325,12 +369,26 @@ jobs:
             && needs.file-check.outputs.run == 'true'
           }}
 
+  # Permit the skipped optional publisher after successful companion verification.
+  # Name direct prerequisites: service-side needs.* can include skipped ancestors.
   build:
+    if: >-
+      ${{ !failure() && !cancelled()
+          && needs.release-companion.result == 'success'
+          && needs.matrix.result == 'success'
+          && needs.version-check.result == 'success'
+          && needs.file-check.result == 'success'
+          && needs.prepare-ibm-mq-libs.result == 'success'
+          && needs.prepare-topology-ip-intel-stock.result == 'success' }}
+    permissions:
+      contents: read
+      actions: read
     name: Build
     runs-on: ${{ matrix.runner }}
     env:
       DOCKER_CLI_EXPERIMENTAL: enabled
     needs:
+      - release-companion
       - matrix
       - version-check
       - file-check
@@ -353,8 +411,16 @@ jobs:
         if: needs.file-check.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           fetch-depth: 0 # We need full history for versioning
           submodules: recursive
+      - name: Stamp the exact Agent release identity
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
+          CHANNEL: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+        run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Set Sentry telemetry env vars
         id: set-telemetry-env-vars
         run: |
@@ -399,12 +465,49 @@ jobs:
         with:
           name: topology-ip-intel-stock
           path: ${{ github.workspace }}/.topology-ip-intel-stock
+      - name: Select the matching runtime architecture
+        id: dem-arch
+        if: github.event_name == 'workflow_dispatch' && github.repository == 'netdata/netdata'
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: |
+          case "$NATIVE_ARCH" in
+            amd64|x86_64) echo 'arch=amd64' >> "$GITHUB_OUTPUT" ;;
+            arm64|aarch64) echo 'arch=arm64' >> "$GITHUB_OUTPUT" ;;
+          esac
+      - name: Download the exact paired native payload
+        if: steps.dem-arch.outputs.arch != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dem-runtime-${{ steps.dem-arch.outputs.arch }}
+          path: ${{ runner.temp }}/native-runtime-artifact
+          run-id: ${{ needs.release-companion.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Download the successful companion publication receipt
+        if: steps.dem-arch.outputs.arch != ''
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dem-runtime-publication-receipt
+          path: ${{ runner.temp }}/native-runtime-receipt
+          run-id: ${{ needs.release-companion.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify and prepare the optional native component
+        if: steps.dem-arch.outputs.arch != ''
+        env:
+          DEM_ARCH: ${{ steps.dem-arch.outputs.arch }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zstd
+          python3 packaging/dem-runtime/ci.py prepare-native --artifacts "$RUNNER_TEMP/native-runtime-artifact" \
+            --receipt "$RUNNER_TEMP/native-runtime-receipt" \
+            --arch "$DEM_ARCH" --release-info packaging/release-info --output "$GITHUB_WORKSPACE/.dem-runtime-payload"
+          echo 'DEM_RUNTIME_PAYLOAD_DIR=/netdata/.dem-runtime-payload' >> "$GITHUB_ENV"
       - name: Build Packages
         id: build
         if: needs.file-check.outputs.run == 'true'
         shell: bash
         run: |
-          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e VERSION=${{ needs.version-check.outputs.version }} \
+          docker run --security-opt seccomp=unconfined -e DISABLE_TELEMETRY=1 -e DEM_RUNTIME_PAYLOAD_DIR="${DEM_RUNTIME_PAYLOAD_DIR:-}" -e VERSION=${{ needs.version-check.outputs.version }} \
                      -e ENABLE_SENTRY=${{ matrix.bundle_sentry }} -e RELEASE_PIPELINE=${{ env.RELEASE_PIPELINE }} \
                      -e BUILD_DESTINATION=${{ matrix.distro }}${{ matrix.version }}_${{ matrix.arch }} -e UPLOAD_SENTRY=${{ env.UPLOAD_SENTRY }} \
                      -e SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_CLI_TOKEN }} -e NETDATA_SENTRY_DSN=${{ secrets.SENTRY_DSN }} \

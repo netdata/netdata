@@ -6,8 +6,16 @@ on:
       - '.github/workflows/dem-runtime-tests.yml'
       - '.github/workflows/dem-runtime-node-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
+      - '.github/workflows/dem-runtime-companion-check.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/packaging.yml'
+      - '.github/workflows/docker.yml'
+      - '.github/scripts/prepare-release-base.sh'
+      - '.github/scripts/tests/test_dem_paired_workflows.py'
       - '.github/data/distros.yml'
       - '.github/scripts/package-upload.sh'
+      - '.github/scripts/pkg-test.sh'
       - 'packaging/cmake/Modules/Packaging.cmake'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
@@ -15,18 +23,32 @@ on:
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
       - 'packaging/dem-runtime/**'
+      - 'packaging/release_info.py'
+      - 'packaging/test_release_info.py'
+      - 'packaging/build-package.sh'
+      - 'packaging/cmake/Modules/NetdataVersion.cmake'
+      - 'packaging/cmake/Modules/NetdataGoTools.cmake'
+      - 'packaging/makeself/**'
+      - 'netdata-installer.sh'
       - 'packaging/cmake/pkg-files/deb/netdata/prerm'
       - 'packaging/installer/kickstart.sh'
       - 'packaging/docker/netdata-dem-docker-host.sh'
       - 'packaging/docker/Dockerfile'
       - 'packaging/docker/netdata-dem-docker'
       - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/netdata-dem-pair.sh'
+      - 'packaging/installer/netdata-updater.sh'
       - 'packaging/installer/netdata-uninstaller.sh'
-      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/installer/tests/test_dem*.py'
+      - 'packaging/installer/tests/test_updater_dem.py'
+      - 'packaging/installer/tests/test_updater_artifacts.py'
+      - 'packaging/installer/tests/test_static_install_callers.py'
       - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
       - 'src/dem-runtime/**'
       - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/internal/pgptest/**'
+      - 'src/go/internal/browserruntimetest/**'
+      - 'src/go/pkg/buildinfo/**'
       - 'src/go/cmd/demplugin/**'
       - 'src/go/plugin/dem/**'
       - 'src/go/plugin/agent/jobmgr/**'
@@ -40,8 +62,16 @@ on:
       - '.github/workflows/dem-runtime-tests.yml'
       - '.github/workflows/dem-runtime-node-tests.yml'
       - '.github/workflows/dem-runtime-release.yml'
+      - '.github/workflows/dem-runtime-companion-check.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/build.yml'
+      - '.github/workflows/packaging.yml'
+      - '.github/workflows/docker.yml'
+      - '.github/scripts/prepare-release-base.sh'
+      - '.github/scripts/tests/test_dem_paired_workflows.py'
       - '.github/data/distros.yml'
       - '.github/scripts/package-upload.sh'
+      - '.github/scripts/pkg-test.sh'
       - 'packaging/cmake/Modules/Packaging.cmake'
       - 'src/collectors/utils/nd-run.c'
       - 'src/collectors/utils/nd-process-tree.*'
@@ -49,18 +79,32 @@ on:
       - 'src/collectors/utils/nd-file-reader.*'
       - 'src/collectors/utils/exec-signals.h'
       - 'packaging/dem-runtime/**'
+      - 'packaging/release_info.py'
+      - 'packaging/test_release_info.py'
+      - 'packaging/build-package.sh'
+      - 'packaging/cmake/Modules/NetdataVersion.cmake'
+      - 'packaging/cmake/Modules/NetdataGoTools.cmake'
+      - 'packaging/makeself/**'
+      - 'netdata-installer.sh'
       - 'packaging/cmake/pkg-files/deb/netdata/prerm'
       - 'packaging/installer/kickstart.sh'
       - 'packaging/docker/netdata-dem-docker-host.sh'
       - 'packaging/docker/Dockerfile'
       - 'packaging/docker/netdata-dem-docker'
       - 'packaging/installer/netdata-dem-runtime.sh'
+      - 'packaging/installer/netdata-dem-pair.sh'
+      - 'packaging/installer/netdata-updater.sh'
       - 'packaging/installer/netdata-uninstaller.sh'
-      - 'packaging/installer/tests/test_dem_runtime*.py'
+      - 'packaging/installer/tests/test_dem*.py'
+      - 'packaging/installer/tests/test_updater_dem.py'
+      - 'packaging/installer/tests/test_updater_artifacts.py'
+      - 'packaging/installer/tests/test_static_install_callers.py'
       - 'packaging/cmake/Modules/NetdataPluginDem.cmake'
       - 'src/dem-runtime/**'
       - 'src/go/tools/dem-runtime-release/**'
       - 'src/go/internal/pgptest/**'
+      - 'src/go/internal/browserruntimetest/**'
+      - 'src/go/pkg/buildinfo/**'
       - 'src/go/cmd/demplugin/**'
       - 'src/go/plugin/dem/**'
       - 'src/go/plugin/agent/jobmgr/**'
@@ -105,18 +149,29 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gnupg cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml
-          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio; do command -v "$tool"; done
+          for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node; do command -v "$tool"; done
       - name: Store lifecycle and supervisor integration
         working-directory: src/go
         run: |
-          go test -race -count=1 ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
-          go vet ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go test -race -count=1 ./pkg/buildinfo ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
+          go vet ./pkg/buildinfo ./plugin/dem/... ./cmd/demplugin ./tools/dem-runtime-release ./plugin/go.d/pkg/ndexec ./plugin/agent/jobmgr/composition
           go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release
           echo "DEM_RELEASE_TEST_TOOL=$RUNNER_TEMP/dem-runtime-release" >> "$GITHUB_ENV"
       - name: Builder, source assembly, and native package contracts
         run: |
+          python3 -m unittest discover -s packaging -p test_release_info.py -v
+          python3 -m unittest discover -s .github/scripts/tests -p test_dem_paired_workflows.py -v
           python3 -m unittest discover -s packaging/dem-runtime -v
           python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
+      - name: Paired installation owners and recovery
+        run: |
+          python3 -m unittest discover -s packaging/installer/tests -p test_dem_pair.py -v
+          python3 -m unittest discover -s packaging/installer/tests -p test_dem_docker_pair.py -v
+          python3 -m unittest discover -s packaging/installer/tests -p test_updater_dem.py -v
+          python3 -m unittest discover -s packaging/installer/tests -p test_updater_artifacts.py -v
+          python3 -m unittest discover -s packaging/installer/tests -p test_static_install_callers.py -v
+          # These root cases use only private fixture paths, not host services.
+          sudo python3 -B -m unittest discover -s packaging/installer/tests -p test_dem_pair.py -v
       - name: Explicit installer and service identity contracts
         run: |
           docker pull python:3.13-bookworm
