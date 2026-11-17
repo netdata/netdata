@@ -1150,6 +1150,16 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     else
         wall_clock_time = (time_t) str2ull_encoded(wall_clock_time_str);
 
+    // a non-positive wall clock can only come from integer wrap-around; it is
+    // replaced by end_time below, so it must not be forwarded to our parent
+    bool wall_clock_sanitized = (wall_clock_time <= 0);
+    if (unlikely(!pluginsd_begin_v2_times_valid(end_time, wall_clock_time, &wall_clock_time))) {
+        char msg[160];
+        snprintfz(msg, sizeof(msg), "invalid end_time %"PRId64" (wall clock %"PRId64")",
+                  (int64_t)end_time, (int64_t)wall_clock_time);
+        return PLUGINSD_PROTOCOL_ERROR(PLUGINSD_KEYWORD_BEGIN_V2, msg);
+    }
+
     if (unlikely(update_every != st->update_every)) {
         rrdset_set_update_every_s(st, update_every);
         update_every = st->update_every;
@@ -1215,7 +1225,9 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
 
         buffer_fast_strcat(wb, " ", 1);
 
-        if(can_copy)
+        // when the child wall clock had to be replaced by end_time, forward the
+        // sanitized value instead of the original (wrapped) string
+        if(can_copy && !wall_clock_sanitized)
             buffer_strcat(wb, wall_clock_time_str);
         else
             buffer_print_uint64_encoded(wb, integer_encoding, wall_clock_time);
@@ -2151,6 +2163,158 @@ int pluginsd_system_info_unittest(void) {
     fprintf(stderr, "  streamed system-info LABEL/OVERWRITE: %s\n", errors ? "FAILED" : "OK");
 #undef STREAM_INFO_CHECK
     return errors;
+}
+
+static int pluginsd_timestamps_unittest_replay(void) {
+    // Child values arrive as unsigned 64-bit strings cast to time_t:
+    // 18446744073709551614 / 18446744073709551615 wrap to -2 / -1 and used to
+    // pass the "non-zero && < wall_clock" checks.
+    const time_t wrapped_start = (time_t)-2;
+    const time_t wrapped_end = (time_t)-1;
+
+    const time_t now = now_realtime_sec();
+    const time_t tolerance = 6;
+    const time_t time_max = nd_time_t_max();
+
+    // samples are stored as seconds * USEC_PER_SEC in a uint64_t; timestamps
+    // above this limit wrap around and would be stored at arbitrary times
+    const uintmax_t usec_limit = (uintmax_t)UINT64_MAX / USEC_PER_SEC;
+    const time_t storable_max = (uintmax_t)time_max < usec_limit ?
+                                time_max : (time_t)usec_limit;
+
+    struct {
+        time_t start, end, wall_clock, tolerance;
+        bool valid;
+    } cases[] = {
+        // the wrap-around values accepted before the fix
+        { wrapped_start, wrapped_end, now, tolerance, false, },
+        { wrapped_start, wrapped_end, wrapped_end, tolerance, false, },
+        // zero / negative
+        { 0, now, now, tolerance, false, },
+        { now, 0, now, tolerance, false, },
+        { -1, -1, now, tolerance, false, },
+        // future beyond tolerance
+        { now + 3600, now + 3601, now, tolerance, false, },
+        // boundary: end == wall_clock + tolerance is rejected (strict <)
+        { now - tolerance, now + tolerance, now, tolerance, false, },
+        // start >= end
+        { now, now, now + tolerance, tolerance, false, },
+        { now, now - 1, now + tolerance, tolerance, false, },
+        // valid replay pair
+        { now - 1, now, now, tolerance, true, },
+        { now - tolerance, now, now, tolerance, true, },
+        // near time_t max: the upper-bound comparison must not overflow
+        { now - 1, now, time_max, tolerance, true, },
+        { storable_max - 1, storable_max, time_max, tolerance, true, },
+    };
+
+    for(size_t i = 0; i < _countof(cases); i++) {
+        bool valid = pluginsd_replay_timestamps_valid(cases[i].start, cases[i].end, cases[i].wall_clock, cases[i].tolerance);
+        if(valid != cases[i].valid) {
+            netdata_log_error("PLUGINSD: replay timestamps unittest failed for case %zu "
+                              "(start=%"PRId64", end=%"PRId64", wall_clock=%"PRId64", tolerance=%"PRId64"): expected %s, got %s",
+                              i, (int64_t)cases[i].start, (int64_t)cases[i].end, (int64_t)cases[i].wall_clock,
+                              (int64_t)cases[i].tolerance,
+                              cases[i].valid ? "valid" : "invalid", valid ? "valid" : "invalid");
+            return 1;
+        }
+    }
+
+    // timestamps that cannot be represented in usec_t must be rejected
+    if((uintmax_t)time_max > usec_limit) {
+        const time_t not_storable = (time_t)(usec_limit + 1);
+
+        if(pluginsd_replay_timestamps_valid(now - 1, not_storable, not_storable, tolerance)) {
+            netdata_log_error("PLUGINSD: replay timestamps unittest failed: non-storable end_time %"PRId64" accepted",
+                              (int64_t)not_storable);
+            return 1;
+        }
+
+        if(pluginsd_replay_timestamps_valid(not_storable, not_storable + 1, not_storable + 1, tolerance)) {
+            netdata_log_error("PLUGINSD: replay timestamps unittest failed: non-storable start_time %"PRId64" accepted",
+                              (int64_t)not_storable);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int pluginsd_timestamps_unittest_begin_v2(void) {
+    const time_t wrapped_end = (time_t)-1;
+    const time_t now = now_realtime_sec();
+    const uintmax_t usec_limit = (uintmax_t)UINT64_MAX / USEC_PER_SEC;
+    const time_t storable_max = (uintmax_t)nd_time_t_max() < usec_limit ?
+                                nd_time_t_max() : (time_t)usec_limit;
+
+    // invalid end_time values
+    struct {
+        time_t end_time, wall_clock;
+    } invalid[] = {
+        { wrapped_end, now, },         // the wrap-around input
+        { wrapped_end, wrapped_end, }, // '#' shorthand: wall_clock == end_time
+        { 0, now, },
+        { -1, now, },
+    };
+
+    for(size_t i = 0; i < _countof(invalid); i++) {
+        time_t wall_clock = invalid[i].wall_clock;
+        if(pluginsd_begin_v2_times_valid(invalid[i].end_time, wall_clock, &wall_clock)) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: end_time %"PRId64" unexpectedly accepted",
+                              (int64_t)invalid[i].end_time);
+            return 1;
+        }
+    }
+
+    // end_time must fit in usec_t, because samples are stored as end_time * USEC_PER_SEC
+    if((uintmax_t)nd_time_t_max() > usec_limit) {
+        const time_t not_storable = (time_t)(usec_limit + 1);
+        time_t wall_clock = now;
+
+        if(pluginsd_begin_v2_times_valid(not_storable, wall_clock, &wall_clock)) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: non-storable end_time %"PRId64" accepted",
+                              (int64_t)not_storable);
+            return 1;
+        }
+    }
+
+    // valid end_time: wall_clock is kept when positive, falls back to end_time otherwise
+    struct {
+        time_t end_time, wall_clock_in, wall_clock_expected;
+    } valid[] = {
+        { now, now, now, },           // positive wall_clock kept
+        { now, now - 10, now - 10, }, // positive wall_clock kept (may differ from end_time)
+        { now, wrapped_end, now, },   // wrapped wall_clock falls back to end_time
+        { now, 0, now, },             // unset wall_clock falls back to end_time
+        { storable_max, storable_max, storable_max, }, // largest timestamp that fits in usec_t
+    };
+
+    for(size_t i = 0; i < _countof(valid); i++) {
+        time_t wall_clock = valid[i].wall_clock_in;
+        if(!pluginsd_begin_v2_times_valid(valid[i].end_time, wall_clock, &wall_clock)) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: end_time %"PRId64" unexpectedly rejected",
+                              (int64_t)valid[i].end_time);
+            return 1;
+        }
+        if(wall_clock != valid[i].wall_clock_expected) {
+            netdata_log_error("PLUGINSD: begin_v2 times unittest failed: expected wall_clock %"PRId64", got %"PRId64,
+                              (int64_t)valid[i].wall_clock_expected, (int64_t)wall_clock);
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+int pluginsd_timestamps_unittest(void) {
+    if(pluginsd_timestamps_unittest_replay())
+        return 1;
+
+    if(pluginsd_timestamps_unittest_begin_v2())
+        return 1;
+
+    netdata_log_info("PLUGINSD: timestamps unittest passed");
+    return 0;
 }
 
 int pluginsd_parser_unittest(void) {
