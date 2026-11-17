@@ -284,7 +284,9 @@ func (r *ProcessRuntime) SnapshotApps(mapsPerCore bool) ([]ProcessAppSnapshot, e
 
 func (r *ProcessRuntime) DeletePids(pids []uint32) error { _ = pids; return ErrDisabled }
 
-func (r *ProcessRuntime) Close() {}
+func (r *ProcessRuntime) Close() {
+	// No-op in the disabled build because the runtime never acquired native resources.
+}
 
 // DNSRuntime disabled stubs — mirrored from dns_libbpf.go (netdata_ebpf_libbpf build).
 

@@ -4,11 +4,18 @@ import "testing"
 
 func TestBuildProcessLegacyPlanUsesBaseForPerPIDIntegration(t *testing.T) {
 	cases := map[string]struct {
-		apps    bool
-		cgroups bool
+		apps       bool
+		cgroups    bool
+		wantFlavor ObjectFlavor
+		wantObject string
 	}{
-		"apps":    {apps: true},
-		"cgroups": {cgroups: true},
+		"apps":    {apps: true, wantFlavor: ObjectFlavorBase, wantObject: "ebpf.d/rnetdata_ebpf_process.6.12.o"},
+		"cgroups": {cgroups: true, wantFlavor: ObjectFlavorBase, wantObject: "ebpf.d/rnetdata_ebpf_process.6.12.o"},
+		// Global-only collection keeps the configured flavor; only per-PID
+		// consumers need the base object's tbl_pid_stats.
+		"global only keeps the configured flavor": {
+			wantFlavor: ObjectFlavorBuffer, wantObject: "ebpf.d/rnetdata_ebpf_process_buffer.6.12.o",
+		},
 	}
 
 	for name, tc := range cases {
@@ -19,14 +26,12 @@ func TestBuildProcessLegacyPlanUsesBaseForPerPIDIntegration(t *testing.T) {
 			cfg.AppsEnabled = tc.apps
 			cfg.CgroupsEnabled = tc.cgroups
 			cfg.HasBTF = true
+			cfg.IsDebian = false
 			cfg.ObjectFlavor = "buffer"
 
 			plan := BuildProcessLegacyPlan(cfg)
-			if plan.Flavor != ObjectFlavorBase {
-				t.Fatalf("plan flavor = %v, want base for per-PID integration", plan.Flavor)
-			}
-			if plan.ObjectPath != "ebpf.d/rnetdata_ebpf_process.6.12.o" {
-				t.Fatalf("plan object = %q, want 6.12 base process object", plan.ObjectPath)
+			if plan.Flavor != tc.wantFlavor || plan.ObjectPath != tc.wantObject {
+				t.Fatalf("plan = (%v, %q), want (%v, %q)", plan.Flavor, plan.ObjectPath, tc.wantFlavor, tc.wantObject)
 			}
 		})
 	}

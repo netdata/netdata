@@ -3,6 +3,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -67,9 +68,13 @@ func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
 		if candidate.LoadMode == LoadCore {
 			legacy := candidate
 			legacy.LoadMode = LoadLegacy
-			if handle, legacyErr := tryLoadProcessPlan(cfg, legacy); legacyErr == nil {
+			handle, legacyErr := tryLoadProcessPlan(cfg, legacy)
+			if legacyErr == nil {
 				return handle, nil
 			}
+			// Keep both causes: the CO-RE error alone hides why the
+			// tracepoint/kprobe retry of the same object failed.
+			loadErr = errors.Join(loadErr, fmt.Errorf("legacy retry: %w", legacyErr))
 		}
 		lastErr = loadErr
 		if i < len(plans)-1 {
