@@ -4,21 +4,16 @@ package otlp
 
 import (
 	"context"
-
 	"encoding/hex"
-
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	coltracepb "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
 	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
 	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
-
 	"google.golang.org/grpc/metadata"
 )
 
@@ -45,9 +40,8 @@ func NewTraces(
 	cfg config.Destination,
 	siteName string,
 	counters Counters,
-	redactor *redact.Redactor,
 ) (*Traces, error) {
-	t, err := newTransport(ctx, cfg, siteName, counters, redactor)
+	t, err := newTransport(ctx, cfg, siteName, counters)
 	if err != nil {
 		return nil, err
 	}
@@ -58,11 +52,8 @@ func NewTraces(
 	}, nil
 }
 
-func (e *Traces) Ingest(b *beacon.Beacon, result aggregate.Result) {
-	if !result.Accepted || !result.Investigated || b.Site != e.siteName {
-		return
-	}
-	if result.Observation == nil || len(result.Observation.Spans) == 0 {
+func (e *Traces) Ingest(result aggregate.Result) {
+	if !result.Investigated || len(result.Observation.Spans) == 0 {
 		return
 	}
 	rs := e.resourceSpans(result.Observation)
@@ -79,7 +70,7 @@ func (e *Traces) Ingest(b *beacon.Beacon, result aggregate.Result) {
 		rs: rs,
 	}:
 	default:
-		e.counters.Add(aggregate.CounterSpansDropped, n)
+		e.counters.Add(CounterSpansDropped, n)
 	}
 }
 
@@ -89,7 +80,18 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 		service = "rum:" + b.Site
 	}
 	res := []*commonpb.KeyValue{strAttr("service.name", service), strAttr("rum.site", b.Site)}
-	for _, kv := range [][2]string{{"dem.vnode_guid", b.VnodeGUID}, {"rum.browser", b.Browser}, {"rum.browser_version", b.BrowserVersion}, {"rum.device", b.Device}, {"rum.country", b.Country}, {"rum.session_id", b.SessionID}, {"rum.experience_id", b.ExperienceID}, {"rum.view_id", b.ViewID}, {"rum.view", b.View}, {"rum.document_entry", b.PageGroup}} {
+	for _, kv := range [][2]string{
+		{"dem.vnode_guid", b.VnodeGUID},
+		{"rum.browser", b.Browser},
+		{"rum.browser_version", b.BrowserVersion},
+		{"rum.device", b.Device},
+		{"rum.country", b.Country},
+		{"rum.session_id", b.SessionID},
+		{"rum.experience_id", b.ExperienceID},
+		{"rum.view_id", b.ViewID},
+		{"rum.view", b.View},
+		{"rum.document_entry", b.PageGroup},
+	} {
 		if kv[1] != "" {
 			res = append(res, strAttr(kv[0], kv[1]))
 		}
@@ -165,87 +167,40 @@ func (e *Traces) resourceSpans(b *beacon.Beacon) *tracepb.ResourceSpans {
 	return rs
 }
 
-// Run batches spans until cancellation, then drains using the owner's shared
-// final context. The owner joins producers before cancellation.
+// Run exports queued spans until ctx is done, then drains them once with the
+// owner's shared, bounded final context (see runQueue).
 func (e *Traces) Run(ctx context.Context, final func() context.Context) {
 	e.conn.Connect()
-	ticker := time.NewTicker(batchPeriod)
-	defer ticker.Stop()
-	batch := make([]spanItem, 0, maxSpanBatch)
-	// An unattempted normal batch belongs to the final drain. An attempted
-	// export is consumed even on failure, since retrying could duplicate data.
-	flush := func(parent context.Context) bool {
-		if len(batch) == 0 {
-			return true
-		}
-		if !e.exportSpans(parent, batch, exportTimeout) {
-			return false
-		}
-		batch = batch[:0]
-		return true
-	}
-normal:
-	for {
-		select {
-		case <-ctx.Done():
-			break normal
-		case it, ok := <-e.spanCh:
-			if !ok {
-				break normal
-			}
-			batch = append(batch, it)
-			if len(batch) >= maxSpanBatch && !flush(ctx) {
-				break normal
-			}
-		case <-ticker.C:
-			if !flush(ctx) {
-				break normal
-			}
-		}
-	}
-	// Producers have been joined by the owner. Use its shared budget once,
-	// including for a batch whose normal export never began.
-	parent := final()
-	flushFinal := func() {
-		if !flush(parent) {
-			var n uint64
-			for _, it := range batch {
-				n += it.n
-			}
-			e.counters.Add(aggregate.CounterSpansDropped, n)
-			batch = batch[:0]
-		}
-	}
-	for {
-		if len(batch) >= maxSpanBatch {
-			flushFinal()
-		}
-		select {
-		case it, ok := <-e.spanCh:
-			if !ok {
-				flushFinal()
-				return
-			}
-			batch = append(batch, it)
-		default:
-			flushFinal()
-			return
-		}
-	}
+	runQueue(
+		ctx,
+		final,
+		e.spanCh,
+		maxSpanBatch,
+		func(ctx context.Context, batch []spanItem) bool { return e.exportSpans(ctx, batch, exportTimeout) },
+		func(batch []spanItem) { e.counters.Add(CounterSpansDropped, spanCount(batch)) },
+	)
 }
 
-func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout time.Duration) bool {
-	req := &coltracepb.ExportTraceServiceRequest{
-		ResourceSpans: make([]*tracepb.ResourceSpans, 0, len(batch)),
-	}
+func spanCount(batch []spanItem) uint64 {
 	var n uint64
 	for _, it := range batch {
-		req.ResourceSpans = append(req.ResourceSpans, it.rs)
 		n += it.n
 	}
+	return n
+}
+
+// exportSpans reports whether a send was attempted, including failed attempts.
+func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout time.Duration) bool {
 	if parent.Err() != nil {
 		return false
 	}
+	req := &coltracepb.ExportTraceServiceRequest{
+		ResourceSpans: make([]*tracepb.ResourceSpans, 0, len(batch)),
+	}
+	for _, it := range batch {
+		req.ResourceSpans = append(req.ResourceSpans, it.rs)
+	}
+	n := spanCount(batch)
 	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	if e.authMD != nil {
@@ -254,14 +209,14 @@ func (e *Traces) exportSpans(parent context.Context, batch []spanItem, timeout t
 	resp, err := e.client.Export(ctx, req)
 	if err != nil {
 		e.failed("traces", err)
-		e.counters.Add(aggregate.CounterSpansErrors, n)
+		e.counters.Add(CounterSpansErrors, n)
 		return true
 	}
 	rejected := rejectedCount(resp.GetPartialSuccess().GetRejectedSpans(), n)
 	if rejected > 0 {
 		e.rejected("traces", rejected)
 	}
-	e.counters.Add(aggregate.CounterSpansErrors, rejected)
-	e.counters.Add(aggregate.CounterSpansSent, n-rejected)
+	e.counters.Add(CounterSpansErrors, rejected)
+	e.counters.Add(CounterSpansSent, n-rejected)
 	return true
 }

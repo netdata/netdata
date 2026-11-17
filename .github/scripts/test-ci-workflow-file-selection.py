@@ -230,6 +230,8 @@ class WorkflowFileSelectionTest(unittest.TestCase):
         self.assertTrue(
             {
                 ".github/scripts/test-go-build-matrix.py",
+                ".github/scripts/summarize-go-test-json.py",
+                ".github/scripts/test-go-test-timings.py",
                 "src/go/**",
                 "src/collectors/cgroups.plugin/cgroup-name/**",
                 "src/collectors/ebpf.plugin/ebpfgo.plugin/**",

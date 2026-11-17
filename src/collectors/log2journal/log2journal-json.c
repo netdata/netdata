@@ -356,6 +356,24 @@ static inline bool json_parse_string(LOG_JSON_STATE *js) {
     return true;
 }
 
+// start a nested key level: write the depth separator only when the separator and the
+// terminator fit in js->key, so js->stack[] never points past js->key
+static inline char *json_key_level_start(LOG_JSON_STATE *js) {
+    char *d = js->stack[js->depth];
+
+    if(js->depth) {
+        if((size_t)(js->key + sizeof(js->key) - d) < 2) {
+            snprintf(js->msg, sizeof(js->msg),
+                     "JSON PARSER: key buffer full - keys are too long, at position %u", js->pos);
+            return NULL;
+        }
+
+        *d++ = '_';
+    }
+
+    return d;
+}
+
 static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
     if (!json_expect_char_after_white_space(js, "\""))
         return false;
@@ -368,11 +386,11 @@ static inline bool json_parse_key_and_push(LOG_JSON_STATE *js) {
 
     json_consume_char(js);
 
-    char *d = js->stack[js->depth];
-    if(js->depth)
-        *d++ = '_';
+    char *d = json_key_level_start(js);
+    if(!d)
+        return false;
 
-    size_t remaining = sizeof(js->key) - (d - js->key);
+    size_t remaining = sizeof(js->key) - (size_t)(d - js->key);
 
     const char *s = json_current_pos(js);
     char last_c = '\0';
@@ -489,10 +507,9 @@ static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
         return false;
     }
 
-    char *d = js->stack[js->depth];
-    if(js->depth > 0) {
-        *d++ = '_';
-    }
+    char *d = json_key_level_start(js);
+    if(!d)
+        return false;
 
     // Convert index to string manually
     char temp[32];
@@ -504,7 +521,7 @@ static inline bool json_key_index_and_push(LOG_JSON_STATE *js, size_t index) {
         index /= 10;
     } while (index > 0);
 
-    size_t remaining = sizeof(js->key) - (d - js->key);
+    size_t remaining = sizeof(js->key) - (size_t)(d - js->key);
 
     // Append the index to the key
     while (*t) {

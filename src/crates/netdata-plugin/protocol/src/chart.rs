@@ -940,12 +940,12 @@ mod tests {
 
     fn chart<'a>(options: ChartOptions) -> ChartLine<'a> {
         ChartLine {
-            id: "otel_service.requests_x",
+            id: "otel.derived_metrics.requests_x",
             name: "",
             title: "Requests",
             units: "requests/s",
             family: "requests",
-            context: "otel_service.requests",
+            context: "otel.derived_metrics.requests",
             chart_type: ChartType::Stacked,
             priority: 70000,
             update_every: 1,
@@ -957,8 +957,8 @@ mod tests {
     fn chart_line_without_options() {
         assert_eq!(
             line(|b| write_chart(b, &chart(ChartOptions::default()))),
-            "CHART otel_service.requests_x '' 'Requests' 'requests/s' 'requests' \
-             'otel_service.requests' stacked 70000 1\n"
+            "CHART otel.derived_metrics.requests_x '' 'Requests' 'requests/s' 'requests' \
+             'otel.derived_metrics.requests' stacked 70000 1\n"
         );
     }
 
@@ -1248,10 +1248,10 @@ mod tests {
                     },
                 },
             );
-            write_begin(&mut b, "otel_service.requests_x", 1_000_000);
+            write_begin(&mut b, "otel.derived_metrics.requests_x", 1_000_000);
             write_set_float(&mut b, "ok", 1.5);
             write_end(&mut b, 10);
-            write_begin(&mut b, "otel_service.requests_x", 1_000_000);
+            write_begin(&mut b, "otel.derived_metrics.requests_x", 1_000_000);
             write_set_empty(&mut b, "ok");
             write_end_timed(&mut b, 11);
             b

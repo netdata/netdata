@@ -21,6 +21,8 @@ import (
 
 type repeatingByte byte
 
+const testFetchLimit = 16 << 10
+
 func (v repeatingByte) Read(p []byte) (int, error) {
 	for i := range p {
 		p[i] = byte(v)
@@ -31,6 +33,14 @@ func (v repeatingByte) Read(p []byte) (int, error) {
 type fetchRoundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f fetchRoundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+// Advertise a policy without enforcing it; the fetcher must bound its own reads.
+type fetchPolicyTransport struct {
+	http.RoundTripper
+	limit int64
+}
+
+func (t fetchPolicyTransport) ResponseBodyLimit() int64 { return t.limit }
 
 type fetchBody struct {
 	io.Reader
@@ -49,18 +59,21 @@ func TestHTTPFetchBoundsCleanup(t *testing.T) {
 	for name, status := range map[string]int{"HTTP error": http.StatusBadGateway, "invalid gzip": http.StatusOK} {
 		t.Run(name, func(t *testing.T) {
 			body := &fetchBody{
-				Reader: io.LimitReader(repeatingByte('x'), web.DefaultResponseBodyLimit+4096),
+				Reader: io.LimitReader(repeatingByte('x'), testFetchLimit+4096),
 			}
 			client := &http.Client{
-				Transport: fetchRoundTripFunc(func(*http.Request) (*http.Response, error) {
-					return &http.Response{
-						StatusCode: status,
-						Header: http.Header{
-							"Content-Encoding": {"gzip"},
-						},
-						Body: body,
-					}, nil
-				}),
+				Transport: fetchPolicyTransport{
+					RoundTripper: fetchRoundTripFunc(func(*http.Request) (*http.Response, error) {
+						return &http.Response{
+							StatusCode: status,
+							Header: http.Header{
+								"Content-Encoding": {"gzip"},
+							},
+							Body: body,
+						}, nil
+					}),
+					limit: testFetchLimit,
+				},
 			}
 			f := httpFetcher{
 				client: client,
@@ -70,13 +83,13 @@ func TestHTTPFetchBoundsCleanup(t *testing.T) {
 			}
 			require.Error(t, f.fetch(context.Background(), io.Discard))
 			assert.True(t, body.closed)
-			assert.Equal(t, web.DefaultResponseBodyLimit+1, body.read)
+			assert.Equal(t, testFetchLimit+1, body.read)
 		})
 	}
 }
 
 func TestPrometheusResponseLimit(t *testing.T) {
-	const limit = 64 << 20
+	const limit = testFetchLimit
 	for name, compressed := range map[string]bool{"plain": false, "gzip": true} {
 		t.Run(name, func(t *testing.T) {
 			var oversized atomic.Bool
@@ -97,7 +110,12 @@ func TestPrometheusResponseLimit(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			p := New(server.Client(), web.RequestConfig{
+			client := server.Client()
+			client.Transport = fetchPolicyTransport{
+				RoundTripper: client.Transport,
+				limit:        limit,
+			}
+			p := New(client, web.RequestConfig{
 				URL: server.URL,
 			}).(*prometheus)
 			for entry, scrape := range map[string]func() error{
@@ -159,7 +177,7 @@ func BenchmarkHTTPFetch(b *testing.B) {
 }
 
 func TestPrometheusCustomResponseLimit(t *testing.T) {
-	for name, limit := range map[string]confopt.ByteSize{"smaller": confopt.KiB, "larger": 64*confopt.MiB + confopt.KiB} {
+	for name, limit := range map[string]confopt.ByteSize{"smaller": confopt.KiB, "larger": 2 * testFetchLimit} {
 		t.Run(name, func(t *testing.T) {
 			for encoding, compressed := range map[string]bool{"plain": false, "gzip": true} {
 				t.Run(encoding, func(t *testing.T) {
@@ -197,6 +215,21 @@ func TestPrometheusCustomResponseLimit(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPrometheusDefaultResponseLimit(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "metric 1\n")
+	}))
+	defer server.Close()
+	// An ordinary client has no policy adapter. Preserve its production fallback
+	// separately from the compact overflow fixtures.
+	p := New(server.Client(), web.RequestConfig{
+		URL: server.URL,
+	})
+	assert.EqualValues(t, 64<<20, web.HTTPClientResponseBodyLimit(p.HTTPClient()))
+	_, err := p.ScrapeSeries(context.Background())
+	require.NoError(t, err)
 }
 
 func TestPrometheusLimitFollowsHTTPClient(t *testing.T) {

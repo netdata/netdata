@@ -24,17 +24,16 @@ var (
 	ErrInvalidID           = errors.New("invalid run or artifact identifier")
 )
 
-type Job registry.Job
-type RunFilter history.RunFilter
-type RunPage history.RunPage
-
 type Observations interface {
 	Snapshot(time.Time) []registry.Job
+	Latest(jobID, runID string) (synthetic.Run, bool)
 }
+
 type History interface {
 	QueryRuns(context.Context, history.RunFilter) (history.RunPage, error)
 	GetRun(context.Context, string, string) (synthetic.Run, error)
 }
+
 type Artifacts interface {
 	Catalogue(context.Context, artifacts.Filter) (artifacts.Page, error)
 	Manifest(context.Context, string, string) (artifacts.Manifest, error)
@@ -57,27 +56,16 @@ func New(active Observations, history History, artifacts Artifacts, policyError 
 	}
 }
 
-func (s *Service) Jobs(now time.Time) []Job {
-	if s.active == nil {
-		return nil
-	}
-	snapshots := s.active.Snapshot(now)
-	out := make([]Job, len(snapshots))
-	for i, job := range snapshots {
-		out[i] = Job(job)
-	}
-	return out
+func (s *Service) Jobs(now time.Time) []registry.Job {
+	return s.active.Snapshot(now)
 }
 
-func (s *Service) Runs(ctx context.Context, filter RunFilter) (RunPage, error) {
+func (s *Service) Runs(ctx context.Context, filter history.RunFilter) (history.RunPage, error) {
 	if err := ctx.Err(); err != nil {
-		return RunPage{}, err
+		return history.RunPage{}, err
 	}
-	if s.history == nil {
-		return RunPage{}, errors.New("history unavailable")
-	}
-	page, err := s.history.QueryRuns(ctx, history.RunFilter(filter))
-	return RunPage(page), queryError(err)
+	page, err := s.history.QueryRuns(ctx, filter)
+	return page, historyError(err)
 }
 
 // Run prefers the exact active observation so failed journal publication does
@@ -86,25 +74,19 @@ func (s *Service) Run(ctx context.Context, jobID, runID string) (synthetic.Run, 
 	if err := ctx.Err(); err != nil {
 		return synthetic.Run{}, err
 	}
-	for _, job := range s.Jobs(time.Now()) {
-		if job.JobID == jobID && job.Latest != nil && job.Latest.ID == runID {
-			return *job.Latest, nil
-		}
-	}
-	if s.history == nil {
-		return synthetic.Run{}, errors.New("history unavailable")
+	if run, ok := s.active.Latest(jobID, runID); ok {
+		return run, nil
 	}
 	run, err := s.history.GetRun(ctx, jobID, runID)
-	return run, queryError(err)
+	return run, historyError(err)
 }
 
-func queryError(err error) error {
-	switch {
-	case errors.Is(err, os.ErrNotExist), errors.Is(err, artifacts.ErrNotFound):
+// historyError maps a run missing from retained history to ErrNotFound.
+func historyError(err error) error {
+	if errors.Is(err, os.ErrNotExist) {
 		return ErrNotFound
-	default:
-		return artifactError(err)
 	}
+	return err
 }
 
 func artifactError(err error) error {

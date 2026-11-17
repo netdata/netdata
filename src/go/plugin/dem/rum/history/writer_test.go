@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package history
 
 import (
@@ -9,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,11 +26,13 @@ func newFakeCounters() *fakeCounters {
 		values: map[string]uint64{},
 	}
 }
+
 func (c *fakeCounters) Add(key string, n uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.values[key] += n
 }
+
 func (c *fakeCounters) get(key string) uint64 {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -41,17 +44,31 @@ type eventWriterFunc func(context.Context, EventRecord) (bool, error)
 func (f eventWriterFunc) AppendEvent(ctx context.Context, r EventRecord) (bool, error) {
 	return f(ctx, r)
 }
+
 func (eventWriterFunc) Sync(context.Context) error { return nil }
 
-func drain(w *Writer) { ctx, cancel := context.WithCancel(context.Background()); cancel(); w.Run(ctx) }
+// ownerFinal stands in for the site owner's shared final context.
+func ownerFinal(t *testing.T, budget time.Duration) func() context.Context {
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
+	t.Cleanup(cancel)
+	return func() context.Context { return ctx }
+}
+
+// drain runs w with its run context already done, so it goes straight to the
+// final drain under final.
+func drain(w *Writer, final func() context.Context) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	w.Run(ctx, final)
+}
 
 func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 	ctx := context.Background()
-	st, err := demjournal.Open(ctx, "")
+	st, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, st.Close()) })
 	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters)
+	w := NewWriter(NewStore(st), counters)
 	now := time.Now().UnixMicro()
 	w.Event(
 		aggregate.HistoryEvent{
@@ -79,28 +96,139 @@ func TestWriterDrainsAlreadyNormalizedRecords(t *testing.T) {
 			Browser:     "Chrome",
 		},
 	)
-	drain(w)
+	drain(w, ownerFinal(t, time.Minute))
 	rows, err := NewStore(st).QuerySessionEvents(ctx, "site", "session", "")
 	require.NoError(t, err)
 	require.Len(t, rows, 2)
 	assert.Equal(t, "/[REDACTED]", rows[0].Page)
-	sessions, err := NewStore(st).QuerySessions(ctx, "site", "", 0, time.Now().Unix()+1, 2000, "")
+	sessions, err := NewStore(st).QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Site:   "site",
+			Before: time.Now().Unix() + 1,
+		},
+		Limit: 2000,
+	})
 	require.NoError(t, err)
 	require.Len(t, sessions, 1)
 	assert.Equal(t, []string{"[REDACTED]"}, sessions[0].UserIDs)
 	assert.EqualValues(t, 1, sessions[0].Pageviews)
 	assert.EqualValues(t, 1, sessions[0].Errors)
-	groups, err := NewStore(st).QueryErrors(ctx, "site", "fp", 0, time.Now().Unix()+1, "")
+	groups, err := NewStore(st).QueryErrors(ctx, ErrorFilter{
+		Filter: Filter{
+			Site:   "site",
+			Before: time.Now().Unix() + 1,
+		},
+		Fingerprint: "fp",
+	})
 	require.NoError(t, err)
 	require.Len(t, groups, 1)
 	assert.Equal(t, "[REDACTED] failed", groups[0].Message)
 	assert.Equal(t, "at [REDACTED]", groups[0].SampleStack)
-	assert.EqualValues(t, 2, counters.get(aggregate.CounterHistoryWritten))
-	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, 2, counters.get(CounterWritten))
+	assert.Zero(t, counters.get(CounterDropped))
 }
+
+func TestWriterRoundTripsMeasurementIdentity(t *testing.T) {
+	store, _ := newTestStore(t)
+	writer := NewWriter(store, newFakeCounters())
+	now := time.Now().UnixMicro()
+	records := []aggregate.HistoryEvent{
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now,
+			Type:         "pageview",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "checkout",
+			ViewID:       "view-one",
+			Revision:     1,
+		},
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now + 1,
+			Type:         "view",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "payment",
+			ViewID:       "view-two",
+			Revision:     2,
+		},
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now + 2,
+			Type:         "vital",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "payment",
+			ViewID:       "view-two",
+			MetricID:     "metric",
+			Revision:     3,
+		},
+	}
+	for _, record := range records {
+		writer.Event(record)
+	}
+	drain(writer, ownerFinal(t, time.Minute))
+	events, err := store.QuerySessionEvents(context.Background(), "shop", "session", "")
+	require.NoError(t, err)
+	require.Equal(t, []SessionEventRecord{
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now,
+			Type:         "pageview",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "checkout",
+			ViewID:       "view-one",
+			Revision:     1,
+		},
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now + 1,
+			Type:         "view",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "payment",
+			ViewID:       "view-two",
+			Revision:     2,
+		},
+		{
+			Site:         "shop",
+			SessionID:    "session",
+			ObservedUS:   now + 2,
+			Type:         "vital",
+			Page:         "/entry",
+			ExperienceID: "document",
+			View:         "payment",
+			ViewID:       "view-two",
+			MetricID:     "metric",
+			Revision:     3,
+		},
+	}, events)
+	sessions, err := store.QuerySessions(
+		context.Background(),
+		SessionFilter{
+			Filter: Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 1,
+			},
+			Limit: 10,
+		},
+	)
+	require.NoError(t, err)
+	require.Len(t, sessions, 1)
+	require.EqualValues(t, 1, sessions[0].Pageviews)
+	require.EqualValues(t, 1, sessions[0].ApplicationViews)
+}
+
 func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	calls := 0
 	w.st = eventWriterFunc(func(context.Context, EventRecord) (bool, error) { calls++; return true, nil })
 	for i := 0; i < queueCap+7; i++ {
@@ -109,14 +237,27 @@ func TestQueueOverflowReportsOnlyRejectedRecords(t *testing.T) {
 			Type: "event",
 		})
 	}
-	drain(w)
+	drain(w, ownerFinal(t, time.Minute))
 	assert.Equal(t, queueCap, calls)
-	assert.EqualValues(t, queueCap, counters.get(aggregate.CounterHistoryWritten))
-	assert.EqualValues(t, 7, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, queueCap, counters.get(CounterWritten))
+	assert.EqualValues(t, 7, counters.get(CounterDropped))
 }
+
+func TestQueueOverflowCountsDropAtEnqueue(t *testing.T) {
+	counters := newFakeCounters()
+	w := NewWriter(nil, counters)
+	for range queueCap + 1 {
+		w.Event(aggregate.HistoryEvent{
+			Site: "site",
+		})
+	}
+	assert.EqualValues(t, 1, counters.get(CounterDropped), "a full queue counts without waiting for a flush")
+	assert.Zero(t, counters.get(CounterWritten))
+}
+
 func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	attempts := map[string]int{}
@@ -137,19 +278,20 @@ func TestCancellationPreservesOnlyUnattemptedSuffix(t *testing.T) {
 			Text: fmt.Sprint(i),
 		})
 	}
-	w.Run(ctx)
+	w.Run(ctx, ownerFinal(t, time.Minute))
 	require.Len(t, attempts, maxBatch+7)
 	for text, n := range attempts {
 		assert.Equal(t, 1, n, "event %s replayed", text)
 	}
-	assert.EqualValues(t, maxBatch+7, counters.get(aggregate.CounterHistoryWritten))
-	assert.Zero(t, counters.get(aggregate.CounterHistoryDropped))
+	assert.EqualValues(t, maxBatch+7, counters.get(CounterWritten))
+	assert.Zero(t, counters.get(CounterDropped))
 }
+
 func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 	for name, writeErr := range map[string]error{"disk error": errors.New("disk full"), "cancelled write": context.Canceled, "successful cancellation race": nil} {
 		t.Run(name, func(t *testing.T) {
 			counters := newFakeCounters()
-			w := NewWriter("site", nil, counters)
+			w := NewWriter(nil, counters)
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			calls := 0
@@ -167,21 +309,29 @@ func TestAttemptedAppendIsNeverReplayed(t *testing.T) {
 					Type: "event",
 				})
 			}
-			w.Run(ctx)
+			w.Run(ctx, ownerFinal(t, time.Minute))
 			assert.Equal(t, maxBatch, calls)
 			wantWritten, wantDropped := maxBatch, 0
 			if writeErr != nil {
 				wantWritten--
 				wantDropped++
 			}
-			assert.EqualValues(t, wantWritten, counters.get(aggregate.CounterHistoryWritten))
-			assert.EqualValues(t, wantDropped, counters.get(aggregate.CounterHistoryDropped))
+			assert.EqualValues(t, wantWritten, counters.get(CounterWritten))
+			assert.EqualValues(t, wantDropped, counters.get(CounterDropped))
 		})
 	}
 }
-func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
+
+// The final drain admits what remains under the owner's shared final context,
+// obtained once.
+func TestFinalDrainAdmitsUnderOwnerContext(t *testing.T) {
 	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+	w := NewWriter(nil, counters)
+	owner, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	want, _ := owner.Deadline()
+	finals := 0
+	final := func() context.Context { finals++; return owner }
 	deadlines := []time.Time{}
 	w.st = eventWriterFunc(func(ctx context.Context, r EventRecord) (bool, error) {
 		deadline, ok := ctx.Deadline()
@@ -195,11 +345,35 @@ func TestFinalDrainSharesOneAdmissionDeadline(t *testing.T) {
 			Type: "event",
 		})
 	}
-	drain(w)
+	drain(w, final)
+	assert.Equal(t, 1, finals)
 	require.Len(t, deadlines, maxBatch+7)
 	for _, d := range deadlines {
-		assert.Equal(t, deadlines[0], d)
+		assert.Equal(t, want, d)
 	}
+	assert.EqualValues(t, maxBatch+7, counters.get(CounterWritten))
+}
+
+// A stalled journal holds the site's shutdown only for the owner's final
+// budget; entries the final drain cannot admit count as dropped.
+func TestFinalDrainEndsWithOwnerBudget(t *testing.T) {
+	counters := newFakeCounters()
+	w := NewWriter(nil, counters)
+	w.st = eventWriterFunc(func(ctx context.Context, _ EventRecord) (bool, error) {
+		<-ctx.Done() // journal admission never opens
+		return false, ctx.Err()
+	})
+	for range 3 {
+		w.Event(aggregate.HistoryEvent{
+			Site: "site",
+			Type: "event",
+		})
+	}
+	start := time.Now()
+	drain(w, ownerFinal(t, 50*time.Millisecond))
+	assert.Less(t, time.Since(start), time.Second)
+	assert.EqualValues(t, 3, counters.get(CounterDropped))
+	assert.Zero(t, counters.get(CounterWritten))
 }
 
 // Empty timer ticks must not dirty and fsync the shared journal per idle site.
@@ -213,24 +387,18 @@ func (w *recordingEventWriter) AppendEvent(context.Context, EventRecord) (bool, 
 	w.appends++
 	return true, nil
 }
+
 func (w *recordingEventWriter) Sync(context.Context) error {
 	w.syncs++
 	return w.syncErr
 }
 
-func TestEmptyFlushSkipsJournalSyncAndReportsQueueDrops(t *testing.T) {
-	counters := newFakeCounters()
-	w := NewWriter("site", nil, counters)
+func TestEmptyFlushSkipsJournalSync(t *testing.T) {
+	w := NewWriter(nil, newFakeCounters())
 	disk := &recordingEventWriter{}
 	w.st = disk
-	for range queueCap + 1 {
-		w.Event(aggregate.HistoryEvent{
-			Site: "site",
-		})
-	}
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Zero(t, disk.syncs)
-	assert.EqualValues(t, 1, counters.get(aggregate.CounterHistoryDropped))
 	assert.Equal(t, 1, w.flush(context.Background(), []aggregate.HistoryEvent{{Site: "site", Type: "event"}}))
 	assert.Equal(t, 1, disk.appends)
 	assert.Equal(t, 1, disk.syncs)
@@ -249,6 +417,7 @@ func (w *cancelLastAppendWriter) AppendEvent(context.Context, EventRecord) (bool
 	}
 	return true, nil
 }
+
 func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -256,10 +425,11 @@ func (w *cancelLastAppendWriter) Sync(ctx context.Context) error {
 	w.synced = true
 	return nil
 }
+
 func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	w := NewWriter("site", nil, newFakeCounters())
+	w := NewWriter(nil, newFakeCounters())
 	disk := &cancelLastAppendWriter{
 		cancel: cancel,
 	}
@@ -270,12 +440,13 @@ func TestFinalDrainSyncsAfterCancellationFollowingLastAppend(t *testing.T) {
 			Type: "event",
 		})
 	}
-	w.Run(ctx)
+	w.Run(ctx, ownerFinal(t, time.Minute))
 	assert.Equal(t, maxBatch, disk.appends)
 	assert.True(t, disk.synced, "final drain must sync accepted appends with its detached context")
 }
+
 func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
-	w := NewWriter("site", nil, newFakeCounters())
+	w := NewWriter(nil, newFakeCounters())
 	disk := &recordingEventWriter{
 		syncErr: errors.New("sync failed"),
 	}
@@ -287,29 +458,4 @@ func TestIdleFlushRetriesFailedSyncWithoutReplayingAppend(t *testing.T) {
 	assert.Equal(t, 2, disk.syncs)
 	assert.Zero(t, w.flush(context.Background(), nil))
 	assert.Equal(t, 2, disk.syncs, "successful sync restores the idle shortcut")
-}
-
-func TestWrongSiteDoesNotQueueOrCount(t *testing.T) {
-	st, err := demjournal.Open(context.Background(), "")
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, st.Close()) })
-	counters := newFakeCounters()
-	w := NewWriter("site", NewStore(st), counters)
-	for range queueCap + 1 {
-		w.Event(aggregate.HistoryEvent{
-			Site:       "other",
-			SessionID:  "session",
-			Type:       "event",
-			ObservedUS: time.Now().UnixMicro(),
-		})
-	}
-	require.Empty(t, w.ch)
-	drain(w)
-	require.Empty(t, counters.values)
-	rows, err := NewStore(st).QuerySessionEvents(context.Background(), "other", "session", "")
-	require.NoError(t, err)
-	require.Empty(t, rows)
-	rows, err = NewStore(st).QuerySessionEvents(context.Background(), "site", "session", "")
-	require.NoError(t, err)
-	require.Empty(t, rows)
 }

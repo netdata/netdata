@@ -33,7 +33,7 @@ type scriptResult struct {
 // runPersistent owns the session for the job's Run lifetime. Candidate
 // validation in Init and Check never launches the script.
 func (c *Collector) runPersistent(ctx context.Context, ready func()) error {
-	s, err := startSession(ctx, c.definition.command)
+	s, err := startSession(ctx, c.definition.command, c.messageLimit)
 	if err != nil {
 		return err
 	}
@@ -140,7 +140,7 @@ func (c *Collector) serveRequest(
 		result.err = err
 		return result, err != nil && !errors.Is(err, errCollectionFailed)
 	}
-	frame, err := encodeFunctionRequest(request.ctx, id, *request.function)
+	frame, err := encodeFunctionRequest(request.ctx, id, *request.function, c.messageLimit)
 	if err != nil {
 		// A local encoding failure has not touched the stream.
 		result.err = err

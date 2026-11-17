@@ -1,0 +1,112 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package syntheticfunc
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/rawfunc"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
+)
+
+var artifactsMethod = method{
+	Method: rawfunc.Method{
+		ID:    "synthetics-artifacts",
+		Title: "Retained synthetic captures",
+		Help: "Saved captures (screenshots, Playwright traces and Lighthouse reports), one set per run, newest " +
+			"first. They are kept apart from run history, so they can outlive it until retention removes them; the " +
+			"storage object shows the retention policy, size and cleanup state of all captures. Pass job_id to " +
+			"show one job. " + limitHelp + " Pass the response's next value as cursor for the next page; retention " +
+			"can remove sets between pages. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
+		Sort:        "published_us",
+		UpdateEvery: 10,
+		Params:      []string{"job_id", "cursor", "limit", "vnode", "vnode_guid"},
+		Columns:     artifactsColumns.Build(),
+	},
+	serve: (*Handler).artifacts,
+}
+
+var artifactsColumns = rawfunc.Columns[artifacts.Set]{
+	column("run_id", "Run", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.RunID }),
+	column("job_id", "Monitor", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.JobID }),
+	column(
+		"published_us",
+		"Published",
+		funcapi.FieldTypeTimestamp,
+		"",
+		func(s artifacts.Set) any { return s.PublishedUS },
+	),
+	column("bytes", "Set size", funcapi.FieldTypeInteger, "bytes", func(s artifacts.Set) any { return s.Bytes }),
+	column(
+		"artifact_count",
+		"Artifacts",
+		funcapi.FieldTypeInteger,
+		"",
+		func(s artifacts.Set) any { return s.Artifacts },
+	),
+	column("vnode_guid", "Vnode GUID", funcapi.FieldTypeString, "", func(s artifacts.Set) any { return s.VnodeGUID }),
+}
+
+func (h *Handler) artifacts(
+	ctx context.Context,
+	args map[string]string,
+	response map[string]any,
+) *funcapi.FunctionResponse {
+	limit, err := rowLimit(args["limit"])
+	if err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
+	cursor, err := parseArtifactCursor(args["cursor"])
+	if err != nil {
+		return funcapi.ErrorResponse(400, "%v", err)
+	}
+	page, err := h.deps.Catalogue(ctx, artifacts.Filter{
+		JobID:     args["job_id"],
+		VnodeGUID: args["vnode_guid"],
+		Before:    cursor,
+		Limit:     limit,
+	})
+	if err != nil {
+		return functionError(err)
+	}
+	rows := make([][]any, 0, len(page.Sets))
+	for _, set := range page.Sets {
+		rows = append(rows, artifactsColumns.Row(set))
+	}
+	response["data"] = rows
+	response["limit"] = limit
+	response["truncated"] = page.Next != nil
+	if page.Next != nil {
+		response["next"] = strconv.FormatInt(page.Next.PublishedUS, 10) + "." + page.Next.RunID
+	}
+	response["storage"] = struct {
+		artifacts.Status
+		PolicyError string `json:"policy_error,omitempty"`
+	}{Status: page.Status, PolicyError: page.PolicyError}
+	return funcapi.RawResponse(response)
+}
+
+// The cursor is a decimal microsecond timestamp and a lowercase hexadecimal run
+// ID. It needs no quoting or escaping in Function command arguments.
+func parseArtifactCursor(value string) (*artifacts.Cursor, error) {
+	if value == "" {
+		return nil, nil
+	}
+	stamp, runID, ok := strings.Cut(value, ".")
+	published, err := strconv.ParseInt(stamp, 10, 64)
+	valid := ok && err == nil && published > 0 && strconv.FormatInt(published, 10) == stamp && len(runID) == 32
+	for _, char := range runID {
+		valid = valid && (char >= '0' && char <= '9' || char >= 'a' && char <= 'f')
+	}
+	if !valid {
+		return nil, errors.New("cursor must be a returned artifact catalogue cursor")
+	}
+	return &artifacts.Cursor{
+		PublishedUS: published,
+		RunID:       runID,
+	}, nil
+}

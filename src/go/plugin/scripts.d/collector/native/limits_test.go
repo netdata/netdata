@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -73,7 +74,7 @@ func TestLimits_LargeSnapshot(t *testing.T) {
 	}
 }
 
-// A 2 MiB configuration value and a 20 MiB Function payload reach the script in both modes.
+// Multi-chunk configuration and Function payloads reach the script in both modes.
 func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 	setupRunner(t)
 	for _, mode := range []string{modeOneshot, modePersistent} {
@@ -89,7 +90,7 @@ func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 			)
 			require.NoError(t, os.WriteFile(filepath.Join(dir, "peer.py"), []byte(peer), 0644))
 			c := registry["native-fixture"].CreateV2().(*Collector)
-			text := strings.Repeat("x", 2<<20)
+			text := strings.Repeat("x", testTransferBytes)
 			c.ScriptConfig = Settings{
 				"text": text,
 			}
@@ -104,11 +105,41 @@ func TestLimits_LargeFunctionAndConfiguration(t *testing.T) {
 			result, err := c.executeFunction(ctx, funcapi.RawMethodRequest{
 				Method:  "items",
 				Args:    []string{"large"},
-				Payload: bytes.Repeat([]byte{'x'}, 20<<20),
+				Payload: bytes.Repeat([]byte{'x'}, testTransferBytes),
 			})
 			require.NoError(t, err)
 			require.Equal(t, 200, result.Status)
-			assert.Equal(t, [][]any{{text, json.Number("20971520")}}, result.Data)
+			assert.Equal(t, [][]any{{text, json.Number(strconv.Itoa(testTransferBytes))}}, result.Data)
 		})
 	}
+}
+
+func TestLimits_ConfigurationBudget(t *testing.T) {
+	registry, _ := configuredFixture(t, "exit 0\n", modeOneshot)
+	c := registry["native-fixture"].CreateV2().(*Collector)
+	c.messageLimit = testMessageLimit
+	c.ScriptConfig = Settings{"text": strings.Repeat("x", testMessageLimit)}
+	require.ErrorContains(t, c.Init(context.Background()), "config envelope exceeds 64 MiB")
+	assert.Error(t, c.Check(context.Background()), "oversized configuration must not initialize the collector")
+}
+
+func TestLimits_OneshotBudget(t *testing.T) {
+	setupRunner(t)
+	c, _ := fixtureCollectorWithLimit(
+		t, fmt.Sprintf("head -c %d /dev/zero\n", testMessageLimit+1), testMessageLimit,
+	)
+	require.ErrorIs(t, c.Collect(context.Background()), errResponseTooLarge)
+	assert.Empty(t, rawSeries(c), "oversized output must not publish metrics")
+}
+
+func TestLimits_FunctionBeforeRuntime(t *testing.T) {
+	registry, dir := functionFixture(t, modePersistent, true)
+	c := initFunctionCollectorWithLimit(t, registry, testMessageLimit)
+	result, err := c.executeFunction(context.Background(), funcapi.RawMethodRequest{
+		Method:  "items",
+		Payload: make([]byte, testMessageLimit*3/4),
+	})
+	require.ErrorContains(t, err, "exceeds 64 MiB", "size rejection precedes runtime admission")
+	assert.Nil(t, result)
+	requireNoFile(t, filepath.Join(dir, "starts"))
 }

@@ -37,13 +37,9 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 		WriteTimeout:      15 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
-		ErrorLog: stdlog.New(
-			io.Discard,
-			"",
-			0,
-		),
-		BaseContext: func(net.Listener) context.Context { return ctx },
-		TLSConfig:   c.tlsConfig,
+		ErrorLog:          stdlog.New(io.Discard, "", 0),
+		BaseContext:       func(net.Listener) context.Context { return ctx },
+		TLSConfig:         c.tlsConfig,
 	}
 	srv.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mu.Lock()
@@ -71,14 +67,7 @@ func (c *Collector) Run(ctx context.Context, ready func()) error {
 			status:         200,
 		}
 		handler.ServeHTTP(rw, r)
-		switch {
-		case rw.status < 400:
-			c.requests[0].Add(1)
-		case rw.status < 500:
-			c.requests[1].Add(1)
-		default:
-			c.requests[2].Add(1)
-		}
+		c.requests.observe(rw.status)
 	})
 	serving := make(chan error, 1)
 	go func() {

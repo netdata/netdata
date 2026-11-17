@@ -410,36 +410,37 @@ modules:
 
         Three charts exist only when `remote_storage.enabled` is `true`. `netdata.otel.index_files_waiting_for_remote` shows the files that are over a retention limit while remote storage did not confirm their catalog entry yet. Such files stay on the local disk, so the disk can hold more than the limits while remote storage is unreachable. `netdata.otel.uploads` and `netdata.otel.uploads_finished` count the uploads of index files and of catalog files together. An upload is `in_progress` from the moment the plugin starts it until it ends; the plugin runs a few uploads at the same time and the others wait for their turn. An upload that fails shows as `failed` each time it fails, and as `waiting_for_retry` until the plugin tries it again.
 
-        The plugin also makes charts for each service, from the traces and the logs that it receives: requests, failed requests and request durations from traces, and log records by severity from logs. A service is the `service.namespace` and `service.name` resource attributes, kept apart by tenant and deployment environment. These charts have no settings. They count as follows:
+        The plugin also makes charts for each service, from the traces and the logs that it receives: requests, failed requests and request durations from traces, and log records by severity from logs. A service is the `service.namespace` and `service.name` resource attributes, kept apart by tenant and deployment environment. The contexts of these charts start with `otel.derived_metrics.`. These charts have no settings. They count as follows:
 
         - A request is a span that starts a trace, or a span of kind SERVER or CONSUMER. A request failed when its span status is ERROR. A request counts at the time it ends.
         - Spans sampled with an OpenTelemetry sampling threshold (`ot=th` in the trace state) count for the number of spans that they represent.
         - A log record counts at its time (its own time, else its observed time, else the time it arrived), in the severity range of its severity number. A record without a severity number counts as `unspecified`, also when it has a severity text. The sender or the OpenTelemetry Collector must set the severity number.
         - The average request duration is the mean duration of the requests that ended in each second. Over a longer time, the chart shows the mean of these per-second values. This is not the mean duration of all the requests in that time.
         - The charts count only the spans and the log records that the plugin stores. When an SDK or a Collector drops spans by sampling and does not write a sampling threshold, the request rates are lower than the real rates, and the share of failed requests can change.
-        - The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Records counted in another time slot or chart set" chart shows these records as `late` and `future`.
+        - The charts show data with a delay of 10 seconds, so that data that arrives late still counts in the correct second. Data that arrives later than that counts in the oldest second that is still open, and data with a time in the future counts in the current second. The "Adjusted log records" and "Adjusted requests" charts show this data as `late` and `future`.
 
-        At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived charts" and "Services removed after 15 minutes without data" charts count the overflow chart set as one service. The "Records counted in another time slot or chart set" chart shows its records as `overflowed`. Such a record can also count as `late` or `future`.
+        At most 500 services have their own charts, for traces and for logs separately. The records of more services go to one shared overflow chart set. When a service sends no data for 15 minutes, its charts are removed and its place becomes free. The "Services with derived metrics" and "Expired services" charts count the overflow chart set as one service. The "Adjusted log records" and "Adjusted requests" charts show its data as `overflowed`. Such a record or request can also count as `late` or `future`. The "Adjusted requests" chart counts each stored request span as one, also when a sampling threshold makes it count for more on the request charts.
       availability: []
       dynamic_context_prefixes:
         - prefix: otel.
           reason: >-
             Chart contexts are generated at runtime from the received OpenTelemetry metric names as
-            otel.<metric name>.
+            otel.<metric name>. The contexts otel.derived_metrics.* are fixed: the plugin makes these
+            charts itself, and the service scope lists them.
       scopes:
         - name: global
-          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
+          description: The plugin itself, with charts of the metric data points, log records and spans that it receives, of the per-service charts that it makes from logs and traces, of the indexing operations that make stored logs and traces searchable, of the files that it keeps on the local disk, and of its uploads to remote storage.
           labels: []
           metrics:
             - name: netdata.otel.metric_data_points
-              description: OpenTelemetry metric data points received
+              description: Metric data points received
               unit: data points/s
               chart_type: stacked
               dimensions:
                 - name: accepted
                 - name: rejected
             - name: netdata.otel.log_records
-              description: OpenTelemetry log records received
+              description: Log records received
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -447,7 +448,7 @@ modules:
                 - name: rejected
                 - name: failed
             - name: netdata.otel.spans
-              description: OpenTelemetry spans received
+              description: Spans received
               unit: spans/s
               chart_type: stacked
               dimensions:
@@ -460,94 +461,98 @@ modules:
               chart_type: line
               dimensions:
                 - name: events
-            - name: netdata.otel.indexing_operations
-              description: Indexing operations running and waiting
-              unit: operations
-              chart_type: stacked
-              dimensions:
-                - name: running
-                - name: waiting
-            - name: netdata.otel.indexing_operations_oldest_wait
-              description: Longest wait of an indexing operation that has not started
-              unit: seconds
-              chart_type: line
-              dimensions:
-                - name: wait
-            - name: netdata.otel.indexing_operations_finished
-              description: Indexing operations finished
-              unit: operations/s
-              chart_type: stacked
-              dimensions:
-                - name: succeeded
-                - name: failed
-            - name: netdata.otel.index_files
-              description: Index files on the local disk
-              unit: files
-              chart_type: stacked
-              dimensions:
-                - name: logs
-                - name: traces
-            - name: netdata.otel.index_size
-              description: Size of the index files on the local disk
-              unit: bytes
-              chart_type: stacked
-              dimensions:
-                - name: logs
-                - name: traces
-            - name: netdata.otel.tenants
-              description: Tenants known to the plugin
-              unit: tenants
-              chart_type: line
-              dimensions:
-                - name: logs
-                - name: traces
-            - name: netdata.otel.index_files_waiting_for_remote
-              description: Index files over the retention limits that wait for remote storage
-              unit: files
-              chart_type: stacked
-              dimensions:
-                - name: logs
-                - name: traces
-            - name: netdata.otel.uploads
-              description: Uploads to remote storage in progress and waiting for a retry
-              unit: operations
-              chart_type: stacked
-              dimensions:
-                - name: in_progress
-                - name: waiting_for_retry
-            - name: netdata.otel.uploads_finished
-              description: Uploads to remote storage finished
-              unit: operations/s
-              chart_type: stacked
-              dimensions:
-                - name: succeeded
-                - name: failed
-        - name: signal
-          description: One signal, logs or traces, that the per-service charts are made from.
-          labels:
-            - name: signal
-              description: The signal that the per-service metrics are made from, `logs` or `traces`.
-          metrics:
             - name: netdata.otel.derived_services
-              description: Services with derived charts
+              description: Services with derived metrics
               unit: services
               chart_type: line
               dimensions:
-                - name: services
+                - name: logs
+                - name: traces
             - name: netdata.otel.derived_expired_services
-              description: Services removed after 15 minutes without data
+              description: Expired services
               unit: services/s
               chart_type: line
               dimensions:
-                - name: expired
-            - name: netdata.otel.derived_adjusted_records
-              description: Records counted in another time slot or chart set
+                - name: logs
+                - name: traces
+            - name: netdata.otel.derived_adjusted_log_records
+              description: Adjusted log records
               unit: records/s
               chart_type: line
               dimensions:
                 - name: late
                 - name: future
                 - name: overflowed
+            - name: netdata.otel.derived_adjusted_requests
+              description: Adjusted requests
+              unit: requests/s
+              chart_type: line
+              dimensions:
+                - name: late
+                - name: future
+                - name: overflowed
+            - name: netdata.otel.indexing_operations
+              description: Indexing operations
+              unit: operations
+              chart_type: stacked
+              dimensions:
+                - name: running
+                - name: waiting
+            - name: netdata.otel.indexing_operations_oldest_wait
+              description: Longest wait of a waiting indexing operation
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: wait
+            - name: netdata.otel.indexing_operations_finished
+              description: Finished indexing operations
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: succeeded
+                - name: failed
+            - name: netdata.otel.index_files
+              description: Local index files
+              unit: files
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.index_size
+              description: Local index size
+              unit: bytes
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.tenants
+              description: Tenants
+              unit: tenants
+              chart_type: line
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.index_files_waiting_for_remote
+              description: Index files waiting for remote storage
+              unit: files
+              chart_type: stacked
+              dimensions:
+                - name: logs
+                - name: traces
+            - name: netdata.otel.uploads
+              description: Uploads to remote storage
+              unit: operations
+              chart_type: stacked
+              dimensions:
+                - name: in_progress
+                - name: waiting_for_retry
+            - name: netdata.otel.uploads_finished
+              description: Finished uploads to remote storage
+              unit: operations/s
+              chart_type: stacked
+              dimensions:
+                - name: succeeded
+                - name: failed
         - name: service
           description: One service, identified by its resource attributes and tenant.
           labels:
@@ -562,8 +567,8 @@ modules:
             - name: otel.metric.overflow
               description: Set to `true` only on the chart set that holds the services over the limit of 500 services.
           metrics:
-            - name: otel_service.log_records
-              description: Service log records by severity
+            - name: otel.derived_metrics.log_records
+              description: Log records
               unit: records/s
               chart_type: stacked
               dimensions:
@@ -574,27 +579,27 @@ modules:
                 - name: debug
                 - name: trace
                 - name: unspecified
-            - name: otel_service.requests
-              description: Service requests
+            - name: otel.derived_metrics.requests
+              description: Requests
               unit: requests/s
               chart_type: stacked
               dimensions:
                 - name: success
                 - name: error
-            - name: otel_service.request_duration_avg
-              description: Service request duration average
+            - name: otel.derived_metrics.request_duration_avg
+              description: Request duration average
               unit: seconds
               chart_type: line
               dimensions:
                 - name: avg
-            - name: otel_service.request_duration_max
-              description: Service request duration maximum
+            - name: otel.derived_metrics.request_duration_max
+              description: Request duration maximum
               unit: seconds
               chart_type: line
               dimensions:
                 - name: max
-            - name: otel_service.request_duration_histogram
-              description: Service request duration histogram
+            - name: otel.derived_metrics.request_duration_histogram
+              description: Request duration histogram
               unit: requests/s
               chart_type: heatmap
               dimensions:

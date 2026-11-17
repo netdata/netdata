@@ -191,7 +191,7 @@ impl StorageCharts {
     pub(crate) fn new(remote_storage: bool) -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let index_files = builder.gauge::<PerSignal>(ChartDescriptor {
-            title: "Index files on the local disk".into(),
+            title: "Local index files".into(),
             units: "files".into(),
             family: "storage".into(),
             context: "netdata.otel.index_files".into(),
@@ -199,7 +199,7 @@ impl StorageCharts {
             priority: 150_030,
         })?;
         let index_size = builder.gauge::<PerSignal>(ChartDescriptor {
-            title: "Size of the index files on the local disk".into(),
+            title: "Local index size".into(),
             units: "bytes".into(),
             family: "storage".into(),
             context: "netdata.otel.index_size".into(),
@@ -207,7 +207,7 @@ impl StorageCharts {
             priority: 150_031,
         })?;
         let tenants = builder.gauge::<PerSignal>(ChartDescriptor {
-            title: "Tenants known to the plugin".into(),
+            title: "Tenants".into(),
             units: "tenants".into(),
             family: "storage".into(),
             context: "netdata.otel.tenants".into(),
@@ -217,8 +217,7 @@ impl StorageCharts {
         let remote = if remote_storage {
             Some(RemoteCharts {
                 waiting_for_remote: builder.gauge::<PerSignal>(ChartDescriptor {
-                    title: "Index files over the retention limits that wait for remote storage"
-                        .into(),
+                    title: "Index files waiting for remote storage".into(),
                     units: "files".into(),
                     family: "remote storage".into(),
                     context: "netdata.otel.index_files_waiting_for_remote".into(),
@@ -226,7 +225,7 @@ impl StorageCharts {
                     priority: 150_040,
                 })?,
                 uploads: builder.gauge::<UploadState>(ChartDescriptor {
-                    title: "Uploads to remote storage in progress and waiting for a retry".into(),
+                    title: "Uploads to remote storage".into(),
                     units: "operations".into(),
                     family: "remote storage".into(),
                     context: "netdata.otel.uploads".into(),
@@ -234,7 +233,7 @@ impl StorageCharts {
                     priority: 150_041,
                 })?,
                 uploads_finished: builder.cumulative_counter::<UploadOutcome>(ChartDescriptor {
-                    title: "Uploads to remote storage finished".into(),
+                    title: "Finished uploads to remote storage".into(),
                     units: "operations/s".into(),
                     family: "remote storage".into(),
                     context: "netdata.otel.uploads_finished".into(),

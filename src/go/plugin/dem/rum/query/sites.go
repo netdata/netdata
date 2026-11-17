@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package query
 
 import (
@@ -8,10 +9,10 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
-func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
+func (s *Service) Sites(ctx context.Context, filter, vnodeGUID string) ([]Site, error) {
 	var out []Site
 	state := s.registry.Availability()
-	err := s.visit(ctx, "", func(key string, site *rumregistry.Site) {
+	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {
 		activity := site.Aggregator.Activity()
 		if vnodeGUID != "" && activity.VnodeGUID != vnodeGUID {
 			return
@@ -25,7 +26,7 @@ func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
 		if publicBase != "" {
 			scriptURL = strings.TrimRight(publicBase, "/") + "/rum/" + cfg.Name + ".js"
 		}
-		rejected, _ := site.Diagnostics.LastRejectedOrigin()
+		rejected := site.Route.LastRejectedOrigin()
 		redact := siteRedactor(site)
 		rejected.Origin = redact.Apply(rejected.Origin)
 		cfg.DisplayName = redact.Apply(cfg.DisplayName)
@@ -50,7 +51,7 @@ func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
 					Geolocation:        cfg.GeolocationMode(),
 					FrustrationSignals: cfg.FrustrationSignalsOn(),
 				},
-				Activity:          Activity(activity),
+				Activity:          activity,
 				Generation:        site.Generation,
 				CollectionEnabled: cfg.MeasureRate() > 0,
 				Rejected: Rejection{
@@ -61,15 +62,16 @@ func (s *Service) Sites(ctx context.Context, vnodeGUID string) ([]Site, error) {
 			},
 		)
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
+
 func (s *Service) Pages(ctx context.Context, filter, vnodeGUID string) ([]Page, error) {
 	var out []Page
 	err := s.visit(ctx, filter, func(key string, site *rumregistry.Site) {
 		rows := site.Aggregator.Pages(vnodeGUID)
-		if len(rows) == 0 {
-			return
-		}
 		redact := siteRedactor(site)
 		for i := range rows {
 			r := &rows[i]
@@ -78,9 +80,10 @@ func (s *Service) Pages(ctx context.Context, filter, vnodeGUID string) ([]Page, 
 			r.INPElement = redact.Apply(r.INPElement)
 			r.CLSElement = redact.Apply(r.CLSElement)
 		}
-		for _, row := range rows {
-			out = append(out, Page(row))
-		}
+		out = append(out, rows...)
 	})
-	return out, err
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }

@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
@@ -9,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
@@ -21,7 +22,7 @@ import (
 func measurementCollector(t *testing.T) (*Collector, *registry.Registry) {
 	t.Helper()
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()
@@ -123,8 +124,12 @@ func TestMeasurementPublicationRetainsCompleteLargePopulation(t *testing.T) {
 	now := time.Now()
 	for i := range 10001 {
 		c.aggregator.Ingest(&beacon.Beacon{
-			Site: "shop", ExperienceID: fmt.Sprint(i), SessionID: fmt.Sprint(i), PageGroup: "/entry", Received: now,
-			Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
+			Site:         "shop",
+			ExperienceID: fmt.Sprint(i),
+			SessionID:    fmt.Sprint(i),
+			PageGroup:    "/entry",
+			Received:     now,
+			Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
 		})
 	}
 	after := collectMeasurements(t, c)
@@ -132,7 +137,10 @@ func TestMeasurementPublicationRetainsCompleteLargePopulation(t *testing.T) {
 		"lcp_observations": 10001, "lcp_good": 10001, "lcp_needs_improvement": 0, "lcp_poor": 0,
 		"lcp_p50": 100, "lcp_p75": 100, "lcp_p95": 100, "observed_sessions": 10001,
 	}, measurementValues(after, "lcp_observations", "lcp_good", "lcp_needs_improvement", "lcp_poor", "lcp_p50", "lcp_p75", "lcp_p95", "observed_sessions"))
-	labels := metrix.Labels{"page": "/entry", "bucket": "value"}
+	labels := metrix.Labels{
+		"page":   "/entry",
+		"bucket": "value",
+	}
 	count, ok := after.Value("breakdown_page_lcp_observations", labels)
 	require.True(t, ok)
 	require.Equal(t, float64(10001), count)
@@ -326,19 +334,35 @@ func TestMeasurementPublicationDistinguishesMissingAndLiteralUnknownHost(t *test
 
 func TestConfiguredVnodeDoesNotBecomeChartLabelOrIdentity(t *testing.T) {
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := registry.New()
-	t.Cleanup(hub.PublishReceiver(registry.Availability{Serving: true}).Close)
+	t.Cleanup(hub.PublishReceiver(registry.Availability{
+		Serving: true,
+	}).Close)
 	var baseline []string
 	for _, group := range []string{"", "11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"} {
-		c := New(Dependencies{Registry: hub, History: history.NewStore(db)})
+		c := New(Dependencies{
+			Registry: hub,
+			History:  history.NewStore(db),
+		})
 		c.Name, c.DisplayName = "job", "Readable job"
-		c.SetConfiguredVnode(vnodes.VirtualNode{GUID: group})
+		c.SetConfiguredVnode(vnodes.VirtualNode{
+			GUID: group,
+		})
 		c.AllowedOrigins = []string{"https://example.org"}
 		require.NoError(t, c.Init(ctx))
-		c.aggregator.Ingest(&beacon.Beacon{Site: "job", SessionID: "session", ExperienceID: "document", PageGroup: "/entry", Events: []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}}, Vitals: []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}}})
+		c.aggregator.Ingest(
+			&beacon.Beacon{
+				Site:         "job",
+				SessionID:    "session",
+				ExperienceID: "document",
+				PageGroup:    "/entry",
+				Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: "document", Revision: 1}},
+				Vitals:       []beacon.Vital{{Name: beacon.LCP, ID: "lcp", Revision: 1, Value: 100}},
+			},
+		)
 		collectMeasurements(t, c)
 		charts := measurementCharts(t, c)
 		require.NotEmpty(t, charts)

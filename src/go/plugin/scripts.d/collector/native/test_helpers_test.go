@@ -52,6 +52,11 @@ func newManifestCollector(manifest string) *Collector {
 	return c
 }
 
+const testMessageLimit = 16 << 10
+const testDescriptionLimit = 16 << 10
+const testPipeBytes = 2 << 20
+const testTransferBytes = 128 << 10
+
 const fixtureCharts = `version: v1
 context_namespace: fixture
 engine:
@@ -90,6 +95,10 @@ charts: charts.yaml
 // fixtureCollector writes a one-shot package whose Bash command runs body, and
 // returns an initialized generic job plus the package directory.
 func fixtureCollector(t *testing.T, body string) (*Collector, string) {
+	return fixtureCollectorWithLimit(t, body, maxMessageBytes)
+}
+
+func fixtureCollectorWithLimit(t *testing.T, body string, limit int) (*Collector, string) {
 	t.Helper()
 	dir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "collect.sh"), []byte("#!/bin/bash\nset -eu\n"+body), 0755))
@@ -97,6 +106,7 @@ func fixtureCollector(t *testing.T, body string) (*Collector, string) {
 	path := filepath.Join(dir, "manifest.yaml")
 	require.NoError(t, os.WriteFile(path, []byte(fixtureManifest), 0644))
 	c := newManifestCollector(path)
+	c.messageLimit = limit
 	require.NoError(t, c.Init(context.Background()))
 	require.NoError(t, c.Check(context.Background()))
 	return c, dir
@@ -104,8 +114,12 @@ func fixtureCollector(t *testing.T, body string) (*Collector, string) {
 
 // persistentCollector is fixtureCollector in persistent mode; body runs for serve.
 func persistentCollector(t *testing.T, body string) (*Collector, string) {
+	return persistentCollectorWithLimit(t, body, maxMessageBytes)
+}
+
+func persistentCollectorWithLimit(t *testing.T, body string, limit int) (*Collector, string) {
 	t.Helper()
-	c, dir := fixtureCollector(t, "[[ $1 == serve ]]\n"+body)
+	c, dir := fixtureCollectorWithLimit(t, "[[ $1 == serve ]]\n"+body, limit)
 	appendFile(t, c.Manifest, "mode: persistent\n")
 	require.NoError(t, c.Init(context.Background()))
 	require.NoError(t, c.Check(context.Background()))
@@ -309,8 +323,13 @@ func functionFixture(t *testing.T, mode string, functionOnly bool) (collectorapi
 
 // initFunctionCollector creates and initializes a native-fixture job with count 23.
 func initFunctionCollector(t *testing.T, registry collectorapi.Registry) *Collector {
+	return initFunctionCollectorWithLimit(t, registry, maxMessageBytes)
+}
+
+func initFunctionCollectorWithLimit(t *testing.T, registry collectorapi.Registry, limit int) *Collector {
 	t.Helper()
 	c := registry["native-fixture"].CreateV2().(*Collector)
+	c.messageLimit = limit
 	c.ScriptConfig = Settings{
 		"text":  "synthetic",
 		"count": float64(23),

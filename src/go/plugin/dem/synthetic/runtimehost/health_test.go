@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,11 +20,9 @@ type healthLog struct {
 }
 
 func TestMissingNativePackageHasPackageGuidanceAndSafeClose(t *testing.T) {
-	h := New(Config{Mode: "native", Unavailable: runtime.ErrUnavailable})
+	h := newUnavailable(ModeNative, browserruntime.ErrUnavailable)
 	require.ErrorContains(t, h.Ready(), "netdata-dem-runtime package")
-	require.Equal(t, StateMissing, h.Status().State)
-	require.Equal(t, "native", h.Status().Mode)
-	require.Nil(t, h.Status().Storage)
+	require.ErrorIs(t, h.Ready(), browserruntime.ErrUnavailable)
 	require.NoError(t, h.Close())
 }
 
@@ -33,10 +31,11 @@ func (l *healthLog) Write(p []byte) (int, error) {
 	defer l.mu.Unlock()
 	return l.data.Write(p)
 }
+
 func (l *healthLog) String() string { l.mu.Lock(); defer l.mu.Unlock(); return l.data.String() }
 
 func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
-	h := New(Config{Unavailable: errors.New("runtime unavailable")})
+	h := newUnavailable(ModeManaged, errors.New("runtime unavailable"))
 	defer h.Close()
 	dependencies, err := h.Dependencies(nil)
 	require.NoError(t, err)
@@ -44,10 +43,11 @@ func TestUnavailableSetupKeepsDependenciesUsable(t *testing.T) {
 	require.ErrorContains(t, dependencies[0].Ready(), "runtime unavailable")
 	_, err = h.BeginUse()
 	require.Error(t, err)
+	require.Nil(t, h.NewUpdater(nil, nil), "only a managed store prepares updates")
 }
 
 func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
-	h := New(Config{})
+	h := newUnavailable(ModeManaged, browserruntime.ErrUnavailable)
 	var logs healthLog
 	h.log = logger.NewWithWriter(&logs)
 	h.setMaintenance("cleanup", errors.New("trash blocked"))
@@ -55,10 +55,8 @@ func TestMaintenanceLoggingAndRecoveryAreOperationSpecific(t *testing.T) {
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup failed"))
 	h.setMaintenance("execution completion", errors.New("execution metadata blocked"))
 	h.setMaintenance("cleanup", nil)
-	require.Contains(t, h.Status().MaintenanceError, "execution metadata blocked")
-	require.NotContains(t, h.Status().MaintenanceError, "trash blocked")
 	require.Equal(t, 1, strings.Count(logs.String(), "cleanup recovered"))
+	require.NotContains(t, logs.String(), "execution completion recovered", "cleanup cannot clear another operation")
 	h.setMaintenance("execution completion", nil)
-	require.Empty(t, h.Status().MaintenanceError)
 	require.Equal(t, 1, strings.Count(logs.String(), "execution completion recovered"))
 }

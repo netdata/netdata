@@ -23,36 +23,21 @@ const (
 	KindVersion = "version"
 )
 
-// Kinds lists the breakdowns in emission order. Application views carry
-// activity and error counts, without document-scoped vital distributions.
-var Kinds = []string{KindBrowser, KindDevice, KindCountry, KindPage, KindVersion, KindView}
-
-// versionTopN is the fixed top-N for the version breakdown ("top-10 by pageviews"); unlike page/country it has no per-site config.
+// versionTopN is the fixed top-N for the version breakdown ("top-10 by
+// pageviews"); unlike page/country it has no per-site config.
 const versionTopN = 10
 
 // Other is the display value of a synthetic fold; output also carries a typed flag.
 const Other = "other"
 
-// Site-level cumulative event and receiver/export diagnostic counters.
+// Site-level cumulative event and receiver diagnostic counters.
 const (
 	CounterPageviews           = "document_views"
 	CounterApplicationViews    = "application_views"
 	CounterInvalidMeasurements = "invalid_measurements"
 	CounterJSErrors            = "js_errors"
 	CounterAccepted            = "accepted"
-	CounterOTLPSent            = "otlp_sent"
-	CounterOTLPDropped         = "otlp_dropped"
-	CounterOTLPErrors          = "otlp_errors"
 
-	// History writer counters: the rum.history chart's
-	// written/dropped dims. Fed by the history writer's own goroutine via
-	// Add, never from inside Ingest (see HistorySink's doc comment).
-	CounterHistoryWritten = "history_written"
-	CounterHistoryDropped = "history_dropped"
-	// Browser span export, the rum.spans chart.
-	CounterSpansSent    = "spans_sent"
-	CounterSpansDropped = "spans_dropped"
-	CounterSpansErrors  = "spans_errors"
 	// Frustration signals, the rum.frustration chart.
 	CounterRageClicks  = "rage_clicks"
 	CounterDeadClicks  = "dead_clicks"
@@ -60,7 +45,9 @@ const (
 )
 
 var frustrationCounters = map[string]string{
-	beacon.RageClickEvent: CounterRageClicks, beacon.DeadClickEvent: CounterDeadClicks, beacon.ErrorClickEvent: CounterErrorClicks,
+	beacon.RageClickEvent:  CounterRageClicks,
+	beacon.DeadClickEvent:  CounterDeadClicks,
+	beacon.ErrorClickEvent: CounterErrorClicks,
 }
 
 const (
@@ -90,7 +77,7 @@ type InvestigateCfg struct {
 
 // alwaysKeep reports whether b alone makes its session investigated.
 func (c InvestigateCfg) alwaysKeep(b *beacon.Beacon) bool {
-	return (c.KeepErrors && len(b.Errors) > 0) || (c.KeepPoorVitals && b.HasPoorVital())
+	return (c.KeepErrors && len(b.Errors) > 0) || (c.KeepPoorVitals && hasPoorVital(b))
 }
 
 // Aggregator owns the rolling measurements and investigation state for one site.
@@ -118,28 +105,39 @@ type Aggregator struct {
 type attributes struct{ browser, device, country, page, version, view string }
 type observationKey struct{ experience, name string }
 type vitalObservation struct {
-	key      observationKey
 	metricID string
 	revision uint64
 	value    float64
 	element  string
 	attrs    *attributes
 }
-type identityKey struct{ kind, experience, item string }
-type identity struct {
-	key      identityKey
-	revision uint64
+
+// identityKind names the population a replay identity belongs to.
+type identityKind uint8
+
+const (
+	identityDocument identityKind = iota
+	identityView
+	identitySession
+	identityNavigation
+	identityResource
+)
+
+type pageSessionKey struct{ session, page string }
+
+type identityKey struct {
+	kind             identityKind
+	experience, item string
 }
 
 // vitalIdentity is the replay evidence of one vital: its SDK metric identity
 // and the dimensions frozen when it was first admitted.
 type vitalIdentity struct {
-	key      observationKey
 	metricID string
 	revision uint64
 	attrs    *attributes
 }
-type sessionObservation struct{ key, page string }
+
 type activityObservation struct {
 	attrs                                  *attributes
 	documents, views, errors, frustrations uint64
@@ -148,23 +146,22 @@ type activityObservation struct {
 	api                                    bool
 }
 
+// siteState owns one site's retained populations. Keyed indexes hold one entry
+// per identity; activity and resources hold every admitted report item.
 type siteState struct {
-	cfg                                                        SiteCfg
-	window                                                     time.Duration
-	counters                                                   map[string]uint64
-	observations                                               map[observationKey]*receiptEntry[vitalObservation]
-	observationOrder                                           receiptHeap[vitalObservation]
-	identities                                                 map[identityKey]*receiptEntry[identity]
-	identityOrder                                              receiptHeap[identity]
-	vitalIdentities                                            map[observationKey]*receiptEntry[vitalIdentity]
-	vitalIdentityOrder                                         receiptHeap[vitalIdentity]
-	activity, resources                                        receiptHeap[activityObservation]
-	sessions                                                   map[string]*receiptEntry[sessionObservation]
-	sessionOrder                                               receiptHeap[sessionObservation]
-	pageSessions                                               map[string]*receiptEntry[sessionObservation]
-	pageSessionOrder                                           receiptHeap[sessionObservation]
-	resourceIdentities                                         map[identityKey]*receiptEntry[identity]
-	resourceIdentityOrder                                      receiptHeap[identity]
+	cfg      SiteCfg
+	window   time.Duration
+	counters map[string]uint64
+	// observations is the latest canonical value per (experience, vital).
+	observations receiptIndex[observationKey, vitalObservation]
+	// identities hold the latest admitted revision per activation, session,
+	// navigation or resource identity; vitalIdentities hold vital replay evidence.
+	identities, resourceIdentities receiptIndex[identityKey, uint64]
+	vitalIdentities                receiptIndex[observationKey, vitalIdentity]
+	activity, resources            receiptHeap[struct{}, activityObservation]
+	// sessions and pageSessions count observed sessions, per site and per page.
+	sessions                                                   receiptIndex[string, struct{}]
+	pageSessions                                               receiptIndex[pageSessionKey, struct{}]
 	sess                                                       *list.List
 	sessIdx                                                    map[string]*list.Element
 	accepted, rejected, bots                                   []time.Time
@@ -188,12 +185,12 @@ func newSiteState(window time.Duration, cfg SiteCfg) siteState {
 		cfg:                cfg,
 		window:             window,
 		counters:           map[string]uint64{},
-		observations:       map[observationKey]*receiptEntry[vitalObservation]{},
-		identities:         map[identityKey]*receiptEntry[identity]{},
-		vitalIdentities:    map[observationKey]*receiptEntry[vitalIdentity]{},
-		sessions:           map[string]*receiptEntry[sessionObservation]{},
-		pageSessions:       map[string]*receiptEntry[sessionObservation]{},
-		resourceIdentities: map[identityKey]*receiptEntry[identity]{},
+		observations:       newReceiptIndex[observationKey, vitalObservation](),
+		identities:         newReceiptIndex[identityKey, uint64](),
+		resourceIdentities: newReceiptIndex[identityKey, uint64](),
+		vitalIdentities:    newReceiptIndex[observationKey, vitalIdentity](),
+		sessions:           newReceiptIndex[string, struct{}](),
+		pageSessions:       newReceiptIndex[pageSessionKey, struct{}](),
 		sess:               list.New(),
 		sessIdx:            map[string]*list.Element{},
 	}
@@ -212,8 +209,4 @@ func (a *Aggregator) SetVnodeGUID(guid string) {
 	cfg.VnodeGUID = guid
 	a.site = newSiteState(a.window, cfg)
 	a.site.sess, a.site.sessIdx = old.sess, old.sessIdx
-	// These counters describe this job's asynchronous transports, not a measured population.
-	for _, key := range []string{CounterHistoryWritten, CounterHistoryDropped, CounterOTLPSent, CounterOTLPDropped, CounterOTLPErrors, CounterSpansSent, CounterSpansDropped, CounterSpansErrors} {
-		a.site.counters[key] = old.counters[key]
-	}
 }

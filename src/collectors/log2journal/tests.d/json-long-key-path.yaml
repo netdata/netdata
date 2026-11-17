@@ -1,0 +1,2 @@
+# nested key paths that do not fit the key buffer drop the line, a path that exactly fits is kept
+pattern: json

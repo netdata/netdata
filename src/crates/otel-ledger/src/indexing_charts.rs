@@ -62,7 +62,7 @@ impl IndexingCharts {
     pub(crate) fn new() -> Result<Self, netdata_plugin_metrics::Error> {
         let mut builder = MetricSetBuilder::new(Settings::default())?;
         let operations = builder.gauge::<State>(ChartDescriptor {
-            title: "Indexing operations running and waiting".into(),
+            title: "Indexing operations".into(),
             units: "operations".into(),
             family: "indexing".into(),
             context: "netdata.otel.indexing_operations".into(),
@@ -70,7 +70,7 @@ impl IndexingCharts {
             priority: 150_020,
         })?;
         let oldest_wait = builder.gauge::<OldestWait>(ChartDescriptor {
-            title: "Longest wait of an indexing operation that has not started".into(),
+            title: "Longest wait of a waiting indexing operation".into(),
             units: "seconds".into(),
             family: "indexing".into(),
             context: "netdata.otel.indexing_operations_oldest_wait".into(),
@@ -78,7 +78,7 @@ impl IndexingCharts {
             priority: 150_021,
         })?;
         let finished = builder.cumulative_counter::<Outcome>(ChartDescriptor {
-            title: "Indexing operations finished".into(),
+            title: "Finished indexing operations".into(),
             units: "operations/s".into(),
             family: "indexing".into(),
             context: "netdata.otel.indexing_operations_finished".into(),

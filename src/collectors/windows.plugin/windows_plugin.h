@@ -77,6 +77,7 @@ int do_PerflibSMB(int update_every, usec_t dt __maybe_unused);
 int do_PerflibSMBClient(int update_every, usec_t dt __maybe_unused);
 int do_PerflibTerminalServices(int update_every, usec_t dt __maybe_unused);
 int do_PerflibDNS(int update_every, usec_t dt __maybe_unused);
+int do_PerflibPagingFile(int update_every, usec_t dt __maybe_unused);
 
 // WMI
 int do_GetFSRMQuota(int update_every, usec_t dt);
@@ -90,6 +91,7 @@ void do_GetPowerSupply_cleanup();
 void do_PerflibSMB_cleanup();
 void do_PerflibSMBClient_cleanup(void);
 void do_PerflibStorage_cleanup();
+void do_PerflibPagingFile_cleanup(void);
 void do_GetPrinters_cleanup(void);
 void do_GetFSRMQuota_cleanup(void);
 void do_GetFSRMQuota_interrupt(void);

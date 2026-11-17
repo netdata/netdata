@@ -4,46 +4,39 @@
 package dem
 
 import (
-	"context"
-
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/journey"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/lighthouse"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/synthetic"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/historyfunc"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	rumfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/geoip"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumquery "github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/artifacts"
-	syntheticfunctions "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/functions"
 	synthetichistory "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/history"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/monitor"
 	syntheticquery "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/query"
 	syntheticregistry "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/registry"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/syntheticfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
-// Executor is the browser capability injected into native collectors.
-type Executor interface {
-	Check(context.Context, synthetic.Kind) error
-	monitor.Executor
-	Rehearse(context.Context, synthetic.Request) error
-}
-
+// Dependencies are the process-owned resources the components borrow. History
+// and Artifacts are required; their owner (Process, in production) keeps them
+// open across Agent run generations and closes them after the components stop.
 type Dependencies struct {
-	GeoIPPaths     geoip.Paths
-	History        *journal.Store
-	Artifacts      *artifacts.Store
-	Runtime        *runtimehost.Host
-	Executor       Executor
-	ConfigProvider func() (Config, error)
+	GeoIPPaths geoip.Paths
+	History    *journalstore.Store
+	Artifacts  *artifacts.Store
+	Executor   synthetic.Executor
+	// BrowserActivation names the process browser runtime that synthetic jobs
+	// wait for; nil when the runtime mode has no readiness owner (preloads).
+	BrowserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
+	// ReloadConfig rereads dem.conf for the retention worker; nil keeps the initial policies.
+	ReloadConfig func() (Config, error)
 }
 
 // Components separates collector selection from process-owned investigation.
@@ -53,92 +46,78 @@ type Components struct {
 	Retention  *Retention
 }
 
-// New keeps the shared stores caller-owned across Agent run generations.
-// The registries contain admitted runtimes only; configuration stays in the framework.
+// New builds the four DEM collectors, the RUM, synthetic and history Functions,
+// and the retention worker over the caller's stores. It does not close them.
+// Open calls it with the stores and runner it opens; tests inject their own.
 func New(deps Dependencies, cfg Config) Components {
 	rumRegistry := rumregistry.New()
-	var rumHistory *rumhistory.Store
-	var syntheticHistory syntheticquery.History
-	if deps.History != nil {
-		rumHistory = rumhistory.NewStore(deps.History)
-		syntheticHistory = synthetichistory.NewStore(deps.History)
-	}
+	rumHistory := rumhistory.NewStore(deps.History)
 	rumQueries := rumquery.New(rumRegistry, rumHistory)
-	site := rum.Creator(rum.Dependencies{
+	syntheticRegistry := syntheticregistry.New()
+	collectors := collectorapi.Registry{}
+	collectors.Register("receiver", receiver.Creator(receiver.Dependencies{
+		Registry:   rumRegistry,
+		GeoIPPaths: deps.GeoIPPaths,
+	}))
+	collectors.Register("rum", rum.Creator(rum.Dependencies{
 		Registry: rumRegistry,
 		History:  rumHistory,
-	})
-	collectors := collectorapi.Registry{}
-	collectors.Register(
-		"receiver",
-		receiver.Creator(receiver.Dependencies{
-			Registry:   rumRegistry,
-			GeoIPPaths: deps.GeoIPPaths,
-		}),
-	)
-	collectors.Register("rum", site)
-	syntheticRegistry := syntheticregistry.New()
-	var captures syntheticquery.Artifacts
-	if deps.Artifacts != nil {
-		captures = deps.Artifacts
-	}
-	workflow := journey.Creator(journey.Dependencies{
-		Registry: syntheticRegistry,
-		Executor: deps.Executor,
-	})
-	audit := lighthouse.Creator(lighthouse.Dependencies{
-		Registry: syntheticRegistry,
-		Executor: deps.Executor,
-	})
-	if deps.Runtime != nil {
-		workflow.ActivationDependencies, audit.ActivationDependencies = deps.Runtime.Dependencies, deps.Runtime.Dependencies
-	}
-	collectors.Register("journey", workflow)
-	collectors.Register("lighthouse", audit)
+	}))
+	collectors.Register("journey", synthetic.JourneyCreator(synthetic.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
+	collectors.Register("lighthouse", synthetic.LighthouseCreator(synthetic.Dependencies{
+		Registry:               syntheticRegistry,
+		Executor:               deps.Executor,
+		ActivationDependencies: deps.BrowserActivation,
+	}))
 	retention := &Retention{
-		policy:         cfg.History,
+		history:        deps.History,
+		historyPolicy:  cfg.History,
+		artifacts:      deps.Artifacts,
 		artifactPolicy: cfg.Artifacts,
-		loadConfig:     deps.ConfigProvider,
+		reloadConfig:   deps.ReloadConfig,
 		log:            logger.New(),
 	}
-	syntheticQueries := syntheticquery.New(syntheticRegistry, syntheticHistory, captures, retention.PolicyError)
-	var historyStatus historyfunc.Deps
-	if deps.History != nil {
-		historyStatus = deps.History
-		retention.store = deps.History
-	}
-	if deps.Artifacts != nil {
-		retention.artifactStore = deps.Artifacts
-	}
+	syntheticQueries := syntheticquery.New(
+		syntheticRegistry,
+		synthetichistory.NewStore(deps.History),
+		deps.Artifacts,
+		retention.PolicyError,
+	)
 	return Components{
 		Collectors: collectors,
 		Functions: []funcapi.ProcessFunctionProvider{
 			{
 				ID: "rum",
 				Functions: func() []funcapi.FunctionConfig {
-					return availableFunctions(rumfunctions.Declarations(), func() bool {
-						return rumRegistry.HasSites() || deps.History.HasObservedKind("rum")
+					return availableFunctions(rumfunc.Declarations(), func() bool {
+						return rumRegistry.HasSites() || deps.History.HasObservedKind(journalstore.KindRUM)
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
-					return rumfunctions.New(rumQueries, ctx.LookupVnodeGUID)
+					return rumfunc.New(rumQueries, ctx.LookupVnodeGUID)
 				},
 			},
 			{
 				ID: "synthetics",
 				Functions: func() []funcapi.FunctionConfig {
-					return availableFunctions(syntheticfunctions.Declarations(), func() bool {
-						return syntheticRegistry.HasJobs() || deps.History.HasObservedKind("synthetic") || deps.Artifacts.HasObservedPublished()
+					return availableFunctions(syntheticfunc.Declarations(), func() bool {
+						return syntheticRegistry.HasJobs() ||
+							deps.History.HasObservedKind(journalstore.KindSynthetic) ||
+							deps.Artifacts.HasObservedPublished()
 					})
 				},
 				NewHandlerWithContext: func(ctx funcapi.ProcessFunctionContext) funcapi.MethodHandler {
-					return syntheticfunctions.New(syntheticQueries, ctx.LookupVnodeGUID)
+					return syntheticfunc.New(syntheticQueries, ctx.LookupVnodeGUID)
 				},
 			},
 			{
 				ID:         "dem-history",
 				Functions:  historyfunc.Declarations,
-				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(historyStatus, retention.PolicyError) },
+				NewHandler: func() funcapi.MethodHandler { return historyfunc.New(deps.History, retention.PolicyError) },
 			},
 		},
 		Retention: retention,

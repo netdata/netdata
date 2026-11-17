@@ -239,12 +239,15 @@ func TestEmptyAndOptionalFields(t *testing.T) {
 }
 
 func TestCancellation(t *testing.T) {
+	release := make(chan struct{})
 	entered := make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		close(entered)
 		<-r.Context().Done()
+		<-release
 	}))
 	defer server.Close()
+	defer close(release) // Keep response EOF from racing client cancellation.
 	client := clientForServer(t, server)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()

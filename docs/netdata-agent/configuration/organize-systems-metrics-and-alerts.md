@@ -274,29 +274,31 @@ send automatic labels = yes
 
 ### Filter and group metrics within charts
 
-Netdata's aggregate charts let you filter and group metrics using label name-value pairs. All go.d plugin collectors support labels at the collection job level.
+Netdata's aggregate charts let you filter and group metrics using label name-value pairs.
 
-Configure metric labels when collected from multiple sources. For example, label two Apache servers by service and location:
+Every go.d job supports a generic `labels:` map at the collection job level. The job framework reads it and
+emits each pair as a chart label (source `conf`) on every chart the job produces, so you can tag jobs with
+ownership or context — for example owner, environment, or contact:
 
 ```yaml
+# go.d/x509check.conf
 jobs:
-  - name: my_webserver1
-    url: http://host1/server-status?auto
+  - name: payments_cert
+    source: https://payments.example.com:443
     labels:
-      service: "Payments"
-      location: "Atlanta"
-  - name: my_webserver2
-    url: http://host2/server-status?auto
-    labels:
-      service: "Payments"
-      location: "New York"
+      team: "Payments"
+      environment: "production"
+      contact: "sre-team@example.com"
 ```
 
-:::tip
+Notes:
 
-Define as many label pairs as you need across all your data collection jobs to create meaningful groupings in your dashboards.
-
-:::
+- `labels:` is read by the job framework itself, not by the collector's own config; all other unrecognized keys
+  in a job definition are ignored.
+- Label keys and values are sanitized on emission.
+- A label that the collector sets on a chart itself takes precedence over a job label with the same key. The
+  label `_collect_job` is reserved.
+- The dynamic configuration GUI does not currently offer `labels:` in job forms.
 
 ## Next steps
 

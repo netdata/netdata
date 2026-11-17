@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	registry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/stretchr/testify/require"
@@ -15,7 +20,7 @@ import (
 
 func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 	hub := registry.New()
-	db, err := journal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	var previous string
@@ -49,7 +54,7 @@ func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 			cancel()
 			t.Fatal("runtime did not become ready")
 		}
-		rows, err := query.New(hub, nil).Sites(context.Background(), "")
+		rows, err := query.New(hub, nil).Sites(context.Background(), "", "")
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.NotEmpty(t, rows[0].Generation)
@@ -57,10 +62,14 @@ func TestRuntimeWithoutInstallURLRetiresAndReplacesEvidence(t *testing.T) {
 		previous = rows[0].Generation
 		require.Empty(t, rows[0].ScriptURL)
 		require.True(t, rows[0].Rejected.At.IsZero())
-		owner, _, release, ok := hub.AcquireSite("shop")
-		require.True(t, ok)
-		owner.Diagnostics.RejectOrigin("https://wrong.example", time.Now())
-		release()
+		preflight := httptest.NewRequest(http.MethodOptions, "/rum/shop/collect", nil)
+		preflight.Header.Set("Origin", "https://wrong.example")
+		response := httptest.NewRecorder()
+		httpapi.New(&config.Receiver{}, hub, nil).Handler().ServeHTTP(response, preflight)
+		require.Equal(t, http.StatusForbidden, response.Code)
+		rows, err = query.New(hub, nil).Sites(context.Background(), "", "")
+		require.NoError(t, err)
+		require.Equal(t, "https://wrong.example", rows[0].Rejected.Origin)
 		cancel()
 		select {
 		case err := <-done:

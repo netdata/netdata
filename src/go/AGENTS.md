@@ -167,6 +167,26 @@ See `src/go/tools/expandstructs/README.md`.
 - Prefer `testify/require` for prerequisites and `testify/assert` for comparisons. Use `t.Fatal`/`t.Fatalf`
   directly for genuine test control flow or when no clearer assertion exists. Test shape: root `AGENTS.md`, "Go
   Test Style".
+- testify `NotEqual` between a named string type and a plain string always passes (the types differ); convert one
+  side or use `NotEqualValues`.
+
+### CI Test Timings And Caches
+
+The Go Tests workflow retains `go-test-timings-*` artifacts for seven days after successful or failed test execution.
+Each contains the raw `go-test.jsonl` stream (including toolchain diagnostics) and `go-test-timings.md`; the timing
+summary also appears in the job summary. Native artifact suffixes are matrix job indices; the report names the module.
+To summarize a downloaded log locally, run from the repository root:
+
+```bash
+python3 .github/scripts/summarize-go-test-json.py /path/to/go-test.jsonl --label src/go
+```
+
+Package durations overlap, and top-level test durations include their subtests. These durations MUST NOT be summed to
+estimate wall time. Compare runner resources, build-cache state, build tags and available external fixtures before
+attributing local timings to CI. Module download caches are shared for identical module manifests; compiled-output
+caches also distinguish toolchain, module and build purpose/target. This does not skip tests: full race coverage and
+`-count=1` remain enabled. Inspect the cache actions' hit/miss and save messages separately from the Go test timings
+when diagnosing cold compilation.
 
 ## Go Review And Reachability
 

@@ -11,14 +11,27 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"sync"
 	"sync/atomic"
 
 	"github.com/gofrs/flock"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
 const FetchMaxBytes int64 = 5 << 20
+
+// CaptureError identifies a hard size failure (copy growth or failure to close an
+// oversized source) that prevented publication of the entire set. Initial oversize
+// alone is skipped.
+type CaptureError struct {
+	ID  string
+	Err error
+}
+
+func (e *CaptureError) Error() string { return e.Err.Error() }
+func (e *CaptureError) Unwrap() error { return e.Err }
+
+func ValidArtifactID(id string) bool { return artifactIDPattern.MatchString(id) }
 
 var (
 	ErrClosed         = os.ErrClosed
@@ -33,14 +46,18 @@ var (
 	artifactIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,127}$`)
 )
 
+// Manifest is Go-authored capture membership, independent of run history.
+type Manifest struct {
+	VnodeGUID   string               `json:"vnode_guid,omitempty"`
+	JobID       string               `json:"job_id"`
+	RunID       string               `json:"run_id"`
+	PublishedUS int64                `json:"published_us"`
+	Artifacts   []synthetic.Artifact `json:"artifacts"`
+}
+
 type manifest struct {
 	Version int `json:"version"`
 	Manifest
-}
-
-func validJobID(id string) bool {
-	kind, name, ok := strings.Cut(id, ":")
-	return ok && (kind == "journey" || kind == "lighthouse") && strings.TrimSpace(name) != ""
 }
 
 type captureOwner struct{ JobID, VnodeGUID string }
@@ -211,7 +228,7 @@ func (s *Store) Close() error {
 // HasObservedPublished is a prompt Function-discovery hint, not proof that a
 // capture is readable. Once true it stays true for this store's lifetime.
 func (s *Store) HasObservedPublished() bool {
-	return s != nil && s.observedPublished.Load()
+	return s.observedPublished.Load()
 }
 
 func (s *Store) publishedAtStartup() bool {

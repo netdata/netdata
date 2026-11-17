@@ -1,1 +1,0 @@
-integrations/lighthouse_desktop_audit.md

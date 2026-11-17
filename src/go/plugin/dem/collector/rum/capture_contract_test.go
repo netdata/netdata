@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum_test
 
 import (
@@ -11,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -184,7 +186,17 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 	checkCaptureTimeline(t, retained, page, stages, users)
 	before := time.Now().Unix() + 10
 	for _, id := range []string{numericID, uuidID} {
-		rows, err := store.QuerySessions(ctx, "shop", id, 0, before, 10, "")
+		rows, err := store.QuerySessions(
+			ctx,
+			rumhistory.SessionFilter{
+				Filter: rumhistory.Filter{
+					Site:   "shop",
+					Before: before,
+				},
+				UserID: id,
+				Limit:  10,
+			},
+		)
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		assert.Equal(t, session, rows[0].SessionID)
@@ -192,11 +204,29 @@ func TestCaptureNormalizationThroughNativeHistory(t *testing.T) {
 		assert.EqualValues(t, 2, rows[0].Errors)
 	}
 	for _, id := range []string{":id", "123", "unknown-user"} {
-		rows, err := store.QuerySessions(ctx, "shop", id, 0, before, 10, "")
+		rows, err := store.QuerySessions(
+			ctx,
+			rumhistory.SessionFilter{
+				Filter: rumhistory.Filter{
+					Site:   "shop",
+					Before: before,
+				},
+				UserID: id,
+				Limit:  10,
+			},
+		)
 		require.NoError(t, err)
 		assert.Empty(t, rows, "exact identity membership only")
 	}
-	errors, err := store.QueryErrors(ctx, "shop", "", 0, before, "")
+	errors, err := store.QueryErrors(
+		ctx,
+		rumhistory.ErrorFilter{
+			Filter: rumhistory.Filter{
+				Site:   "shop",
+				Before: before,
+			},
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, errors, 1)
 	assert.Equal(t, snapshot.ErrorGroups[0].Fingerprint, errors[0].Fingerprint)

@@ -9,12 +9,17 @@ import (
 	"fmt"
 	"math"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
-	sdk "github.com/netdata/systemd-journal-sdk/go/journal"
+	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
 
-func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, visit func(string, synthetic.Run)) error {
+func (s *Store) scanSynthetic(
+	ctx context.Context,
+	f RunFilter,
+	runID string,
+	visit func(synthetic.HistoryPhase, synthetic.Run),
+) error {
 	before := int64(math.MaxInt64)
 	if f.Before != nil {
 		before = *f.Before
@@ -22,15 +27,12 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 	if f.After < 0 || before < f.After {
 		return fmt.Errorf("invalid synthetic start-time range")
 	}
-	reader, closeReader, err := s.journal.OpenReader(ctx)
+	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
 	}
 	defer closeReader()
-	if reader == nil {
-		return ctx.Err()
-	}
-	candidate := func(entry *sdk.SnapshotEntry) error {
+	candidate := func(entry *journal.SnapshotEntry) error {
 		phase, run, syntheticEntry, err := decodeSynthetic(entry)
 		if err != nil {
 			return err
@@ -47,7 +49,7 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 		if f.Kind != "" && run.Kind != f.Kind {
 			return nil
 		}
-		if phase == "start" {
+		if phase == synthetic.HistoryStart {
 			run.Outcome = synthetic.Unknown
 			run.CompletedUS = 0
 			run.DurationMS = nil
@@ -58,13 +60,13 @@ func (s *Store) scanSynthetic(ctx context.Context, f RunFilter, runID string, vi
 	if runID != "" {
 		return reader.VisitMatch("DEM_RUN_ID", runID, candidate)
 	}
-	return reader.VisitRange("synthetic", f.After, before, candidate)
+	return reader.VisitRange(journalstore.KindSynthetic, f.After, before, candidate)
 }
 
 // Both phases carry their immutable start clock, so indexed membership includes
 // a retained completion even when it was written after the selected interval.
-func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, error) {
-	var envelope demjournal.Envelope
+func decodeSynthetic(entry *journal.SnapshotEntry) (synthetic.HistoryPhase, synthetic.Run, bool, error) {
+	var envelope journalstore.Envelope
 	var phase, jobID, runID string
 	var run synthetic.Run
 	var seen uint8
@@ -110,7 +112,7 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 		return "", synthetic.Run{}, false, err
 	}
 	kind, started, err := envelope.Validate()
-	if err != nil || kind != "synthetic" {
+	if err != nil || kind != journalstore.KindSynthetic {
 		return "", synthetic.Run{}, false, err
 	}
 	for _, field := range []struct{ name, value string }{
@@ -126,11 +128,11 @@ func decodeSynthetic(entry *sdk.SnapshotEntry) (string, synthetic.Run, bool, err
 	if dataErr != nil {
 		return "", run, false, fmt.Errorf("decode synthetic history: %w", dataErr)
 	}
-	if (phase != "start" && phase != "complete") || run.ID != runID || run.JobID != jobID || run.StartedUS != started {
+	if !validPhase(synthetic.HistoryPhase(phase)) || run.ID != runID || run.JobID != jobID || run.StartedUS != started {
 		return "", run, false, fmt.Errorf("invalid synthetic journal identity or start time")
 	}
-	if phase == "complete" && run.CompletedUS <= 0 {
+	if synthetic.HistoryPhase(phase) == synthetic.HistoryComplete && run.CompletedUS <= 0 {
 		return "", run, false, fmt.Errorf("invalid synthetic completion time")
 	}
-	return phase, run, true, nil
+	return synthetic.HistoryPhase(phase), run, true, nil
 }

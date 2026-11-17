@@ -16,6 +16,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
 // Paths are injected from the Agent's runtime or compiled data roots.
@@ -48,6 +50,13 @@ type Status struct {
 	LookupErrors  uint64 `json:"lookup_errors"`
 }
 
+// Status.State values.
+const (
+	StateLoaded        = "loaded"
+	StateUsingPrevious = "using_previous" // no candidate loaded; the previous snapshot stays in use
+	StateUnavailable   = "unavailable"
+)
+
 type source struct{ kind, path string }
 type snapshot struct {
 	source   source
@@ -75,7 +84,7 @@ func New(explicit string, paths Paths) *Resolver {
 		wake: make(chan struct{}, 1),
 		status: Status{
 			Selection: "auto",
-			State:     "unavailable",
+			State:     StateUnavailable,
 			Reason:    "not_checked",
 		},
 	}
@@ -167,16 +176,16 @@ func (r *Resolver) Refresh() error {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	state := "loaded"
+	state := StateLoaded
 	if selected != nil && selected.tainted.Load() {
 		selected = nil
 	}
 	if selected == nil && previous != nil && !previousRemoved && !previous.tainted.Load() {
 		selected = previous
-		state = "using_previous"
+		state = StateUsingPrevious
 	}
 	if selected == nil {
-		state = "unavailable"
+		state = StateUnavailable
 		if reason == "" {
 			reason = "missing"
 		}
@@ -205,7 +214,7 @@ func (r *Resolver) Status() Status {
 	if current := r.current; current != nil {
 		status.LookupErrors = current.errors.Load()
 		if current.tainted.Load() {
-			status.State, status.Reason = "unavailable", "unsafe_snapshot"
+			status.State, status.Reason = StateUnavailable, "unsafe_snapshot"
 			return status
 		}
 		status.Source = current.source.kind
@@ -233,7 +242,7 @@ type geoRecord struct {
 
 // Lookup returns only validated fields. A record decode failure loses this lookup,
 // not the entire source; a mapped-read fault retires the unsafe source instead.
-func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64, hasGeo bool) {
+func (r *Resolver) Lookup(ipStr string) (loc beacon.Location) {
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
 		return
@@ -257,19 +266,19 @@ func (r *Resolver) Lookup(ipStr string) (country, city string, lat, lon float64,
 		return
 	}
 	invalid := false
-	country = rec.Country.ISOCode
+	country := rec.Country.ISOCode
 	if country != "" &&
 		(len(country) != 2 || country[0] < 'A' || country[0] > 'Z' || country[1] < 'A' || country[1] > 'Z') {
 		country = ""
 		invalid = true
 	}
-	city = trimCityAnnex(rec.City.Names.En)
+	loc.Country = country
+	loc.City = trimCityAnnex(rec.City.Names.En)
 	if rec.Location.Latitude != nil && rec.Location.Longitude != nil {
 		a, b := *rec.Location.Latitude, *rec.Location.Longitude
-		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 && !math.IsNaN(b) && !math.IsInf(b, 0) &&
-			b >= -180 &&
-			b <= 180 {
-			lat, lon, hasGeo = round1(a), round1(b), true
+		if !math.IsNaN(a) && !math.IsInf(a, 0) && a >= -90 && a <= 90 &&
+			!math.IsNaN(b) && !math.IsInf(b, 0) && b >= -180 && b <= 180 {
+			loc.Lat, loc.Lon, loc.HasGeo = round1(a), round1(b), true
 		} else {
 			invalid = true
 		}
@@ -318,5 +327,5 @@ func (r *Resolver) Close() {
 		r.current.db.close()
 		r.current = nil
 	}
-	r.status.State, r.status.Reason = "unavailable", "closed"
+	r.status.State, r.status.Reason = StateUnavailable, "closed"
 }
