@@ -49,6 +49,7 @@ from .tools import (
     otel_push,
     otel_service_map,
     otel_stream,
+    otel_traces,
     run,
 )
 
@@ -113,6 +114,7 @@ def build_server() -> FastMCP:
     otel_logs.register(mcp)
     otel_files.register(mcp)
     otel_service_map.register(mcp)
+    otel_traces.register(mcp)
     otel_push.register(mcp)
     otel_stream.register(mcp)
     agent_mcp.register(mcp)

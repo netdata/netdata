@@ -134,6 +134,7 @@ A dedicated surface for iterating on the OTel-logs path against a ready agent:
 | `netdata_agent_otel_stream_{start,status,stop,list}(…)` | Run a live source (`source=certstream\|jetstream\|github\|ris`) as a daemon; `list` enumerates all streams. |
 | `netdata_agent_otel_logs(agent_id, …)` | Query the `otel-logs` function (typed params; mints a Cloud bearer when `NETDATA_CLOUD_TOKEN` is set). |
 | `netdata_agent_otel_files(agent_id, …)` | List the storage files the otel-ledger is tracking (WAL / SFST / catalog) per tenant, with sizes, time ranges, record counts, and the `rotated`/`uploaded`/`remote_cataloged`/`pending_deletion` flags not visible on disk. Inventory, not content (use `netdata_agent_otel_logs` for rows). Same SIGNED_ID gate (mints a bearer). |
+| `netdata_agent_otel_traces(agent_id, mode, …)` | Query the `otel-traces` Function in one of its modes: `list` (trace list + window overview, paged by `anchor`), `info`, `trace` (one trace's spans by `trace_id`), `suggest` (search-bar keys or one key's values), `explore` (span view: histogram and/or rows). Typed params, each documented with the modes that read it; a param the mode does not read is refused. Same SIGNED_ID gate (mints a bearer). |
 | `netdata_agent_otel_service_map(agent_id, after, before, tenant, info)` | Query the `topology:tracing` Function: the service map built from stored traces over a window, as a `netdata.topology.v1` payload. 413 = answer over the plugin's byte budget (narrow the window). Same SIGNED_ID gate (mints a bearer). |
 | `netdata_agent_mint_bearer(agent_id, …)` | Mint and **return** a per-agent Cloud bearer for the **Playwright (browser) MCP**, so an LLM can view SIGNED_ID-gated functions (otel-logs, otel-files, systemd-journal) in the dashboard UI. The description embeds the `browser_run_code_unsafe` + `setExtraHTTPHeaders` injection recipe. Localhost-dev only (returns the bearer by design). |
 
@@ -334,6 +335,7 @@ netdata_mcp/
     otel_logs.py   # netdata_agent_otel_logs
     otel_files.py  # netdata_agent_otel_files (storage-file inventory)
     otel_service_map.py # netdata_agent_otel_service_map (topology:tracing)
+    otel_traces.py # netdata_agent_otel_traces (otel-traces, all modes)
     otel_push.py   # netdata_agent_otel_push_{logs,traces} (one-shot synth)
     otel_stream.py # netdata_agent_otel_stream_{start,status,stop,list}
 ```
