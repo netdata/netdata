@@ -105,6 +105,8 @@ jobs:
               - '!**/*.md'
             identity:
               - .github/workflows/dem-runtime-tests.yml
+              - packaging/docker/netdata-dem-docker
+              - packaging/docker/netdata-dem-docker-host.sh
               - packaging/installer/kickstart.sh
               - packaging/installer/netdata-dem-runtime.sh
               - packaging/installer/netdata-uninstaller.sh
