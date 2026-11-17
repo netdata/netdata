@@ -192,7 +192,7 @@ Netdata monitors the full infrastructure stack — operating systems, processes,
 
 ## Application Performance Monitoring
 
-Netdata provides application performance monitoring (APM) and distributed tracing from OpenTelemetry traces. Applications instrumented with any OpenTelemetry SDK send spans to Netdata Agents and Parents, which store and index every span, chart request rate, errors and duration for every service, map the calls between services and the databases, queues and external endpoints they depend on, and analyze any slice of traffic after the fact. Traces share the timeline, machine learning and alerting of everything else Netdata monitors.
+Netdata provides application performance monitoring (APM) and distributed tracing from OpenTelemetry traces. Applications instrumented with any OpenTelemetry SDK send spans to Netdata Agents and Parents, which store and index every span, chart request rate, errors and duration for every service, map the calls between services and the databases, queues and external endpoints they depend on, and analyze any slice of traffic after the fact. Through Real User Monitoring, backend traces connect to the browser sessions and JavaScript errors (grouped, with sample stack traces) that started them. Traces share the timeline, machine learning and alerting of everything else Netdata monitors.
 
 **Learn more:** [Trace storage and retention](/docs/opentelemetry/trace-storage-and-retention.md) · [Ingest OpenTelemetry metrics, logs and traces](/docs/opentelemetry/otlp-ingestion.md)
 
