@@ -232,7 +232,7 @@ flowchart LR
     S5[Browsers and synthetic checks]
   end
   subgraph Hubs[Hubs you place per site, region or team]
-    H1[Parents: metrics]
+    H1[Agents and Parents: metrics]
     H2[Agents: network devices and hardware]
     H3[Agents: logs, traces, flows, RUM]
   end
