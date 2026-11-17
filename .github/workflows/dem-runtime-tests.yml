@@ -79,13 +79,14 @@ jobs:
               - src/go/plugin/go.d/pkg/ndexec/**
               - src/go/go.mod
               - src/go/go.sum
+              - src/health/health.d/dem.conf
+              - src/plugins.d/FUNCTION_UI_SCHEMA.json
               - src/collectors/utils/nd-run.c
               - src/collectors/utils/nd-process-tree.*
               - src/collectors/utils/nd-file-reader.*
               - src/collectors/utils/supervisor-pipes.h
               - src/collectors/utils/exec-signals.h
               - '!**/*.md'
-              - '!**/metadata.yaml'
             installer:
               - .github/workflows/dem-runtime-tests.yml
               - packaging/makeself/**

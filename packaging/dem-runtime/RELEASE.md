@@ -153,9 +153,9 @@ upgrade matrix is not duplicated under ARM emulation.
 
 PR checks follow the changed inputs. `dem-runtime-tests.yml` selects workflow behavior, Python packaging/native
 fixtures, Go runtime integration, installer ownership and Node wire checks separately. The installer identity
-container runs only for its helper/caller tests. Documentation changes skip execution tests; test-only changes run
-their suite without rebuilding Agent packages, images or browser bundles. Go/security checks retain their own
-repository-wide selection rules.
+container runs only for its helper/caller tests. Prose changes skip execution tests; metadata, alert definitions and
+Function schemas consumed by Go contract tests remain inputs. Test-only changes run their suite without rebuilding
+Agent packages, images or browser bundles. Go/security checks retain their own repository-wide selection rules.
 
 Agent builds follow Agent build inputs. Release orchestration changes run workflow checks; changes to the runtime
 builder workflow still build and qualify both browser architectures. Scheduled and manual releases always run the
