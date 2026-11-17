@@ -29,9 +29,18 @@ Netdata is a distributed observability platform. Netdata Agents collect, store a
 - [Default retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md) per tier by time and size, whichever comes first: tier 0 14 days, tier 1 3 months, tier 2 2 years, each capped at 1 GiB (about 4 GiB per Agent with metadata); configurable per tier
 - About 0.6 bytes per sample on disk at tier 0 (Gorilla and ZSTD compression); about 6 and 18 bytes per sample at tiers 1 and 2, which store sum, min, max, count and anomaly count per interval
 - Anomaly bit stored with every sample, in real-time, at collection time
-- Logs and traces: indexed log and span stores on Agents and Parents, with offload to S3-compatible or filesystem storage (see Logs and Application Performance Monitoring)
 - Alternative modes: `ram` (in memory), `alloc`, `none` (streaming only)
 - [Extreme cardinality protection](/docs/extreme-cardinality-protection.md): automatic cleanup of archived, ephemeral metric instances, without touching collected metrics
+
+**Storage — [logs](/docs/logs/log-storage-and-retention.md) and [traces](/docs/opentelemetry/trace-storage-and-retention.md)**
+- One storage engine for OpenTelemetry logs and traces on Agents and Parents: records are written to a write-ahead log before the sender is acknowledged, then sealed into compressed (zstd), indexed files
+- Every field of every record is indexed, with the indexing strategy adapted to each field; logs take about 1/4 of their raw size. Spans also get a trace-ID index with a bloom filter, so any trace loads whole
+- Records are queryable as soon as they arrive, before their files are sealed
+- Retention by total size, age and file count, per tenant; offload to S3-compatible or filesystem storage, fetched back on demand through a local cache
+- Logs Monitoring adds no storage: systemd-journal, Windows Event Log and macOS unified logs are queried in place
+
+**Storage — [network flows](/docs/npm/network-flows/retention-querying.md)**
+- Flow records stored on the receiving Agent in four tiers (raw, 1-minute, 5-minute, 1-hour), each with its own retention
 
 **[Streaming](/src/streaming/README.md) and Parents**
 - Real-time streaming from Children to Parents with compression (ZSTD default; LZ4, gzip, Brotli) and TLS
