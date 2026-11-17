@@ -4,9 +4,9 @@
 
 Netdata is a distributed, real-time observability platform for metrics, logs and traces. Netdata Agents collect, store and analyze data where it is generated — per second, with machine learning anomaly detection on every metric — and Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data.
 
-Netdata covers the full stack in one product: infrastructure monitoring (systems, containers, Kubernetes, virtualization, hardware, applications) through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems; network performance monitoring (devices, topology, flows, traps, BGP, licenses, application dependencies); database monitoring for 50+ databases and managed services with live query views; logs, from in-place querying on every node to OpenTelemetry-based logs management; OpenTelemetry traces; AWS and Azure monitoring; Windows, macOS and edge devices; and digital experience monitoring with RUM and synthetic journeys.
+Netdata covers the full stack in one product: infrastructure monitoring (systems, containers, Kubernetes, virtualization, hardware, applications and services) through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems; application performance monitoring with OpenTelemetry traces, a traces explorer with RED analysis at query time, and service maps; digital experience monitoring with RUM, synthetic journeys and Lighthouse audits; network performance monitoring (devices, topology, flows, traps, BGP, licenses, application dependencies); database monitoring for 50+ databases and managed services with live query views; logs, from in-place querying on every node to OpenTelemetry-based logs management; AWS and Azure monitoring; and Windows, macOS and edge devices.
 
-Everything is automatic: discovery, dashboards, 1,100+ stock alerts and anomaly detection start without configuration, and every metric is explorable without a query language. Netdata AI and MCP servers make the whole infrastructure available to AI for troubleshooting and root-cause analysis. Data stays on the customer's infrastructure, with Netdata Cloud available as SaaS or Enterprise On-Prem.
+Everything is automatic: discovery, dashboards, 1,100+ stock alerts and anomaly detection start without configuration, and every metric is explorable without a query language. Netdata AI and MCP servers make all of it, from infrastructure to applications, available to AI for troubleshooting and root-cause analysis. Data stays on the customer's infrastructure, with Netdata Cloud available as SaaS or Enterprise On-Prem.
 
 ## Platform Architecture
 
@@ -1206,9 +1206,9 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 
 ## Mission
 
-Netdata's mission is to reveal and surface the pulse and breath of systems and applications, making infrastructure health visible and actionable without requiring deep expertise.
+Netdata's mission is to reveal and surface the pulse and breath of systems and applications, making their health visible and actionable without requiring deep expertise.
 
-Netdata is focused on making observability simple and affordable for operations teams: monitoring should work for operators, not the other way around. Netdata removes the work that makes monitoring hard — choosing and integrating tools, configuring collection, building dashboards, writing alerts, tuning thresholds, scaling central databases — so that teams get complete, real-time visibility and fast answers from the moment they install it, at a cost that lets them monitor everything instead of choosing what to leave out.
+Netdata is focused on making observability simple and affordable for every team that builds and runs systems and applications: observability should work for its users, not the other way around. Netdata removes the work that makes monitoring hard — choosing and integrating tools, configuring collection, building dashboards, writing alerts, tuning thresholds, scaling central databases — so that teams get complete, real-time visibility and fast answers from the moment they install it, at a cost that lets them monitor everything instead of choosing what to leave out.
 
 The roadmap follows this mission: broader coverage that works without configuration, deeper automation through machine learning and AI, and open standards that let teams bring the tools and instrumentation they already use.
 
@@ -1234,7 +1234,7 @@ SASE platforms sit in the traffic path and enforce policy; Netdata stays out of 
 
 ## Summary
 
-Netdata makes observability simple and affordable for operations teams. One distributed platform collects everything — from servers and Kubernetes to network devices, databases, cloud services, logs, traces, devices and browsers — at per-second resolution for system metrics, analyzes every metric with machine learning, and turns it into dashboards, alerts and AI-assisted answers automatically.
+Netdata makes observability simple and affordable for every team that builds and runs systems and applications. One distributed platform collects everything — from servers and Kubernetes to applications, network devices, databases, cloud services, logs, traces, devices and browsers — at per-second resolution for system metrics, analyzes every metric with machine learning, and turns it into dashboards, alerts and AI-assisted answers automatically.
 
 - **Complete:** [800+ integrations](/src/collectors/COLLECTORS.md) plus the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems, in one data model and one UI
 - **Real-time:** per-second collection, visualization, anomaly detection and alerting
