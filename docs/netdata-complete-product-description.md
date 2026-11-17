@@ -236,7 +236,7 @@ Netdata provides application performance monitoring (APM) and distributed tracin
 
 Netdata monitors digital experience: Real User Monitoring (RUM) measures what real visitors experience in their browsers, including Core Web Vitals (LCP, INP, CLS), synthetic journeys and Lighthouse audits test critical user flows and page performance from real browsers on a schedule, and OpenTelemetry traces connect browser requests to backend services. Digital experience data shares dashboards, alerting and machine learning with the applications and infrastructure behind it.
 
-**Learn more:** [Real User Monitoring](/src/go/plugin/dem/collector/rum/README.md) · [Browser journeys](/src/go/plugin/dem/collector/journey/README.md)
+**Learn more:** [Real User Monitoring](/src/go/plugin/dem/collector/rum/README.md) · [Browser journeys](/src/go/plugin/dem/collector/synthetic/integrations/browser_journey.md)
 
 **Design**
 
