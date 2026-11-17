@@ -1,3 +1,4 @@
+import json
 import types
 from pathlib import Path
 
@@ -45,7 +46,8 @@ async def test_reads_the_run_buffer_without_journald(monkeypatch):
 
 
 def _env(pid, run_dir):
-    return f'T host otel-plugin[{pid}]: netdata environment: {{"user_config_dir":"{run_dir}/etc","run_dir":"{run_dir}/run"}}'
+    env = {"user_config_dir": f"{run_dir}/etc", "run_dir": f"{run_dir}/run"}
+    return f"T host otel-plugin[{pid}]: netdata environment: {json.dumps(env, separators=(',', ':'))}"
 
 
 def test_scope_to_run_keeps_only_the_agents_supervisor():
@@ -74,7 +76,9 @@ async def test_journal_ignores_other_agents_and_keeps_the_refusal(monkeypatch):
         ])
 
     monkeypatch.setattr(otel_effective_config.journal, "read_logs", fake_read)
-    run = types.SimpleNamespace(state="ready", buffer=LogBuffer(), pid=None, created_wall=1700000000.5, run_dir=Path("/r/a"))
+    run = types.SimpleNamespace(
+        state="ready", buffer=LogBuffer(), pid=None, created_wall=1700000000.5, run_dir=Path("/r/a")
+    )
     out = await _call(monkeypatch, run, journald=True)
     assert seen == {
         "identifier": "otel-plugin", "pid": None, "lines": 500,

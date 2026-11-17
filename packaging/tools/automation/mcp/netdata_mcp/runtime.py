@@ -181,10 +181,11 @@ class OtelConfig:
     the stock values. ``extra_yaml`` is a raw YAML mapping deep-merged on top, for
     configs the typed model refuses on purpose (unknown keys for strict-config
     refusal tests). After both, the harness pins what per-agent isolation needs:
-    ``base_dir`` under the run dir and each listener's ``enabled`` and endpoint. An unset endpoint auto-assigns a free loopback port
-    so parallel agents never collide on 4317/4318; the HTTP listener is on unless
-    ``settings`` sets its ``enabled: false``. A listener set ``enabled: false``
-    gets no port and reports no endpoint.
+    ``base_dir`` under the run dir and each listener's ``enabled`` and endpoint. An
+    unset endpoint auto-assigns a free loopback port so parallel agents never
+    collide on 4317/4318; both listeners are on (HTTP too, unlike stock) unless
+    ``settings`` sets ``enabled: false``, which leaves that listener with no port
+    and no reported endpoint.
     """
 
     settings: OtelSettings = field(default_factory=OtelSettings)
@@ -275,6 +276,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str | None, otlp_http_en
             protocols[key]["enabled"] = False
             protocols[key].pop("endpoint", None)
     return doc
+
 
 def _ini_safe(s: str) -> str:
     # Strip newlines (the section/key injection vector) and null bytes; defensive

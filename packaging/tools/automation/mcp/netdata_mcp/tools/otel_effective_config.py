@@ -35,7 +35,9 @@ class OtelEffectiveConfig(BaseModel):
     agent_id: str
     source: Literal["journal", "run_logs"] | None = None
     effective: dict[str, Any] | None = Field(default=None, description="The resolved plugin config, as logged.")
-    config_log: str | None = Field(default=None, description="The run's config-related log lines, when no effective config was found.")
+    config_log: str | None = Field(
+        default=None, description="The run's config-related log lines, when no effective config was found."
+    )
     error: str | None = None
     message: str = ""
 

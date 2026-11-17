@@ -20,8 +20,12 @@ from .gated_function import AgentId, FunctionResult, Timeout, call_gated_functio
 _FUNCTION = "topology:tracing"
 
 _Info = Annotated[bool, Field(description="If true, return the function's descriptor instead of a map.")]
-_After = Annotated[int | None, Field(description="Window start, unix seconds; negative = relative to before. Omit for 15 minutes before 'before'.")]
-_Before = Annotated[int | None, Field(description="Window end, unix seconds; negative = relative to now. Omit for now.")]
+_After = Annotated[int | None, Field(description=(
+    "Window start, unix seconds; negative = relative to before. Omit for 15 minutes before 'before'."
+))]
+_Before = Annotated[int | None, Field(description=(
+    "Window end, unix seconds; negative = relative to now. Omit for now."
+))]
 _Tenant = Annotated[str | None, Field(description="Tenant to read; omitted or empty reads the 'default' tenant.")]
 
 

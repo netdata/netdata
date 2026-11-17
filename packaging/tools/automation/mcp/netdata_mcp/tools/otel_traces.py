@@ -29,9 +29,16 @@ class Condition(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    key: str = Field(description="Field key, e.g. 'resource.attributes.service.name', 'name', 'duration', 'status.code'.")
-    op: str = Field(description="One of = != =~ !~ > >= < <= ^= !^= ; '!' ops mean NOT EXISTS, '=~' is a whole-value regex, '^=' is starts-with.")
-    values: list[str | int | float] = Field(description="Values OR'd together (ordering ops take one). Durations are integer nanoseconds.")
+    key: str = Field(description=(
+        "Field key, e.g. 'resource.attributes.service.name', 'name', 'duration', 'status.code'."
+    ))
+    op: str = Field(description=(
+        "One of = != =~ !~ > >= < <= ^= !^= ; '!' ops mean NOT EXISTS, '=~' is a whole-value regex, '^=' is "
+        "starts-with."
+    ))
+    values: list[str | int | float] = Field(description=(
+        "Values OR'd together (ordering ops take one). Durations are integer nanoseconds."
+    ))
 
 
 # Which params each mode reads; everything else set for that mode is refused.
@@ -64,20 +71,35 @@ _Conditions = Annotated[list[Condition] | None, Field(description=(
     "Search-bar chips (list/trace/explore). list: AND at trace level. explore: AND per span "
     "(trace-level keys refused; trace_id selects spans of given traces). trace: marks matching spans."
 ))]
-_Text = Annotated[list[str] | None, Field(description="Free-text tokens, each at least 3 chars, case-insensitive 'contains' over span name, status message, event names and attribute values.")]
-_Anchor = Annotated[str | None, Field(description="Pagination cursor echoed from a previous answer (list: anchor.next; explore: rows.anchor.next).")]
+_Text = Annotated[list[str] | None, Field(description=(
+    "Free-text tokens, each at least 3 chars, case-insensitive 'contains' over span name, status message, event names"
+    " and attribute values."
+))]
+_Anchor = Annotated[str | None, Field(description=(
+    "Pagination cursor echoed from a previous answer (list: anchor.next; explore: rows.anchor.next)."
+))]
 _Last = Annotated[int | None, Field(description="list: traces per page (1-200).")]
 _SkipOverview = Annotated[bool | None, Field(description="list: true skips the window overview section.")]
 _TraceId = Annotated[str | None, Field(description="trace: the trace id, 32 hex chars.")]
 _Key = Annotated[str | None, Field(description="suggest: the key whose values to suggest; omit to suggest keys.")]
 _Term = Annotated[str | None, Field(description="suggest: typed prefix text; empty matches everything.")]
 _MaxItems = Annotated[int | None, Field(description="suggest: cap on suggestions (1-200); not with tier.")]
-_Tier = Annotated[Literal["low", "mid", "high"] | None, Field(description="suggest: every key of this tier (keys only, not with key/max_items).")]
-_Histogram = Annotated[bool | None, Field(description="explore: ask for the histogram section (implied by histogram_stack).")]
-_HistogramStack = Annotated[str | None, Field(description="explore: key whose values stack the histogram (default status.code).")]
-_Rows = Annotated[bool | None, Field(description="explore: ask for a page of spans, newest first (implied by rows_limit/rows_columns).")]
+_Tier = Annotated[Literal["low", "mid", "high"] | None, Field(description=(
+    "suggest: every key of this tier (keys only, not with key/max_items)."
+))]
+_Histogram = Annotated[bool | None, Field(description=(
+    "explore: ask for the histogram section (implied by histogram_stack)."
+))]
+_HistogramStack = Annotated[str | None, Field(description=(
+    "explore: key whose values stack the histogram (default status.code)."
+))]
+_Rows = Annotated[bool | None, Field(description=(
+    "explore: ask for a page of spans, newest first (implied by rows_limit/rows_columns)."
+))]
 _RowsLimit = Annotated[int | None, Field(description="explore: spans per page.")]
-_RowsColumns = Annotated[list[str] | None, Field(description="explore: keys each span row carries (default service, name, kind, status).")]
+_RowsColumns = Annotated[list[str] | None, Field(description=(
+    "explore: keys each span row carries (default service, name, kind, status)."
+))]
 
 
 def build_payload(mode: str, tenant: str | None, params: dict[str, Any]) -> dict[str, Any]:

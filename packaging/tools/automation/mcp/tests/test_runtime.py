@@ -334,7 +334,8 @@ def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monke
 
 def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-cat2", otel=_cfg({"logs": {"catalog": {"rotation_count": 2}}}))
+    cfg = _cfg({"logs": {"catalog": {"rotation_count": 2}}})
+    rd, _conf, _otlp, _http = runtime.generate_runtime("agent-cat2", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["logs"]["catalog"] == {"rotation_count": 2}
 

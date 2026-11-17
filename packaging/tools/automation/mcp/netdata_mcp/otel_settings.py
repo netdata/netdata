@@ -77,7 +77,9 @@ class Protocol(_Strict):
 
 class Protocols(_Strict):
     grpc: Protocol | None = Field(default=None, description="OTLP/gRPC listener; always on unless enabled=false.")
-    http: Protocol | None = Field(default=None, description="OTLP/HTTP listener; on by default here (stock is off), enabled=false turns it off.")
+    http: Protocol | None = Field(default=None, description=(
+        "OTLP/HTTP listener; on by default here (stock is off), enabled=false turns it off."
+    ))
 
 
 class Otlp(_Strict):
@@ -101,8 +103,13 @@ class Metrics(_Strict):
 
 
 class RemoteStorage(_Strict):
-    enabled: bool | None = Field(default=None, description="Upload SFST + catalog files to object storage (both signals).")
-    uri: str | None = Field(default=None, description="opendal URI ('fs:///abs/path', 's3://bucket/prefix'). Omitted while enabled: a per-agent fs:// dir under the run dir.")
+    enabled: bool | None = Field(default=None, description=(
+        "Upload SFST + catalog files to object storage (both signals)."
+    ))
+    uri: str | None = Field(default=None, description=(
+        "opendal URI ('fs:///abs/path', 's3://bucket/prefix'). Omitted while enabled: a per-agent fs:// dir under the"
+        " run dir."
+    ))
     read_cache_max_size: Size | None = Field(default=None, description="Download cache both signals share.")
     startup_op_timeout: str | None = None
 
@@ -116,19 +123,27 @@ class RemoteStorage(_Strict):
 
 class RotationEntry(_Strict):
     max_file_size: Size | None = None
-    max_entries: NonNegativeInt | None = Field(default=None, description="Tiny values (e.g. 10) force multi-file splits over a small corpus.")
-    max_file_duration: str | None = Field(default=None, description="Max wall time a data file stays open; idle streams seal on the periodic sweep.")
+    max_entries: NonNegativeInt | None = Field(default=None, description=(
+        "Tiny values (e.g. 10) force multi-file splits over a small corpus."
+    ))
+    max_file_duration: str | None = Field(default=None, description=(
+        "Max wall time a data file stays open; idle streams seal on the periodic sweep."
+    ))
 
 
 class RetentionEntry(_Strict):
     max_files: NonNegativeInt | None = None
     max_total_size: Size | None = None
     max_age: str | None = Field(default=None, description="Measured from a file's latest data timestamp.")
-    horizon: str | None = Field(default=None, description="How long catalog (index) files are kept: the remote archive horizon.")
+    horizon: str | None = Field(default=None, description=(
+        "How long catalog (index) files are kept: the remote archive horizon."
+    ))
 
 
 class Catalog(_Strict):
-    rotation_count: NonNegativeInt | None = Field(default=None, description="Index files recorded before a catalog file rotates and uploads; small values force catalog rotation.")
+    rotation_count: NonNegativeInt | None = Field(default=None, description=(
+        "Index files recorded before a catalog file rotates and uploads; small values force catalog rotation."
+    ))
     rotation_period: str | None = None
 
 
@@ -140,14 +155,20 @@ class Ingest(_Strict):
 class Signal(_Strict):
     crc_enabled: bool | None = None
     compression_enabled: bool | None = None
-    rotation: dict[str, RotationEntry] | None = Field(default=None, description="Per tenant; the 'default' entry applies to tenants without their own.")
-    retention: dict[str, RetentionEntry] | None = Field(default=None, description="Per tenant; the 'default' entry applies to tenants without their own.")
+    rotation: dict[str, RotationEntry] | None = Field(default=None, description=(
+        "Per tenant; the 'default' entry applies to tenants without their own."
+    ))
+    retention: dict[str, RetentionEntry] | None = Field(default=None, description=(
+        "Per tenant; the 'default' entry applies to tenants without their own."
+    ))
     catalog: Catalog | None = None
     ingest: Ingest | None = None
 
 
 class LogsSignal(Signal):
-    journal_dir: str | None = Field(default=None, description="Read-only journal files of the former plugin, for the legacy-otel-logs viewer.")
+    journal_dir: str | None = Field(default=None, description=(
+        "Read-only journal files of the former plugin, for the legacy-otel-logs viewer."
+    ))
 
 
 class OtelSettings(_Strict):
