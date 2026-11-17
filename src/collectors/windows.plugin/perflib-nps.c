@@ -16,6 +16,7 @@ struct nps_dim {
     COUNTER_DATA cd;
     RRDDIM *rd;
     RRDDIM *rd_total;
+    bool discontinuous; // missed a committed sample; its last collected value is stale
 };
 
 struct nps_chart {
@@ -230,11 +231,20 @@ static void nps_chart_update(
     }
 
     for (size_t i = 0; ch->dims[i].id; i++) {
-        if (!read[i])
-            continue;
-
         struct nps_dim *d = &ch->dims[i];
+        if (!read[i]) {
+            d->discontinuous = true;
+            continue;
+        }
+
         collected_number value = (collected_number)d->cd.current.Data;
+
+        // The chart kept advancing while this dimension was missing, so the delta against its stale value would
+        // be charged to a single interval. Rebaseline it to emit zero for this interval instead of a spike.
+        if (d->discontinuous && ch->units_total)
+            rrddim_set_last_collected_int(d->rd, value);
+        d->discontinuous = false;
+
         rrddim_set_by_pointer(ch->st, d->rd, value);
         if (ch->st_total)
             rrddim_set_by_pointer(ch->st_total, d->rd_total, value);
