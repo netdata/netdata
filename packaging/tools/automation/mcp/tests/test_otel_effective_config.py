@@ -25,9 +25,10 @@ def test_parse_effective():
         assert parse_effective(lines) == want, name
 
 
-def _call(monkeypatch, run, journald):
+def _call(monkeypatch, run, journald, usable=True):
     monkeypatch.setattr(otel_effective_config, "get_runs", lambda ctx: types.SimpleNamespace(get=lambda _id: run))
     monkeypatch.setattr(otel_effective_config.journal, "journald_socket_present", lambda: journald)
+    monkeypatch.setattr(otel_effective_config.journal, "usable", lambda: usable)
     from mcp.server.fastmcp import FastMCP
 
     mcp = FastMCP("t")
@@ -102,6 +103,26 @@ async def test_journal_returns_the_agents_own_effective_config(monkeypatch):
     assert out == OtelEffectiveConfig(
         agent_id="a", source="journal", effective={"base_dir": "/r/a/lib/otel"}, message="ok"
     )
+
+
+async def test_reports_why_nothing_was_found(monkeypatch):
+    async def failing_read(**kw):
+        return "[journalctl timed out after 10s]"
+
+    monkeypatch.setattr(otel_effective_config.journal, "read_logs", failing_read)
+    run = types.SimpleNamespace(state="ready", buffer=LogBuffer(), pid=None, created_wall=0.0, run_dir=Path("/r/a"))
+    out = await _call(monkeypatch, run, journald=True)
+    assert out.error is not None and out.error.endswith("journalctl: [journalctl timed out after 10s]")
+
+    out = await _call(monkeypatch, run, journald=True, usable=False)
+    assert out.error == "the agent logs to the journal, but journalctl is not usable on this host"
+
+    buf = LogBuffer(max_lines=1)
+    buf.append('INFO effective config: {"a": 1}')
+    buf.append("later output")
+    run = types.SimpleNamespace(state="ready", buffer=buf, pid=None, created_wall=0.0)
+    out = await _call(monkeypatch, run, journald=False)
+    assert out.error is not None and "evicted" in out.error
 
 
 async def test_unknown_agent(monkeypatch):

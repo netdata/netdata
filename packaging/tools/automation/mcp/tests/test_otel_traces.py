@@ -19,7 +19,7 @@ def test_build_payload():
                 "text": ["err"], "skip_overview": True, "tenant": "t1",
             },
         ),
-        "info drops tenant": ("info", "t1", {}, {"info": {}}),
+        "info": ("info", None, {}, {"info": {}}),
         "trace": (
             "trace", None, dict(trace_id="ab" * 16, after=1, before=2),
             {"trace": {"id": "ab" * 16, "after": 1, "before": 2}},
@@ -50,12 +50,13 @@ def test_build_payload_refuses_params_of_other_modes():
     cases = {
         "list": ("list", dict(trace_id="x", rows=True), "mode 'list' does not take: rows, trace_id"),
         "info": ("info", dict(after=1), "mode 'info' does not take: after"),
+        "info tenant": ("info", dict(), "mode 'info' does not take: tenant"),
         "suggest": ("suggest", dict(conditions=[_CHIP]), "mode 'suggest' does not take: conditions"),
         "trace": ("trace", dict(last=5), "mode 'trace' does not take: last"),
     }
     for name, (mode, params, msg) in cases.items():
         with pytest.raises(ValueError) as exc:
-            build_payload(mode, None, params)
+            build_payload(mode, "t1" if name == "info tenant" else None, params)
         assert str(exc.value) == msg, name
 
 

@@ -19,14 +19,18 @@ from __future__ import annotations
 import ipaddress
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, field_validator
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictStr, field_validator
 
 # The plugin parses listener endpoints as a Rust SocketAddr: an IP literal
 # (IPv6 in brackets) and a port, never a hostname.
 _HOST_PORT_RE = re.compile(r"(?:\[([0-9A-Fa-f:.]+)\]|([0-9.]+)):([0-9]{1,5})", re.ASCII)
 
-# The plugin reads counts and sizes as unsigned integers.
-Size = str | NonNegativeInt
+# Strict, so a bool or numeric string is refused instead of coerced into a
+# different valid value; the plugin reads counts and sizes as unsigned integers.
+Count = Annotated[int, Field(ge=0, strict=True)]
+Size = StrictStr | Count
 
 
 def _is_ip(text: str | None, version: int) -> bool:
@@ -60,7 +64,7 @@ class Tls(_Strict):
 
 
 class Protocol(_Strict):
-    enabled: bool | None = None
+    enabled: StrictBool | None = None
     endpoint: str | None = Field(
         default=None,
         description="'ip:port'. Omit to auto-assign a free loopback port (never the stock 4317/4318).",
@@ -91,19 +95,19 @@ class Receivers(_Strict):
 
 
 class Auth(_Strict):
-    enabled: bool | None = Field(default=None, description="Tenant authentication on the OTLP receivers.")
+    enabled: StrictBool | None = Field(default=None, description="Tenant authentication on the OTLP receivers.")
 
 
 class Metrics(_Strict):
     chart_configs_dir: str | None = None
-    interval_secs: NonNegativeInt | None = None
-    grace_period_secs: NonNegativeInt | None = None
-    expiry_duration_secs: NonNegativeInt | None = None
-    max_new_charts_per_request: NonNegativeInt | None = None
+    interval_secs: Count | None = None
+    grace_period_secs: Count | None = None
+    expiry_duration_secs: Count | None = None
+    max_new_charts_per_request: Count | None = None
 
 
 class RemoteStorage(_Strict):
-    enabled: bool | None = Field(default=None, description=(
+    enabled: StrictBool | None = Field(default=None, description=(
         "Upload SFST + catalog files to object storage (both signals)."
     ))
     uri: str | None = Field(default=None, description=(
@@ -123,7 +127,7 @@ class RemoteStorage(_Strict):
 
 class RotationEntry(_Strict):
     max_file_size: Size | None = None
-    max_entries: NonNegativeInt | None = Field(default=None, description=(
+    max_entries: Count | None = Field(default=None, description=(
         "Tiny values (e.g. 10) force multi-file splits over a small corpus."
     ))
     max_file_duration: str | None = Field(default=None, description=(
@@ -132,7 +136,7 @@ class RotationEntry(_Strict):
 
 
 class RetentionEntry(_Strict):
-    max_files: NonNegativeInt | None = None
+    max_files: Count | None = None
     max_total_size: Size | None = None
     max_age: str | None = Field(default=None, description="Measured from a file's latest data timestamp.")
     horizon: str | None = Field(default=None, description=(
@@ -141,7 +145,7 @@ class RetentionEntry(_Strict):
 
 
 class Catalog(_Strict):
-    rotation_count: NonNegativeInt | None = Field(default=None, description=(
+    rotation_count: Count | None = Field(default=None, description=(
         "Index files recorded before a catalog file rotates and uploads; small values force catalog rotation."
     ))
     rotation_period: str | None = None
@@ -153,8 +157,8 @@ class Ingest(_Strict):
 
 
 class Signal(_Strict):
-    crc_enabled: bool | None = None
-    compression_enabled: bool | None = None
+    crc_enabled: StrictBool | None = None
+    compression_enabled: StrictBool | None = None
     rotation: dict[str, RotationEntry] | None = Field(default=None, description=(
         "Per tenant; the 'default' entry applies to tenants without their own."
     ))

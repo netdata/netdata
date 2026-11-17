@@ -107,6 +107,8 @@ def build_payload(mode: str, tenant: str | None, params: dict[str, Any]) -> dict
     Raises ``ValueError`` naming every param the mode does not read."""
     set_params = {k: v for k, v in params.items() if v is not None}
     stray = sorted(set(set_params) - _MODE_PARAMS[mode])
+    if tenant is not None and mode == "info":
+        stray.append("tenant")
     if stray:
         raise ValueError(f"mode {mode!r} does not take: {', '.join(stray)}")
     if "conditions" in set_params:
@@ -139,7 +141,7 @@ def build_payload(mode: str, tenant: str | None, params: dict[str, Any]) -> dict
                 rows["columns"] = set_params["rows_columns"]
             sel["rows"] = rows
         body = {"explore": sel}
-    if tenant is not None and mode != "info":
+    if tenant is not None:
         body["tenant"] = tenant
     return body
 

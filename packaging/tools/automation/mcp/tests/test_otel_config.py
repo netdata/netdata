@@ -89,6 +89,20 @@ def test_settings_refuse_negative_counts_and_sizes():
             OtelSettings.model_validate(bad)
 
 
+def test_settings_refuse_coercible_values_of_the_wrong_type():
+    # Lax coercion would write a different valid value (true -> 1 entry per
+    # file) where the plugin would refuse the config.
+    for bad in (
+        {"traces": {"rotation": {"default": {"max_entries": True}}}},
+        {"traces": {"rotation": {"default": {"max_entries": "10"}}}},
+        {"logs": {"rotation": {"default": {"max_file_size": True}}}},
+        {"traces": {"crc_enabled": "yes"}},
+        {"auth": {"enabled": 1}},
+    ):
+        with pytest.raises(ValidationError):
+            OtelSettings.model_validate(bad)
+
+
 def test_settings_refuse_a_remote_uri_without_scheme():
     with pytest.raises(ValidationError):
         OtelSettings.model_validate({"remote_storage": {"uri": "/abs/path"}})

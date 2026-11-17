@@ -89,17 +89,31 @@ def register(mcp: FastMCP) -> None:
                 error=f"No run for {agent_id!r}. Start it with netdata_run_start.",
             )
         source: Literal["journal", "run_logs"]
+        note = ""
         if journal.journald_socket_present():
             source = "journal"
+            if not journal.usable():
+                return OtelEffectiveConfig(
+                    agent_id=agent_id, source=source,
+                    error="the agent logs to the journal, but journalctl is not usable on this host",
+                )
             # "config" also matches the environment line (user_config_dir).
             text = await journal.read_logs(
                 identifier=journal.syslog_identifier("supervisor"), pid=None, lines=500,
                 grep="config", priority=None, since=run.created_wall,
             )
-            lines = scope_to_run(text.splitlines(), str(run.run_dir / "etc"))
+            raw = text.splitlines()
+            lines = scope_to_run(raw, str(run.run_dir / "etc"))
+            # read_logs reports its own failures as bracketed lines.
+            failures = [line for line in raw if line.startswith("[")]
+            if failures:
+                note = " journalctl: " + "; ".join(failures)
         else:
             source = "run_logs"
-            lines = [line for line in run.buffer.read(0).text.splitlines() if "config" in line]
+            buffered = run.buffer.read(0)
+            lines = [line for line in buffered.text.splitlines() if "config" in line]
+            if buffered.truncated:
+                note = " The run output's oldest lines, startup included, were evicted from its buffer."
         effective = parse_effective(lines)
         if effective is not None:
             return OtelEffectiveConfig(agent_id=agent_id, source=source, effective=effective, message="ok")
@@ -107,5 +121,5 @@ def register(mcp: FastMCP) -> None:
             agent_id=agent_id, source=source,
             config_log="\n".join(lines[-_CONTEXT_LINES:]),
             error=f"no effective config logged for {agent_id!r} (state={run.state}): the plugin "
-            "refused its config or has not started yet; see config_log.",
+            f"refused its config or has not started yet; see config_log.{note}",
         )
