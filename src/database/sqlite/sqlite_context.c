@@ -438,10 +438,12 @@ void ctx_sql_queue_delete(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_
 }
 
 #define CTX_SQL_FINAL_FLUSH_WAIT_MS 3000
+#define CTX_SQL_FINAL_FLUSH_MAX_MS 10000
 
 // Executes the pending context writes, in queueing order. final = metasync's last flush at shutdown: it closes the
-// queue, and waits at most CTX_SQL_FINAL_FLUSH_WAIT_MS for another flusher, which may be stuck in SQLite after
-// outliving metasync's shutdown wait; past that, the pending writes are dropped.
+// queue, waits at most CTX_SQL_FINAL_FLUSH_WAIT_MS for another flusher, which may be stuck in SQLite after outliving
+// metasync's shutdown wait, and executes for at most CTX_SQL_FINAL_FLUSH_MAX_MS, so a slow database cannot exhaust
+// the shutdown budget; what it cannot execute is dropped.
 void ctx_sql_flush(bool final)
 {
     // netdata_mutex_t has no static initializer
@@ -474,11 +476,12 @@ void ctx_sql_flush(bool final)
     spinlock_unlock(&ctx_sql_queue.spinlock);
 
     size_t dropped = 0;
+    usec_t deadline_ut = final ? now_monotonic_usec() + CTX_SQL_FINAL_FLUSH_MAX_MS * USEC_PER_MS : 0;
     while (batch) {
         CTX_SQL_WRITE *w = batch;
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(batch, w, prev, next);
 
-        if (unlikely(!locked))
+        if (unlikely(!locked || (final && now_monotonic_usec() > deadline_ut)))
             dropped++;
         else {
             // flushers run where SQLite may run: schedule the cleanup directly, never through metasync's queue,
@@ -497,10 +500,11 @@ void ctx_sql_flush(bool final)
 
     if (locked)
         netdata_mutex_unlock(&ctx_sql_queue.flush_mutex);
-    else if (dropped)
+
+    if (unlikely(dropped))
         nd_log_daemon(NDLP_WARNING,
-                      "CONTEXT SQL: dropped %zu context writes at shutdown, another flush is still running after %d ms",
-                      dropped, CTX_SQL_FINAL_FLUSH_WAIT_MS);
+                      "CONTEXT SQL: dropped %zu context writes at shutdown (%s)", dropped,
+                      locked ? "the database was too slow to execute them in time" : "another flush is still running");
 }
 
 // returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
