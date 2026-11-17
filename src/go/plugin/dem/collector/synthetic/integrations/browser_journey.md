@@ -120,15 +120,14 @@ installed. It needs Linux on amd64 or arm64.
 
 | Netdata installation | Install the runtime with |
 |:--|:--|
-| Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. It requires a running systemd host, and stops the Agent while it installs and starts it again. |
+| Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. It requires a running systemd host, stops the Agent during installation and restores its previous service state. |
 | Static or source installation | `kickstart.sh --install-dem-runtime` during an install or update, or the installed helper: `sudo /opt/netdata/usr/libexec/netdata/netdata-dem-runtime.sh install --agent /opt/netdata/usr/sbin/netdata --allow-download` (static paths). |
 | Docker (local, rootful) | `kickstart.sh --install-dem-runtime --docker-container NAME`, run on the Docker host. |
 
-Static, source and Docker installations download the signed release named by `runtime.release_url` in
-`dem.conf`, so set it to the release URL for the host's architecture first. The installation also prepares
-the host so
-Chromium's sandbox can run (an AppArmor allowance on Ubuntu 24.04) and test-runs a journey and a
-Lighthouse audit before it is used.
+Static, source and Docker release builds default to the signed runtime matching the Agent version,
+channel and architecture. `runtime.release_url` in `dem.conf` can override that URL. Setup also prepares
+the host for Chromium's sandbox (an AppArmor allowance on Ubuntu 24.04). Installation verifies integrity
+and version compatibility. Local `runtime qualify` is optional.
 
 The [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md) covers offline installation,
 Docker requirements, updates and removal.
@@ -138,8 +137,9 @@ Docker requirements, updates and removal.
 
 A running Agent keeps the runtime it found when it started. After the first installation, restart the
 Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
-does this for you. On static, source and Docker installations, runtime updates are prepared daily
-(unless your last install or repair used `--manual-updates`) and also take effect at the next restart.
+restores the previous service state for you. Later updates replace Agent and runtime as a matching
+pair. Source/static installers coordinate that transition; Docker deployments must switch the pinned
+image and runtime selection together. There is no separate daily runtime update.
 
 To check the runtime, run as the Netdata service account:
 
@@ -767,11 +767,11 @@ Installing the runtime online, with kickstart, the helper or `--allow-download`.
 
 **Cause**
 
-`runtime.release_url` in `dem.conf` is empty.
+The build has no release identity, or `runtime.release_url` in `dem.conf` explicitly disables the default URL.
 
 **Fix**
 
-Set `runtime.release_url` to the signed release URL for the host's architecture, or install offline from a downloaded release (see the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)).
+Use a release build's default URL, configure an exact matching signed release URL, or provide signed offline inputs (see the [browser runtime host setup guide](https://github.com/netdata/netdata/blob/master/packaging/installer/DEM-RUNTIME.md)).
 
 #### offline preparation requires runtime.offline_keyring; no runtime release verification key is configured
 
