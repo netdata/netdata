@@ -256,18 +256,18 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 
 | Capability                   | Description                                                                                                                                   |
 |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
-| **Comprehensive Collection** | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• SNMP devices, NetFlow/IPFIX/sFlow, SNMP traps<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Real user monitoring and synthetic checks |
-| **Performance & Precision**  | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
-| **Edge-Based ML**            | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Scoring engine that ranks what changed in any time window     |
+| **Collection**               | • 800+ integrations<br>• Systems, containers, VMs, hardware sensors<br>• SNMP devices, NetFlow/IPFIX/sFlow, SNMP traps<br>• OpenMetrics, StatsD, and OpenTelemetry (OTLP metrics, logs and traces)<br>• Real user monitoring and synthetic checks |
+| **Resolution**               | • Per-second collection<br>• Real-time visualization with 1-second latency<br>• High-resolution metrics                                       |
+| **Machine Learning**         | • ML models trained at the edge<br>• Automatic anomaly detection per metric<br>• Scoring engine that ranks what changed in any time window     |
 | **Logs Monitoring**          | • systemd-journal, Windows Event Log and macOS unified logs queried in place<br>• No log shipping, pipelines or extra storage<br>• Rich log visualization |
 | **Logs Management**          | • OpenTelemetry logs (OTLP) and syslog, collected and stored<br>• Every field indexed, at about 1/4 of raw size<br>• Same logs explorer, next to metrics, alerts and traces |
 | **APM and Traces**           | • OpenTelemetry traces (OTLP)<br>• Per-service request rate, errors and duration<br>• Service map                                            |
-| **Observability Pipeline**   | • Parent-Child relationships<br>• Flexible centralization<br>• Multi-level replication and retention                                          |
-| **Automated Visualization**  | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
-| **Smart Alerting**           | • 1,100+ stock alerts and your own<br>• Multiple notification methods<br>• Evaluated on every Agent, without Netdata Cloud                    |
-| **AI Ready**                 | • MCP server on every Agent and Parent<br>• Any AI assistant can query metrics, logs, alerts and live views                                   |
-| **Low Maintenance**          | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
-| **Open & Extensible**        | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
+| **Streaming and Replication** | • Parent-Child relationships<br>• Flexible centralization<br>• Multi-level replication and retention                                          |
+| **Visualization**            | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
+| **Alerting**                 | • 1,100+ stock alerts and your own<br>• Multiple notification methods<br>• Evaluated on every Agent, without Netdata Cloud                    |
+| **AI and MCP**               | • MCP server on every Agent and Parent<br>• Any AI assistant can query metrics, logs, alerts and live views                                   |
+| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
+| **Extensibility**            | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
 
 ---
 
