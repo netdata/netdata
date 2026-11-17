@@ -151,6 +151,17 @@ The installation-owner upgrade matrix runs on amd64. Native ARM CI covers build/
 recovery lifecycle tests, and genuine signed-runtime installation with sandboxed browser smoke tests. The shared
 upgrade matrix is not duplicated under ARM emulation.
 
+PR checks follow the changed inputs. `dem-runtime-tests.yml` selects workflow behavior, Python packaging/native
+fixtures, Go runtime integration, installer ownership and Node wire checks separately. The installer identity
+container runs only for its helper/caller tests. Documentation changes skip execution tests; test-only changes run
+their suite without rebuilding Agent packages, images or browser bundles. Go/security checks retain their own
+repository-wide selection rules.
+
+Agent builds follow Agent build inputs. Release orchestration changes run workflow checks; changes to the runtime
+builder workflow still build and qualify both browser architectures. Scheduled and manual releases always run the
+complete companion build, wire checks, signing and public verification before Agent publication, regardless of the
+PR filters. The reusable Node workflow defaults to running its tests for release callers.
+
 ```sh
 cd src/go
 go build -trimpath -o /tmp/dem-runtime-release ./tools/dem-runtime-release

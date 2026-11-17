@@ -9,6 +9,11 @@ on:
       - '.github/workflows/prometheus-profile-tests.yml'
       - '.agents/skills/collectors-prometheus-profiles/**'
       - 'src/go/**'
+      - '!src/go/plugin/dem/**'
+      - '!src/go/cmd/demplugin/**'
+      - '!src/go/tools/dem-runtime-release/**'
+      - '!src/go/internal/browserruntimetest/**'
+      - '!src/go/internal/pgptest/**'
   pull_request: null
 
 permissions:
@@ -43,10 +48,18 @@ jobs:
             if (files.length < context.payload.pull_request.changed_files) {
               return 'true';
             }
-            const relevant = (path) =>
+            const unrelated = (path) =>
+              path.startsWith('src/go/') && (
+                path.startsWith('src/go/plugin/dem/') ||
+                path.startsWith('src/go/cmd/demplugin/') ||
+                path.startsWith('src/go/tools/dem-runtime-release/') ||
+                path.startsWith('src/go/internal/browserruntimetest/') ||
+                path.startsWith('src/go/internal/pgptest/')
+              );
+            const relevant = (path) => !unrelated(path) && (
               path === '.github/workflows/prometheus-profile-tests.yml' ||
               path.startsWith('.agents/skills/collectors-prometheus-profiles/') ||
-              path.startsWith('src/go/');
+              path.startsWith('src/go/'));
             return files.some((file) =>
               relevant(file.filename) ||
               (file.previous_filename && relevant(file.previous_filename))

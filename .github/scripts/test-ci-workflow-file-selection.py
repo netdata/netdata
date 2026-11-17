@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 
 import fnmatch
+import json
 import re
 import shlex
+import shutil
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from pathlib import Path, PurePosixPath
 
@@ -80,6 +83,42 @@ def literal_block(step: list[str], key: str) -> set[str]:
 
 
 class WorkflowFileSelectionTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('node'), 'requires Node.js')
+    def test_prometheus_selection_uses_changed_and_previous_paths(self) -> None:
+        workflow = (ROOT / '.github/workflows/prometheus-profile-tests.yml').read_text(encoding='utf-8')
+        step = workflow_step(workflow, 'Check modified files')
+        start = next(index for index, line in enumerate(step) if line.strip() == 'script: |')
+        script = textwrap.dedent('\n'.join(step[start + 1:]))
+        runner = '''
+const input = JSON.parse(require('fs').readFileSync(0, 'utf8'));
+const context = {eventName: 'pull_request', repo: {}, issue: {number: 1},
+  payload: {pull_request: {changed_files: input.count}}};
+const github = {rest: {pulls: {listFiles: {}}}, paginate: async () => input.files};
+const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
+new AsyncFunction('github', 'context', input.script)(github, context).then(console.log);
+'''
+        for files, count, expected in (
+                ([{'filename': 'src/go/plugin/dem/synthetic/runtimehost/open.go'}], 1, 'false'),
+                ([{'filename': 'src/go/plugin/dem/README.md'}], 1, 'false'),
+                ([{'filename': 'src/go/internal/pgptest/key.go'}], 1, 'false'),
+                ([{'filename': 'src/go/plugin/go.d/collector/prometheus/metadata.yaml'}], 1, 'true'),
+                ([{'filename': 'src/go/plugin/go.d/collector/prometheus/profile-proofs/app/OPERATOR-MODEL.md'}],
+                 1, 'true'),
+                ([{'filename': 'src/go/plugin/go.d/collector/prometheus/collect.go'}], 1, 'true'),
+                ([{'filename': 'src/go/go.mod'}], 1, 'true'),
+                ([{'filename': 'src/go/pkg/web/client.go'}], 1, 'true'),
+                ([{'filename': 'src/go/plugin/dem/config.go'},
+                  {'filename': 'src/go/pkg/web/client.go'}], 2, 'true'),
+                ([{'filename': 'src/go/plugin/dem/moved.go',
+                   'previous_filename': 'src/go/plugin/go.d/collector/prometheus/moved.go'}], 1, 'true'),
+                ([{'filename': 'src/go/plugin/dem/config.go'}], 2, 'true'),
+                ([{'filename': '.github/workflows/prometheus-profile-tests.yml'}], 1, 'true')):
+            with self.subTest(files=files, count=count):
+                result = subprocess.run(['node', '-e', runner], text=True, capture_output=True,
+                                        input=json.dumps({'script': script, 'files': files, 'count': count}))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.strip(), expected)
+
     def test_codeql_go_and_rust_source_selection(self) -> None:
         workflow = CODEQL_WORKFLOW.read_text(encoding="utf-8")
         cases = {
