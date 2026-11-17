@@ -411,6 +411,22 @@ extern int simple_pattern_is_potential_name(SIMPLE_PATTERN *p)
     return (alpha || wildcards) && !colon;
 }
 
+// Returns the number of entries when every entry is a plain string matched exactly: no wildcard, not negative,
+// case sensitive. Such a pattern matches a string only when it equals one of the entries (simple_pattern_iterate()
+// lists them), so callers can look them up in a hash. Returns 0 for any other pattern.
+size_t simple_pattern_exact_entries(SIMPLE_PATTERN *p) {
+    size_t entries = 0;
+
+    for(struct simple_pattern *m = (struct simple_pattern *)p; m ; m = m->next) {
+        if(m->mode != SIMPLE_PATTERN_EXACT || m->child || m->negative || !m->case_sensitive || !m->match || !*m->match)
+            return 0;
+
+        entries++;
+    }
+
+    return entries;
+}
+
 char *simple_pattern_iterate(SIMPLE_PATTERN **p)
 {
     struct simple_pattern *root = (struct simple_pattern *) *p;
