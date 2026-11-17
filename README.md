@@ -119,6 +119,7 @@ With Netdata you can monitor all these components across platforms:
 |                                       **O/S Services**<small><br/>Resources, Performance and Status</small> | Yes<small><br/>`systemd`</small> |    -    |   -   |         Yes<small><br/>`Windows Services`</small>         |
 |                                      **Processes**<small><br/>Resources, Performance, OOM, and more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                                                                             **Logs Monitoring**<small><br/>Logs queried where the OS stores them</small> | Yes<small><br/>`systemd`-journal |    -    | Yes<small><br/>unified logs</small> | Yes<small><br/>`Windows Event Log`, `ETW`</small> |
+|                **Logs Management**<small><br/>OpenTelemetry logs and syslog, collected and indexed</small> |               Yes                |    -    |  Yes  |                         -                         |
 |                                 **Network Connections**<small><br/>Live TCP and UDP sockets per PID</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |        **Network Performance Monitoring**<small><br/>SNMP devices, Topology, Traps, BGP, NetFlow/IPFIX/sFlow</small> |               Full               |  Some<small><br/>no flows</small>  | Some<small><br/>no flows</small> |  Some<small><br/>no flows</small>  |
 |                               **Containers**<small><br/>Docker/containerd, LXC/LXD, Kubernetes, etc</small> |               Yes                |    -    |   -   |                         -                         |
@@ -127,7 +128,6 @@ With Netdata you can monitor all these components across platforms:
 | **Packaged Applications**<small><br/>nginx, apache, postgres, redis, mongodb,<br/>and hundreds more</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                              **Cloud Services**<small><br/>AWS and Azure native monitoring</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
 |                       **Custom Applications**<small><br/>OpenMetrics and StatsD</small> |               Yes                |   Yes   |  Yes  |                        Yes                        |
-|                **Logs Management**<small><br/>OpenTelemetry logs and syslog, collected and indexed</small> |               Yes                |    -    |  Yes  |                         -                         |
 |                      **OpenTelemetry (OTLP)**<small><br/>Metrics, logs and traces over gRPC and HTTP</small>|               Yes                |    -    |  Yes  |                         -                         |
 
 On Linux, you can continuously monitor all kernel features and hardware sensors for errors, including Intel/AMD/Nvidia GPUs, PCI AER, RAM EDAC, IPMI, S.M.A.R.T, Intel RAPL, NVMe, fans, power supplies, and voltage readings.
