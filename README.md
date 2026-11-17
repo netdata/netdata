@@ -7,7 +7,11 @@
 </a>
 </p>
 <h3 align="center">Full-stack observability. Every metric, every second.</h3>
-<h4 align="center">Infrastructure, applications, networks and users, with AI over all of it.</h4>
+<p align="center">
+  <b>Metrics · Logs · Traces · Flows · Topology</b><br/>
+  Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI<br/>
+  OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 800+ integrations
+</p>
 
 <br />
 <p align="center">
