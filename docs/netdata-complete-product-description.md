@@ -2,21 +2,21 @@
 
 ## Executive Summary
 
-Netdata is a distributed, real-time observability platform for metrics, logs and traces. Netdata Agents collect, store and analyze data where it is generated — per second, with machine learning anomaly detection on every metric — and Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data.
+Netdata is a distributed, real-time observability platform for metrics, logs and traces. Netdata Agents collect, store and analyze data where it is generated (on each system, or at each site for network devices and flows) — per second, with machine learning anomaly detection on every metric — and Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data.
 
-Netdata covers the full stack in one product: infrastructure monitoring (systems, containers, Kubernetes, virtualization, hardware, applications and services) through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems; application performance monitoring with OpenTelemetry traces, a traces explorer with RED analysis at query time, and service maps; digital experience monitoring with RUM, synthetic journeys and Lighthouse audits; network performance monitoring (devices, topology, flows, traps, BGP, licenses, application dependencies); database monitoring for 50+ databases and managed services with live query views; logs, from in-place querying on every node to OpenTelemetry-based logs management; AWS and Azure monitoring; and Windows, macOS and edge devices.
+Netdata covers the full stack in one product: infrastructure monitoring (systems, containers, Kubernetes, virtualization, hardware, applications and services) through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems; application performance monitoring with OpenTelemetry traces, a traces explorer with RED analysis at query time, and service maps; digital experience monitoring with RUM, synthetic journeys and Lighthouse audits; network performance monitoring (zero-configuration monitoring of any SNMP device, with 1,700+ device profiles; L2/L3 topology; NetFlow, IPFIX and sFlow with enrichment; SNMP traps decoded against 150,000+ definitions; BGP; licenses; application dependencies), collected per site with no central poller; database monitoring for 50+ databases and managed services with live query views; logs, from in-place querying on every node to OpenTelemetry-based logs management; AWS and Azure monitoring; and Windows, macOS and edge devices.
 
-Everything is automatic: discovery, dashboards, 1,100+ stock alerts and anomaly detection start without configuration, and every metric is explorable without a query language. Netdata AI and MCP servers make all of it, from infrastructure to applications, available to AI for troubleshooting and root-cause analysis. Data stays on the customer's infrastructure, with Netdata Cloud available as SaaS or Enterprise On-Prem.
+Everything is automatic: discovery, dashboards, 1,100+ stock alerts and anomaly detection start without configuration, and every metric is explorable without a query language. Netdata AI and MCP servers make all of it, from infrastructure and networks to applications, available to AI for troubleshooting and root-cause analysis. Data stays on the customer's infrastructure, with Netdata Cloud available as SaaS or Enterprise On-Prem.
 
 ## Platform Architecture
 
-Netdata is a distributed observability platform. Netdata Agents collect, store and analyze data on the systems where it is generated; Netdata Parents centralize data from many Agents; Netdata Cloud (SaaS or On-Prem) provides a unified view, access control and collaboration without storing metrics, logs or traces. The design keeps per-second data, machine learning and alerting at the edge, and scales by adding Agents and Parents instead of growing a central database.
+Netdata is a distributed observability platform. Netdata Agents collect, store and analyze data on the systems where it is generated and, for network devices and flows, at each site; Netdata Parents centralize data from many Agents; Netdata Cloud (SaaS or On-Prem) provides a unified view, access control and collaboration without storing metrics, logs, traces or flows. The design keeps per-second data, machine learning and alerting at the edge, and scales by adding Agents and Parents instead of growing a central database.
 
 **Learn more:** [Architecture and scalability](/docs/scalability.md) · [Distributed observability pipeline on netdata.cloud](https://www.netdata.cloud/features/architecture/distributed-observability-data-pipeline/)
 
 **Design**
 
-- **[Netdata Agent](/docs/deployment-guides/standalone-deployment.md).** One process per system: collects metrics (per second for system metrics), receives OpenTelemetry metrics, logs and traces, RUM beacons and synthetic checks, stores metrics in a local multi-tier time-series database and logs and traces in indexed stores, trains machine learning models per metric, evaluates alerts, serves dashboards, Functions and an MCP server, and streams to Parents.
+- **[Netdata Agent](/docs/deployment-guides/standalone-deployment.md).** One process per system: collects metrics (per second for system metrics), polls network devices over SNMP and receives flows (NetFlow, IPFIX, sFlow), SNMP traps and syslog, receives OpenTelemetry metrics, logs and traces, RUM beacons and synthetic checks, stores metrics in a local multi-tier time-series database and logs and traces in indexed stores, trains machine learning models per metric, evaluates alerts, serves dashboards, Functions and an MCP server, and streams to Parents.
 - **[Netdata Parents](/docs/deployment-guides/deployment-with-centralization-points.md).** Agents that receive streams from other Agents (Children), storing their metrics, running machine learning and alerting on their behalf, and serving their dashboards and queries. Parents form active-active clusters; Children stream to one Parent at a time and fail over to others automatically.
 - **[Netdata Cloud](/docs/netdata-cloud/README.md).** The control plane: fleet-wide dashboards, Rooms, users and roles, alert notifications, AI features, Functions routing, and the traces explorer, digital experience, network monitor and uptime views. Netdata Cloud receives metadata and status changes, not metric samples; dashboards query Agents and Parents in real time. Available as SaaS or Enterprise On-Prem (including air-gapped).
 - **Distributed queries.** Netdata Cloud fans queries out to the Agents and Parents holding the data and merges the results, so fleet-wide views do not require centralizing the data.
@@ -60,23 +60,23 @@ Netdata is a distributed observability platform. Netdata Agents collect, store a
 
 **Value**
 
-- **No central bottleneck.** Collection, storage, machine learning and alerting run where the data is; adding systems adds capacity instead of loading a central database.
+- **No central bottleneck.** Collection, storage, machine learning and alerting run where the data is; adding systems adds capacity instead of loading a central database, and network collection has no central poller to outgrow.
 - **Per-second data kept affordably.** Compression of about 0.6 bytes per sample and tiered retention keep per-second detail and long-term history on modest storage.
 - **Resilient by design.** Parent clusters, automatic failover and replication keep monitoring available through Parent failures and network outages.
-- **Data stays on the customer's infrastructure.** Metric samples, logs, traces and query text are stored on Agents and Parents; Netdata Cloud receives only metadata, with an On-Prem option for full control.
+- **Data stays on the customer's infrastructure.** Metric samples, logs, traces, flow records and query text are stored on Agents and Parents; Netdata Cloud receives only metadata, with an On-Prem option for full control.
 - **Operated from the UI.** Collectors, alerts and virtual nodes are configured centrally, with secrets kept in the customer's vaults.
 - **Predictable scaling.** Published sizing for Parents and Agents makes capacity planning straightforward up to 100,000+ nodes.
 
 ## Infrastructure Monitoring
 
-Netdata monitors the full infrastructure stack — operating systems, processes, containers, Kubernetes, virtualization, hardware, applications and services — through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems. Every collected metric is visualized automatically and analyzed by machine learning anomaly detection, at per-second resolution for system metrics, and the entire infrastructure is available to AI assistants for troubleshooting. Each monitored system runs a Netdata Agent that collects locally; Netdata Parents and Netdata Cloud combine the fleet into one view.
+Netdata monitors the full infrastructure stack — operating systems, processes, containers, Kubernetes, virtualization, hardware, applications and services — through 800+ integrations and the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems. Every collected metric is visualized automatically and analyzed by machine learning anomaly detection, at per-second resolution for system metrics, and the entire infrastructure is available to AI assistants for troubleshooting. Each monitored system runs a Netdata Agent that collects locally; Netdata Parents and Netdata Cloud combine the fleet into one view. Network infrastructure is covered in Network Performance Monitoring.
 
 **Learn more:** [Collecting metrics documentation](/src/collectors/README.md) · [Infrastructure monitoring on netdata.cloud](https://www.netdata.cloud/solutions/use-cases/infrastructure-monitoring/)
 
 **Design**
 
 - **[Every metric visualized and analyzed automatically](/docs/dashboards-and-charts/netdata-charts.md).** Metrics from native collectors, Prometheus exporters, OpenTelemetry sources, Nagios plugins and StatsD clients are charted, grouped by their labels and analyzed by machine learning the moment they are collected — no dashboard design, no per-chart queries, no query language. Native collectors and profiles add full structure (contexts, instances, dimensions, families) declaratively.
-- **[Machine learning on every metric](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md), [AI over everything](/docs/netdata-ai/mcp/README.md).** Every metric gets unsupervised anomaly detection trained locally on its own behavior, with anomaly rates shown on every chart and used to find anomalous and correlated metrics across the infrastructure. Through Netdata's MCP server and Netdata AI, AI assistants query metrics, anomalies, correlations, alerts and live Functions (processes, containers, connections, logs) to investigate and explain issues.
+- **[Machine learning on every metric](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md), [AI over everything](/docs/netdata-ai/mcp/README.md).** Every metric gets unsupervised anomaly detection trained locally on its own behavior, with anomaly rates shown on every chart and used to find anomalous and correlated metrics across the infrastructure. Through Netdata's MCP server and Netdata AI, AI assistants query metrics, anomalies, correlations, alerts and live Functions (processes, containers, connections, logs, network topology, flows, traps) to investigate and explain issues.
 - **[Local collection on every system](/docs/realtime-monitoring.md).** The Netdata Agent collects from the kernel, processes, containers, hardware and local applications on the system it runs on, at one-second resolution by default for system metrics; remote and API-based targets are collected as frequently as needed.
 - **[Automatic discovery](/src/collectors/SERVICE-DISCOVERY.md).** Service discovery finds local applications (listening ports and processes), Docker containers and Kubernetes workloads, and starts the matching collectors; 650+ known Prometheus exporter ports are recognized automatically.
 - **[Structured metrics, automatic dashboards](/docs/NIDL-Framework.md).** Collectors organize metrics into contexts, instances, dimensions and labels (the NIDL model), so every chart can be sliced, filtered and grouped from the dashboard without query languages or dashboard building.
@@ -127,7 +127,7 @@ Netdata monitors the full infrastructure stack — operating systems, processes,
 - **Process supervisors and DevOps:** Supervisord, Monit, Puppet; Jenkins, GitLab Runner and others through Prometheus
 - **[AI serving](/src/go/plugin/go.d/collector/prometheus/integrations/vllm.md):** vLLM and LiteLLM through Prometheus profiles
 - **Other:** Go expvar, OpenSIPS
-- Databases, network devices, cloud services and OpenTelemetry: see their sections
+- Databases, network (devices, topology, flows, traps, BGP), cloud services and OpenTelemetry: see their sections
 
 **Endpoint checks**
 - [HTTP endpoints](/src/go/plugin/go.d/collector/httpcheck/integrations/http_endpoints.md) (`httpcheck`), TCP/UDP ports (`portcheck`), ICMP (`ping`), DNS queries (`dnsquery`), TLS certificate expiry (`x509check`), domain expiry (`whoisquery`), files and directories (`filecheck`), S3-compatible storage (`s3check`)
@@ -145,6 +145,7 @@ Netdata monitors the full infrastructure stack — operating systems, processes,
 - System: `processes`, `containers-vms`, `systemd-services`, `systemd-list-units`, `mount-points`, `block-devices`, `network-interfaces`, `network-connections`, `network-protocols`, `dns-queries`, `topology:network-connections`
 - Hardware: `sensors`, `ipmi-sensors`, `redfish:sensors`, `redfish:hardware`, `redfish:logs`, `smbios-memory-inventory`
 - Containers, storage, virtualization: `docker:container-ls`, `ceph:osds`, `ceph:pools`, `vsphere:readiness`, `topology:vsphere`
+- Network: `snmp:interfaces`, `snmp:bgp-peers`, `snmp:licenses`, `snmp:traps`, `flows:netflow`, `topology:snmp` (see Network Performance Monitoring)
 - Netdata itself: `netdata-streaming`, `topology:streaming`, `netdata-api-calls`, `netdata-metrics-cardinality`, `config`
 - Logs, databases, network and OpenTelemetry Functions: see their sections
 
@@ -263,18 +264,18 @@ Netdata monitors digital experience: Real User Monitoring (RUM) measures what re
 
 ## Network Performance Monitoring
 
-Netdata provides network performance monitoring covering network devices (SNMP), topology (SNMP L2/L3, application dependencies, vSphere, Cato Networks), traffic flows (NetFlow, IPFIX, sFlow), SNMP traps, BGP, network licenses and network device syslog, correlated with the servers, containers and applications Netdata monitors. Any SNMP device is monitored with zero configuration: devices are identified by vendor from the complete IANA registry (65,000+ vendors), 1,700+ device models from 100+ vendors have dedicated profiles, and all other devices are monitored through standard MIBs. SNMP traps are decoded against 150,000+ trap definitions from 800+ vendors and 6,000+ MIBs. Device profiles are open, declarative and documented, and can be extended without code.
+Netdata provides network performance monitoring covering network devices (SNMP), topology (SNMP L2/L3, application dependencies, vSphere, Cato Networks), traffic flows (NetFlow, IPFIX, sFlow), SNMP traps, BGP, network licenses and network device syslog, correlated with the servers, containers and applications Netdata monitors. Any SNMP device is monitored with zero configuration: devices are identified by vendor from the complete IANA registry (65,000+ vendors), 1,700+ device models from 100+ vendors have dedicated profiles, and all other devices are monitored through standard MIBs. SNMP traps are decoded against 150,000+ trap definitions from 800+ vendors and 6,000+ MIBs. Device profiles are open, declarative and documented, and can be extended without code. Collection is distributed, one Netdata Agent per site with no central poller, and every device becomes a node with its own dashboards, alerts and machine learning anomaly detection.
 
 **Learn more:** [Network performance monitoring documentation](/docs/npm/README.md) · [Network monitoring on netdata.cloud](https://www.netdata.cloud/solutions/use-cases/network-monitoring/)
 
 **Design**
 
-- **[Distributed collection that scales](/docs/npm/device-metrics/sizing-and-scaling.md).** Netdata Agents collect network data where it is produced: one Agent per site polls devices, receives flows, traps and syslog; every Agent on a server maps that server's connections. There is no central poller to outgrow: adding Agents adds capacity, so polling stays on schedule at any network size and as frequently as needed, down to every second where devices support it and it is useful.
-- **Read-only.** Netdata only reads from network devices (SNMP GET/WALK); it never changes device configuration.
+- **[Distributed collection that scales](/docs/npm/device-metrics/sizing-and-scaling.md).** Netdata Agents collect network data where it is produced: one Agent per site polls devices, receives flows, traps and syslog; every Agent on a server maps that server's connections. There is no central poller to outgrow: adding Agents adds capacity, so polling stays on schedule at any network size and as frequently as needed, down to every second where the device supports it.
+- **Safe for production devices.** Collection is read-only (SNMP GET/WALK); Netdata never changes device configuration.
 - **Every device is a node.** Each SNMP device, Cato site or vSphere object appears as its own (virtual) node, with its own dashboards, alerts and anomaly detection — the same as a server.
 - **[One topology model](/docs/npm/topology/README.md).** All topology sources (SNMP L2/L3, application dependencies, Netdata streaming, vSphere, Cato Networks) are published through the same topology schema and explored in the same topology view.
 - **Standards first.** SNMP v1/v2c/v3, NetFlow/IPFIX/sFlow, BMP, OTLP. Syslog from network devices enters through Netdata's OpenTelemetry logs pipeline (see Logs Management); traps can be forwarded over OTLP to any OpenTelemetry-compatible destination (e.g., SIEM).
-- **Network Monitor.** Netdata Cloud brings devices, topology, flows and trap events together on one page.
+- **Network Monitor.** One Netdata Cloud workspace for network operations: device inventory and health, L2/L3 topology, traffic flows and trap events together, on the same timeline as servers and applications.
 
 **Capabilities**
 
@@ -293,7 +294,7 @@ Netdata provides network performance monitoring covering network devices (SNMP),
 - Vendor alert packs: FortiGate (HA, SD-WAN, IPS, link monitor, wireless), Cisco Nexus (vPC, HSRP, BFD, NTP)
 - [SNMP diagnostics](/docs/npm/device-metrics/collect-snmp-troubleshooting-data.md) included in support bundles
 
-**[Network discovery](/src/go/plugin/go.d/discovery/sdext/discoverer/snmpsd/integrations/snmp.md)** — SNMP service discovery (`snmp` discoverer), for dynamic networks, labs and staging; run continuously, on a schedule, or not at all
+**[Network discovery](/src/go/plugin/go.d/discovery/sdext/discoverer/snmpsd/integrations/snmp.md)** — SNMP service discovery (`snmp` discoverer) finds and onboards devices across production networks of any size, including dynamic environments; it runs continuously, on a schedule, or not at all
 - Scans configured subnets in parallel, with SNMP v1/v2c/v3 credentials per subnet
 - Identifies each responding device (system name, description, location, contact, vendor, model, category)
 - Creates a monitoring job for every discovered device from customizable rules (e.g., per vendor, category or subnet); devices become nodes automatically
@@ -376,6 +377,7 @@ Netdata provides network performance monitoring covering network devices (SNMP),
 
 **Value**
 
+- **One network monitoring product instead of several.** Device polling, L2/L3 topology, flow analysis, trap management, BGP, license monitoring and syslog in one product, replacing separate network management, flow-analyzer, trap-receiver and network-mapping tools.
 - **Zero-configuration device onboarding.** Device recognition, vendor identification and profile selection are automatic; devices report without OID lists, templates or per-device setup, and network discovery adds new devices automatically in dynamic networks.
 - **Coverage with autonomy.** 1,700+ device models have dedicated profiles and every other SNMP device is monitored through standard MIBs; customers can extend profiles themselves, and Netdata adds missing device profiles for customers as required.
 - **Collection that scales with the network.** Collection is distributed across Netdata Agents with no central poller; polling stays on schedule at any network size, as frequently as needed, down to every second, and each Agent processes 50,000–100,000 flow records per second.
@@ -769,7 +771,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 
 ## Machine Learning and AI
 
-Netdata applies unsupervised machine learning to every metric it collects, on the Agents and Parents that hold the data, and makes everything it observes — metrics, anomalies, alerts, logs, traces, database queries and live Functions, from infrastructure to applications — available to AI: Netdata AI in Netdata Cloud (conversations, troubleshooting investigations, reports, alert automation) and Netdata's MCP servers for any AI assistant.
+Netdata applies unsupervised machine learning to every metric it collects, on the Agents and Parents that hold the data, and makes everything it observes — metrics, anomalies, alerts, logs, traces, database queries, network topology, flows and traps, and live Functions, from infrastructure and networks to applications — available to AI: Netdata AI in Netdata Cloud (conversations, troubleshooting investigations, reports, alert automation) and Netdata's MCP servers for any AI assistant.
 
 **Learn more:** [Machine learning and AI documentation](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md) · [AI-powered observability on netdata.cloud](https://www.netdata.cloud/features/aiml/aiops/)
 
@@ -805,7 +807,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 - **Agent and Parent MCP server:** Streamable HTTP (`/mcp`), SSE (`/sse`) and WebSocket transports; `nd-mcp` bridge for stdio-only clients
 - **Netdata Cloud MCP server:** fleet-wide access through Netdata Cloud (Streamable HTTP, API token with MCP scope)
 - **Tools:** `list_metrics`, `get_metrics_details`, `list_nodes`, `get_nodes_details`, `list_functions`, `execute_function`, `query_metrics`, `find_correlated_metrics`, `find_anomalous_metrics`, `find_unstable_metrics`, `list_raised_alerts`, `list_running_alerts`, `list_alert_transitions`
-- Live Functions through MCP: processes, containers, connections, logs, traces, database queries and more
+- Live Functions through MCP: processes, containers, connections, logs, traces, database queries, network topology, flows, SNMP traps, BGP peers, interfaces, licenses and more
 - [Documented clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md): Claude Desktop, Claude Code, Cursor, VS Code, JetBrains IDEs, OpenAI Codex CLI, Gemini CLI, Crush, OpenCode, and AI DevOps copilots in general
 - Security: MCP API key (Bearer), access-control lists (`allow mcp from`), permissions following the user's Netdata Cloud role; sensitive Functions require the corresponding permission
 - AI skills published in the Netdata repository for querying Agents and Netdata Cloud
@@ -835,7 +837,7 @@ Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,10
 **Capabilities**
 
 **Alerts**
-- 1,179 stock alert definitions across 142 configuration files, covering systems, containers, applications, databases, network devices, cloud services, web experience (Core Web Vitals), synthetic journeys and Netdata itself
+- 1,179 stock alert definitions across 142 configuration files, covering systems, containers, applications, databases, network devices, BGP sessions, network licenses, SNMP traps, cloud services, web experience (Core Web Vitals), synthetic journeys and Netdata itself
 - [Alert expressions](/src/health/REFERENCE.md): lookups over any time window (average, min, max, sum, percentiles and more), anomaly-rate lookups, calculations, warning and critical conditions with hysteresis, delays and repeat intervals, per-alert evaluation interval
 - Label-based targeting (host labels, chart labels) and templates applied to all matching instances
 - Alert states CLEAR, WARNING, CRITICAL (plus UNDEFINED, UNINITIALIZED, REMOVED); alert transitions history
@@ -862,7 +864,7 @@ Netdata evaluates alerts on every Agent and Parent, close to the data, with 1,10
 
 ## Dashboards and Visualization
 
-Netdata dashboards are generated automatically from the collected metrics and organized by technology, with every chart interactive through the NIDL model (nodes, instances, dimensions, labels) — no query language and no dashboard building required. Netdata Cloud adds fleet-wide views, custom dashboards, logs, traces, topology, live Functions and AI.
+Netdata dashboards are generated automatically from the collected metrics and organized by technology, with every chart interactive through the NIDL model (nodes, instances, dimensions, labels) — no query language and no dashboard building required. Netdata Cloud adds fleet-wide views, custom dashboards, logs, traces, Network Monitor (devices, topology, flows, traps), live Functions and AI.
 
 **Learn more:** [Dashboards and charts documentation](/docs/dashboards-and-charts/README.md) · [The Netdata UI on netdata.cloud](https://www.netdata.cloud/product/netdata-ui/)
 
@@ -881,7 +883,7 @@ Netdata dashboards are generated automatically from the collected metrics and or
 - [Chart annotations](/docs/dashboards-and-charts/chart-annotations.md) (Netdata Cloud)
 
 **Netdata Cloud views**
-- [Home](/docs/dashboards-and-charts/home-tab.md) (room overview), [Nodes](/docs/dashboards-and-charts/nodes-tab.md) and **Nodes Map** (devices grouped and colored by labels and metrics, node notes, geographic location), Kubernetes Explorer, Alerts, Anomalies (Anomaly Advisor), Events feed (alert transitions, node state changes and environment events, for attributing changes in time), Logs, Traces, Live (Functions), Top (live top-style tables from Functions — processes, containers, services, queries), Topology, Network Monitor, Digital Experience (RUM and synthetics), Insights (AI), **Uptime** (fleet-wide availability built from every state metric — endpoint checks, services, devices, synthetic journeys — with reliability figures, a severity timeline, per-check and per-node drill-down, curated views and configurable severity semantics)
+- [Home](/docs/dashboards-and-charts/home-tab.md) (room overview), [Nodes](/docs/dashboards-and-charts/nodes-tab.md) and **Nodes Map** (devices grouped and colored by labels and metrics, node notes, geographic location), Kubernetes Explorer, Alerts, Anomalies (Anomaly Advisor), Events feed (alert transitions, node state changes and environment events, for attributing changes in time), Logs, Traces, Live (Functions), Top (live top-style tables from Functions — processes, containers, services, queries), Topology, Network Monitor, Network Flows (Sankey, maps, globe, top talkers), Digital Experience (RUM and synthetics), Insights (AI), **Uptime** (fleet-wide availability built from every state metric — endpoint checks, services, devices, synthetic journeys — with reliability figures, a severity timeline, per-check and per-node drill-down, curated views and configurable severity semantics)
 - Single-node views: [alerts](/docs/dashboards-and-charts/alerts-tab.md), [anomalies](/docs/dashboards-and-charts/anomaly-advisor-tab.md), [events](/docs/dashboards-and-charts/events-feed.md), logs, top, traces
 - **[Custom dashboards](/docs/dashboards-and-charts/dashboards-tab.md):** drag-and-drop charts and cards (text, state timeline, alert count, raised alerts, map, uptime), templates and presets, import and export, sharing within the Space
 - **TV Mode** (token-authenticated wallboard URLs) and **Playlists**
@@ -940,13 +942,13 @@ Netdata organizes infrastructure and people in Netdata Cloud: Spaces isolate org
 
 ## Security and Privacy
 
-Netdata keeps monitoring data on the customer's infrastructure: metric samples, logs, traces and query text are stored on Netdata Agents and Parents, while Netdata Cloud receives metadata and status changes over an encrypted, outbound-only connection. Access is controlled through roles, sensitive-data permissions, single sign-on and Agent-level access controls.
+Netdata keeps monitoring data on the customer's infrastructure: metric samples, logs, traces, flow records and query text are stored on Netdata Agents and Parents, while Netdata Cloud receives metadata and status changes over an encrypted, outbound-only connection. Access is controlled through roles, sensitive-data permissions, single sign-on and Agent-level access controls.
 
 **Learn more:** [Security and privacy design](/docs/security-and-privacy-design/README.md) · [Netdata for CISOs on netdata.cloud](https://www.netdata.cloud/solutions/built-for/cisos/)
 
 **Design**
 
-- **[Data stays at the edge](/docs/security-and-privacy-design/netdata-cloud-security.md).** Metric samples, logs, traces and database query text are stored on Agents and Parents, and logs and traces can also be offloaded to the customer's own object storage, when configured; Netdata Cloud stores metadata (nodes, charts, alerts, users) and queries the data in real time when users view it.
+- **[Data stays at the edge](/docs/security-and-privacy-design/netdata-cloud-security.md).** Metric samples, logs, traces, flow records and database query text are stored on Agents and Parents, and logs and traces can also be offloaded to the customer's own object storage, when configured; Netdata Cloud stores metadata (nodes, charts, alerts, users) and queries the data in real time when users view it.
 - **[Outbound-only Cloud connection](/src/aclk/README.md).** Agents connect to Netdata Cloud over TLS-encrypted WebSockets (MQTT); no inbound ports are required. Proxy support (including SOCKS5).
 - **Sensitive data gated by permission.** Logs, query text, processes and connections are available only to signed-in Space members whose role grants permission to view sensitive data.
 - **[On-Prem for full control](https://www.netdata.cloud/product/cloud-on-premises/).** Enterprise On-Prem runs the complete Netdata Cloud on customer infrastructure, including air-gapped environments.
@@ -1096,21 +1098,22 @@ Netdata Cloud availability: at least 99.5% monthly availability during the subsc
 2. **[Machine learning on every metric](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).** 18 unsupervised models per metric, trained locally on every Agent and Parent, with consensus scoring and the anomaly flag stored with every sample. Not ML on a sample of metrics, not ML as an add-on.
 3. **[Automatic everything](/src/collectors/SERVICE-DISCOVERY.md).** Discovery, collection, structured dashboards and 1,100+ stock alerts start without configuration; metrics from any source are charted and analyzed the moment they arrive.
 4. **[Query-less analysis](/docs/NIDL-Framework.md).** The NIDL model makes every chart explorable by node, instance, dimension and label from dropdowns — no query language required for anyone on the team.
-5. **[Distributed by design](/docs/scalability.md).** Collection, storage, machine learning and alerting run on Agents and Parents; Netdata Cloud queries them in real time. No central database to scale, no cardinality limits imposed by a central store.
-6. **[Data stays on the customer's infrastructure](/docs/security-and-privacy-design/README.md).** Metric samples, logs, traces and query text are stored on Agents and Parents; Netdata Cloud receives metadata only. Enterprise On-Prem removes the external dependency entirely.
+5. **[Distributed by design](/docs/scalability.md).** Collection, storage, machine learning and alerting run on Agents and Parents; Netdata Cloud queries them in real time. No central database to scale, no central network poller to outgrow, no cardinality limits imposed by a central store.
+6. **[Data stays on the customer's infrastructure](/docs/security-and-privacy-design/README.md).** Metric samples, logs, traces, flow records and query text are stored on Agents and Parents; Netdata Cloud receives metadata only. Enterprise On-Prem removes the external dependency entirely.
 7. **[Live inspection without SSH](/docs/top-monitoring-netdata-functions.md).** Functions return processes, containers, connections, services, sensors, logs, database queries and topology live from any node, to the dashboard and to AI assistants.
 8. **[One platform from infrastructure to applications and users](/src/collectors/COLLECTORS.md).** Infrastructure, Kubernetes, databases, network, cloud services, logs, application traces (APM), real-user and synthetic monitoring, endpoints and edge devices in one product, one data model and one UI.
 9. **Open ecosystems.** Prometheus, OpenTelemetry, Nagios and StatsD sources work as they are; OpenTelemetry is the native pipeline for logs and traces.
 10. **[Trace analysis without pre-defined metrics](/docs/opentelemetry/trace-storage-and-retention.md).** Rate, errors and duration are computed at query time from stored spans, for any combination of attributes, without cardinality limits.
+11. **[Zero-configuration network monitoring at any scale](/docs/npm/README.md).** Any SNMP device is recognized and monitored automatically (1,700+ device profiles, standard MIBs for the rest), with L2/L3 topology, enriched flows, 150,000+ decoded trap definitions, BGP and licenses; collection is distributed per site, and every device is a node with machine learning anomaly detection.
 
 ### By category
 
 | Compared with | Netdata difference |
 |---|---|
 | **[Prometheus and Grafana](https://www.netdata.cloud/comparisons/prometheus/)** | Collection, storage, dashboards, alerting and ML in one product with zero configuration; metrics charted automatically instead of panel-by-panel with PromQL; Netdata benchmark (2025, 4.6M metrics/s): 37% less CPU, 88% less RAM, 97% less disk I/O, 13% less bandwidth, 15× longer per-second retention (up to 40× in lower tiers), 22× faster on large queries, 100% sample completeness vs 93.7% |
-| **[Datadog](https://www.netdata.cloud/comparisons/datadog/), New Relic, Dynatrace and other SaaS** | Per-second resolution instead of 10–60 s; ML on every metric; data stored on customer infrastructure; per-node pricing without per-metric, per-host-add-on or ingestion charges for metrics; open-source Agent; infrastructure, APM (OpenTelemetry traces, query-time RED analysis, service maps), logs, RUM and synthetics in one product |
+| **[Datadog](https://www.netdata.cloud/comparisons/datadog/), New Relic, Dynatrace and other SaaS** | Per-second resolution instead of 10–60 s; ML on every metric; data stored on customer infrastructure; per-node pricing without per-metric, per-host-add-on or ingestion charges for metrics; open-source Agent; infrastructure, APM (OpenTelemetry traces, query-time RED analysis, service maps), network (devices, topology, flows, traps), logs, RUM and synthetics in one product |
 | **[Elasticsearch](https://www.netdata.cloud/comparisons/elk/), Loki, Splunk (logs)** | Logs queried in place on every node without shipping; Logs Management with field-level indexing at about 1/4 of raw size (Loki: ~1/4 with label-only indexing; systemd-journal: ~1×; Elasticsearch: ≥2.5×); OpenTelemetry-native pipeline |
-| **[SolarWinds](https://www.netdata.cloud/solarwinds-npm-alternative/), PRTG, LibreNMS, Datadog NDM (network)** | Distributed collection with no central poller to outgrow; read-only; 1,700+ device models and 150,000+ trap definitions; L2/L3 topology, flows, BGP, licensing and application dependency mapping in one product, next to servers and applications |
+| **[SolarWinds](https://www.netdata.cloud/solarwinds-npm-alternative/), PRTG, LibreNMS, Datadog NDM (network)** | Zero-configuration onboarding of any SNMP device (1,700+ device models, 150,000+ trap definitions); machine learning anomaly detection on every device metric; polling down to every second; distributed collection with no central poller to outgrow; never changes device configuration; L2/L3 topology, enriched flows, BGP, licensing and application dependency mapping in one product, next to servers and applications |
 | **pganalyze, Percona PMM, Datadog DBM (databases)** | 50+ databases and managed services in one tool; per-object metrics; top-query views on 12 engines; query text never stored outside the customer's infrastructure |
 | **Traditional monitoring ([Nagios](https://www.netdata.cloud/comparisons/nagios/), Zabbix, Checkmk)** | Automatic discovery and dashboards instead of templates; per-second data; ML anomaly detection; existing Nagios plugins keep working |
 
@@ -1142,9 +1145,9 @@ Netdata's standard figures, used consistently across Netdata materials:
 
 - [Infrastructure and Kubernetes monitoring](https://www.netdata.cloud/solutions/use-cases/infrastructure-monitoring/) with per-second resolution and automatic dashboards
 - Application performance monitoring with OpenTelemetry traces, query-time RED analysis and service maps
-- Replacing Prometheus/Grafana stacks or SaaS observability platforms (infrastructure, APM, logs, RUM) to reduce cost and operational effort
+- Replacing Prometheus/Grafana stacks, SaaS observability platforms or standalone network monitoring tools (infrastructure, APM, network, logs, RUM) to reduce cost and operational effort
 - Digital experience monitoring: real-user Core Web Vitals, synthetic Playwright journeys and Lighthouse audits
-- [Network performance monitoring](https://www.netdata.cloud/solutions/use-cases/network-monitoring/): devices, topology, flows, traps, BGP
+- [Network performance monitoring](https://www.netdata.cloud/solutions/use-cases/network-monitoring/) replacing standalone network management, flow and trap tools: zero-configuration devices, L2/L3 topology, enriched flows, traps, BGP and licenses, distributed with no central poller
 - Logs monitoring and management across the fleet
 - [Database monitoring](https://www.netdata.cloud/solutions/use-cases/database-monitoring/) across many engines without a DBA per engine
 - [Hybrid and multi-cloud monitoring](https://www.netdata.cloud/solutions/use-cases/hybrid-cloud-observability/) (AWS, Azure, on-premises)
@@ -1214,7 +1217,7 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 - Try AI troubleshooting
 - Send OpenTelemetry traces and logs to the Agent's OTLP endpoint
 - Add RUM to a site or create a synthetic journey
-- Add network devices (SNMP auto-discovery)
+- Add network devices (SNMP auto-discovery), point flow exporters (NetFlow, IPFIX, sFlow) and SNMP traps at an Agent, and open Network Monitor
 
 ### Enterprise Deployment
 
@@ -1225,6 +1228,7 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 1. **Design Topology** (1 day)
    - Decide Parent placement (one cluster per ~500 nodes)
    - Position by geography/provider
+   - Place a collection Agent per site or network segment for SNMP polling, flows, traps and syslog
    - Teams organize later via Rooms
 
 2. **Deploy Everywhere** (1 day)
@@ -1234,7 +1238,8 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 
 3. **Add Collector Credentials** (2 hours)
    - UI shows discovered services needing auth
-   - Configure databases, cloud accounts, SNMP
+   - Configure databases, cloud accounts, SNMP credentials or discovery subnets
+   - Point NetFlow, IPFIX and sFlow exporters and SNMP traps at the site Agent
    - Enable custom app collectors
    - Point OpenTelemetry SDKs and Collectors at Agents or Parents; add RUM sites and synthetic journeys
 
@@ -1251,9 +1256,9 @@ Installation guides: [Linux and macOS](/packaging/installer/methods/kickstart.md
 
 ## Mission
 
-Netdata's mission is to reveal and surface the pulse and breath of systems and applications, making their health visible and actionable without requiring deep expertise.
+Netdata's mission is to reveal and surface the pulse and breath of systems, networks and applications, making their health visible and actionable without requiring deep expertise.
 
-Netdata is focused on making observability simple and affordable for every team that builds and runs systems and applications: observability should work for its users, not the other way around. Netdata removes the work that makes monitoring hard — choosing and integrating tools, configuring collection, building dashboards, writing alerts, tuning thresholds, scaling central databases — so that teams get complete, real-time visibility and fast answers from the moment they install it, at a cost that lets them monitor everything instead of choosing what to leave out.
+Netdata is focused on making observability simple and affordable for every team that builds and runs systems, networks and applications: observability should work for its users, not the other way around. Netdata removes the work that makes monitoring hard — choosing and integrating tools, configuring collection, building dashboards, writing alerts, tuning thresholds, scaling central databases — so that teams get complete, real-time visibility and fast answers from the moment they install it, at a cost that lets them monitor everything instead of choosing what to leave out.
 
 The roadmap follows this mission: broader coverage that works without configuration, deeper automation through machine learning and AI, and open standards that let teams bring the tools and instrumentation they already use.
 
@@ -1272,14 +1277,17 @@ Through Netdata's OpenTelemetry logs pipeline: the OpenTelemetry Collector's [sy
 The OpenTelemetry Collector stage of the pipeline routes copies of logs to any destination, including SIEMs; SNMP traps can also be [exported over OTLP](/docs/npm/snmp-traps/forwarding-to-siem.md).
 
 **Does Netdata poll network devices every second?**
-Collection intervals are [configurable per device](/docs/npm/device-metrics/configuration.md). Netdata's distributed collection keeps polling on schedule at any network size, as frequently as needed, down to every second where devices support it and it is useful.
+Collection intervals are [configurable per device](/docs/npm/device-metrics/configuration.md). Netdata's distributed collection keeps polling on schedule at any network size, as frequently as needed, down to every second where the device supports it.
+
+**How does Netdata scale network monitoring without a central poller?**
+One Netdata Agent per site or network segment polls the devices and receives the flows, traps and syslog of that site. Adding Agents adds capacity, each Agent processes 50,000–100,000 flow records and about 50,000 traps per second, and Netdata Cloud combines all sites into one Network Monitor view. See [sizing and scaling](/docs/npm/device-metrics/sizing-and-scaling.md).
 
 **How does Netdata relate to SASE platforms?**
 SASE platforms sit in the traffic path and enforce policy; Netdata stays out of the path and measures what happens on systems and networks, providing an independent view. Netdata also monitors [Cato Networks](/src/go/plugin/go.d/collector/cato_networks/integrations/cato_networks.md) SASE sites, devices and BGP through the Cato API.
 
 ## Summary
 
-Netdata makes observability simple and affordable for every team that builds and runs systems and applications. One distributed platform collects everything — from servers and Kubernetes to applications, network devices, databases, cloud services, logs, application traces, edge devices, and real-user and synthetic browser monitoring — at per-second resolution for system metrics, analyzes every metric with machine learning, and turns it into dashboards, alerts and AI-assisted answers automatically.
+Netdata makes observability simple and affordable for every team that builds and runs systems, networks and applications. One distributed platform collects everything — from servers and Kubernetes to applications, networks (devices, topology and traffic flows), databases, cloud services, logs, application traces, edge devices, and real-user and synthetic browser monitoring — at per-second resolution for system metrics, analyzes every metric with machine learning, and turns it into dashboards, alerts and AI-assisted answers automatically.
 
 - **Complete:** infrastructure, APM, digital experience, network, databases, logs and cloud; [800+ integrations](/src/collectors/COLLECTORS.md) plus the Prometheus, OpenTelemetry, Nagios and StatsD ecosystems, in one data model and one UI
 - **Real-time:** per-second collection, visualization, anomaly detection and alerting
@@ -1309,4 +1317,4 @@ Netdata makes observability simple and affordable for every team that builds and
 
 ---
 
-*This product description is based on Netdata source code, official documentation and publicly available information as of October 2026.*
+*This product description is based on Netdata source code, official documentation and publicly available information as of November 2026.*
