@@ -18,6 +18,6 @@ func nativeProtectedPath(string) error                             { return errN
 func nativeProtectedFile(*os.Root, string, bool) error             { return errNativePlatform }
 func nativeProofDirectory(NativeConfig, nativeControlRecord) error { return errNativePlatform }
 func createNativeControl(NativeConfig, int, int) error             { return errNativePlatform }
-func readNativePayload(string) (Paths, Manifest, error) {
+func readNativePayload(NativeConfig) (Paths, Manifest, error) {
 	return Paths{}, Manifest{}, errNativePlatform
 }

@@ -18,6 +18,8 @@ var ErrNativeClosed = errors.New("native browser runtime admission is closed; re
 type NativeConfig struct {
 	ControlPath string
 	PayloadPath string
+	// Agent is the installation target used by package hooks, not execution.
+	Agent *AgentRelease
 }
 
 // DefaultNativeConfig is package wiring, not a per-consumer configuration knob.
@@ -167,8 +169,8 @@ func (n *Native) Sweep() error {
 	return err
 }
 
-// NativeConsumer holds one process or qualification claim for a fixed package
-// target. Qualification retains this handle across all checks and their gaps.
+// NativeConsumer holds one process or validation claim for a fixed package
+// target. Optional diagnostics retain this handle across all checks and gaps.
 type NativeConsumer struct {
 	native   *Native
 	manifest Manifest
@@ -180,17 +182,23 @@ type NativeConsumer struct {
 }
 
 func (n *Native) AcquireSelected() (*NativeConsumer, error) {
-	return n.acquire(nativeReady, nil)
+	return n.acquire(nativeReady, nil, nil)
+}
+
+// AcquireSelectedPair verifies completed package admission against the installed
+// Agent. Package owners use it after a transaction; execution uses AcquireSelected.
+func (n *Native) AcquireSelectedPair() (*NativeConsumer, error) {
+	return n.acquire(nativeReady, nil, n.config.Agent)
 }
 
 func (n *Native) AcquireCandidate(target Manifest) (*NativeConsumer, error) {
 	if err := target.Validate(); err != nil {
 		return nil, err
 	}
-	return n.acquire(nativeQualifying, &target)
+	return n.acquire(nativeQualifying, &target, n.config.Agent)
 }
 
-func (n *Native) acquire(phase nativePhase, expected *Manifest) (consumer *NativeConsumer, result error) {
+func (n *Native) acquire(phase nativePhase, expected *Manifest, agent *AgentRelease) (consumer *NativeConsumer, result error) {
 	gate, err := lockNativeGate(context.Background(), n.config, false)
 	if err != nil {
 		return nil, err
@@ -212,9 +220,11 @@ func (n *Native) acquire(phase nativePhase, expected *Manifest) (consumer *Nativ
 		return nil, ErrNativeClosed
 	}
 	if expected != nil && !sameManifest(*state.Target, *expected) {
-		return nil, errors.New("native qualification target differs from the root gate")
+		return nil, errors.New("native validation target differs from the root gate")
 	}
-	paths, m, err := readNativePayload(n.config.PayloadPath)
+	payloadConfig := n.config
+	payloadConfig.Agent = agent
+	paths, m, err := readNativePayload(payloadConfig)
 	if err != nil {
 		return nil, err
 	}

@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 )
 
@@ -47,9 +49,34 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Mode:                  Mode(DefaultMode),
+		ReleaseURL:            defaultReleaseURL(AgentRelease(), runtime.GOARCH),
 		MaxBytes:              browserruntime.DefaultMaxBytes,
 		PreviousRetentionDays: int(browserruntime.DefaultPreviousRetention / day),
 	}
+}
+
+// AgentRelease is the canonical build identity, independent of display/native
+// package version encodings. Unstamped developer builds have no public default.
+func AgentRelease() browserruntime.AgentRelease {
+	return browserruntime.AgentRelease{
+		Version: buildinfo.ReleaseVersion,
+		Channel: buildinfo.ReleaseChannel,
+		Source:  buildinfo.ReleaseRef,
+	}
+}
+
+func defaultReleaseURL(agent browserruntime.AgentRelease, arch string) string {
+	if agent.Validate() != nil || (arch != "amd64" && arch != "arm64") {
+		return ""
+	}
+	return "https://artifacts.netdata.cloud/dem-runtime/" + agent.Channel + "/" + agent.Version + "/" + arch + "/release.json"
+}
+
+// NativeConfig uses the same exact pair requirement as managed and preload modes.
+func NativeConfig() browserruntime.NativeConfig {
+	config := browserruntime.DefaultNativeConfig()
+	config.Agent = new(AgentRelease())
+	return config
 }
 
 func (c Config) Validate() error {
@@ -125,6 +152,9 @@ func (c Config) ReleaseLoader(
 		if !release.Release().Manifest.MatchesHost() {
 			return browserruntime.VerifiedRelease{}, errors.New("runtime release does not match this architecture")
 		}
+		if err := release.Release().ValidateForAgent(AgentRelease()); err != nil {
+			return browserruntime.VerifiedRelease{}, err
+		}
 		return release, nil
 	}
 }
@@ -148,5 +178,6 @@ func (c Config) StoreConfig(varLibPath string) (browserruntime.Config, error) {
 		Path:              path,
 		MaxBytes:          c.MaxBytes,
 		PreviousRetention: time.Duration(c.PreviousRetentionDays) * day,
+		Agent:             new(AgentRelease()),
 	}, nil
 }

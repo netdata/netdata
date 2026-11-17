@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
@@ -55,28 +56,34 @@ func jsonText(t *testing.T, value string) string {
 	return string(data)
 }
 
-const runtimeFlagUsage = `  -allow-download
-    	explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates
+var runtimeFlagUsage = strings.ReplaceAll(`  -allow-download
+    \texplicitly download canonical keys, signed metadata and runtime bytes; install/repair permits paired downloads unless --manual-updates
   -archive string
-    	offline archive checked against the trusted release descriptor
+    \toffline archive checked against the trusted release descriptor
   -cache string
-    	managed installation directory
+    \tmanaged installation directory
   -cancel-on-stdin-close
-    	cancel ensure cooperatively when its private stdin control channel closes
+    \tcancel ensure cooperatively when its private stdin control channel closes
   -config-dir string
-    	directory containing administrator dem.conf
+    \tdirectory containing administrator dem.conf
   -expected-root string
-    	require this canonical managed root before ensure mutates storage
+    \trequire this canonical managed root before ensure mutates storage
+  -keyring string
+    \texplicit retained public keyring for offline fetch/prepare
   -manual-updates
-    	disable automatic daily update preparation (install/repair); activation always requires restart
+    \trequire explicit runtime acquisition during Agent updates (install/repair)
+  -output string
+    \tnew installer-owned directory for authenticated inputs (fetch only)
+  -prepared-only
+    \tcancel only a pending preparation (rollback only); otherwise do nothing
   -release string
-    	local signed release descriptor; otherwise use configured latest URL
+    \tlocal signed release descriptor; otherwise use this Agent's configured release URL
   -root string
-    	preload final root (must be new or empty; never move it)
-`
+    \tpreload final root (must be new or empty; never move it)
+`, `\t`, "\t")
 
 func TestRuntimeCommandHelpAndFlagErrors(t *testing.T) {
-	for _, command := range []string{"ensure", "install", "update", "repair", "uninstall", "preload", "status", "qualify"} {
+	for _, command := range []string{"ensure", "install", "fetch", "prepare", "activate", "rollback", "repair", "uninstall", "preload", "status", "qualify"} {
 		t.Run(command, func(t *testing.T) {
 			usage := "Usage of runtime " + command + ":\n" + runtimeFlagUsage
 			result := runtimeRun(t, context.Background(), "runtime", command, "-h")
@@ -111,7 +118,7 @@ func TestRuntimeCommandArgumentErrors(t *testing.T) {
 		args    []string
 		message string
 	}{
-		"no command":                {[]string{"runtime"}, "usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]"},
+		"no command":                {[]string{"runtime"}, "usage: dem.plugin runtime {ensure|install|update|fetch|prepare|activate|rollback|repair|uninstall|preload|status|qualify|setup-plan} [flags]"},
 		"unknown command":           {[]string{"runtime", "import"}, `unknown runtime command "import"`},
 		"unknown native command":    {[]string{"runtime", "native-bogus", "--x"}, `unknown internal native runtime command "native-bogus"`},
 		"native arguments":          {[]string{"runtime", "native-inspect", "stray"}, "internal native runtime commands accept no flags or positional arguments"},
@@ -123,13 +130,13 @@ func TestRuntimeCommandArgumentErrors(t *testing.T) {
 		"cancel without channel":    {[]string{"runtime", "ensure", "--cancel-on-stdin-close", "--config-dir", "relative"}, "--cancel-on-stdin-close requires a private stdin control channel"},
 		"config dir relative":       {[]string{"runtime", "status", "--config-dir", "relative", "--allow-download"}, "--config-dir must be absolute"},
 		"release relative":          {[]string{"runtime", "install", "--release", "relative"}, "--release must be absolute"},
-		"no source":                 {[]string{"runtime", "update"}, "provide either --archive or --allow-download for ensure/install/update/repair/preload"},
-		"two sources":               {[]string{"runtime", "preload", "--release", "/r", "--archive", "/a", "--allow-download"}, "provide either --archive or --allow-download for ensure/install/update/repair/preload"},
+		"no source":                 {[]string{"runtime", "install"}, "provide either --archive or --allow-download for ensure/install/fetch/prepare/repair/preload"},
+		"two sources":               {[]string{"runtime", "preload", "--release", "/r", "--archive", "/a", "--allow-download"}, "provide either --archive or --allow-download for ensure/install/fetch/prepare/repair/preload"},
 		"archive without release":   {[]string{"runtime", "repair", "--archive", "relative"}, "offline archive requires an absolute --release path"},
-		"source for status":         {[]string{"runtime", "status", "--release", "/r", "--manual-updates"}, "--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload"},
-		"source for uninstall":      {[]string{"runtime", "uninstall", "--archive", "/a"}, "--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload"},
-		"source for qualify":        {[]string{"runtime", "qualify", "--allow-download"}, "--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload"},
-		"manual updates for update": {[]string{"runtime", "update", "--manual-updates", "--allow-download", "--root", "/p"}, "--manual-updates is only valid for install/repair; update preserves the installed policy"},
+		"source for status":         {[]string{"runtime", "status", "--release", "/r", "--manual-updates"}, "--release, --archive and --allow-download are only valid for ensure/install/fetch/prepare/repair/preload"},
+		"source for uninstall":      {[]string{"runtime", "uninstall", "--archive", "/a"}, "--release, --archive and --allow-download are only valid for ensure/install/fetch/prepare/repair/preload"},
+		"source for qualify":        {[]string{"runtime", "qualify", "--allow-download"}, "--release, --archive and --allow-download are only valid for ensure/install/fetch/prepare/repair/preload"},
+		"manual updates for update": {[]string{"runtime", "update", "--manual-updates", "--allow-download", "--root", "/p"}, runtimeUpdateGuidance},
 		"archive relative":          {[]string{"runtime", "install", "--release", "/r", "--archive", "relative", "--root", "/p"}, "--archive must be absolute"},
 		"preload without root":      {[]string{"runtime", "preload", "--allow-download"}, "preload requires an absolute --root final directory"},
 		"preload relative root":     {[]string{"runtime", "preload", "--allow-download", "--root", "relative", "--cache", "/c"}, "preload requires an absolute --root final directory"},
@@ -355,7 +362,7 @@ func TestRuntimeDispatchAndBadArguments(t *testing.T) {
 }
 
 func TestRuntimeMissingReleaseNeverPreparesCandidate(t *testing.T) {
-	for _, command := range []string{"install", "update", "repair", "preload"} {
+	for _, command := range []string{"install", "repair", "preload"} {
 		t.Run(command, func(t *testing.T) {
 			root := t.TempDir()
 			cache := filepath.Join(root, "cache")
@@ -419,7 +426,7 @@ func TestRuntimePreloadedCommandsRequirePreparedBundle(t *testing.T) {
 		assert.Equal(t, "unavailable", report.State)
 		require.Nil(t, report.Qualification)
 	}
-	for _, command := range []string{"install", "update", "repair", "uninstall"} {
+	for _, command := range []string{"install", "repair", "uninstall"} {
 		args := []string{"runtime", command, "--config-dir", dir}
 		if command != "uninstall" {
 			args = append(args, "--archive", "/unused", "--release", "/unused.json")
@@ -452,10 +459,10 @@ func TestRuntimeRepairRequiresTrustedExplicitInput(t *testing.T) {
 }
 
 func TestRuntimeManualUpdatesOnlyChangesInstallAndRepairPolicy(t *testing.T) {
-	for _, command := range []string{"update", "preload", "status", "qualify", "uninstall"} {
+	for _, command := range []string{"preload", "status", "qualify", "uninstall"} {
 		t.Run(command, func(t *testing.T) {
 			args := []string{"runtime", command, "--manual-updates"}
-			if command == "update" || command == "preload" {
+			if command == "preload" {
 				args = append(args, "--release", "/release.json", "--archive", "/archive.tar.zst")
 			}
 			_, err := runtimeCommand(t, args...)
@@ -470,7 +477,8 @@ func TestReleaseOperationMapsOnlyInstallCommands(t *testing.T) {
 		wantErr   bool
 	}{
 		"install":          {operation: browserruntime.InstallRelease},
-		"update":           {operation: browserruntime.UpdateRelease},
+		"update":           {wantErr: true},
+		"prepare":          {operation: browserruntime.PrepareRelease},
 		"repair":           {operation: browserruntime.RepairRelease},
 		"ensure":           {wantErr: true},
 		"preload":          {wantErr: true},
@@ -488,4 +496,22 @@ func TestReleaseOperationMapsOnlyInstallCommands(t *testing.T) {
 			assert.Equal(t, tc.operation, operation)
 		})
 	}
+}
+
+func TestRuntimeUpdateOnlyDirectsInstallationOwner(t *testing.T) {
+	config := t.TempDir()
+	cache := filepath.Join(config, "runtime")
+	require.NoError(t, os.WriteFile(filepath.Join(config, "dem.conf"), []byte("invalid: ["), 0600))
+	for _, flags := range [][]string{nil, {"--config-dir", config, "--cache", cache, "--allow-download"},
+		{"--release", "/missing/release", "--archive", "/missing/archive"}} {
+		result := runtimeRun(t, context.Background(), append([]string{"runtime", "update"}, flags...)...)
+		require.EqualError(t, result.err, runtimeUpdateGuidance)
+		require.Empty(t, result.stdout)
+		require.Empty(t, result.stderr)
+		require.NoDirExists(t, cache)
+	}
+	result := runtimeRun(t, context.Background(), "runtime", "update", "--help")
+	require.NoError(t, result.err)
+	require.Equal(t, runtimeUpdateGuidance+"\n", result.stderr)
+	require.Empty(t, result.stdout)
 }

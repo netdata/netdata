@@ -93,10 +93,8 @@ func Open(opts Options) (*Process, error) {
 		return nil, fmt.Errorf("initializing DEM browser execution: %w", err)
 	}
 	var browserActivation func(map[string]any) ([]collectorapi.ActivationDependency, error)
-	var updater *runtimehost.Updater
 	if browserRuntime.Host != nil {
 		browserActivation = browserRuntime.Host.Dependencies
-		updater = browserRuntime.Host.NewUpdater(executor, cfg.Runtime.ReleaseLoader("", true))
 	}
 	components := New(Dependencies{
 		GeoIPPaths:        opts.GeoIPPaths,
@@ -109,9 +107,6 @@ func Open(opts Options) (*Process, error) {
 	services := []composition.ProcessService{components.Retention}
 	if browserRuntime.Host != nil {
 		services = append(services, browserRuntime.Host)
-	}
-	if updater != nil {
-		services = append(services, updater)
 	}
 	return &Process{
 		Components: components,

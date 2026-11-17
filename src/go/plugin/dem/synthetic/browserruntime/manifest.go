@@ -80,16 +80,31 @@ func (m Manifest) Identity() synthetic.RuntimeIdentity {
 	}
 }
 
+// ErrIncompatible identifies a healthy runtime that this Agent cannot execute.
+// Its lifecycle records remain readable; recovery must not treat it as damage.
+var ErrIncompatible = errors.New("runtime is incompatible with this Agent")
+
+// Validate requires both readable metadata and this Agent's execution contract.
 func (m Manifest) Validate() error {
-	if m.Format != 1 || m.Version == "" || !supportedPlatform(m.Platform) || !validID(m.Archive.SHA256) {
-		return errors.New("invalid runtime identity or platform")
+	if err := m.ValidateMetadata(); err != nil {
+		return err
 	}
 	if m.Contract != synthetic.ExecutionContract {
 		return fmt.Errorf(
-			"unsupported runtime execution contract %d (Agent supports %d); upgrade the Agent or select a compatible runtime release",
+			"%w: unsupported runtime execution contract %d (Agent supports %d); install a matching Agent/runtime pair",
+			ErrIncompatible,
 			m.Contract,
 			synthetic.ExecutionContract,
 		)
+	}
+	return nil
+}
+
+// ValidateMetadata checks persisted or authenticated metadata independently of
+// execution eligibility, so upgrades can inspect and retire another contract.
+func (m Manifest) ValidateMetadata() error {
+	if m.Format != 1 || m.Contract <= 0 || m.Version == "" || !supportedPlatform(m.Platform) || !validID(m.Archive.SHA256) {
+		return errors.New("invalid runtime identity or platform")
 	}
 	a := m.Archive
 	if a.Bytes <= 0 || a.TarBytes <= 0 || a.ExpandedBytes <= 0 || a.ExpandedBytes > a.TarBytes || a.Entries <= 0 ||

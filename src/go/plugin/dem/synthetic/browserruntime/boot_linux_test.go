@@ -40,7 +40,7 @@ func TestKernelBootProvenance(t *testing.T) {
 		ID:       "11111111-1111-1111-1111-111111111111",
 		Verified: true,
 	}
-	use, err := s.beginUse(m)
+	use, err := s.beginUse(m, nil)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	*now = now.Add(100 * 24 * time.Hour)
@@ -54,6 +54,6 @@ func TestKernelBootProvenance(t *testing.T) {
 	require.NoError(t, s.Sweep())
 	*now = now.Add(8 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err = s.beginUse(m)
+	_, err = s.beginUse(m, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
 }

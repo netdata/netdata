@@ -123,7 +123,7 @@ func nativeServiceEnvironment(identity nativeIdentity, parent []string) []string
 		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
 		"LC_ALL=C",
 	}
-	// Qualification uses loopback content and the build-time nd-run path. Keep
+	// Validation reads package files and service proof. Keep
 	// only local temp/cache/runtime-directory policy; no loader, Node, proxy,
 	// credentials, browser-argument or executable-path injection is inherited.
 	for _, entry := range parent {
@@ -156,15 +156,14 @@ func nativeCredentialCommand(ctx context.Context, executable string, args []stri
 	}
 	command.Env = nativeServiceEnvironment(identity, os.Environ())
 	command.Dir = "/"
-	// A killed qualifier can leave descendants holding stdio. Bound pipe joins
-	// without treating that timeout as process-tree completion or releasing proof.
+	// Bound pipe joins if the service child is interrupted.
 	command.WaitDelay = 5 * time.Second
 	return command
 }
 
 func (c *nativeChild) run(ctx context.Context, verb string, input []byte) ([]byte, error) {
 	switch verb {
-	case "native-initialize", "native-inspect", "native-qualify":
+	case "native-initialize", "native-inspect", "native-validate", "native-status":
 	default:
 		return nil, errors.New("invalid native service child operation")
 	}

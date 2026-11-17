@@ -22,7 +22,7 @@ import (
 func TestNativeRuntimeRoleRouting(t *testing.T) {
 	commands := []string{"native-prepare", "native-configure"}
 	if os.Geteuid() == 0 {
-		commands = []string{"native-initialize", "native-inspect", "native-qualify"}
+		commands = []string{"native-initialize", "native-inspect", "native-validate"}
 	}
 	for _, command := range commands {
 		var output bytes.Buffer

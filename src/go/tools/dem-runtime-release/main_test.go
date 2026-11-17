@@ -77,8 +77,12 @@ func newFixture(t *testing.T, arch string) fixture {
 			"https://example.invalid/runtime.tar.zst",
 			"--sources-url",
 			"https://example.invalid/sources.tar.zst",
-			"--sequence",
-			"17",
+			"--agent-version",
+			m.Version,
+			"--agent-channel",
+			"nightly",
+			"--agent-source",
+			strings.Repeat("a", 40),
 			"--output",
 			filepath.Join(dir, "release.json"),
 		},
@@ -125,7 +129,15 @@ func TestSignVerifyBothArchitectures(t *testing.T) {
 			expected := f.manifest
 			expected.Archive.URL = "https://example.invalid/runtime.tar.zst"
 			assert.Equal(t, expected, release.Manifest)
-			assert.Equal(t, uint64(17), release.Sequence)
+			assert.Equal(t, 2, release.Format)
+			assert.Zero(t, release.Sequence)
+			require.NotNil(t, release.Agent)
+			assert.Equal(t, browserruntime.AgentRelease{
+				Version: f.manifest.Version,
+				Channel: "nightly",
+				Source:  strings.Repeat("a", 40),
+			}, *release.Agent)
+			require.NoError(t, release.ValidateForAgent(*release.Agent))
 			var envelope struct {
 				Payload   []byte `json:"payload"`
 				Signature []byte `json:"signature"`
@@ -151,9 +163,14 @@ func TestSignVerifyBothArchitectures(t *testing.T) {
 }
 
 func TestSignRejectsInvalidInputs(t *testing.T) {
-	for _, kind := range []string{"digest", "size", "unknown", "trailing", "oversize", "url", "sequence", "key", "empty-sources"} {
+	for _, kind := range []string{"digest", "size", "unknown", "trailing", "oversize", "url", "legacy-sequence", "agent-version", "agent-channel", "agent-source", "missing-agent-version", "missing-agent-channel", "missing-agent-source", "key", "empty-sources"} {
 		t.Run(kind, func(t *testing.T) {
-			f := newSigningFixture(t, "amd64")
+			// Every case must fail before GPG execution, so use a local public keyring
+			// without requiring a signing process or host GPG installation.
+			f := newFixture(t, "amd64")
+			publicKey := filepath.Join(f.dir, "public.gpg")
+			require.NoError(t, os.WriteFile(publicKey, pgptest.Public(t, pgptest.Key(t, 11)), 0600))
+			f.args = append(f.args, "--key", strings.Repeat("a", 40), "--public-key", publicKey)
 			switch kind {
 			case "digest":
 				require.NoError(
@@ -182,15 +199,40 @@ func TestSignRejectsInvalidInputs(t *testing.T) {
 				require.NoError(t, os.WriteFile(p, data, 0600))
 			case "url":
 				f.args = append(f.args, "--archive-url", "http://example.invalid/archive")
-			case "sequence":
-				f.args = append(f.args, "--sequence", "0")
+			case "legacy-sequence":
+				f.args = append(f.args, "--sequence", "17")
+			case "agent-version":
+				f.args = append(f.args, "--agent-version", "another-version")
+			case "agent-channel":
+				f.args = append(f.args, "--agent-channel", "edge")
+			case "agent-source":
+				f.args = append(f.args, "--agent-source", "master")
+			case "missing-agent-version", "missing-agent-channel", "missing-agent-source":
+				f.args = append(f.args, "--"+strings.TrimPrefix(kind, "missing-"), "")
 			case "key":
 				f.args = append(f.args, "--key", "PRIVATE CONTENT MUST NOT APPEAR IN ERROR")
 			case "empty-sources":
 				require.NoError(t, os.WriteFile(filepath.Join(f.dir, "sources"), nil, 0600))
 			}
+			want := map[string]string{
+				"digest":                "artifact SHA256 or byte count",
+				"size":                  "artifact SHA256 or byte count",
+				"unknown":               "unknown field",
+				"trailing":              "trailing content",
+				"oversize":              "exceeds release protocol size limit",
+				"url":                   "runtime download requires",
+				"legacy-sequence":       "flag provided but not defined",
+				"agent-version":         "manifest version differs",
+				"agent-channel":         "channel must be",
+				"agent-source":          "source must be",
+				"missing-agent-version": "sign requires",
+				"missing-agent-channel": "sign requires",
+				"missing-agent-source":  "sign requires",
+				"key":                   "full GPG signing fingerprint",
+				"empty-sources":         "invalid runtime release source archive",
+			}[kind]
 			err := run(f.args, io.Discard)
-			require.Error(t, err)
+			require.ErrorContains(t, err, want)
 			assert.NotContains(t, err.Error(), "PRIVATE CONTENT")
 			_, err = os.Stat(filepath.Join(f.dir, "release.json"))
 			assert.ErrorIs(t, err, os.ErrNotExist)
@@ -325,4 +367,28 @@ func gpgFixture(t *testing.T) (string, []byte) {
 	public, err := exec.Command("gpg", "--batch", "--export", fingerprint).Output()
 	require.NoError(t, err)
 	return fingerprint, public
+}
+
+func TestVerifyAcceptsLegacyDescriptorForRecovery(t *testing.T) {
+	f := newFixture(t, "amd64")
+	key := pgptest.Key(t, 11)
+	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "public.gpg"), pgptest.Public(t, key), 0600))
+	manifest := f.manifest
+	manifest.Archive.URL = "https://example.invalid/runtime.tar.zst"
+	hash, size, err := hashFile(filepath.Join(f.dir, "sources"))
+	require.NoError(t, err)
+	release := browserruntime.Release{
+		Format:   1,
+		Sequence: 17,
+		Manifest: manifest,
+		Sources: browserruntime.ReleaseSource{
+			URL:    "https://example.invalid/sources.tar.zst",
+			SHA256: hash,
+			Bytes:  size,
+		},
+	}
+	data, err := pgptest.Release(release, key)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(f.dir, "release.json"), data, 0600))
+	require.NoError(t, run(f.verifyArgs(), io.Discard))
 }

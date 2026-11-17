@@ -30,18 +30,20 @@ import (
 func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdout, stderr io.Writer) error {
 	if len(args) == 0 {
 		return errors.New(
-			"usage: dem.plugin runtime {ensure|install|update|repair|uninstall|preload|status|qualify|setup-plan} [flags]",
+			"usage: dem.plugin runtime {ensure|install|update|fetch|prepare|activate|rollback|repair|uninstall|preload|status|qualify|setup-plan} [flags]",
 		)
 	}
 	command, flags := args[0], args[1:]
 	switch {
 	case command == "setup-plan":
 		return runSetupPlan(flags, stdout, stderr)
+	case command == "pair-plan":
+		return runPairPlan(flags, stdout, stderr)
 	case strings.HasPrefix(command, "native-"):
 		return runNativeCommand(ctx, command, flags, stdout, stderr)
 	}
 	switch command {
-	case "ensure", "install", "update", "repair", "uninstall", "preload", "status", "qualify":
+	case "ensure", "install", "update", "fetch", "prepare", "activate", "rollback", "repair", "uninstall", "preload", "preload-validate", "status", "qualify":
 		return runAdminCommand(ctx, command, flags, input, stdout, stderr)
 	default:
 		return fmt.Errorf("unknown runtime command %q", command)
@@ -63,6 +65,9 @@ func runAdminCommand(
 	}
 	if err != nil {
 		return err
+	}
+	if command == "update" {
+		return errors.New(runtimeUpdateGuidance)
 	}
 	if err := f.validateEnsureOnly(command); err != nil {
 		return err
@@ -90,6 +95,9 @@ func runAdminCommand(
 		return err
 	}
 	cfg := config.Runtime
+	if f.keyring != "" {
+		cfg.OfflineKeyring = f.keyring
+	}
 	if f.cache != "" {
 		cfg.CachePath = f.cache
 	}
@@ -105,7 +113,19 @@ func runAdminCommand(
 	}
 	// preload always prepares a fresh root through managed storage, whatever the
 	// configured mode.
-	if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
+	if command == "fetch" {
+		var verified browserruntime.VerifiedRelease
+		verified, err = cfg.ReleaseLoader(f.release, f.allowDownload)(ctx)
+		if err == nil {
+			var inputs browserruntime.ReleaseInputs
+			inputs, err = verified.SaveInputs(ctx, runtimehost.AgentRelease(), f.output, f.archive)
+			if err == nil {
+				report.Inputs = &inputs
+				report.State = "inputs-verified"
+				report.Notice = "Authenticated runtime inputs retained. Selection is unchanged; the installation owner controls preparation and activation."
+			}
+		}
+	} else if (cfg.Mode == runtimehost.ModePreloaded || cfg.Mode == runtimehost.ModeNative) && command != "preload" {
 		err = runFixedRuntimeCommand(ctx, command, cfg, &report)
 	} else {
 		err = runManagedCommand(ctx, command, cfg, f, &report, stderr)
@@ -123,12 +143,20 @@ type adminFlags struct {
 	root               string
 	archive            string
 	allowDownload      bool
+	output             string
+	keyring            string
+	preparedOnly       bool
 }
+
+const runtimeUpdateGuidance = "Runtime updates belong to the Agent installation owner. Update or reinstall the Agent through its installer, package manager or deployment workflow to acquire its matching runtime; runtime update does not change runtime storage."
 
 func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlags, error) {
 	var f adminFlags
 	flags := flag.NewFlagSet("runtime "+command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
+	if command == "update" {
+		flags.Usage = func() { fmt.Fprintln(stderr, runtimeUpdateGuidance) }
+	}
 	flags.StringVar(&f.configDir, "config-dir", "", "directory containing administrator dem.conf")
 	flags.StringVar(
 		&f.expectedRoot,
@@ -142,21 +170,24 @@ func parseAdminFlags(command string, args []string, stderr io.Writer) (adminFlag
 		false,
 		"cancel ensure cooperatively when its private stdin control channel closes",
 	)
-	flags.StringVar(&f.release, "release", "", "local signed release descriptor; otherwise use configured latest URL")
+	flags.StringVar(&f.release, "release", "", "local signed release descriptor; otherwise use this Agent's configured release URL")
 	flags.BoolVar(
 		&f.manualUpdates,
 		"manual-updates",
 		false,
-		"disable automatic daily update preparation (install/repair); activation always requires restart",
+		"require explicit runtime acquisition during Agent updates (install/repair)",
 	)
 	flags.StringVar(&f.cache, "cache", "", "managed installation directory")
 	flags.StringVar(&f.root, "root", "", "preload final root (must be new or empty; never move it)")
 	flags.StringVar(&f.archive, "archive", "", "offline archive checked against the trusted release descriptor")
+	flags.StringVar(&f.output, "output", "", "new installer-owned directory for authenticated inputs (fetch only)")
+	flags.StringVar(&f.keyring, "keyring", "", "explicit retained public keyring for offline fetch/prepare")
+	flags.BoolVar(&f.preparedOnly, "prepared-only", false, "cancel only a pending preparation (rollback only); otherwise do nothing")
 	flags.BoolVar(
 		&f.allowDownload,
 		"allow-download",
 		false,
-		"explicitly download canonical package-signing keys, signed release metadata and runtime bytes; install/repair enables automatic preparation unless --manual-updates",
+		"explicitly download canonical keys, signed metadata and runtime bytes; install/repair permits paired downloads unless --manual-updates",
 	)
 	if err := flags.Parse(args); err != nil {
 		return f, err
@@ -180,27 +211,40 @@ func (f adminFlags) validateEnsureOnly(command string) error {
 }
 
 func (f adminFlags) validate(command string) error {
+	if f.preparedOnly && command != "rollback" {
+		return errors.New("--prepared-only is only valid for rollback")
+	}
 	if command == "ensure" && os.Geteuid() == 0 {
 		return errors.New("runtime ensure must run as the nonroot DEM service account")
 	}
 	if f.configDir != "" && !filepath.IsAbs(f.configDir) {
 		return errors.New("--config-dir must be absolute")
 	}
+	if f.keyring != "" && (!filepath.IsAbs(f.keyring) || f.allowDownload || (command != "fetch" && command != "prepare")) {
+		return errors.New("--keyring requires an absolute path and offline fetch/prepare")
+	}
 	if preparesCandidate(command) {
 		if f.release != "" && !filepath.IsAbs(f.release) {
 			return errors.New("--release must be absolute")
 		}
 		if (f.archive != "") == f.allowDownload {
-			return errors.New("provide either --archive or --allow-download for ensure/install/update/repair/preload")
+			return errors.New("provide either --archive or --allow-download for ensure/install/fetch/prepare/repair/preload")
 		}
 		if f.archive != "" && f.release == "" {
 			return errors.New("offline archive requires an absolute --release path")
 		}
 	} else if f.release != "" || f.archive != "" || f.allowDownload {
-		return errors.New("--release, --archive and --allow-download are only valid for ensure/install/update/repair/preload")
+		return errors.New("--release, --archive and --allow-download are only valid for ensure/install/fetch/prepare/repair/preload")
+	}
+	if command == "fetch" {
+		if !filepath.IsAbs(f.output) || f.cache != "" {
+			return errors.New("fetch requires an absolute new --output directory and does not use --cache")
+		}
+	} else if f.output != "" {
+		return errors.New("--output is only valid for fetch")
 	}
 	if f.manualUpdates && command != "install" && command != "repair" {
-		return errors.New("--manual-updates is only valid for install/repair; update preserves the installed policy")
+		return errors.New("--manual-updates is only valid for install/repair")
 	}
 	if f.archive != "" && !filepath.IsAbs(f.archive) {
 		return errors.New("--archive must be absolute")
@@ -218,35 +262,36 @@ func (f adminFlags) validate(command string) error {
 	return nil
 }
 
-// preparesCandidate reports whether the command acquires and qualifies a release.
+// preparesCandidate reports whether the command acquires and verifies a release.
 func preparesCandidate(command string) bool {
 	switch command {
-	case "ensure", "install", "update", "repair", "preload":
+	case "ensure", "install", "fetch", "prepare", "repair", "preload":
 		return true
 	}
 	return false
 }
 
 type runtimeCommandReport struct {
-	Outcome         string                       `json:"outcome,omitempty"`
-	DownloadAllowed bool                         `json:"download_allowed"`
-	Command         string                       `json:"command"`
-	Mode            runtimehost.Mode             `json:"mode"`
-	State           string                       `json:"state"`
-	ReleasePath     string                       `json:"release_path,omitempty"`
-	CachePath       string                       `json:"cache_path,omitempty"`
-	Generation      string                       `json:"generation,omitempty"`
-	Runtime         *synthetic.RuntimeIdentity   `json:"runtime,omitempty"`
-	Candidate       *synthetic.RuntimeIdentity   `json:"candidate,omitempty"`
-	CandidateState  string                       `json:"candidate_state,omitempty"`
-	SetupError      string                       `json:"setup_error,omitempty"`
-	Storage         *browserruntime.Status       `json:"storage,omitempty"`
-	StorageError    string                       `json:"storage_error,omitempty"`
-	Native          *browserruntime.NativeStatus `json:"native,omitempty"`
-	Qualification   *runner.Qualification        `json:"qualification,omitempty"`
-	PreloadedConfig map[string]any               `json:"preloaded_config,omitempty"`
-	PreloadPath     string                       `json:"preload_path,omitempty"`
-	Notice          string                       `json:"notice,omitempty"`
+	Outcome         string                        `json:"outcome,omitempty"`
+	DownloadAllowed bool                          `json:"download_allowed"`
+	Command         string                        `json:"command"`
+	Mode            runtimehost.Mode              `json:"mode"`
+	State           string                        `json:"state"`
+	ReleasePath     string                        `json:"release_path,omitempty"`
+	CachePath       string                        `json:"cache_path,omitempty"`
+	Generation      string                        `json:"generation,omitempty"`
+	Runtime         *synthetic.RuntimeIdentity    `json:"runtime,omitempty"`
+	Candidate       *synthetic.RuntimeIdentity    `json:"candidate,omitempty"`
+	CandidateState  string                        `json:"candidate_state,omitempty"`
+	SetupError      string                        `json:"setup_error,omitempty"`
+	Storage         *browserruntime.Status        `json:"storage,omitempty"`
+	StorageError    string                        `json:"storage_error,omitempty"`
+	Inputs          *browserruntime.ReleaseInputs `json:"inputs,omitempty"`
+	Native          *browserruntime.NativeStatus  `json:"native,omitempty"`
+	Qualification   *runner.Qualification         `json:"qualification,omitempty"`
+	PreloadedConfig map[string]any                `json:"preloaded_config,omitempty"`
+	PreloadPath     string                        `json:"preload_path,omitempty"`
+	Notice          string                        `json:"notice,omitempty"`
 }
 
 // setRuntime reports a runtime with its generation, the archive digest.

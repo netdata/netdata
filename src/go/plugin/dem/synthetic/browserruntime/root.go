@@ -78,6 +78,31 @@ func openRuntimeRoot(path string, layout runtimeRootLayout) (string, *os.Root, e
 	return canonical, root, nil
 }
 
+func readRuntimeRoot(path string, layout runtimeRootLayout) (string, *os.Root, error) {
+	canonical, err := CanonicalRoot(path)
+	if err != nil {
+		return "", nil, err
+	}
+	if err := privateDirectory(canonical); err != nil {
+		return "", nil, err
+	}
+	root, err := os.OpenRoot(canonical)
+	if err != nil {
+		return "", nil, err
+	}
+	record, err := layout.read(root)
+	if err == nil && record.Phase != "ready" {
+		err = errors.New("runtime initialization is incomplete; use its installation owner to recover")
+	}
+	if err == nil {
+		err = layout.validate(root)
+	}
+	if err != nil {
+		return "", nil, errors.Join(err, root.Close())
+	}
+	return canonical, root, nil
+}
+
 func (layout runtimeRootLayout) open(root *os.Root, path string) error {
 	record, err := layout.read(root)
 	if errors.Is(err, os.ErrNotExist) {

@@ -30,9 +30,9 @@ func TestStoreGraceProcessAndRestart(t *testing.T) {
 	require.NoError(t, err)
 	*now = now.Add(8 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err = s.beginUse(first)
+	_, err = s.beginUse(first, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
-	use, err := s.beginUse(second)
+	use, err := s.beginUse(second, nil)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(true))
 	require.NoError(t, s.closeClaim(claim))
@@ -52,7 +52,7 @@ func TestStoreGraceProcessAndRestart(t *testing.T) {
 	require.NoError(t, other.Sweep())
 	*now = now.Add(3 * 24 * time.Hour)
 	require.NoError(t, other.Sweep())
-	_, err = s.beginUse(second)
+	_, err = s.beginUse(second, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
 }
 
@@ -65,7 +65,7 @@ func TestStorePressureNeverEvictsProcessOrUncertainUse(t *testing.T) {
 	second, archive := bundleFixture(t, strings.Repeat("B", 80<<10))
 	file := archiveFile(t, archive)
 	require.ErrorIs(t, s.importUnselected(t, context.Background(), second, file), ErrAllowance)
-	use, err := s.beginUse(first)
+	use, err := s.beginUse(first, nil)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false)) // no launch proof is supplied
 	require.NoError(t, s.closeClaim(claim))
@@ -83,9 +83,9 @@ func TestStorePressureReclaimsSoftGrace(t *testing.T) {
 	s.config.MaxBytes = 128 << 10
 	first := importFixture(t, s, strings.Repeat("A", 80<<10))
 	second := importFixture(t, s, strings.Repeat("B", 80<<10))
-	_, err := s.beginUse(first)
+	_, err := s.beginUse(first, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
-	use, err := s.beginUse(second)
+	use, err := s.beginUse(second, nil)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(true))
 	status, err := s.Inspect()
@@ -101,7 +101,7 @@ func TestFailedImportAndReadOnlyInspection(t *testing.T) {
 	file := filepath.Join(t.TempDir(), "truncated")
 	require.NoError(t, os.WriteFile(file, archive[:len(archive)-1], 0600))
 	require.Error(t, s.importUnselected(t, context.Background(), m, file))
-	_, err = s.beginUse(m)
+	_, err = s.beginUse(m, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
 	require.NoError(t, s.Sweep())
 	for _, parent := range []string{"uses", "claims", "staging", "trash", "initializing", "generations"} {
@@ -122,7 +122,7 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	s, now := testStore(t)
 	m := importFixture(t, s, "proof")
-	use, err := s.beginUse(m)
+	use, err := s.beginUse(m, nil)
 	require.NoError(t, err)
 	process, err := ndexec.StartUnprivilegedProcessTree(
 		context.Background(),
@@ -137,7 +137,7 @@ func TestPersistentSupervisorCompletionReleasesPin(t *testing.T) {
 	require.NoError(t, use.Finish(false))
 	*now = now.Add(31 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err = s.beginUse(m)
+	_, err = s.beginUse(m, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
 	status, err := s.Inspect()
 	require.NoError(t, err)
@@ -152,7 +152,7 @@ func TestCallerFinishesAfterReceiptReconciliation(t *testing.T) {
 	t.Cleanup(ndexec.SetRunnerPathsForTests(helper, ""))
 	s, _ := testStore(t)
 	m := importFixture(t, s, "receipt-race")
-	use, err := s.beginUse(m)
+	use, err := s.beginUse(m, nil)
 	require.NoError(t, err)
 	process, err := ndexec.StartUnprivilegedProcessTree(
 		context.Background(),
@@ -263,7 +263,7 @@ func TestAllowanceExplainsProtectedGenerationBytes(t *testing.T) {
 	claim, err := s.testProcessClaim(m.Archive.SHA256)
 	require.NoError(t, err)
 	defer s.closeClaim(claim)
-	use, err := s.beginUse(m)
+	use, err := s.beginUse(m, nil)
 	require.NoError(t, err)
 	require.NoError(t, use.Finish(false))
 	next, _ := bundleFixture(t, strings.Repeat("b", 80<<10))
@@ -309,7 +309,7 @@ func TestRealBundlePreparation(t *testing.T) {
 		t.Logf("inspect duration=%s used_bytes=%d", time.Since(start), status.UsedBytes)
 	}
 	for _, command := range []string{"node", "browser", "reexec"} {
-		use, err := s.beginUse(m)
+		use, err := s.beginUse(m, nil)
 		require.NoError(t, err)
 		program, args := use.Paths.Node, []string{"--version"}
 		if command == "browser" {
@@ -433,7 +433,7 @@ func TestAbandonedPreparationAndProcessClaim(t *testing.T) {
 	require.NoError(t, s.Sweep())
 	*now = now.Add(31 * 24 * time.Hour)
 	require.NoError(t, s.Sweep())
-	_, err := s.beginUse(first)
+	_, err := s.beginUse(first, nil)
 	require.ErrorIs(t, err, ErrUnavailable)
 	second, _ := bundleFixture(t, "incoming")
 	stop = startRuntimeOwner(t, s, second, "partial")
@@ -477,7 +477,7 @@ func BenchmarkRuntimeUse(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		use, err := s.beginUse(m)
+		use, err := s.beginUse(m, nil)
 		require.NoError(b, err)
 		process, err := ndexec.StartUnprivilegedProcessTree(
 			context.Background(),
