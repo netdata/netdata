@@ -4,7 +4,8 @@ A declared agent carries an :class:`~netdata_mcp.runtime.OtelConfig`; this tool
 replaces it. It is written as the agent's user ``otel.yaml`` on the next
 ``netdata_run_start`` / restart, so the edit-config -> restart -> re-query loop
 is how an LLM forces storage edge cases (rotation, retention) over small,
-deterministic corpora.
+deterministic corpora. What the plugin actually applied is read back with
+``netdata_agent_otel_effective_config``.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ _ExtraYaml = Annotated[
         "Raw YAML mapping deep-merged over the generated file (wins on conflicts). Only for "
         "configs the typed 'config' refuses on purpose: unknown or misplaced keys for "
         "strict-config refusal tests. A config the plugin refuses keeps it down; the refusal "
-        "shows in netdata_agent_logs component='supervisor'."
+        "shows in netdata_agent_otel_effective_config."
     )),
 ]
 
@@ -72,7 +73,8 @@ def register(mcp: FastMCP) -> None:
             "loopback port; the HTTP listener is on unless enabled=false; remote_storage enabled "
             "without uri uses a per-agent fs:// dir; an endpoint on the agent's declared web port "
             "is refused. Small rotation/retention/catalog values force multi-file, eviction and "
-            "upload edge cases over a small corpus."
+            "upload edge cases over a small corpus. Check what the plugin applied with "
+            "netdata_agent_otel_effective_config once the agent is ready."
         ),
     )
     async def netdata_agent_otel_config(

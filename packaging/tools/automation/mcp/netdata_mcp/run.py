@@ -63,6 +63,8 @@ class Run:
     cloud_connected: bool | None = None  # ACLK online / live in the Cloud UI
     current_phase: str | None = None
     created_at: float = field(default_factory=time.monotonic)
+    # Wall clock of the same moment, to scope journal reads to this run.
+    created_wall: float = field(default_factory=time.time)
 
     _proc: asyncio.subprocess.Process | None = field(default=None, repr=False)
     _task: asyncio.Task | None = field(default=None, repr=False)
