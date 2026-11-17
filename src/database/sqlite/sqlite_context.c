@@ -437,8 +437,11 @@ void ctx_sql_queue_delete(nd_uuid_t *host_uuid, VERSIONED_CONTEXT_DATA *context_
     ctx_sql_queue_write(CTX_SQL_DELETE, host_uuid, context_data);
 }
 
+#define CTX_SQL_FINAL_FLUSH_WAIT_MS 3000
+
 // Executes the pending context writes, in queueing order. final = metasync's last flush at shutdown: it closes the
-// queue, and does not wait for a flusher that outlived metasync's shutdown wait (the pending writes are dropped).
+// queue, and waits at most CTX_SQL_FINAL_FLUSH_WAIT_MS for another flusher, which may be stuck in SQLite after
+// outliving metasync's shutdown wait; past that, the pending writes are dropped.
 void ctx_sql_flush(bool final)
 {
     // netdata_mutex_t has no static initializer
@@ -450,8 +453,13 @@ void ctx_sql_flush(bool final)
     spinlock_unlock(&ctx_sql_queue.spinlock);
 
     bool locked;
-    if (final)
+    if (final) {
         locked = (netdata_mutex_trylock(&ctx_sql_queue.flush_mutex) == 0);
+        for (int waited_ms = 0; !locked && waited_ms < CTX_SQL_FINAL_FLUSH_WAIT_MS; waited_ms += 10) {
+            sleep_usec(10 * USEC_PER_MS);
+            locked = (netdata_mutex_trylock(&ctx_sql_queue.flush_mutex) == 0);
+        }
+    }
     else {
         netdata_mutex_lock(&ctx_sql_queue.flush_mutex);
         locked = true;
@@ -491,7 +499,8 @@ void ctx_sql_flush(bool final)
         netdata_mutex_unlock(&ctx_sql_queue.flush_mutex);
     else if (dropped)
         nd_log_daemon(NDLP_WARNING,
-                      "CONTEXT SQL: dropped %zu context writes at shutdown, another flush is still running", dropped);
+                      "CONTEXT SQL: dropped %zu context writes at shutdown, another flush is still running after %d ms",
+                      dropped, CTX_SQL_FINAL_FLUSH_WAIT_MS);
 }
 
 // returns -1 when the value is unavailable, which pulse turns into UINT64_MAX and skips
@@ -567,6 +576,12 @@ static uint64_t ctx_sql_queue_unittest_version(nd_uuid_t *host_uuid, const char 
     return row.version;
 }
 
+static void ctx_sql_queue_unittest_final_flush(void *arg)
+{
+    (void)arg;
+    ctx_sql_flush(true);
+}
+
 static int ctx_sql_queue_unittest(nd_uuid_t *host_uuid)
 {
     VERSIONED_CONTEXT_DATA d = {
@@ -593,9 +608,17 @@ static int ctx_sql_queue_unittest(nd_uuid_t *host_uuid)
     ctx_sql_flush(false);
     CTX_SQL_QUEUE_CHECK("queue.store", 1, 2);
 
-    // a delete then a store: the store wins
+    // a delete then a store: one pending store that keeps the delete's cleanup, and the store wins
     d.id = "queue.store"; ctx_sql_queue_delete(host_uuid, &d);
     d.version = 3; ctx_sql_queue_store(host_uuid, &d);
+    spinlock_lock(&ctx_sql_queue.spinlock);
+    CTX_SQL_WRITE *pending = ctx_sql_queue.head;
+    bool coalesced = pending && !pending->next && pending->op == CTX_SQL_STORE && pending->cleanup;
+    spinlock_unlock(&ctx_sql_queue.spinlock);
+    if (!coalesced) {
+        netdata_log_error("CONTEXT SQL QUEUE TEST: a delete then a store did not coalesce into one store with cleanup");
+        errors++;
+    }
     ctx_sql_flush(false);
     CTX_SQL_QUEUE_CHECK("queue.store", 1, 3);
 
@@ -606,8 +629,16 @@ static int ctx_sql_queue_unittest(nd_uuid_t *host_uuid)
     CTX_SQL_QUEUE_CHECK("queue.store", 0, 0);
     CTX_SQL_QUEUE_CHECK("queue.other", 1, 7);
 
-    // the final flush closes the queue: later writes are dropped
-    ctx_sql_flush(true);
+    // the final flush waits for a flusher that is still running, executes what was queued before it, and closes the
+    // queue: later writes are dropped
+    d.id = "queue.final"; d.version = 8; ctx_sql_queue_store(host_uuid, &d);
+    netdata_mutex_lock(&ctx_sql_queue.flush_mutex);
+    ND_THREAD *final_flusher = nd_thread_create(
+        "CTXSQL_TEST", NETDATA_THREAD_OPTION_DONT_LOG, ctx_sql_queue_unittest_final_flush, NULL);
+    sleep_usec(200 * USEC_PER_MS);
+    netdata_mutex_unlock(&ctx_sql_queue.flush_mutex);
+    nd_thread_join(final_flusher);
+    CTX_SQL_QUEUE_CHECK("queue.final", 1, 8);
     d.id = "queue.late"; d.version = 9; ctx_sql_queue_store(host_uuid, &d);
     ctx_sql_flush(false);
     CTX_SQL_QUEUE_CHECK("queue.late", 0, 0);
