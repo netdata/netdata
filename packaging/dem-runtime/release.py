@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+from urllib.error import HTTPError
+from urllib.request import Request
 
 from bundle import read_release_info, run, sha256, validate_release_info, validate_url_prefix, write_json
 from locked import HTTPS_OPENER, DOWNLOAD_TIMEOUT_SECONDS
@@ -21,6 +23,7 @@ ARCHITECTURES = ('amd64', 'arm64')
 METADATA_LIMIT = 1 << 20
 PUBLIC_KEY_LIMIT = 1 << 20
 PUBLIC_KEY_URL = 'https://repository.netdata.cloud/netdatabot.gpg.key'
+PUBLIC_USER_AGENT = 'Netdata-DEM-release/1'
 
 
 def empty_directory(path):
@@ -109,7 +112,8 @@ def verified_release(tool, key, path):
 
 def fetch_public_key(args):
     """Acquire current online trust from the fixed package-signing authority."""
-    with HTTPS_OPENER.open(PUBLIC_KEY_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+    request = Request(PUBLIC_KEY_URL, headers={'User-Agent': PUBLIC_USER_AGENT})
+    with HTTPS_OPENER.open(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         body = response.read(PUBLIC_KEY_LIMIT + 1)
     if not 0 < len(body) <= PUBLIC_KEY_LIMIT:
         raise ValueError('public keyring exceeds the protocol limit or is empty')
@@ -145,7 +149,8 @@ def signed_agent(release, arch):
 def public_identity(url, digest, size):
     """Read the public serving path, including CDN, before completing publication."""
     actual, count = hashlib.sha256(), 0
-    with HTTPS_OPENER.open(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+    request = Request(url, headers={'User-Agent': PUBLIC_USER_AGENT})
+    with HTTPS_OPENER.open(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         while True:
             block = response.read(min(1024 * 1024, size - count + 1))
             if not block:
@@ -329,6 +334,10 @@ if __name__ == '__main__':
         sys.exit(error.returncode if error.returncode > 0 else 1)
     except ValueError as error:
         print('runtime release operation failed: ' + str(error), file=sys.stderr)
+        sys.exit(1)
+    except HTTPError as error:
+        error.close()
+        print(f'runtime release operation failed: HTTP {error.code}', file=sys.stderr)
         sys.exit(1)
     except (OSError, KeyError) as error:
         # Do not print arbitrary network exceptions containing sensitive URLs.
