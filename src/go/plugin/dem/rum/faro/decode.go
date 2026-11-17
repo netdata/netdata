@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package faro decodes Faro web SDK transport bodies into normalized beacons under the site's input policy
+// (normalization, redaction, error fingerprints, bot classification), and renders the pinned Faro bootstrap script
+// and assets.
 package faro
 
 import (
 	"encoding/json"
 	"io"
-	"math"
 	"net/url"
 	"strconv"
 	"strings"
@@ -87,6 +89,7 @@ type faroPayload struct {
 // Bounds on client-supplied strings (cardinality and record size).
 const (
 	maxPathLen    = 512
+	maxGroupLen   = 200
 	maxUserIDLen  = 128
 	maxSelector   = 200
 	maxNameLen    = 64
@@ -96,6 +99,10 @@ const (
 	maxAttrLen    = 256
 	maxItems      = 500 // per array; the body cap bounds the rest
 )
+
+// tabletViewportMinWidth is the viewport width (CSS px) at or above which a
+// mobile:true beacon is classified as tablet rather than mobile.
+const tabletViewportMinWidth = 600
 
 // vitalKeys maps Faro web-vitals value keys to beacon vital names.
 var vitalKeys = map[string]string{
@@ -108,17 +115,13 @@ var vitalKeys = map[string]string{
 type Options struct {
 	Site               string
 	Now                time.Time
-	Country            string
-	City               string
-	Lat                float64
-	Lon                float64
-	HasGeo             bool
+	Location           beacon.Location
 	EventLogs          bool
 	FrustrationSignals bool
 	Redactor           *redact.Redactor
 	ConsoleLogs        bool
 	Tracing            bool
-	PathRules          []beacon.PathRule
+	PathRules          []PathRule
 }
 
 const (
@@ -136,72 +139,87 @@ var attributionKeys = map[string]string{
 
 // Decode normalizes a Faro transport body using the supplied site policy.
 func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
-	now := opt.Now
 	var p faroPayload
 	if err := json.Unmarshal(raw, &p); err != nil {
 		return nil, err
 	}
-	b := &beacon.Beacon{
-		Site:           opt.Site,
-		Received:       now,
-		SessionID:      observationID(p.Meta.Session.ID),
-		ExperienceID:   observationID(p.Meta.Page.ID),
-		ViewID:         observationID(p.Meta.View.ID),
-		Browser:        opt.text(p.Meta.Browser.Name, maxNameLen),
-		BrowserVersion: opt.text(p.Meta.Browser.Version, maxNameLen),
-		OS:             opt.text(p.Meta.Browser.OS, maxNameLen),
-		Device:         beacon.DeviceDesktop,
-		Country:        opt.Country,
-		City:           opt.City,
-		Lat:            opt.Lat,
-		Lon:            opt.Lon,
-		HasGeo:         opt.HasGeo,
-		View:           opt.view(p.Meta.View.Name),
-		AppVersion:     opt.text(p.Meta.App.Version, maxNameLen),
-		UserID:         opt.text(p.Meta.User.ID, maxUserIDLen),
-		Environment:    opt.text(p.Meta.App.Environment, maxNameLen),
+	b := opt.meta(&p)
+	b.Vitals = opt.vitals(&p)
+	b.Errors = opt.exceptions(&p)
+	opt.events(&p, b)
+	if opt.Tracing && p.Traces != nil {
+		b.Spans, b.ServiceName = parseSpans(p.Traces.ResourceSpans, opt)
 	}
-	if p.Meta.Browser.Mobile {
+	if opt.ConsoleLogs {
+		b.Logs = opt.logs(&p)
+	}
+	return b, nil
+}
+
+// meta builds the beacon's identity, client and page context.
+func (o Options) meta(p *faroPayload) *beacon.Beacon {
+	m := &p.Meta
+	b := &beacon.Beacon{
+		Site:           o.Site,
+		Received:       o.Now,
+		SessionID:      observationID(m.Session.ID),
+		ExperienceID:   observationID(m.Page.ID),
+		ViewID:         observationID(m.View.ID),
+		Browser:        o.text(m.Browser.Name, maxNameLen),
+		BrowserVersion: o.text(m.Browser.Version, maxNameLen),
+		OS:             o.text(m.Browser.OS, maxNameLen),
+		Device:         beacon.DeviceDesktop,
+		Location:       o.Location,
+		View:           o.view(m.View.Name),
+		AppVersion:     o.text(m.App.Version, maxNameLen),
+		UserID:         o.text(m.User.ID, maxUserIDLen),
+		Environment:    o.text(m.App.Environment, maxNameLen),
+	}
+	if m.Browser.Mobile {
 		b.Device = beacon.DeviceMobile
 		// Tablet needs a viewport width the SDK actually reported; an unparsable/absent width keeps the mobile|desktop
 		// split unchanged.
-		if w, err := strconv.Atoi(strings.TrimSpace(p.Meta.Browser.ViewportWidth)); err == nil &&
-			w >= beacon.TabletViewportMinWidth {
+		if w, err := strconv.Atoi(strings.TrimSpace(m.Browser.ViewportWidth)); err == nil &&
+			w >= tabletViewportMinWidth {
 			b.Device = beacon.DeviceTablet
 		}
 	}
-	pageURL := opt.cleanURL(p.Meta.Page.URL)
-	b.Path = beacon.Path(pageURL)
+	pageURL := o.cleanURL(m.Page.URL)
+	b.Path = urlPath(pageURL)
 	b.PageHost = pageHost(pageURL)
-	b.PageGroup = beacon.PageGroup(b.Path)
+	b.PageGroup = pageGroup(b.Path)
+	return b
+}
 
+// vitals reads web-vitals measurements; other measurement values are ignored.
+func (o Options) vitals(p *faroPayload) []beacon.Vital {
+	var vitals []beacon.Vital
 	for i, m := range p.Measurements {
 		if i >= maxItems {
 			break
 		}
-		ts := flexTime(m.Timestamp, now)
-		if len(m.Values) > 0 {
-			for k, v := range m.Values {
-				name, ok := vitalKeys[strings.ToLower(k)]
-				if !ok || v < 0 || math.IsNaN(v) || math.IsInf(v, 0) {
-					continue
-				}
-				b.Vitals = append(
-					b.Vitals,
-					beacon.Vital{
-						ID:       observationContextID(m.Context),
-						Revision: observationContextRevision(m.Context),
-						Name:     name,
-						Value:    v,
-						Time:     ts,
-						Element:  opt.attributedElement(name, m.Context),
-					},
-				)
+		ts := flexTime(m.Timestamp, o.Now)
+		for k, v := range m.Values {
+			name, ok := vitalKeys[strings.ToLower(k)]
+			if !ok || !nonNegativeFinite(v) {
+				continue
 			}
-			continue
+			vitals = append(vitals, beacon.Vital{
+				ID:       observationContextID(m.Context),
+				Revision: observationContextRevision(m.Context),
+				Name:     name,
+				Value:    v,
+				Time:     ts,
+				Element:  o.attributedElement(name, m.Context),
+			})
 		}
 	}
+	return vitals
+}
 
+// exceptions reads JS errors with bounded stacks and their fingerprints.
+func (o Options) exceptions(p *faroPayload) []beacon.Error {
+	var errors []beacon.Error
 	for i, e := range p.Exceptions {
 		if i >= maxItems {
 			break
@@ -209,7 +227,7 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 		var stack strings.Builder
 		firstFrame := ""
 		for i, frame := range e.Stacktrace.Frames {
-			identity := opt.appendFrame(&stack, frame)
+			identity := o.appendFrame(&stack, frame)
 			if i == 0 {
 				firstFrame = identity
 			}
@@ -217,57 +235,37 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 				break
 			}
 		}
-		typ := opt.text(e.Type, maxNameLen)
-		msg := opt.text(e.Value, maxMessageLen)
-		b.Errors = append(b.Errors, beacon.Error{
+		typ := o.text(e.Type, maxNameLen)
+		msg := o.text(e.Value, maxMessageLen)
+		errors = append(errors, beacon.Error{
 			Type:        typ,
 			Message:     msg,
-			Stack:       beacon.Truncate(stack.String(), maxStackLen),
-			Time:        flexTime(e.Timestamp, now),
-			Fingerprint: beacon.Fingerprint(typ, msg, firstFrame),
+			Stack:       truncate(stack.String(), maxStackLen),
+			Time:        flexTime(e.Timestamp, o.Now),
+			Fingerprint: fingerprint(typ, msg, firstFrame),
 		})
 	}
+	return errors
+}
 
+// events reads SDK and custom events. Navigation and resource timing events
+// are also lifted into the typed fields aggregation measures.
+func (o Options) events(p *faroPayload, b *beacon.Beacon) {
 	for i, ev := range p.Events {
 		if i >= maxItems {
 			break
 		}
 		// Classification uses protocol names, before free-text transformation.
-		name := beacon.Clean(ev.Name, len(ev.Name))
-		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" || (beacon.IsFrustration(name) && !opt.FrustrationSignals) {
+		name := clean(ev.Name, len(ev.Name))
+		if name == "" || name == "securitypolicyviolation" || name == "faro.user.action" ||
+			(beacon.IsFrustration(name) && !o.FrustrationSignals) {
 			continue
 		}
 		kind := eventKind(name)
 		if kind == beacon.EventCustom && !beacon.IsFrustration(name) {
-			name = opt.text(ev.Name, maxNameLen)
+			name = o.text(ev.Name, maxNameLen)
 		}
-		var attrs map[string]string
-		if len(ev.Attributes) > 0 {
-			for k, v := range ev.Attributes {
-				if len(attrs) >= maxEventAttrs {
-					break
-				}
-				k = beacon.Clean(k, len(k))
-				nativeAttr := keepEventAttr(kind, name, k)
-				if !opt.EventLogs && !nativeAttr {
-					continue
-				}
-				value, valid := opt.eventAttr(kind, k, v)
-				if !valid {
-					continue
-				}
-				// Known keys carry protocol semantics; custom keys are diagnostic text.
-				if !nativeAttr {
-					k = opt.text(k, maxNameLen)
-				}
-				if k != "" {
-					if attrs == nil {
-						attrs = make(map[string]string, min(len(ev.Attributes), maxEventAttrs))
-					}
-					attrs[k] = value
-				}
-			}
-		}
+		attrs := o.eventAttrs(kind, name, ev.Attributes)
 		id := observationID(ev.Attributes["observation_id"])
 		revision := observationRevision(ev.Attributes["observation_sequence"])
 		b.Events = append(b.Events, beacon.Event{
@@ -275,14 +273,12 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			Revision: revision,
 			Name:     name,
 			Kind:     kind,
-			Domain:   opt.text(ev.Domain, maxNameLen),
+			Domain:   o.text(ev.Domain, maxNameLen),
 			Attrs:    attrs,
-			Time:     flexTime(ev.Timestamp, now),
+			Time:     flexTime(ev.Timestamp, o.Now),
 			TraceID:  hexID(ev.Trace.TraceID, 32),
 		})
-		// Navigation/resource timing ride the generic events array — also lift them into typed fields the aggregator uses
-		// for document navigation and resource measurements. Attribute names
-		// verified against a captured Faro 2.11 beacon, see
+		// Attribute names verified against a captured Faro 2.11 beacon, see
 		// TestParseFaro timing-event cases in decode_test.go.
 		switch name {
 		case navigationEvent:
@@ -299,31 +295,70 @@ func Decode(raw []byte, opt Options) (*beacon.Beacon, error) {
 			b.Resources = append(b.Resources, r)
 		}
 	}
+}
 
-	if opt.Tracing && p.Traces != nil {
-		b.Spans, b.ServiceName = parseSpans(p.Traces.ResourceSpans, opt)
-	}
-
-	if opt.ConsoleLogs {
-		for i, l := range p.Logs {
-			if i >= maxItems {
-				break
+// eventAttrs keeps the attributes native measurements read and, with optional
+// event logs, the rest as bounded diagnostic text.
+func (o Options) eventAttrs(kind beacon.EventKind, name string, raw map[string]string) map[string]string {
+	var attrs map[string]string
+	for received, v := range raw {
+		if len(attrs) >= maxEventAttrs {
+			break
+		}
+		k := clean(received, len(received))
+		rule := eventAttrRule(kind, name, k)
+		if !o.EventLogs && !rule.native {
+			continue
+		}
+		value, valid := o.eventAttr(rule, k, v)
+		if !valid {
+			continue
+		}
+		// Known keys carry protocol semantics; custom keys are diagnostic text.
+		if !rule.native {
+			k = o.text(received, maxNameLen)
+		}
+		if k != "" {
+			if attrs == nil {
+				attrs = make(map[string]string, min(len(raw), maxEventAttrs))
 			}
-			msg := opt.text(l.Message, maxMessageLen)
-			if msg == "" {
-				continue
-			}
-			errorType, stack := consoleErrorContext(l.Context, opt)
-			b.Logs = append(b.Logs, beacon.Log{
-				ErrorType: errorType,
-				Stack:     stack,
-				Level:     opt.text(strings.ToLower(l.Level), 16),
-				Message:   msg,
-				Time:      flexTime(l.Timestamp, now),
-			})
+			attrs[k] = value
 		}
 	}
-	return b, nil
+	return attrs
+}
+
+// logs reads console logs, keeping only the SDK's console Error context.
+func (o Options) logs(p *faroPayload) []beacon.Log {
+	var logs []beacon.Log
+	for i, l := range p.Logs {
+		if i >= maxItems {
+			break
+		}
+		msg := o.text(l.Message, maxMessageLen)
+		if msg == "" {
+			continue
+		}
+		errorType, stack := consoleErrorContext(l.Context, o)
+		logs = append(logs, beacon.Log{
+			ErrorType: errorType,
+			Stack:     stack,
+			Level:     o.consoleLevel(l.Level),
+			Message:   msg,
+			Time:      flexTime(l.Timestamp, o.Now),
+		})
+	}
+	return logs
+}
+
+// consoleLevel keeps Faro's log levels in lower case; any other value is
+// diagnostic text, redacted as received.
+func (o Options) consoleLevel(level string) string {
+	switch lower := strings.ToLower(clean(level, len(level))); lower {
+	case "trace", "debug", "info", "log", "warn", "error":
+		return lower
+	}
+	return o.text(level, 16)
 }
 
 // attributedElement is the redacted selector Faro reports for vital.
@@ -336,7 +371,7 @@ func (o Options) attributedElement(vital string, ctx map[string]any) string {
 }
 
 // pageHost is the page URL's host (first-party resource
-// classification), independent of beacon.Path's query/fragment stripping.
+// classification), independent of urlPath's query/fragment stripping.
 // "" when the URL has no host (relative path, unparsable).
 func pageHost(raw string) string {
 	u, err := url.Parse(strings.TrimSpace(raw))
@@ -346,28 +381,18 @@ func pageHost(raw string) string {
 	return strings.ToLower(u.Hostname())
 }
 
-// parseNavigationAttrs reads the two navigation-timing attributes the
-// navigation measurements need from a faro.performance.navigation
-// event's attributes. Field names verified against a captured Faro 2.11
-// beacon and pinned by TestParseFaro in decode_test.go:
-// "pageLoadTime" (fetchStart..domComplete, the SDK's own "page load"
-// metric — there is no separate "time to DOMContentLoaded from
-// navigation start" attribute) and "domContentLoadHandlerTime" (the
-// DOMContentLoaded handler's own duration) — the same two fields
-// Grafana's own Faro-based Frontend Observability product charts as
-// "page load" and "DOM content loaded". A missing/unparsable attribute
-// (the SDK omits it rather than sending a placeholder) leaves Has* false.
+// parseNavigationAttrs reads the two navigation-timing attributes Faro 2.11
+// sends on faro.performance.navigation events (pinned by TestParseFaro):
+// pageLoadTime (fetchStart to domComplete, the SDK's page-load metric) and
+// domContentLoadHandlerTime (the DOMContentLoaded handler's own duration).
+// The SDK omits an unavailable attribute, which leaves its Has* flag false.
 func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 	if len(attrs) == 0 {
 		return nil
 	}
 	n := &beacon.Navigation{}
-	if v, err := strconv.ParseFloat(attrs["pageLoadTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
-		n.LoadMS, n.HasLoad = v, true
-	}
-	if v, err := strconv.ParseFloat(attrs["domContentLoadHandlerTime"], 64); err == nil && v >= 0 && !math.IsInf(v, 0) && !math.IsNaN(v) {
-		n.DCLMS, n.HasDCL = v, true
-	}
+	n.LoadMS, n.HasLoad = parseNonNegative(attrs["pageLoadTime"])
+	n.DCLMS, n.HasDCL = parseNonNegative(attrs["domContentLoadHandlerTime"])
 	if !n.HasLoad && !n.HasDCL {
 		return nil
 	}
@@ -379,13 +404,11 @@ func parseNavigationAttrs(attrs map[string]string) *beacon.Navigation {
 func parseResourceAttrs(attrs map[string]string) beacon.Resource {
 	r := beacon.Resource{
 		Host:      strings.ToLower(attrs["httpHost"]),
-		Initiator: beacon.Clean(attrs["initiatorType"], maxNameLen),
+		Initiator: clean(attrs["initiatorType"], maxNameLen),
 		Self:      isCollectorRequest(attrs["name"]),
 	}
-	if dur, err := strconv.ParseFloat(attrs["duration"], 64); err == nil && dur >= 0 && !math.IsInf(dur, 0) && !math.IsNaN(dur) {
-		r.DurationMS, r.HasDuration = dur, true
-	}
-	if xfer, err := strconv.ParseFloat(attrs["transferSize"], 64); err == nil && xfer >= 0 && !math.IsInf(xfer, 0) && !math.IsNaN(xfer) {
+	r.DurationMS, r.HasDuration = parseNonNegative(attrs["duration"])
+	if xfer, ok := parseNonNegative(attrs["transferSize"]); ok {
 		r.TransferB = xfer
 	}
 	return r
@@ -478,5 +501,5 @@ func consoleErrorContext(raw json.RawMessage, opt Options) (string, string) {
 			break
 		}
 	}
-	return typ, beacon.Truncate(stack.String(), maxStackLen)
+	return typ, truncate(stack.String(), maxStackLen)
 }

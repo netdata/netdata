@@ -41,8 +41,10 @@ func TestParseRawParams(t *testing.T) {
 		},
 		"arguments, then selections, then payload": {
 			req: RawMethodRequest{
-				Args:    []string{"service:/argument"},
-				Payload: []byte(`{"service":"/payload","severity":"OK","after":-60,"selections":{"service":["/selection"],"severity":["Warning"]}}`),
+				Args: []string{"service:/argument"},
+				Payload: []byte(
+					`{"service":"/payload","severity":"OK","after":-60,"selections":{"service":["/selection"],"severity":["Warning"]}}`,
+				),
 			},
 			want: rawParams(map[string]string{
 				"service":    `"/argument"`,
@@ -145,6 +147,49 @@ func TestRawParams_String(t *testing.T) {
 	}
 }
 
+func TestRawParams_Names(t *testing.T) {
+	assert.Empty(t, rawParams(map[string]string{}).Names())
+	p := rawParams(map[string]string{"site": `"shop"`, "after": `1`, "": `"x"`})
+	assert.Equal(t, []string{"", "after", "site"}, p.Names())
+}
+
+func TestRawParams_Text(t *testing.T) {
+	tests := map[string]struct {
+		raw     *string // nil: the key is absent
+		want    string
+		wantErr string
+	}{
+		"absent":             {want: ""},
+		"string":             {raw: new(`"/log"`), want: "/log"},
+		"empty string":       {raw: new(`""`), want: ""},
+		"single selection":   {raw: new(`["Warning"]`), want: "Warning"},
+		"integer":            {raw: new(`1700000000`), want: "1700000000"},
+		"negative integer":   {raw: new(`-60`), want: "-60"},
+		"number as written":  {raw: new(`1.5e3`), want: "1.5e3"},
+		"several selections": {raw: new(`["a","b"]`), wantErr: "key requires one string or number value"},
+		"null":               {raw: new(`null`), wantErr: "key requires one string or number value"},
+		"boolean":            {raw: new(`true`), wantErr: "key requires one string or number value"},
+		"object":             {raw: new(`{"a":"b"}`), wantErr: "key requires one string or number value"},
+		"number selection":   {raw: new(`[1]`), wantErr: "key requires one string or number value"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := rawParams(map[string]string{})
+			if tc.raw != nil {
+				p = rawParams(map[string]string{"key": *tc.raw})
+			}
+			got, err := p.Text("key")
+			if tc.wantErr != "" {
+				assert.EqualError(t, err, tc.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestRawParams_TimeRange(t *testing.T) {
 	now := time.Unix(1700000000, 0)
 	type window struct {
@@ -157,46 +202,75 @@ func TestRawParams_TimeRange(t *testing.T) {
 	}{
 		"absent": {},
 		"absolute": {
-			req:  payloadRequest(`{"after":1699990000,"before":1699999000}`),
-			want: window{after: new(int64(1699990000)), before: new(int64(1699999000))},
+			req: payloadRequest(`{"after":1699990000,"before":1699999000}`),
+			want: window{
+				after:  new(int64(1699990000)),
+				before: new(int64(1699999000)),
+			},
 		},
 		"equal bounds": {
-			req:  payloadRequest(`{"after":10,"before":10}`),
-			want: window{after: new(int64(10)), before: new(int64(10))},
+			req: payloadRequest(`{"after":10,"before":10}`),
+			want: window{
+				after:  new(int64(10)),
+				before: new(int64(10)),
+			},
 		},
 		"arguments relative to now": {
 			req: RawMethodRequest{
 				Args: []string{"after:-3600", "before:0"},
 			},
-			want: window{after: new(now.Unix() - 3600), before: new(now.Unix())},
+			want: window{
+				after:  new(now.Unix() - 3600),
+				before: new(now.Unix()),
+			},
 		},
 		"after relative to relative before": {
-			req:  payloadRequest(`{"after":-60,"before":-600}`),
-			want: window{after: new(now.Unix() - 660), before: new(now.Unix() - 600)},
+			req: payloadRequest(`{"after":-60,"before":-600}`),
+			want: window{
+				after:  new(now.Unix() - 660),
+				before: new(now.Unix() - 600),
+			},
 		},
 		"after relative to absolute before": {
-			req:  payloadRequest(`{"after":-60,"before":1600000000}`),
-			want: window{after: new(int64(1599999940)), before: new(int64(1600000000))},
+			req: payloadRequest(`{"after":-60,"before":1600000000}`),
+			want: window{
+				after:  new(int64(1599999940)),
+				before: new(int64(1600000000)),
+			},
 		},
 		"after relative to now without before": {
-			req:  payloadRequest(`{"after":-60}`),
-			want: window{after: new(now.Unix() - 60)},
+			req: payloadRequest(`{"after":-60}`),
+			want: window{
+				after: new(now.Unix() - 60),
+			},
 		},
 		"after zero is the epoch": {
-			req:  payloadRequest(`{"after":0,"before":1}`),
-			want: window{after: new(int64(0)), before: new(int64(1))},
+			req: payloadRequest(`{"after":0,"before":1}`),
+			want: window{
+				after:  new(int64(0)),
+				before: new(int64(1)),
+			},
 		},
 		"quoted seconds": {
-			req:  payloadRequest(`{"after":"-60","before":"1700000000"}`),
-			want: window{after: new(now.Unix() - 60), before: new(now.Unix())},
+			req: payloadRequest(`{"after":"-60","before":"1700000000"}`),
+			want: window{
+				after:  new(now.Unix() - 60),
+				before: new(now.Unix()),
+			},
 		},
 		"range bounds": {
-			req:  payloadRequest(`{"after":-62135596800,"before":253402300799}`),
-			want: window{after: new(int64(253402300799 - 62135596800)), before: new(int64(253402300799))},
+			req: payloadRequest(`{"after":-62135596800,"before":253402300799}`),
+			want: window{
+				after:  new(int64(253402300799 - 62135596800)),
+				before: new(int64(253402300799)),
+			},
 		},
 		"lowest relative values": {
-			req:  payloadRequest(`{"after":-62135596800,"before":-62135596800}`),
-			want: window{after: new(int64(-62135596800*2 + 1700000000)), before: new(int64(-62135596800 + 1700000000))},
+			req: payloadRequest(`{"after":-62135596800,"before":-62135596800}`),
+			want: window{
+				after:  new(int64(-62135596800*2 + 1700000000)),
+				before: new(int64(-62135596800 + 1700000000)),
+			},
 		},
 		"reversed": {
 			req:     payloadRequest(`{"after":10,"before":9}`),
@@ -329,7 +403,9 @@ func TestRawParams_QueryMatcher(t *testing.T) {
 }
 
 func rawParams(values map[string]string) RawParams {
-	p := RawParams{values: make(map[string]json.RawMessage, len(values))}
+	p := RawParams{
+		values: make(map[string]json.RawMessage, len(values)),
+	}
 	for k, v := range values {
 		p.values[k] = json.RawMessage(v)
 	}

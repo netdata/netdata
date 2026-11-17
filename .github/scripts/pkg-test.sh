@@ -4,6 +4,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 export DISABLE_TELEMETRY=1
 
+agent_rpms() {
+  # Minimal RPM images may not have find before package installation.
+  for package in /netdata/artifacts/netdata*.rpm; do
+    case "$package" in /netdata/artifacts/netdata-dem-runtime-*) continue ;; esac
+    [ -f "$package" ] || continue
+    printf '%s\n' "$package"
+  done
+}
+
 install_debian_like() {
   # This is needed to ensure package installs don't prompt for any user input.
   export DEBIAN_FRONTEND=noninteractive
@@ -20,7 +29,7 @@ install_debian_like() {
   # Strange quoting is required here so that glob matching works.
   # shellcheck disable=SC2046
   apt-get install -y $(find /netdata/artifacts -type f -name 'netdata*.deb' \
-! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*') || exit 3
+! -name '*dbgsym*' ! -name '*cups*' ! -name '*freeipmi*' ! -name 'netdata-dem-runtime_*') || exit 3
 
   # Install testing tools
   apt-get install -y --no-install-recommends curl dpkg-dev "${netcat}" jq || exit 1
@@ -40,7 +49,8 @@ install_fedora_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  # shellcheck disable=SC2046
+  "${PKGMGR}" install -y $(agent_rpms) || exit 1
 
   # Install testing tools
   "${PKGMGR}" install -y curl nc jq || exit 1
@@ -63,7 +73,8 @@ install_centos() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  # shellcheck disable=SC2046
+  "${PKGMGR}" install -y $(agent_rpms) || exit 1
 
   # Install testing tools
   # shellcheck disable=SC2086
@@ -81,7 +92,8 @@ install_amazon_linux() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  "${PKGMGR}" install -y /netdata/artifacts/netdata*.rpm || exit 1
+  # shellcheck disable=SC2046
+  "${PKGMGR}" install -y $(agent_rpms) || exit 1
 
   # Install testing tools
   # shellcheck disable=SC2086
@@ -96,7 +108,8 @@ install_suse_like() {
 
   # Install Netdata
   # Strange quoting is required here so that glob matching works.
-  zypper install -y --allow-downgrade --allow-unsigned-rpm /netdata/artifacts/netdata*.rpm || exit 1
+  # shellcheck disable=SC2046
+  zypper install -y --allow-downgrade --allow-unsigned-rpm $(agent_rpms) || exit 1
 
   # Install testing tools
   zypper install -y --allow-downgrade --no-recommends curl netcat-openbsd jq || exit 1
@@ -153,6 +166,13 @@ case "${DISTRO}" in
     exit 1
     ;;
 esac
+
+# These containers test ordinary Agent packages; runtime transactions require
+# the dedicated live-systemd tests and explicit browser enrollment.
+if [ -e /usr/lib/netdata/dem-runtime ]; then
+  printf '%s\n' 'ERROR: generic package installation enrolled the optional DEM runtime' >&2
+  exit 1
+fi
 
 echo "::group::Netdata buildinfo"
 /usr/sbin/netdata -W buildinfo

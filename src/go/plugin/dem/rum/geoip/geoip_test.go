@@ -12,6 +12,7 @@ import (
 
 	"github.com/maxmind/mmdbwriter"
 	"github.com/maxmind/mmdbwriter/mmdbtype"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,8 +62,7 @@ func replaceBytes(t *testing.T, path string, data []byte) {
 
 func country(t *testing.T, r *Resolver, want string) {
 	t.Helper()
-	got, _, _, _, _ := r.Lookup("192.0.2.1")
-	assert.Equal(t, want, got)
+	assert.Equal(t, want, r.Lookup("192.0.2.1").Country)
 }
 
 func TestSourceTransitions(t *testing.T) {
@@ -164,25 +164,22 @@ func TestLookupRealFixture(t *testing.T) {
 	r := New(fixture, Paths{})
 	t.Cleanup(r.Close)
 	require.NoError(t, r.Refresh())
-	c, city, lat, lon, ok := r.Lookup("81.2.69.142")
-	assert.Equal(t, "GB", c)
-	assert.Equal(t, "London", city)
-	assert.Equal(t, 51.5, lat)
-	assert.Equal(t, -0.1, lon)
-	assert.True(t, ok)
-	c, city, lat, lon, ok = r.Lookup("89.160.20.118")
-	assert.Equal(t, "SE", c)
-	assert.Equal(t, "Linköping", city)
-	assert.Equal(t, 58.4, lat)
-	assert.Equal(t, 15.6, lon)
-	assert.True(t, ok)
+	assert.Equal(t, beacon.Location{
+		Country: "GB",
+		City:    "London",
+		Lat:     51.5,
+		Lon:     -0.1,
+		HasGeo:  true,
+	}, r.Lookup("81.2.69.142"))
+	assert.Equal(t, beacon.Location{
+		Country: "SE",
+		City:    "Linköping",
+		Lat:     58.4,
+		Lon:     15.6,
+		HasGeo:  true,
+	}, r.Lookup("89.160.20.118"))
 	for _, ip := range []string{"192.0.2.1", "not-an-ip"} {
-		c, city, lat, lon, ok = r.Lookup(ip)
-		assert.Empty(t, c)
-		assert.Empty(t, city)
-		assert.Zero(t, lat)
-		assert.Zero(t, lon)
-		assert.False(t, ok)
+		assert.Zero(t, r.Lookup(ip))
 	}
 	assert.Zero(t, r.Status().LookupErrors)
 }
@@ -244,20 +241,18 @@ func TestLookupFieldValidation(t *testing.T) {
 			r := New(p, Paths{})
 			t.Cleanup(r.Close)
 			require.NoError(t, r.Refresh()) // Loading does not claim full-record validation.
-			c, city, lat, lon, ok := r.Lookup("192.0.2.1")
-			assert.Equal(t, tc.country, c)
-			assert.Equal(t, tc.city, city)
-			assert.Equal(t, tc.location, ok)
-			assert.Zero(t, lat)
-			assert.Zero(t, lon)
-			assert.False(t, math.Signbit(lon))
+			loc := r.Lookup("192.0.2.1")
+			assert.Equal(t, tc.country, loc.Country)
+			assert.Equal(t, tc.city, loc.City)
+			assert.Equal(t, tc.location, loc.HasGeo)
+			assert.Zero(t, loc.Lat)
+			assert.Zero(t, loc.Lon)
+			assert.False(t, math.Signbit(loc.Lon))
 			assert.Equal(t, tc.errors, r.Status().LookupErrors)
 			assert.Equal(t, "loaded", r.Status().State)
 			require.NoError(t, r.Refresh())
 			assert.Equal(t, tc.errors, r.Status().LookupErrors)
-			c, _, _, _, ok = r.Lookup("2001:db8::1") // IPv6 against IPv4 database is absence.
-			assert.Empty(t, c)
-			assert.False(t, ok)
+			assert.Zero(t, r.Lookup("2001:db8::1")) // IPv6 against IPv4 database is absence.
 			assert.Equal(t, tc.errors, r.Status().LookupErrors)
 			writeDatabase(t, p, "Netdata-Topology-GEO", countryRecord("US"))
 			require.NoError(t, r.Refresh())
@@ -284,7 +279,7 @@ func TestConcurrentReplacementAndClose(t *testing.T) {
 					return
 				default:
 				}
-				c, _, _, _, _ := r.Lookup("192.0.2.1")
+				c := r.Lookup("192.0.2.1").Country
 				if c != "" && c != "GB" && c != "US" {
 					t.Errorf("invalid country %q", c)
 					return

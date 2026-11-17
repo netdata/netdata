@@ -16,7 +16,7 @@ on:
         required: true
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
   group: release-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   update-changelogs:
     name: Update changelog
@@ -26,6 +26,8 @@ jobs:
       version: ${{ steps.target.outputs.version }}
       type: ${{ steps.target.outputs.type }}
       run: ${{ steps.target.outputs.run }}
+      channel: ${{ steps.target.outputs.channel }}
+      source_sha: ${{ steps.commit.outputs.source_sha }}
     steps:
       - name: Checkout
         id: checkout
@@ -36,13 +38,15 @@ jobs:
           token: ${{ secrets.NETDATABOT_GITHUB_TOKEN }}
       - name: Prepare base ref
         id: target
-        run: >-
-          .github/scripts/prepare-release-base.sh \
-              ${{ github.repository }} \
-              ${{ github.event_name }} \
-              ${{ github.event.inputs.type }} \
-              ${{ github.event.inputs.version }} \
-              ${{ secrets.NETDATA_RELEASE_TEST }}
+        env:
+          RELEASE_REPO: ${{ github.repository }}
+          RELEASE_EVENT: ${{ github.event_name }}
+          RELEASE_TYPE: ${{ inputs.type }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_TEST: ${{ secrets.NETDATA_RELEASE_TEST }}
+        run: |
+          .github/scripts/prepare-release-base.sh "$RELEASE_REPO" "$RELEASE_EVENT" \
+            "$RELEASE_TYPE" "$RELEASE_VERSION" "$RELEASE_TEST"
       - name: Set up git-cliff
         id: setup-git-cliff
         if: steps.target.outputs.run == 'true'
@@ -61,6 +65,7 @@ jobs:
           git config user.email "bot@netdata.cloud"
           git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${{ steps.target.outputs.message }}"
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ "${{ steps.target.outputs.type }}" != "nightly" ]; then
             git tag -a "${{ github.event.inputs.version }}" -m "${{ steps.target.outputs.message }}"
           fi
@@ -89,17 +94,27 @@ jobs:
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
         if: failure()
 
+  runtime-companion:
+    needs: update-changelogs
+    if: needs.update-changelogs.outputs.run == 'true'
+    uses: ./.github/workflows/dem-runtime-release.yml
+    with:
+      source_sha: ${{ needs.update-changelogs.outputs.source_sha }}
+      channel: ${{ needs.update-changelogs.outputs.channel }}
+      publish: true
+    secrets: inherit
+
   trigger-artifacts:
     name: Trigger artifact builds
     runs-on: ubuntu-latest
-    needs: update-changelogs
+    needs: [update-changelogs, runtime-companion]
     if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.update-changelogs.outputs.ref }}
+          ref: ${{ needs.update-changelogs.outputs.source_sha }}
       - name: Trigger build
         id: trigger
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
@@ -108,7 +123,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: build.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}", "source_sha": "${{ needs.update-changelogs.outputs.source_sha }}", "companion_run_id": "${{ needs.runtime-companion.outputs.run_id }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -127,14 +142,14 @@ jobs:
   trigger-docker:
     name: Trigger docker builds
     runs-on: ubuntu-latest
-    needs: update-changelogs
+    needs: [update-changelogs, runtime-companion]
     if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.update-changelogs.outputs.ref }}
+          ref: ${{ needs.update-changelogs.outputs.source_sha }}
       - name: Trigger build
         id: trigger
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
@@ -143,7 +158,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: docker.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "source_sha": "${{ needs.update-changelogs.outputs.source_sha }}", "companion_run_id": "${{ needs.runtime-companion.outputs.run_id }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -162,14 +177,14 @@ jobs:
   trigger-packages:
     name: Trigger package builds
     runs-on: ubuntu-latest
-    needs: update-changelogs
+    needs: [update-changelogs, runtime-companion]
     if: needs.update-changelogs.outputs.run == 'true'
     steps:
       - name: Checkout
         id: checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ needs.update-changelogs.outputs.ref }}
+          ref: ${{ needs.update-changelogs.outputs.source_sha }}
       - name: Trigger build
         id: trigger
         uses: benc-uk/workflow-dispatch@d004979be141727c7a17c28f603e2facc40d0855 # v1.3.3
@@ -178,7 +193,7 @@ jobs:
           repo: ${{ github.repository }}
           workflow: packaging.yml
           ref: ${{ needs.update-changelogs.outputs.ref }}
-          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}"}'
+          inputs: '{"version": "${{ needs.update-changelogs.outputs.version }}", "type": "${{ needs.update-changelogs.outputs.type }}", "source_sha": "${{ needs.update-changelogs.outputs.source_sha }}", "companion_run_id": "${{ needs.runtime-companion.outputs.run_id }}"}'
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:

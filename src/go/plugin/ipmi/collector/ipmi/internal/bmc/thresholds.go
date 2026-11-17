@@ -26,15 +26,12 @@ type rawThresholds struct {
 	raw      [thresholdCount]uint8
 }
 
-// sdrThresholds returns the threshold fields of a full record. The SDK parses
-// the two threshold masks swapped: its Settable flags hold the record's
-// readable threshold mask (IPMI 2.0 Table 43-1 byte 19, as FreeIPMI and
-// ipmitool read it).
+// sdrThresholds returns a full record's raw thresholds and readable mask.
 func sdrThresholds(f *types.SDRFull) rawThresholds {
 	t := f.Mask.Threshold
 	return rawThresholds{
 		readable: [thresholdCount]bool{
-			t.LNR.Settable, t.LCR.Settable, t.LNC.Settable, t.UNC.Settable, t.UCR.Settable, t.UNR.Settable,
+			t.LNR.Readable, t.LCR.Readable, t.LNC.Readable, t.UNC.Readable, t.UCR.Readable, t.UNR.Readable,
 		},
 		raw: [thresholdCount]uint8{f.LNR_Raw, f.LCR_Raw, f.LNC_Raw, f.UNC_Raw, f.UCR_Raw, f.UNR_Raw},
 	}

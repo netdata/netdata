@@ -12,6 +12,8 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
 
+// Service reads redacted copies of RUM observations. A failed read returns no
+// rows.
 type Service struct {
 	registry *rumregistry.Registry
 	history  *history.Store
@@ -61,9 +63,12 @@ func (s *Service) visit(ctx context.Context, filter string, fn func(string, *rum
 	}
 	return ctx.Err()
 }
+
+// siteRedactor is the site's redactor, or the credential patterns for a route
+// built without one.
 func siteRedactor(site *rumregistry.Site) *redact.Redactor {
-	if site.Redactor != nil {
-		return site.Redactor
+	if r := site.Route.Redactor(); r != nil {
+		return r
 	}
-	return redact.NewRedactor()
+	return redact.Patterns
 }

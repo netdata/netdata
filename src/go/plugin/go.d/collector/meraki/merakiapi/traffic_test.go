@@ -314,11 +314,16 @@ func TestSwitchUsageHTTPPolicy(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			var calls atomic.Int32
+			release := make(chan struct{})
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, "Bearer "+syntheticKey, r.Header.Get("Authorization"))
 				tc.respond(w, r, calls.Add(1))
+				if tc.timeout > 0 {
+					<-release
+				}
 			}))
 			defer server.Close()
+			defer close(release) // Keep response EOF from racing client cancellation.
 			hc := web.NewHTTPClientWithTransport(
 				web.ClientConfig{
 					ResponseBodyLimit: confopt.ByteSize(64),

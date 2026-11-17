@@ -8,8 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 )
 
 const (
@@ -20,10 +18,7 @@ const (
 // Every chart identified by ifName must also carry the operator-assigned alias as the `if_alias` label,
 // read from the same row scope, so the UI can display it consistently across profiles.
 func TestStockProfiles_IfNameInterfaceTagsCarryIfAlias(t *testing.T) {
-	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-	require.NoError(t, err)
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 

@@ -16,6 +16,10 @@ import (
 // Version is the Netdata Agent version.
 var Version = "v0.0.0"
 
+// ReleaseVersion, ReleaseChannel and ReleaseRef identify an official release.
+// All three are empty for ordinary developer builds; Version keeps its display format.
+var ReleaseVersion, ReleaseChannel, ReleaseRef string
+
 // UserConfigDir is the path to the user configuration directory.
 var UserConfigDir = ""
 
@@ -50,9 +54,10 @@ var LogDir = "/var/log/netdata"
 // This output is intended for external consumption. Callers must not assume a
 // fixed set, order, or count of keys. New keys may be added over time as more
 // build metadata becomes available, so parsers should ignore unknown keys to
-// remain forward-compatible.
+// remain forward-compatible. Official builds include the complete optional
+// release_version, release_channel and release_ref tuple.
 func Info() string {
-	return fmt.Sprintf(
+	info := fmt.Sprintf(
 		"version=%s go_version=%s user_config_dir=%s stock_config_dir=%s stock_data_dir=%s plugins_dir=%s netdata_bin_dir=%s cache_dir=%s var_lib_dir=%s log_dir=%s",
 		Version,
 		runtime.Version(),
@@ -65,6 +70,10 @@ func Info() string {
 		VarLibDir,
 		LogDir,
 	)
+	if ReleaseVersion != "" && ReleaseChannel != "" && ReleaseRef != "" {
+		info += fmt.Sprintf(" release_version=%s release_channel=%s release_ref=%s", ReleaseVersion, ReleaseChannel, ReleaseRef)
+	}
+	return info
 }
 
 func init() {

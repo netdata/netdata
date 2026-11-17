@@ -6,12 +6,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/buildinfo"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
 	"github.com/stretchr/testify/require"
 )
 
@@ -33,7 +35,8 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 	t.Helper()
 	root := t.TempDir()
 	user, stock = filepath.Join(root, "user"), filepath.Join(root, "stock")
-	buildUser, buildStock, cli = filepath.Join(root, "build-user"), filepath.Join(root, "build-stock"), filepath.Join(root, "cli")
+	buildUser, buildStock = filepath.Join(root, "build-user"), filepath.Join(root, "build-stock")
+	cli = filepath.Join(root, "cli")
 	for _, dir := range []string{user, stock, buildUser, buildStock, cli} {
 		require.NoError(t, os.MkdirAll(dir, 0700))
 	}
@@ -47,7 +50,10 @@ func runtimeConfigRoots(t *testing.T) (user, stock, buildUser, buildStock, cli s
 
 func writeRuntimeConfig(t *testing.T, dir, cache string) {
 	t.Helper()
-	require.NoError(t, os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  cache_path: "+cache+"\n"), 0600))
+	require.NoError(
+		t,
+		os.WriteFile(filepath.Join(dir, "dem.conf"), []byte("runtime:\n  cache_path: "+cache+"\n"), 0600),
+	)
 }
 
 func TestRuntimeConfigurationMatchesService(t *testing.T) {
@@ -121,7 +127,9 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 			}
 			report, err := runtimeCommand(t, args...)
 			require.Error(t, err) // Cache selection is observable before opening an absent installation.
-			pluginconfig.MustInit(pluginconfig.InitInput{ConfDir: confDirs})
+			pluginconfig.MustInit(pluginconfig.InitInput{
+				ConfDir: confDirs,
+			})
 			service, err := dem.LoadConfig(pluginconfig.ConfigDir())
 			require.NoError(t, err)
 			storeConfig, err := service.Runtime.StoreConfig(varlib)
@@ -132,6 +140,45 @@ func TestRuntimeConfigurationMatchesService(t *testing.T) {
 			report, err = runtimeCommand(t, append(args, "--cache", override)...)
 			require.Error(t, err)
 			require.Equal(t, override, report.CachePath)
+		})
+	}
+}
+
+func TestRuntimeConfigurationUsesExactReleaseDefaultAndPreservesOverrides(t *testing.T) {
+	for name, tc := range map[string]struct {
+		agent    browserruntime.AgentRelease
+		stock    bool
+		body     string
+		override *string
+	}{
+		"stable default":  {agent: fixtureAgent("v2.12.0")},
+		"stock default":   {agent: fixtureAgent("v2.12.0"), stock: true},
+		"nightly default": {agent: browserruntime.AgentRelease{Version: "v2.12.0-9-nightly", Channel: "nightly", Source: fixtureAgent("").Source}},
+		"explicit empty":  {agent: fixtureAgent("v2.12.0"), body: "runtime:\n  release_url: ''\n", override: new("")},
+		"explicit URL": {agent: fixtureAgent("v2.12.0"), body: "runtime:\n  release_url: https://example.invalid/offline-release.json\n",
+			override: new("https://example.invalid/offline-release.json")},
+		"developer": {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			setRuntimeAgent(t, tc.agent)
+			root := t.TempDir()
+			if tc.stock {
+				body, err := os.ReadFile("../../plugin/dem/config/dem.conf")
+				require.NoError(t, err)
+				require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), body, 0600))
+			} else if tc.body != "" {
+				require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), []byte(tc.body), 0600))
+			}
+			config, err := dem.LoadConfig([]string{root})
+			require.NoError(t, err)
+			want := ""
+			if tc.agent.Version != "" && (runtime.GOARCH == "amd64" || runtime.GOARCH == "arm64") {
+				want = "https://artifacts.netdata.cloud/dem-runtime/" + tc.agent.Channel + "/" + tc.agent.Version + "/" + runtime.GOARCH + "/release.json"
+			}
+			if tc.override != nil {
+				want = *tc.override
+			}
+			require.Equal(t, want, config.Runtime.ReleaseURL)
 		})
 	}
 }

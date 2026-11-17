@@ -6,7 +6,8 @@ operation. Put the installation routes, outstanding decisions and test limitatio
 1. **Describe the operator's path.** Show the opt-in action, download source, size, installation owner, update and
    activation behavior, and removal for each supported install method. In DEM, native users install an optional
    package. Static, Docker and source deployments explicitly provision a managed archive or preload. Native hooks
-   can restart a previously active Agent. A managed update prepares a release for activation on restart.
+   can restart a previously active Agent. Source/static installers and Docker/preload deployment owners coordinate
+   the matching Agent/runtime pair; the running plugin has no independent update timer.
 2. **Map the diff to reviewers.** Point packaging/SRE to CPack metadata, maintainer scripts, installer changes,
    build matrices, signing and repository upload. Point runtime maintainers to verification, extraction, service
    identity and readiness checks. Identify the contract they share, such as the capability a package hook needs.
@@ -23,14 +24,16 @@ operation. Put the installation routes, outstanding decisions and test limitatio
 | When | Question for the named owner | Evidence to link |
 |---|---|---|
 | Code review | Which catalog, repository and existing signing conventions does this component reuse? Which exceptions need agreement? | Workflow, generated destination matrix, dependency metadata and signing/verifier test |
-| Before first publication | Which storage remote and public HTTPS base serve the exact bytes? Who configures immutable retention and caching of mutable pointers? | Confirmed route, storage and cache settings, and release runbook |
+| Before first publication | Which storage remote and public HTTPS base serve the exact bytes? Who configures immutable retention and public serving? | Confirmed route, storage and cache settings, and release runbook |
 | Before first publication | Who owns key custody/rotation, environment reviewers, branch restrictions, host keys and scoped credential access? | Names of required settings, which already exist and which need provisioning |
 | Before first publication | Which exact artifacts were qualified and who approved the matching sources and licenses? | Artifact digests, supported host results and corresponding-source review |
-| Before promoting the channel pointer | Can clients fetch the immutable runtime and sources through the public URL? | Public read-back sizes and digests matching the signed release |
+| Before exposing the matching Agent release | Can clients fetch the immutable runtime and sources through the public URL? | Public read-back sizes and digests matching the signed release |
 | Before availability is announced | Did each repository ingest the signed package, and can a client install it and use the feature? | Signed repository metadata and a fresh install/update through the published channel |
 
 If a reviewer asks to reuse a signing key, clarify **both** the signature protocol and how an installed client
 obtains replacement public keys. Record offline behavior and what happens when refresh fails. If someone proposes
 a bucket or hostname by analogy, mark it as proposed until the owner confirms its public routing. For DEM,
-`packaging/dem-runtime/RELEASE.md#infrastructure-configuration` owns the setting names and trust/rotation limits.
-In a PR, request identifiers and ownership only. Credential values belong in the protected release environment.
+`packaging/dem-runtime/RELEASE.md#public-objects` and
+`packaging/dem-runtime/RELEASE.md#trust-and-retries` own public delivery and trust limits. Keep internal infrastructure
+identifiers, access arrangements and credential details in the team's private coordination channel. Public issues
+should state the externally observable requirement and its readiness, not reproduce infrastructure discussions.

@@ -19,13 +19,13 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	collector "github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/httpapi"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/query"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/rumfunc"
 	"github.com/stretchr/testify/require"
 )
 
@@ -51,7 +51,7 @@ func TestOnboardingBrowser(t *testing.T) {
 		"tracing-failure", "core-failure", "disabled", "wrong-origin", "alias-coherent", "alias-bootstrap-only",
 	}
 	hub := registry.New()
-	db, err := journal.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"))
+	db, err := journalstore.Open(context.Background(), filepath.Join(t.TempDir(), "history.db"), "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 
@@ -70,13 +70,14 @@ func TestOnboardingBrowser(t *testing.T) {
 		},
 	}
 	handler := httpapi.New(&receiverConfig, hub, nil).Handler()
-	fn := functions.New(query.New(hub, history.NewStore(db)), nil)
+	fn := rumfunc.New(query.New(hub, history.NewStore(db)), nil)
 	receiver := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/function":
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(fn.HandleRaw(r.Context(), funcapi.RawMethodRequest{
-				Method: "rum-sites",
+				Method:      "rum-sites",
+				Permissions: "0x1b",
 			}).RawResponse)
 			return
 		case "/requests":
@@ -247,4 +248,5 @@ func (w *browserResponseWriter) WriteHeader(status int) {
 	w.status = status
 	w.ResponseWriter.WriteHeader(status)
 }
+
 func (w *browserResponseWriter) Unwrap() http.ResponseWriter { return w.ResponseWriter }

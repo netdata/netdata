@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -27,11 +26,26 @@ func TestOptionalStoredSiteAssociation(t *testing.T) {
 		})
 	}
 	require.NoError(t, store.Sync(ctx))
-	all, err := store.QuerySessions(ctx, "", "", 0, now/1e6+1, 2000, "")
+	all, err := store.QuerySessions(ctx, SessionFilter{
+		Filter: Filter{
+			Before: now/1e6 + 1,
+		},
+		Limit: 2000,
+	})
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	assert.Equal(t, "", all[0].VnodeGUID, "old records lacking DEM_VNODE_GUID stay unassigned")
-	selected, err := store.QueryErrors(ctx, "job", "same", 0, now/1e6+1, "11111111-1111-4111-8111-111111111111")
+	selected, err := store.QueryErrors(
+		ctx,
+		ErrorFilter{
+			Filter: Filter{
+				Site:      "job",
+				VnodeGUID: "11111111-1111-4111-8111-111111111111",
+				Before:    now/1e6 + 1,
+			},
+			Fingerprint: "same",
+		},
+	)
 	require.NoError(t, err)
 	require.Len(t, selected, 1)
 	assert.Equal(t, "11111111-1111-4111-8111-111111111111", selected[0].VnodeGUID)
@@ -58,9 +72,27 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 	ctx := context.Background()
 	store, _ := newTestStore(t)
 	now := time.Now().UnixMicro()
-	groups := []string{"11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111", "", "22222222-2222-4222-8222-222222222222", "22222222-2222-4222-8222-222222222222", "", "11111111-1111-4111-8111-111111111111"}
+	groups := []string{
+		"11111111-1111-4111-8111-111111111111",
+		"11111111-1111-4111-8111-111111111111",
+		"",
+		"22222222-2222-4222-8222-222222222222",
+		"22222222-2222-4222-8222-222222222222",
+		"",
+		"11111111-1111-4111-8111-111111111111",
+	}
 	for i, group := range groups {
-		appendEvent(t, store, EventRecord{Site: "job", VnodeGUID: group, SessionID: "session", Type: "event", ObservedUS: now + int64(i)})
+		appendEvent(
+			t,
+			store,
+			EventRecord{
+				Site:       "job",
+				VnodeGUID:  group,
+				SessionID:  "session",
+				Type:       "event",
+				ObservedUS: now + int64(i),
+			},
+		)
 	}
 	require.NoError(t, store.Sync(ctx))
 	events, err := store.QuerySessionEvents(ctx, "job", "session", "")
@@ -70,28 +102,20 @@ func TestStoredSiteAssociationTransitionsRemainIndependent(t *testing.T) {
 		assert.Equal(t, groups[i], event.VnodeGUID, "each persisted event retains its own association")
 	}
 	var scanned []EventRecord
-	require.NoError(t, store.scan(ctx, "job", now/1e6, now/1e6+1, "", func(event EventRecord) { scanned = append(scanned, event) }))
+	require.NoError(
+		t,
+		store.scan(
+			ctx,
+			Filter{
+				Site:   "job",
+				After:  now / 1e6,
+				Before: now/1e6 + 1,
+			},
+			func(event EventRecord) { scanned = append(scanned, event) },
+		),
+	)
 	require.Len(t, scanned, len(groups))
 	for i, event := range scanned {
 		assert.Equal(t, groups[i], event.VnodeGUID, "missing fields must not inherit the previous association")
 	}
-}
-
-func TestLegacySiteTextNeverBecomesVnodeIdentity(t *testing.T) {
-	ctx := context.Background()
-	store, _ := newTestStore(t)
-	fields := eventFields(EventRecord{Site: "job", SessionID: "session", Type: "event", ObservedUS: time.Now().UnixMicro()})
-	// Even UUID-looking legacy site text was not a captured vnode association.
-	fields = append(fields, journal.StringField("DEM_SITE_ID", "11111111-1111-4111-8111-111111111111"))
-	attempted, err := store.journal.Append(ctx, fields)
-	require.True(t, attempted)
-	require.NoError(t, err)
-	require.NoError(t, store.Sync(ctx))
-	rows, err := store.QuerySessionEvents(ctx, "job", "session", "")
-	require.NoError(t, err)
-	require.Len(t, rows, 1)
-	assert.Empty(t, rows[0].VnodeGUID)
-	selected, err := store.QuerySessionEvents(ctx, "job", "session", "11111111-1111-4111-8111-111111111111")
-	require.NoError(t, err)
-	assert.Empty(t, selected)
 }

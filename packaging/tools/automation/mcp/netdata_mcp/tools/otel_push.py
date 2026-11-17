@@ -90,7 +90,7 @@ def register(mcp: FastMCP) -> None:
         description=(
             "Send a deterministic synthetic OTLP LOG corpus to a ready agent's otel "
             "plugin (one-shot; runs otel-streams `synth` to completion). Use with "
-            "netdata_agent_otel_config's small logs_* rotation/retention thresholds + "
+            "netdata_agent_otel_config's small logs rotation/retention thresholds + "
             "netdata_agent_otel_files to verify storage edge cases over a known corpus. "
             "For traces use netdata_agent_otel_push_traces. First call also builds the "
             "generator (cargo), so allow time."
@@ -129,8 +129,8 @@ def register(mcp: FastMCP) -> None:
         description=(
             "Send a deterministic synthetic OTLP TRACE corpus (spans) to a ready agent's "
             "otel plugin (one-shot; runs otel-streams `synth-traces` to completion). Use "
-            "with netdata_agent_otel_config's small traces_* rotation thresholds (e.g. "
-            "traces_rotation_max_entries=10) + netdata_agent_otel_files to watch the traces "
+            "with netdata_agent_otel_config's small traces rotation thresholds (e.g. "
+            "traces.rotation.default.max_entries=10) + netdata_agent_otel_files to watch the traces "
             "pipeline rotate + seal + upload over a known corpus WITHOUT an additional "
             "restart (the small thresholds, applied at the prior run_start, make rotation "
             "automatic as data arrives). Like "

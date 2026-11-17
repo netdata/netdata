@@ -28,9 +28,7 @@ run sed "s|NETDATA_VERSION|${VERSION}|g" < "${NETDATA_MAKESELF_PATH}/makeself.ls
 run "${NETDATA_MAKESELF_PATH}/makeself.sh" \
   --gzip \
   --complevel 9 \
-  --notemp \
   --needroot \
-  --target "${NETDATA_INSTALL_PATH}" \
   --header "${NETDATA_MAKESELF_PATH}/makeself-header.sh" \
   --lsm "${NETDATA_MAKESELF_PATH}/makeself.lsm.tmp" \
   --license "${NETDATA_MAKESELF_PATH}/makeself-license.txt" \

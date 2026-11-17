@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 	"github.com/netdata/systemd-journal-sdk/go/journalhost"
 )
@@ -34,7 +34,7 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 	} {
 		b.Run(workload.name, func(b *testing.B) {
 			ctx := context.Background()
-			owner, err := demjournal.Open(ctx, "")
+			owner, err := journalstore.Open(ctx, "", "")
 			if err != nil {
 				b.Fatal(err)
 			}
@@ -82,11 +82,44 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 				name string
 				run  func() error
 			}{
-				{"sessions_global", func() error { _, err := store.QuerySessions(ctx, "", "", start, end, 0, ""); return err }},
-				{"sessions_site", func() error { _, err := store.QuerySessions(ctx, "site-42", "", start, end, 0, ""); return err }},
-				{"sessions_recent", func() error { _, err := store.QuerySessions(ctx, "site-42", "", end-900, end, 0, ""); return err }},
+				{"sessions_global", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							After:  start,
+							Before: end,
+						},
+					})
+					return err
+				}},
+				{"sessions_site", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							Site:   "site-42",
+							After:  start,
+							Before: end,
+						},
+					})
+					return err
+				}},
+				{"sessions_recent", func() error {
+					_, err := store.QuerySessions(ctx, SessionFilter{
+						Filter: Filter{
+							Site:   "site-42",
+							After:  end - 900,
+							Before: end,
+						},
+					})
+					return err
+				}},
 				{"errors_guid", func() error {
-					_, err := store.QueryErrors(ctx, "", "fingerprint", start, end, "00000009-1111-4111-8111-111111111111")
+					_, err := store.QueryErrors(ctx, ErrorFilter{
+						Filter: Filter{
+							VnodeGUID: "00000009-1111-4111-8111-111111111111",
+							After:     start,
+							Before:    end,
+						},
+						Fingerprint: "fingerprint",
+					})
 					return err
 				}},
 			} {
@@ -104,7 +137,9 @@ func BenchmarkHistoryMultiSiteQueries(b *testing.B) {
 }
 
 // 10,000 retained rows span 200 sessions, seven error fingerprints, and 20
-// archives. Receipt time spans 10,000 seconds; the recent window selects 891 rows.
+// archives. Receipt time spans 10,000 seconds up to a fixed, minute-aligned
+// instant, so every run places rows and query windows on the same minute
+// boundaries; the recent window selects 891 rows.
 // Snapshot admission captures bounded index metadata per file. Reducers retain only
 // distinct summary keys or the requested timeline output, traversing outside the
 // writer gate. Selected fingerprint details retain its distinct session/page/
@@ -133,7 +168,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	now := time.Now().Truncate(time.Second)
+	now := time.Unix(1_700_000_040, 0)
 	for i := 0; i < 10000; i++ {
 		saved := now.Add(time.Duration(i-9999) * time.Second)
 		r := EventRecord{
@@ -163,7 +198,7 @@ func BenchmarkHistoryQueries(b *testing.B) {
 	if err := log.Close(); err != nil {
 		b.Fatal(err)
 	}
-	owner, err := demjournal.Open(context.Background(), root)
+	owner, err := journalstore.Open(context.Background(), root, "")
 	s := NewStore(owner)
 	if err != nil {
 		b.Fatal(err)
@@ -181,16 +216,41 @@ func BenchmarkHistoryQueries(b *testing.B) {
 			return err
 		}},
 		{"sessions_15m", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", now.Add(-15*time.Minute).Unix(), now.Unix(), 0, "")
+			_, err := s.QuerySessions(context.Background(), SessionFilter{
+				Filter: Filter{
+					Site:   "shop",
+					After:  now.Add(-15 * time.Minute).Unix(),
+					Before: now.Unix(),
+				},
+			})
 			return err
 		}},
 		{"sessions_all", func() error {
-			_, err := s.QuerySessions(context.Background(), "shop", "", 0, now.Unix(), 0, "")
+			_, err := s.QuerySessions(context.Background(), SessionFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+			})
 			return err
 		}},
-		{"errors_overview_all", func() error { _, err := s.QueryErrors(context.Background(), "shop", "", 0, now.Unix(), ""); return err }},
+		{"errors_overview_all", func() error {
+			_, err := s.QueryErrors(context.Background(), ErrorFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+			})
+			return err
+		}},
 		{"error_selected_all", func() error {
-			_, err := s.QueryErrors(context.Background(), "shop", "fingerprint-1", 0, now.Unix(), "")
+			_, err := s.QueryErrors(context.Background(), ErrorFilter{
+				Filter: Filter{
+					Site:   "shop",
+					Before: now.Unix(),
+				},
+				Fingerprint: "fingerprint-1",
+			})
 			return err
 		}},
 	} {
@@ -206,11 +266,13 @@ func BenchmarkHistoryQueries(b *testing.B) {
 }
 
 // Measures synchronous AppendEvent validation, encoding and SDK append. It excludes
-// queueing, periodic Sync, rotation and retention. The journal grows throughout each
-// run; use a fixed count (e.g. -benchtime=50000x) when comparing implementations.
+// queueing, periodic Sync, rotation and retention; the first append, which also runs
+// the journal's open-time retention check, is made before the timer starts. The
+// journal grows throughout each run, which slows appends; use a fixed count (e.g.
+// -benchtime=50000x) when comparing timings.
 func BenchmarkHistoryEventAppend(b *testing.B) {
 	ctx := context.Background()
-	owner, err := demjournal.Open(ctx, "")
+	owner, err := journalstore.Open(ctx, "", "")
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -232,6 +294,10 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 		ErrorType:   "TypeError",
 		Message:     "request failed",
 		SampleStack: "app.js:10",
+		ObservedUS:  1_700_000_000_000_000 - 1_000_000,
+	}
+	if _, err := store.AppendEvent(ctx, event); err != nil {
+		b.Fatal(err)
 	}
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -242,4 +308,50 @@ func BenchmarkHistoryEventAppend(b *testing.B) {
 		}
 	}
 	b.StopTimer()
+}
+
+type discardEventWriter struct{}
+
+func (discardEventWriter) AppendEvent(context.Context, EventRecord) (bool, error) { return true, nil }
+
+func (discardEventWriter) Sync(context.Context) error { return nil }
+
+type discardCounters struct{}
+
+func (discardCounters) Add(string, uint64) {}
+
+// Measures the writer's per-batch work without journal I/O: admission checks,
+// accounting and one batch sync per full batch. Cost is O(batch) with no
+// allocation. Timings are local trends, not CI gates.
+func BenchmarkWriterFlush(b *testing.B) {
+	w := NewWriter(nil, discardCounters{})
+	w.st = discardEventWriter{}
+	batch := make([]aggregate.HistoryEvent, maxBatch)
+	for i := range batch {
+		batch[i] = aggregate.HistoryEvent{
+			VnodeGUID:   "11111111-1111-4111-8111-111111111111",
+			Revision:    1,
+			Site:        "shop",
+			SessionID:   "session",
+			ObservedUS:  1_700_000_000_000_000 + int64(i),
+			Type:        "error",
+			Page:        "/checkout",
+			Browser:     "Firefox",
+			Country:     "GR",
+			Device:      "desktop",
+			Version:     "release-1",
+			UserID:      "user-id",
+			Fingerprint: "fingerprint",
+			ErrorType:   "TypeError",
+			Message:     "request failed",
+			SampleStack: "app.js:10",
+		}
+	}
+	ctx := context.Background()
+	b.ReportAllocs()
+	for b.Loop() {
+		if n := w.flush(ctx, batch); n != len(batch) {
+			b.Fatalf("flushed %d of %d", n, len(batch))
+		}
+	}
 }

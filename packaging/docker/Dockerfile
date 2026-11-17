@@ -6,6 +6,8 @@ FROM netdata/builder:v3 AS builder
 
 # One of 'nightly' or 'stable'
 ARG RELEASE_CHANNEL=nightly
+ARG BUILD_VERSION
+ARG RELEASE_SOURCE
 
 ARG CFLAGS
 
@@ -28,6 +30,13 @@ COPY --exclude='**/.git' \
      --exclude='**/Dockerfile' \
      . /opt/netdata.git
 WORKDIR /opt/netdata.git
+
+# Official builds carry identity explicitly; generated host metadata is Git-ignored.
+RUN if [ -n "$RELEASE_SOURCE" ]; then \
+      test -n "$BUILD_VERSION" && \
+      printf 'version=%s\nchannel=%s\nsource=%s\n' \
+        "$BUILD_VERSION" "$RELEASE_CHANNEL" "$RELEASE_SOURCE" > packaging/release-info; \
+    fi
 
 # Install from source
 RUN chmod +x netdata-installer.sh && \
@@ -84,7 +93,6 @@ RUN mkdir -p /app/usr/sbin/ \
                 ndsudo \
                 slabinfo.plugin \
                 network-viewer.plugin \
-                otel-plugin \
                 systemd-journal.plugin; do \
         [ -f "/app/usr/libexec/netdata/plugins.d/$name" ] && chmod 4755 "/app/usr/libexec/netdata/plugins.d/$name"; \
     done && \
@@ -171,7 +179,6 @@ RUN addgroup --gid ${NETDATA_GID} --system "${DOCKER_GRP}" && \
                 ndsudo \
                 slabinfo.plugin \
                 network-viewer.plugin \
-                otel-plugin \
                 systemd-journal.plugin; do \
         [ -f "/usr/libexec/netdata/plugins.d/$name" ] && test $(stat -c %a "/usr/libexec/netdata/plugins.d/$name") = "4755"; \
     done && \

@@ -11,14 +11,12 @@ import (
 // FailureEvidence contains optional, bounded reporter observations. It never
 // determines execution outcome. A nil pointer means evidence was not recorded.
 type FailureEvidence struct {
-	Availability     string         `json:"availability"`
-	Reason           string         `json:"reason,omitempty"`
-	ReporterComplete bool           `json:"reporter_complete"`
-	Truncated        []string       `json:"truncated,omitempty"`
-	Tests            []EvidenceTest `json:"tests,omitempty"`
-	Steps            []EvidenceStep `json:"steps,omitempty"`
-	FirstFailure     *FailureDetail `json:"first_failure,omitempty"`
-	StopContext      *FailureDetail `json:"stop_context,omitempty"`
+	FeatureStatus
+	Truncated    []string       `json:"truncated,omitempty"`
+	Tests        []EvidenceTest `json:"tests,omitempty"`
+	Steps        []EvidenceStep `json:"steps,omitempty"`
+	FirstFailure *FailureDetail `json:"first_failure,omitempty"`
+	StopContext  *FailureDetail `json:"stop_context,omitempty"`
 }
 
 type EvidenceTest struct {
@@ -68,12 +66,12 @@ func CloneFailureEvidence(in *FailureEvidence) *FailureEvidence {
 		return nil
 	}
 	out := *in
-	out.Truncated = append([]string(nil), in.Truncated...)
-	out.Tests = append([]EvidenceTest(nil), in.Tests...)
+	out.Truncated = slices.Clone(in.Truncated)
+	out.Tests = slices.Clone(in.Tests)
 	for i := range out.Tests {
 		cloneEvidenceTest(&out.Tests[i])
 	}
-	out.Steps = append([]EvidenceStep(nil), in.Steps...)
+	out.Steps = slices.Clone(in.Steps)
 	for i := range out.Steps {
 		cloneEvidenceStep(&out.Steps[i])
 	}
@@ -88,7 +86,7 @@ func cloneFailureDetail(in *FailureDetail) *FailureDetail {
 	}
 	out := *in
 	cloneEvidenceTest(&out.Test)
-	out.Location = cloneEvidenceLocation(in.Location)
+	out.Location = clonePtr(in.Location)
 	out.Path = slices.Clone(in.Path)
 	for i := range out.Path {
 		cloneEvidenceStep(&out.Path[i])
@@ -96,41 +94,22 @@ func cloneFailureDetail(in *FailureDetail) *FailureDetail {
 	return &out
 }
 
-func cloneEvidenceLocation(in *EvidenceLocation) *EvidenceLocation {
-	if in == nil {
-		return nil
-	}
-	out := *in
-	return &out
-}
 func cloneEvidenceTest(test *EvidenceTest) {
-	test.Location = cloneEvidenceLocation(test.Location)
-	if test.DurationMS != nil {
-		duration := *test.DurationMS
-		test.DurationMS = &duration
-	}
-}
-func cloneEvidenceStep(step *EvidenceStep) {
-	step.Location = cloneEvidenceLocation(step.Location)
-	if step.DurationMS != nil {
-		duration := *step.DurationMS
-		step.DurationMS = &duration
-	}
+	test.Location = clonePtr(test.Location)
+	test.DurationMS = clonePtr(test.DurationMS)
 }
 
-// ReportingStatus distinguishes missing or unavailable evidence from a partial
-// reporter stream; truncation remains an independent property of the evidence.
+func cloneEvidenceStep(step *EvidenceStep) {
+	step.Location = clonePtr(step.Location)
+	step.DurationMS = clonePtr(step.DurationMS)
+}
+
+// ReportingStatus is NotRecorded for absent evidence, else its FeatureStatus.
 func (e *FailureEvidence) ReportingStatus() string {
 	if e == nil {
-		return "not_recorded"
+		return NotRecorded
 	}
-	if e.Availability != "supported" {
-		return e.Availability
-	}
-	if e.ReporterComplete {
-		return "complete"
-	}
-	return "partial"
+	return e.FeatureStatus.ReportingStatus()
 }
 
 // FailureSummary is shared by the retained-run Function and synchronous rehearsal.
@@ -179,7 +158,7 @@ func (e *FailureEvidence) detailSummary(f *FailureDetail) string {
 	if f.Message != "" {
 		summary += ": " + f.Message
 	}
-	if e.Availability == "invalid" {
+	if e.Availability == FeatureInvalid {
 		summary += " [partial: evidence invalid]"
 	}
 	if f.PathIncomplete {
@@ -227,9 +206,7 @@ func (e *FailureEvidence) LastObservedStepSummary() string {
 			path = append(path, parent.Title)
 			current = *parent
 		}
-		for left, right := 0, len(path)-1; left < right; left, right = left+1, right-1 {
-			path[left], path[right] = path[right], path[left]
-		}
+		slices.Reverse(path)
 		for _, test := range e.Tests {
 			if test.ID == step.TestID {
 				path = append([]string{test.Title}, path...)
@@ -240,7 +217,7 @@ func (e *FailureEvidence) LastObservedStepSummary() string {
 		if step.Location != nil {
 			summary += fmt.Sprintf(" (%s:%d:%d)", step.Location.File, step.Location.Line, step.Location.Column)
 		}
-		if e.Availability == "invalid" {
+		if e.Availability == FeatureInvalid {
 			summary += " [partial: evidence invalid]"
 		}
 		for _, scope := range e.Truncated {

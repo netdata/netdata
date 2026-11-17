@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package config
 
 import (
@@ -66,9 +67,9 @@ func TestEffectiveFeaturesRemainIndependent(t *testing.T) {
 			require.Equal(t, "", *e.EventLogs.Destination.Endpoint)
 			require.Equal(t, DefaultEndpoint, *e.Tracing.Destination.Endpoint)
 			if logs {
-				require.NotEmpty(t, ValidateSiteExtras(e))
+				require.Error(t, validateWithRequired(e))
 			} else {
-				require.Empty(t, ValidateSiteExtras(e))
+				require.NoError(t, validateWithRequired(e))
 			}
 			*e.EventLogs.Destination.Endpoint = "http://changed:4317"
 			e.EventLogs.Enabled = !logs
@@ -96,12 +97,12 @@ func TestDisabledDestinationsRetainButDoNotValidate(t *testing.T) {
 			},
 		},
 	}
-	require.Empty(t, ValidateSiteExtras(s))
+	require.NoError(t, validateWithRequired(s))
 	s.EventLogs.Enabled = true
-	require.NotEmpty(t, ValidateSiteExtras(s))
+	require.Error(t, validateWithRequired(s))
 	s.EventLogs.Enabled = false
 	s.Tracing.Enabled = true
-	require.NotEmpty(t, ValidateSiteExtras(s))
+	require.Error(t, validateWithRequired(s))
 	data, err := yaml.Marshal(s)
 	require.NoError(t, err)
 	var round Site
@@ -109,4 +110,5 @@ func TestDisabledDestinationsRetainButDoNotValidate(t *testing.T) {
 	require.Equal(t, s.EventLogs, round.EventLogs)
 	require.Equal(t, s.Tracing, round.Tracing)
 }
+
 func stringPtr(s string) *string { return &s }

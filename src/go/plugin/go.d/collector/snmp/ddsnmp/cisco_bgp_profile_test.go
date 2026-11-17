@@ -81,10 +81,7 @@ func Test_CiscoBGPProfilesIncludeTypedRows(t *testing.T) {
 		},
 	}
 
-	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-	require.NoError(t, err)
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 
@@ -115,7 +112,7 @@ func Test_CiscoGenericProfilesDoNotInheritBGP(t *testing.T) {
 	dir, err := filepath.Abs("../../../config/go.d/snmp.profiles/default")
 	require.NoError(t, err)
 
-	_, err = loadProfilesFromDir(dir, multipath.New(dir))
+	_, err = stockProfilesForTest()
 	require.NoError(t, err)
 
 	for name, tc := range tests {

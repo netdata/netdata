@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 "use strict";
 const { FEATURE } = require("./failure-evidence.cjs");
+const { FEATURE: BROWSER_SUMMARY } = require("./browser-summary.cjs");
+const { FEATURE: CAPTURE_DETAILS } = require("./capture-details.cjs");
+
+const FAILURE_TRACE = "failure_trace.v1";
 
 function selection(request) {
   if (
@@ -10,8 +14,13 @@ function selection(request) {
     )
   )
     return undefined;
-  return request.kind === "journey" && request.extensions.includes(FEATURE)
-    ? [FEATURE]
+  return request.kind === "journey"
+    ? [FEATURE, BROWSER_SUMMARY, CAPTURE_DETAILS, FAILURE_TRACE].filter(
+        (feature) =>
+          request.extensions.includes(feature) &&
+          (![CAPTURE_DETAILS, FAILURE_TRACE].includes(feature) ||
+            request.capture),
+      )
     : [];
 }
 function family(record) {
@@ -31,10 +40,11 @@ function optional(record, selected, terminal) {
   const kind = family(record);
   if (kind !== "extension" && kind !== "extension_init") return false;
   if (kind === "extension_init" && selected && !terminal) return record;
-  if (kind === "extension" && selected?.includes(FEATURE) && !terminal) {
+  if (kind === "extension" && selected?.length && !terminal) {
     const feature = record.extension?.feature;
-    if (feature === FEATURE || typeof feature !== "string") return record;
+    if (selected.includes(feature) || typeof feature !== "string")
+      return record;
   }
   return true;
 }
-module.exports = { selection, family, optional };
+module.exports = { selection, family, optional, FAILURE_TRACE };

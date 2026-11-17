@@ -835,6 +835,9 @@ if(ENABLE_PLUGIN_DEM)
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SECTION "net")
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_PREDEPENDS "netdata-user")
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_SUGGESTS "netdata-dem-runtime")
+  # Calendar-version runtimes require only API1, so their own dependencies cannot
+  # force migration to the exact Agent pair. Keep the runtime optional.
+  set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_BREAKS "netdata-dem-runtime (<< 1:0)")
   set(CPACK_DEBIAN_PLUGIN-DEM_PACKAGE_PROVIDES "netdata-dem-runtime-api (= 1)")
   set(CPACK_DEBIAN_PLUGIN-DEM_DEBUGINFO_PACKAGE Off)
   configure_file("${PKG_FILES_PATH}/deb/plugin-dem/postinst.in"
@@ -846,6 +849,7 @@ if(ENABLE_PLUGIN_DEM)
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_SUMMARY "Experimental digital experience monitoring for the Netdata Agent")
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_REQUIRES "netdata = ${CPACK_PACKAGE_VERSION}")
   set(CPACK_RPM_PLUGIN-DEM_PACKAGE_PROVIDES "netdata-dem-runtime-api = 1")
+  set(CPACK_RPM_PLUGIN-DEM_PACKAGE_CONFLICTS "netdata-dem-runtime < 1:0")
   if(NETDATA_RPM_PLUGIN_SUGGESTS)
     set(CPACK_RPM_PLUGIN-DEM_PACKAGE_SUGGESTS "netdata-dem-runtime")
   endif()
@@ -1413,4 +1417,5 @@ if(OS_WINDOWS)
         list(APPEND CPACK_COMPONENTS_ALL "netdata_driver" "netdata_driver_inf" "wevt_netdata_dll")
 endif()
 
+include("${PKG_FILES_PATH}/../../dem-runtime/native/CMakeLists.txt")
 include(CPack)

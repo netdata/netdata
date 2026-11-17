@@ -72,7 +72,8 @@ payload="$(jq -n \
 
 echo -e "${COV_GRAY}Posting triage update for CID ${CID} (class=${CLASS_ID} sev=${SEV_ID} act=${ACT_ID})...${COV_NC}" >&2
 
-response_file="$(mktemp "${TMPDIR:-/tmp}/cov-triage-XXXXXX.json")"
+# BSD/macOS mktemp randomizes only trailing X's, so the template must end in them.
+response_file="$(mktemp "${TMPDIR:-/tmp}/cov-triage.XXXXXX")"
 trap 'rm -f "${response_file}"' EXIT
 
 http=$(curl -sS -X POST -o "${response_file}" -w '%{http_code}' \

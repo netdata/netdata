@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # dem.plugin: the experimental digital experience monitoring plugin and config.
-# Browser execution assets are delivered by the independent DEM runtime.
+# Browser execution assets are delivered by the optional paired DEM runtime.
 #
 # include()d from the root file, so paths resolve against the repository and
 # build roots; nothing here may use CMAKE_CURRENT_LIST_DIR.
@@ -19,7 +19,7 @@ if(ENABLE_PLUGIN_DEM)
 
     set(_DEM_GO_LDFLAGS "${GO_LDFLAGS}")
     if(NETDATA_PACKAGE_KIND STREQUAL "deb" OR NETDATA_PACKAGE_KIND STREQUAL "rpm")
-        string(APPEND GO_LDFLAGS " -X github.com/netdata/netdata/go/plugins/plugin/dem.DefaultRuntimeMode=native")
+        string(APPEND GO_LDFLAGS " -X github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost.DefaultMode=native")
     endif()
     add_go_target(dem-plugin ${DEM_PLUGIN_BIN} src/go cmd/demplugin)
     set(GO_LDFLAGS "${_DEM_GO_LDFLAGS}")

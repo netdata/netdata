@@ -52,6 +52,7 @@ type Collector struct {
 	definition       packageDefinition
 	registered       bool
 	configEnvelope   []byte
+	messageLimit     int // Selected before Init; production constructors use the protocol default.
 	initialized      bool
 	templates        *chartengine.TemplateSet
 	checks           []checkDefinition // definitions in the current template set only
@@ -71,6 +72,7 @@ func New() *Collector {
 			UpdateEvery:    defaultUpdateEvery,
 			Timeout:        confopt.Duration(defaultTimeout),
 		},
+		messageLimit:       maxMessageBytes,
 		store:              metrix.NewCollectorStore(),
 		validateExecutable: pathvalidate.ValidateBinaryPath,
 	}
@@ -104,7 +106,7 @@ func (c *Collector) Init(context.Context) error {
 		return err
 	}
 	var err error
-	if c.configEnvelope, err = c.definition.configEnvelope(c.ScriptConfig); err != nil {
+	if c.configEnvelope, err = c.definition.configEnvelope(c.ScriptConfig, c.messageLimit); err != nil {
 		return err
 	}
 	c.templates = c.definition.templates

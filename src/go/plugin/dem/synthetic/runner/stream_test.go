@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package runner
 
 import (
@@ -26,6 +27,7 @@ func (r *fragmentReader) Read(p []byte) (int, error) {
 	}
 	return n, nil
 }
+
 func diagnosticText(events []synthetic.Event) string {
 	var b strings.Builder
 	for _, e := range events {
@@ -33,10 +35,12 @@ func diagnosticText(events []synthetic.Event) string {
 	}
 	return b.String()
 }
+
 func TestBootstrapStderrRedactsAcrossReadBoundaries(t *testing.T) {
 	s := newSink(
-		synthetic.Journey,
-		false,
+		synthetic.Request{
+			Kind: synthetic.Journey,
+		},
 		newRedactor(
 			map[string]string{"DEM_SECRET_TOKEN": "fixture-only-secret-0123456789", "DEM_SECRET_UTF": "秘密🔐value"},
 		),
@@ -70,7 +74,9 @@ func TestBootstrapStderrRedactsAcrossReadBoundaries(t *testing.T) {
 func TestDiagnosticStreamsKeepBoundariesAndEvidence(t *testing.T) {
 	secret := "fixture-only-secret-0123456789"
 	r := newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret})
-	s := newSink(synthetic.Journey, false, r)
+	s := newSink(synthetic.Request{
+		Kind: synthetic.Journey,
+	}, r)
 	var wire strings.Builder
 	for _, event := range []synthetic.Event{
 		{Kind: "stdout", Phase: "worker", Message: "before fixture-only-secret-"},
@@ -101,18 +107,21 @@ func TestDiagnosticStreamsKeepBoundariesAndEvidence(t *testing.T) {
 		"structured evidence remains incremental while a stream is buffered",
 	)
 }
+
 func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	secret := strings.Repeat("private-fixture-", 300)
-	s := newSink(synthetic.Journey, false, newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret}))
+	s := newSink(synthetic.Request{
+		Kind: synthetic.Journey,
+	}, newRedactor(map[string]string{"DEM_SECRET_TOKEN": secret}))
 	chunks := []string{
 		secret[:2001],
 		secret[2001:] + "\n",
-		strings.Repeat("safe ", TextLimit),
+		strings.Repeat("safe ", textLimit),
 		"token=hidden-tail\n",
 		"-----BEGIN PRIVATE KEY-----\n",
 		strings.Repeat("private-material", 1000),
 		"\n-----END -----\nstill-private\n-----END PRIVATE KEY-----\n",
-		strings.Repeat("safe line\n", EventLimit+5),
+		strings.Repeat("safe line\n", eventLimit+5),
 		"unfinished " + secret[:80],
 	}
 	s.stderr(&fragmentReader{
@@ -120,7 +129,7 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	})
 	got := s.snapshot()
 	recovered := diagnosticText(got.events)
-	assert.Len(t, got.events, EventLimit)
+	assert.Len(t, got.events, eventLimit)
 	assert.Greater(t, got.dropped, 0)
 	for _, part := range []string{"private-fixture-", "hidden-tail", "private-material", "still-private"} {
 		assert.NotContains(t, recovered, part)
@@ -128,9 +137,10 @@ func TestDiagnosticOverflowAndRetentionCannotExposeTails(t *testing.T) {
 	assert.Contains(t, recovered, "[REDACTED]")
 	assert.Contains(t, recovered, "diagnostic line exceeded")
 	for _, event := range got.events {
-		assert.LessOrEqual(t, utf8.RuneCountInString(event.Message), TextLimit)
+		assert.LessOrEqual(t, utf8.RuneCountInString(event.Message), textLimit)
 	}
 }
+
 func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {
 	values := map[string]string{
 		"DEM_SECRET_A": "abc",
@@ -141,7 +151,9 @@ func TestExactStreamOverlapUnicodeAndShortValues(t *testing.T) {
 	}
 	input := "ordinary 界 abc abcdef 秘密🔐value first\nsecond ! tail abcde"
 	for width := 1; width <= len(input); width++ {
-		s := newSink(synthetic.Journey, false, newRedactor(values))
+		s := newSink(synthetic.Request{
+			Kind: synthetic.Journey,
+		}, newRedactor(values))
 		var chunks []string
 		for left := input; len(left) > 0; {
 			n := min(width, len(left))

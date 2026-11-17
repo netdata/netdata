@@ -3,96 +3,115 @@
 package main
 
 import (
-	"archive/tar"
-	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
-	goruntime "runtime"
+	"runtime"
+	"strings"
 	"testing"
 
-	"github.com/klauspost/compress/zstd"
+	"github.com/netdata/netdata/go/plugins/internal/browserruntimetest"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
 	"github.com/netdata/netdata/go/plugins/plugin/dem"
-	runtime "github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/browserruntime"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic/runtimehost"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/ndexec"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// This authenticated fixture proves archive plumbing and final-path binding, not
-// executable/browser readiness. qualify must reject it.
+// adminBundleFixture writes the shared fixture payload and its signed release.
+// It proves archive plumbing and final-path binding, not executable/browser
+// readiness: qualify must reject it.
 func adminBundleFixture(t *testing.T) (manifestPath, archivePath string) {
 	t.Helper()
-	prefix := append([]byte("/unprepared/"), make([]byte, 1012)...)
-	entries := []struct {
-		name string
-		body []byte
-	}{
-		{"node", prefix}, {"browser", prefix}, {"loader", []byte("loader")},
-		{"dependencies/package.json", []byte("{}")}, {"fonts/test.ttf", []byte("font")},
-		{"runner/run.mjs", []byte("// non-executable qualification fixture")},
-		{"runtime.json", []byte(`{"contract":2,"version":"cli-fixture","paths":{"dependencies":"dependencies","browser":"chrome"}}`)},
+	setRuntimeAgent(t, fixtureAgent("cli-fixture"))
+	return adminNamedBundleFixture(t, "cli-fixture")
+}
+
+func adminNamedBundleFixture(t *testing.T, label string) (manifestPath, archivePath string) {
+	t.Helper()
+	agent := fixtureAgent(label)
+	b := browserruntimetest.NewBundle(t, label, browserruntimetest.Entry{
+		Name: "release-info", Mode: 0644,
+		Contents: []byte("version=" + agent.Version + "\nchannel=" + agent.Channel + "\nsource=" + agent.Source + "\n"),
+	})
+	manifest := browserruntime.Manifest{
+		Format:   1,
+		Contract: 2,
+		Version:  label,
+		Platform: "linux/" + runtime.GOARCH,
+		Archive:  browserruntime.Archive(b.Bounds),
+		Layout:   browserruntime.Layout(b.Layout),
 	}
-	var raw, compressed bytes.Buffer
-	tw := tar.NewWriter(&raw)
-	var expanded int64
-	for _, entry := range entries {
-		require.NoError(t, tw.WriteHeader(&tar.Header{Name: entry.name, Mode: 0755, Size: int64(len(entry.body)), Typeflag: tar.TypeReg}))
-		_, err := tw.Write(entry.body)
-		require.NoError(t, err)
-		expanded += int64(len(entry.body))
-	}
-	require.NoError(t, tw.Close())
-	encoder, err := zstd.NewWriter(&compressed, zstd.WithEncoderConcurrency(1))
-	require.NoError(t, err)
-	_, err = encoder.Write(raw.Bytes())
-	require.NoError(t, err)
-	require.NoError(t, encoder.Close())
-	digest := sha256.Sum256(compressed.Bytes())
-	manifest := runtime.Manifest{Format: 1, Contract: 2, Version: "cli-fixture", Platform: "linux/" + goruntime.GOARCH,
-		Archive:  runtime.Archive{SHA256: hex.EncodeToString(digest[:]), Bytes: int64(compressed.Len()), TarBytes: int64(raw.Len()), ExpandedBytes: expanded, Entries: len(entries)},
-		Layout:   runtime.Layout{EntryPoint: "runner/run.mjs", Node: "node", Browser: "browser", Dependencies: "dependencies", Loader: "loader", Fonts: "fonts"},
-		Bindings: []runtime.Binding{{Path: "node", Expected: prefix}, {Path: "browser", Expected: prefix}},
+	for _, binding := range b.Bindings {
+		manifest.Bindings = append(manifest.Bindings, browserruntime.Binding(binding))
 	}
 	require.NoError(t, manifest.Validate())
 	root := t.TempDir()
 	manifestPath = filepath.Join(root, "trusted.json")
 	archivePath = filepath.Join(root, "runtime.tar.zst")
 	writeAdminRelease(t, manifestPath, manifest)
-	require.NoError(t, os.WriteFile(archivePath, compressed.Bytes(), 0600))
+	require.NoError(t, os.WriteFile(archivePath, b.Data, 0600))
 	return manifestPath, archivePath
 }
 
-func TestRuntimeInstallRejectsUnqualifiedArchive(t *testing.T) {
+func TestRuntimeInstallDoesNotExecuteBrowser(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	cache := filepath.Join(root, "cache")
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--cache", cache, "--archive", archive)
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root,
+		"--release", manifest, "--cache", cache, "--archive", archive)
+	require.NoError(t, err)
+	assert.Equal(t, "installed", report.State)
+	assert.Equal(t, "selected", report.CandidateState)
+	assert.Nil(t, report.Qualification)
+	require.NotNil(t, report.Storage)
+	require.NotNil(t, report.Storage.Release)
+	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root, "--cache", cache)
 	require.Error(t, err)
-	assert.Equal(t, "unavailable", report.State)
-	assert.Equal(t, "prepared", report.CandidateState)
+	assert.Equal(t, "installed", report.State)
 	require.NotNil(t, report.Qualification)
 	assert.False(t, report.Qualification.SandboxedLocalJourney)
-	require.NotNil(t, report.Storage)
-	assert.Nil(t, report.Storage.Selected)
 	report, err = runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
-	require.ErrorIs(t, err, runtime.ErrUnavailable)
-	assert.Equal(t, "unavailable", report.State)
+	require.NoError(t, err)
+	assert.Equal(t, "installed", report.State)
+	assert.Nil(t, report.Qualification)
 }
 
-func TestRuntimePreloadRequiresQualifiedArchiveAndFreshRoot(t *testing.T) {
+func TestRuntimePreloadDoesNotExecuteBrowserAndRequiresFreshRoot(t *testing.T) {
 	manifest, archive := adminBundleFixture(t)
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	final := filepath.Join(root, "preloaded")
-	args := []string{"runtime", "preload", "--config-dir", root, "--release", manifest, "--archive", archive, "--root", final}
+	args := []string{
+		"runtime",
+		"preload",
+		"--config-dir",
+		root,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--root",
+		final,
+	}
 	report, err := runtimeCommand(t, args...)
+	require.NoError(t, err)
+	assert.NotNil(t, report.PreloadedConfig)
+	assert.Nil(t, report.Qualification)
+	assert.FileExists(t, filepath.Join(final, "preload.json"))
+	config, err := json.Marshal(map[string]any{
+		"runtime": map[string]any{"mode": "preloaded", "preload_path": final},
+	})
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(root, "dem.conf"), config, 0600))
+	report, err = runtimeCommand(t, "runtime", "qualify", "--config-dir", root)
 	require.Error(t, err)
-	assert.Nil(t, report.PreloadedConfig)
-	assert.NoFileExists(t, filepath.Join(final, "preload.json"))
+	assert.Equal(t, "installed", report.State)
+	require.NotNil(t, report.Qualification)
+	assert.False(t, report.Qualification.SandboxedLocalJourney)
 	_, err = runtimeCommand(t, args...)
 	require.ErrorContains(t, err, "preload root must be empty")
 }
@@ -102,12 +121,24 @@ func TestRuntimeInstallDigestFailureNeverReportsPrepared(t *testing.T) {
 	root := t.TempDir()
 	writeAdminTrust(t, root, "")
 	require.NoError(t, os.WriteFile(archive, []byte("corrupt"), 0600))
-	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root, "--release", manifest, "--archive", archive, "--cache", filepath.Join(root, "cache"))
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"install",
+		"--config-dir",
+		root,
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--cache",
+		filepath.Join(root, "cache"),
+	)
 	require.Error(t, err)
 	assert.Equal(t, "unavailable", report.State)
 	assert.NotEmpty(t, report.SetupError)
 	require.NotNil(t, report.Storage)
-	assert.Nil(t, report.Storage.Selected)
+	assert.Nil(t, report.Storage.Release)
 }
 
 func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
@@ -124,15 +155,25 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, serviceCache, service.Runtime.CachePath)
 	report, err := runtimeCommand(t, "runtime", "install", "--release", manifest, "--archive", archive)
-	require.Error(t, err) // Structurally valid fixture cannot qualify as an executable runtime.
-	require.Equal(t, "unavailable", report.State)
-	require.Equal(t, "prepared", report.CandidateState)
+	require.NoError(t, err)
+	require.Equal(t, "installed", report.State)
+	require.Equal(t, "selected", report.CandidateState)
 	require.Equal(t, service.Runtime.CachePath, report.CachePath)
 	require.DirExists(t, filepath.Join(serviceCache, "generations", report.Candidate.SHA256))
 	require.NoDirExists(t, wrongCache)
 	overrideCache := filepath.Join(t.TempDir(), "override-cache")
-	report, err = runtimeCommand(t, "runtime", "install", "--release", manifest, "--archive", archive, "--cache", overrideCache)
-	require.Error(t, err)
+	report, err = runtimeCommand(
+		t,
+		"runtime",
+		"install",
+		"--release",
+		manifest,
+		"--archive",
+		archive,
+		"--cache",
+		overrideCache,
+	)
+	require.NoError(t, err)
 	require.Equal(t, overrideCache, report.CachePath)
 	require.DirExists(t, filepath.Join(overrideCache, "generations", report.Candidate.SHA256))
 	require.NoDirExists(t, wrongCache)
@@ -141,11 +182,16 @@ func TestRuntimeInstallUsesServiceConfiguration(t *testing.T) {
 // This opt-in test uses authentic release descriptors and archives through the
 // production CLI acquisition, qualification and publication path.
 func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
-	manifest, archive, helper := os.Getenv("DEM_RUNTIME_TEST_RELEASE"), os.Getenv("DEM_RUNTIME_TEST_ARCHIVE"), os.Getenv("DEM_RUNTIME_TEST_HELPER")
+	manifest := os.Getenv("DEM_RUNTIME_TEST_RELEASE")
+	archive := os.Getenv("DEM_RUNTIME_TEST_ARCHIVE")
+	helper := os.Getenv("DEM_RUNTIME_TEST_HELPER")
 	publicKey := os.Getenv("DEM_RUNTIME_TEST_PUBLIC_KEY")
 	if manifest == "" || archive == "" || helper == "" || publicKey == "" {
-		t.Skip("requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER")
+		t.Skip(
+			"requires DEM_RUNTIME_TEST_RELEASE, DEM_RUNTIME_TEST_ARCHIVE, DEM_RUNTIME_TEST_PUBLIC_KEY and DEM_RUNTIME_TEST_HELPER",
+		)
 	}
+	require.NoError(t, runtimehost.AgentRelease().Validate(), "real runtime tests require compiled matching ReleaseVersion, ReleaseChannel and ReleaseRef linker metadata")
 	require.NotZero(t, os.Geteuid())
 	restore := ndexec.SetRunnerPathsForTests(helper, "")
 	defer restore()
@@ -158,18 +204,27 @@ func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "installed", report.State)
 	require.NotNil(t, report.Runtime)
-	require.NotNil(t, report.Qualification)
-	require.True(t, report.Qualification.ExecutionContract)
-	require.True(t, report.Qualification.SandboxedLocalJourney)
-	require.True(t, report.Qualification.SandboxedLocalLighthouse)
-	require.True(t, report.Qualification.ProcessTreeDrained)
-	require.Equal(t, report.Runtime, report.Qualification.Runtime)
+	require.Nil(t, report.Qualification)
+	// Installing remains exact-pair checked. Execution uses the same contract and
+	// integrity checks as an ordinary developer build with no release stamps.
+	setRuntimeAgent(t, browserruntime.AgentRelease{})
 	for _, command := range []string{"status", "qualify"} {
 		result, err := runtimeCommand(t, append([]string{"runtime", command}, common...)...)
 		require.NoError(t, err)
 		require.Equal(t, report.Runtime, result.Runtime)
+		if command == "qualify" {
+			require.Equal(t, "qualified", result.State)
+			require.NotNil(t, result.Qualification)
+			require.True(t, result.Qualification.ExecutionContract)
+			require.True(t, result.Qualification.SandboxedLocalJourney)
+			require.True(t, result.Qualification.SandboxedLocalLighthouse)
+			require.True(t, result.Qualification.ProcessTreeDrained)
+			require.Equal(t, report.Runtime, result.Qualification.Runtime)
+		} else {
+			require.Nil(t, result.Qualification)
+		}
 	}
-	store, err := runtime.Open(runtime.DefaultConfig(cache))
+	store, err := browserruntime.Open(browserruntime.DefaultConfig(cache))
 	require.NoError(t, err)
 	consumer, err := store.AcquireSelected()
 	require.NoError(t, err)
@@ -181,5 +236,78 @@ func TestRealRuntimeInstallQualifyAndUninstall(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "uninstalled", result.State)
 	_, err = runtimeCommand(t, append([]string{"runtime", "status"}, common...)...)
-	require.ErrorIs(t, err, runtime.ErrUnavailable)
+	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
+}
+
+func TestRuntimePairedUpdateDoesNotExecuteBrowser(t *testing.T) {
+	root, cache, _, _, previous := selectedAdminFixture(t)
+	release, archive := adminNamedBundleFixture(t, "updated-fixture")
+	// The installation owner uses the target helper to prepare, then activates
+	// after replacing Agent files. Neither command executes the browser.
+	setRuntimeAgent(t, fixtureAgent("updated-fixture"))
+	report, err := runtimeCommand(t, "runtime", "prepare", "--config-dir", root,
+		"--release", release, "--cache", cache, "--archive", archive)
+	require.NoError(t, err)
+	assert.Equal(t, "installed", report.State)
+	assert.Equal(t, "prepared", report.CandidateState)
+	assert.Equal(t, previous.Archive.SHA256, report.Runtime.SHA256)
+	assert.Nil(t, report.Qualification)
+	report, err = runtimeCommand(t, "runtime", "activate", "--config-dir", root, "--cache", cache)
+	require.NoError(t, err)
+	assert.Nil(t, report.Qualification)
+	require.NotNil(t, report.Runtime)
+	assert.Equal(t, "updated-fixture", report.Runtime.Version)
+	assert.NotEqual(t, previous.Archive.SHA256, report.Runtime.SHA256)
+	assert.FileExists(t, filepath.Join(cache, "generations", previous.Archive.SHA256, "prepared.json"))
+}
+
+func TestRuntimeInstallRejectsDifferentAgentPair(t *testing.T) {
+	for name, change := range map[string]func(*browserruntime.AgentRelease){
+		"version": func(agent *browserruntime.AgentRelease) { agent.Version = "next-Agent-release" },
+		"channel": func(agent *browserruntime.AgentRelease) { agent.Channel = "nightly" },
+		"source":  func(agent *browserruntime.AgentRelease) { agent.Source = strings.Repeat("b", 40) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			root, cache, release, archive, selected := selectedAdminFixture(t)
+			agent := fixtureAgent(selected.Version)
+			change(&agent)
+			if name == "version" {
+				// Acquiring a later runtime does not advance the installed helper.
+				release, archive = adminNamedBundleFixture(t, agent.Version)
+			} else {
+				writeAdminPairedRelease(t, release, selected, agent)
+			}
+			selection := filepath.Join(cache, "selection.json")
+			before, err := os.ReadFile(selection)
+			require.NoError(t, err)
+			report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root,
+				"--cache", cache, "--release", release, "--archive", archive)
+			require.ErrorIs(t, err, browserruntime.ErrIncompatible)
+			require.Nil(t, report.Candidate)
+			require.Nil(t, report.Qualification)
+			after, err := os.ReadFile(selection)
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			status, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
+			require.NoError(t, err)
+			require.NotNil(t, status.Runtime)
+			require.Equal(t, selected.Identity(), *status.Runtime)
+		})
+	}
+}
+
+func TestRuntimeInstallRequiresCompiledAgentIdentity(t *testing.T) {
+	release, archive := adminBundleFixture(t)
+	setRuntimeAgent(t, browserruntime.AgentRelease{})
+	root := t.TempDir()
+	writeAdminTrust(t, root, "")
+	cache := filepath.Join(root, "cache")
+	report, err := runtimeCommand(t, "runtime", "install", "--config-dir", root,
+		"--cache", cache, "--release", release, "--archive", archive)
+	require.ErrorContains(t, err, "expected Agent release")
+	require.Nil(t, report.Candidate)
+	require.Nil(t, report.Qualification)
+	status, err := runtimeCommand(t, "runtime", "status", "--config-dir", root, "--cache", cache)
+	require.ErrorIs(t, err, browserruntime.ErrUnavailable)
+	require.Nil(t, status.Runtime)
 }

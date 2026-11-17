@@ -38,6 +38,9 @@
   Your netdata configuration will be retained.
   After installation, netdata will be (re-)started.
 
+  Temporary extraction uses TMPDIR (default /tmp). This filesystem must
+  allow execution and have space for the complete uncompressed package.
+
   netdata re-distributes a lot of open source software components.
   Check its full license at:
   https://github.com/netdata/netdata/blob/master/LICENSE.md

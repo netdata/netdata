@@ -30,7 +30,18 @@ func TestRuntimeEnsureWarmSelectionAvoidsQualificationAndInventory(t *testing.T)
 	selectionPath := filepath.Join(cache, "selection.json")
 	before, err := os.ReadFile(selectionPath)
 	require.NoError(t, err)
-	report, err := runtimeCommand(t, "runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--expected-root", cache)
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"ensure",
+		"--allow-download",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--expected-root",
+		cache,
+	)
 	require.NoError(t, err)
 	require.Equal(t, "already-selected", report.Outcome)
 	require.Equal(t, "installed", report.State)
@@ -50,7 +61,18 @@ func TestRuntimeEnsureExpectedRootRefusesBeforeCreatingStore(t *testing.T) {
 	}
 	root := t.TempDir()
 	cache := filepath.Join(root, "absent", "cache")
-	report, err := runtimeCommand(t, "runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--expected-root", "/var/lib/netdata/dem/runtime")
+	report, err := runtimeCommand(
+		t,
+		"runtime",
+		"ensure",
+		"--allow-download",
+		"--config-dir",
+		root,
+		"--cache",
+		cache,
+		"--expected-root",
+		"/var/lib/netdata/dem/runtime",
+	)
 	require.ErrorContains(t, err, "differs from --expected-root")
 	require.Equal(t, "failed", report.Outcome)
 	require.NoDirExists(t, filepath.Dir(cache))
@@ -64,7 +86,13 @@ func TestRuntimeEnsureCanceledBeforeStorageMutation(t *testing.T) {
 	cache := filepath.Join(root, "cache")
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := runRuntimeCommand(ctx, []string{"runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache}, os.Stdout, os.Stderr)
+	err := runRuntimeCommand(
+		ctx,
+		[]string{"ensure", "--allow-download", "--config-dir", root, "--cache", cache},
+		nil,
+		os.Stdout,
+		os.Stderr,
+	)
 	require.ErrorIs(t, err, context.Canceled)
 	require.NoDirExists(t, cache)
 }
@@ -85,7 +113,18 @@ func TestRuntimeEnsureRejectsRoot(t *testing.T) {
 // the command returns; finishing must join the reader without waiting for EOF.
 func TestRuntimeEnsurePrivateStdinSubprocess(t *testing.T) {
 	if os.Getenv("NETDATA_TEST_ENSURE_STDIN") == "child" {
-		os.Args = []string{"dem.plugin", "runtime", "ensure", "--allow-download", "--config-dir", os.Getenv("NETDATA_TEST_ENSURE_CONFIG"), "--cache", os.Getenv("NETDATA_TEST_ENSURE_CACHE"), "--cancel-on-stdin-close"}
+		setRuntimeAgent(t, fixtureAgent("cli-fixture"))
+		os.Args = []string{
+			"dem.plugin",
+			"runtime",
+			"ensure",
+			"--allow-download",
+			"--config-dir",
+			os.Getenv("NETDATA_TEST_ENSURE_CONFIG"),
+			"--cache",
+			os.Getenv("NETDATA_TEST_ENSURE_CACHE"),
+			"--cancel-on-stdin-close",
+		}
 		main()
 		os.Exit(0)
 	}
@@ -102,7 +141,12 @@ func TestRuntimeEnsurePrivateStdinSubprocess(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRuntimeEnsurePrivateStdinSubprocess$")
-			cmd.Env = append(os.Environ(), "NETDATA_TEST_ENSURE_STDIN=child", "NETDATA_TEST_ENSURE_CONFIG="+root, "NETDATA_TEST_ENSURE_CACHE="+cache)
+			cmd.Env = append(
+				os.Environ(),
+				"NETDATA_TEST_ENSURE_STDIN=child",
+				"NETDATA_TEST_ENSURE_CONFIG="+root,
+				"NETDATA_TEST_ENSURE_CACHE="+cache,
+			)
 			cmd.Stdin = input
 			output, err := cmd.CombinedOutput()
 			require.NoError(t, err, "%s", output)
@@ -130,7 +174,21 @@ func TestRuntimeEnsureControlEOFCancelsInstallerWait(t *testing.T) {
 				defer cancel()
 				done := make(chan error, 1)
 				go func() {
-					_, err := runRuntimeCommandWithInput(ctx, []string{"runtime", "ensure", "--allow-download", "--config-dir", root, "--cache", cache, "--cancel-on-stdin-close"}, input, io.Discard, io.Discard)
+					err := runRuntimeCommand(
+						ctx,
+						[]string{
+							"ensure",
+							"--allow-download",
+							"--config-dir",
+							root,
+							"--cache",
+							cache,
+							"--cancel-on-stdin-close",
+						},
+						input,
+						io.Discard,
+						io.Discard,
+					)
 					done <- err
 				}()
 				if action == "cancel" {

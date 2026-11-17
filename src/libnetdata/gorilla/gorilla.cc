@@ -132,8 +132,10 @@ void gorilla_writer_add_buffer(gorilla_writer_t *gw, gorilla_buffer_t *gbuf, siz
     gw->prev_xor_lzc = 0;
     gw->capacity = capacity;
 
+    // publishes the new buffer's header and the old buffer's final entries to
+    // readers that acquire-load next
     if (gw->last_buffer)
-        gw->last_buffer->header.next = gbuf;
+        __atomic_store_n(&gw->last_buffer->header.next, gbuf, __ATOMIC_RELEASE);
 
     __atomic_store_n(&gw->last_buffer, gbuf, __ATOMIC_RELEASE);
 }
@@ -350,6 +352,19 @@ gorilla_reader_t gorilla_reader_init(gorilla_buffer_t *gbuf)
     };
 }
 
+#ifdef NETDATA_INTERNAL_CHECKS
+// -W unittest only: runs inside a reader that ran out of entries, between its
+// reload of the buffer's entries and its load of the next buffer
+static void (*gorilla_reader_unittest_hook)(void) = nullptr;
+
+static void gorilla_reader_unittest_pause(void)
+{
+    void (*hook)(void) = __atomic_load_n(&gorilla_reader_unittest_hook, __ATOMIC_RELAXED);
+    if (unlikely(hook))
+        hook();
+}
+#endif
+
 static bool gorilla_reader_read_bits(gorilla_reader_t *gr, const uint32_t *data, uint32_t *number, size_t nbits)
 {
     if (unlikely(gr->position > gr->capacity || nbits > gr->capacity - gr->position))
@@ -375,14 +390,22 @@ extern "C" {
             // if the reader's current buffer has not been updated, we need to
             // check if it has a pointer to a next buffer.
             if (gr->index + 1 > gr->entries) {
+#ifdef NETDATA_INTERNAL_CHECKS
+                gorilla_reader_unittest_pause();
+#endif
                 gorilla_buffer_t *next_buffer = __atomic_load_n(&gr->buffer->header.next, __ATOMIC_ACQUIRE);
 
-                if (!next_buffer) {
-                    // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n (No more buffers to read from)", gr->length, gr->buffer);
+                if (!next_buffer)
                     return false;
-                }
 
-                // fprintf(stderr, "Consumed reader with %zu entries from buffer %p\n", gr->length, gr->buffer);
+                // The writer appends the last values of this buffer before it
+                // links the next one, and they may have landed after the loads
+                // above: read this buffer's entries again before leaving it.
+                gr->entries = __atomic_load_n(&gr->buffer->header.entries, __ATOMIC_ACQUIRE);
+                gr->capacity = __atomic_load_n(&gr->buffer->header.nbits, __ATOMIC_ACQUIRE);
+                if (gr->index + 1 <= gr->entries)
+                    break;
+
                 *gr = gorilla_reader_init(next_buffer);
                 data = gr->buffer->data;
             }
@@ -454,6 +477,112 @@ void gorilla_writer_aral_unmark(const gorilla_writer_t *gw, struct aral *ar)
 
         curr_gbuf = next_gbuf;
     }
+}
+
+/*
+ * -W unittest: a reader of a hot page must not skip the values the writer
+ * appends to a buffer right before it links the next one.
+ */
+
+#include <memory>
+#include <new>
+#include <utility>
+#include <vector>
+
+namespace {
+
+struct gorilla_unittest_buffer_delete {
+    void operator()(gorilla_buffer_t *p) const { ::operator delete(p); }
+};
+
+struct gorilla_unittest_hot_page {
+    static constexpr size_t slots = 8; // tiny buffers, so the writer links new ones often
+
+    // zeroed raw buffers, as the dbengine allocates them
+    std::vector<std::unique_ptr<gorilla_buffer_t, gorilla_unittest_buffer_delete>> storage;
+    std::vector<uint32_t> written;
+    gorilla_writer_t gw{};
+    uint32_t next_value = 1000;
+
+    gorilla_buffer_t *new_buffer() {
+        size_t bytes = slots * sizeof(uint32_t);
+        std::unique_ptr<gorilla_buffer_t, gorilla_unittest_buffer_delete> buf(
+            static_cast<gorilla_buffer_t *>(::operator new(bytes)));
+        std::memset(buf.get(), 0, bytes);
+        storage.push_back(std::move(buf));
+        return storage.back().get();
+    }
+
+    // as pgd_append_point() does: a full buffer makes the write fail, then link a new one
+    void write_one() {
+        uint32_t v = next_value;
+        next_value = next_value * 2654435761u + 1;
+        if (!gorilla_writer_write(&gw, v)) {
+            gorilla_writer_add_buffer(&gw, new_buffer(), slots);
+            gorilla_writer_write(&gw, v);
+        }
+        written.push_back(v);
+    }
+
+    // fill the current buffer and link the next one
+    void write_until_new_buffer() {
+        size_t buffers = storage.size();
+        while (storage.size() == buffers)
+            write_one();
+    }
+};
+
+gorilla_unittest_hot_page *gorilla_unittest_page = nullptr;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+void gorilla_unittest_writer_in_window(void) {
+    __atomic_store_n(&gorilla_reader_unittest_hook, (void (*)(void)) nullptr, __ATOMIC_RELAXED);
+    gorilla_unittest_page->write_until_new_buffer();
+}
+#endif
+
+} // namespace
+
+extern "C" int gorilla_unittest(void)
+{
+    gorilla_unittest_hot_page page;
+    gorilla_unittest_page = &page;
+    page.gw = gorilla_writer_init(page.new_buffer(), gorilla_unittest_hot_page::slots);
+    page.write_one();
+
+    gorilla_reader_t gr = gorilla_writer_get_reader(&page.gw);
+    std::vector<uint32_t> got;
+    uint32_t value;
+
+    for (int round = 0; round < 50; round++) {
+        // drain what is there, so the next read reaches the end of the buffer
+        while (gorilla_reader_read(&gr, &value))
+            got.push_back(value);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        // the writer acts between the reader's entries reload and its next load
+        __atomic_store_n(&gorilla_reader_unittest_hook, &gorilla_unittest_writer_in_window, __ATOMIC_RELAXED);
+#else
+        page.write_until_new_buffer();
+#endif
+    }
+    while (gorilla_reader_read(&gr, &value))
+        got.push_back(value);
+
+#ifdef NETDATA_INTERNAL_CHECKS
+    __atomic_store_n(&gorilla_reader_unittest_hook, (void (*)(void)) nullptr, __ATOMIC_RELAXED);
+#endif
+    gorilla_unittest_page = nullptr;
+
+    size_t same = 0;
+    while (same < got.size() && same < page.written.size() && got[same] == page.written[same])
+        same++;
+
+    bool ok = got.size() == page.written.size() && same == got.size();
+    fprintf(stderr, "gorilla: hot page reader across %zu buffers: wrote %zu values, read %zu, first mismatch at %zu: %s\n",
+            page.storage.size(), page.written.size(), got.size(), same, ok ? "OK" : "FAILED");
+
+    return ok ? 0 : 1;
 }
 
 /*

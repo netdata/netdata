@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum_test
 
 import (
@@ -14,12 +15,11 @@ import (
 	"testing"
 	"time"
 
-	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
-
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/receiver"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
+	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
@@ -38,14 +38,21 @@ func (o *output) Write(p []byte) (int, error) {
 	defer o.mu.Unlock()
 	return o.buf.Write(p)
 }
+
 func (o *output) String() string { o.mu.Lock(); defer o.mu.Unlock(); return o.buf.String() }
 func startJob(t *testing.T, module, name string, c collectorapi.CollectorV2) (*jobruntime.JobV2, *output, func()) {
 	t.Helper()
 	return startJobWithConfig(t, jobruntime.JobV2Config{
-		PluginName: "dem", ModuleName: module, Name: name, FullName: module + "_" + name,
-		Module: c, UpdateEvery: 1, StoreFirst: true,
+		PluginName:  "dem",
+		ModuleName:  module,
+		Name:        name,
+		FullName:    module + "_" + name,
+		Module:      c,
+		UpdateEvery: 1,
+		StoreFirst:  true,
 	})
 }
+
 func startJobWithConfig(t *testing.T, cfg jobruntime.JobV2Config) (*jobruntime.JobV2, *output, func()) {
 	t.Helper()
 	out := &output{}
@@ -78,6 +85,7 @@ func startJobWithConfig(t *testing.T, cfg jobruntime.JobV2Config) (*jobruntime.J
 	require.True(t, run.Running())
 	return job, out, stop
 }
+
 func tickUntil(t *testing.T, job *jobruntime.JobV2, out *output, needle string) {
 	t.Helper()
 	for i := 1; i <= 300; i++ {
@@ -93,7 +101,7 @@ func tickUntil(t *testing.T, job *jobruntime.JobV2, out *output, needle string) 
 // Receiver reload must preserve an independent site's measurements and history.
 func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	hub := rumregistry.New()
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
@@ -156,7 +164,14 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 	send("/checkout")
 	stopNext()
 	stopSite()
-	rows, err := rumhistory.NewStore(db).QuerySessions(context.Background(), "shop", "", 0, time.Now().Unix()+10, 10, "")
+	rows, err := rumhistory.NewStore(db).
+		QuerySessions(context.Background(), rumhistory.SessionFilter{
+			Filter: rumhistory.Filter{
+				Site:   "shop",
+				Before: time.Now().Unix() + 10,
+			},
+			Limit: 10,
+		})
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	assert.EqualValues(t, 2, rows[0].Pageviews)
@@ -165,7 +180,7 @@ func TestNativeJobsIngressReplacementAndHistory(t *testing.T) {
 }
 
 func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	defer db.Close()
 	site := rum.New(rum.Dependencies{
@@ -184,7 +199,7 @@ func TestCancelledOTLPPreparationHonorsCaller(t *testing.T) {
 
 func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := rumregistry.New()
@@ -250,7 +265,14 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 	stopBeta()
 	stopNext()
 	for name, want := range map[string]uint64{"alpha": 1, "beta": 2} {
-		rows, err := rumhistory.NewStore(db).QuerySessions(ctx, name, "", 0, time.Now().Unix()+10, 10, "")
+		rows, err := rumhistory.NewStore(db).
+			QuerySessions(ctx, rumhistory.SessionFilter{
+				Filter: rumhistory.Filter{
+					Site:   name,
+					Before: time.Now().Unix() + 10,
+				},
+				Limit: 10,
+			})
 		require.NoError(t, err)
 		require.Len(t, rows, 1)
 		require.Equal(t, "same-session", rows[0].SessionID)
@@ -260,7 +282,7 @@ func TestIndependentSitesSurviveReceiverReplacementAndRetirement(t *testing.T) {
 
 func TestOversizedChunkedUploadRespondsPromptlyAndDisablesKeepAlive(t *testing.T) {
 	hub := rumregistry.New()
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	site := rum.New(rum.Dependencies{
@@ -306,23 +328,47 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	const guidA = "11111111-1111-4111-8111-111111111111"
 	const guidB = "22222222-2222-4222-8222-222222222222"
 	ctx := context.Background()
-	db, err := demjournal.Open(ctx, "")
+	db, err := journalstore.Open(ctx, "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	hub := rumregistry.New()
 	var vnodeMu sync.RWMutex
-	current := jobruntime.VnodeSnapshot{Vnode: &vnodes.VirtualNode{Name: "site-a", Hostname: "site-a", GUID: guidA}, Revision: 1, MetadataRevision: 1}
+	current := jobruntime.VnodeSnapshot{
+		Vnode: &vnodes.VirtualNode{
+			Name:     "site-a",
+			Hostname: "site-a",
+			GUID:     guidA,
+		},
+		Revision:         1,
+		MetadataRevision: 1,
+	}
 	lookup := func(string) (jobruntime.VnodeSnapshot, bool) {
 		vnodeMu.RLock()
 		defer vnodeMu.RUnlock()
 		return current.Copy(), true
 	}
 	startSite := func(name, guid string) (*jobruntime.JobV2, *output, func()) {
-		c := rum.New(rum.Dependencies{Registry: hub, History: rumhistory.NewStore(db)})
+		c := rum.New(rum.Dependencies{
+			Registry: hub,
+			History:  rumhistory.NewStore(db),
+		})
 		c.Name = name
 		c.Vnode = "site-a"
 		c.AllowedOrigins = []string{"https://example.org"}
-		cfg := jobruntime.JobV2Config{PluginName: "dem", ModuleName: "rum", Name: name, FullName: "rum_" + name, Module: c, UpdateEvery: 1, StoreFirst: true, Vnode: vnodes.VirtualNode{Name: "site-a", Hostname: "site-a", GUID: guid}}
+		cfg := jobruntime.JobV2Config{
+			PluginName:  "dem",
+			ModuleName:  "rum",
+			Name:        name,
+			FullName:    "rum_" + name,
+			Module:      c,
+			UpdateEvery: 1,
+			StoreFirst:  true,
+			Vnode: vnodes.VirtualNode{
+				Name:     "site-a",
+				Hostname: "site-a",
+				GUID:     guid,
+			},
+		}
 		if name == "shop" {
 			cfg.VnodeName = "site-a"
 			cfg.VnodeRevision = 1
@@ -333,13 +379,27 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	}
 	job, out, _ := startSite("shop", guidA)
 	peer, peerOut, _ := startSite("peer", guidB)
-	recv := receiver.New(receiver.Dependencies{Registry: hub})
+	recv := receiver.New(receiver.Dependencies{
+		Registry: hub,
+	})
 	recv.Listen = "127.0.0.1:0"
 	_, _, _ = startJob(t, "receiver", "receiver", recv)
 	send := func(name, page string, lcp int) {
 		id := strings.TrimPrefix(page, "/")
-		body := fmt.Sprintf(`{"meta":{"page":{"id":%q,"url":%q},"session":{"id":"same-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":%q,"observation_sequence":"1"}}],"measurements":[{"type":"web-vitals","values":{"lcp":%d},"context":{"id":%q,"observation_sequence":"2"}}]}`, id, "https://example.org"+page, id, lcp, "lcp-"+id)
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+hub.Availability().Listen+"/rum/"+name+"/collect", strings.NewReader(body))
+		body := fmt.Sprintf(
+			`{"meta":{"page":{"id":%q,"url":%q},"session":{"id":"same-session"}},"events":[{"name":"document_activated","attributes":{"observation_id":%q,"observation_sequence":"1"}}],"measurements":[{"type":"web-vitals","values":{"lcp":%d},"context":{"id":%q,"observation_sequence":"2"}}]}`,
+			id,
+			"https://example.org"+page,
+			id,
+			lcp,
+			"lcp-"+id,
+		)
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			"http://"+hub.Availability().Listen+"/rum/"+name+"/collect",
+			strings.NewReader(body),
+		)
 		require.NoError(t, err)
 		req.Header.Set("Origin", "https://example.org")
 		req.Header.Set("User-Agent", "Mozilla/5.0 Chrome/124.0.0.0 Safari/537.36")
@@ -362,7 +422,15 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	release()
 	priorLength := len(out.String())
 	vnodeMu.Lock()
-	current = jobruntime.VnodeSnapshot{Vnode: &vnodes.VirtualNode{Name: "site-a", Hostname: "site-b", GUID: guidB}, Revision: 2, MetadataRevision: 2}
+	current = jobruntime.VnodeSnapshot{
+		Vnode: &vnodes.VirtualNode{
+			Name:     "site-a",
+			Hostname: "site-b",
+			GUID:     guidB,
+		},
+		Revision:         2,
+		MetadataRevision: 2,
+	}
 	vnodeMu.Unlock()
 	tickUntil(t, job, out, "HOST '"+guidB+"'")
 	switched := out.String()[priorLength:]
@@ -372,7 +440,7 @@ func TestNativeRUMConfiguredVnodeChangeKeepsEvidenceAndMovesFreshMetrics(t *test
 	require.True(t, ok)
 	require.Equal(t, generation, site.Generation, "vnode refresh does not restart ingestion")
 	require.Empty(t, site.Aggregator.Pages(""))
-	oldRows, _ := site.Aggregator.Live(0, 10, guidA)
+	oldRows := site.Aggregator.Live(0, 10, guidA)
 	require.Len(t, oldRows, 2)
 	release()
 	send("shop", "/new", 100)

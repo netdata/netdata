@@ -15,6 +15,11 @@ sh netdata-x86_64-latest.gz.run -- --preview-channel
 
 The installer also accepts `--stable-channel` and `--nightly-channel`; the default is nightly.
 
+The archive extracts into temporary staging before updating `/opt/netdata`. Set `TMPDIR` to a writable filesystem
+that permits execution and has room for the complete uncompressed package. Kickstart and the updater pass their
+selected executable temporary directory to the archive, including across privilege elevation. Existing configuration,
+runtime state and directory symlinks are retained; a failed update leaves the installation available for ordinary repair.
+
 ## State permissions during updates
 
 Installation makes package directories traversable and initializes the service's library, cache and log roots.

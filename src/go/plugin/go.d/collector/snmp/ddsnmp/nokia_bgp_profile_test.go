@@ -3,7 +3,6 @@
 package ddsnmp
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 )
 
@@ -201,9 +199,7 @@ func Test_NokiaBGPProfileMergedIntoNokiaSROS(t *testing.T) {
 func mustLoadNokiaSROSBGPProfile(t *testing.T) *Profile {
 	t.Helper()
 
-	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 

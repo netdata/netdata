@@ -845,6 +845,23 @@ fi
 # -----------------------------------------------------------------------------
 progress "Install netdata"
 
+# Enrolled installations verify the companion before the first live write.
+# The ordinary no-runtime installation keeps the existing CMake install path.
+. "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-dem-pair.sh"
+DP_ENABLED=0
+DP_DONT_START=$DONOTSTART
+if [ -x "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/dem.plugin" ] || [ -d "${NETDATA_PREFIX}/etc/netdata" ]; then
+  dem_pair_plan "${NETDATA_BUILD_DIR}/dem.plugin" "${NETDATA_PREFIX}/usr/sbin/netdata" \
+    "${NETDATA_PREFIX:-/}" source "${NETDATA_BUILD_DIR}/netdata" "${NETDATA_BUILD_DIR}/netdatacli" || exit $?
+fi
+if [ "${DP_ENABLED}" = 1 ]; then
+  trap 'dem_pair_exit "$?"' EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM HUP
+  dem_pair_begin || exit $?
+  DONOTSTART=1
+fi
+# CMake owns installation for both enrolled and ordinary Agents.
 if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
@@ -1351,6 +1368,13 @@ echo >&2 "Setting netdata.tarball.checksum to 'new_installation'"
 cat << EOF > "${NETDATA_LIB_DIR}/netdata.tarball.checksum"
 new_installation
 EOF
+
+if [ "${DP_ENABLED:-0}" = 1 ]; then
+  dem_pair_finish || exit $?
+  [ "$DP_WAS_RUNNING" = 1 ] && [ "$DP_DONT_START" != 1 ] && started=1
+fi
+dem_pair_cleanup_stage || exit $?
+trap - EXIT HUP INT TERM
 
 print_deferred_errors
 

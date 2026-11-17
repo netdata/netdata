@@ -128,7 +128,7 @@ GET /api/v3/function?function=systemd-journal info after:1234567890 before:12345
   - Common fields: `help`, `unique_view`, optional `value_separator` for an accepted joined-value encoding
   - `options[]`: `id`, `name`, optional `defaultSelected`, `disabled`, `sort`, `aliases`
   - Optional `focus` declares topology roots/depth controls; see
-    [Topology focus controls](FUNCTION_UI_DEVELOPER_GUIDE.md#topology-focus-controls).
+    [Topology focus controls](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#topology-focus-controls).
 
 When normalizing values against selector metadata, option IDs are opaque. Match an exact ID before considering
 declared aliases or splitting a joined value; `beta rack,1` can be one ID, and `prod-a` differs from `prod_a`.
@@ -136,7 +136,7 @@ An alias advertised by several options is ambiguous and does not identify an opt
 accepted producer input; they do not change parsing.
 Go structured Function command arguments split commas before resolution regardless of this metadata. Use structured
 JSON `selections` to preserve IDs containing commas.
-See [Accepted option forms](FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
+See [Accepted option forms](/src/plugins.d/FUNCTION_UI_DEVELOPER_GUIDE.md#accepted-option-forms).
 
 **Cloud-frontend UI notes (verified):**
 - `type: "select"` renders as a **single-select**.
@@ -1428,7 +1428,8 @@ Frontend handles 304 responses gracefully without showing errors to users.
 
 **Common Optional Fields:**
 - `has_history`: Default false
-- `help`: Documentation text
+- `help`: Documentation text. The Cloud Functions UI shows it as plain text (no Markdown) in the tooltip of the
+  information icon next to the Function title, so keep it short.
 - `update_every`: Default 1
 - `expires`: Cache control
 - `default_sort_column`: Initial sort

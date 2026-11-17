@@ -114,13 +114,15 @@ func (s *Store) readManifest(id string) (manifest, error) {
 	if err != nil {
 		return manifest{}, err
 	}
-	if vnodeguid.Validate(m.VnodeGUID) != nil || m.Version != 2 || m.RunID != id || !validJobID(m.JobID) || m.PublishedUS <= 0 || len(m.Artifacts) == 0 {
+	if vnodeguid.Validate(m.VnodeGUID) != nil || m.Version != 2 || m.RunID != id || !synthetic.ValidJobID(m.JobID) ||
+		m.PublishedUS <= 0 ||
+		len(m.Artifacts) == 0 {
 		return manifest{}, fmt.Errorf("invalid artifact manifest")
 	}
 	ids := make(map[string]bool)
 	for _, a := range m.Artifacts {
 		if !artifactIDPattern.MatchString(a.ID) || ids[a.ID] || a.Bytes < 0 || len(a.SHA256) != 64 ||
-			!((a.Kind == "screenshot" && a.MIME == "image/png") || (a.Kind == "report" && a.MIME == "text/html")) {
+			!validCaptureKind(a.Kind, a.MIME) {
 			return manifest{}, fmt.Errorf("invalid artifact manifest entry")
 		}
 		ids[a.ID] = true
@@ -129,7 +131,7 @@ func (s *Store) readManifest(id string) (manifest, error) {
 }
 
 func (s *Store) readOwnedManifest(jobID, runID string) (manifest, error) {
-	if !validJobID(jobID) {
+	if !synthetic.ValidJobID(jobID) {
 		return manifest{}, ErrInvalidID
 	}
 	m, err := s.readManifest(runID)

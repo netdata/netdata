@@ -9,7 +9,6 @@ import (
 	"sync"
 	"testing"
 
-	redact "github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/aggregate"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 	"github.com/stretchr/testify/require"
@@ -74,9 +73,17 @@ func tracedBeacon() *beacon.Beacon {
 	return b
 }
 
+func newTraceExporter(t *testing.T, endpoint, site string, c Counters) *Traces {
+	t.Helper()
+	e, err := NewTraces(context.Background(), destination(endpoint), site, c)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, e.Close()) })
+	return e
+}
+
 // Browser spans preserve normalized values and IDs and carry the RUM resource.
 func TestResourceSpans(t *testing.T) {
-	e := newTraceExporter(t, "127.0.0.1:1", "s1", newRecCounters(), newRedactor(t, "hunter2"))
+	e := newTraceExporter(t, "127.0.0.1:1", "s1", newRecCounters())
 	rs := e.resourceSpans(tracedBeacon())
 	res := map[string]string{}
 	for _, kv := range rs.Resource.Attributes {
@@ -102,7 +109,7 @@ func TestResourceSpans(t *testing.T) {
 
 func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 	remote := &fakeTraceService{}
-	e := newTraceExporter(t, startTraceServer(t, remote), "s1", newRecCounters(), nil)
+	e := newTraceExporter(t, startTraceServer(t, remote), "s1", newRecCounters())
 	first, second := tracedBeacon(), tracedBeacon()
 	second.ServiceName = "other-service"
 	second.SessionID = "another-session"
@@ -114,14 +121,12 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 	extra.Scope = "other-scope"
 	extra.ScopeVersion = "2"
 	first.Spans = append(first.Spans, extra, first.Spans[0])
-	e.Ingest(first, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  first,
-		Accepted:     true,
 		Investigated: true,
 	})
-	e.Ingest(second, aggregate.Result{
+	e.Ingest(aggregate.Result{
 		Observation:  second,
-		Accepted:     true,
 		Investigated: true,
 	})
 	ctx, cancel := context.WithCancel(context.Background())
@@ -155,12 +160,4 @@ func TestTraceBatchPreservesPerBeaconResourcesAndScopes(t *testing.T) {
 		},
 		attrs,
 	)
-}
-
-func newTraceExporter(t *testing.T, endpoint, site string, c Counters, r *redact.Redactor) *Traces {
-	t.Helper()
-	e, err := NewTraces(context.Background(), destination(endpoint), site, c, r)
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, e.Close()) })
-	return e
 }

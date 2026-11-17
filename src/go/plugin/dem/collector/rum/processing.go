@@ -19,13 +19,13 @@ type processor struct {
 func (p *processor) Ingest(b *beacon.Beacon) {
 	result := p.aggregator.Ingest(b)
 	if p.logs != nil {
-		p.logs.Ingest(b, result)
+		p.logs.Ingest(result)
 	}
 	if p.traces != nil {
-		p.traces.Ingest(b, result)
+		p.traces.Ingest(result)
 	}
 }
 
-func (p *processor) Reject(site, reason string) {
-	p.aggregator.Reject(site, reason)
+func (p *processor) Reject(reason string) {
+	p.aggregator.Reject(reason)
 }

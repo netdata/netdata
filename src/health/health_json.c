@@ -2,39 +2,18 @@
 
 #include "health.h"
 
-void health_string2json(BUFFER *wb, const char *prefix, const char *label, const char *value, const char *suffix) {
-    if(value && *value) {
-        buffer_sprintf(wb, "%s\"%s\":\"", prefix, label);
-        buffer_strcat_htmlescape(wb, value);
-        buffer_strcat(wb, "\"");
-        buffer_strcat(wb, suffix);
-    }
-    else
-        buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
+// expression text, or null when there is none
+static inline void health_json_member_add_expression_text(BUFFER *wb, const char *key, const char *value) {
+    buffer_json_member_add_string(wb, key, (value && *value) ? value : NULL);
 }
 
 static inline void health_rrdcalc_values2json_nolock(
     RRDHOST *host, BUFFER *wb, RRDCALC *rc, const RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
     (void)host;
-    buffer_sprintf(wb,
-                   "\t\t\"%s.%s\": {\n"
-                   "\t\t\t\"id\": %lu,\n"
-                   , rrdcalc_chart_name(rc), rrdcalc_name(rc)
-                   , (unsigned long)rc->id);
-
-    buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_print_netdata_double(wb, snapshot->value);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\t\t\"last_updated\":");
-    buffer_sprintf(wb, "%lu", (unsigned long)snapshot->last_updated);
-    buffer_strcat(wb, ",\n");
-
-    buffer_sprintf(wb,
-                   "\t\t\t\"status\": \"%s\"\n"
-                   , rrdcalc_status2string(snapshot->status));
-
-    buffer_strcat(wb, "\t\t}");
+    buffer_json_member_add_uint64(wb, "id", rc->id);
+    buffer_json_member_add_double(wb, "value", snapshot->value);
+    buffer_json_member_add_uint64(wb, "last_updated", (uint64_t)snapshot->last_updated);
+    buffer_json_member_add_string(wb, "status", rrdcalc_status2string(snapshot->status));
 }
 
 static inline void health_rrdcalc2json_nolock(
@@ -49,128 +28,84 @@ static inline void health_rrdcalc2json_nolock(
     char hash_id[GUID_LEN + 1];
     uuid_unparse_lower(rc->config.hash_id, hash_id);
 
-    buffer_sprintf(wb,
-            "\t\t\"%s.%s\": {\n"
-                    "\t\t\t\"id\": %lu,\n"
-                    "\t\t\t\"config_hash_id\": \"%s\",\n"
-                    "\t\t\t\"name\": \"%s\",\n"
-                    "\t\t\t\"chart\": \"%s\",\n"
-                    "\t\t\t\"class\": \"%s\",\n"
-                    "\t\t\t\"component\": \"%s\",\n"
-                    "\t\t\t\"type\": \"%s\",\n"
-                    "\t\t\t\"active\": %s,\n"
-                    "\t\t\t\"disabled\": %s,\n"
-                    "\t\t\t\"silenced\": %s,\n"
-                    "\t\t\t\"exec\": \"%s\",\n"
-                    "\t\t\t\"recipient\": \"%s\",\n"
-                    "\t\t\t\"source\": \"%s\",\n"
-                    "\t\t\t\"units\": \"%s\",\n"
-                    "\t\t\t\"summary\": \"%s\",\n"
-                    "\t\t\t\"info\": \"%s\",\n"
-                    "\t\t\t\"status\": \"%s\",\n"
-                    "\t\t\t\"last_status_change\": %lu,\n"
-                    "\t\t\t\"last_updated\": %lu,\n"
-                    "\t\t\t\"next_update\": %lu,\n"
-                    "\t\t\t\"update_every\": %d,\n"
-                    "\t\t\t\"delay_up_duration\": %d,\n"
-                    "\t\t\t\"delay_down_duration\": %d,\n"
-                    "\t\t\t\"delay_max_duration\": %d,\n"
-                    "\t\t\t\"delay_multiplier\": %f,\n"
-                    "\t\t\t\"delay\": %d,\n"
-                    "\t\t\t\"delay_up_to_timestamp\": %lu,\n"
-                    "\t\t\t\"warn_repeat_every\": \"%u\",\n"
-                    "\t\t\t\"crit_repeat_every\": \"%u\",\n"
-                    "\t\t\t\"value_string\": \"%s\",\n"
-                    "\t\t\t\"last_repeat\": \"%lu\",\n"
-                    "\t\t\t\"times_repeat\": %lu,\n"
-                   , rrdcalc_chart_name(rc), rrdcalc_name(rc)
-                   , (unsigned long)rc->id
-                   , hash_id
-                   , rrdcalc_name(rc)
-                   , rrdcalc_chart_name(rc)
-                   , rc->config.classification?rrdcalc_classification(rc):"Unknown"
-                   , rc->config.component?rrdcalc_component(rc):"Unknown"
-                   , rc->config.type?rrdcalc_type(rc):"Unknown"
-                   , (rc->rrdset)?"true":"false"
-                   , (snapshot->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
-                   , (snapshot->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
-                   , rc->config.exec?rrdcalc_exec(rc):string2str(host->health.default_exec)
-                   , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.default_recipient)
-                   , rrdcalc_source(rc)
-                   , rrdcalc_units(rc)
-                   , string2str(summary)
-                   , string2str(info)
-                   , rrdcalc_status2string(snapshot->status)
-                   , (unsigned long)snapshot->last_status_change
-                   , (unsigned long)snapshot->last_updated
-                   , (unsigned long)snapshot->next_update
-                   , rc->config.update_every
-                   , rc->config.delay_up_duration
-                   , rc->config.delay_down_duration
-                   , rc->config.delay_max_duration
-                   , rc->config.delay_multiplier
-                   , snapshot->delay_last
-                   , (unsigned long)snapshot->delay_up_to_timestamp
-                   , rc->config.warn_repeat_every
-                   , rc->config.crit_repeat_every
-                   , value_string
-                   , (unsigned long)snapshot->last_repeat
-                   , (unsigned long)snapshot->times_repeat
-    );
+    buffer_json_member_add_uint64(wb, "id", rc->id);
+    buffer_json_member_add_string(wb, "config_hash_id", hash_id);
+    buffer_json_member_add_string(wb, "name", rrdcalc_name(rc));
+    buffer_json_member_add_string(wb, "chart", rrdcalc_chart_name(rc));
+    buffer_json_member_add_string(wb, "class", rc->config.classification ? rrdcalc_classification(rc) : "Unknown");
+    buffer_json_member_add_string(wb, "component", rc->config.component ? rrdcalc_component(rc) : "Unknown");
+    buffer_json_member_add_string(wb, "type", rc->config.type ? rrdcalc_type(rc) : "Unknown");
+    buffer_json_member_add_boolean(wb, "active", rc->rrdset != NULL);
+    buffer_json_member_add_boolean(wb, "disabled", snapshot->run_flags & RRDCALC_FLAG_DISABLED);
+    buffer_json_member_add_boolean(wb, "silenced", snapshot->run_flags & RRDCALC_FLAG_SILENCED);
+    buffer_json_member_add_string(wb, "exec",
+        rc->config.exec ? rrdcalc_exec(rc) : string2str(host->health.default_exec));
+    buffer_json_member_add_string(wb, "recipient",
+        rc->config.recipient ? rrdcalc_recipient(rc) : string2str(host->health.default_recipient));
+    buffer_json_member_add_string(wb, "source", rrdcalc_source(rc));
+    buffer_json_member_add_string(wb, "units", rrdcalc_units(rc));
+    buffer_json_member_add_string(wb, "summary", string2str(summary));
+    buffer_json_member_add_string(wb, "info", string2str(info));
+    buffer_json_member_add_string(wb, "status", rrdcalc_status2string(snapshot->status));
+    buffer_json_member_add_uint64(wb, "last_status_change", (uint64_t)snapshot->last_status_change);
+    buffer_json_member_add_uint64(wb, "last_updated", (uint64_t)snapshot->last_updated);
+    buffer_json_member_add_uint64(wb, "next_update", (uint64_t)snapshot->next_update);
+    buffer_json_member_add_int64(wb, "update_every", rc->config.update_every);
+    buffer_json_member_add_int64(wb, "delay_up_duration", rc->config.delay_up_duration);
+    buffer_json_member_add_int64(wb, "delay_down_duration", rc->config.delay_down_duration);
+    buffer_json_member_add_int64(wb, "delay_max_duration", rc->config.delay_max_duration);
+    // "%f" keeps it a JSON double (1.000000), as it has always been
+    buffer_json_member_add_key_only(wb, "delay_multiplier");
+    buffer_sprintf(wb, "%f", rc->config.delay_multiplier);
+    buffer_json_member_add_int64(wb, "delay", snapshot->delay_last);
+    buffer_json_member_add_uint64(wb, "delay_up_to_timestamp", (uint64_t)snapshot->delay_up_to_timestamp);
 
-    if(unlikely(rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)) {
-        buffer_strcat(wb, "\t\t\t\"no_clear_notification\": true,\n");
-    }
+    // these three have always been strings
+    buffer_json_member_add_sprintf(wb, "warn_repeat_every", "%u", rc->config.warn_repeat_every);
+    buffer_json_member_add_sprintf(wb, "crit_repeat_every", "%u", rc->config.crit_repeat_every);
+    buffer_json_member_add_string(wb, "value_string", value_string);
+    buffer_json_member_add_sprintf(wb, "last_repeat", "%lu", (unsigned long)snapshot->last_repeat);
+
+    buffer_json_member_add_uint64(wb, "times_repeat", snapshot->times_repeat);
+
+    if(unlikely(rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION))
+        buffer_json_member_add_boolean(wb, "no_clear_notification", true);
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
         if(rc->config.dimensions)
-            health_string2json(wb, "\t\t\t", "lookup_dimensions", rrdcalc_dimensions(rc), ",\n");
+            health_json_member_add_expression_text(wb, "lookup_dimensions", rrdcalc_dimensions(rc));
 
-        buffer_sprintf(wb,
-                "\t\t\t\"db_after\": %lu,\n"
-                        "\t\t\t\"db_before\": %lu,\n"
-                        "\t\t\t\"lookup_method\": \"%s\",\n"
-                        "\t\t\t\"lookup_after\": %d,\n"
-                        "\t\t\t\"lookup_before\": %d,\n"
-                        "\t\t\t\"lookup_options\": \"",
-                       (unsigned long)snapshot->db_after,
-                       (unsigned long)snapshot->db_before,
-                       time_grouping_id2txt(rc->config.time_group),
-                       rc->config.after,
-                       rc->config.before
-        );
+        buffer_json_member_add_uint64(wb, "db_after", (uint64_t)snapshot->db_after);
+        buffer_json_member_add_uint64(wb, "db_before", (uint64_t)snapshot->db_before);
+        buffer_json_member_add_string(wb, "lookup_method", time_grouping_id2txt(rc->config.time_group));
+        buffer_json_member_add_int64(wb, "lookup_after", rc->config.after);
+        buffer_json_member_add_int64(wb, "lookup_before", rc->config.before);
+
+        // option names are fixed literals that need no escaping
+        buffer_json_member_add_key_only(wb, "lookup_options");
+        buffer_fast_strcat(wb, "\"", 1);
         rrdr_options_to_buffer(wb, rc->config.options);
-        buffer_strcat(wb, "\",\n");
+        buffer_fast_strcat(wb, "\"", 1);
     }
 
     if(rc->config.calculation) {
-        health_string2json(wb, "\t\t\t", "calc", expression_source(rc->config.calculation), ",\n");
-        health_string2json(wb, "\t\t\t", "calc_parsed", expression_parsed_as(rc->config.calculation), ",\n");
+        health_json_member_add_expression_text(wb, "calc", expression_source(rc->config.calculation));
+        health_json_member_add_expression_text(wb, "calc_parsed", expression_parsed_as(rc->config.calculation));
     }
 
     if(rc->config.warning) {
-        health_string2json(wb, "\t\t\t", "warn", expression_source(rc->config.warning), ",\n");
-        health_string2json(wb, "\t\t\t", "warn_parsed", expression_parsed_as(rc->config.warning), ",\n");
+        health_json_member_add_expression_text(wb, "warn", expression_source(rc->config.warning));
+        health_json_member_add_expression_text(wb, "warn_parsed", expression_parsed_as(rc->config.warning));
     }
 
     if(rc->config.critical) {
-        health_string2json(wb, "\t\t\t", "crit", expression_source(rc->config.critical), ",\n");
-        health_string2json(wb, "\t\t\t", "crit_parsed", expression_parsed_as(rc->config.critical), ",\n");
+        health_json_member_add_expression_text(wb, "crit", expression_source(rc->config.critical));
+        health_json_member_add_expression_text(wb, "crit_parsed", expression_parsed_as(rc->config.critical));
     }
 
-    buffer_strcat(wb, "\t\t\t\"green\":");
-    buffer_print_netdata_double(wb, NAN);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\t\t\"red\":");
-    buffer_print_netdata_double(wb, NAN);
-    buffer_strcat(wb, ",\n");
-
-    buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_print_netdata_double(wb, snapshot->value);
-    buffer_strcat(wb, "\n");
-
-    buffer_strcat(wb, "\t\t}");
+    buffer_json_member_add_double(wb, "green", NAN);
+    buffer_json_member_add_double(wb, "red", NAN);
+    buffer_json_member_add_double(wb, "value", snapshot->value);
 }
 
 void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCALC_STATUS status) {
@@ -238,13 +173,17 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     buffer_sprintf(wb, "%d", numberOfAlarms);
 }
 
+// one "<chart>.<alert>" object per alert, filled by fp
 static void health_alarms2json_fill_alarms(
     RRDHOST *host,
     BUFFER *wb,
     int all,
     void (*fp)(RRDHOST *, BUFFER *, RRDCALC *, const RRDCALC_RUNTIME_SNAPSHOT *)) {
+    CLEAN_BUFFER *key = buffer_create(0, NULL);
+
+    buffer_json_member_add_object(wb, "alarms");
+
     RRDCALC *rc;
-    int i = 0;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
         RRDSET *st = rrdcalc_rrdset_read_lock(rc);
         if(unlikely(!st))
@@ -267,12 +206,18 @@ static void health_alarms2json_fill_alarms(
             continue;
         }
 
-        if(likely(i)) buffer_strcat(wb, ",\n");
+        buffer_flush(key);
+        buffer_sprintf(key, "%s.%s", rrdcalc_chart_name(rc), rrdcalc_name(rc));
+
+        buffer_json_member_add_object(wb, buffer_tostring(key));
         fp(host, wb, rc, &snapshot);
-        i++;
+        buffer_json_object_close(wb);
+
         rrdcalc_rrdset_read_unlock(st);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
+
+    buffer_json_object_close(wb);
 }
 
 void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
@@ -280,29 +225,24 @@ void health_alarms2json(RRDHOST *host, BUFFER *wb, int all) {
     uint32_t latest_alarm_log_unique_id = (host->health_log.next_log_id > 0) ? (host->health_log.next_log_id - 1) : 0;
     rw_spinlock_read_unlock(&host->health_log.spinlock);
 
-    buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
-                    "\n\t\"latest_alarm_log_unique_id\": %u,"
-                    "\n\t\"status\": %s,"
-                    "\n\t\"now\": %lu,"
-                    "\n\t\"alarms\": {\n",
-                   rrdhost_hostname(host),
-                   latest_alarm_log_unique_id,
-                   host->health.enabled ?"true":"false",
-                   (unsigned long)now_realtime_sec());
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
+    buffer_json_member_add_uint64(wb, "latest_alarm_log_unique_id", latest_alarm_log_unique_id);
+    buffer_json_member_add_boolean(wb, "status", host->health.enabled);
+    buffer_json_member_add_uint64(wb, "now", (uint64_t)now_realtime_sec());
 
-    health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc2json_nolock);
+    health_alarms2json_fill_alarms(host, wb, all, health_rrdcalc2json_nolock);
 
-    buffer_strcat(wb, "\n\t}\n}\n");
+    buffer_json_finalize(wb);
 }
 
 void health_alarms_values2json(RRDHOST *host, BUFFER *wb, int all) {
-    buffer_sprintf(wb, "{\n\t\"hostname\": \"%s\","
-                       "\n\t\"alarms\": {\n",
-                   rrdhost_hostname(host));
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(host));
 
-    health_alarms2json_fill_alarms(host, wb, all,  health_rrdcalc_values2json_nolock);
+    health_alarms2json_fill_alarms(host, wb, all, health_rrdcalc_values2json_nolock);
 
-    buffer_strcat(wb, "\n\t}\n}\n");
+    buffer_json_finalize(wb);
 }
 
 void health_entry_flags_to_json_array(BUFFER *wb, const char *key, HEALTH_ENTRY_FLAGS flags) {

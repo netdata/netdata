@@ -1,24 +1,27 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package history persists synthetic run start and completion records in the process-owned DEM journal and reduces
+// them back into runs for queries.
 package history
 
 import (
 	"context"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/synthetic"
 )
 
-// Store encodes and queries synthetic runs in the command-owned journal.
-// It borrows the journal; only the command may close it or enforce retention.
-type Store struct{ journal *demjournal.Store }
+// Store encodes and queries synthetic runs in the process-owned journal.
+// It borrows the journal; only the plugin process (dem.Process) may close it or enforce retention.
+type Store struct{ store *journalstore.Store }
 
-func NewStore(journal *demjournal.Store) *Store {
+func NewStore(store *journalstore.Store) *Store {
 	return &Store{
-		journal: journal,
+		store: store,
 	}
 }
-func (s *Store) Sync(ctx context.Context) error { return s.journal.Sync(ctx) }
+
+func (s *Store) Sync(ctx context.Context) error { return s.store.Sync(ctx) }
 
 type RunFilter struct {
 	JobID     string
@@ -29,7 +32,8 @@ type RunFilter struct {
 	Before    *int64
 	Limit     int
 }
+
 type RunPage struct {
-	Runs      []synthetic.Run `json:"runs"`
-	Truncated bool            `json:"truncated"`
+	Runs      []synthetic.Run
+	Truncated bool
 }

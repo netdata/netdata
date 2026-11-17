@@ -77,12 +77,15 @@ func (sim discoverySim) run(t *testing.T) {
 
 func (sim discoverySim) collectGroups(t *testing.T, pl *Pipeline) []*confgroup.Group {
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	in := make(chan []*confgroup.Group)
 	done := make(chan struct{})
 
 	go func() { defer close(done); pl.Run(ctx, in) }()
+	defer func() {
+		cancel()
+		<-done // Join before the caller inspects compose counters, even on timeout.
+	}()
 
 	timeout := time.Second * 10
 	var groups []*confgroup.Group

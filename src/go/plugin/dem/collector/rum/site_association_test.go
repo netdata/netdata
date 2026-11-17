@@ -1,22 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum_test
 
 import (
 	"context"
 	"encoding/json"
+	"testing"
+
 	"github.com/netdata/netdata/go/plugins/plugin/dem/collector/rum"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
-	"testing"
 )
 
 func TestNativeRUMVnodeReferenceConfiguration(t *testing.T) {
 	for _, reference := range []string{"", "storefront", "site.name"} {
 		t.Run(reference, func(t *testing.T) {
 			factory, last := nativeRUMConfigFactory(t)
-			input := confgroup.Config{"name": "physical-job", "allowed_origins": []any{"https://example.org"}, "vnode": reference}
+			input := confgroup.Config{
+				"name":            "physical-job",
+				"allowed_origins": []any{"https://example.org"},
+				"vnode":           reference,
+			}
 			for _, format := range []string{"yaml", "json"} {
 				var raw []byte
 				var err error

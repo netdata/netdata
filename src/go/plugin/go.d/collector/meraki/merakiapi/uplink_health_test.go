@@ -307,12 +307,15 @@ func TestUplinkHealthRejectsCancellationAfterBufferedResponse(t *testing.T) {
 func TestUplinkHealthDeadlineDuringResponse(t *testing.T) {
 	for operation, read := range healthReads {
 		t.Run(operation, func(t *testing.T) {
+			release := make(chan struct{})
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprint(w, `[`)
 				w.(http.Flusher).Flush()
 				<-r.Context().Done()
+				<-release
 			}))
 			defer server.Close()
+			defer close(release) // Keep response EOF from racing client cancellation.
 			ctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 			defer cancel()
 			got, err := read(ctx, clientForServer(t, server), "ORG")

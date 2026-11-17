@@ -13,28 +13,28 @@
       },
       "listen": {
         "title": "Listen address",
-        "description": "Address and port that accept browser telemetry. The default accepts connections from this host only.",
+        "description": "Address and port to listen on. The default accepts connections from this host only.",
         "type": "string",
         "default": "127.0.0.1:19938"
       },
       "public_url": {
         "title": "Public URL",
-        "description": "Public receiver base URL used to generate installation snippets. If neither receiver nor site sets a public URL, no snippet is offered.",
+        "description": "Public base URL of the receiver, such as `https://rum.example.org`, used in the sites' script tags. Leave empty and no script tag is offered unless a site sets its own.",
         "type": "string"
       },
       "tls_cert": {
         "title": "TLS certificate",
-        "description": "Server certificate file. Leave empty with TLS key to serve HTTP.",
+        "description": "Certificate file for serving HTTPS directly. Set together with `tls_key`; leave both empty to serve plain HTTP.",
         "type": "string"
       },
       "tls_key": {
         "title": "TLS key",
-        "description": "Server private key file. Set together with TLS certificate to serve HTTPS.",
+        "description": "Private key file of the certificate. Set together with `tls_cert`.",
         "type": "string"
       },
       "trusted_proxies": {
         "title": "Trusted proxies",
-        "description": "Proxy IP addresses or CIDR ranges allowed to supply forwarded client addresses. Leave empty to distrust forwarded headers.",
+        "description": "IP addresses or CIDR ranges of reverse proxies whose `X-Forwarded-For` and `X-Real-IP` headers are trusted for the visitor's address. Leave empty to use the connection's address.",
         "type": [
           "array",
           "null"
@@ -45,31 +45,31 @@
       },
       "geoip_db": {
         "title": "GeoIP database",
-        "description": "Geographic MMDB file; an explicit path uses only that file. Leave empty to try the Agent cache and then stock IP intelligence database; unavailable geography does not stop collection.",
+        "description": "Location database (MMDB file) for looking up visitors' countries and cities. Leave empty to use the database the Agent provides, if there is one.",
         "type": "string"
       },
       "max_body_bytes": {
         "title": "Maximum payload size",
-        "description": "Maximum accepted browser payload size, in bytes. Larger requests are rejected.",
+        "description": "Largest report accepted, in bytes. Larger reports are refused with HTTP 413.",
         "type": "integer",
         "minimum": 1,
         "default": 262144
       },
       "rate_limit": {
         "title": "Rate limits",
-        "description": "Limits for browser telemetry requests.",
+        "description": "Request limits that protect the Agent from floods of reports.",
         "type": "object",
         "properties": {
           "per_ip_per_min": {
             "title": "Requests per IP",
-            "description": "Maximum requests per client IP per minute.",
+            "description": "Requests accepted per visitor IP address per minute. More are refused with HTTP 429.",
             "type": "integer",
             "minimum": 1,
             "default": 120
           },
           "per_site_per_sec": {
             "title": "Requests per site",
-            "description": "Maximum requests per site per second.",
+            "description": "Requests accepted per site per second, from all visitors together. More are refused with HTTP 429.",
             "type": "integer",
             "minimum": 1,
             "default": 500
@@ -109,7 +109,7 @@
       ]
     },
     "geoip_db": {
-      "ui:help": "Supported database types are Netdata-Topology-GEO, GeoLite2-City, GeoLite2-Country, GeoIP2-City, GeoIP2-Country, DBIP-City-Lite and DBIP-Country-Lite. Provision a readable file separately; DEM does not download it.\n\nSources are checked at receiver startup and every 60 seconds. Publish updates by atomic file replacement, never by overwriting or truncating the active file. Check collector.geoip in rum-sites for source availability; each site still controls capture.geolocation."
+      "ui:help": "Supported database types: Netdata-Topology-GEO, GeoLite2-City, GeoLite2-Country, GeoIP2-City, GeoIP2-Country, DBIP-City-Lite and DBIP-Country-Lite. Netdata does not download it for you.\n\nThe database is checked at start and every minute after. To update it, write a new file and rename it over the old one; never edit or truncate the file in use. Without a database, reports are still collected, without location."
     }
   }
 }

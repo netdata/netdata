@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package rum
 
 import (
@@ -7,8 +8,7 @@ import (
 	"os"
 	"testing"
 
-	demjournal "github.com/netdata/netdata/go/plugins/plugin/dem/journal"
-	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/config"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	rumhistory "github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/santhosh-tekuri/jsonschema/v6"
@@ -72,9 +72,9 @@ func TestExportFormAndRuntimeAddressValidation(t *testing.T) {
 						assert.Equal(t, valid, schema.Validate(input) == nil, "form")
 						raw, err := json.Marshal(input)
 						require.NoError(t, err)
-						var site config.Site
-						require.NoError(t, json.Unmarshal(raw, &site))
-						assert.Equal(t, valid, len(config.ValidateSiteExtras(site)) == 0, "runtime")
+						c := New(Dependencies{})
+						require.NoError(t, json.Unmarshal(raw, &c.Config))
+						assert.Equal(t, valid, c.Site.Validate() == nil, "runtime")
 					},
 				)
 			}
@@ -99,7 +99,7 @@ func TestSamplingFormAndRuntimeValidation(t *testing.T) {
 	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
 	form, err := compiler.Compile("rum.json")
 	require.NoError(t, err)
-	db, err := demjournal.Open(context.Background(), "")
+	db, err := journalstore.Open(context.Background(), "", "")
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	for _, tc := range []struct {
@@ -154,9 +154,9 @@ func TestCaptureFormAndRuntimeValidation(t *testing.T) {
 			var input map[string]any
 			require.NoError(t, json.Unmarshal(raw, &input))
 			assert.Equal(t, tc.valid, form.Validate(input) == nil, "form")
-			var site config.Site
-			err := json.Unmarshal(raw, &site)
-			valid := err == nil && len(config.ValidateSiteExtras(site)) == 0
+			c := New(Dependencies{})
+			err := json.Unmarshal(raw, &c.Config)
+			valid := err == nil && c.Site.Validate() == nil
 			assert.Equal(t, tc.valid, valid, "runtime")
 		})
 	}

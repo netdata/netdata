@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package artifacts
 
 import (
@@ -6,9 +7,26 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"sort"
+	"slices"
 	"time"
 )
+
+type Policy struct {
+	Days     int   `json:"days"`
+	MaxBytes int64 `json:"max_bytes"`
+}
+
+type Cleanup struct {
+	AttemptedUS  int64  `json:"attempted_us"`
+	SuccessfulUS int64  `json:"successful_us"`
+	Error        string `json:"error,omitempty"`
+}
+
+type Status struct {
+	Policy    *Policy   `json:"policy"`
+	Inventory Inventory `json:"inventory"`
+	Cleanup   Cleanup   `json:"cleanup"`
+}
 
 // The narrow syscall boundary permits real transition/failure tests without
 // substituting the store's ownership, selection or recovery logic.
@@ -67,7 +85,7 @@ func (s *Store) Enforce(ctx context.Context, days int, maxBytes int64) (Status, 
 }
 
 func expiredSets(entries []Set, now time.Time, days int, maxBytes int64) []Set {
-	sort.Slice(entries, func(i, j int) bool { return newer(entries[j], entries[i]) })
+	slices.SortFunc(entries, func(a, b Set) int { return newestFirst(b, a) })
 	var victims, eligible []Set
 	newest := map[string]string{}
 	var total int64
@@ -174,5 +192,18 @@ func (s *Store) recordCleanupError(err error) {
 	// A failed run-local cleanup cannot erase an earlier maintenance failure.
 	if s.cleanup.Error == "" {
 		s.cleanup.Error = err.Error()
+	}
+}
+
+func (s *Store) status(inv Inventory) Status {
+	var policy *Policy
+	if s.policy != nil {
+		copy := *s.policy
+		policy = &copy
+	}
+	return Status{
+		Policy:    policy,
+		Inventory: inv,
+		Cleanup:   s.cleanup,
 	}
 }

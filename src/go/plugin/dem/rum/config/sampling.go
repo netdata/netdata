@@ -2,6 +2,8 @@
 
 package config
 
+import "slices"
+
 // Investigate is investigate sampling.
 type Investigate struct {
 	// SampleRate is the baseline detail share of received sessions. Nil defaults
@@ -55,13 +57,5 @@ func (s Site) KeepsErrors() bool { return s.keeps(KeepErrors) }
 func (s Site) KeepsPoorVitals() bool { return s.keeps(KeepPoorVitals) }
 
 func (s Site) keeps(cond string) bool {
-	if s.Investigate == nil || s.Investigate.AlwaysKeep == nil {
-		return true
-	}
-	for _, c := range s.Investigate.AlwaysKeep {
-		if c == cond {
-			return true
-		}
-	}
-	return false
+	return s.Investigate == nil || s.Investigate.AlwaysKeep == nil || slices.Contains(s.Investigate.AlwaysKeep, cond)
 }

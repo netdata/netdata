@@ -3,20 +3,15 @@
 package ddsnmp
 
 import (
-	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/netdata/netdata/go/plugins/pkg/multipath"
 )
 
 func Test_AlcatelBGPProfileUsesTypedRows(t *testing.T) {
-	dir, _ := filepath.Abs("../../../config/go.d/snmp.profiles/default")
-
-	profiles, err := loadProfilesFromDir(dir, multipath.New(dir))
+	profiles, err := stockProfilesForTest()
 	require.NoError(t, err)
 	require.NotEmpty(t, profiles)
 

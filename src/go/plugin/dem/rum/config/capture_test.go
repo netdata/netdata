@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 package config
 
 import (
@@ -24,7 +25,9 @@ func TestCaptureDefaultsAndRoundTrip(t *testing.T) {
 	} {
 		for format, decode := range map[string]func([]byte, any) error{"json": json.Unmarshal, "yaml": yaml.Unmarshal} {
 			t.Run(format+tc.raw, func(t *testing.T) {
-				site := Site{AllowedOrigins: []string{"https://example.org"}}
+				site := Site{
+					AllowedOrigins: []string{"https://example.org"},
+				}
 				require.NoError(t, decode([]byte(tc.raw), &site))
 				before, err := json.Marshal(site)
 				require.NoError(t, err)
@@ -35,7 +38,7 @@ func TestCaptureDefaultsAndRoundTrip(t *testing.T) {
 				for _, candidate := range []Site{site, effective} {
 					require.Equal(t, tc.mode, candidate.GeolocationMode())
 					require.Equal(t, tc.frustration, candidate.FrustrationSignalsOn())
-					require.Empty(t, ValidateSiteExtras(candidate))
+					require.NoError(t, validateWithRequired(candidate))
 					for _, codec := range []struct {
 						marshal   func(any) ([]byte, error)
 						unmarshal func([]byte, any) error

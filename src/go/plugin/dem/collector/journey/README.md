@@ -1,1 +1,0 @@
-integrations/browser_journey.md

@@ -127,7 +127,10 @@ class RunInfo(BaseModel):
     worktree: str | None = None
     port: int | None = Field(default=None, description="Loopback web port: the declared one, else assigned at start.")
     url: str | None = Field(default=None, description="http://127.0.0.1:<port> once the agent is ready.")
-    otlp_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/gRPC data (ip:port); send test logs here. Null until the agent has started.")
+    otlp_endpoint: str | None = Field(default=None, description=(
+        "Where the otel plugin listens for OTLP/gRPC data (ip:port); send test logs here. Null until the agent has "
+        "started, and when the listener is disabled."
+    ))
     otlp_http_endpoint: str | None = Field(default=None, description="Where the otel plugin listens for OTLP/HTTP data (ip:port; POST /v1/logs, /v1/traces, /v1/metrics). Null until the agent has started, and when the listener is disabled.")
     current_phase: str | None = Field(default=None, description="configure | install | launch.")
     elapsed_seconds: float = 0.0

@@ -6,7 +6,7 @@ package config
 type Capture struct {
 	// Nil means country; an explicit empty string is invalid.
 	Geolocation        *string `yaml:"geolocation,omitempty" json:"geolocation"`
-	FrustrationSignals bool    `yaml:"frustration_signals" json:"frustration_signals"`
+	FrustrationSignals bool    `yaml:"frustration_signals"   json:"frustration_signals"`
 }
 
 const (

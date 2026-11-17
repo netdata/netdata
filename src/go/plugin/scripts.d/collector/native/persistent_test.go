@@ -76,14 +76,14 @@ func TestPersistent_StartupFailure(t *testing.T) {
 		"early exit":       {body: "exit 0\n"},
 		"eof without exit": {body: "exec 1>&-\nsleep 30\n"},
 		"oversize": {
-			body:    fmt.Sprintf("head -c %d /dev/zero; printf '\\n'; sleep 30\n", maxMessageBytes),
+			body:    fmt.Sprintf("head -c %d /dev/zero; printf '\\n'; sleep 30\n", testMessageLimit),
 			timeout: 5 * time.Second,
 			wantErr: errResponseTooLarge,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			c, _ := persistentCollector(t, tc.body)
+			c, _ := persistentCollectorWithLimit(t, tc.body, testMessageLimit)
 			c.Timeout = confopt.Duration(time.Second)
 			if tc.timeout > 0 {
 				c.Timeout = confopt.Duration(tc.timeout)
@@ -119,14 +119,14 @@ func TestPersistent_TerminalReply(t *testing.T) {
 		"timeout":       {reply: ":"},
 		"exit":          {reply: "exit 1"},
 		"oversize": {
-			reply:   fmt.Sprintf("head -c %d /dev/zero; printf '\\n'", maxMessageBytes),
+			reply:   fmt.Sprintf("head -c %d /dev/zero; printf '\\n'", testMessageLimit),
 			timeout: 5 * time.Second,
 			wantErr: errResponseTooLarge,
 		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			c, _ := persistentCollector(t, readyLine+"read -r request\n"+tc.reply+"\nsleep 30\n")
+			c, _ := persistentCollectorWithLimit(t, readyLine+"read -r request\n"+tc.reply+"\nsleep 30\n", testMessageLimit)
 			c.Timeout = confopt.Duration(time.Second)
 			if tc.timeout > 0 {
 				c.Timeout = confopt.Duration(tc.timeout)

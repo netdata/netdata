@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+// Package config declares the RUM receiver and site configuration, validates it, and derives the effective capture
+// and sampling policy.
 package config
 
-// Site is one monitored web property. AllowedOrigins is required
-// Native job admission determines whether its endpoints exist.
+import "regexp"
+
+// Site is one monitored web property. Validate requires a name, top-N bounds
+// and at least one allowed origin; native job admission decides whether its
+// endpoints exist.
 type Site struct {
 	Name           string   `yaml:"name"                          json:"name"`
 	DisplayName    string   `yaml:"display_name"                  json:"display_name"`
@@ -20,7 +25,7 @@ type Site struct {
 	// exports. Nil selects all received sessions.
 	Investigate *Investigate `yaml:"investigate,omitempty"         json:"investigate"`
 	// Capture selects optional location and interaction evidence. Nil uses defaults.
-	Capture *Capture `yaml:"capture,omitempty" json:"capture"`
+	Capture *Capture `yaml:"capture,omitempty"             json:"capture"`
 	// Bots is BotsExclude (default: crawlers, headless browsers and other
 	// automation send nothing and are counted as filtered) or BotsInclude
 	// (kept, with device "bot").
@@ -38,6 +43,15 @@ type Site struct {
 type PathRule struct {
 	Pattern string `yaml:"pattern" json:"pattern"`
 	Replace string `yaml:"replace" json:"replace"`
+}
+
+// Regexp compiles Pattern. An empty pattern is an empty row from the form: it
+// is kept in the configuration but never matched, so Regexp returns nil.
+func (r PathRule) Regexp() (*regexp.Regexp, error) {
+	if r.Pattern == "" {
+		return nil, nil
+	}
+	return regexp.Compile(r.Pattern)
 }
 
 // Bot handling.
@@ -87,7 +101,21 @@ type EventLogs struct {
 	Destination        Destination `yaml:"destination"          json:"destination"`
 }
 
-func (s Site) EventLogsOn() bool   { return s.EventLogs != nil && s.EventLogs.Enabled }
+func (s Site) EventLogsOn() bool { return s.EventLogs != nil && s.EventLogs.Enabled }
+
+// Secrets are the configured credentials site output must mask, including
+// those of disabled exports, which stay in the stored configuration.
+func (s Site) Secrets() []string {
+	var secrets []string
+	if s.EventLogs != nil {
+		secrets = append(secrets, s.EventLogs.Destination.AuthToken)
+	}
+	if s.Tracing != nil {
+		secrets = append(secrets, s.Tracing.Destination.AuthToken)
+	}
+	return secrets
+}
+
 func (s Site) ConsoleLogsOn() bool { return s.EventLogsOn() && s.EventLogs.IncludeConsoleLogs }
 
 // Effective returns defaults without changing the stored configuration.

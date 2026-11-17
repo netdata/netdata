@@ -44,10 +44,13 @@ from .tools import (
     logs,
     mint_bearer,
     otel_config,
+    otel_effective_config,
     otel_files,
     otel_logs,
     otel_push,
+    otel_service_map,
     otel_stream,
+    otel_traces,
     run,
 )
 
@@ -109,8 +112,11 @@ def build_server() -> FastMCP:
     logs.register(mcp)
     mint_bearer.register(mcp)
     otel_config.register(mcp)
+    otel_effective_config.register(mcp)
     otel_logs.register(mcp)
     otel_files.register(mcp)
+    otel_service_map.register(mcp)
+    otel_traces.register(mcp)
     otel_push.register(mcp)
     otel_stream.register(mcp)
     agent_mcp.register(mcp)

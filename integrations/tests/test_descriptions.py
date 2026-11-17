@@ -321,7 +321,6 @@ MAP_DESCRIPTION_TARGETS = {
     "docs/learn.netdata.cloud/ecr-mirror.md",
     "docs/learn.netdata.cloud/installation.md",
     "docs/netdata-agent/configuration/dynamic-configuration.md",
-    "docs/netdata-enterprise-evaluation.md",
     (
         "docs/observability-centralization-points/metrics-centralization-points/"
         "clustering-and-high-availability-of-netdata-parents.md"

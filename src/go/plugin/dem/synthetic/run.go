@@ -2,6 +2,8 @@
 
 package synthetic
 
+import "slices"
+
 type Outcome string
 
 const (
@@ -12,6 +14,19 @@ const (
 	Inconclusive Outcome = "inconclusive"
 	Error        Outcome = "error"
 	Cancelled    Outcome = "cancelled"
+)
+
+// JobState is an active job's current state: unknown until an attempt reports a phase, the executor-reported
+// attempt phase, the latest outcome, or stale when that outcome is no longer fresh and no attempt is in progress.
+type JobState string
+
+const (
+	JobUnknown = JobState(Unknown)
+	// JobWaiting means an attempt waits for browser admission.
+	JobWaiting JobState = "waiting"
+	// JobRunning means the admitted attempt's runner process started.
+	JobRunning JobState = "running"
+	JobStale   JobState = "stale"
 )
 
 type TestCounts struct {
@@ -53,6 +68,15 @@ type LabMetrics struct {
 	CLS         *float64 `json:"cls,omitempty"`
 }
 
+// HistoryPhase names one of a run's two history records: written at admission
+// and at completion.
+type HistoryPhase string
+
+const (
+	HistoryStart    HistoryPhase = "start"
+	HistoryComplete HistoryPhase = "complete"
+)
+
 // ExecutionContract is the semantic Agent/runtime request and result contract.
 const ExecutionContract = 2
 
@@ -73,6 +97,8 @@ const (
 // StartedUS is immutable across both phases. Positive completion wall time may
 // precede start after a clock adjustment; DurationMS is measured independently.
 type Run struct {
+	Captures          *CaptureReport    `json:"captures,omitempty"`
+	BrowserSummary    *BrowserSummary   `json:"browser_summary,omitempty"`
 	FailureEvidence   *FailureEvidence  `json:"failure_evidence,omitempty"`
 	Runtime           *RuntimeIdentity  `json:"runtime,omitempty"`
 	ID                string            `json:"id"`
@@ -93,7 +119,7 @@ type Run struct {
 	Metrics           *LabMetrics       `json:"metrics,omitempty"`
 	Events            []Event           `json:"events"`
 	DroppedEvents     int               `json:"dropped_events"`
-	CaptureState      string            `json:"capture_state"`
+	CaptureState      CaptureState      `json:"capture_state"`
 	Artifacts         []Artifact        `json:"artifacts"`
 	HistoryError      string            `json:"history_error,omitempty"`
 }
@@ -106,41 +132,65 @@ type Execution struct {
 // CloneRun copies every mutable field crossing observation and history boundaries.
 func CloneRun(in Run) Run {
 	r := in
+	r.Captures = CloneCaptureReport(in.Captures)
+	r.BrowserSummary = CloneBrowserSummary(in.BrowserSummary)
 	r.FailureEvidence = CloneFailureEvidence(in.FailureEvidence)
-	if in.Runtime != nil {
-		identity := *in.Runtime
-		r.Runtime = &identity
-	}
-	r.Events = append([]Event(nil), in.Events...)
+	r.Runtime = clonePtr(in.Runtime)
+	r.Events = slices.Clone(in.Events)
 	for i := range r.Events {
-		if v := r.Events[i].DeclaredTests; v != nil {
-			n := *v
-			r.Events[i].DeclaredTests = &n
-		}
-		if v := r.Events[i].DurationMS; v != nil {
-			n := *v
-			r.Events[i].DurationMS = &n
-		}
+		r.Events[i].DeclaredTests = clonePtr(r.Events[i].DeclaredTests)
+		r.Events[i].DurationMS = clonePtr(r.Events[i].DurationMS)
 	}
-	r.Artifacts = append([]Artifact(nil), in.Artifacts...)
-	if in.Tests != nil {
-		v := *in.Tests
-		r.Tests = &v
-	}
+	r.Artifacts = slices.Clone(in.Artifacts)
+	r.Tests = clonePtr(in.Tests)
 	if in.Metrics != nil {
 		m := *in.Metrics
+		m.Performance = clonePtr(m.Performance)
+		m.FCPMS = clonePtr(m.FCPMS)
+		m.LCPMS = clonePtr(m.LCPMS)
+		m.TBTMS = clonePtr(m.TBTMS)
+		m.SIMS = clonePtr(m.SIMS)
+		m.CLS = clonePtr(m.CLS)
 		r.Metrics = &m
-		values := []**float64{&m.Performance, &m.FCPMS, &m.LCPMS, &m.TBTMS, &m.SIMS, &m.CLS}
-		for _, p := range values {
-			if *p != nil {
-				v := **p
-				*p = &v
-			}
+	}
+	r.DurationMS = clonePtr(in.DurationMS)
+	return r
+}
+
+// clonePtr returns a pointer to a copy of *p, or nil.
+func clonePtr[T any](p *T) *T {
+	if p == nil {
+		return nil
+	}
+	return new(*p)
+}
+
+// Labels of the evidence summaries shared by run history and rehearsal errors.
+const (
+	FirstFailureLabel     = "First unexpected failure"
+	LastObservedStepLabel = "Last observed running step"
+	StopContextLabel      = "Pending before cleanup"
+	BrowserErrorsLabel    = "Browser errors"
+)
+
+// Diagnostic is one labeled summary of optional run evidence.
+type Diagnostic struct {
+	Label string
+	Text  string
+}
+
+// Diagnostics returns the run's non-empty evidence summaries in presentation order.
+func (r Run) Diagnostics() []Diagnostic {
+	var out []Diagnostic
+	for _, d := range []Diagnostic{
+		{FirstFailureLabel, r.FailureEvidence.FailureSummary()},
+		{LastObservedStepLabel, r.FailureEvidence.LastObservedStepSummary()},
+		{StopContextLabel, r.FailureEvidence.StopSummary()},
+		{BrowserErrorsLabel, r.BrowserSummary.Summary()},
+	} {
+		if d.Text != "" {
+			out = append(out, d)
 		}
 	}
-	if in.DurationMS != nil {
-		v := *in.DurationMS
-		r.DurationMS = &v
-	}
-	return r
+	return out
 }

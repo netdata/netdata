@@ -1,0 +1,1373 @@
+plugin_name: dem.plugin
+modules:
+  - meta: &meta
+      id: collector-dem.plugin-journey
+      plugin_name: dem.plugin
+      module_name: journey
+      monitored_instance: &monitored_instance
+        name: Browser Journey
+        link: https://playwright.dev/
+        icon_filename: netdata.png
+        categories:
+          - data-collection.synthetic-testing
+      keywords:
+        - browser journey
+        - playwright
+        - synthetic
+        - synthetic transaction
+        - user journey
+        - end-to-end test
+        - chromium
+        - dem
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: dem.plugin
+              module_name: lighthouse
+            - plugin_name: dem.plugin
+              module_name: rum
+      info_provided_to_referring_integrations:
+        description: Runs scripted browser workflows against the website on a schedule and alerts when they fail.
+    overview:
+      data_collection:
+        metrics_description: |
+          Run scripted browser journeys against your website on a schedule and get alerted when a critical workflow,
+          such as logging in or checking out, breaks.
+
+          Each job runs one [Playwright Test](https://playwright.dev/docs/writing-tests) file in a real Chromium browser
+          and gives you:
+
+          - The outcome of every run, with the number of tests that passed, failed, timed out, were skipped or did not run.
+          - How long each run took and how old the latest result is.
+          - An alert when the latest run fails or times out.
+          - A run history with the first failing test, the step it failed in, its source line and error message.
+          - Optionally, a screenshot and a Playwright trace of each failure, and a count of the browser errors (uncaught
+            exceptions, console errors, failed requests and HTTP error responses) seen during every run.
+        method_description: |
+          Every `check_every` seconds (15 minutes by default), the Agent starts a fresh, sandboxed Chromium browser on
+          this host and runs the job's Playwright Test file in it, with one worker and no retries. The browser reaches
+          your website over the network, like a visitor would.
+
+          Everything the script does is real: form submissions, orders and account changes happen on the website and
+          are not rolled back. Point write actions at test accounts or a staging site. The **Test** action in the job
+          editor also runs the journey once, for real, without recording the result: a pass reports success, and a failure
+          shows the same failure summary that run history would, with browser error counts when `browser_error_summary` is
+          on. Test shares the browser with the running jobs, so it can wait for them and delay their checks.
+
+          Credentials reach the script as `DEM_SECRET_*` environment variables. The script and the secret values are
+          not stored in run history, and secret values are masked in recorded error text. Screenshots and traces are
+          kept as captured and can contain them.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          | Permission | Needed when |
+          |:--|:--|
+          | The Netdata service account (usually `netdata`) can read the `script_path` file and every file it imports. | The job uses `script_path`. |
+          | The host lets an unprivileged process create the user namespaces Chromium's sandbox needs. | Always. Installing the browser runtime prepares this on hosts that restrict it, such as Ubuntu 24.04 (see Prerequisites). |
+
+          Browser jobs never run as root, and Chromium's sandbox stays enabled.
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: |
+            - All journey and Lighthouse jobs on the Agent share `browser.concurrency` in `dem.conf`, which runs one
+              browser at a time by default. A check that comes due while the browser is busy waits; if it is still
+              waiting when the job's next check comes due, it is skipped and counted as coalesced.
+            - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
+              and test charts leave a gap until a new run completes.
+            - Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and captures
+              for 7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day
+              expire together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go
+              first.
+            - Run diagnostics keep up to 500 test, step, error and output events per run and 2,000 characters per text,
+              and count what they drop. HAR files, videos and filmstrips are not captured.
+            - A screenshot or trace larger than 5 MiB is not kept.
+        performance_impact:
+          description: |
+            Each run starts a new Chromium browser and Node.js process on the Agent host, which use CPU and memory for
+            as long as the run lasts; heavier pages and longer scripts cost more. The website receives every request
+            the script makes.
+
+            - Raise `check_every` to run less often. `update_every` only refreshes the charts and starts no browser.
+            - `browser.concurrency` in `dem.conf` limits how many browsers run at once; size it for the host's CPU and
+              memory, and restart the Agent to apply it.
+            - `trace_on_failure` records a trace during every run, including runs that pass, which adds CPU, memory and
+              temporary disk use.
+            - `browser_error_summary` can add over a CPU-second and about 150 MiB of memory to a run on a page that
+              logs thousands of console errors.
+    setup:
+      prerequisites: &prerequisites
+        list:
+          - title: Install the browser runtime
+            description: |
+              Journeys and Lighthouse audits run in a separately installed browser runtime (Node.js, Chromium,
+              Playwright and Lighthouse). Netdata never installs it on its own, and a job waits until it is
+              installed. It needs Linux on amd64 or arm64.
+
+              | Netdata installation | Install the runtime with |
+              |:--|:--|
+              | Native DEB or RPM packages | The optional `netdata-dem-runtime` package, installed with your package manager. It requires a running systemd host, stops the Agent during installation and restores its previous service state. |
+              | Static or source installation | `kickstart.sh --install-dem-runtime` during an install or update, or the installed helper: `sudo /opt/netdata/usr/libexec/netdata/netdata-dem-runtime.sh install --agent /opt/netdata/usr/sbin/netdata --allow-download` (static paths). |
+              | Docker (local, rootful) | `kickstart.sh --install-dem-runtime --docker-container NAME`, run on the Docker host. |
+
+              Static, source and Docker release builds default to the signed runtime matching the Agent version,
+              channel and architecture. `runtime.release_url` in `dem.conf` can override that URL. Setup also prepares
+              the host for Chromium's sandbox (an AppArmor allowance on Ubuntu 24.04). Installation verifies integrity
+              and version compatibility. Local `runtime qualify` is optional.
+
+              The [browser runtime host setup guide](/packaging/installer/DEM-RUNTIME.md) covers offline installation,
+              Docker requirements, updates and removal.
+          - title: Restart Netdata to activate the runtime
+            description: |
+              A running Agent keeps the runtime it found when it started. After the first installation, restart the
+              Agent (`sudo systemctl restart netdata`) or the container (`docker restart NAME`). The native package
+              restores the previous service state for you. Later updates replace Agent and runtime as a matching
+              pair. Source/static installers coordinate that transition; Docker deployments must switch the pinned
+              image and runtime selection together. There is no separate daily runtime update.
+
+              To check the runtime, run as the Netdata service account:
+
+              ```bash
+              sudo -u netdata /usr/libexec/netdata/plugins.d/dem.plugin runtime status
+              sudo -u netdata /usr/libexec/netdata/plugins.d/dem.plugin runtime qualify
+              ```
+
+              `qualify` runs a test journey and a Lighthouse audit. Static installations keep the plugin under
+              `/opt/netdata/usr/libexec/netdata/plugins.d/`.
+      configuration:
+        file:
+          name: dem/journey.conf
+        options:
+          description: Each job is one journey. All options apply per job.
+          folding:
+            enabled: true
+            title: Configuration options
+          list:
+            - name: name
+              description: Job name. It identifies the journey in charts, alerts and run history, so renaming starts a separate history.
+              default_value: ''
+              required: true
+              group: Journey
+            - name: script
+              description: Playwright Test source code, in JavaScript or TypeScript. Set either this or `script_path`.
+              default_value: ''
+              required: false
+              group: Journey
+              detailed_description: |
+                The script can import `@playwright/test`, which the browser runtime provides. Every `test` in it runs
+                on each check, in declaration order. A run succeeds only when every declared test passes. When no test
+                fails but some are skipped (`test.skip`), marked as expected to fail (`test.fail`) or missing, the run
+                ends as `inconclusive`.
+            - name: script_path
+              description: Absolute path to a Playwright Test file (.js, .ts, .mjs, .cjs, .mts or .cts) readable by the Netdata service account. Set either this or `script`.
+              default_value: ''
+              required: false
+              group: Journey
+              detailed_description: |
+                Use a file when the journey imports helpers or page objects from other files next to it. The file and
+                its imports are read on every run, so edits take effect at the next check.
+            - name: secrets[].name
+              description: Environment variable name for the script, starting with `DEM_SECRET_` and followed by letters, digits or underscores. Names must be unique within the job.
+              default_value: ''
+              required: false
+              group: Secrets
+              detailed_description: |
+                The script reads the value with `process.env`, for example `process.env.DEM_SECRET_PASSWORD`.
+            - name: secrets[].value
+              description: Secret value. Prefer a secret reference, such as `${env:WORKFLOW_PASSWORD}`, over a literal value.
+              default_value: ''
+              required: false
+              group: Secrets
+            - name: screenshot_on_failure
+              description: Save a screenshot when a test fails. Screenshots can show sensitive page content.
+              default_value: false
+              required: false
+              group: Diagnosis
+            - name: trace_on_failure
+              description: Save a Playwright trace when a test fails; requires failure screenshots. Traces can contain passwords, cookies and request and response bodies.
+              default_value: false
+              required: false
+              group: Diagnosis
+              detailed_description: |
+                The trace records DOM snapshots, network activity and a visual timeline of the failing test. Recording
+                runs during every run, including runs that pass, and adds CPU, memory and temporary disk use. Traces
+                larger than 5 MiB are not kept.
+
+                Download a trace with the `synthetics-artifact` Function (administrator access), save the decoded bytes
+                as a `.zip` file and open it with the [Playwright Trace Viewer](https://playwright.dev/docs/trace-viewer).
+                Secrets are not masked inside traces, and a script can change what is recorded, for example with
+                `test.use({ trace: 'on' })`.
+
+                When a run times out, saving the trace can use up the time kept for recording the timeout, and the run can
+                then lose its final report and screenshots. Traces never extend the time limit or cause a retry.
+            - name: browser_error_summary
+              description: Count uncaught exceptions, console errors, failed requests and HTTP error responses during every run, with a few samples of each. Adds CPU and memory use on pages that log heavily.
+              default_value: false
+              required: false
+              group: Diagnosis
+              detailed_description: |
+                The counts and up to four samples per kind (at most three from each test) appear in the journey run history,
+                for runs that pass as well as runs that fail. Only pages opened through the test's `page` or `context` fixtures are observed; a
+                browser context the script creates itself is not. Samples can contain text from the page.
+            - name: check_every
+              description: How often to run the journey, in seconds.
+              default_value: 900
+              required: false
+              group: Collection
+              detailed_description: |
+                A new job runs its first check right away. The second comes one to two intervals later, at a point that
+                depends on the job name, so jobs created together do not all run at once. After that, checks follow
+                every `check_every` seconds.
+            - &option_update_every
+              name: update_every
+              description: How often to refresh the charts from the latest result, in seconds. Refreshing never starts a browser.
+              default_value: 10
+              required: false
+              group: Collection
+            - name: timeout
+              description: Time limit for one run of the journey, in seconds. Time spent waiting for a free browser does not count.
+              default_value: 120
+              required: false
+              group: Collection
+              detailed_description: |
+                The limit applies to the whole file and to each test in it. The last 5 seconds of it (one fifth of a
+                limit under 25 seconds) are kept for recording the timeout, so the tests have slightly less time. A run
+                that exceeds it ends as `timeout`. After the browser and its processes exit, saving captures and history
+                has up to 10 more seconds, and the run keeps its browser slot until then.
+            - &option_vnode
+              name: vnode
+              description: Associates this job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
+              detailed_description: |
+                The job's charts and alerts appear under the virtual node instead of this Agent's host, which lets you
+                group the checks of one website under one node. Define the virtual node first, as the `dem:vnode`
+                dynamic configuration or as a YAML file in the `vnodes/` directory of the Netdata configuration
+                directory, then enter its name, not its GUID. Changing it clears the latest-result charts until the
+                next run; earlier runs keep the virtual node they ran under.
+              default_value: ''
+              required: false
+              group: Virtual Node
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Check that a page loads
+              description: The minimal journey. It opens a page and checks its title every 15 minutes.
+              config: |
+                jobs:
+                  - name: home
+                    script: |
+                      import { test, expect } from '@playwright/test';
+
+                      test('home page loads', async ({ page }) => {
+                        await page.goto('https://example.org/');
+                        await expect(page).toHaveTitle(/Example Domain/);
+                      });
+            - name: Log in with a stored password
+              description: Passes the password to the script as an environment variable, read from the Agent's environment.
+              config: |
+                jobs:
+                  - name: login
+                    secrets:
+                      - name: DEM_SECRET_PASSWORD
+                        value: ${env:SHOP_TEST_PASSWORD}
+                    script: |
+                      import { test, expect } from '@playwright/test';
+
+                      test('user can log in', async ({ page }) => {
+                        await page.goto('https://shop.example.org/login');
+                        await page.getByLabel('Email').fill('monitor@example.org');
+                        await page.getByLabel('Password').fill(process.env.DEM_SECRET_PASSWORD);
+                        await page.getByRole('button', { name: 'Log in' }).click();
+                        await expect(page.getByRole('heading', { name: 'My account' })).toBeVisible();
+                      });
+            - name: Run a test file from disk
+              description: Runs a Playwright Test file that imports helpers from its own directory.
+              config: |
+                jobs:
+                  - name: checkout
+                    script_path: /etc/netdata/dem/journeys/checkout.spec.ts
+            - name: Keep evidence of failures
+              description: Saves a screenshot and a Playwright trace whenever a test fails, and checks every 5 minutes.
+              config: |
+                jobs:
+                  - name: checkout
+                    script_path: /etc/netdata/dem/journeys/checkout.spec.ts
+                    check_every: 300
+                    screenshot_on_failure: true
+                    trace_on_failure: true
+            - name: Group checks under a virtual node
+              description: Shows the journey's charts and alerts under the `shop` virtual node, which must be defined first.
+              config: |
+                jobs:
+                  - name: checkout
+                    vnode: shop
+                    script_path: /etc/netdata/dem/journeys/checkout.spec.ts
+    troubleshooting:
+      errors:
+        list:
+          - &error_machine_id
+            error: 'opening DEM history: load journal identity: journalhost: machine id: no machine id found'
+            when: |
+              The Agent's log shows this when `dem.plugin` starts on Linux. The plugin then exits, so no DEM job runs,
+              whichever modules are enabled.
+            cause: |
+              DEM keeps its history in journal files, which need the host's machine ID, and none was found. Neither
+              `/etc/machine-id` nor `/var/lib/dbus/machine-id` holds a valid ID, and neither file exists under the
+              Netdata host prefix (`/host` in the official Docker image). This is common in minimal containers.
+            fix: |
+              On a host, create the machine ID with `sudo systemd-machine-id-setup` (or
+              `sudo dbus-uuidgen --ensure=/etc/machine-id` without systemd), then restart the Agent.
+
+              In the official Docker image, mount the host's machine ID under the Netdata host prefix: add
+              `-v /etc/machine-id:/host/etc/machine-id:ro` to `docker run`, or the same mount under `volumes:` in Docker
+              Compose, then recreate the container. Check first that the host has `/etc/machine-id`: Docker creates a
+              missing source path as an empty directory, which DEM rejects.
+          - &error_runtime_missing
+            error: 'install a browser runtime and restart dem.plugin: matching browser runtime is not prepared'
+            when: Static, source or Docker installation. The job stays waiting and never runs.
+            cause: No browser runtime is installed, or it was installed after the Agent started.
+            fix: Install the runtime (see Prerequisites), then restart the Agent or the container.
+          - &error_runtime_package_missing
+            error: 'install the optional netdata-dem-runtime package and restart dem.plugin: matching browser runtime is not prepared'
+            when: Native DEB or RPM installation. The job stays waiting and never runs.
+            cause: The `netdata-dem-runtime` package is not installed.
+            fix: Install `netdata-dem-runtime` with the package manager. The package restarts the Agent when it finishes.
+          - &error_runtime_root
+            error: 'DEM browser execution requires the plugin to run as an unprivileged user; root RUM operation does not enable browser jobs'
+            cause: The Netdata service runs as root. Browser jobs refuse to start Chromium as root.
+            fix: Run the Netdata service as its unprivileged service account (`netdata` by default). RUM keeps working either way.
+          - &error_runtime_platform
+            error: DEM browser execution requires prepared Linux amd64 or arm64 runtime
+            cause: The host is not Linux on amd64 or arm64, where the browser runtime is not available.
+            fix: Run browser jobs from an Agent on an amd64 or arm64 Linux host. RUM does not need the runtime.
+          - &error_release_url
+            error: online runtime preparation requires runtime.release_url
+            when: Installing the runtime online, with kickstart, the helper or `--allow-download`.
+            cause: The build has no release identity, or `runtime.release_url` in `dem.conf` explicitly disables the default URL.
+            fix: Use a release build's default URL, configure an exact matching signed release URL, or provide signed offline inputs (see the [browser runtime host setup guide](/packaging/installer/DEM-RUNTIME.md)).
+          - &error_offline_keyring
+            error: 'offline preparation requires runtime.offline_keyring; no runtime release verification key is configured'
+            when: Installing the runtime from a release file and archive with `--release` and `--archive`.
+            cause: There is no public key to verify the release signature.
+            fix: Set `runtime.offline_keyring` in `dem.conf` to the absolute path of the Netdata release signing keyring, readable by the Netdata service account.
+          - &error_sandbox
+            error: Runtime installation or qualification fails with a Chromium sandbox error
+            cause: The host does not let an unprivileged process create the user namespaces Chromium's sandbox needs, usually because of an AppArmor restriction (Ubuntu 24.04) or a container's seccomp or namespace settings.
+            fix: |
+              Install the runtime with kickstart or the `netdata-dem-runtime.sh` helper, which prepare the AppArmor
+              allowance; for Docker, use the documented container settings, including `apparmor=unconfined` on AppArmor
+              hosts. Look for denials in the kernel log:
+
+              ```bash
+              sudo journalctl -k --since '10 minutes ago'
+              ```
+
+              Do not disable Chromium's sandbox or the host's restrictions.
+          - &error_coalesced
+            error: Checks are coalesced, or the state chart shows `stale`
+            cause: The browser is busy with other jobs for longer than this job's check interval, so its checks wait and newer ones replace them. The scheduling charts show growing queue age and coalesced occurrences.
+            fix: Raise `check_every` or lower `timeout` on busy jobs, or raise `browser.concurrency` in `dem.conf` if the host has CPU and memory to spare, then restart the Agent.
+          - &error_unverified_cleanup
+            error: 'plugin exiting with retained unverified synthetic work: `ERROR`'
+            when: A journey or Lighthouse run, or a runtime check, ends without proof that its browser processes exited, and
+              the whole plugin, RUM included, exits.
+            cause: &cause_unverified_cleanup DEM could not confirm that every browser and Node.js process of the run exited,
+              for example because one is stuck in uninterruptible disk I/O or Netdata lost track of it. It keeps the run's
+              files and its runtime release protected instead of deleting something that may still be in use.
+            fix: &fix_unverified_cleanup |
+              Look for leftover processes of the Netdata service account (for example `ps -u netdata -f`) and resolve what
+              keeps them running, then restart the Agent. A process stuck in uninterruptible disk I/O can need a host
+              reboot, which also lets DEM release the protected runtime files.
+
+              Leave the files in the `dem` directory under the Agent's state directory (usually `/var/lib/netdata/dem/`)
+              in place: DEM never removes protected work based on age or a missing process ID.
+          - &error_unverified_completion
+            error: 'unverified synthetic completion: `ERROR`'
+            when: The plugin was shutting down when a run or runtime check ended without proof that its browser processes
+              exited.
+            cause: *cause_unverified_cleanup
+            fix: *fix_unverified_cleanup
+          - error: set exactly one of script and script_path
+            cause: The job sets both `script` and `script_path`, or neither.
+            fix: Keep exactly one of them.
+          - error: script_path must be an absolute JS or TS file
+            cause: '`script_path` is a relative path, or does not end in `.js`, `.ts`, `.mjs`, `.cjs`, `.mts` or `.cts`.'
+            fix: Use the absolute path of the test file.
+          - error: script_path must reference a readable regular file
+            cause: The file does not exist, is not a regular file, or a directory on its path cannot be searched by the Netdata service account.
+            fix: &fix_script_path |
+              Check the path and the permissions as the service account:
+
+              ```bash
+              sudo -u netdata cat /etc/netdata/dem/journeys/checkout.spec.ts
+              ```
+          - error: script_path must be readable
+            cause: The file exists, but the Netdata service account cannot read it.
+            fix: *fix_script_path
+          - error: script must not be blank
+            cause: '`script` contains only whitespace.'
+            fix: Put the Playwright Test source in `script`, or remove it and set `script_path`.
+          - error: trace_on_failure requires screenshot_on_failure
+            cause: Traces are saved only together with failure screenshots.
+            fix: Set `screenshot_on_failure` to `true`, or `trace_on_failure` to `false`.
+          - error: invalid DEM_SECRET_ environment entry
+            cause: A secret name does not start with `DEM_SECRET_`, contains characters other than letters, digits and underscores, or the value contains a NUL character.
+            fix: Rename the secret, for example to `DEM_SECRET_PASSWORD`.
+          - error: secret names must be unique
+            cause: Two secrets in the job have the same name.
+            fix: Give each secret its own name.
+          - error: Runs end as `inconclusive`
+            cause: No test failed, but not every declared test passed. The file has no tests, or tests were skipped, marked as expected to fail (`test.fail`), or did not run.
+            fix: Check the test counts in the journey run history, and make every test in the file run and pass.
+          - error: Runs end as `error`
+            cause: The run could not produce test results, for example because the script has a syntax error or imports a module that is not available, or the browser failed to start.
+            fix: Open the run in the journey run history; its error column has the message. Check that the script runs with `npx playwright test` on a development machine.
+          - error: Runs end as `timeout`
+            cause: A test or the whole file took longer than `timeout`. The run's termination reason tells which.
+            fix: Open the run in the journey run history. The last observed step and stop context show what the browser was waiting for; speed up that step or raise `timeout`.
+          - error: The Test action in the job editor times out
+            cause: Test first waits for a free browser, shared with the running jobs, then runs the whole journey; the editor's
+              request must cover both, which a long journey or a busy Agent can exceed. A Test that timed out keeps no result
+              to look at later.
+            fix: Save the job without testing it and check its first run in the journey run history, or test again when fewer
+              checks are running.
+    metrics: &metrics
+      description: |
+        Each job has its own charts, under its virtual node when `vnode` is set and under this Agent's host otherwise.
+        The charts show the latest completed run until the next one finishes. When that result is older than two check
+        intervals, the state chart shows `stale` and the duration, test and Lighthouse charts leave a gap instead of
+        repeating it.
+        Changing a job's `vnode` clears the latest result until the first run under the new virtual node completes.
+      availability: []
+      folding:
+        enabled: false
+        title: Metrics
+      scopes:
+        - &job_scope
+          name: journey job
+          description: One configured journey.
+          labels: []
+          metrics:
+            - &metric_execution_state
+              name: dem_synthetic.execution_state
+              description: Latest synthetic observation state
+              unit: state
+              chart_type: stacked
+              dimensions:
+                - name: unknown
+                - name: success
+                - name: failed
+                - name: timeout
+                - name: inconclusive
+                - name: error
+                - name: cancelled
+                - name: stale
+            - &metric_duration
+              name: dem_synthetic.duration
+              description: Latest synthetic attempt duration
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: duration
+            - &metric_observation_age
+              name: dem_synthetic.observation_age
+              description: Age of latest synthetic observation
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - &metric_attempts
+              name: dem_synthetic.attempts
+              description: Completed synthetic attempts
+              unit: attempts/s
+              chart_type: stacked
+              dimensions:
+                - name: success
+                - name: failed
+                - name: timeout
+                - name: inconclusive
+                - name: error
+                - name: cancelled
+                - name: unknown
+            - &metric_occurrences
+              name: dem_synthetic.occurrences
+              description: Synthetic scheduled occurrences
+              unit: occurrences/s
+              chart_type: line
+              dimensions:
+                - name: scheduled
+                - name: admitted
+                - name: coalesced
+            - &metric_scheduler_state
+              name: dem_synthetic.scheduler_state
+              description: Synthetic active and pending attempts
+              unit: attempts
+              chart_type: line
+              dimensions:
+                - name: active
+                - name: pending
+            - &metric_queue_age
+              name: dem_synthetic.queue_age
+              description: Oldest synthetic admission wait
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: age
+            - &metric_scheduling_delay
+              name: dem_synthetic.scheduling_delay
+              description: Latest synthetic admission delay from selected due time
+              unit: seconds
+              chart_type: line
+              dimensions:
+                - name: delay
+            - name: dem_synthetic.journey.declared_tests
+              description: Latest declared journey tests
+              unit: tests
+              chart_type: line
+              dimensions:
+                - name: declared
+            - name: dem_synthetic.journey.test_outcomes
+              description: Latest journey test outcomes
+              unit: tests
+              chart_type: stacked
+              dimensions:
+                - name: passed
+                - name: failed
+                - name: timed_out
+                - name: skipped
+                - name: expected_failure
+                - name: not_run
+    functions:
+      description: &functions_description |
+        These Functions show the state of every journey and Lighthouse job on the Agent, their run history and their
+        saved screenshots, traces and reports. They are available while the Agent has at least one active job, saved
+        run or saved capture, so history stays readable after a job is removed. Run history has one Function per kind;
+        the others serve both kinds.
+
+        Viewing them requires a signed-in member of the node's Netdata Cloud Space with permission to view sensitive
+        data, on a paid plan or an active trial. Jobs run and their history is kept on every plan.
+
+        To narrow the results to one virtual node, pass `vnode` with its configured name, or `vnode_guid` with its GUID
+        for a virtual node that was renamed or removed. Without either, every job is included, with or without a
+        virtual node.
+
+        The plugin-wide `dem-history-status` Function covers the history that RUM and synthetic monitoring share. It is
+        available whenever the plugin runs, needs the same access and takes no parameters. It shows the retention in
+        effect (`history` in `dem.conf`), how much disk the history files use, and the latest cleanup, write or
+        configuration reload error.
+      list:
+        - &function_checks
+          id: synthetics-checks
+          function_name: synthetics-checks
+          name: Synthetic monitors
+          description: The current status of every active journey and Lighthouse job - its latest result and whether it is still fresh, when it last succeeded and failed, and whether its checks are waiting for a free browser. Disabled jobs and jobs that failed to start are not listed; their status is in the job configuration.
+          parameters:
+            - &param_vnode
+              id: vnode
+              name: Virtual node name (`vnode`)
+              description: Only jobs of the configured virtual node with this name. An empty or unknown name is an error. Do not combine with `vnode_guid`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - &param_vnode_guid
+              id: vnode_guid
+              name: Virtual node GUID (`vnode_guid`)
+              description: Only jobs recorded under the virtual node with this GUID. Do not combine with `vnode`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: job_id
+              name: Job (`job_id`)
+              description: Only this job, written as module and job name, such as `journey:checkout` or `lighthouse:home`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: kind
+              name: Kind (`kind`)
+              description: Only `journey` or only `lighthouse` jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - &param_limit
+              id: limit
+              name: Maximum rows (`limit`)
+              description: The maximum number of rows to return, from 1 to 2000. The response sets `truncated` when more rows match.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: One row per active job.
+            columns:
+              - name: job_id
+                type: string
+                unit: ''
+                description: Module and job name, such as `journey:checkout`.
+              - name: kind
+                type: string
+                unit: ''
+                description: '`journey` or `lighthouse`.'
+              - name: name
+                type: string
+                unit: ''
+                description: Job name.
+              - name: target
+                type: string
+                unit: ''
+                description: Audited URL of a Lighthouse job, without credentials. Empty for journeys.
+              - name: state
+                type: string
+                unit: ''
+                description: The latest outcome; `waiting` or `running` while a check is in progress; `stale` when the latest result is older than two check intervals; `unknown` before the first result.
+              - name: fresh
+                type: boolean
+                unit: ''
+                description: Whether the latest result is less than two check intervals old.
+              - name: run_id
+                type: string
+                unit: ''
+                description: ID of the latest run.
+              - name: outcome
+                type: string
+                unit: ''
+                description: Outcome of the latest run.
+              - name: completed_us
+                type: timestamp
+                unit: ''
+                description: When the latest run finished.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: How long the latest run took.
+              - name: last_success_us
+                type: timestamp
+                unit: ''
+                description: When a run last succeeded, since the job started or moved to another virtual node.
+              - name: last_failure_us
+                type: timestamp
+                unit: ''
+                description: When a run last failed or timed out, since the job started or moved to another virtual node.
+              - name: error
+                type: string
+                unit: ''
+                description: Error message of the latest run.
+              - name: history_error
+                type: string
+                unit: ''
+                description: Problem saving the latest run to the run history.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: GUID of the job's virtual node. Empty when it has none.
+              - name: check_every
+                type: integer
+                unit: 's'
+                description: Configured check interval.
+              - name: scheduled
+                type: integer
+                unit: ''
+                description: Checks that came due since the job started.
+              - name: admitted
+                type: integer
+                unit: ''
+                description: Checks that got a browser and ran.
+              - name: coalesced
+                type: integer
+                unit: ''
+                description: Checks skipped because the job's previous check was still waiting for a browser.
+              - name: pending
+                type: boolean
+                unit: ''
+                description: Whether a check is waiting for a browser.
+              - name: queue_age
+                type: float
+                unit: 's'
+                description: How long the waiting check has waited.
+              - name: scheduling_delay
+                type: float
+                unit: 's'
+                description: How long after its due time the latest check got a browser.
+          performance: Reads the jobs' current state in memory. Starts no browser and contacts no website.
+          security: Shows job names, audited URLs and error messages, which can contain sensitive text.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - id: synthetics-journey-runs
+          function_name: synthetics-journey-runs
+          name: Journey runs
+          description: The history of journey runs, newest first, with test counts, the first failure and its step, and the browser error counts. Use it to see when a journey started failing and why. Runs are selected by start time.
+          parameters:
+            - *param_vnode
+            - *param_vnode_guid
+            - id: job_id
+              name: Job (`job_id`)
+              description: Only runs of this journey, such as `journey:checkout`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - &param_outcome
+              id: outcome
+              name: Outcome (`outcome`)
+              description: Only runs with this outcome - `success`, `failed`, `timeout`, `inconclusive`, `error`, `cancelled` or `unknown`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - &param_after
+              id: after
+              name: Started after (`after`)
+              description: Only runs started at or after this time, in Unix seconds, or seconds before now when negative (`-3600` for the last hour). Empty includes the whole history.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - &param_before
+              id: before
+              name: Started before (`before`)
+              description: Only runs started at or before this time, in Unix seconds, or seconds before now when negative. Empty means now.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - *param_limit
+          returns:
+            description: One row per run. The response reports the time range it used and sets `truncated` when more runs match than `limit`. Values a run did not report, such as test counts of a run that failed to start, are null.
+            columns:
+              - &column_run_id
+                name: run_id
+                type: string
+                unit: ''
+                description: Run ID.
+              - &column_job_id
+                name: job_id
+                type: string
+                unit: ''
+                description: Module and job name.
+              - &column_name
+                name: name
+                type: string
+                unit: ''
+                description: Job name.
+              - &column_target
+                name: target
+                type: string
+                unit: ''
+                description: Audited URL, without credentials. Empty for journeys.
+              - &column_started
+                name: started_us
+                type: timestamp
+                unit: ''
+                description: When the run started.
+              - &column_completed
+                name: completed_us
+                type: timestamp
+                unit: ''
+                description: When the run finished. Null when it did not finish, for example because the Agent stopped.
+              - &column_outcome
+                name: outcome
+                type: string
+                unit: ''
+                description: Outcome of the run.
+              - &column_duration
+                name: duration_ms
+                type: float
+                unit: ms
+                description: How long the run took, excluding the wait for a browser.
+              - &column_capture_state
+                name: capture_state
+                type: string
+                unit: ''
+                description: Whether captures were saved - `available`, `not_needed`, `unavailable` or `disabled`.
+              - &column_error
+                name: error
+                type: string
+                unit: ''
+                description: First error reported by the run.
+              - &column_history_error
+                name: history_error
+                type: string
+                unit: ''
+                description: Problem saving the run to the history.
+              - &column_vnode_guid
+                name: vnode_guid
+                type: string
+                unit: ''
+                description: GUID of the virtual node the run belonged to. Empty when it had none.
+              - &column_scheduled
+                name: scheduled_us
+                type: timestamp
+                unit: ''
+                description: When the check was due.
+              - &column_queued
+                name: queued_us
+                type: timestamp
+                unit: ''
+                description: When the check started waiting for a browser.
+              - &column_termination
+                name: termination_reason
+                type: string
+                unit: ''
+                description: Why the run stopped early, such as `test_timeout`, `suite_timeout`, `execution_budget` or `cancelled`. Empty when it ran to the end.
+              - name: tests_declared
+                type: integer
+                unit: ''
+                description: Tests declared in the file.
+              - name: tests_passed
+                type: integer
+                unit: ''
+                description: Tests that passed.
+              - name: tests_failed
+                type: integer
+                unit: ''
+                description: Tests that failed.
+              - name: tests_timed_out
+                type: integer
+                unit: ''
+                description: Tests that timed out.
+              - name: tests_skipped
+                type: integer
+                unit: ''
+                description: Tests that were skipped.
+              - name: tests_expected_failure
+                type: integer
+                unit: ''
+                description: Tests that failed as expected (`test.fail`).
+              - name: tests_not_run
+                type: integer
+                unit: ''
+                description: Tests that did not run.
+              - name: failure_evidence_status
+                type: string
+                unit: ''
+                description: Whether failure details were recorded - `complete`, `partial`, `unavailable`, `unsupported`, `invalid` or `not_recorded`.
+              - name: first_failure
+                type: string
+                unit: ''
+                description: The first unexpected test failure, with its step, source location and error message.
+              - name: last_observed_step
+                type: string
+                unit: ''
+                description: The last step seen running. It does not mean the browser is still on it.
+              - name: stop_context
+                type: string
+                unit: ''
+                description: What a timed-out or interrupted test was waiting for when it was stopped. It shows what was pending, not necessarily the cause.
+              - name: browser_summary_status
+                type: string
+                unit: ''
+                description: Whether browser error counts were recorded, with the same values as `failure_evidence_status`. Requires `browser_error_summary`.
+              - name: browser_errors
+                type: string
+                unit: ''
+                description: Browser error counts by kind. Missing counts mean nothing was recorded, not zero errors.
+          performance: Reads the run history from disk, up to 2000 rows per request. Starts no browser and contacts no website.
+          security: Rows can contain URLs, test and step titles, and error messages from the website, which can include sensitive text.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - &function_run
+          id: synthetics-run
+          function_name: synthetics-run
+          name: Synthetic run detail
+          description: Everything recorded about one run, journey or Lighthouse, including a run that is still in progress - its outcome, error, test counts or Lighthouse measurements, failure details, captures and the timeline of test and step events. Open it from the monitor overview or the run history.
+          parameters:
+            - id: job_id
+              name: Job (`job_id`)
+              description: Module and job name of the run, such as `journey:checkout`.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: run_id
+              name: Run (`run_id`)
+              description: Run ID, from the monitor overview or the run history.
+              type: string
+              required: true
+              default: ''
+              options: []
+          returns:
+            description: |
+              One row per recorded test, step or audit event. The response also carries the full run record, including
+              what was captured; a missing completion time means the run has not finished or its end was not recorded.
+              For a journey, the record's `failure_evidence` holds the first failure's test and step path, source
+              locations and error excerpts, plus what was still pending when a timed-out test was stopped, and
+              `browser_summary` holds the browser error counts and samples when `browser_error_summary` is on.
+
+              A capture the run reported but Netdata did not save is listed in the record's `captures.unpublished` with a
+              reason: `too_large` (over the 5 MiB download limit), `publication_failed` (saving failed; the run's error
+              says why), `not_eligible` (taken while the run was being stopped; such captures are kept only when it
+              stopped with `execution_budget`) or `not_in_final_report` (listed in `captures.associations` but missing
+              from the run's final report).
+            columns:
+              - name: at_ms
+                type: timestamp
+                unit: ''
+                description: When the event happened.
+              - name: kind
+                type: string
+                unit: ''
+                description: Event type, such as a test, step or error.
+              - name: test_id
+                type: string
+                unit: ''
+                description: Test the event belongs to.
+              - name: title
+                type: string
+                unit: ''
+                description: Test or step title.
+              - name: phase
+                type: string
+                unit: ''
+                description: Phase of the run, such as start or end.
+              - name: status
+                type: string
+                unit: ''
+                description: Status the test or step ended with.
+              - name: expected_status
+                type: string
+                unit: ''
+                description: Status the test was expected to end with.
+              - name: duration_ms
+                type: float
+                unit: ms
+                description: How long the test or step took.
+              - name: message
+                type: string
+                unit: ''
+                description: Error or status message.
+          performance: Reads one run from memory or disk. Starts no browser and contacts no website.
+          security: Shows URLs, titles and error messages from the website, which can contain sensitive text.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - &function_artifacts
+          id: synthetics-artifacts
+          function_name: synthetics-artifacts
+          name: Retained synthetic captures
+          description: The saved failure screenshots, traces and Lighthouse reports, one set per run, newest first. Captures are kept separately from the run history (7 days or 2 GiB by default), so they can remain after their run's history or their job is gone, until they expire. The response also shows how much disk the captures use and the retention policy.
+          parameters:
+            - *param_vnode
+            - *param_vnode_guid
+            - id: job_id
+              name: Job (`job_id`)
+              description: Only captures of this job, such as `journey:checkout`. The storage totals always cover all jobs.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: cursor
+              name: Page cursor (`cursor`)
+              description: The `next` value of the previous response, to read the next page. Empty starts from the newest captures.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - id: limit
+              name: Maximum rows (`limit`)
+              description: The maximum number of capture sets to return, from 1 to 2000. When `truncated` is true, pass `next` as `cursor` for more.
+              type: string
+              required: false
+              default: '2000'
+              options: []
+          returns:
+            description: One row per saved capture set. The `storage` object reports the retention policy, the disk space used and any cleanup error.
+            columns:
+              - name: run_id
+                type: string
+                unit: ''
+                description: Run the captures belong to.
+              - name: job_id
+                type: string
+                unit: ''
+                description: Module and job name.
+              - name: published_us
+                type: timestamp
+                unit: ''
+                description: When the captures were saved.
+              - name: bytes
+                type: integer
+                unit: bytes
+                description: Size of the capture set.
+              - name: artifact_count
+                type: integer
+                unit: ''
+                description: Number of files in the set.
+              - name: vnode_guid
+                type: string
+                unit: ''
+                description: GUID of the run's virtual node. Empty when it had none.
+          performance: Reads capture file sizes and metadata from disk, not their contents. Starts no browser.
+          security: Shows job names and capture metadata, not capture contents.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - &function_artifact
+          id: synthetics-artifact
+          function_name: synthetics-artifact
+          name: Synthetic capture detail
+          description: The captures of one run, and the download of one of them - a screenshot, a Playwright trace ZIP or a Lighthouse HTML report. Downloading requires administrator access to the node.
+          parameters:
+            - id: job_id
+              name: Job (`job_id`)
+              description: Module and job name of the run, such as `journey:checkout`.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: run_id
+              name: Run (`run_id`)
+              description: Run ID, from the capture list, the monitor overview or the run history.
+              type: string
+              required: true
+              default: ''
+              options: []
+            - id: artifact_id
+              name: Capture (`artifact_id`)
+              description: Capture to download. The response returns its content base64-encoded. Empty lists the run's captures.
+              type: string
+              required: false
+              default: ''
+              options: []
+          returns:
+            description: One row per capture of the run. A capture that has expired is reported as `expired_or_unavailable`. A downloaded file is checked against its recorded SHA-256 and returned as base64 in `data_base64`, up to 5 MiB.
+            columns:
+              - name: artifact_id
+                type: string
+                unit: ''
+                description: Capture ID, for download.
+              - name: kind
+                type: string
+                unit: ''
+                description: Capture type.
+              - name: mime
+                type: string
+                unit: ''
+                description: Content type.
+              - name: bytes
+                type: integer
+                unit: bytes
+                description: File size.
+              - name: sha256
+                type: string
+                unit: ''
+                description: SHA-256 of the file.
+              - name: availability
+                type: string
+                unit: ''
+                description: Whether the file is still kept.
+              - name: test
+                type: string
+                unit: ''
+                description: Title of the test a screenshot or trace belongs to, or `Test not recorded` when the run did not
+                  report it. Empty for Lighthouse reports.
+              - name: label
+                type: string
+                unit: ''
+                description: Screenshot, Trace or Lighthouse report.
+          performance: Reads metadata from disk, and one file of up to 5 MiB when downloading. Starts no browser.
+          security: Listing requires member access; downloading requires administrator access. Screenshots, traces and reports can contain passwords, cookies, personal data and other page content.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+  - meta:
+      <<: *meta
+      id: collector-dem.plugin-lighthouse
+      module_name: lighthouse
+      monitored_instance:
+        <<: *monitored_instance
+        name: Lighthouse Desktop Audit
+        link: https://developer.chrome.com/docs/lighthouse/overview
+      keywords:
+        - lighthouse desktop audit
+        - lighthouse
+        - google lighthouse
+        - page speed
+        - pagespeed
+        - web vitals
+        - lab test
+        - synthetic
+        - dem
+      related_resources:
+        integrations:
+          list:
+            - plugin_name: dem.plugin
+              module_name: journey
+            - plugin_name: dem.plugin
+              module_name: rum
+      info_provided_to_referring_integrations:
+        description: Audits page load performance with Lighthouse in a lab browser on a schedule.
+    overview:
+      data_collection:
+        metrics_description: |
+          Audit the load performance of a web page on a schedule with Lighthouse and follow how it changes over time.
+
+          Each job loads one URL in a fresh desktop Chromium browser and gives you:
+
+          - The Lighthouse performance score, from 0 to 100.
+          - Lab timings: First Contentful Paint, Largest Contentful Paint, Total Blocking Time and Speed Index, plus
+            Cumulative Layout Shift.
+          - The outcome and duration of every audit, how old the latest result is, and a run history.
+          - Optionally, the full Lighthouse HTML report of each audit.
+        method_description: |
+          Every `check_every` seconds (30 minutes by default), the Agent starts a fresh, sandboxed Chromium browser on
+          this host and runs a [Lighthouse](https://developer.chrome.com/docs/lighthouse/overview) performance audit of
+          the configured URL with the desktop preset. The browser loads the page like a visitor would, without clicking
+          or submitting anything.
+
+          These are lab measurements from one browser on the Agent host, so they depend on that host's network and CPU
+          and differ from what visitors experience. For measurements from real visitors, use Real User Monitoring. The
+          **Test** action in the job editor checks that the browser runtime is ready, without running an audit.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: true
+      additional_permissions:
+        description: |
+          The host must let an unprivileged process create the user namespaces Chromium's sandbox needs. Installing the
+          browser runtime prepares this on hosts that restrict it, such as Ubuntu 24.04 (see Prerequisites). Browser
+          jobs never run as root, and Chromium's sandbox stays enabled.
+      default_behavior:
+        auto_detection:
+          description: ''
+        limits:
+          description: |
+            - All journey and Lighthouse jobs on the Agent share `browser.concurrency` in `dem.conf`, which runs one
+              browser at a time by default. A check that comes due while the browser is busy waits; if it is still
+              waiting when the job's next check comes due, it is skipped and counted as coalesced.
+            - Audits that run at the same time compete for the host's CPU, which changes their timings and scores.
+            - A result is fresh for two check intervals. After that the state chart shows `stale` and the duration
+              and Lighthouse charts leave a gap until a new audit completes.
+            - Run history is shared with RUM and kept for about 30 days, or less once it would exceed 1 GiB, and reports for
+              7 days, or less once they would exceed 2 GiB (`history` and `artifacts` in `dem.conf`). History files of up to a day expire
+              together, so runs can stay about a day longer. When the size limit is reached, the oldest entries go first.
+            - A report larger than 5 MiB is not kept.
+            - Run diagnostics keep up to 500 events per audit and 2,000 characters per text, and count what they drop.
+            - To be alerted on a low performance score, add your own health alert on
+              `dem_synthetic.lighthouse.performance`.
+        performance_impact:
+          description: |
+            Each audit starts a new Chromium browser and Node.js process on the Agent host, which use CPU and memory for
+            as long as the audit lasts. The audited website receives one full page load, with all its resources.
+
+            - Raise `check_every` to audit less often. `update_every` only refreshes the charts and starts no browser.
+            - `browser.concurrency` in `dem.conf` limits how many browsers run at once; size it for the host's CPU and
+              memory, and restart the Agent to apply it.
+    setup:
+      prerequisites: *prerequisites
+      configuration:
+        file:
+          name: dem/lighthouse.conf
+        options:
+          description: Each job audits one page. All options apply per job.
+          folding:
+            enabled: true
+            title: Configuration options
+          list:
+            - name: name
+              description: Job name. It identifies the audit in charts and run history, so renaming starts a separate history.
+              default_value: ''
+              required: true
+              group: Target
+            - name: url
+              description: Page to audit, as an absolute http:// or https:// URL without a username or password.
+              default_value: ''
+              required: true
+              group: Target
+            - name: save_report
+              description: Save the full Lighthouse HTML report of each audit. Reports can contain sensitive URLs and page content.
+              default_value: false
+              required: false
+              group: Diagnosis
+              detailed_description: |
+                Download a report with the `synthetics-artifact` Function (administrator access) and open it in a
+                browser. Reports larger than 5 MiB are not kept.
+            - name: check_every
+              description: How often to audit the page, in seconds.
+              default_value: 1800
+              required: false
+              group: Collection
+              detailed_description: |
+                A new job runs its first audit right away. The second comes one to two intervals later, at a point that
+                depends on the job name, so jobs created together do not all run at once. After that, audits follow
+                every `check_every` seconds.
+            - *option_update_every
+            - name: timeout
+              description: Time limit for one audit, in seconds. Time spent waiting for a free browser does not count.
+              default_value: 180
+              required: false
+              group: Collection
+              detailed_description: |
+                An audit that exceeds it ends as `timeout`. After the browser and its processes exit, saving the report and
+                history has up to 10 more seconds, and the audit keeps its browser slot until then.
+            - *option_vnode
+        examples:
+          folding:
+            enabled: true
+            title: Config
+          list:
+            - name: Audit a page
+              description: The minimal audit. It checks the page every 30 minutes.
+              config: |
+                jobs:
+                  - name: home
+                    url: https://example.org/
+            - name: Keep the HTML report
+              description: Saves the full Lighthouse report of every audit, for a closer look at a slow result.
+              config: |
+                jobs:
+                  - name: home
+                    url: https://example.org/
+                    save_report: true
+            - name: Group audits under a virtual node
+              description: Shows the audit's charts under the `shop` virtual node, which must be defined first.
+              config: |
+                jobs:
+                  - name: home
+                    vnode: shop
+                    url: https://shop.example.org/
+    troubleshooting:
+      errors:
+        list:
+          - *error_machine_id
+          - *error_runtime_missing
+          - *error_runtime_package_missing
+          - *error_runtime_root
+          - *error_runtime_platform
+          - *error_release_url
+          - *error_offline_keyring
+          - *error_sandbox
+          - *error_coalesced
+          - *error_unverified_cleanup
+          - *error_unverified_completion
+          - error: audit URL must be absolute HTTP(S) without credentials
+            cause: '`url` is not an absolute `http://` or `https://` URL, or it contains a username or password.'
+            fix: Use a full URL such as `https://example.org/`. Pages behind a login cannot be audited this way; check them with a journey instead.
+          - error: Audits end as `error`
+            cause: Lighthouse could not audit the page, for example because it did not load, the name did not resolve or the TLS certificate was not trusted.
+            fix: Open the audit in the Lighthouse run history; its error column has Lighthouse's message. Check that the Agent host can reach the URL.
+    metrics:
+      <<: *metrics
+      scopes:
+        - <<: *job_scope
+          name: lighthouse job
+          description: One configured Lighthouse audit.
+          metrics:
+            - *metric_execution_state
+            - *metric_duration
+            - *metric_observation_age
+            - *metric_attempts
+            - *metric_occurrences
+            - *metric_scheduler_state
+            - *metric_queue_age
+            - *metric_scheduling_delay
+            - name: dem_synthetic.lighthouse.performance
+              description: Latest Lighthouse performance score
+              unit: points
+              chart_type: line
+              dimensions:
+                - name: performance
+            - name: dem_synthetic.lighthouse.timings
+              description: Latest Lighthouse lab timings
+              unit: milliseconds
+              chart_type: line
+              dimensions:
+                - name: fcp
+                - name: lcp
+                - name: tbt
+                - name: speed_index
+            - name: dem_synthetic.lighthouse.cls
+              description: Latest Lighthouse cumulative layout shift
+              unit: ratio
+              chart_type: line
+              dimensions:
+                - name: cls
+    functions:
+      description: *functions_description
+      list:
+        - *function_checks
+        - id: synthetics-lighthouse-runs
+          function_name: synthetics-lighthouse-runs
+          name: Lighthouse runs
+          description: The history of Lighthouse audits, newest first, with the performance score and lab timings of each. Use it to see when a page got slower. Audits are selected by start time.
+          parameters:
+            - *param_vnode
+            - *param_vnode_guid
+            - id: job_id
+              name: Job (`job_id`)
+              description: Only audits of this job, such as `lighthouse:home`.
+              type: string
+              required: false
+              default: ''
+              options: []
+            - *param_outcome
+            - *param_after
+            - *param_before
+            - *param_limit
+          returns:
+            description: One row per audit. The response reports the time range it used and sets `truncated` when more audits match than `limit`. Measurements an audit did not report are null.
+            columns:
+              - *column_run_id
+              - *column_job_id
+              - *column_name
+              - *column_target
+              - *column_started
+              - *column_completed
+              - *column_outcome
+              - *column_duration
+              - *column_capture_state
+              - *column_error
+              - *column_history_error
+              - *column_vnode_guid
+              - *column_scheduled
+              - *column_queued
+              - *column_termination
+              - name: performance
+                type: float
+                unit: points
+                description: Lighthouse performance score, from 0 to 100.
+              - name: fcp_ms
+                type: float
+                unit: ms
+                description: First Contentful Paint.
+              - name: lcp_ms
+                type: float
+                unit: ms
+                description: Largest Contentful Paint.
+              - name: tbt_ms
+                type: float
+                unit: ms
+                description: Total Blocking Time.
+              - name: si_ms
+                type: float
+                unit: ms
+                description: Speed Index.
+              - name: cls
+                type: float
+                unit: ''
+                description: Cumulative Layout Shift, a unitless score.
+          performance: Reads the run history from disk, up to 2000 rows per request. Starts no browser and contacts no website.
+          security: Rows can contain URLs and error messages, which can include sensitive text.
+          availability: While the Agent has at least one active synthetic job, saved run or saved capture.
+          require_cloud: true
+          prerequisites:
+            list: []
+        - *function_run
+        - *function_artifacts
+        - *function_artifact

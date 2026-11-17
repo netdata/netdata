@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+const nativeDiagnosticLimit = 16 << 10
+
 func nativeCommandPlatform() error { return nil }
 
 type nativeIdentity struct {
@@ -43,7 +45,11 @@ func nativeServiceAccount() (nativeIdentity, error) {
 	if !filepath.IsAbs(account.HomeDir) {
 		return identity, errors.New("native runtime service home must be absolute")
 	}
-	identity = nativeIdentity{uid: uint32(uid), gid: uint32(gid), home: account.HomeDir}
+	identity = nativeIdentity{
+		uid:  uint32(uid),
+		gid:  uint32(gid),
+		home: account.HomeDir,
+	}
 	groups, err := account.GroupIds()
 	if err != nil {
 		return identity, fmt.Errorf("lookup native runtime supplementary groups: %w", err)
@@ -76,7 +82,11 @@ func newNativeChild(identity nativeIdentity, diagnostic io.Writer) (*nativeChild
 	if err := trustedNativeExecutable(path); err != nil {
 		return nil, err
 	}
-	return &nativeChild{executable: path, identity: identity, diagnostic: diagnostic}, nil
+	return &nativeChild{
+		executable: path,
+		identity:   identity,
+		diagnostic: diagnostic,
+	}, nil
 }
 
 func trustedNativeExecutable(path string) error {
@@ -90,7 +100,8 @@ func trustedNativeExecutable(path string) error {
 			return err
 		}
 		owner, ok := info.Sys().(*syscall.Stat_t)
-		if !ok || owner.Uid != 0 || info.Mode().Perm()&0022 != 0 || info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
+		if !ok || owner.Uid != 0 || info.Mode().Perm()&0022 != 0 ||
+			info.Mode()&(os.ModeSetuid|os.ModeSetgid|os.ModeSticky) != 0 {
 			return errors.New("native service executable and ancestors must be root-owned and not group/world-writable")
 		}
 		if (file && (!info.Mode().IsRegular() || info.Mode().Perm()&0111 == 0)) || (!file && !info.IsDir()) {
@@ -104,8 +115,15 @@ func trustedNativeExecutable(path string) error {
 }
 
 func nativeServiceEnvironment(identity nativeIdentity, parent []string) []string {
-	environment := []string{"HOME=" + identity.home, "USER=netdata", "LOGNAME=netdata", "SHELL=/bin/sh", "PATH=/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL=C"}
-	// Qualification uses loopback content and the build-time nd-run path. Keep
+	environment := []string{
+		"HOME=" + identity.home,
+		"USER=netdata",
+		"LOGNAME=netdata",
+		"SHELL=/bin/sh",
+		"PATH=/usr/sbin:/usr/bin:/sbin:/bin",
+		"LC_ALL=C",
+	}
+	// Validation reads package files and service proof. Keep
 	// only local temp/cache/runtime-directory policy; no loader, Node, proxy,
 	// credentials, browser-argument or executable-path injection is inherited.
 	for _, entry := range parent {
@@ -129,18 +147,23 @@ func nativeServiceEnvironment(identity nativeIdentity, parent []string) []string
 
 func nativeCredentialCommand(ctx context.Context, executable string, args []string, identity nativeIdentity) *exec.Cmd {
 	command := exec.CommandContext(ctx, executable, args...)
-	command.SysProcAttr = &syscall.SysProcAttr{Credential: &syscall.Credential{Uid: identity.uid, Gid: identity.gid, Groups: identity.groups}}
+	command.SysProcAttr = &syscall.SysProcAttr{
+		Credential: &syscall.Credential{
+			Uid:    identity.uid,
+			Gid:    identity.gid,
+			Groups: identity.groups,
+		},
+	}
 	command.Env = nativeServiceEnvironment(identity, os.Environ())
 	command.Dir = "/"
-	// A killed qualifier can leave descendants holding stdio. Bound pipe joins
-	// without treating that timeout as process-tree completion or releasing proof.
+	// Bound pipe joins if the service child is interrupted.
 	command.WaitDelay = 5 * time.Second
 	return command
 }
 
 func (c *nativeChild) run(ctx context.Context, verb string, input []byte) ([]byte, error) {
 	switch verb {
-	case "native-initialize", "native-inspect", "native-qualify":
+	case "native-initialize", "native-inspect", "native-validate", "native-status":
 	default:
 		return nil, errors.New("invalid native service child operation")
 	}
@@ -152,17 +175,34 @@ func (c *nativeChild) run(ctx context.Context, verb string, input []byte) ([]byt
 	}
 	command := nativeCredentialCommand(ctx, c.executable, []string{"runtime", verb}, c.identity)
 	command.Stdin = bytes.NewReader(input)
-	output := nativeOutput{limit: nativeProtocolLimit}
-	diagnostic := nativeOutput{limit: nativeDiagnosticLimit}
+	output := nativeOutput{
+		limit: nativeProtocolLimit,
+	}
+	diagnostic := nativeOutput{
+		limit: nativeDiagnosticLimit,
+	}
 	command.Stdout, command.Stderr = &output, &diagnostic
 	// Arguments contain only the trusted executable and fixed internal verb.
 	// Manifest input and inherited environment are never included in command logs.
-	if _, err := fmt.Fprintf(c.diagnostic, "+ uid=%d gid=%d %s runtime %s\n", c.identity.uid, c.identity.gid, nativeDisplayArg(c.executable), verb); err != nil {
+	if _, err := fmt.Fprintf(
+		c.diagnostic,
+		"+ uid=%d gid=%d %s runtime %s\n",
+		c.identity.uid,
+		c.identity.gid,
+		nativeDisplayArg(c.executable),
+		verb,
+	); err != nil {
 		return nil, fmt.Errorf("log native service command: %w", err)
 	}
 	err := command.Run()
 	if err != nil {
-		return nil, fmt.Errorf("native service %s (cwd %s): %w: %s", verb, command.Dir, err, strings.TrimSpace(diagnostic.String()))
+		return nil, fmt.Errorf(
+			"native service %s (cwd %s): %w: %s",
+			verb,
+			command.Dir,
+			err,
+			strings.TrimSpace(diagnostic.String()),
+		)
 	}
 	if output.overflow {
 		return nil, errors.New("native helper output exceeds 1 MiB")

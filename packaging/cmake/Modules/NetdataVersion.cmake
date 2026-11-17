@@ -6,6 +6,40 @@
 
 include_guard()
 function(netdata_version)
+  # Official builds carry this generated identity through archives and images.
+  # It is separate from the existing display and native package versions.
+  foreach(field VERSION CHANNEL REF)
+    if(DEFINED NETDATA_RELEASE_${field} AND NOT "${NETDATA_RELEASE_${field}}" STREQUAL "")
+      message(FATAL_ERROR "Release identity must come from packaging/release-info, not NETDATA_RELEASE_${field}")
+    endif()
+    set(NETDATA_RELEASE_${field} "" PARENT_SCOPE)
+  endforeach()
+  set(release_info "${CMAKE_SOURCE_DIR}/packaging/release-info")
+  if(EXISTS "${release_info}")
+    file(SIZE "${release_info}" release_size)
+    if(release_size GREATER 256)
+      message(FATAL_ERROR "packaging/release-info exceeds its size limit")
+    endif()
+    file(READ "${release_info}" release_body)
+    # Match the stamper's fixed three-line format; never evaluate file contents.
+    file(READ "${release_info}" release_hex HEX)
+    if(release_hex MATCHES "^(..)*(00|0d)" OR NOT release_body MATCHES
+       "^version=([A-Za-z0-9][A-Za-z0-9._-]*)\nchannel=(stable|nightly|devel)\nsource=([0-9a-f]+)\n$")
+      message(FATAL_ERROR "Invalid packaging/release-info: expected version, channel and source lines")
+    endif()
+    set(release_version "${CMAKE_MATCH_1}")
+    set(release_channel "${CMAKE_MATCH_2}")
+    set(release_source "${CMAKE_MATCH_3}")
+    string(LENGTH "${release_version}" release_version_length)
+    string(LENGTH "${release_source}" release_source_length)
+    if(release_version_length GREATER 128 OR NOT release_source_length EQUAL 40)
+      message(FATAL_ERROR "Invalid packaging/release-info version, channel or source")
+    endif()
+    set(NETDATA_RELEASE_VERSION "${release_version}" PARENT_SCOPE)
+    set(NETDATA_RELEASE_CHANNEL "${release_channel}" PARENT_SCOPE)
+    set(NETDATA_RELEASE_REF "${release_source}" PARENT_SCOPE)
+  endif()
+
   find_package(Git)
 
   if(GIT_EXECUTABLE)

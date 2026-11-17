@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// live.go is the rum-live FUNCTION data source: a bounded ring of recently admitted
+// The rum-live Function data source is a bounded ring of recently admitted
 // document activations, application-view occurrences, vital reports and JS errors.
 // The ring belongs to this aggregator runtime and is guarded by its mutex.
+
 package aggregate
 
 import (
+	"sort"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
@@ -13,6 +15,14 @@ import (
 
 // liveRingCap bounds rows retained by one aggregator runtime.
 const liveRingCap = 5000
+
+// LiveRow.Kind values: the observation a rum-live row reports.
+const (
+	LiveKindDocument = "document" // document activation
+	LiveKindView     = "view"     // application view occurrence
+	LiveKindVital    = "vital"    // vital report
+	LiveKindError    = "error"    // JavaScript errors of one report
+)
 
 // LiveRow is one rum-live ring entry. Has* distinguishes an absent vital
 // from a genuine zero, matching the FUNCTION's "null when absent" column
@@ -69,27 +79,22 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	}
 	if pageView {
 		row := base
-		row.Kind = "document"
-		for _, ev := range b.Events {
-			if ev.Kind == beacon.EventDocument {
-				row.Revision = ev.Revision
-				break
-			}
-		}
+		row.Kind = LiveKindDocument
+		row.Revision = documentRevision(b)
 		row.PageView = true
 		appendRow(row)
 	}
 	for _, ev := range b.Events {
 		if ev.Kind == beacon.EventView {
 			row := base
-			row.Kind = "view"
+			row.Kind = LiveKindView
 			row.Revision = ev.Revision
 			appendRow(row)
 		}
 	}
 	for _, v := range b.Vitals {
 		row := base
-		row.Kind = "vital"
+		row.Kind = LiveKindVital
 		row.Vital = v.Name
 		row.MetricID = v.ID
 		row.Revision = v.Revision
@@ -116,7 +121,7 @@ func (a *Aggregator) appendLive(b *beacon.Beacon, pageView bool, now time.Time) 
 	}
 	if len(b.Errors) > 0 {
 		row := base
-		row.Kind = "error"
+		row.Kind = LiveKindError
 		row.Errors = len(b.Errors)
 		appendRow(row)
 	}
@@ -143,10 +148,11 @@ func (a *Aggregator) evictLive(now time.Time) {
 	}
 }
 
-// Live returns ring rows with Seq > after, oldest first, capped at maxRows. next is the max seq among returned rows,
-// or after unchanged when nothing matched. A cursor ahead of this runtime
-// sequence is treated as 0; the Function routing owner fences generations.
-func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) ([]LiveRow, uint64) {
+// Live returns at most maxRows ring rows with Seq > after, oldest first; a
+// non-positive maxRows returns none. A caller resumes from the Seq of the last
+// row it received. A cursor ahead of this runtime sequence is treated as 0; the
+// Function routing owner fences generations.
+func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
@@ -158,17 +164,26 @@ func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) ([]LiveRo
 	if after > a.liveSeq {
 		after = 0
 	}
-	next := after
-	out := make([]LiveRow, 0, maxRows)
-	for _, row := range a.live[a.liveStart:] {
-		if row.Seq <= after || row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
+	if maxRows <= 0 {
+		return nil
+	}
+	// Seq grows along the ring, so the rows after the cursor are its suffix.
+	ring := a.live[a.liveStart:]
+	ring = ring[sort.Search(len(ring), func(i int) bool { return ring[i].Seq > after }):]
+	var out []LiveRow
+	for i := range ring {
+		row := &ring[i]
+		if row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
 			continue
 		}
-		out = append(out, row)
-		next = row.Seq
-		if maxRows > 0 && len(out) >= maxRows {
+		if out == nil {
+			// The rows from the first match on bound the result.
+			out = make([]LiveRow, 0, min(maxRows, len(ring)-i))
+		}
+		out = append(out, *row)
+		if len(out) == maxRows {
 			break
 		}
 	}
-	return out, next
+	return out
 }
