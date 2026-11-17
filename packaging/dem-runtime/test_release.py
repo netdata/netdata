@@ -82,22 +82,22 @@ class PublicationTests(unittest.TestCase):
 
     def test_immutable_metadata_reads_storage_and_fails_closed(self):
         remote = 's3:bucket/dem-runtime/nightly/v2.12.0-2-nightly/amd64/release.json'
-        with patch.object(release, 'run', side_effect=[json.dumps({'IsDir': False, 'Size': 2}), '{}']) as run:
+        entry = {'Path': 'release.json', 'IsDir': False, 'Size': 2}
+        with patch.object(release, 'run', side_effect=[json.dumps([entry]), '{}']) as run:
             self.assertEqual(release.read_stored_descriptor(remote), b'{}')
-            self.assertEqual(run.call_args_list[0].args[0], ['rclone', 'lsjson', '--stat', remote])
             self.assertIn('--count', run.call_args_list[1].args[0])
+        with patch.object(release, 'run', return_value='[]') as run:
+            self.assertIsNone(release.read_stored_descriptor(remote))
+            self.assertEqual(run.call_count, 1)
         for status in (3, 4, 1, 5, 7):
             with self.subTest(status=status), \
                     patch.object(release, 'run', side_effect=subprocess.CalledProcessError(status, ['rclone'])):
-                if status in (3, 4):
-                    self.assertIsNone(release.read_stored_descriptor(remote))
-                else:
-                    with self.assertRaises(subprocess.CalledProcessError):
-                        release.read_stored_descriptor(remote)
-        for stat, body in (({'IsDir': True, 'Size': 2}, '{}'),
-                           ({'IsDir': False, 'Size': release.METADATA_LIMIT + 1}, '{}'),
-                           ({'IsDir': False, 'Size': 3}, '{}')):
-            with patch.object(release, 'run', side_effect=[json.dumps(stat), body]), self.assertRaises(ValueError):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    release.read_stored_descriptor(remote)
+        for stat, body in ((dict(entry, IsDir=True), '{}'),
+                           (dict(entry, Size=release.METADATA_LIMIT + 1), '{}'),
+                           (dict(entry, Size=3), '{}')):
+            with patch.object(release, 'run', side_effect=[json.dumps([stat]), body]), self.assertRaises(ValueError):
                 release.read_stored_descriptor(remote)
 
     def test_public_object_exact_size_digest_and_streaming_bound(self):
