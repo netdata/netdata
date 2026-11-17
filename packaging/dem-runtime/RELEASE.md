@@ -136,6 +136,14 @@ signatures are the native installation trust boundary. Neither route distributes
 private keys. Offline users explicitly provision the public keyring; online
 clients fetch canonical public trust for each preparation attempt.
 
+The publisher identifies its public-key and artifact-readback requests as
+`Netdata-DEM-release/1`. The public endpoints can reject Python's default
+User-Agent even when curl succeeds. HTTP failures report the numeric status
+without echoing response details or URLs. Keep the canonical trust source when
+diagnosing failures; do not substitute a key exported from the signing secret.
+After changing the helper, start a release from the fixed source: rerunning an
+old run still checks out its frozen source commit.
+
 OpenPGP signatures can differ across retries because of signing timestamps. The
 publisher verifies the immutable stored payload, reuses its original signed bytes,
 and refuses changed or unverifiable content. Plan key rotation across Agent

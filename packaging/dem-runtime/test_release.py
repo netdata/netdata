@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Publisher control flow and real Go/GPG signature integration regressions."""
 import base64
+from contextlib import redirect_stderr
 import hashlib
 import io
 import json
 from pathlib import Path
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -15,6 +17,8 @@ import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request
 
 import release
 
@@ -25,6 +29,23 @@ def candidate(arch, version='v2.12.0-2-nightly', channel='nightly', source='a' *
 
 
 class PublicationTests(unittest.TestCase):
+    def test_cli_reports_http_status_without_untrusted_details(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'public.gpg'
+            argv = [release.__file__, 'fetch-public-key', '--output', str(output)]
+            for status in (403, 503):
+                with self.subTest(status=status):
+                    error = HTTPError('https://example.invalid/?token=secret', status,
+                                      'private response reason', {'Secret': 'private header'}, None)
+                    stderr = io.StringIO()
+                    with patch.object(release.HTTPS_OPENER, 'open', side_effect=error), \
+                            patch.object(sys, 'argv', argv), \
+                            redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                        runpy.run_path(release.__file__, run_name='__main__')
+                    self.assertEqual(raised.exception.code, 1)
+                    self.assertEqual(stderr.getvalue().strip(), f'runtime release operation failed: HTTP {status}')
+                    self.assertFalse(output.exists())
+
     def test_cli_reports_sanitized_failure_without_secondary_exception(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run([
@@ -49,8 +70,12 @@ class PublicationTests(unittest.TestCase):
                         with self.assertRaises(ValueError):
                             release.fetch_public_key(args)
                         self.assertEqual(args.output.read_bytes(), b'prior keyring')
-                    opened.assert_called_once_with(release.PUBLIC_KEY_URL,
-                                                   timeout=release.DOWNLOAD_TIMEOUT_SECONDS)
+                    opened.assert_called_once()
+                    request = opened.call_args.args[0]
+                    self.assertIsInstance(request, Request)
+                    self.assertEqual(request.full_url, release.PUBLIC_KEY_URL)
+                    self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
+                    self.assertEqual(opened.call_args.kwargs, {'timeout': release.DOWNLOAD_TIMEOUT_SECONDS})
             with patch.object(release.HTTPS_OPENER, 'open', side_effect=OSError('unavailable')):
                 with self.assertRaises(OSError):
                     release.fetch_public_key(args)
@@ -80,12 +105,17 @@ class PublicationTests(unittest.TestCase):
         digest = hashlib.sha256(original).hexdigest()
         for data, ok in ((original, True), (original[:-1], False),
                          (original + b'x', False), (b'x' * len(original), False)):
-            with self.subTest(data=data), patch.object(release.HTTPS_OPENER, 'open', return_value=io.BytesIO(data)):
+            with self.subTest(data=data), \
+                    patch.object(release.HTTPS_OPENER, 'open', return_value=io.BytesIO(data)) as opened:
                 if ok:
                     release.public_identity('https://example.invalid/runtime', digest, len(original))
                 else:
                     with self.assertRaises(ValueError):
                         release.public_identity('https://example.invalid/runtime', digest, len(original))
+                request = opened.call_args.args[0]
+                self.assertIsInstance(request, Request)
+                self.assertEqual(request.full_url, 'https://example.invalid/runtime')
+                self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
 
     def test_immutable_upload_never_syncs_or_mutates_prior_objects(self):
         args = SimpleNamespace(remote='s3:bucket')
