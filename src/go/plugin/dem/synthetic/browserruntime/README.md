@@ -13,14 +13,25 @@ key source and adapts this package to the runner and job framework; `cmd/demplug
 | `ownership_ledger*.go` | Claims, execution receipts, proof inventory and trash |
 | `store.go`, `inventory.go`, `retention.go` | Managed store, generations, damage classification, status and retirement |
 | `selection.go`, `installation.go`, `prepare.go`, `preload.go` | Selection record and consumers, candidates and published installation, preparation, sealed preloads |
+| `recovery.go`, `inputs.go`, `pairing.go` | Prepared/previous pair references, authenticated retained inputs and payload Agent identity |
 | `native*.go` | Native package preparation, root admission control and service-UID consumers |
 
 ## Trust and preparation
 
-A publisher-authenticated format-1 descriptor identifies execution contract 2, release version, platform, archive
+A publisher-authenticated format-2 descriptor identifies its exact Agent version, channel and source commit, plus execution contract, platform, archive
 SHA256/size, tar/expanded bounds, entry count, layout and authenticated interpreter slots. The archive is not its own
 trust anchor. `FetchRelease` (online discovery) and `ReadRelease` (offline descriptor) both end in `VerifyRelease`;
-which keyring they use is the caller's policy.
+which keyring they use is the caller's policy. Legacy format-1 descriptors remain readable for inspection and recovery.
+The persisted `Manifest` shape stays unchanged; format 2 carries the Agent tuple in the enclosing release.
+
+`Manifest.ValidateMetadata` and `Release.ValidateMetadata` check structural identity and preparation instructions
+without requiring this Agent's execution contract. Persisted selections, retained generations and native admission
+records remain readable across contract changes. `Manifest.Validate` additionally checks execution eligibility and
+returns `ErrIncompatible` for healthy metadata naming another contract. Acquisition and execution still require that
+strict check; incompatibility does not justify repairing or deleting ownership evidence. Execution does not compare
+the caller’s Agent version/channel/source: it validates the payload’s own provenance and, for managed paired releases,
+its binding to the authenticated descriptor. Different or empty plugin release stamps use the same execution checks.
+`Store.ValidateRelease` and native/preload installation validators additionally require the exact target Agent pair.
 
 ### Signed release descriptors
 
@@ -37,14 +48,13 @@ which keyring they use is the caller's policy.
 - **Limits.** Publisher and verifier enforce a 1 MiB envelope limit; descriptors carry metadata and binding slots, not
   source bodies or complete file inventories. Public keyrings are limited to 1 MiB and detached signatures to 64 KiB
   before parsing. Unknown fields and trailing JSON are rejected.
-- **Publication sequence.** The sequence is monotonically increasing across architectures and execution contract changes
-  in the release channel. Installation and update checks reject regression below the current selected sequence and reuse
-  of that sequence for different release content. Equal content is a no-op. This rule applies to ordinary latest checks,
-  including an explicitly requested check; choosing an older authenticated offline release is a deliberate administrator
-  recovery operation instead.
-- **What it does not prove.** Sequence describes publisher order, not component security. These primitives do not detect
-  withheld updates, guarantee freshness for a fresh installation, or retain a historical high-water mark after explicit
-  recovery. Signature validity also does not establish platform qualification or actual source availability. Key changes
+- **Agent pair.** Format 2 requires a validated Agent tuple, the same manifest version, and no publication sequence.
+  `ValidateForAgent` requires the exact expected tuple and execution contract. Reusing one tuple for different release
+  content is rejected; identical content is a no-op. Agent release/update owners decide ordering and explicit downgrades.
+- **Legacy sequence.** Format 1 retains its positive sequence and no Agent tuple. Its old sequence checks remain for
+  inspecting/recovering legacy installations; normal paired updates cannot switch back to independent releases.
+- **What it does not prove.** These primitives do not detect withheld updates or guarantee freshness for a fresh
+  installation. Signature validity also does not establish platform qualification or actual source availability. Key changes
   do not revoke already installed runtime execution.
 - **Online keys.** Online trust is fetched from the canonical package-key HTTPS endpoint for each preparation attempt.
   Endpoint control and system TLS trust authorize key replacement; fetching the key does not establish freshness or
@@ -60,7 +70,9 @@ which keyring they use is the caller's policy.
   symlink parents.
 - **Binding.** Preparation binds only authenticated interpreter slots to the final generation, generates the private
   browser wrapper/font configuration and verifies the bound layout: plain parents, the entrypoint, and owner-executable
-  executables in the preparing account's staging. Ensure checks a selected generation the same way. Native admission
+  executables in the preparing account's staging. Retained and preloaded generations also compare the authenticated
+  interpreter slots and generated configuration with their expected bound bytes, using bounded reads. Ensure checks
+  a selected generation the same way. Native admission
   applies the same layout check but requires a group or other execute bit: root owns package files and the non-root
   service runs them.
 - **Publishing.** Preparation syncs staging before publishing. A prepared generation must never be relocated.
@@ -74,7 +86,10 @@ which keyring they use is the caller's policy.
   `--allow-download` remains an online operation. Both routes verify identical archive bounds and digests.
 - **Where keys are not used.** Key lookup is not part of execution, status or native package operation, and an update
   lookup failure preserves the installed selection.
-- **Qualification.** Browser qualification is separate from preparation and belongs to the CLI caller before selection.
+- **Qualification.** Ordinary CLI install, update, ensure, repair and preload verify and prepare artifacts without
+  executing Node or a browser. `runtime qualify` is an optional diagnostic against the installed release; it runs real
+  contract checks, a sandboxed journey and Lighthouse, and reports the caller's account, environment and drainage.
+  Its failure does not undo installation. The runtime process has no background release updater or download schedule.
 
 ## Ownership
 
@@ -85,12 +100,15 @@ account.
 | Protection | Lifetime |
 |---|---|
 | Selected installation | Durable until explicit uninstall or replacement selection; survives idle periods and process death |
+| Prepared/previous pair | Durable recovery references retained through owner activation or explicit recovery |
 | Process consumer | One release acquired atomically at startup; old processes retain it after updates |
-| Candidate | Serialized installation transaction, from preparation through qualification and selection/abort |
+| Candidate | Serialized installation transaction, from preparation through validation and selection/abort |
 | Execution receipt | Every executable access; only authoritative drainage, helper receipt or verified reboot permits release |
 
 - **Installation and selection.** `BeginPublishedInstall` holds a separate installation lock while
-  preparation/qualification runs outside inventory coordination. `Candidate.Select` publishes the qualified release.
+  preparation and any caller-owned checks run outside inventory coordination. `Candidate.Select` publishes the verified
+  release without requiring a browser smoke test. Pair owners use `PreparePair` instead: preparation leaves selection
+  unchanged until the owner has installed the matching Agent and drained consumers.
   `AcquireSelected` reads that selection and creates its process claim under the same coordination lock. There is no
   per-monitor claim or automatic download. A missing startup selection requires a restart after installation.
 - **Uses.** Each consumer/candidate `BeginUse` publishes an execution record before returning paths. Pass its
@@ -119,26 +137,50 @@ account.
 
 ## Installation, update and repair
 
-- **Serialization.** `BeginPublishedInstall` serializes release discovery, candidate qualification and selection with
-  explicit installation and uninstall. It takes installer exclusion before reading consent or fetching metadata, but
-  never holds inventory exclusion across the network. Automatic checks do nothing when no authenticated installation has
-  opted in. Cancellation releases installer exclusion; a progressing download has no total duration limit, so another
-  installer or uninstall may wait.
-- **Selection record.** The selected descriptor, publication sequence and automatic-update policy share one atomic
-  selection record. Failed candidates preserve them. The same publication sequence is a no-op only for identical
-  complete release metadata; explicit reinstallation can change its update policy without downloading unchanged bytes.
-  Normal checks reject regressions.
-- **Update policy.** The CLI's explicit install and repair commands, including signed offline imports, enable future
-  automatic online preparation unless `--manual-updates` is supplied. Offline import describes acquisition for that
-  invocation, which uses only local files; it does not select a manual update policy. Protected preloads remain manual.
-- **Errors.** Install and update preparation or qualification errors keep the previous selection. Repair errors keep a
+The compatibility `runtime update` command only directs callers to the Agent installer, package manager or deployment
+workflow. It performs no discovery, acquisition or storage mutation.
+
+- **Serialization.** `BeginPublishedInstall` serializes explicit release discovery, candidate preparation and selection
+  with installation and uninstall. It takes installer exclusion before reading the selection or fetching metadata, but
+  never holds inventory exclusion across the network. Preparing an absent selection fails before discovery. Cancellation
+  releases installer exclusion; a progressing download has no total duration limit, so another installer or uninstall
+  may wait. The store schedules no discovery or downloads itself.
+- **Selection record.** The selected descriptor and update-consent policy share one atomic selection record. Failed
+  candidates preserve them. A matching Agent tuple is a no-op only for identical complete metadata;
+  explicit reinstallation can change its policy without downloading unchanged bytes. Identical `PrepareRelease`
+  verifies the selected payload and provenance, returns unchanged and preserves the previous recovery point. An existing
+  pending transition still requires reconciliation, including when its target is already selected. Legacy sequences
+  remain readable metadata for old installations; they no longer drive an independent runtime update.
+- **Update policy.** The existing `automatic_updates` selection field records acquisition consent for the Agent's
+  installation owner; no process service consumes it to update the runtime independently. Pair preparation preserves
+  this field. Install and repair set it, including offline imports: acquisition for one invocation and future owner consent
+  are separate decisions. Protected preloads remain manually deployed.
+- **Paired activation.** `PreparePair` records pending before/after selections in one separate `recovery.json` record
+  and makes the current selection the recovery point. Beginning B→C may retire older A; a failed transition
+  retains B, and repeated rollback stays on B. An unchanged B preparation preserves A. A changed target retains both
+  pending generations without publishing the target selection. `ActivatePair` requires drained consumers and the exact
+  target Agent, selects the target, then clears the pending transition while retaining its recovery point. A retry
+  reconciles interruption between these writes. With no pending transition, activation verifies the exact selected pair without
+  changing recovery state, so owners can also call it after unchanged preparation. `RollbackPair` restores pending-before
+  or previous selection without executing it; preparation-only cancellation is a no-op when no pending transition exists.
+  Agent files/images belong to the caller.
+- **Retained inputs.** `VerifiedRelease.SaveInputs` saves the authenticated descriptor, compressed archive and exact
+  verification public keyring outside managed storage, after pair/digest checks and without changing selection. Retry
+  supplies that retained keyring explicitly. Earlier binaries ignore pair recovery references and can reclaim a future
+  generation after rollback; owners retain inputs for unresolved attempts and re-import on retry. Successful
+  source/static installations release their temporary inputs. Before first migration imports, stop the
+  old consumer and its GC. No background keeper or physical-retention promise is added for old readers.
+- **Errors.** CLI install and pair preparation or validation errors keep the previous selection. Repair errors keep a
   healthy different selection but cannot restore a cleared one; retrying repair is supported once the reported problem
   is resolved, and a successful repair needs a DEM restart.
 - **Repair.** Explicit repair can select an older authenticated release after all consumers/executions drain, with a
   newly specified update policy. Repair retires damaged generations plus the requested generation, then uses ordinary
-  import or download, qualification and selection. It durably clears a damaged selection, or the one being rebuilt,
+  import or download, integrity validation and selection. It durably clears a damaged selection, or the one being rebuilt,
   before retirement. A healthy different selection stays protected; other unselected generations follow ordinary
-  retention. Repair reports candidate identity and progress separately from the final selected installation.
+  retention. A retained pair can be rebuilt only with its exact executable manifest and Agent identity, even after a
+  failed import removed its generation. Its recovery record remains intact. Pending pair operations must be resolved
+  through their owner first; repair never bypasses that ownership guard. Repair reports candidate identity and progress
+  separately from the final selected installation.
 - **Uninstall.** Uninstall serializes against installation and refuses any live consumer/candidate, preparation or
   unresolved execution across all generations. Refusal preserves selection. Successful uninstall clears selection before
   retiring bytes. No timeout, PID disappearance or process lock can substitute for an execution receipt.
@@ -152,8 +194,9 @@ account.
 - **Allowance.** The default allowance is 4 GiB of logical regular-file bytes, including archives, workspace, lifecycle
   records and trash. Active preparation reserves its unwritten remainder using the same observation as byte accounting.
   This is not a physical quota; filesystem metadata and protected preloads are additional.
-- **Protection and grace.** Selected, process-owned, candidate and execution-protected generations never yield to
-  pressure. The most recently used unprotected old generation has a seven-day soft grace; others can retire immediately.
+- **Protection and grace.** Selected, prepared/previous-pair, process-owned, candidate and execution-protected
+  generations never yield to pressure. The most recently used unprotected old generation has a seven-day soft grace;
+  others can retire immediately.
   Pressure can shorten grace. A selected release stays installed even without monitors. Unknown executions may retain
   files indefinitely and prevent a later installation.
 - **Inspect.** `Inspect` is read-only: selected descriptor, protected/reclaimable totals, preparation, trash, and
@@ -162,7 +205,9 @@ account.
 - **Diagnostic inventory.** Inventory separates executable metadata validity from independent ownership evidence. Status
   reports selection and generation damage with the available bytes and owners, and an incomplete ownership or I/O
   inspection is explicit (unknown). A damaged old generation does not make a healthy selection unavailable. Execution
-  still requires a valid selected release; ordinary installation and automatic retirement do not repair metadata.
+  still requires a compatible selected release; ordinary installation and automatic retirement do not repair metadata.
+  Healthy incompatible metadata remains visible in inventory. CLI status preserves its identity and reports
+  `incompatible` with a nonzero exit status, rather than classifying it as `damaged`.
 - **Sweep.** `Sweep` reconciles and retires at startup, before preparation and hourly; cleanup health is separate from
   monitor outcomes. Cleanup health survives coordination failures and cannot be cleared by an older sweep.
 - **Deletion.** Objects retire to trash under coordination. Parent directories are synced before physical deletion
@@ -173,10 +218,16 @@ account.
 
 ## Protected preloads
 
-`Candidate.SealPreload` finishes a fresh, qualified root and records its trusted identity/final location. Managed
+`Candidate.SealPreload` finishes a fresh, integrity-verified root and records its trusted identity/final location. Managed
 operations then refuse the root, including stores opened before sealing. `ReadPreload` supports read-only mounts without
-state writes and uses the sealed metadata without a separate installed manifest. The administrator must keep it private,
-service-account-owned and immutable, and stop every consumer before removal/replacement.
+state writes and checks the bound payload, compatible contract and intrinsic release provenance. Installation owners
+supply an expected Agent identity for an additional exact-pair check; ordinary execution supplies none. It uses sealed
+metadata without a separate installed manifest. The administrator must keep it private, service-account-owned and immutable, and stop every consumer before
+removal/replacement. Deployment prepares a new final root and retains the old one; sealed roots cannot be relocated.
+The deployment owner publishes/restores configuration and controls service intent. Source/static preload updates
+use ordinary Agent installation and leave the pair stopped; `runtime preload-validate` checks the target pair
+before and after replacement, independently of ordinary execution/status; they invoke no managed selection operation or automatic
+configuration rewrite.
 
 ## Native packages
 
@@ -188,9 +239,11 @@ state in `/var/lib/netdata-dem-runtime`. Native package and repository authentic
   `native.json` only after syncing the stage. Package recipes assign root ownership.
 - Admission (root, package hooks): a root-owned gate and `admission.json` move through `initializing`, `closed`,
   `qualifying` and `ready`. `CloseAdmission` refuses while service-UID proof shows consumers or executions, and closes
-  admission before the package manager changes files. `QualifyAndReady` records the installed payload as the qualifying
-  target, runs service-UID qualification without holding the gate, and opens ordinary admission only if the payload and
-  target are unchanged and no proof remains. Established state never bootstraps a missing gate, ledger or namespace.
+  admission before the package manager changes files. `ValidateAndReady` records the installed payload as the candidate
+  target and verifies it as the service UID without executing the browser. The service acquires and closes an exact
+  candidate claim while the root gate is released; admission opens only if the payload and target are unchanged and no
+  proof remains. The persisted `qualifying` phase name is retained for older readers and interrupted transactions; it
+  now denotes candidate validation. Established state never bootstraps a missing gate, ledger or namespace.
 - Consumers (service UID): `Native` reads admission under the shared gate and admits a payload only if its whole tree is
   root-owned and immutable to the service, its bound layout is intact with a group or other execute bit, and its
   interpreter slots and generated configuration name the installed prefix. Claims and execution receipts use the same

@@ -9,11 +9,11 @@ cross-package rules are in [ARCHITECTURE](../../ARCHITECTURE.md#browser-runtime-
 
 The mode decides who owns the runtime files. Packaging sets `DefaultMode` to `native` for DEB/RPM builds.
 
-| Mode | Files owned by | Runner source | Automatic updater |
+| Mode | Files owned by | Runner source | Pair update owner |
 |---|---|---|---|
-| `managed` | DEM, in its managed store (the DEM cache) | `Host` | Yes, `Host.NewUpdater` |
-| `native` | The package manager (the `netdata-dem-runtime` payload) | `Host` | No |
-| `preloaded` | The administrator (a sealed preload) | A borrowed preload source, outside managed retention | No |
+| `managed` | The service account, in its private runtime store | `Host` | Agent installer or explicit deployment helper |
+| `native` | The package manager (`netdata-dem-runtime`) | `Host` | Package manager |
+| `preloaded` | The administrator (a sealed preload) | A borrowed preload source, outside managed retention | Deployment owner |
 
 | File | Contents |
 |---|---|
@@ -22,7 +22,6 @@ The mode decides who owns the runtime files. Packaging sets `DefaultMode` to `na
 | `host.go` | `Host`, the runner source of managed and native modes |
 | `source.go` | The borrowed-claim, preload and unavailable sources and the execution-use adapter |
 | `health.go` | Maintenance and execution-completion health logging |
-| `update.go` | The automatic `Updater` |
 
 ## Fixed startup selection
 
@@ -43,32 +42,41 @@ The mode decides who owns the runtime files. Packaging sets `DefaultMode` to `na
 
 ## Maintenance and errors
 
-- **Sweeps.** `Run` sweeps storage at startup and hourly, even with no browser jobs. Selected installations and active
-  process/execution protection govern retention.
+- **Sweeps.** `Run` sweeps storage at startup and hourly, even with no browser jobs. Selected, prepared and previous
+  pair references and process/execution protection govern retention. It performs no release discovery or downloads.
 - **Separate errors.** A setup error keeps `Ready` failing, while cleanup and execution-completion failures are logged
   with their recovery. They do not invalidate a usable runtime or alter a completed website measurement.
 - **Sticky errors.** Each maintenance operation retains its error until its own successful retry; a healthy invocation
   cannot erase an earlier execution-retirement failure.
 
-## Automatic updater
+## Pair preparation and recovery
 
-`Host.NewUpdater` attaches the `Updater` to a managed host. It is a separately run process service that logs check
-failures and their recovery.
+The runtime host holds its startup selection and performs storage maintenance. It has no background release updater
+or download schedule. Initial browser installation remains explicit; an Agent without an enrolled runtime acquires no
+browser through ordinary startup or monitor changes.
 
-- **Consent and schedule.** After explicit signed installation consent, it checks latest within the first five minutes
-  and then every 23–25 hours. Installation exclusion precedes consent and discovery; manual installations and an empty
-  store perform no network access.
-- **Failures.** Failed checks retry on the next scheduled attempt. Download and qualification do not block hourly
-  storage maintenance.
-- **Qualification.** Candidate qualification shares the monitoring engine's admission and fatal owner, with a separate
-  source and temporary work store. It never changes the startup consumer or emits monitor history.
-- **Activation.** Successful preparation changes the next process's selection, which a restart activates; the updater
-  never restarts the Agent.
+The Agent's installer or deployment owner acquires its exact signed companion. Managed `prepare` retains a candidate
+without selecting it; the owner stops consumers, replaces the Agent payload and calls `activate` before restarting.
+One recovery selection remains available for explicit `rollback`, which does not execute the old runtime or restore
+Agent files. Beginning B→C retains B and may retire the older A pair, even when C fails. An unchanged B preparation
+verifies the payload and preserves A without creating a transaction; the owner can still call `activate` to verify the
+selected pair. Existing pending transitions are reconciled rather than treated as unchanged. The owner repairs or
+restores the matching Agent payload or image through its normal installation workflow. The compatibility `runtime update`
+command provides this owner guidance without changing runtime storage.
+
+The persisted `automatic_updates` bit remains acquisition consent for that installation owner. It grants no runtime
+process permission to discover or advance a release independently. Manual installations require explicit matching
+inputs or acquisition authority. Native package operations and protected preload deployments retain their own owners.
+
+Structural metadata stays readable across execution-contract changes. A healthy incompatible selection remains
+inventory and recovery evidence. Execution requires a compatible contract, matching architecture and intact payload,
+including its own release provenance. It does not compare the plugin’s version/channel/source stamp; ordinary
+development builds follow the same checks. Exact release pairing belongs to installation and update validation.
+See [installation and recovery](../browserruntime/README.md#installation-update-and-repair) for the store primitives.
 
 ## Shutdown
 
-- `Close` follows joined jobs, joins the attached updater and the maintenance worker, and releases process protection.
-  The handle then closes the store.
-- The updater's `Close` cancels and joins update work; `Host.Close` calls it before releasing runtime ownership.
+- `Close` follows joined jobs, joins the maintenance worker and releases process protection. The handle then closes
+  the store.
 - Uncertain executions remain protected by their independent completion receipts. Unknown child drainage reaches the
   existing process fail-stop path and keeps its receipts.

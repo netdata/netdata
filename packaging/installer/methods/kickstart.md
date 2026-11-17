@@ -122,7 +122,13 @@ For native package installations, kickstart installs the optional `netdata-dem-r
 
 For static and source installations, kickstart calls the installed `netdata-dem-runtime.sh` host helper. The helper prepares the necessary AppArmor launcher allowance, then runs `dem.plugin runtime install --allow-download` as the configured nonroot Netdata service user. It reads the installed Agent's normal configuration to find its plugin, administrator/stock configuration and persistent-state directories, including custom installation prefixes. The CLI reads `runtime.release_url` from `dem.conf` and fetches the canonical package keyring from `https://repository.netdata.cloud/netdatabot.gpg.key`; kickstart does not provide a substitute trust key or release URL.
 
-This managed action downloads signed release metadata and the browser archive, then enables automatic daily preparation of future releases. **An operator must restart the Agent to activate the prepared runtime.** Kickstart does not restart it for managed runtime activation. The Agent's `--no-updates` option controls Agent updates separately; to disable automatic runtime preparation, use the installed host helper with `install --agent /path/to/netdata --allow-download --manual-updates`. See [browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) for offline inputs, policy scope and removal.
+This managed action downloads the signed runtime matching the Agent and permits companion downloads during future
+Agent updates. **Restart the Agent explicitly after first setup.** Kickstart does not perform that managed activation.
+The Agent's `--no-updates` option controls its update schedule. To require explicit runtime inputs or download consent
+for each paired update, use the installed helper with
+`install --agent /path/to/netdata --allow-download --manual-updates`.
+See [browser runtime host setup](/packaging/installer/DEM-RUNTIME.md) for paired updates/recovery, offline inputs,
+policy scope and removal.
 
 The browser runtime requires Linux `x86_64` or `aarch64`, an Agent containing the runtime CLI, and a host where browser sandboxing is allowed. Native package qualification requires a running systemd host. A missing `runtime.release_url` for managed setup, an unavailable optional package, or failed browser qualification makes explicit setup fail even if Agent installation succeeded. Kickstart does not inspect live service `-c`/`-u` arguments or environment overrides. Such custom launch setups, and plugin paths requiring escaping, must use the runtime CLI directly with the same service identity and configuration as the Agent, after an administrator prepares any required host policy through the helper's policy-only route.
 

@@ -6,18 +6,21 @@ loader/library closure, fonts, notices, and the complete release-owned execution
 adapters from `src/dem-runtime`. `nd-run` remains an Agent component. DEM disables
 video recording, so no Playwright FFmpeg artifact is shipped. Exact component pins
 are runtime-owned; the Agent validates semantic execution contract 2 and immutable
-release identity. The Agent integration remains experimental while delivery is
-qualified. The builder itself does not publish. The separate [release workflow](RELEASE.md)
-assembles optional native packages and defines protected signing/publication steps.
+Agent release identity. The integration remains experimental and actual signed
+public publication is pending. The builder itself does not publish. The
+[release runbook](RELEASE.md) describes paired portable/source publication and
+transport of prebound bytes to normal Agent native packaging.
 
 ## Build from reviewed inputs
 
-From the repository root, with Python 3.9 or newer and Docker with BuildKit:
+From the repository root, with modern Python 3 and Docker with BuildKit, use the
+`packaging/release-info` generated for the exact Agent release checkout:
 
 ```sh
 python3 packaging/dem-runtime/build.py --arch arm64 \
   --output .local/audits/dem-runtime-delivery/build-arm64 \
   --cache .local/audits/dem-runtime-delivery/binary-inputs
+# --release-info /absolute/path/release-info selects an explicit matching identity file.
 python3 -m unittest discover -s packaging/dem-runtime -v
 ```
 
@@ -28,9 +31,14 @@ zstd build tool. Source-archive assembly and local Python tests additionally req
 `zstd` on their worker; the installed plugin uses its existing Go decoder and needs
 no host compression executable.
 
-`inputs.json` pins the independent runtime version, deterministic timestamp,
-Debian base image and architecture manifests, Node and patchelf binary hashes,
-and their source hashes. Generated `locks/<architecture>.json` files record the
+`packaging/release-info` contains the canonical Agent `version`, `channel` and
+full source commit, in three plain newline-terminated fields. The shared
+`packaging/release_info.py` reader validates it before acquisition. The donor
+receives that same file read-only; no runtime-owned release version or sequence
+is selected. Missing identity refuses the build, rather than guessing a nightly.
+
+`inputs.json` retains the deterministic timestamp, Debian base image and
+architecture manifests, Node and patchelf binary hashes, and their source hashes. Generated `locks/<architecture>.json` files record the
 immutable base inventory, complete resulting Debian inventory, exact additional
 binary archive URLs/sizes/SHA256s, and source records. The base image owns unchanged
 packages; every changed or added package comes from a locked binary archive.
@@ -64,15 +72,17 @@ The output contains:
   source trees, compressed with zstd level 19, one thread, a checksum and an 8 MiB window;
 - `manifest.json`: format 1 identity, execution contract 2, exact compressed/tar/regular-file byte bounds,
   entry count, layout including `entrypoint: runner/run.mjs`, and authenticated ELF bindings;
-- `provenance.json`: complete runtime source/test and recipe hashes, exact input locks, original copied
-  library hashes, and exact redistributed Debian source records;
+- `provenance.json`: the Agent tuple, complete runtime source/test, recipe and shared
+  release-helper hashes, exact input locks, original copied library hashes, and
+  exact redistributed Debian source records;
+- `release-info`: the exact plain Agent identity file copied into the archive;
 - `sbom.cdx.json`: CycloneDX 1.5 inventory of actual Debian browser/library/font
   packages with source versions, Node, and locked npm packages;
 - `sources-required.json`: the source records needed for the copied Debian
   components, excluding unrelated build-only tools.
 
 The runtime archive includes `runner/`, the runtime-owned component `manifest.json`,
-and `runtime.json` stamped with the release version. Runtime metadata resolves
+`release-info`, and `runtime.json` stamped with the canonical Agent release version. Runtime metadata resolves
 dependencies under `dependencies/` and the prepared `chrome` wrapper at the root.
 The outer descriptor's digest is never embedded in the payload. It also includes
 the SBOM/provenance, regular-file hashes (`files.json`),
@@ -85,7 +95,7 @@ sandbox qualification. Runtime launchers never disable the browser sandbox.
 
 Without `--url-prefix`, `archive.url` remains empty in the builder descriptor. An explicit
 approved HTTPS base constructs
-`<prefix>/dem-runtime/<version>/<architecture>/<digest>.tar.zst`. The builder does
+`<prefix>/dem-runtime/<channel>/<Agent-version>/<architecture>/<digest>.tar.zst`. The builder does
 not publish anything. The release signing step binds the reviewed manifest to its
 archive and source URLs; an unsigned manifest is not an administrator CLI input.
 
@@ -95,17 +105,20 @@ Use the DEM CLI's explicit runtime install/update commands with a signed release
 descriptor and its exact archive. The outer builder `manifest.json` and the
 source-level component manifest inside the runtime are different documents.
 `src/go/tools/dem-runtime-release` signs the complete descriptor, including the
-publication sequence, archive identity/bounds and source identity. Online preparation
+exact Agent version/channel/source, archive identity/bounds and source identity.
+Format-2 descriptors carry no independent publication sequence. Legacy format-1
+descriptors remain readable for inventory and recovery. Online preparation
 fetches the canonical package OpenPGP keyring over HTTPS. Offline imports require an
 explicit administrator-provisioned local keyring and do not fetch keys or the signed
 HTTPS URLs. The descriptor cannot choose its own key source.
-See `packaging/installer/DEM-RUNTIME.md` for CLI options, automatic/manual update consent
-and restart activation. Enabling a monitor does not acquire runtime components.
+See `packaging/installer/DEM-RUNTIME.md` for CLI options, acquisition consent and paired
+Agent/runtime activation and recovery. Enabling a monitor does not acquire runtime components.
 
-Candidate qualification must run both a journey and a Lighthouse audit against
+Release validation and optional local qualification run both a journey and a Lighthouse audit against
 deterministic local content through the Agent and supervised `nd-run`. Runtime
 `--check` verifies component versions/imports without a browser session, so it does
-not establish browser execution readiness. Local build/import evidence does not
+not establish browser execution readiness. Ordinary installation validates integrity without running these browser
+tests; use `runtime qualify` for a local diagnostic. Local build/import evidence does not
 establish production hosting, native packaging or source delivery.
 
 ## Refresh Debian locks
@@ -132,7 +145,7 @@ rebuild suffix such as `+b2` is preserved on the binary version; Debian's
 
 A refresh MAY record unavailable source metadata for unused base/tools as a
 warning. Runtime assembly MUST fail if any actually redistributed Debian component
-lacks its exact source record. Updating lock inputs requires a new runtime version,
+lacks its exact source record. Updating lock inputs requires a new Agent release identity,
 clean builds, a byte-for-byte repeat, and qualification of the exact browser/
 Playwright pair. Verify Node and patchelf releases against their official release
 checksums when changing those separately maintained pins.
@@ -183,7 +196,8 @@ route does not independently verify the descriptor's OpenPGP signature.
 The assembly also verifies Node sources, patchelf sources, and exact npm published
 source archives using their integrity pins. It retains the complete packaging/ELF
 modification recipe and tests, native package/publisher recipes, locks, all runtime adapters/tests,
-the staging tool's local Go build closure and module pins, runtime identity/provenance/SBOM, and a
+the shared `packaging/release_info.py` at its repository-relative path under `shared/`, the exact plain `release-info`, the
+staging tool's local Go build closure and module pins, runtime identity/provenance/SBOM, and a
 `source-assembly.json` file inventory. Existing downloads are reverified on rerun. The output must stay outside the recipe
 directory; unexpected existing files are rejected and preserved, not included in
 the verified inventory.
@@ -245,7 +259,7 @@ host setup uses `netdata-dem-runtime.sh` to register a launcher allowance for th
 deployment-visible root; compatible runtime updates require no recurring privileged
 action. On supported restricted Ubuntu hosts, kickstart prepares host policy and
 enrolls the runtime in the named local rootful Docker container. The administrator
-restarts the container after successful qualification. Rootless, nested and remote-daemon setups are
+restarts the container after successful installation. Local qualification is optional. Rootless, nested and remote-daemon setups are
 not qualified by this route. This is namespace eligibility,
 not exclusive authorization of signed bytes: service-owned replacement, profile
 adoption and matching paths in other mount namespaces remain possible. No automatic
