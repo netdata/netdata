@@ -916,7 +916,7 @@ single-select hop limit and unlimited option. Without this declaration, a select
 control. The schema validates the descriptor structure; Go managed declarations and responses also validate its
 option IDs and role relationships. This metadata does not change Function request parsing or implement filtering.
 
-The [topology contract](FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus) owns binding resolution,
+The [topology contract](/src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md#aggregate-first-focus) owns binding resolution,
 aggregate-first ordering and traversal semantics. Direct Agent clients keep sending the existing selectors; cloud
 consumers must implement that contract before withholding focus controls from fan-out requests. Data response
 metadata may refine the info response's choices and policy for the actual map returned.
