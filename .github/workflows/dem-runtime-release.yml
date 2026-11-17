@@ -247,7 +247,8 @@ jobs:
       - name: Install publication tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y gnupg rclone zstd
+          sudo apt-get install -y curl gnupg unzip zstd
+          bash .github/scripts/install-rclone.sh
           (cd src/go && go build -trimpath -o "$RUNNER_TEMP/dem-runtime-release" ./tools/dem-runtime-release)
       - name: Import the existing package signing key
         id: package-key

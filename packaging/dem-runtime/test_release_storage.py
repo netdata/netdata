@@ -26,6 +26,7 @@ class ReleaseStorageTests(unittest.TestCase):
         self.errors = {('PUT', '/bucket'): 403}
         self.requests = []
         self.fail_uploaded_head = False
+        self.upload_version_id = None
         fixture = self
 
         def etag(body):
@@ -52,6 +53,8 @@ class ReleaseStorageTests(unittest.TestCase):
                 if self.command == 'PUT':
                     uploaded = self.rfile.read(int(self.headers.get('Content-Length', 0)))
                 status = fixture.errors.get((self.command, url.path))
+                if self.command == 'HEAD' and 'versionId' in parse_qs(url.query):
+                    status = 501  # R2 does not support versioned object requests.
                 if status:
                     body = f'<Error><Code>{"AccessDenied" if status == 403 else "InternalError"}</Code></Error>'
                     self.send_response(status)
@@ -67,6 +70,8 @@ class ReleaseStorageTests(unittest.TestCase):
                     self.send_response(200)
                     self.send_header('Content-Length', '0')
                     self.send_header('ETag', etag(uploaded))
+                    if fixture.upload_version_id is not None:
+                        self.send_header('x-amz-version-id', fixture.upload_version_id)
                     self.end_headers()
                     return
                 if url.path == '/bucket':
@@ -151,10 +156,9 @@ class ReleaseStorageTests(unittest.TestCase):
 
     def test_failed_descriptor_read_is_not_absence(self):
         self.objects[self.key] = b'{"signed": "descriptor"}'
-        for method in ('HEAD', 'GET'):
-            with self.subTest(method=method):
-                self.errors.clear()
-                self.errors[method, '/bucket/' + self.key] = 403
+        for status in (403, 500):
+            with self.subTest(status=status):
+                self.errors['GET', '/bucket/' + self.key] = status
                 with self.assertRaises((subprocess.CalledProcessError, ValueError)):
                     release.read_stored_descriptor(self.remote)
 
@@ -204,6 +208,18 @@ class ReleaseStorageTests(unittest.TestCase):
                 release.upload(args, path, self.key)
             self.assertEqual(self.objects[self.key], path.read_bytes())
             self.assertIn(('HEAD', '/bucket/' + self.key), self.requests)
+
+    def test_upload_verifies_current_object_when_versioned_head_is_unsupported(self):
+        self.upload_version_id = 'fixture-version'
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'release.json'
+            path.write_bytes(b'runtime payload')
+            release.upload(SimpleNamespace(remote='demtest:bucket'), path, self.key)
+            self.assertEqual(self.objects[self.key], path.read_bytes())
+            put = ('PUT', '/bucket/' + self.key)
+            self.assertEqual(self.requests.count(put), 1)
+            # Require verification after the write, not just a pre-upload lookup.
+            self.assertIn(('HEAD', '/bucket/' + self.key), self.requests[self.requests.index(put) + 1:])
 
     def test_failed_existing_object_inspection_never_overwrites(self):
         with tempfile.TemporaryDirectory() as temporary:
