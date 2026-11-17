@@ -10,9 +10,115 @@
 // second: on Windows Server 2025 the raw value was 303 about 304 s after IAS started.
 
 #define NPS_MAX_DIMS 6
+#define NPS_CHARTS 4
+
+enum nps_object_index {
+    NPS_AUTHENTICATION,
+    NPS_ACCOUNTING,
+    NPS_OBJECTS,
+};
+
+// Both objects publish the same counters, except for the request/response pairs and "No Record", so the charts are
+// defined once and each dimension names its counter per object.
+struct nps_dim_def {
+    const char *id;
+    const char *key[NPS_OBJECTS]; // NULL: the object does not have this counter
+};
+
+struct nps_chart_def {
+    const char *suffix; // chart id and context are "<family>_<suffix>"; the totals chart appends "_total"
+    const char *title;  // prefixed with "NPS <family>"
+    const char *units;
+    const char *units_total; // NULL: elapsed-time gauge, no totals chart
+    int priority[NPS_OBJECTS];
+    int priority_total[NPS_OBJECTS];
+    RRDSET_TYPE type;
+    struct nps_dim_def dims[NPS_MAX_DIMS + 1];
+};
+
+static const struct nps_chart_def nps_chart_defs[NPS_CHARTS] = {
+    {
+        .suffix = "requests",
+        .title = "requests and responses",
+        .units = "requests/s",
+        .units_total = "requests",
+        .priority = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_REQUESTS,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_REQUESTS,
+        },
+        .priority_total = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_REQUESTS_TOTAL,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_REQUESTS_TOTAL,
+        },
+        .type = RRDSET_TYPE_LINE,
+        .dims = {
+            {.id = "requests", .key = {"Access-Requests", "Accounting-Requests"}},
+            {.id = "accepts", .key = {"Access-Accepts", NULL}},
+            {.id = "rejects", .key = {"Access-Rejects", NULL}},
+            {.id = "challenges", .key = {"Access-Challenges", NULL}},
+            {.id = "responses", .key = {NULL, "Accounting-Responses"}},
+        },
+    },
+    {
+        .suffix = "packets",
+        .title = "packets",
+        .units = "packets/s",
+        .units_total = "packets",
+        .priority = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_PACKETS,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_PACKETS,
+        },
+        .priority_total = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_PACKETS_TOTAL,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_PACKETS_TOTAL,
+        },
+        .type = RRDSET_TYPE_LINE,
+        .dims = {
+            {.id = "received", .key = {"Packets Received", "Packets Received"}},
+            {.id = "sent", .key = {"Packets Sent", "Packets Sent"}},
+        },
+    },
+    {
+        .suffix = "errors",
+        .title = "packet errors",
+        .units = "packets/s",
+        .units_total = "packets",
+        .priority = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_ERRORS,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_ERRORS,
+        },
+        .priority_total = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_ERRORS_TOTAL,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_ERRORS_TOTAL,
+        },
+        .type = RRDSET_TYPE_STACKED,
+        .dims = {
+            {.id = "bad_authenticators", .key = {"Bad Authenticators", "Bad Authenticators"}},
+            {.id = "dropped", .key = {"Dropped Packets", "Dropped Packets"}},
+            {.id = "invalid", .key = {"Invalid Requests", "Invalid Requests"}},
+            {.id = "malformed", .key = {"Malformed Packets", "Malformed Packets"}},
+            {.id = "no_record", .key = {NULL, "No Record"}},
+            {.id = "unknown_type", .key = {"Unknown Type", "Unknown Type"}},
+        },
+    },
+    {
+        .suffix = "uptime",
+        .title = "server uptime",
+        .units = "seconds",
+        .units_total = NULL,
+        .priority = {
+            [NPS_AUTHENTICATION] = PRIO_NPS_AUTHENTICATION_UPTIME,
+            [NPS_ACCOUNTING] = PRIO_NPS_ACCOUNTING_UPTIME,
+        },
+        .type = RRDSET_TYPE_LINE,
+        .dims = {
+            {.id = "uptime", .key = {"Server Up Time", "Server Up Time"}},
+            {.id = "since_reset", .key = {"Server Reset Time", "Server Reset Time"}},
+        },
+    },
+};
 
 struct nps_dim {
-    const char *id;
     COUNTER_DATA cd;
     RRDDIM *rd;
     RRDDIM *rd_total;
@@ -20,148 +126,29 @@ struct nps_dim {
 };
 
 struct nps_chart {
-    const char *id; // also the context suffix; the totals chart appends "_total"
-    const char *title;
-    const char *units;
-    const char *units_total; // NULL: elapsed-time gauge, no totals chart
-    int priority;
-    int priority_total;
-    RRDSET_TYPE type;
-    struct nps_dim dims[NPS_MAX_DIMS + 1];
-
     RRDSET *st;
     RRDSET *st_total;
+    struct nps_dim dims[NPS_MAX_DIMS];
 };
 
 struct nps_object {
     const char *name;
     const char *family;
-    struct nps_chart *charts;
+    struct nps_chart charts[NPS_CHARTS];
 };
 
-static struct nps_chart nps_authentication_charts[] = {
-    {
-        .id = "authentication_requests",
-        .title = "NPS authentication requests and responses",
-        .units = "requests/s",
-        .units_total = "requests",
-        .priority = PRIO_NPS_AUTHENTICATION_REQUESTS,
-        .priority_total = PRIO_NPS_AUTHENTICATION_REQUESTS_TOTAL,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "requests", .cd = {.key = "Access-Requests"}},
-            {.id = "accepts", .cd = {.key = "Access-Accepts"}},
-            {.id = "rejects", .cd = {.key = "Access-Rejects"}},
-            {.id = "challenges", .cd = {.key = "Access-Challenges"}},
-        },
-    },
-    {
-        .id = "authentication_packets",
-        .title = "NPS authentication packets",
-        .units = "packets/s",
-        .units_total = "packets",
-        .priority = PRIO_NPS_AUTHENTICATION_PACKETS,
-        .priority_total = PRIO_NPS_AUTHENTICATION_PACKETS_TOTAL,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "received", .cd = {.key = "Packets Received"}},
-            {.id = "sent", .cd = {.key = "Packets Sent"}},
-        },
-    },
-    {
-        .id = "authentication_errors",
-        .title = "NPS authentication packet errors",
-        .units = "packets/s",
-        .units_total = "packets",
-        .priority = PRIO_NPS_AUTHENTICATION_ERRORS,
-        .priority_total = PRIO_NPS_AUTHENTICATION_ERRORS_TOTAL,
-        .type = RRDSET_TYPE_STACKED,
-        .dims = {
-            {.id = "bad_authenticators", .cd = {.key = "Bad Authenticators"}},
-            {.id = "dropped", .cd = {.key = "Dropped Packets"}},
-            {.id = "invalid", .cd = {.key = "Invalid Requests"}},
-            {.id = "malformed", .cd = {.key = "Malformed Packets"}},
-            {.id = "unknown_type", .cd = {.key = "Unknown Type"}},
-        },
-    },
-    {
-        .id = "authentication_uptime",
-        .title = "NPS authentication server uptime",
-        .units = "seconds",
-        .units_total = NULL,
-        .priority = PRIO_NPS_AUTHENTICATION_UPTIME,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "uptime", .cd = {.key = "Server Up Time"}},
-            {.id = "since_reset", .cd = {.key = "Server Reset Time"}},
-        },
-    },
-    {.id = NULL},
+static struct nps_object nps_objects[NPS_OBJECTS] = {
+    [NPS_AUTHENTICATION] = {.name = "NPS Authentication Server", .family = "authentication"},
+    [NPS_ACCOUNTING] = {.name = "NPS Accounting Server", .family = "accounting"},
 };
 
-static struct nps_chart nps_accounting_charts[] = {
-    {
-        .id = "accounting_requests",
-        .title = "NPS accounting requests and responses",
-        .units = "requests/s",
-        .units_total = "requests",
-        .priority = PRIO_NPS_ACCOUNTING_REQUESTS,
-        .priority_total = PRIO_NPS_ACCOUNTING_REQUESTS_TOTAL,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "requests", .cd = {.key = "Accounting-Requests"}},
-            {.id = "responses", .cd = {.key = "Accounting-Responses"}},
-        },
-    },
-    {
-        .id = "accounting_packets",
-        .title = "NPS accounting packets",
-        .units = "packets/s",
-        .units_total = "packets",
-        .priority = PRIO_NPS_ACCOUNTING_PACKETS,
-        .priority_total = PRIO_NPS_ACCOUNTING_PACKETS_TOTAL,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "received", .cd = {.key = "Packets Received"}},
-            {.id = "sent", .cd = {.key = "Packets Sent"}},
-        },
-    },
-    {
-        .id = "accounting_errors",
-        .title = "NPS accounting packet errors",
-        .units = "packets/s",
-        .units_total = "packets",
-        .priority = PRIO_NPS_ACCOUNTING_ERRORS,
-        .priority_total = PRIO_NPS_ACCOUNTING_ERRORS_TOTAL,
-        .type = RRDSET_TYPE_STACKED,
-        .dims = {
-            {.id = "bad_authenticators", .cd = {.key = "Bad Authenticators"}},
-            {.id = "dropped", .cd = {.key = "Dropped Packets"}},
-            {.id = "invalid", .cd = {.key = "Invalid Requests"}},
-            {.id = "malformed", .cd = {.key = "Malformed Packets"}},
-            {.id = "no_record", .cd = {.key = "No Record"}},
-            {.id = "unknown_type", .cd = {.key = "Unknown Type"}},
-        },
-    },
-    {
-        .id = "accounting_uptime",
-        .title = "NPS accounting server uptime",
-        .units = "seconds",
-        .units_total = NULL,
-        .priority = PRIO_NPS_ACCOUNTING_UPTIME,
-        .type = RRDSET_TYPE_LINE,
-        .dims = {
-            {.id = "uptime", .cd = {.key = "Server Up Time"}},
-            {.id = "since_reset", .cd = {.key = "Server Reset Time"}},
-        },
-    },
-    {.id = NULL},
-};
-
-static struct nps_object nps_objects[] = {
-    {.name = "NPS Authentication Server", .family = "authentication", .charts = nps_authentication_charts},
-    {.name = "NPS Accounting Server", .family = "accounting", .charts = nps_accounting_charts},
-};
+static void nps_initialize(void)
+{
+    for (size_t o = 0; o < NPS_OBJECTS; o++)
+        for (size_t c = 0; c < NPS_CHARTS; c++)
+            for (size_t i = 0; nps_chart_defs[c].dims[i].id; i++)
+                nps_objects[o].charts[c].dims[i].cd.key = nps_chart_defs[c].dims[i].key[o];
+}
 
 static RRDSET *nps_chart_create(
     const char *family,
@@ -193,14 +180,19 @@ static RRDSET *nps_chart_create(
 static void nps_chart_update(
     PERF_DATA_BLOCK *pDataBlock,
     PERF_OBJECT_TYPE *pObjectType,
-    const char *family,
+    size_t o,
+    const struct nps_chart_def *def,
     struct nps_chart *ch,
     int update_every)
 {
-    bool read[NPS_MAX_DIMS];
+    const char *family = nps_objects[o].family;
+    bool read[NPS_MAX_DIMS] = {false};
     bool all_read = true, any_read = false;
 
-    for (size_t i = 0; ch->dims[i].id; i++) {
+    for (size_t i = 0; def->dims[i].id; i++) {
+        if (!def->dims[i].key[o])
+            continue;
+
         read[i] = perflibGetObjectCounter(pDataBlock, pObjectType, &ch->dims[i].cd);
         all_read = all_read && read[i];
         any_read = any_read || read[i];
@@ -211,26 +203,38 @@ static void nps_chart_update(
         return;
 
     if (unlikely(!ch->st)) {
-        ch->st = nps_chart_create(family, ch->id, ch->title, ch->units, ch->priority, ch->type, update_every);
+        char id[RRD_ID_LENGTH_MAX + 1];
+        char title[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "%s_%s", family, def->suffix);
+        snprintfz(title, RRD_ID_LENGTH_MAX, "NPS %s %s", family, def->title);
+        ch->st = nps_chart_create(family, id, title, def->units, def->priority[o], def->type, update_every);
 
-        RRD_ALGORITHM algorithm = ch->units_total ? RRD_ALGORITHM_INCREMENTAL : RRD_ALGORITHM_ABSOLUTE;
-        for (struct nps_dim *d = ch->dims; d->id; d++)
-            d->rd = rrddim_add(ch->st, d->id, NULL, 1, 1, algorithm);
+        RRD_ALGORITHM algorithm = def->units_total ? RRD_ALGORITHM_INCREMENTAL : RRD_ALGORITHM_ABSOLUTE;
+        for (size_t i = 0; def->dims[i].id; i++) {
+            if (def->dims[i].key[o])
+                ch->dims[i].rd = rrddim_add(ch->st, def->dims[i].id, NULL, 1, 1, algorithm);
+        }
 
-        if (ch->units_total) {
-            char id[RRD_ID_LENGTH_MAX + 1];
-            char title[RRD_ID_LENGTH_MAX + 1];
-            snprintfz(id, RRD_ID_LENGTH_MAX, "%s_total", ch->id);
-            snprintfz(title, RRD_ID_LENGTH_MAX, "%s since NPS start", ch->title);
-            ch->st_total =
-                nps_chart_create(family, id, title, ch->units_total, ch->priority_total, ch->type, update_every);
+        if (def->units_total) {
+            char id_total[RRD_ID_LENGTH_MAX + 1];
+            char title_total[RRD_ID_LENGTH_MAX + 1];
+            snprintfz(id_total, RRD_ID_LENGTH_MAX, "%s_total", id);
+            snprintfz(title_total, RRD_ID_LENGTH_MAX, "%s since NPS start", title);
+            ch->st_total = nps_chart_create(
+                family, id_total, title_total, def->units_total, def->priority_total[o], def->type, update_every);
 
-            for (struct nps_dim *d = ch->dims; d->id; d++)
-                d->rd_total = rrddim_add(ch->st_total, d->id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            for (size_t i = 0; def->dims[i].id; i++) {
+                if (def->dims[i].key[o])
+                    ch->dims[i].rd_total =
+                        rrddim_add(ch->st_total, def->dims[i].id, NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+            }
         }
     }
 
-    for (size_t i = 0; ch->dims[i].id; i++) {
+    for (size_t i = 0; def->dims[i].id; i++) {
+        if (!def->dims[i].key[o])
+            continue;
+
         struct nps_dim *d = &ch->dims[i];
         if (!read[i]) {
             d->discontinuous = true;
@@ -241,7 +245,7 @@ static void nps_chart_update(
 
         // The chart kept advancing while this dimension was missing, so the delta against its stale value would
         // be charged to a single interval. Rebaseline it to emit zero for this interval instead of a spike.
-        if (d->discontinuous && ch->units_total)
+        if (d->discontinuous && def->units_total)
             rrddim_set_last_collected_int(d->rd, value);
         d->discontinuous = false;
 
@@ -255,8 +259,10 @@ static void nps_chart_update(
         rrdset_done(ch->st_total);
 }
 
-static void nps_object_collect(struct nps_object *obj, int update_every)
+static void nps_object_collect(size_t o, int update_every)
 {
+    struct nps_object *obj = &nps_objects[o];
+
     // Absent while the NPS role is not installed; the name table refreshes when it is, so keep probing.
     DWORD id = RegistryFindIDByName(obj->name);
     if (id == PERFLIB_REGISTRY_NAME_NOT_FOUND)
@@ -270,15 +276,21 @@ static void nps_object_collect(struct nps_object *obj, int update_every)
     if (!pObjectType)
         return;
 
-    for (struct nps_chart *ch = obj->charts; ch->id; ch++)
-        nps_chart_update(pDataBlock, pObjectType, obj->family, ch, update_every);
+    for (size_t c = 0; c < NPS_CHARTS; c++)
+        nps_chart_update(pDataBlock, pObjectType, o, &nps_chart_defs[c], &obj->charts[c], update_every);
 }
 
 int do_PerflibNPS(int update_every, usec_t dt __maybe_unused)
 {
+    static bool initialized = false;
+    if (unlikely(!initialized)) {
+        nps_initialize();
+        initialized = true;
+    }
+
     // Each object is read and fully processed before the next query reuses the Perflib buffer.
-    for (size_t i = 0; i < _countof(nps_objects); i++)
-        nps_object_collect(&nps_objects[i], update_every);
+    for (size_t o = 0; o < NPS_OBJECTS; o++)
+        nps_object_collect(o, update_every);
 
     // Never disable: a missing role or a failed read is reported as a gap and may recover.
     return 0;
