@@ -1,8 +1,9 @@
 import types
+from pathlib import Path
 
 from netdata_mcp.runner import LogBuffer
 from netdata_mcp.tools import otel_effective_config
-from netdata_mcp.tools.otel_effective_config import OtelEffectiveConfig, parse_effective
+from netdata_mcp.tools.otel_effective_config import OtelEffectiveConfig, parse_effective, scope_to_run
 
 
 def test_parse_effective():
@@ -43,23 +44,60 @@ async def test_reads_the_run_buffer_without_journald(monkeypatch):
     assert out == OtelEffectiveConfig(agent_id="a", source="run_logs", effective={"a": 2}, message="ok")
 
 
-async def test_reads_the_journal_from_the_run_start(monkeypatch):
+def _env(pid, run_dir):
+    return f'T host otel-plugin[{pid}]: netdata environment: {{"user_config_dir":"{run_dir}/etc","run_dir":"{run_dir}/run"}}'
+
+
+def test_scope_to_run_keeps_only_the_agents_supervisor():
+    lines = [
+        _env(7, "/r/a"),
+        _env(8, "/r/b"),
+        'T host otel-plugin[8]: effective config: {"base_dir": "/r/b/lib/otel"}',
+        "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: unknown field `tracez`",
+        "garbage without a pid",
+    ]
+    assert scope_to_run(lines, "/r/a/etc") == [lines[0], lines[3]]
+    assert scope_to_run(lines, "/r/c/etc") == []
+
+
+async def test_journal_ignores_other_agents_and_keeps_the_refusal(monkeypatch):
+    # Another agent logs its effective config after this run started; this
+    # run's supervisor refused its config and exited.
     seen = {}
+    refusal = "T host otel-plugin[7]: failed to load configuration: parsing /r/a/etc/otel.yaml: unknown field `tracez`"
 
     async def fake_read(**kw):
         seen.update(kw)
-        return 'x otel-plugin[7]: ERROR parsing /r/etc/otel.yaml: unknown field `tracez`'
+        return "\n".join([
+            _env(7, "/r/a"), refusal,
+            _env(8, "/r/b"), 'T host otel-plugin[8]: effective config: {"base_dir": "/r/b/lib/otel"}',
+        ])
 
     monkeypatch.setattr(otel_effective_config.journal, "read_logs", fake_read)
-    run = types.SimpleNamespace(state="ready", buffer=LogBuffer(), pid=None, created_wall=1700000000.5)
+    run = types.SimpleNamespace(state="ready", buffer=LogBuffer(), pid=None, created_wall=1700000000.5, run_dir=Path("/r/a"))
     out = await _call(monkeypatch, run, journald=True)
     assert seen == {
         "identifier": "otel-plugin", "pid": None, "lines": 500,
         "grep": "config", "priority": None, "since": 1700000000.5,
     }
     assert out.source == "journal" and out.effective is None
-    assert out.config_log == 'x otel-plugin[7]: ERROR parsing /r/etc/otel.yaml: unknown field `tracez`'
+    assert out.config_log == "\n".join([_env(7, "/r/a"), refusal])
     assert out.error is not None and "refused" in out.error
+
+
+async def test_journal_returns_the_agents_own_effective_config(monkeypatch):
+    async def fake_read(**kw):
+        return "\n".join([
+            _env(7, "/r/a"), 'T host otel-plugin[7]: effective config: {"base_dir": "/r/a/lib/otel"}',
+            _env(8, "/r/b"), 'T host otel-plugin[8]: effective config: {"base_dir": "/r/b/lib/otel"}',
+        ])
+
+    monkeypatch.setattr(otel_effective_config.journal, "read_logs", fake_read)
+    run = types.SimpleNamespace(state="ready", buffer=LogBuffer(), pid=None, created_wall=0.0, run_dir=Path("/r/a"))
+    out = await _call(monkeypatch, run, journald=True)
+    assert out == OtelEffectiveConfig(
+        agent_id="a", source="journal", effective={"base_dir": "/r/a/lib/otel"}, message="ok"
+    )
 
 
 async def test_unknown_agent(monkeypatch):

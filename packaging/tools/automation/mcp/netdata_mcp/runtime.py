@@ -181,20 +181,25 @@ class OtelConfig:
     the stock values. ``extra_yaml`` is a raw YAML mapping deep-merged on top, for
     configs the typed model refuses on purpose (unknown keys for strict-config
     refusal tests). After both, the harness pins what per-agent isolation needs:
-    ``base_dir`` under the run dir, the gRPC endpoint, and the HTTP listener's
-    ``enabled`` and endpoint. An unset endpoint auto-assigns a free loopback port
+    ``base_dir`` under the run dir and each listener's ``enabled`` and endpoint. An unset endpoint auto-assigns a free loopback port
     so parallel agents never collide on 4317/4318; the HTTP listener is on unless
-    ``settings`` sets its ``enabled: false``.
+    ``settings`` sets its ``enabled: false``. A listener set ``enabled: false``
+    gets no port and reports no endpoint.
     """
 
     settings: OtelSettings = field(default_factory=OtelSettings)
     extra_yaml: str | None = None
 
     @property
-    def grpc_endpoint(self) -> str | None:
-        """The pinned OTLP/gRPC endpoint, or None to auto-assign."""
+    def grpc_disabled(self) -> bool:
         grpc = self.settings.protocol("grpc")
-        return grpc.endpoint if grpc else None
+        return bool(grpc and grpc.enabled is False)
+
+    @property
+    def grpc_endpoint(self) -> str | None:
+        """The pinned OTLP/gRPC endpoint, or None (auto-assigned or disabled)."""
+        grpc = self.settings.protocol("grpc")
+        return None if self.grpc_disabled or grpc is None else grpc.endpoint
 
     @property
     def http_disabled(self) -> bool:
@@ -221,15 +226,15 @@ def _deep_merge(base: dict, override: dict) -> dict:
     return out
 
 
-def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint: str | None) -> dict:
+def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str | None, otlp_http_endpoint: str | None) -> dict:
     """The user otel.yaml: the caller's settings, then ``extra_yaml``, then the pins.
 
     ``base_dir`` is pinned under the run dir, so every derived dir
     (``{base_dir}/{logs,traces}/{wal,index,catalog}``, the shared download cache,
     the seq high-water file) lands in isolation for both signals. Remote storage
     enabled without a URI defaults to a per-agent ``fs://`` dir, so the upload
-    path runs end to end without external storage. ``otlp_http_endpoint``
-    arrives resolved: an address, or None for a disabled listener.
+    path runs end to end without external storage. Both endpoints arrive
+    resolved: an address, or None for a disabled listener.
     """
     base_dir = str(rd / "lib" / "otel")
     doc: dict = {"base_dir": base_dir, **cfg.settings.document()}
@@ -241,8 +246,8 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     # The pins below must survive the passthrough: they are harness invariants
     # (isolation, the reported OTLP endpoints, no undeclared 4318 bind), not
     # plugin knobs. Everything else in extra_yaml, keys the plugin will refuse
-    # included, passes through untouched. A disabled HTTP section keeps only its
-    # enabled pin, so it never shows an address that is not bound.
+    # included, passes through untouched. A disabled listener's section keeps
+    # only its enabled pin, so it never shows an address that is not bound.
     if cfg.extra_yaml:
         try:
             extra = yaml.safe_load(cfg.extra_yaml)
@@ -262,13 +267,13 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str, otlp_http_endpoint:
     for key in ("grpc", "http"):
         if not isinstance(protocols.get(key), dict):
             protocols[key] = {}
-    protocols["grpc"]["endpoint"] = otlp_endpoint
-    if otlp_http_endpoint:
-        protocols["http"]["enabled"] = True
-        protocols["http"]["endpoint"] = otlp_http_endpoint
-    else:
-        protocols["http"]["enabled"] = False
-        protocols["http"].pop("endpoint", None)
+    for key, endpoint in (("grpc", otlp_endpoint), ("http", otlp_http_endpoint)):
+        if endpoint:
+            protocols[key]["enabled"] = True
+            protocols[key]["endpoint"] = endpoint
+        else:
+            protocols[key]["enabled"] = False
+            protocols[key].pop("endpoint", None)
     return doc
 
 def _ini_safe(s: str) -> str:
@@ -293,10 +298,10 @@ def generate_runtime(
     overrides: dict[str, dict[str, str]] | None = None,
     otel: OtelConfig | None = None,
     reserved_ports: Iterable[int] = (),
-) -> tuple[Path, Path, str, str | None]:
+) -> tuple[Path, Path, str | None, str | None]:
     """Create the isolated run dir, write netdata.conf + otel.yaml; return
-    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — the HTTP
-    endpoint is None when the config disables the OTLP/HTTP listener.
+    ``(run_dir, conf_path, otlp_endpoint, otlp_http_endpoint)`` — an endpoint
+    is None when the config disables that listener.
 
     ``overrides`` is the per-agent extension point ({section: {key: value}}),
     deep-merged over the defaults — the hook for runtime overrides (db mode,
@@ -338,9 +343,10 @@ def generate_runtime(
     # socket, so two calls can return the same port, and the plugin refuses
     # to start when its two listeners collide.
     taken = reserved | pinned_ports(cfg)
+    otlp_endpoint: str | None = None
     if cfg.grpc_endpoint:
         otlp_endpoint = cfg.grpc_endpoint
-    else:
+    elif not cfg.grpc_disabled:
         port = free_port_except(taken)
         taken.add(port)
         otlp_endpoint = f"127.0.0.1:{port}"

@@ -136,7 +136,7 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # dir from it (per-agent isolation for both logs and traces).
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     # endpoint auto-assigned on loopback and reported back
-    assert _protocols(doc)["grpc"] == {"endpoint": otlp}
+    assert _protocols(doc)["grpc"] == {"enabled": True, "endpoint": otlp}
     assert otlp.startswith("127.0.0.1:")
     # the OTLP/HTTP listener gets its OWN auto-assigned loopback port — never
     # the stock 4318 (a collide-and-fail-fast across parallel agents), never
@@ -386,10 +386,10 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
 
 def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    # base_dir, both endpoint addresses and the HTTP enabled flag are harness
+    # base_dir and both listeners' addresses and enabled flags are harness
     # isolation invariants: the passthrough must not escape the per-agent run
     # dir, lie about the reported OTLP endpoints, or smuggle in an undeclared
-    # HTTP bind.
+    # bind. Turning a listener off goes through the typed settings.
     cfg = _cfg(
         extra_yaml=(
             "base_dir: /tmp/escape\n"
@@ -412,17 +412,14 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     protocols = _protocols(doc)
-    # Endpoints and the HTTP enabled flag are re-pinned to the harness values.
+    # Endpoints and enabled flags are re-pinned to the harness values.
     assert protocols["grpc"]["endpoint"] == otlp
+    assert protocols["grpc"]["enabled"] is True
     assert protocols["http"]["endpoint"] == http
     assert protocols["http"]["enabled"] is True
     assert http.startswith("127.0.0.1:") and http != otlp
-    # Everything else passes through: gRPC's enabled flag (a caller may run
-    # the plugin HTTP-only, which leaves the reported OTLP/gRPC endpoint and
-    # the gRPC push tools without a listener), either listener's TLS, and the
-    # deprecated endpoint block (the plugin warns and uses the pinned
-    # receivers value).
-    assert protocols["grpc"]["enabled"] is False
+    # Everything else passes through: either listener's TLS and the deprecated
+    # endpoint block (the plugin warns and uses the pinned receivers value).
     assert protocols["grpc"]["tls"] == {"cert_file": "/x.pem"}
     assert protocols["http"]["tls"] == {"cert_file": "/y.pem"}
     assert doc["endpoint"] == {"path": "1.2.3.4:0"}
@@ -460,7 +457,7 @@ def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_receivers(tmp
         doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
         assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
         assert doc["receivers"] == {
-            "otlp": {"protocols": {"grpc": {"endpoint": otlp}, "http": {"enabled": False}}}
+            "otlp": {"protocols": {"grpc": {"enabled": True, "endpoint": otlp}, "http": {"enabled": False}}}
         }, evil
 
 
@@ -602,3 +599,16 @@ def test_generate_runtime_otel_settings_land_with_the_pins(tmp_path, monkeypatch
     }
     assert doc["auth"] == {"enabled": True}
     assert doc["metrics"] == {"interval_secs": 5}
+
+
+def test_generate_runtime_disabled_grpc_gets_no_port_and_no_endpoint(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # Like a disabled HTTP listener: nothing allocated, nothing reported, and a
+    # pinned address on a disabled listener neither binds nor clashes.
+    cfg = _cfg(_listeners(grpc={"enabled": False, "endpoint": "127.0.0.1:19999"}))
+    rd, _conf, otlp, http = runtime.generate_runtime("agent-nogrpc", otel=cfg, reserved_ports=(19999,))
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert otlp is None
+    assert _protocols(doc) == {"grpc": {"enabled": False}, "http": {"enabled": True, "endpoint": http}}
+    assert runtime.web_port_clash(cfg, 19999) is None
+    assert runtime.pinned_ports(cfg) == set()

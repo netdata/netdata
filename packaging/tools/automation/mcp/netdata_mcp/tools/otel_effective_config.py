@@ -5,14 +5,17 @@ logs one ``effective config: {json}`` line (``otel-plugin/src/config/mod.rs``,
 ``log_config``), with ``remote_storage.uri`` redacted to its scheme. This tool
 finds that line for the agent's current run: in the journal on journald hosts
 (where the agent routes its logs, see ``runtime._default_conf``), else in the
-run's captured output. No line means the plugin refused its config or has not
+run's captured output. Journal entries carry no per-agent field, so the run's
+supervisor is identified by its ``netdata environment`` startup line, logged
+before the config is loaded and naming the agent's own config dir; only that
+process's lines are used, whether or not it is still alive. No line means the plugin refused its config or has not
 started; the run's config-related log lines are returned instead.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
+import re
 from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -23,6 +26,8 @@ from ._common import get_runs
 from .gated_function import AgentId
 
 _MARKER = "effective config: "
+# journalctl short-iso: "<time> <host> otel-plugin[<pid>]: <message>"
+_JOURNAL_PID_RE = re.compile(r"\sotel-plugin\[(\d+)\]: ")
 _CONTEXT_LINES = 20
 
 
@@ -50,6 +55,18 @@ def parse_effective(lines: list[str]) -> dict[str, Any] | None:
     return None
 
 
+def scope_to_run(lines: list[str], user_config_dir: str) -> list[str]:
+    """The journal ``lines`` of the supervisor(s) whose ``netdata environment``
+    line names ``user_config_dir``; empty when no such line is present."""
+    needle = f'"user_config_dir":{json.dumps(user_config_dir)}'
+    pids = set()
+    for line in lines:
+        m = _JOURNAL_PID_RE.search(line)
+        if m and "netdata environment: " in line and needle in line:
+            pids.add(m.group(1))
+    return [line for line in lines if (m := _JOURNAL_PID_RE.search(line)) and m.group(1) in pids]
+
+
 def register(mcp: FastMCP) -> None:
     @mcp.tool(
         name="netdata_agent_otel_effective_config",
@@ -72,19 +89,12 @@ def register(mcp: FastMCP) -> None:
         source: Literal["journal", "run_logs"]
         if journal.journald_socket_present():
             source = "journal"
-            netdata_pid = run.pid
-            pid = (
-                await asyncio.to_thread(journal.resolve_pid, netdata_pid, "supervisor")
-                if netdata_pid is not None
-                else None
-            )
-            # The supervisor PID is unknown once it exits (a refused config), so
-            # the run's start time is what keeps other agents' lines out.
+            # "config" also matches the environment line (user_config_dir).
             text = await journal.read_logs(
-                identifier=journal.syslog_identifier("supervisor"), pid=pid, lines=500,
+                identifier=journal.syslog_identifier("supervisor"), pid=None, lines=500,
                 grep="config", priority=None, since=run.created_wall,
             )
-            lines = text.splitlines()
+            lines = scope_to_run(text.splitlines(), str(run.run_dir / "etc"))
         else:
             source = "run_logs"
             lines = [line for line in run.buffer.read(0).text.splitlines() if "config" in line]

@@ -74,6 +74,21 @@ def test_settings_document_keeps_only_set_keys():
     assert OtelSettings.model_validate(doc).document() == doc
 
 
+def test_settings_refuse_negative_counts_and_sizes():
+    # The plugin reads these as unsigned integers; a negative value would only
+    # surface as a startup refusal.
+    for bad in (
+        {"metrics": {"interval_secs": -1}},
+        {"traces": {"rotation": {"default": {"max_entries": -1}}}},
+        {"logs": {"rotation": {"default": {"max_file_size": -1}}}},
+        {"logs": {"retention": {"t1": {"max_files": -1}}}},
+        {"traces": {"catalog": {"rotation_count": -1}}},
+        {"remote_storage": {"read_cache_max_size": -5}},
+    ):
+        with pytest.raises(ValidationError):
+            OtelSettings.model_validate(bad)
+
+
 def test_settings_refuse_a_remote_uri_without_scheme():
     with pytest.raises(ValidationError):
         OtelSettings.model_validate({"remote_storage": {"uri": "/abs/path"}})

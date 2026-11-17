@@ -19,13 +19,14 @@ from __future__ import annotations
 import ipaddress
 import re
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, field_validator
 
 # The plugin parses listener endpoints as a Rust SocketAddr: an IP literal
 # (IPv6 in brackets) and a port, never a hostname.
 _HOST_PORT_RE = re.compile(r"(?:\[([0-9A-Fa-f:.]+)\]|([0-9.]+)):([0-9]{1,5})", re.ASCII)
 
-Size = str | int
+# The plugin reads counts and sizes as unsigned integers.
+Size = str | NonNegativeInt
 
 
 def _is_ip(text: str | None, version: int) -> bool:
@@ -93,10 +94,10 @@ class Auth(_Strict):
 
 class Metrics(_Strict):
     chart_configs_dir: str | None = None
-    interval_secs: int | None = None
-    grace_period_secs: int | None = None
-    expiry_duration_secs: int | None = None
-    max_new_charts_per_request: int | None = None
+    interval_secs: NonNegativeInt | None = None
+    grace_period_secs: NonNegativeInt | None = None
+    expiry_duration_secs: NonNegativeInt | None = None
+    max_new_charts_per_request: NonNegativeInt | None = None
 
 
 class RemoteStorage(_Strict):
@@ -115,19 +116,19 @@ class RemoteStorage(_Strict):
 
 class RotationEntry(_Strict):
     max_file_size: Size | None = None
-    max_entries: int | None = Field(default=None, description="Tiny values (e.g. 10) force multi-file splits over a small corpus.")
+    max_entries: NonNegativeInt | None = Field(default=None, description="Tiny values (e.g. 10) force multi-file splits over a small corpus.")
     max_file_duration: str | None = Field(default=None, description="Max wall time a data file stays open; idle streams seal on the periodic sweep.")
 
 
 class RetentionEntry(_Strict):
-    max_files: int | None = None
+    max_files: NonNegativeInt | None = None
     max_total_size: Size | None = None
     max_age: str | None = Field(default=None, description="Measured from a file's latest data timestamp.")
     horizon: str | None = Field(default=None, description="How long catalog (index) files are kept: the remote archive horizon.")
 
 
 class Catalog(_Strict):
-    rotation_count: int | None = Field(default=None, description="Index files recorded before a catalog file rotates and uploads; small values force catalog rotation.")
+    rotation_count: NonNegativeInt | None = Field(default=None, description="Index files recorded before a catalog file rotates and uploads; small values force catalog rotation.")
     rotation_period: str | None = None
 
 
