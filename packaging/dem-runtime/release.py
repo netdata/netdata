@@ -167,9 +167,16 @@ def public_identity(url, digest, size):
 
 
 def upload(args, path, relative):
-    run(['rclone', 'copyto', '--checksum', '--immutable', '--header-upload',
+    parent, name = relative.rsplit('/', 1)
+    if path.name != name:
+        raise ValueError('publication upload must preserve its filename')
+    # The bucket is provisioned by SRE; publishing needs only object-level access.
+    # rclone 1.60 copyto ignores --immutable for changed contents. Directory copy
+    # enforces it; select only this file so descriptors cannot upload early.
+    run(['rclone', 'copy', '--s3-no-check-bucket', '--checksum', '--immutable', '--no-traverse',
+         '--include', '/' + name, '--header-upload',
          'Cache-Control: public, max-age=31536000, immutable, no-transform',
-         path, args.remote.rstrip('/') + '/' + relative])
+         path.parent, args.remote.rstrip('/') + '/' + parent + '/'])
 
 
 def validate_inventory(directory, arch):

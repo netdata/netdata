@@ -1,10 +1,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Exercise the publisher through real rclone against controlled S3 responses."""
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import hashlib
 import os
+from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -14,14 +18,19 @@ import release
 
 
 @unittest.skipUnless(shutil.which('rclone'), 'requires real rclone with the S3 backend')
-class StoredDescriptorTests(unittest.TestCase):
+class ReleaseStorageTests(unittest.TestCase):
     def setUp(self):
         self.key = 'dem-runtime/nightly/v1.2.3-1-nightly/amd64/release.json'
         self.remote = 'demtest:bucket/' + self.key
         self.objects = {}
-        self.errors = {}
+        self.errors = {('PUT', '/bucket'): 403}
         self.requests = []
+        self.fail_uploaded_head = False
         fixture = self
+
+        def etag(body):
+            # S3 uses MD5 as the transport checksum for single-part uploads.
+            return '"' + hashlib.md5(body, usedforsecurity=False).hexdigest() + '"'
 
         class S3Handler(BaseHTTPRequestHandler):
             def log_message(self, *args):
@@ -33,9 +42,15 @@ class StoredDescriptorTests(unittest.TestCase):
             def do_GET(self):
                 self.respond()
 
+            def do_PUT(self):
+                self.respond()
+
             def respond(self):
                 url = urlsplit(self.path)
                 fixture.requests.append((self.command, url.path))
+                uploaded = None
+                if self.command == 'PUT':
+                    uploaded = self.rfile.read(int(self.headers.get('Content-Length', 0)))
                 status = fixture.errors.get((self.command, url.path))
                 if status:
                     body = f'<Error><Code>{"AccessDenied" if status == 403 else "InternalError"}</Code></Error>'
@@ -44,6 +59,15 @@ class StoredDescriptorTests(unittest.TestCase):
                     self.end_headers()
                     if self.command != 'HEAD':
                         self.wfile.write(body.encode())
+                    return
+                if self.command == 'PUT':
+                    fixture.objects[url.path.removeprefix('/bucket/')] = uploaded
+                    if fixture.fail_uploaded_head:
+                        fixture.errors['HEAD', url.path] = 403
+                    self.send_response(200)
+                    self.send_header('Content-Length', '0')
+                    self.send_header('ETag', etag(uploaded))
+                    self.end_headers()
                     return
                 if url.path == '/bucket':
                     query = parse_qs(url.query)
@@ -60,7 +84,7 @@ class StoredDescriptorTests(unittest.TestCase):
                             directories.add(prefix + key[len(prefix):].split('/')[0] + '/')
                             continue
                         item = SubElement(listing, 'Contents')
-                        for name, value in {'Key': key, 'Size': str(len(data)), 'ETag': '"fixture"',
+                        for name, value in {'Key': key, 'Size': str(len(data)), 'ETag': etag(data),
                                             'LastModified': '2026-11-17T00:00:00Z'}.items():
                             SubElement(item, name).text = value
                     for directory in sorted(directories):
@@ -74,7 +98,7 @@ class StoredDescriptorTests(unittest.TestCase):
                 self.send_response(200)
                 self.send_header('Content-Length', str(len(body)))
                 self.send_header('Last-Modified', 'Tue, 17 Nov 2026 00:00:00 GMT')
-                self.send_header('ETag', '"fixture"')
+                self.send_header('ETag', etag(body))
                 self.end_headers()
                 if self.command != 'HEAD':
                     self.wfile.write(body)
@@ -88,7 +112,7 @@ class StoredDescriptorTests(unittest.TestCase):
         environment = patch.dict(os.environ, {
             'RCLONE_CONFIG': os.devnull,
             'RCLONE_CONFIG_DEMTEST_TYPE': 's3',
-            'RCLONE_CONFIG_DEMTEST_PROVIDER': 'Other',
+            'RCLONE_CONFIG_DEMTEST_PROVIDER': 'Cloudflare',
             'RCLONE_CONFIG_DEMTEST_ENDPOINT': f'http://127.0.0.1:{server.server_port}',
             'RCLONE_CONFIG_DEMTEST_ENV_AUTH': 'false',
             'RCLONE_CONFIG_DEMTEST_ACCESS_KEY_ID': '',
@@ -133,6 +157,53 @@ class StoredDescriptorTests(unittest.TestCase):
                 self.errors[method, '/bucket/' + self.key] = 403
                 with self.assertRaises((subprocess.CalledProcessError, ValueError)):
                     release.read_stored_descriptor(self.remote)
+
+    def test_upload_and_immutable_retry_need_only_object_access(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'runtime.tar.zst'
+            key = self.key.replace('release.json', path.name)
+            body = b'original runtime payload'
+            path.write_bytes(body)
+            path.with_name('release.json').write_bytes(b'must not upload early')
+            nested = path.parent / 'nested'
+            nested.mkdir()
+            (nested / path.name).write_bytes(b'must not upload')
+            self.objects['unrelated'] = b'must not delete'
+            args = SimpleNamespace(remote='demtest:bucket')
+            release.upload(args, path, key)
+            expected = {key: body, 'unrelated': b'must not delete'}
+            self.assertEqual(self.objects, expected)
+            self.assertNotIn(('PUT', '/bucket'), self.requests)
+            self.assertIn(('HEAD', '/bucket/' + key), self.requests)
+
+            self.requests.clear()
+            release.upload(args, path, key)
+            self.assertFalse(any(method == 'PUT' for method, _ in self.requests))
+
+            path.write_bytes(body.upper())  # Same size, different checksum.
+            with self.assertRaises(subprocess.CalledProcessError):
+                release.upload(args, path, key)
+            self.assertEqual(self.objects, expected)
+            self.assertFalse(any(method == 'PUT' for method, _ in self.requests))
+
+    def test_upload_propagates_object_write_and_verification_failures(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / 'release.json'
+            path.write_bytes(b'runtime payload')
+            args = SimpleNamespace(remote='demtest:bucket')
+            self.errors['PUT', '/bucket/' + self.key] = 403
+            with self.assertRaises(subprocess.CalledProcessError):
+                release.upload(args, path, self.key)
+            self.assertEqual(self.objects, {})
+            self.assertIn(('PUT', '/bucket/' + self.key), self.requests)
+            self.assertNotIn(('PUT', '/bucket'), self.requests)
+
+            del self.errors['PUT', '/bucket/' + self.key]
+            self.fail_uploaded_head = True
+            with self.assertRaises(subprocess.CalledProcessError):
+                release.upload(args, path, self.key)
+            self.assertEqual(self.objects[self.key], path.read_bytes())
+            self.assertIn(('HEAD', '/bucket/' + self.key), self.requests)
 
 
 if __name__ == '__main__':

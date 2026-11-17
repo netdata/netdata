@@ -117,15 +117,12 @@ class PublicationTests(unittest.TestCase):
                 self.assertEqual(request.full_url, 'https://example.invalid/runtime')
                 self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
 
-    def test_immutable_upload_never_syncs_or_mutates_prior_objects(self):
+    def test_upload_rejects_filename_changes(self):
         args = SimpleNamespace(remote='s3:bucket')
         with patch.object(release, 'run') as run:
-            release.upload(args, Path('/tmp/archive'), 'dem-runtime/stable/v1.0.0/amd64/hash.tar.zst')
-            command = run.call_args.args[0]
-            self.assertEqual(command[:2], ['rclone', 'copyto'])
-            self.assertIn('--immutable', command)
-            self.assertIn('--checksum', command)
-            self.assertNotIn('sync', command)
+            with self.assertRaisesRegex(ValueError, 'preserve its filename'):
+                release.upload(args, Path('/tmp/archive'), 'dem-runtime/stable/v1.0.0/amd64/hash.tar.zst')
+            run.assert_not_called()
 
     def test_inventory_rejects_changes_extras_links_and_path_escape(self):
         with tempfile.TemporaryDirectory() as temporary:
