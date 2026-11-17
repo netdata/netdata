@@ -51,15 +51,19 @@ Netdata is a full-stack observability platform: infrastructure, application perf
 
 Netdata is distributed and real-time. Netdata Agents collect, store and analyze data where it is generated, per second, with machine learning anomaly detection on every metric. Netdata Parents and Netdata Cloud combine them into one view, without centralizing the data. Netdata scales to 100,000+ nodes, and its Agent is open source.
 
-**Core Advantages:**
+**Core Design Decisions:**
 
-* **Everything, every second** – Every metric collected per second, with dashboards and 1,100+ stock alerts from the first minute.
-* **Zero configuration** – Discovery, dashboards, alerts and anomaly detection start on their own.
-* **AI at the core** – Machine learning on every metric, a scoring engine that ranks what changed, and Netdata AI for root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
-* **Efficient** – About 0.6 bytes per sample on disk, and an Agent that uses under 5% of one CPU core and about 200 MB of RAM on a typical server.
-* **Your data stays yours** – Data stays on your infrastructure, in independent hubs you place where they make sense; Netdata Cloud unifies them.
+* **Understanding over traffic lights** – Monitoring tells you that something is wrong; observability tells you why. Netdata gives you both, from the same data.
+* **Everything, every second, affordably** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
+* **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
+* **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
+* **Machine learning as evidence, not alarms** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.
+* **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
+* **Observability for everyone** – No query language and nothing to administer: the expertise is built into the product, so everyone on the team can investigate.
+* **Configured your way** – Automatic first, then as code, from the dashboard, or both.
+* **Open, and yours** – The engine is open source, speaks open standards and runs on your infrastructure.
 
-Read the [Complete Product Description](https://learn.netdata.cloud/docs/welcome-to-netdata/complete-product-description) for every capability.
+Read [Netdata Design](https://learn.netdata.cloud/docs/welcome-to-netdata/netdata-design) for the reasoning behind each decision, and the [Complete Product Description](https://learn.netdata.cloud/docs/welcome-to-netdata/complete-product-description) for every capability.
 
 ### Most Energy-Efficient Monitoring Tool
 
