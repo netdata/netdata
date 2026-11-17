@@ -7,7 +7,7 @@
 </a>
 </p>
 <h3 align="center">Full-stack observability. Every metric, every second.</h3>
-<h4 align="center">Infrastructure, applications, networks and users, with AI over all of it. No BS.</h4>
+<h4 align="center">Infrastructure, applications, networks and users, with AI over all of it.</h4>
 
 <br />
 <p align="center">
