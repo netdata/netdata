@@ -32,6 +32,9 @@ strict check; incompatibility does not justify repairing or deleting ownership e
 the caller’s Agent version/channel/source: it validates the payload’s own provenance and, for managed paired releases,
 its binding to the authenticated descriptor. Different or empty plugin release stamps use the same execution checks.
 `Store.ValidateRelease` and native/preload installation validators additionally require the exact target Agent pair.
+`Store.ValidateSelected` lets unstamped source updates retain a compatible installed runtime. Under installation
+exclusion it checks inventory, rejects pending paired transitions and validates the bound payload and provenance;
+it does not change selection, acquisition consent or recovery records, or execute a browser.
 
 ### Signed release descriptors
 

@@ -40,6 +40,90 @@ func TestLegacyEmptySelectionIsUninstalled(t *testing.T) {
 	require.NotEqual(t, legacyEmptySelection, string(data))
 }
 
+func TestValidateSelectedForSourceUpdate(t *testing.T) {
+	cases := map[string]struct {
+		fault    string
+		want     error
+		wantText string
+	}{
+		"running compatible runtime": {},
+		"missing executable":         {fault: "executable", want: ErrDamaged},
+		"damaged provenance":         {fault: "provenance", want: ErrDamaged},
+		"incompatible contract":      {fault: "contract", want: ErrIncompatible},
+		"pending pair":               {fault: "pending", want: ErrPairPending},
+		"damaged ownership":          {fault: "ownership", wantText: "owner.json"},
+	}
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			ctx := context.Background()
+			agent := pairFixture("v2.13.0")
+			s := openPairFixture(t, filepath.Join(t.TempDir(), "runtime"), agent)
+			release, archive := pairedBundleFixture(t, agent, pairInfoFixture(agent))
+			installRelease(t, s, release, archive, AutomaticUpdates)
+			consumer, err := s.AcquireSelected()
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, consumer.Close()) })
+			payload := filepath.Join(s.path, "generations", release.Manifest.Archive.SHA256)
+			var protectedOwner string
+			switch test.fault {
+			case "ownership":
+				owners, err := filepath.Glob(filepath.Join(s.path, "claims", "*", "owner.json"))
+				require.NoError(t, err)
+				require.Len(t, owners, 1)
+				protectedOwner = owners[0]
+				original, err := os.ReadFile(protectedOwner)
+				require.NoError(t, err)
+				t.Cleanup(func() { require.NoError(t, os.WriteFile(protectedOwner, original, 0600)) })
+				require.NoError(t, os.WriteFile(protectedOwner, []byte("broken"), 0600))
+			case "executable":
+				path := filepath.Join(payload, release.Manifest.Layout.Node)
+				require.NoError(t, os.Rename(path, path+".missing"))
+			case "provenance":
+				path := filepath.Join(payload, releaseInfoName)
+				require.NoError(t, os.Chmod(path, 0600))
+				require.NoError(t, os.WriteFile(path, []byte("invalid"), 0600))
+			case "contract":
+				record, err := s.readSelectionRecord()
+				require.NoError(t, err)
+				record.Release.Manifest = setPersistedContract(t, s, release.Manifest, 1)
+				require.NoError(t, saveJSON(s.root, "selection.json", record))
+			case "pending":
+				next := pairFixture("v2.14.0")
+				target := openPairFixture(t, s.path, next)
+				nextRelease, nextArchive := pairedBundleFixture(t, next, pairInfoFixture(next))
+				preparePairFixture(t, target, nextRelease, nextArchive)
+			}
+			before, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			recoveryBefore, recoveryErr := os.ReadFile(filepath.Join(s.path, "recovery.json"))
+			require.True(t, recoveryErr == nil || errors.Is(recoveryErr, os.ErrNotExist))
+			development := openPairFixture(t, s.path, AgentRelease{})
+			err = development.ValidateSelected(ctx)
+			if test.wantText != "" {
+				require.ErrorContains(t, err, test.wantText)
+				require.NotErrorIs(t, err, ErrDamaged)
+				owner, err := os.ReadFile(protectedOwner)
+				require.NoError(t, err)
+				require.Equal(t, "broken", string(owner), "unknown ownership evidence must stay protected")
+			} else if test.want == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, test.want)
+			}
+			after, err := os.ReadFile(filepath.Join(s.path, "selection.json"))
+			require.NoError(t, err)
+			require.Equal(t, before, after, "validation must retain selection and consent")
+			recoveryAfter, err := os.ReadFile(filepath.Join(s.path, "recovery.json"))
+			if recoveryErr == nil {
+				require.NoError(t, err)
+			} else {
+				require.ErrorIs(t, err, os.ErrNotExist)
+			}
+			require.Equal(t, recoveryBefore, recoveryAfter, "validation must not create or alter recovery state")
+		})
+	}
+}
+
 func TestSelectedInstallationSurvivesIdleRestartAndPressure(t *testing.T) {
 	s, now := testStore(t)
 	s.config.MaxBytes = 128 << 10

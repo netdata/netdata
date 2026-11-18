@@ -3,6 +3,7 @@
 package browserruntime
 
 import (
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
@@ -158,6 +159,29 @@ func (c *Consumer) Close() error {
 	defer c.mu.Unlock()
 	c.closed = true
 	return c.store.closeClaim(c.claim)
+}
+
+// ValidateSelected lets an installation owner retain a runtime without changing
+// its release or consent. It checks execution eligibility and the bound payload,
+// including provenance, while excluding installers; running consumers may remain.
+func (s *Store) ValidateSelected(ctx context.Context) error {
+	return publicDamage(s.withPairOperation(ctx, func(inv inventory, recovery pairRecovery) error {
+		if err := inv.damageError(); err != nil {
+			return err
+		}
+		if recovery.Pending != nil {
+			return ErrPairPending
+		}
+		if inv.release == nil {
+			return ErrUnavailable
+		}
+		if err := inv.release.Validate(); err != nil {
+			return err
+		}
+		return s.validateRetainedSelection(selection{
+			Release: inv.release,
+		})
+	}))
 }
 
 func (s *Store) AcquireSelected() (*Consumer, error) {

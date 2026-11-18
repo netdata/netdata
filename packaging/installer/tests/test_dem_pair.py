@@ -874,6 +874,16 @@ class OwnerTests(unittest.TestCase):
         self.target.write_text('''#!/bin/sh
 command=$2
 shift 2
+if [ "$command" = pair-plan ]; then
+    case " $* " in *" --source-update "*) ;; *) exit 98 ;; esac
+    if [ "${PAIR_FAIL_SOURCE_PLAN:-0}" != 0 ]; then exit "$PAIR_FAIL_SOURCE_PLAN"; fi
+    if [ -n "${PAIR_SOURCE_PLAN_ONCE:-}" ]; then
+        if [ -f "$PAIR_SOURCE_PLAN_ONCE" ]; then exit 49; fi
+        : > "$PAIR_SOURCE_PLAN_ONCE"
+    fi
+    printf '%s\\n' "${PAIR_SOURCE_PLAN:-paired}"
+    exit 0
+fi
 printf '%s\\n' "$command" >> ''' + shlex.quote(str(self.events)) + '''
 if [ "$command" = fetch ] && [ "${PAIR_FAIL_FETCH:-0}" != 0 ]; then exit "$PAIR_FAIL_FETCH"; fi
 if [ "$command" = activate ] && [ "${PAIR_FAIL_ACTIVATE:-0}" != 0 ]; then exit "$PAIR_FAIL_ACTIVATE"; fi
@@ -930,6 +940,37 @@ exit 0
         self.assertEqual(self.config.read_text(), 'administrator config')
         self.assertEqual(self.proof.read_text(), 'private ownership proof')
         self.assertEqual([p.name for p in self.state.iterdir()], ['lock'])
+
+    def test_unstamped_source_keeps_runtime_without_acquisition(self):
+        for consent in ('manual', 'automatic'):
+            with self.subTest(consent=consent):
+                self.events.write_text('')
+                extra = 'export PAIR_SOURCE_PLAN=retain\nDP_CONSENT=' + consent
+                result = self.run_owner(running=True, extra=extra)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(self.recorded(), ['stop', 'start'])
+                self.assertEqual(self.proof.read_text(), 'private ownership proof')
+                self.assertEqual(self.config.read_text(), 'administrator config')
+                self.assertIn('Retaining the installed runtime', result.stderr)
+
+    def test_source_retention_validation_failure_precedes_stop(self):
+        result = self.run_owner(running=True, extra='export PAIR_FAIL_SOURCE_PLAN=37')
+        self.assertEqual(result.returncode, 37, result.stderr)
+        self.assertEqual(self.recorded(), [])
+        self.assertEqual(self.core.read_text(), 'old core')
+
+    def test_source_retention_rechecks_before_restart(self):
+        marker = self.root / 'source-validation'
+        extra = 'export PAIR_SOURCE_PLAN=retain PAIR_SOURCE_PLAN_ONCE=' + shlex.quote(str(marker))
+        result = self.run_owner(running=True, extra=extra)
+        self.assertEqual(result.returncode, 49, result.stderr)
+        self.assertEqual(self.recorded(), ['stop'])
+        self.assertEqual(self.proof.read_text(), 'private ownership proof')
+
+    def test_static_updates_still_require_the_exact_pair(self):
+        result = self.run_owner(running=True, extra='DP_FLAVOR=static\nexport PAIR_SOURCE_PLAN=retain')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.recorded(), ['fetch', 'stop', 'prepare', 'activate', 'start'])
 
     def test_inactive_or_explicit_dont_start_stays_stopped(self):
         for running, extra in [(False, ''), (True, 'DP_DONT_START=1')]:

@@ -1207,7 +1207,9 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   bind those bytes to the execution contract. The configured URL can change the source, not relax installation pairing.
   Execution checks contract/platform compatibility and payload integrity/provenance without comparing plugin release
   stamps. This same rule permits ordinary development builds to use an installed compatible runtime; no bypass exists.
-  Normal Agent updates acquire the exact companion only for enrolled installations. Native package dependencies
+  Published Agent updates acquire the exact companion only for enrolled installations. Unstamped source updates
+  validate and retain the installed runtime before replacement and restart, without acquiring bytes or changing
+  selection, consent or recovery records. Native package dependencies
   bind the final versions, while helper capabilities separately cover pre-unpack/pre-erasure hooks. Packages:
   `browserruntime`, `runtimehost`, `packaging/dem-runtime`, Agent release/packaging workflows.
 - **Durable recovery.** Managed `recovery.json` records one pending before/after transition and one previous pair;
