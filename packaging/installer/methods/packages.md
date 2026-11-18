@@ -257,10 +257,15 @@ curl localhost:19999/api/v1/info
 After installation, you can access the Netdata dashboard at `http://localhost:19999`.
 </details>
 
-On Debian and Ubuntu, upgrades and reinstalls leave a stopped Netdata service stopped. This also applies when
-reinstalling after `apt remove netdata` with configuration retained. Start it when ready with
-`sudo systemctl start netdata`. Fresh installations, including installation after a purge, start the service subject
-to the system's service policy.
+On Debian and Ubuntu, normal upgrade and reinstall configuration leaves a Netdata service that is stopped at the
+activity check stopped. This also applies when reinstalling after `apt remove netdata` with configuration retained.
+Start it when ready with `sudo systemctl start netdata`. Fresh installations, including installation after a purge,
+start the service subject to the system's service policy.
+
+Package-manager abort recovery retains its existing restart behavior and may start a stopped service. Service control
+continues to use the Debian helper's `restart` action and policy checks; it does not serialize against an administrator
+stopping the service during an upgrade. If an activity query fails, the hook retries once. If it still cannot determine
+the service state, it reports that restart was skipped; check the service and restart it explicitly when appropriate.
 
 ## Local Mirrors of the Official Netdata Repositories
 

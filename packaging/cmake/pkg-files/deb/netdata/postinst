@@ -46,10 +46,27 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
         systemctl --system daemon-reload >/dev/null || true
         # Keep previously configured installations stopped, including reinstall after removal.
         # Fresh installs (no prior configured version) still start through the Debian helper.
-        if [ "$1" != configure ] || [ -z "${2:-}" ] ||
-            systemctl --system --quiet is-active 'netdata.service'; then
-            deb-systemd-invoke restart 'netdata.service' >/dev/null || true
+        netdata_service_status=0
+        if [ "$1" = configure ] && [ -n "${2:-}" ]; then
+            systemctl --system --quiet is-active 'netdata.service' || netdata_service_status=$?
+            # is-active returns 3 for non-active units and 4 for missing units.
+            case "$netdata_service_status" in
+                0|3|4) ;;
+                *)
+                    # Retry a query failure once; it does not prove the service is stopped.
+                    netdata_service_status=0
+                    systemctl --system --quiet is-active 'netdata.service' || netdata_service_status=$?
+                    ;;
+            esac
         fi
+        case "$netdata_service_status" in
+            0) deb-systemd-invoke restart 'netdata.service' >/dev/null || true ;;
+            3|4) ;;
+            *)
+                printf 'netdata: service activity query failed with status %s; restart skipped\n' \
+                    "$netdata_service_status" >&2
+                ;;
+        esac
     fi
 fi
 
