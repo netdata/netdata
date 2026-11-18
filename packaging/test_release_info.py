@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import release_info
 
@@ -83,6 +84,52 @@ class ReleaseInfoTests(unittest.TestCase):
             self.assertEqual(release_info.stamp(root, 'devel', source), expected)
             self.assertEqual(release_info.read_release_info(path), expected)
             self.assertEqual((root / 'packaging/version').read_text(), 'v2.12.0\n')
+
+    def _stamp_fixture(self, root):
+        (root / 'packaging').mkdir()
+        (root / 'packaging/version').write_text('v2.12.0\n')
+        for args in (['init', '-q'],
+                     ['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                      'commit', '--allow-empty', '-qm', 'Fixture']):
+            subprocess.run(['git', *args], cwd=root, check=True, capture_output=True)
+        return subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=root, check=True,
+                              capture_output=True, text=True).stdout.strip()
+
+    @unittest.skipUnless(shutil.which('git'), 'requires Git')
+    def test_stamp_without_fchmod(self):
+        # Windows CPython before 3.13 has no os.fchmod.
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self._stamp_fixture(root)
+            saved = os.fchmod
+            del os.fchmod
+            try:
+                release_info.stamp(root, 'stable', source)
+            finally:
+                os.fchmod = saved
+            path = root / 'packaging/release-info'
+            self.assertEqual(release_info.read_release_info(path)['source'], source)
+            if os.name == 'posix':
+                self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+
+    @unittest.skipUnless(shutil.which('git'), 'requires Git')
+    def test_stamp_writes_lf_under_windows_newline_translation(self):
+        real = tempfile.NamedTemporaryFile
+
+        def windows_text_mode(*args, **kwargs):
+            # Text mode with the default newline writes CRLF on Windows.
+            if 'b' not in kwargs.get('mode', 'w+b'):
+                kwargs.setdefault('newline', '\r\n')
+            return real(*args, **kwargs)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = self._stamp_fixture(root)
+            with mock.patch.object(release_info.tempfile, 'NamedTemporaryFile', windows_text_mode):
+                release_info.stamp(root, 'stable', source)
+            path = root / 'packaging/release-info'
+            self.assertEqual(path.read_bytes(),
+                             f'version=v2.12.0\nchannel=stable\nsource={source}\n'.encode('ascii'))
 
     def test_cli_preserves_git_failure_status_and_diagnostics(self):
         with tempfile.TemporaryDirectory() as temporary:

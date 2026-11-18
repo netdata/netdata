@@ -62,13 +62,15 @@ def stamp(root, channel, source):
     body = ''.join(key + '=' + info[key] + '\n' for key in FIELDS)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(mode='w', encoding='ascii', dir=output.parent,
+        # Binary mode keeps LF line endings on Windows, where CMake rejects CR.
+        with tempfile.NamedTemporaryFile(mode='wb', dir=output.parent,
                                          prefix='.release-info-', delete=False) as stream:
             temporary = Path(stream.name)
-            stream.write(body)
+            stream.write(body.encode('ascii'))
             stream.flush()
             os.fsync(stream.fileno())
-            os.fchmod(stream.fileno(), 0o644)
+        # os.fchmod() is POSIX-only before Python 3.13; chmod the closed path instead.
+        os.chmod(temporary, 0o644)
         os.replace(temporary, output)
     finally:
         if temporary is not None and temporary.exists():
