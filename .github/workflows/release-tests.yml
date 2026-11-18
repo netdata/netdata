@@ -16,6 +16,9 @@ on:
       - '.github/scripts/test-artifact-prefixes.py'
       - '.github/scripts/test-gen-package-repos.py'
       - '.github/scripts/test-gen-docker-tags.py'
+      - '.github/scripts/test-version-scheme.py'
+      - 'packaging/cmake/Modules/NetdataVersion.cmake'
+      - 'packaging/installer/netdata-updater.sh'
   workflow_dispatch:
 permissions:
   contents: read
@@ -30,3 +33,4 @@ jobs:
           python3 .github/scripts/test-artifact-prefixes.py
           python3 .github/scripts/test-gen-package-repos.py
           python3 .github/scripts/test-gen-docker-tags.py
+          python3 .github/scripts/test-version-scheme.py

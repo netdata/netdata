@@ -11,7 +11,7 @@ on:
         default: nightly
         required: true
       version:
-        description: Version Tag (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.0-rcX; ~rcX is accepted)
+        description: Version Tag (vMAJOR.MINOR.PATCH or vMAJOR.MINOR.0-rcNN; rcN and ~rcN are accepted)
         default: nightly
         required: true
 concurrency: # Serialize tag/branch validation and publication across dispatch refs.
@@ -65,20 +65,28 @@ jobs:
           RELEASE_TAG: ${{ steps.target.outputs.ref }}
           RELEASE_BRANCH: ${{ steps.target.outputs.branch }}
           RELEASE_NEW_BRANCH: ${{ steps.target.outputs.new-branch }}
+          RELEASE_MARKER: ${{ steps.target.outputs.marker }}
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
+          set -- "${RELEASE_BRANCH}"
+          if [ -n "${RELEASE_NEW_BRANCH}" ]; then
+            # A first release candidate branches the series off master as it stands now.
+            git checkout -b "${RELEASE_NEW_BRANCH}"
+          fi
           git add packaging/version CHANGELOG.md
           git commit -m "[ci skip] ${RELEASE_MESSAGE}"
           echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-          set -- "${RELEASE_BRANCH}"
           if [ "${RELEASE_TYPE}" != "nightly" ]; then
             git tag -a "${RELEASE_TAG}" -m "${RELEASE_MESSAGE}"
             set -- "$@" "refs/tags/${RELEASE_TAG}"
           fi
-          if [ -n "${RELEASE_NEW_BRANCH}" ]; then
-            git branch "${RELEASE_NEW_BRANCH}"
-            set -- "$@" "${RELEASE_NEW_BRANCH}"
+          if [ -n "${RELEASE_MARKER}" ]; then
+            # Master then opens the next series with an empty commit carrying its marker tag.
+            git checkout master
+            git commit --allow-empty -m "[ci skip] Start ${RELEASE_MARKER} development."
+            git tag -a "${RELEASE_MARKER}" -m "Start ${RELEASE_MARKER} development."
+            set -- "$@" master "refs/tags/${RELEASE_MARKER}"
           fi
           git push --atomic origin "$@"
       - name: Failure Notification

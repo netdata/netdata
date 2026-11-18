@@ -65,7 +65,7 @@ class PackageReposTest(unittest.TestCase):
             ('release', '2.12.1', 'netdata/netdata'),
             ('release', '2.12.2', 'netdata/netdata netdata/netdata-preview'),
             ('release', '2.12.3', 'netdata/netdata netdata/netdata-preview'),
-            ('release-candidate', '2.13.0-rc1', 'netdata/netdata-preview'),
+            ('release-candidate', '2.13.0-rc01', 'netdata/netdata-preview'),
             ('nightly', '2.12.2', 'netdata/netdata-edge'),
             ('devel', '2.12.2', 'netdata/netdata-devel'),
         ):
@@ -79,13 +79,14 @@ class PackageReposTest(unittest.TestCase):
                 (root / 'packaging/version').write_text('v2.12.2-1-nightly')
                 (root / '.github').mkdir()
                 (root / '.github/scripts').symlink_to(SCRIPTS, target_is_directory=True)
-                preview = root / 'Version'
+                preview = root / 'artifacts/preview/latest/Version'
+                preview.parent.mkdir(parents=True)
                 preview.write_text('v2.12.2\n')
                 # Keep the real workflow command and eligibility logic; redirect only
                 # the child Python process's preview lookup to fixed local metadata.
                 (root / 'sitecustomize.py').write_text(
                     'from modules import release_versions\n'
-                    f'release_versions.PREVIEW_VERSION_URL = {preview.as_uri()!r}\n'
+                    f'release_versions.ARTIFACT_URL_PREFIX = {(root / "artifacts").as_uri()!r}\n'
                 )
                 output = root / 'output'
                 subprocess.run(['bash', '-eu', '-c', script], cwd=root, check=True,

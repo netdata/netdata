@@ -50,7 +50,7 @@ class ArtifactPrefixesTest(unittest.TestCase):
     def test_github_tag_normalization(self):
         step = WORKFLOW.split('      - name: Normalize Tag\n', 1)[1].split('  upload-release:', 1)[0]
         script = '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
-        for version in ('2.13.0', '2.13.0-rc1', 'v2.13.0', 'v2.13.0-rc1'):
+        for version in ('2.13.0', '2.13.0-rc01', 'v2.13.0', 'v2.13.0-rc01'):
             with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
                 output = Path(directory) / 'output'
                 subprocess.run(['bash', '-eu', '-c', script], check=True,
@@ -85,7 +85,7 @@ class ArtifactPrefixesTest(unittest.TestCase):
         stub = 'rclone() { printf "%s|%s\\n" "${7}" "${8}"; }\n'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('v2.13.0-rc1', 'latest'):
+            for name in ('v2.13.0-rc01', 'latest'):
                 (root / name).mkdir()
             result = subprocess.run(['bash', '-eu', '-c', stub + script], cwd=root,
                                     capture_output=True, text=True, check=True,
@@ -93,7 +93,7 @@ class ArtifactPrefixesTest(unittest.TestCase):
                                          'RELEASE_TYPE': 'release-candidate'})
             self.assertCountEqual(result.stdout.splitlines(), [
                 f'./{name}/|s3:netdata-agent-artifacts/preview/{name}/'
-                for name in ('v2.13.0-rc1', 'latest')
+                for name in ('v2.13.0-rc01', 'latest')
             ])
 
     def test_comparison_and_selection(self):
@@ -219,8 +219,8 @@ class PrepareArtifactAliasesTest(unittest.TestCase):
         self.assert_tree(root, 'r2', ['latest'], version=version)
 
     def test_rc_artifacts_use_preview_metadata_only(self):
-        root = self.prepare({}, {}, build_type='release-candidate', version='v2.13.0-rc1')
-        self.assert_tree(root, 'r2', ['latest'], version='v2.13.0-rc1')
+        root = self.prepare({}, {}, build_type='release-candidate', version='v2.13.0-rc01')
+        self.assert_tree(root, 'r2', ['latest'], version='v2.13.0-rc01')
         self.assertFalse((root / 'artifacts/r2-preview').exists())
         lookups = (root / 'lookups').read_text().splitlines()
         self.assertEqual(lookups, ['https://artifacts.netdata.cloud/preview/latest/Version'])
@@ -234,7 +234,7 @@ class PrepareArtifactAliasesTest(unittest.TestCase):
         self.assert_tree(root, 'r2-preview', ['latest', '2', '2.12'])
 
     def test_aliases_use_their_own_metadata(self):
-        root = self.prepare({}, {'latest': 'v3.0.0', '2': 'v2.12.2', '2.12': 'v2.12.2-rc1'})
+        root = self.prepare({}, {'latest': 'v3.0.0', '2': 'v2.12.2', '2.12': 'v2.12.2-rc01'})
         self.assert_tree(root, 'r2', ['latest', '2', '2.12'])
         self.assert_tree(root, 'r2-preview', ['2.12'])
 

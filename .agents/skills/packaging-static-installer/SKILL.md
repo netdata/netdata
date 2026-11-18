@@ -41,9 +41,9 @@ docker pull netdata/static-builder:v1     # see Gotcha #2
 # 3. Output
 ls -la artifacts/
 # artifacts/netdata-x86_64-latest.gz.run        historically ~190 MB; matching compatible x86_64 Linux target
-# artifacts/netdata-x86_64-vX.Y.Z-N-nightly.gz.run
+# artifacts/netdata-x86_64-vX.Y-N-nightly.gz.run
 # artifacts/netdata-latest.gz.run               (x86_64 only — alias of the above)
-# artifacts/netdata-vX.Y.Z-N-nightly.gz.run     (x86_64 only — alias)
+# artifacts/netdata-vX.Y-N-nightly.gz.run     (x86_64 only — alias)
 ```
 
 For debug builds: `./packaging/makeself/build-static.sh x86_64 debug`.
@@ -170,9 +170,9 @@ Job `99-copy-archives.sh` writes to `artifacts/` (gitignored, host-side, owned b
 ```
 artifacts/
 ├── netdata-x86_64-latest.gz.run            # copied alias of the versioned archive
-├── netdata-x86_64-v2.10.0-171-nightly.gz.run
+├── netdata-x86_64-v2.11-171-nightly.gz.run
 ├── netdata-latest.gz.run                   # x86_64 only — generic alias
-├── netdata-v2.10.0-171-nightly.gz.run      # x86_64 only — generic alias
+├── netdata-v2.11-171-nightly.gz.run      # x86_64 only — generic alias
 └── cache/                                  # build cache, see below
 ```
 

@@ -6,10 +6,33 @@ Run the **Release** workflow on `master`. It validates the requested version, up
 | Build type | Version example | Source branch | Publication |
 |---|---|---|---|
 | `nightly` | `nightly` | `master` | Nightly artifacts; edge packages; `netdata/netdata-nightlies` GitHub release |
-| `release-candidate` | `v2.13.0-rc1` | `master` for the first RC; `v2.13` thereafter | Preview artifacts/packages; GitHub prerelease draft |
+| `release-candidate` | `v2.13.0-rc01` | `master` for the first RC (creates `v2.13`); `v2.13` thereafter | Preview artifacts/packages; GitHub prerelease draft |
 | `minor` | `v2.13.0` | Existing `v2.13` | Stable and eligible preview destinations; GitHub release draft |
 | `major` | `v3.0.0` | Existing `v3.0` | Stable and eligible preview destinations; GitHub release draft |
 | `patch` | `v2.13.1` | Existing `v2.13` | Stable and eligible preview destinations; GitHub release draft |
+
+## Version forms
+
+`master` never carries release tags. It carries annotated development marker tags (`vMAJOR.MINOR`) that name the
+series under development; releases are tagged only on their `vMAJOR.MINOR` release branch. Examples for the period
+around the `v2.14` series:
+
+| Build | Version (`packaging/version`, tags, artifacts, Docker) | DEB/RPM | Windows MSI |
+|---|---|---|---|
+| Stable | `v2.14.0`, `v2.14.1` | `2.14.0`, `2.14.1` | `2.14.100`, `2.14.101` |
+| Release candidate | `v2.14.0-rc01`, `v2.14.0-rc02` | `2.14.0~rc01` | `2.14.1`, `2.14.2` |
+| Nightly before `v2.14.0-rc01` | `v2.14-29-nightly` | `2.14.0~nightly.29` | `2.14.0.29` |
+| Nightly after `v2.14.0-rc01` | `v2.15-37-nightly` | `2.15.0~nightly.37` | `2.15.0.37` |
+| Nightly after a stable tag on `master` (pre-marker transition) | `v2.13.0-29-post-nightly` | `2.13.0.post.29` | `2.13.100.29` |
+| Git build | `v2.15-617-g3340f53a85` | `2.15.0~git.617.g3340f53a85` | `2.15.0.617` |
+
+- Within one major.minor version, nightlies sort before release candidates, and release candidates before the
+  stable release. `-post` nightlies sort after the stable release they follow. Git builds are not ordered against
+  nightlies.
+- MSI only compares the first three fields, so stable patch numbers are offset by 100 to sort after RCs (rc01-rc99).
+- [NetdataVersion.cmake](../packaging/cmake/Modules/NetdataVersion.cmake) derives the package and MSI versions;
+  the updater's `parse_version` and [release_versions.py](scripts/modules/release_versions.py) implement the same
+  ordering.
 
 ## Running a release
 
@@ -31,18 +54,16 @@ atomically, so a failed push cannot publish only part of that update.
 
 - The Release workflow is scheduled daily at 00:00 UTC. A scheduled run skips publication when `HEAD` is already
   the last nightly version-update commit. A manual `nightly` dispatch does not use that skip condition.
-- Preparation runs from `master`, generates the changelog and writes a version derived from the nearest tag and
-  the number of commits since it, in the form `<tag>-<count-plus-one>-nightly`, with the count zero-padded to five
-  digits (for example `00042`). When the nearest tag is a release candidate (first RCs are tagged on `master`), its
-  `-rcX` suffix is dropped, so `v2.13.0-rc1` yields `v2.13.0-<padded-count>-nightly`. When the nearest tag is a
-  stable release, the suffix is `-post-nightly` instead, because that nightly follows the release.
-- Native package versions differ by base: RC-based nightlies use `~` (`2.13.0~00005.nightly`), sorting below
-  `2.13.0~rc1` and `2.13.0`; stable-based nightlies keep `.` (`2.12.0.00545.post`), sorting above `2.12.0`. The dispatch version remains `nightly`; downstream builds read the generated
-  version from `packaging/version`.
+- Preparation runs from `master`, generates the changelog and writes `<tag>-<count>-nightly`, where `<tag>` is the
+  nearest tag (normally the development marker, such as `v2.15`) and `<count>` is the number of commits since it,
+  so a nightly of the marker commit itself is number `0`. When the nearest tag is a stable release (before the first
+  marker exists), the suffix is `-post-nightly`, because that nightly follows the release.
+- The nightly commit only changes `packaging/version` and the changelog; the build system uses that version instead
+  of `git describe` when it builds that commit. The dispatch version remains `nightly`.
 - Source, static installer and Windows artifacts go under the `nightly` artifact prefix, including `latest`.
   GitHub releases are published automatically in `netdata/netdata-nightlies`, rather than drafted in the main repository.
 - Native packages go to the edge repository on both package hosts. Docker publishes `edge` and `latest` to
-  Docker Hub, Quay and GHCR. The Docker `latest` tag therefore tracks nightly builds.
+  Docker Hub, Quay and GHCR.
 - Nightlies do not trigger the stable Helmchart or MSI follow-up workflows.
 
 ## Stable releases: major, minor and patch
@@ -52,8 +73,8 @@ An existing tag cannot be reused.
 
 | Type | Version rule | Example progression |
 |---|---|---|
-| `major` | Minor and patch must both be zero | `v3.0.0-rc1` → `v3.0.0` |
-| `minor` | Patch must be zero | `v2.13.0-rc1` → `v2.13.0` |
+| `major` | Minor and patch must both be zero | `v3.0.0-rc01` → `v3.0.0` |
+| `minor` | Patch must be zero | `v2.13.0-rc01` → `v2.13.0` |
 | `patch` | Version must be newer than the branch's current core version | `v2.13.0` → `v2.13.1` |
 
 - All three types require an existing `vMAJOR.MINOR` branch and matching major/minor numbers in its
@@ -68,34 +89,39 @@ An existing tag cannot be reused.
   already advertised at each alias. Versioned artifacts are still published for releases of older series.
 - Native packages go to the stable repository on both package hosts, and also to preview when the same preview
   eligibility check passes.
-- Docker publishes the exact version, major, major/minor and `stable` tags to Docker Hub, Quay and GHCR, plus
-  `preview` when eligible. These Docker aliases are assigned by the build; they do not use the artifact alias
-  comparison above. Stable releases do not update Docker's `latest` tag.
+- Docker publishes the exact version and `latest` tags to Docker Hub, Quay and GHCR. The major, major/minor and
+  `stable` tags are added only when the release is not older than the version published at the matching
+  `stable/<alias>/Version` artifact metadata, and `preview` under the preview eligibility check above, so a patch
+  for an older series does not move them.
 - The Docker workflow dispatches the Agent Version PR workflow in `netdata/helmchart` and the stable Build
   workflow in `netdata/msi-installer`. Check those follow-up runs as part of the release.
 
 The [release preparation script](scripts/prepare-release-base.sh) owns version and branch validation.
-The [shared preview eligibility helper](scripts/modules/release_versions.py) owns stable-to-preview routing.
+The [shared release ordering helper](scripts/modules/release_versions.py) owns preview and Docker alias eligibility.
 
 ## Release candidates
 
-- Tags use `vMAJOR.MINOR.0-rcX`, where core numbers follow SemVer and `X` is a positive decimal integer without
-  leading zeroes. Build metadata, other prerelease names and nonzero patch numbers are rejected.
-- The workflow also accepts the package-style form `vMAJOR.MINOR.0~rcX` and normalizes it to `-rcX`: Git tags and
-  Docker tags cannot contain `~`. Tags, `packaging/version`, artifact names and Docker tags use `-rcX`; native
-  package versions use `MAJOR.MINOR.0~rcX`, derived by the build system, so an RC sorts below its final release.
-- Each version starts at `rc1`. Subsequent RC numbers must exceed every existing RC number for that version;
+- Tags use `vMAJOR.MINOR.0-rcNN`, where core numbers follow SemVer and `NN` is two digits from `01` to `99`.
+  Release candidates are only made for major and minor releases. Build metadata, other prerelease names and
+  nonzero patch numbers are rejected.
+- The workflow also accepts `rcN` and the package-style `~rcN` and normalizes them to `-rcNN`: Git tags and Docker
+  tags cannot contain `~`. Native package versions use `MAJOR.MINOR.0~rcNN`, derived by the build system.
+- Each version starts at `rc01`. Subsequent RC numbers must exceed every existing RC number for that version;
   gaps are allowed. Existing tags cannot be reused.
 - An RC is rejected if a regular release of the same version already exists.
-- The first RC starts a newer minor series in the current major, or a newer major with minor zero, from `master`.
-  It creates the `vMAJOR.MINOR` release branch at the changelog/version commit. Subsequent RCs require that branch.
+- The first RC must not be older than the series under development on `master` (its marker tag, or the latest
+  stable tag before markers exist); a new major requires minor zero. It creates the `vMAJOR.MINOR` release branch
+  from `master` as it stands, commits the changelog/version there and tags the RC on that branch. It then adds an
+  empty commit to `master` with the annotated marker tag for the next series (`v2.15` after `v2.14.0-rc01`,
+  `v3.1` after `v3.0.0-rc01`). Branch, tags and `master` are pushed atomically. Subsequent RCs require the branch.
 - Downstream builds receive type `release-candidate`. Source/static/Windows artifacts go exclusively to the
   `preview` artifact prefix; native packages go exclusively to the preview repository on both package hosts.
   RCs can update preview's `latest` alias according to the existing version comparison, but do not create major/minor aliases.
 - GitHub release drafts are created in the main repository and marked as prereleases. The existing manual
   draft-publication step still applies.
-- Docker publishes only the exact version tag, such as `v2.13.0-rc1`, to each registry. RCs do not update
-  `stable`, `preview`, `latest`, major or minor Docker aliases. Stable Helmchart and MSI follow-up workflows are skipped.
+- Docker publishes the exact version tag, such as `v2.13.0-rc01`, and `latest` to each registry, plus `preview`
+  when the RC is not older than `preview/latest/Version`. RCs do not update `stable`, major or minor Docker
+  aliases. Stable Helmchart and MSI follow-up workflows are skipped.
 
 ## Other build and release workflows
 
@@ -115,6 +141,7 @@ python3 .github/scripts/test-prepare-release-base.py
 python3 .github/scripts/test-artifact-prefixes.py
 python3 .github/scripts/test-gen-package-repos.py
 python3 .github/scripts/test-gen-docker-tags.py
+python3 .github/scripts/test-version-scheme.py
 ```
 
 These tests use temporary Git repositories and intercepted upload/download commands. They do not publish releases

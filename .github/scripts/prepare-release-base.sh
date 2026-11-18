@@ -9,9 +9,12 @@ EVENT_VERSION="${4}"
 RELEASE_TEST="${5}"
 
 # Git refs cannot contain '~', so accept the package-style RC separator and store the tag form.
-# The build system maps '-rcN' back to '~rcN' for native package versions.
+# Release candidate numbers are two digits (rc01-rc99) so they also sort correctly as text.
 case "${EVENT_VERSION}" in
     *\~rc*) EVENT_VERSION="${EVENT_VERSION%%\~rc*}-rc${EVENT_VERSION#*\~rc}" ;;
+esac
+case "${EVENT_VERSION}" in
+    *-rc[1-9]) EVENT_VERSION="${EVENT_VERSION%-rc*}-rc0${EVENT_VERSION##*-rc}" ;;
 esac
 
 ##############################################################
@@ -87,16 +90,14 @@ if [ "${REPO}" != "netdata/netdata" ] && [ -z "${RELEASE_TEST}" ]; then
 elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     echo "::notice::Preparing a nightly release build."
     LAST_TAG=$(git describe --abbrev=0 --tags)
+    # The count excludes the nightly commit itself, so a nightly of the tagged commit is number 0.
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
-    # Release candidates are tagged on master; nightlies carry only the numeric core.
-    # A nightly after a stable tag follows that release, so mark it 'post' to keep it out of the
-    # pre-release (~) package ordering NetdataVersion.cmake applies to RC-based nightlies.
-    NIGHTLY_SUFFIX=post-nightly
     case "${LAST_TAG}" in
-        *-rc*) NIGHTLY_SUFFIX=nightly ;;
+        # Nightlies after a stable tag (from before marker tags existed) follow that release.
+        v*.*.*) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-post-nightly" ;;
+        # Marker tags (vX.Y) open development of that release, so nightlies precede it.
+        *) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-nightly" ;;
     esac
-    # Zero-pad the count so nightly versions also sort correctly as text.
-    NEW_VERSION="${LAST_TAG%%-rc*}-$(printf '%05d' "$((COMMITS_SINCE_RELEASE + 1))")-${NIGHTLY_SUFFIX}"
     LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
@@ -116,8 +117,8 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
 elif [ "${EVENT_VERSION}" != nightly ]; then
     case "${EVENT_TYPE}" in
         release-candidate)
-            if ! echo "${EVENT_VERSION}" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0-rc[1-9][0-9]*$'; then
-                echo '::error::Release candidates must use vMAJOR.MINOR.0-rcX, with positive X and no build metadata.'
+            if ! echo "${EVENT_VERSION}" | grep -qE '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.0-rc(0[1-9]|[1-9][0-9])$'; then
+                echo '::error::Release candidates must use vMAJOR.MINOR.0-rcNN, with NN from 01 to 99 and no build metadata.'
                 exit 1
             fi
             ;;
@@ -134,6 +135,7 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
     check_for_existing_tag || exit 1
     branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
     new_branch=''
+    marker=''
     build_type=release
     if [ "${EVENT_TYPE}" = release-candidate ]; then
         build_type=release-candidate
@@ -143,10 +145,10 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
             echo "::error::A regular release of ${base_version} already exists."
             exit 1
         fi
-        latest_rc="$(git tag --list "${base_version}-rc*" | grep -E '^v[0-9]+\.[0-9]+\.0-rc[1-9][0-9]*$' | sort -V | tail -n 1)"
+        latest_rc="$(git tag --list "${base_version}-rc*" | grep -E '^v[0-9]+\.[0-9]+\.0-rc[0-9]{2}$' | sort | tail -n 1)"
         if [ -z "${latest_rc}" ]; then
-            if [ "${EVENT_VERSION}" != "${base_version}-rc1" ]; then
-                echo '::error::Release candidate numbering must start at rc1.'
+            if [ "${EVENT_VERSION}" != "${base_version}-rc01" ]; then
+                echo '::error::Release candidate numbering must start at rc01.'
                 exit 1
             fi
             if git show-ref --verify --quiet "refs/heads/${branch_name}" || git show-ref --verify --quiet "refs/remotes/origin/${branch_name}"; then
@@ -154,23 +156,31 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
                 exit 1
             fi
             git checkout master
-            # A first RC starts a new major or minor series from master.
-            current_major="$(cut -f 1 -d '-' packaging/version | cut -f 1 -d '.')"
-            target_major="$(echo "${EVENT_VERSION}" | cut -f 1 -d '.')"
-            check_newer_version || exit 1
-            if [ "${current_major}" != "${target_major}" ]; then minor_is_zero || exit 1; fi
-            new_branch="${branch_name}"
-            branch=master
-        else
-            # Version sort compares arbitrary-length decimal RC numbers numerically.
-            if [ "$(printf '%s\n' "${latest_rc}" "${EVENT_VERSION}" | sort -V | tail -n 1)" != "${EVENT_VERSION}" ]; then
-                echo "::error::Release candidate must be newer than ${latest_rc}."
+            # A first RC starts a new release series from master. Master's latest tag is either the
+            # marker for the series under development (vX.Y) or, before marker tags existed, a stable tag.
+            master_tag="$(git describe --abbrev=0 --tags)"
+            master_core="${master_tag#v}"
+            target_core="${base_version#v}"
+            case "${master_core}" in
+                *.*.*) ;;
+                *) master_core="${master_core}.0" ;;
+            esac
+            if [ "${master_tag}" != "${branch_name}" ] && \
+               { [ "${master_core}" = "${target_core}" ] || [ "$(printf '%s\n' "${master_core}" "${target_core}" | sort -V | tail -n 1)" != "${target_core}" ]; }; then
+                echo "::error::Version ${EVENT_VERSION} is not newer than the current development version (${master_tag})."
                 exit 1
             fi
-            branch="${branch_name}"
+            if [ "${master_core%%.*}" != "${target_core%%.*}" ]; then minor_is_zero || exit 1; fi
+            new_branch="${branch_name}"
+            marker="${branch_name%.*}.$(( ${branch_name##*.} + 1 ))"
+            if git show-ref --verify --quiet "refs/tags/${marker}"; then
+                echo "::error::The development marker tag ${marker} already exists."
+                exit 1
+            fi
+        elif [ "$(printf '%s\n' "${latest_rc}" "${EVENT_VERSION}" | sort | tail -n 1)" != "${EVENT_VERSION}" ]; then
+            echo "::error::Release candidate must be newer than ${latest_rc}."
+            exit 1
         fi
-    else
-        branch="${branch_name}"
     fi
     if [ -z "${new_branch}" ]; then
         if ! git checkout "${branch_name}"; then
@@ -195,8 +205,12 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=${build_type}" >> "${GITHUB_OUTPUT}"
     echo "channel=stable" >> "${GITHUB_OUTPUT}"
-    echo "branch=${branch}" >> "${GITHUB_OUTPUT}"
-    if [ -n "${new_branch}" ]; then echo "new-branch=${new_branch}" >> "${GITHUB_OUTPUT}"; fi
+    echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
+    # A first RC creates the release branch from master and an empty marker commit on master.
+    if [ -n "${new_branch}" ]; then
+        echo "new-branch=${new_branch}" >> "${GITHUB_OUTPUT}"
+        echo "marker=${marker}" >> "${GITHUB_OUTPUT}"
+    fi
     echo "version=${EVENT_VERSION#v}" >> "${GITHUB_OUTPUT}"
 else
     echo '::error::Unrecognized release type or invalid version.'

@@ -7,7 +7,7 @@ import sys
 
 from typing import Final
 
-from modules.release_versions import stable_reaches_preview, version_core
+from modules.release_versions import reaches, version_core
 
 github_event: Final = sys.argv[1]
 version: Final = sys.argv[2]
@@ -40,20 +40,20 @@ match version:
         nightly = True
     case _:
         version_core(version)
+        # 'latest' tracks the most recent publication; channel and series aliases never move backwards.
+        versions = [f'v{version}', 'latest']
         if '-' in version.split('+', 1)[0]:
             prerelease = True
-            versions = [f'v{version}']
         else:
-            v = f'v{version}'.split('.')
-            versions = [
-                v[0],
-                '.'.join(v[0:2]),
-                '.'.join(v[0:3]),
-                'stable',
-            ]
+            major, minor, _ = version.split('+', 1)[0].split('.')
+            for tag, alias in ((f'v{major}', f'stable/{major}'),
+                               (f'v{major}.{minor}', f'stable/{major}.{minor}'),
+                               ('stable', 'stable/latest')):
+                if reaches(version, alias):
+                    versions.append(tag)
 
-            if stable_reaches_preview(version):
-                versions.append('preview')
+        if reaches(version, 'preview/latest'):
+            versions.append('preview')
 
         for h in REPOS.keys():
             tags[h] = [f'{REPOS[h]}:{t}' for t in versions]

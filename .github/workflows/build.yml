@@ -1337,7 +1337,7 @@ jobs:
         env:
           RELEASE_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if echo "${RELEASE_VERSION}" | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(-rc[1-9][0-9]*)?$'; then
+          if echo "${RELEASE_VERSION}" | grep -qE '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+(-rc[0-9]{2})?$'; then
             echo "tag=v${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
           else
             echo "tag=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"

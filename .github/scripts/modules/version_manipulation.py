@@ -10,8 +10,9 @@ repos_URL = {
     "nightly": "netdata/netdata-nightlies"
 }
 
-# Nightly counts are zero-padded; 'post' marks nightlies based on a stable tag.
-NIGHTLY_PATTERN = r'v(\d+)\.(\d+)\.(\d+)-(\d+)-(?:post-)?nightly'
+# Nightlies are vX.Y-N-nightly after a development marker tag, or vX.Y.Z-N-post-nightly after a stable tag
+# (legacy vX.Y.Z-N-nightly is treated as the latter).
+NIGHTLY_PATTERN = r'v(\d+)\.(\d+)(?:\.(\d+))?-(\d+)-(post-)?nightly$'
 
 GH_TOKEN = os.getenv("GH_TOKEN")
 if GH_TOKEN is None or GH_TOKEN != "":
@@ -20,7 +21,7 @@ if GH_TOKEN is None or GH_TOKEN != "":
 
 def identify_channel(_version):
     nightly_pattern = NIGHTLY_PATTERN
-    stable_pattern = r'v(\d+)\.(\d+)\.(\d+)'
+    stable_pattern = r'v(\d+)\.(\d+)\.(\d+)$'
     if re.match(nightly_pattern, _version):
         _channel = "nightly"
         _pattern = nightly_pattern
@@ -45,6 +46,11 @@ def extract_version(title):
         _, _pattern = identify_channel(title)
     try:
         match = re.match(_pattern, title)
+        if match and _pattern == NIGHTLY_PATTERN:
+            major, minor, patch, count, _ = match.groups()
+            # A nightly after a stable tag follows that release; one after a marker precedes X.Y.0.
+            post_rank = 1 if patch is not None else 0
+            return (int(major), int(minor), int(patch or 0), post_rank, int(count))
         if match:
             return tuple(map(int, match.groups()))
     except Exception as e:
@@ -54,7 +60,7 @@ def extract_version(title):
 
 def get_release_path_and_filename(_version):
     nightly_pattern = NIGHTLY_PATTERN
-    stable_pattern = r'v(\d+)\.(\d+)\.(\d+)'
+    stable_pattern = r'v(\d+)\.(\d+)\.(\d+)$'
     if match := re.match(nightly_pattern, _version):
         msb = match.group(1)
         _path = "nightly"

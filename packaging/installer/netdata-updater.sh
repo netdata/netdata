@@ -891,11 +891,14 @@ self_update() {
 # Parse the version into a (large) integer for easy comparison.
 #
 # The resultant integer consists of three groups of three digits encoding the major, minor, and patch versions,
-# followed by a single digit encoding the version type (0 for nightly builds and git builds based on a stable or
-# nightly version, 1 for release candidate builds, 2 for git builds based on a release candidate version, 3 for
-# stable versions, and 9 for unknown), three digits for the release candidate number (all zeroes if the build
-# isn’t a release candidate build), and five digits for the commit number for git builds (all zeroes if the
-# build isn’t a git build).
+# followed by a single digit encoding the version type (0 for nightly and git builds of a development marker
+# such as 2.15-37-nightly, 1 for release candidate builds, 2 for git builds based on a release candidate version,
+# 3 for stable versions, 4 for nightly and git builds after a stable tag such as 2.13.0-29-post-nightly, and 9 for
+# unknown), three digits for the release candidate number (all zeroes if the build isn’t a release candidate
+# build), and five digits for the nightly or git commit number (all zeroes for releases).
+#
+# Within one major.minor version this orders nightlies before release candidates and release candidates before
+# the stable release.
 parse_version() {
   r="${1}"
   vmax="999999999999999999"
@@ -929,16 +932,18 @@ parse_version() {
       b=99999
     fi
   elif echo "${b1}" | grep -Eq "^[0-9]+$"; then
-    # Nightlies after a stable tag (-post-nightly) follow that release; others precede it.
-    if [ "${b2}" = post ]; then
-      t=4
-    else
-      t=0
-    fi
+    # Builds after a stable tag (X.Y.Z-N-...) follow that release; marker-based ones (X.Y-N-...) precede it.
+    case "${v}" in
+      *.*.*) t=4 ;;
+      *) t=0 ;;
+    esac
     rc=0
     b="${b1}"
   elif [ -z "${b1}" ]; then
-    t=3
+    case "${v}" in
+      *.*.*) t=3 ;;
+      *) t=0 ;; # A development marker tag itself.
+    esac
     rc=0
     b=0
   else
@@ -952,9 +957,12 @@ parse_version() {
 
   rm -f "${tmpfile}"
 
-  # Nightly commit counts are zero-padded; printf would read them as octal.
+  # Release candidate numbers are zero-padded (rc01); printf would read them as octal.
+  rc="${rc#"${rc%%[!0]*}"}"
+  rc="${rc:-0}"
   b="${b#"${b%%[!0]*}"}"
   b="${b:-0}"
+  patch="${patch:-0}"
 
   if [ "${#maj}" -gt 3 ] || [ "${#min}" -gt 3 ] || [ "${#patch}" -gt 3 ] || [ "${#rc}" -gt 3 ] || [ "${#b}" -gt 5 ]; then
     warning "Failed to parse version ${r}"
