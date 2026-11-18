@@ -16,14 +16,15 @@ var sessionEventsMethod = method{
 		Title: "RUM Session Events",
 		Help: "The timeline of one session (session_id) in the order the Agent received its events, with trace " +
 			"IDs of traced requests. It ignores the time range and includes events not saved yet. Pass site to " +
-			"show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
+			"show one site. " + rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp + " " + rawfunc.UnassignedVnodeHelp,
 		Sort:        "ts",
 		UpdateEvery: 10,
 		History:     true,
 		Params:      []string{"site", "vnode", "vnode_guid", "session_id"},
 		Columns:     sessionEventsColumns.Build(),
 	},
-	rows: (*Handler).sessionEventsRows,
+	allowUnassignedVnode: true,
+	rows:                 (*Handler).sessionEventsRows,
 }
 
 func (h *Handler) sessionEventsRows(ctx context.Context, args map[string]string, _ map[string]any) ([][]any, error) {

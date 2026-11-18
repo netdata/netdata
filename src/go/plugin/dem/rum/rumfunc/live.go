@@ -19,13 +19,14 @@ var liveMethod = method{
 			"and errors. Each request returns up to " + strconv.Itoa(rawfunc.MaxRows) + " events. A request " +
 			"without cursor starts at the oldest event still held; pass the response's next value as cursor to get " +
 			"the events after them (changing the virtual node selection starts over). Pass site to show one site. " +
-			rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp,
+			rawfunc.VnodeHelp + " " + rawfunc.RecordedVnodeHelp + " " + rawfunc.UnassignedVnodeHelp,
 		Sort:        "seq",
 		UpdateEvery: 2,
 		Params:      []string{"site", "vnode", "vnode_guid", "cursor"},
 		Columns:     liveColumns.Build(),
 	},
-	rows: (*Handler).liveRows,
+	allowUnassignedVnode: true,
+	rows:                 (*Handler).liveRows,
 }
 
 func (h *Handler) liveRows(ctx context.Context, args map[string]string, response map[string]any) ([][]any, error) {

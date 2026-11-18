@@ -10,6 +10,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/beacon"
 )
 
@@ -152,7 +153,7 @@ func (a *Aggregator) evictLive(now time.Time) {
 // non-positive maxRows returns none. A caller resumes from the Seq of the last
 // row it received. A cursor ahead of this runtime sequence is treated as 0; the
 // Function routing owner fences generations.
-func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow {
+func (a *Aggregator) Live(after uint64, maxRows int, vnodeSelector string) []LiveRow {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	now := a.now()
@@ -173,7 +174,7 @@ func (a *Aggregator) Live(after uint64, maxRows int, vnodeGUID string) []LiveRow
 	var out []LiveRow
 	for i := range ring {
 		row := &ring[i]
-		if row.TS.Before(cutoff) || (vnodeGUID != "" && row.VnodeGUID != vnodeGUID) {
+		if row.TS.Before(cutoff) || !vnodeguid.Matches(vnodeSelector, row.VnodeGUID) {
 			continue
 		}
 		if out == nil {

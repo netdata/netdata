@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/redact"
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/rum/history"
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 )
@@ -60,7 +61,7 @@ func (s *Service) Sessions(ctx context.Context, f SessionFilter) ([]Session, err
 	return rows, nil
 }
 
-func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID string) ([]SessionEvent, error) {
+func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeSelector string) ([]SessionEvent, error) {
 	// Copy the bounded active ring before journal I/O, releasing leases before any I/O.
 	// A retiring generation can then flush while this query reads persisted data.
 	var live []history.SessionEventRecord
@@ -70,7 +71,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 		redactors[key] = redact
 		events, _ := runtime.Aggregator.SessionEvents(session)
 		for _, event := range events {
-			if vnodeGUID != "" && event.VnodeGUID != vnodeGUID {
+			if !vnodeguid.Matches(vnodeSelector, event.VnodeGUID) {
 				continue
 			}
 			row := history.SessionEventOf(event)
@@ -81,7 +82,7 @@ func (s *Service) SessionEvents(ctx context.Context, site, session, vnodeGUID st
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.history.QuerySessionEvents(ctx, site, session, vnodeGUID)
+	rows, err := s.history.QuerySessionEvents(ctx, site, session, vnodeSelector)
 	if err != nil {
 		return nil, err
 	}
