@@ -183,7 +183,7 @@ Example logrotate configuration:
     notifempty
     sharedscripts
     postrotate
-        /bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
+        /usr/sbin/netdatacli reopen-logs >/dev/null 2>&1 || true
     endscript
 }
 ```

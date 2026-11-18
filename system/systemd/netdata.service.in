@@ -13,7 +13,8 @@ User=root
 Group=netdata
 # tmpfiles and the Agent own /run/netdata as the runtime user. RuntimeDirectory
 # would recursively reassign surviving IPC files to root before the Agent starts.
-ExecStartPre=/usr/bin/systemd-tmpfiles --create --prefix=/run/netdata
+# Keep the Agent's fallback when a standalone service install has no tmpfiles rule.
+ExecStartPre=-/bin/sh -c 'exec systemd-tmpfiles --create --prefix=/run/netdata netdata.conf'
 ExecStart=@sbindir_POST@/netdata -D
 PermissionsStartOnly=true
 
