@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import runpy
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -19,9 +20,12 @@ WORKFLOW = (SCRIPTS.parent / 'workflows/build.yml').read_text()
 JOB = WORKFLOW.split('  publish-stable-artifacts:', 1)[1].split('\n  # Remaining jobs', 1)[0]
 
 
-def step_script(name):
-    step = JOB.split(f'      - name: {name}\n', 1)[1].split('\n      - name:', 1)[0]
-    return '\n'.join(line[10:] for line in step.split('        run: |\n', 1)[1].splitlines())
+def step_script(name, job=JOB):
+    step = job.split(f'      - name: {name}\n', 1)[1].split('\n      - name:', 1)[0]
+    run = step.split('        run: ', 1)[1]
+    if run.startswith('|\n'):
+        return '\n'.join(line[10:] for line in run[2:].splitlines())
+    return run.splitlines()[0]
 
 
 class ArtifactPrefixesTest(unittest.TestCase):
@@ -162,6 +166,41 @@ class ArtifactPrefixesTest(unittest.TestCase):
 
 
 class PrepareArtifactAliasesTest(unittest.TestCase):
+    def test_installer_checks_use_versioned_artifacts(self):
+        cases = {
+            'older RC': ('release-candidate', 'v2.13.0-rc01', {}, {'latest': 'v2.13.0-rc02'}),
+            'repeated RC': ('release-candidate', 'v2.13.0-rc01', {}, {'latest': 'v2.13.0-rc01'}),
+            'older stable': ('release', 'v2.12.2', {'latest': 'v2.13.0'}, {'latest': 'v2.13.0'}),
+            'nightly': ('nightly', 'v2.14-37-nightly', {}, {}),
+        }
+        for name, (kind, version, stable, preview) in cases.items():
+            root = self.prepare(stable, preview, build_type=kind, version=version)
+            if kind != 'nightly':
+                self.assertFalse((root / 'artifacts/r2/latest').exists())
+            for job_name in ('artifact-verification-dist', 'artifact-verification-static'):
+                job = re.split(r'\n  [a-z][a-z-]+:', WORKFLOW.split(f'  {job_name}:', 1)[1])[0]
+                with self.subTest(case=name, job=job_name), tempfile.TemporaryDirectory() as directory:
+                    checkout = Path(directory)
+                    (checkout / 'packaging').mkdir()
+                    (checkout / 'packaging/version').write_text(version + '\n')
+                    shutil.copytree(root / 'artifacts/r2', checkout / 'artifacts')
+                    subprocess.run(['bash', '-eu', '-c', step_script('Prepare artifacts directory', job)],
+                                   cwd=checkout, check=True, capture_output=True)
+                    # Intercept installation, keeping the real workflow's URL selection and staging.
+                    env = {**os.environ, 'NETDATA_ARTIFACT_URL_PREFIX': 'http://localhost:8080/latest'}
+                    result = subprocess.run(['bash', '-eu', '-c',
+                                             'sh() { printf "%s\\n" "$NETDATA_ARTIFACT_URL_PREFIX"; }\n'
+                                             + step_script('Verify that artifacts work with installer', job)],
+                                            cwd=checkout, env=env, check=True, capture_output=True, text=True)
+                    self.assertEqual(result.stdout.strip(), f'http://localhost:8080/{version}')
+                    selected = checkout / version
+                    self.assertEqual((selected / 'Version').read_text().strip(), version)
+                    self.assertTrue((selected / 'Manifest.sig').is_file())
+                    for record in (selected / 'Manifest').read_text().splitlines():
+                        filename, size, digest = record.split()
+                        data = (selected / filename).read_bytes()
+                        self.assertEqual((len(data), hashlib.sha256(data).hexdigest()), (int(size), digest))
+
     def prepare(self, stable, preview, event='workflow_dispatch', build_type='release', version='v2.12.2'):
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)

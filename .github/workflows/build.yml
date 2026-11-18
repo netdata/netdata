@@ -966,9 +966,9 @@ jobs:
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
-        env:
-          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
-        run: sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
+        run: |
+          NETDATA_ARTIFACT_URL_PREFIX="http://localhost:8080/$(cat packaging/version)" \
+            sh -x packaging/installer/kickstart.sh --build-only --dont-start-it --disable-telemetry --dont-wait
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:
@@ -1036,9 +1036,9 @@ jobs:
       - name: Verify that artifacts work with installer
         id: verify
         if: needs.file-check.outputs.run == 'true'
-        env:
-          NETDATA_ARTIFACT_URL_PREFIX: http://localhost:8080/latest
-        run: sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
+        run: |
+          NETDATA_ARTIFACT_URL_PREFIX="http://localhost:8080/$(cat packaging/version)" \
+            sh -x packaging/installer/kickstart.sh --static-only --dont-start-it --disable-telemetry
       - name: Failure Notification
         uses: rtCamp/action-slack-notify@06cc13f74fa8d4d2296c09455d91e9453e4025f4 # v2.4.1
         env:

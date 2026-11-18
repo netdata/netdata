@@ -156,3 +156,8 @@ python3 .github/scripts/test-version-scheme.py
 
 These tests use temporary Git repositories and intercepted upload/download commands. They do not publish releases
 or require credentials. The **Release process tests** workflow runs them for affected pull requests.
+
+The Build workflow's source and static installer checks use the versioned artifact directory named by
+`packaging/version`. Verification therefore runs even when an older release or a repeated build does not advance
+the channel's `latest` alias. The offline tests exercise both verification jobs with older/repeated RCs, an older
+stable release and a nightly, checking the selected versioned manifests and artifact checksums without installation.
