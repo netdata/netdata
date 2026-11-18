@@ -47,6 +47,7 @@ jobs:
               - .github/data/distros.yml
               - .github/scripts/package-upload.sh
               - .github/scripts/pkg-test.sh
+              - .github/scripts/install-rclone.sh
               - packaging/dem-runtime/**
               - packaging/release_info.py
               - packaging/test_release_info.py
@@ -160,7 +161,7 @@ jobs:
         run: |
           packages=(gnupg)
           if [ "$PACKAGE_TESTS" = true ]; then
-            packages+=(cmake rpm cpio dpkg-dev zstd python3-ruamel.yaml)
+            packages+=(cmake rpm cpio dpkg-dev zstd curl unzip python3-ruamel.yaml)
           fi
           sudo apt-get update
           sudo apt-get install -y "${packages[@]}"
@@ -169,6 +170,9 @@ jobs:
           if [ "$PACKAGE_TESTS" = true ]; then
             for tool in cmake cpack dpkg-deb rpmbuild rpm rpm2cpio cpio node; do command -v "$tool"; done
           fi
+      - name: Install the publication client for integration tests
+        if: needs.changes.outputs.packaging == 'true'
+        run: bash .github/scripts/install-rclone.sh
       - name: Store lifecycle and supervisor integration
         if: needs.changes.outputs.go == 'true'
         working-directory: src/go

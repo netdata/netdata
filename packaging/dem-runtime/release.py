@@ -12,6 +12,8 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+from urllib.error import HTTPError
+from urllib.request import Request
 
 from bundle import read_release_info, run, sha256, validate_release_info, validate_url_prefix, write_json
 from locked import HTTPS_OPENER, DOWNLOAD_TIMEOUT_SECONDS
@@ -21,6 +23,7 @@ ARCHITECTURES = ('amd64', 'arm64')
 METADATA_LIMIT = 1 << 20
 PUBLIC_KEY_LIMIT = 1 << 20
 PUBLIC_KEY_URL = 'https://repository.netdata.cloud/netdatabot.gpg.key'
+PUBLIC_USER_AGENT = 'Netdata-DEM-release/1'
 
 
 def empty_directory(path):
@@ -109,7 +112,8 @@ def verified_release(tool, key, path):
 
 def fetch_public_key(args):
     """Acquire current online trust from the fixed package-signing authority."""
-    with HTTPS_OPENER.open(PUBLIC_KEY_URL, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+    request = Request(PUBLIC_KEY_URL, headers={'User-Agent': PUBLIC_USER_AGENT})
+    with HTTPS_OPENER.open(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         body = response.read(PUBLIC_KEY_LIMIT + 1)
     if not 0 < len(body) <= PUBLIC_KEY_LIMIT:
         raise ValueError('public keyring exceeds the protocol limit or is empty')
@@ -119,18 +123,21 @@ def fetch_public_key(args):
 
 def read_stored_descriptor(remote):
     # Authenticate retry state from storage rather than a possibly stale CDN.
-    try:
-        stat = json.loads(run(['rclone', 'lsjson', '--stat', remote], capture=True))
-    except subprocess.CalledProcessError as error:
-        if error.returncode in (3, 4):  # rclone directory/file not found; other failures are fatal.
-            return None
-        raise
-    if stat['IsDir'] or not 0 < stat['Size'] <= METADATA_LIMIT:
-        raise ValueError('stored descriptor exceeds the protocol limit')
-    body = run(['rclone', 'cat', '--count', str(METADATA_LIMIT + 1), remote], capture=True).encode()
-    if len(body) != stat['Size'] or len(body) > METADATA_LIMIT:
-        raise ValueError('stored descriptor changed during publication inspection')
-    return body
+    # A bucket stat can report an absent object as a directory. List its parent
+    # with a trailing slash to avoid probing an object as the filesystem root.
+    parent, name = remote.rsplit('/', 1)
+    entries = json.loads(run(['rclone', 'lsjson', '--files-only', '--include', '/' + name,
+                              '--no-mimetype', '--no-modtime', parent + '/'], capture=True))
+    for stat in entries:
+        if stat['Path'] != name:
+            continue
+        if stat['IsDir'] or not 0 < stat['Size'] <= METADATA_LIMIT:
+            raise ValueError('stored descriptor exceeds the protocol limit')
+        body = run(['rclone', 'cat', '--count', str(METADATA_LIMIT + 1), remote], capture=True).encode()
+        if len(body) != stat['Size'] or len(body) > METADATA_LIMIT:
+            raise ValueError('stored descriptor changed during publication inspection')
+        return body
+    return None  # Only a successful listing can establish absence.
 
 
 def signed_agent(release, arch):
@@ -145,7 +152,8 @@ def signed_agent(release, arch):
 def public_identity(url, digest, size):
     """Read the public serving path, including CDN, before completing publication."""
     actual, count = hashlib.sha256(), 0
-    with HTTPS_OPENER.open(url, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+    request = Request(url, headers={'User-Agent': PUBLIC_USER_AGENT})
+    with HTTPS_OPENER.open(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
         while True:
             block = response.read(min(1024 * 1024, size - count + 1))
             if not block:
@@ -159,7 +167,13 @@ def public_identity(url, digest, size):
 
 
 def upload(args, path, relative):
-    run(['rclone', 'copyto', '--checksum', '--immutable', '--header-upload',
+    _, name = relative.rsplit('/', 1)
+    if path.name != name or not re.fullmatch(r'[A-Za-z0-9._-]+', name):
+        raise ValueError('publication upload must preserve a literal filename')
+    # The bucket is provisioned by SRE; publishing needs only object-level access.
+    # The pinned client enforces immutable single-object copies and fails on
+    # destination HEAD errors. Avoid directory traversal and its partial listings.
+    run(['rclone', 'copyto', '--s3-no-check-bucket', '--checksum', '--immutable', '--header-upload',
          'Cache-Control: public, max-age=31536000, immutable, no-transform',
          path, args.remote.rstrip('/') + '/' + relative])
 
@@ -319,6 +333,11 @@ def main():
         args.public_base = args.public_base.rstrip('/')
     if args.command == 'publish' and not re.fullmatch(r'[A-Za-z0-9_-]+:[A-Za-z0-9_./-]+', args.remote):
         parser.error('remote must be a named rclone remote and bucket path')
+    if args.command == 'publish':
+        version = json.loads(Path(__file__).with_name('rclone.json').read_text())['version']
+        if run(['rclone', 'version'], capture=True).splitlines()[:1] != ['rclone v' + version]:
+            raise ValueError('publishing requires rclone ' + version +
+                             '; install it with .github/scripts/install-rclone.sh')
     {'assemble': assemble, 'stage': stage, 'publish': publish}[args.command](args)
 
 
@@ -329,6 +348,10 @@ if __name__ == '__main__':
         sys.exit(error.returncode if error.returncode > 0 else 1)
     except ValueError as error:
         print('runtime release operation failed: ' + str(error), file=sys.stderr)
+        sys.exit(1)
+    except HTTPError as error:
+        error.close()
+        print(f'runtime release operation failed: HTTP {error.code}', file=sys.stderr)
         sys.exit(1)
     except (OSError, KeyError) as error:
         # Do not print arbitrary network exceptions containing sensitive URLs.

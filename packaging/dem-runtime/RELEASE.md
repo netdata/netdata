@@ -124,8 +124,27 @@ its exact Agent target. Runtime publication has no mutable latest aliases or
 version-order promotion. Normal Agent latest channels and release cadence remain
 owned by the Agent release lanes.
 
-Immutable upload uses `rclone copyto --immutable --checksum`, never synchronization
-or deletion. Public readback checks exact serving bytes.
+Immutable upload uses `rclone copyto --immutable --checksum` with an exact source
+and destination, never synchronization or deletion. The pinned client checks the
+destination object before writing and refuses changed contents or lookup errors.
+Only the selected file is copied, preserving descriptor-last ordering.
+It also sets `--s3-no-check-bucket` because the destination bucket is
+already provisioned: publishing must not require bucket-creation permission.
+Object checksums, post-upload verification and public readback remain enabled.
+Cloudflare documents this requirement for
+[object-level credentials](https://developers.cloudflare.com/r2/examples/rclone/).
+
+Publication and its integration tests install the same pinned rclone release through
+`.github/scripts/install-rclone.sh`, using `packaging/dem-runtime/rclone.json` as the
+version/checksum owner. The script verifies the Linux amd64 archive against the
+pinned SHA-256 before extracting or running it. The `publish` command requires that
+exact client version before accessing storage, including when invoked manually.
+Update the version and checksum together and run the real-client storage tests when upgrading.
+The older distro rclone 1.60.1 sends versioned post-upload HEAD requests that R2
+rejects; the pinned client retains HEAD verification without requesting object versions.
+Its `copyto` also enforces immutability, unlike 1.60.1. Directory copy is unsuitable
+here: newer clients can start transfers before reporting a destination listing failure.
+
 Sources remain beside their exact runtime identity. Storage retention is
 infrastructure policy; these helpers implement no publisher garbage collection.
 
@@ -136,6 +155,14 @@ signatures are the native installation trust boundary. Neither route distributes
 private keys. Offline users explicitly provision the public keyring; online
 clients fetch canonical public trust for each preparation attempt.
 
+The publisher identifies its public-key and artifact-readback requests as
+`Netdata-DEM-release/1`. The public endpoints can reject Python's default
+User-Agent even when curl succeeds. HTTP failures report the numeric status
+without echoing response details or URLs. Keep the canonical trust source when
+diagnosing failures; do not substitute a key exported from the signing secret.
+After changing the helper, start a release from the fixed source: rerunning an
+old run still checks out its frozen source commit.
+
 OpenPGP signatures can differ across retries because of signing timestamps. The
 publisher verifies the immutable stored payload, reuses its original signed bytes,
 and refuses changed or unverifiable content. Plan key rotation across Agent
@@ -144,6 +171,13 @@ signature. Missing, revoked or expired signers block authenticated retry. Emerge
 trust recovery requires the release owner's explicit procedure.
 Signature validity does not detect withheld releases, certify every host policy,
 or establish fresh key state through a stale cache.
+
+The publisher checks for an existing descriptor by listing its parent storage
+prefix and selecting the exact filename. A successful empty listing permits first
+publication; failed listings, including a missing bucket, stop publication.
+Do not use an object-root `rclone lsjson --stat` to establish absence: bucket
+backends can report a missing object as an empty directory. Existing descriptors
+still require bounded reads and signature/payload verification before any upload.
 
 ## Local validation and limits
 
@@ -175,6 +209,13 @@ python3 -m unittest discover -s packaging/dem-runtime/native/tests -v
 explicit signing key but performs no publication. `publish` mutates
 remote state and is not an ordinary test command. Source assembly and transport
 archives use zstd level 19, one worker and an 8 MiB window.
+
+The storage regression tests run real `rclone` against a local S3 HTTP fixture,
+covering absent/existing descriptors, size limits, failed listings/reads, uploads
+with bucket creation denied, immutable retries, unsupported versioned HEAD requests,
+and object write/verification failures. They
+require `rclone` (installed by the packaging CI job) and no external service or
+credentials. Local runs without it report an explicit skip.
 
 Tests cover identity consistency, signed staging/tampering, immutable retry,
 stable/nightly/devel paths, partial publication, public digest checks,

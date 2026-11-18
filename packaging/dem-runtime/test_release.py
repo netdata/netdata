@@ -1,11 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Publisher control flow and real Go/GPG signature integration regressions."""
 import base64
+from contextlib import redirect_stderr
 import hashlib
 import io
 import json
 from pathlib import Path
 import os
+import runpy
 import shutil
 import subprocess
 import sys
@@ -15,6 +17,8 @@ import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.request import Request
 
 import release
 
@@ -25,16 +29,52 @@ def candidate(arch, version='v2.12.0-2-nightly', channel='nightly', source='a' *
 
 
 class PublicationTests(unittest.TestCase):
+    def test_publish_cli_requires_pinned_client_before_storage(self):
+        version = json.loads(Path(release.__file__).with_name('rclone.json').read_text())['version']
+        argv = ['release.py', 'publish', '--publication', 'unused', '--release-tool', 'unused',
+                '--public-key', 'unused', '--public-base', 'https://example.invalid', '--remote', 'unused:prefix']
+        for actual in ('rclone v1.60.1-DEV', '', 'rclone v99.0.0', 'rclone v' + version):
+            with self.subTest(actual=actual), patch.object(sys, 'argv', argv), \
+                    patch.object(release, 'run', return_value=actual + '\n') as run, \
+                    patch.object(release, 'publish') as publish:
+                if actual == 'rclone v' + version:
+                    release.main()
+                    publish.assert_called_once()
+                else:
+                    with self.assertRaisesRegex(ValueError, 'publishing requires rclone'):
+                        release.main()
+                    publish.assert_not_called()
+                run.assert_called_once_with(['rclone', 'version'], capture=True)
+
+    def test_cli_reports_http_status_without_untrusted_details(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / 'public.gpg'
+            argv = [release.__file__, 'fetch-public-key', '--output', str(output)]
+            for status in (403, 503):
+                with self.subTest(status=status):
+                    error = HTTPError('https://example.invalid/?token=secret', status,
+                                      'private response reason', {'Secret': 'private header'}, None)
+                    stderr = io.StringIO()
+                    with patch.object(release.HTTPS_OPENER, 'open', side_effect=error), \
+                            patch.object(sys, 'argv', argv), \
+                            redirect_stderr(stderr), self.assertRaises(SystemExit) as raised:
+                        runpy.run_path(release.__file__, run_name='__main__')
+                    self.assertEqual(raised.exception.code, 1)
+                    self.assertEqual(stderr.getvalue().strip(), f'runtime release operation failed: HTTP {status}')
+                    self.assertFalse(output.exists())
+
     def test_cli_reports_sanitized_failure_without_secondary_exception(self):
         with tempfile.TemporaryDirectory() as temporary:
             result = subprocess.run([
-                sys.executable, str(Path(release.__file__)), 'publish',
-                '--publication', str(Path(temporary) / 'missing'),
+                sys.executable, str(Path(release.__file__)), 'stage',
+                '--artifacts', str(Path(temporary) / 'missing'), '--output', str(Path(temporary) / 'output'),
+                '--signing-key', 'unused',
                 '--release-tool', 'unused', '--public-key', 'unused',
-                '--public-base', 'https://example.invalid', '--remote', 'unused:prefix',
+                '--public-base', 'https://example.invalid',
             ], capture_output=True, text=True)
             self.assertEqual(result.returncode, 1)
-            self.assertEqual(result.stderr.strip(), 'runtime release operation failed: FileNotFoundError')
+            self.assertEqual(result.stderr.splitlines()[-1], 'runtime release operation failed: FileNotFoundError')
+            self.assertNotIn('Traceback', result.stderr)
 
     def test_canonical_key_acquisition_is_bounded_and_has_no_failure_fallback(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -49,30 +89,34 @@ class PublicationTests(unittest.TestCase):
                         with self.assertRaises(ValueError):
                             release.fetch_public_key(args)
                         self.assertEqual(args.output.read_bytes(), b'prior keyring')
-                    opened.assert_called_once_with(release.PUBLIC_KEY_URL,
-                                                   timeout=release.DOWNLOAD_TIMEOUT_SECONDS)
+                    opened.assert_called_once()
+                    request = opened.call_args.args[0]
+                    self.assertIsInstance(request, Request)
+                    self.assertEqual(request.full_url, release.PUBLIC_KEY_URL)
+                    self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
+                    self.assertEqual(opened.call_args.kwargs, {'timeout': release.DOWNLOAD_TIMEOUT_SECONDS})
             with patch.object(release.HTTPS_OPENER, 'open', side_effect=OSError('unavailable')):
                 with self.assertRaises(OSError):
                     release.fetch_public_key(args)
 
     def test_immutable_metadata_reads_storage_and_fails_closed(self):
         remote = 's3:bucket/dem-runtime/nightly/v2.12.0-2-nightly/amd64/release.json'
-        with patch.object(release, 'run', side_effect=[json.dumps({'IsDir': False, 'Size': 2}), '{}']) as run:
+        entry = {'Path': 'release.json', 'IsDir': False, 'Size': 2}
+        with patch.object(release, 'run', side_effect=[json.dumps([entry]), '{}']) as run:
             self.assertEqual(release.read_stored_descriptor(remote), b'{}')
-            self.assertEqual(run.call_args_list[0].args[0], ['rclone', 'lsjson', '--stat', remote])
             self.assertIn('--count', run.call_args_list[1].args[0])
+        with patch.object(release, 'run', return_value='[]') as run:
+            self.assertIsNone(release.read_stored_descriptor(remote))
+            self.assertEqual(run.call_count, 1)
         for status in (3, 4, 1, 5, 7):
             with self.subTest(status=status), \
                     patch.object(release, 'run', side_effect=subprocess.CalledProcessError(status, ['rclone'])):
-                if status in (3, 4):
-                    self.assertIsNone(release.read_stored_descriptor(remote))
-                else:
-                    with self.assertRaises(subprocess.CalledProcessError):
-                        release.read_stored_descriptor(remote)
-        for stat, body in (({'IsDir': True, 'Size': 2}, '{}'),
-                           ({'IsDir': False, 'Size': release.METADATA_LIMIT + 1}, '{}'),
-                           ({'IsDir': False, 'Size': 3}, '{}')):
-            with patch.object(release, 'run', side_effect=[json.dumps(stat), body]), self.assertRaises(ValueError):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    release.read_stored_descriptor(remote)
+        for stat, body in ((dict(entry, IsDir=True), '{}'),
+                           (dict(entry, Size=release.METADATA_LIMIT + 1), '{}'),
+                           (dict(entry, Size=3), '{}')):
+            with patch.object(release, 'run', side_effect=[json.dumps([stat]), body]), self.assertRaises(ValueError):
                 release.read_stored_descriptor(remote)
 
     def test_public_object_exact_size_digest_and_streaming_bound(self):
@@ -80,22 +124,26 @@ class PublicationTests(unittest.TestCase):
         digest = hashlib.sha256(original).hexdigest()
         for data, ok in ((original, True), (original[:-1], False),
                          (original + b'x', False), (b'x' * len(original), False)):
-            with self.subTest(data=data), patch.object(release.HTTPS_OPENER, 'open', return_value=io.BytesIO(data)):
+            with self.subTest(data=data), \
+                    patch.object(release.HTTPS_OPENER, 'open', return_value=io.BytesIO(data)) as opened:
                 if ok:
                     release.public_identity('https://example.invalid/runtime', digest, len(original))
                 else:
                     with self.assertRaises(ValueError):
                         release.public_identity('https://example.invalid/runtime', digest, len(original))
+                request = opened.call_args.args[0]
+                self.assertIsInstance(request, Request)
+                self.assertEqual(request.full_url, 'https://example.invalid/runtime')
+                self.assertEqual(request.get_header('User-agent'), 'Netdata-DEM-release/1')
 
-    def test_immutable_upload_never_syncs_or_mutates_prior_objects(self):
+    def test_upload_rejects_filename_changes_and_globs(self):
         args = SimpleNamespace(remote='s3:bucket')
-        with patch.object(release, 'run') as run:
-            release.upload(args, Path('/tmp/archive'), 'dem-runtime/stable/v1.0.0/amd64/hash.tar.zst')
-            command = run.call_args.args[0]
-            self.assertEqual(command[:2], ['rclone', 'copyto'])
-            self.assertIn('--immutable', command)
-            self.assertIn('--checksum', command)
-            self.assertNotIn('sync', command)
+        for source, target in (('archive', 'hash.tar.zst'), ('[r]elease.json', '[r]elease.json'),
+                               ('*.json', '*.json'), ('{release,other}.json', '{release,other}.json')):
+            with self.subTest(source=source, target=target), patch.object(release, 'run') as run:
+                with self.assertRaisesRegex(ValueError, 'literal filename'):
+                    release.upload(args, Path('/tmp') / source, 'dem-runtime/stable/v1.0.0/amd64/' + target)
+                run.assert_not_called()
 
     def test_inventory_rejects_changes_extras_links_and_path_escape(self):
         with tempfile.TemporaryDirectory() as temporary:
