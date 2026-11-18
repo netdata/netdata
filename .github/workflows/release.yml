@@ -69,7 +69,7 @@ jobs:
         run: |
           git config user.name "netdatabot"
           git config user.email "bot@netdata.cloud"
-          set -- "${RELEASE_BRANCH}"
+          set -- "refs/heads/${RELEASE_BRANCH}"
           if [ -n "${RELEASE_NEW_BRANCH}" ]; then
             # A first release candidate branches the series off master as it stands now.
             git checkout -b "${RELEASE_NEW_BRANCH}"
@@ -86,7 +86,7 @@ jobs:
             git checkout master
             git commit --allow-empty -m "[ci skip] Start ${RELEASE_MARKER} development."
             git tag -a "${RELEASE_MARKER}" -m "Start ${RELEASE_MARKER} development."
-            set -- "$@" master "refs/tags/${RELEASE_MARKER}"
+            set -- "$@" refs/heads/master "refs/tags/${RELEASE_MARKER}"
           fi
           git push --atomic origin "$@"
       - name: Failure Notification

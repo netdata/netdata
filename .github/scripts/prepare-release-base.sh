@@ -138,7 +138,8 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
             ;;
     esac
     check_for_existing_tag || exit 1
-    branch_name="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
+    series="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
+    branch_name="release-${series}"
     new_branch=''
     marker=''
     build_type=release
@@ -170,14 +171,14 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
                 *.*.*) ;;
                 *) master_core="${master_core}.0" ;;
             esac
-            if [ "${master_tag}" != "${branch_name}" ] && \
+            if [ "${master_tag}" != "${series}" ] && \
                { [ "${master_core}" = "${target_core}" ] || [ "$(printf '%s\n' "${master_core}" "${target_core}" | sort -V | tail -n 1)" != "${target_core}" ]; }; then
                 echo "::error::Version ${EVENT_VERSION} is not newer than the current development version (${master_tag})."
                 exit 1
             fi
             if [ "${master_core%%.*}" != "${target_core%%.*}" ]; then minor_is_zero || exit 1; fi
             new_branch="${branch_name}"
-            marker="${branch_name%.*}.$(( ${branch_name##*.} + 1 ))"
+            marker="${series%.*}.$(( ${series##*.} + 1 ))"
             if git show-ref --verify --quiet "refs/tags/${marker}"; then
                 echo "::error::The development marker tag ${marker} already exists."
                 exit 1

@@ -6,15 +6,15 @@ Run the **Release** workflow on `master`. It validates the requested version, up
 | Build type | Version example | Source branch | Publication |
 |---|---|---|---|
 | `nightly` | `nightly` | `master` | Nightly artifacts; edge packages; `netdata/netdata-nightlies` GitHub release |
-| `release-candidate` | `v2.13.0-rc01` | `master` for the first RC (creates `v2.13`); `v2.13` thereafter | Preview artifacts/packages; GitHub prerelease draft |
-| `minor` | `v2.13.0` | Existing `v2.13` | Stable and eligible preview destinations; GitHub release draft |
-| `major` | `v3.0.0` | Existing `v3.0` | Stable and eligible preview destinations; GitHub release draft |
-| `patch` | `v2.13.1` | Existing `v2.13` | Stable and eligible preview destinations; GitHub release draft |
+| `release-candidate` | `v2.13.0-rc01` | `master` for the first RC (creates `release-v2.13`); `release-v2.13` thereafter | Preview artifacts/packages; GitHub prerelease draft |
+| `minor` | `v2.13.0` | Existing `release-v2.13` | Stable and eligible preview destinations; GitHub release draft |
+| `major` | `v3.0.0` | Existing `release-v3.0` | Stable and eligible preview destinations; GitHub release draft |
+| `patch` | `v2.13.1` | Existing `release-v2.13` | Stable and eligible preview destinations; GitHub release draft |
 
 ## Version forms
 
 `master` never carries release tags. It carries annotated development marker tags (`vMAJOR.MINOR`) that name the
-series under development; releases are tagged only on their `vMAJOR.MINOR` release branch. Examples for the period
+series under development; releases are tagged only on their `release-vMAJOR.MINOR` release branch. Examples for the period
 around the `v2.14` series:
 
 | Build | Version (`packaging/version`, tags, artifacts, Docker) | DEB/RPM | Windows MSI |
@@ -37,7 +37,7 @@ around the `v2.14` series:
 ## Running a release
 
 1. Choose the build type and version from the table. For a stable release, ensure the intended changes are on
-   the existing `vMAJOR.MINOR` branch; preparation does not merge changes from `master` into that branch.
+   the existing `release-vMAJOR.MINOR` branch; preparation does not merge changes from `master` into that branch.
 2. Dispatch the [Release workflow](workflows/release.yml) on `master` with those `type` and `version` inputs.
    Supply the leading `v` for numbered releases; use `nightly` for both inputs for a manual nightly.
 3. Monitor preparation and the dispatched [artifact](workflows/build.yml), [native package](workflows/packaging.yml)
@@ -77,8 +77,10 @@ An existing tag cannot be reused.
 | `minor` | Patch must be zero | `v2.13.0-rc01` → `v2.13.0` |
 | `patch` | Version must be newer than the branch's current core version | `v2.13.0` → `v2.13.1` |
 
-- All three types require an existing `vMAJOR.MINOR` branch and matching major/minor numbers in its
-  `packaging/version`. Start a new series with an RC first; stable major/minor releases do not create branches.
+- All three types require an existing `release-vMAJOR.MINOR` branch and matching major/minor numbers in its
+  `packaging/version`. Existing series using the old `vMAJOR.MINOR` branch name must be renamed to `release-vMAJOR.MINOR` before
+  dispatching this workflow; the `vMAJOR.MINOR` development marker tag stays in place.
+- Start a new series with an RC first; stable major/minor releases do not create branches.
 - Major/minor releases may promote a same-core prerelease to its final version. Otherwise the requested core
   must be newer than the branch's current core. Patch releases always require a newer core. Preparation rejects
   rollback from a newer patch already recorded on the branch.
@@ -110,7 +112,7 @@ The [shared release ordering helper](scripts/modules/release_versions.py) owns p
   gaps are allowed. Existing tags cannot be reused.
 - An RC is rejected if a regular release of the same version already exists.
 - The first RC must not be older than the series under development on `master` (its marker tag, or the latest
-  stable tag before markers exist); a new major requires minor zero. It creates the `vMAJOR.MINOR` release branch
+  stable tag before markers exist); a new major requires minor zero. It creates the `release-vMAJOR.MINOR` release branch
   from `master` as it stands, commits the changelog/version there and tags the RC on that branch. It then adds an
   empty commit to `master` with the annotated marker tag for the next series (`v2.15` after `v2.14.0-rc01`,
   `v3.1` after `v3.0.0-rc01`). Branch, tags and `master` are pushed atomically. Subsequent RCs require the branch.

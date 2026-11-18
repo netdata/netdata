@@ -35,7 +35,7 @@ class ReleasePreparationTest(unittest.TestCase):
         self.git('commit', '--allow-empty', '-m', version)
 
     def series(self, version='v2.13.0-rc01', remote=False):
-        branch = '.'.join(version.split('.')[:2])
+        branch = 'release-' + '.'.join(version.split('.')[:2])
         self.git('checkout', '-b', branch)
         self.write_version(version)
         self.git('tag', '-a', version, '-m', version)
@@ -69,8 +69,8 @@ class ReleasePreparationTest(unittest.TestCase):
             with self.subTest(version=version):
                 result, outputs = self.prepare(version)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                branch = '.'.join(version.split('.')[:2])
-                major, minor = branch[1:].split('.')
+                branch = 'release-' + '.'.join(version.split('.')[:2])
+                major, minor = branch.removeprefix('release-v').split('.')
                 self.assertEqual(outputs, {
                     'run': 'true', 'message': f'release-candidate release {version}.',
                     'ref': version, 'type': 'release-candidate', 'branch': branch,
@@ -88,7 +88,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 result, outputs = self.prepare(version)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual((outputs['ref'], outputs['version'], outputs['new-branch']),
-                                 ('v2.13.0-rc01', '2.13.0-rc01', 'v2.13'))
+                                 ('v2.13.0-rc01', '2.13.0-rc01', 'release-v2.13'))
                 self.assertEqual((self.root / 'packaging/version').read_text(), 'v2.13.0-rc01\n')
                 (self.root / 'packaging/version').write_text('v2.12.3-1-nightly\n')
 
@@ -127,6 +127,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 self.assert_rejected('v2.13.0-rc01', error='regular release')
 
     def test_later_rc_numbers_and_remote_branch(self):
+        self.git('tag', '-a', 'v2.13', '-m', 'development marker')
         self.series('v2.13.0-rc09', remote=True)
         self.git('tag', 'v2.13.0-rc01')
         for version in ('v2.13.0-rc09', 'v2.13.0-rc02', 'v2.13.0-rc08', 'v2.13.0-rc8'):
@@ -136,7 +137,7 @@ class ReleasePreparationTest(unittest.TestCase):
             with self.subTest(version=version):
                 result, outputs = self.prepare(version)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(outputs['branch'], 'v2.13')
+                self.assertEqual(outputs['branch'], 'release-v2.13')
                 self.assertEqual(outputs['type'], 'release-candidate')
                 self.assertNotIn('new-branch', outputs)
                 self.assertNotIn('marker', outputs)
@@ -153,9 +154,9 @@ class ReleasePreparationTest(unittest.TestCase):
                 self.assert_rejected(version, kind, 'Could not find a branch')
 
     def test_first_rc_rejects_existing_branch_or_marker(self):
-        self.git('branch', 'v2.13')
+        self.git('branch', 'release-v2.13')
         self.assert_rejected('v2.13.0-rc01', error='already exists')
-        self.git('update-ref', 'refs/remotes/origin/v3.0', 'HEAD')
+        self.git('update-ref', 'refs/remotes/origin/release-v3.0', 'HEAD')
         self.assert_rejected('v3.0.0-rc01', error='already exists')
         self.git('tag', 'v4.1')
         self.assert_rejected('v4.0.0-rc01', error='marker tag')
@@ -168,7 +169,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 self.series(rc)
                 result, outputs = self.prepare(version, kind)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(outputs['branch'], '.'.join(version.split('.')[:2]))
+                self.assertEqual(outputs['branch'], 'release-' + '.'.join(version.split('.')[:2]))
                 self.assertEqual(outputs['type'], 'release')
                 self.assertNotIn('new-branch', outputs)
                 self.write_version(version)
@@ -183,10 +184,11 @@ class ReleasePreparationTest(unittest.TestCase):
             with self.subTest(kind=kind, version=version):
                 self.assert_rejected(version, kind)
         self.series('v2.13.2')
-        self.git('checkout', 'v2.13')
+        self.git('checkout', 'release-v2.13')
         self.assert_rejected('v2.13.1', 'patch', 'not newer')
 
     def test_workflow_publishes_branch_marker_and_tags_atomically(self):
+        self.git('tag', '-a', 'v2.13', '-m', 'development marker')
         remote = self.root / 'remote.git'
         self.git('init', '--bare', str(remote))
         self.git('remote', 'add', 'origin', str(remote))
@@ -209,7 +211,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 subprocess.run(['bash', '-eu', '-c', script], cwd=self.root,
                                env=env, check=True, capture_output=True)
                 self.assertEqual(self.git(*remote_git, 'show', f'{version}:packaging/version'), version)
-                self.assertEqual(self.git(*remote_git, 'show', 'v2.13:packaging/version'), version)
+                self.assertEqual(self.git(*remote_git, 'show', 'release-v2.13:packaging/version'), version)
                 # Release tags never land on master.
                 ancestor = subprocess.run(['git', *remote_git, 'merge-base', '--is-ancestor', version, 'master'],
                                           cwd=self.root)
@@ -217,7 +219,7 @@ class ReleasePreparationTest(unittest.TestCase):
         # The marker is an empty, annotated commit on master, on top of the branch point.
         self.assertEqual(self.git(*remote_git, 'describe', 'master'), 'v2.14')
         self.assertEqual(self.git(*remote_git, 'rev-parse', 'master^'),
-                         self.git(*remote_git, 'merge-base', 'master', 'v2.13'))
+                         self.git(*remote_git, 'merge-base', 'master', 'release-v2.13'))
         self.assertEqual(self.git(*remote_git, 'diff', '--stat', 'master^', 'master'), '')
         self.assertEqual(self.git(*remote_git, 'show', 'master:packaging/version'), 'v2.12.3-1-nightly')
         self.assert_rejected('v2.13.0-rc04', error='regular release')
