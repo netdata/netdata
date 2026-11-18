@@ -78,8 +78,8 @@ link_parsers = [
 ]
 # Include only canonical release tags (exclude vX.Y development markers and -rcNN prereleases).
 tag_pattern = '^v[0-9]+\.[0-9]+\.[0-9]+$'
-# Include only the tags that belong to the current branch.
-use_branch_tags = true
+# The generator selects exact tags and revision ranges, including releases off the current branch.
+use_branch_tags = false
 # Order releases topologically instead of chronologically.
 topo_order = false
 # Order releases topologically instead of chronologically.

@@ -50,6 +50,33 @@ around the `v2.14` series:
 Release workflow runs are serialized across dispatch refs. Each preparation pushes its branch and tag updates
 atomically, so a failed push cannot publish only part of that update.
 
+## Changelog generation
+
+`packaging/generate-changelog.sh` requires Python 3.11 or newer and git-cliff. It writes `CHANGELOG.md` using
+an explicit inventory of canonical stable tags after `v1.47.0`, including tags on other release branches.
+The checkout must contain that cutoff tag and the complete release tags/history; release preparation uses a
+full-history checkout. The generator replaces the changelog only after all sections render successfully.
+
+- Historical sections appear in descending numeric version order. Each section uses the range from the preceding
+  lower stable version to its tag. Git's revision exclusion removes shared commits even across divergent branches;
+  branch-only fixes remain in the release that contains them. An older-series patch published after a newer minor
+  retains its own heading. Annotated tags supply release dates; lightweight tags use their commit dates.
+- The unreleased section uses the highest stable version at or below the version in `packaging/version` as its
+  baseline. A reachable development marker can advance that version before the next nightly updates the file.
+  Thus maintenance builds use their own series, while master excludes shared work already delivered in a prior
+  series. Without a qualifying stable release, the baseline is `v1.47.0`.
+- RCs, development markers and nightlies do not create historical release headings. Pending stable releases remain
+  under `unreleased` until tagged, as before. An empty unreleased range is omitted; an explicit stable section may
+  contain no entries when its range contains only automation commits excluded by `cliff.toml`.
+- git-cliff still owns formatting, grouping, PR links and automation exclusions. The helper supplies ranges and
+  exact tag selection; changing `use_branch_tags` alone cannot restore boundaries for tags off master.
+
+For inspection without replacing the checkout's changelog:
+
+```sh
+packaging/generate-changelog.sh --output /tmp/netdata-changelog.md
+```
+
 ## Nightly releases
 
 - The Release workflow is scheduled daily at 00:00 UTC. A scheduled run skips publication when `HEAD` is already
@@ -152,10 +179,12 @@ python3 .github/scripts/test-artifact-prefixes.py
 python3 .github/scripts/test-gen-package-repos.py
 python3 .github/scripts/test-gen-docker-tags.py
 python3 .github/scripts/test-version-scheme.py
+python3 .github/scripts/test-generate-changelog.py
 ```
 
 These tests use temporary Git repositories and intercepted upload/download commands. They do not publish releases
 or require credentials. The **Release process tests** workflow runs them for affected pull requests.
+Changelog tests require git-cliff, which that workflow installs, and exercise real temporary Git histories.
 
 The Build workflow's source and static installer checks use the versioned artifact directory named by
 `packaging/version`. Verification therefore runs even when an older release or a repeated build does not advance
