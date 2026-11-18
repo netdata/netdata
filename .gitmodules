@@ -4,3 +4,6 @@
 [submodule "src/collectors/debugfs.plugin/libsensors/vendored"]
 	path = src/collectors/debugfs.plugin/libsensors/vendored
 	url = https://github.com/lm-sensors/lm-sensors.git
+[submodule "packaging/static/makeself"]
+	path = packaging/static/makeself
+	url = https://github.com/megastep/makeself.git

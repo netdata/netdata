@@ -1,0 +1,40 @@
+
+  ^
+  |.-.   .-.   .-.   .-.   .  Netdata
+  |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!
+  +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
+
+  Copyright 2018-2025 Netdata Inc.
+  SPDX-License-Identifier: GPL-3.0-or-later
+
+  You are about to install netdata to this system.
+  netdata will be installed at:
+
+                    /opt/netdata
+
+  The following changes will be made to your system:
+
+  # USERS / GROUPS
+  User 'netdata' and group 'netdata' will be added, if not present.
+
+  # LOGROTATE
+  This file will be installed if logrotate is present.
+
+   - /etc/logrotate.d/netdata
+
+  # SYSTEM INIT
+  If a supported init system is detected, appropriate configuration will be
+  installed to allow Netdata to run as a system service. We currently support
+  systemd, OpenRC, LSB init scripts, and traditional init.d setups, as well as
+  having experimental support for runit.
+
+
+  This package can also update a netdata installation that has been
+  created with another version of it.
+
+  Your netdata configuration will be retained.
+  After installation, netdata will be (re-)started.
+
+  netdata re-distributes a lot of open source software components.
+  Check its full license at:
+  https://github.com/netdata/netdata/blob/master/LICENSE
