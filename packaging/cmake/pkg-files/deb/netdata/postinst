@@ -34,11 +34,6 @@ case "$1" in
 esac
 
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
-    netdata_service_enabled=
-    if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
-        # postrm masks a removed service; reinstalling it should start normally.
-        netdata_service_enabled=$(systemctl --system is-enabled 'netdata.service' 2>/dev/null || true)
-    fi
     deb-systemd-helper unmask 'netdata.service' >/dev/null || true
 
     if deb-systemd-helper --quiet was-enabled 'netdata.service'; then
@@ -49,9 +44,9 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
 
     if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
         systemctl --system daemon-reload >/dev/null || true
-        # Preserve a deliberately stopped service on upgrade or same-version reinstall.
-        # Administrator masks remain protected by deb-systemd-helper and systemd.
-        if [ "$1" != configure ] || [ -z "${2:-}" ] || [ "$netdata_service_enabled" = masked ] ||
+        # Keep previously configured installations stopped, including reinstall after removal.
+        # Fresh installs (no prior configured version) still start through the Debian helper.
+        if [ "$1" != configure ] || [ -z "${2:-}" ] ||
             systemctl --system --quiet is-active 'netdata.service'; then
             deb-systemd-invoke restart 'netdata.service' >/dev/null || true
         fi

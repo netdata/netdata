@@ -13,7 +13,7 @@ POSTINST = ROOT / 'packaging/cmake/pkg-files/deb/netdata/postinst'
 
 class AgentServiceTests(unittest.TestCase):
     def run_postinst(self, arguments, *, active=False, policy_denied=False,
-                     offline=False, systemd=True, previously_removed=False):
+                     offline=False, systemd=True):
         with tempfile.TemporaryDirectory(prefix='netdata-deb-service-') as temporary:
             root = Path(temporary)
             commands = root / 'bin'
@@ -36,7 +36,6 @@ class AgentServiceTests(unittest.TestCase):
             service = commands / 'systemctl'
             service.write_text('''#!/bin/sh
 case " $* " in
-    *" is-enabled "*) printf '%s\n' "$TEST_ENABLEMENT"; exit 0 ;;
     *" is-active "*) test "$(cat "$TEST_STATE")" = active; exit $? ;;
     *" daemon-reload "*) exit 0 ;;
 esac
@@ -57,7 +56,6 @@ esac
             result = subprocess.run(['sh', str(script), *arguments], text=True, capture_output=True,
                                     env=dict(os.environ, PATH=str(commands) + ':' + os.environ['PATH'],
                                              TEST_STATE=str(state), TEST_EVENTS=str(events),
-                                             TEST_ENABLEMENT='masked' if previously_removed else 'enabled',
                                              TEST_POLICY_DENIED='yes' if policy_denied else 'no',
                                              DPKG_ROOT=str(root) if offline else ''))
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -76,9 +74,6 @@ esac
 
     def test_first_install_respects_service_policy(self):
         self.assertEqual(self.run_postinst(['configure', ''], policy_denied=True)[0], 'inactive')
-
-    def test_install_after_removal_starts_despite_retained_config_version(self):
-        self.assertEqual(self.run_postinst(['configure', '2.12.0'], previously_removed=True)[0], 'active')
 
     def test_abort_callbacks_keep_existing_restart_behavior(self):
         for action in ('abort-upgrade', 'abort-deconfigure', 'abort-remove'):
