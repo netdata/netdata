@@ -73,7 +73,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 major, minor = branch.removeprefix('release-v').split('.')
                 self.assertEqual(outputs, {
                     'run': 'true', 'message': f'release-candidate release {version}.',
-                    'ref': version, 'type': 'release-candidate', 'branch': branch,
+                    'ref': version, 'type': 'release-candidate', 'channel': 'release-candidate', 'branch': branch,
                     'new-branch': branch, 'marker': f'v{major}.{int(minor) + 1}',
                     'version': version[1:],
                 })
@@ -171,6 +171,7 @@ class ReleasePreparationTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertEqual(outputs['branch'], 'release-' + '.'.join(version.split('.')[:2]))
                 self.assertEqual(outputs['type'], 'release')
+                self.assertEqual(outputs['channel'], 'stable')
                 self.assertNotIn('new-branch', outputs)
                 self.write_version(version)
                 self.git('tag', version)
@@ -207,7 +208,8 @@ class ReleasePreparationTest(unittest.TestCase):
                        'RELEASE_TYPE': outputs['type'], 'RELEASE_TAG': outputs['ref'],
                        'RELEASE_BRANCH': outputs['branch'],
                        'RELEASE_NEW_BRANCH': outputs.get('new-branch', ''),
-                       'RELEASE_MARKER': outputs.get('marker', '')}
+                       'RELEASE_MARKER': outputs.get('marker', ''),
+                       'GITHUB_OUTPUT': str(self.root / 'commit-output')}
                 subprocess.run(['bash', '-eu', '-c', script], cwd=self.root,
                                env=env, check=True, capture_output=True)
                 self.assertEqual(self.git(*remote_git, 'show', f'{version}:packaging/version'), version)
@@ -236,6 +238,7 @@ class ReleasePreparationTest(unittest.TestCase):
         result, outputs = self.prepare('nightly', 'nightly')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(outputs['type'], 'nightly')
+        self.assertEqual(outputs['channel'], 'nightly')
         return (self.root / 'packaging/version').read_text().strip()
 
     def test_nightly_versions(self):

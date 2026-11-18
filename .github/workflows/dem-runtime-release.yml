@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       channel:
-        description: Agent release channel (stable, nightly or devel)
+        description: Agent release channel (stable, release-candidate, nightly or devel)
         required: true
         type: string
       publish:

@@ -155,7 +155,7 @@ function(netdata_version)
     # Match the stamper's fixed three-line format; never evaluate file contents.
     file(READ "${release_info}" release_hex HEX)
     if(release_hex MATCHES "^(..)*(00|0d)" OR NOT release_body MATCHES
-       "^version=([A-Za-z0-9][A-Za-z0-9._-]*)\nchannel=(stable|nightly|devel)\nsource=([0-9a-f]+)\n$")
+       "^version=([A-Za-z0-9][A-Za-z0-9._-]*)\nchannel=(stable|release-candidate|nightly|devel)\nsource=([0-9a-f]+)\n$")
       message(FATAL_ERROR "Invalid packaging/release-info: expected version, channel and source lines")
     endif()
     set(release_version "${CMAKE_MATCH_1}")

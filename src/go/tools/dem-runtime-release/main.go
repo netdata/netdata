@@ -56,7 +56,7 @@ func sign(args []string, diagnostics io.Writer) error {
 	archiveURL := fs.String("archive-url", "", "immutable HTTPS runtime archive publication URL")
 	sourcesURL := fs.String("sources-url", "", "immutable HTTPS source archive publication URL")
 	agentVersion := fs.String("agent-version", "", "canonical paired Agent release version")
-	agentChannel := fs.String("agent-channel", "", "paired Agent release channel: stable, nightly or devel")
+	agentChannel := fs.String("agent-channel", "", "paired Agent release channel: stable, release-candidate, nightly or devel")
 	agentSource := fs.String("agent-source", "", "full lowercase paired Agent source commit SHA")
 	if err := fs.Parse(args); err != nil {
 		return err

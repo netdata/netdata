@@ -33,9 +33,9 @@ func (a AgentRelease) Validate() error {
 		)
 	}
 	switch a.Channel {
-	case "stable", "nightly", "devel":
+	case "stable", "release-candidate", "nightly", "devel":
 	default:
-		return errors.New("Agent release channel must be stable, nightly or devel")
+		return errors.New("Agent release channel must be stable, release-candidate, nightly or devel")
 	}
 	if len(a.Source) != 40 || strings.Trim(a.Source, "0123456789abcdef") != "" {
 		return errors.New("Agent release source must be a full lowercase Git commit SHA")

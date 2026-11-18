@@ -40,7 +40,7 @@ jobs:
     uses: ./.github/workflows/dem-runtime-release.yml
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
-      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'release-candidate' && 'release-candidate' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
       publish: true
     secrets: inherit
 
@@ -54,7 +54,7 @@ jobs:
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
       companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
-      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+      channel: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'release-candidate' && 'release-candidate' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
       version: ${{ inputs.version }}
 
   file-check: # Check what files changed if we’re being run in a PR or on a push.
@@ -421,7 +421,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
+          CHANNEL: ${{ inputs.type == 'release' && 'stable' || inputs.type == 'release-candidate' && 'release-candidate' || inputs.type == 'nightly' && 'nightly' || 'devel' }}
         run: python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
       - name: Set Sentry telemetry env vars
         id: set-telemetry-env-vars

@@ -210,7 +210,11 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
     echo "message=${EVENT_TYPE} release ${EVENT_VERSION}." >> "${GITHUB_OUTPUT}"
     echo "ref=${EVENT_VERSION}" >> "${GITHUB_OUTPUT}"
     echo "type=${build_type}" >> "${GITHUB_OUTPUT}"
-    echo "channel=stable" >> "${GITHUB_OUTPUT}"
+    if [ "${build_type}" = release-candidate ]; then
+        echo "channel=release-candidate" >> "${GITHUB_OUTPUT}"
+    else
+        echo "channel=stable" >> "${GITHUB_OUTPUT}"
+    fi
     echo "branch=${branch_name}" >> "${GITHUB_OUTPUT}"
     # A first RC creates the release branch from master and an empty marker commit on master.
     if [ -n "${new_branch}" ]; then

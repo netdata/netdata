@@ -40,7 +40,7 @@ jobs:
     uses: ./.github/workflows/dem-runtime-release.yml
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
-      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
       publish: true
     secrets: inherit
 
@@ -54,7 +54,7 @@ jobs:
     with:
       source_sha: ${{ inputs.source_sha || github.sha }}
       companion_run_id: ${{ inputs.companion_run_id || needs.runtime-companion.outputs.run_id }}
-      channel: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+      channel: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
       version: ${{ inputs.version }}
 
   file-check: # Check what files changed if we’re being run in a PR or on a push.
@@ -265,7 +265,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
@@ -403,7 +403,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
@@ -607,7 +607,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
@@ -813,7 +813,7 @@ jobs:
         shell: bash
         env:
           SOURCE_SHA: ${{ inputs.source_sha || github.sha }}
-          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || 'stable' }}
+          CHANNEL: ${{ inputs.version == 'nightly' && 'nightly' || contains(inputs.version, '-rc') && 'release-candidate' || 'stable' }}
         run: |
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"

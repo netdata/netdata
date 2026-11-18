@@ -21,6 +21,7 @@ class ReleaseInfoTests(unittest.TestCase):
         valid = f'version=v2.12.0-9-nightly\nchannel=nightly\nsource={SOURCE}\n'
         cases = {
             'stable': valid.replace('v2.12.0-9-nightly', 'v2.12.0').replace('nightly\n', 'stable\n'),
+            'release candidate': valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01').replace('nightly\n', 'release-candidate\n'),
             'nightly': valid,
             'devel': valid.replace('channel=nightly', 'channel=devel'),
             'single character version': valid.replace('v2.12.0-9-nightly', '1'),
@@ -35,6 +36,7 @@ class ReleaseInfoTests(unittest.TestCase):
             'path': valid.replace('v2.12.0-9-nightly', '../release'),
             'overlong': valid.replace('v2.12.0-9-nightly', 'v' * 129),
             'channel': valid.replace('channel=nightly', 'channel=preview'),
+            'rc alias': valid.replace('channel=nightly', 'channel=rc'),
             'short SHA': valid.replace(SOURCE, 'a' * 39),
             'uppercase SHA': valid.replace(SOURCE, 'A' * 40),
             'not hex': valid.replace(SOURCE, 'x' * 40),
@@ -80,6 +82,9 @@ class ReleaseInfoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'differs'):
                 release_info.stamp(root, 'nightly', SOURCE)
             self.assertEqual(path.read_bytes(), original)
+            expected = {'version': 'v2.12.0', 'channel': 'release-candidate', 'source': source}
+            self.assertEqual(release_info.stamp(root, 'release-candidate', source), expected)
+            self.assertEqual(release_info.read_release_info(path), expected)
             expected = {'version': '0.' + source, 'channel': 'devel', 'source': source}
             self.assertEqual(release_info.stamp(root, 'devel', source), expected)
             self.assertEqual(release_info.read_release_info(path), expected)

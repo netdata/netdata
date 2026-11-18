@@ -12,6 +12,7 @@ import tempfile
 
 
 FIELDS = ('version', 'channel', 'source')
+CHANNELS = ('stable', 'release-candidate', 'nightly', 'devel')
 MAX_BYTES = 256
 
 
@@ -21,8 +22,8 @@ def validate_release_info(info):
         raise ValueError('release identity requires exactly version, channel and source')
     if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]{0,127}', info['version']):
         raise ValueError('release version must be a path-safe identifier of 1 to 128 characters')
-    if info['channel'] not in ('stable', 'nightly', 'devel'):
-        raise ValueError('release channel must be stable, nightly or devel')
+    if info['channel'] not in CHANNELS:
+        raise ValueError('release channel must be one of ' + ', '.join(CHANNELS))
     if not re.fullmatch(r'[0-9a-f]{40}', info['source']):
         raise ValueError('release source must be a full lowercase Git commit SHA')
     return dict(info)
@@ -82,7 +83,7 @@ def stamp(root, channel, source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parent.parent)
-    parser.add_argument('--channel', required=True, choices=('stable', 'nightly', 'devel'))
+    parser.add_argument('--channel', required=True, choices=CHANNELS)
     parser.add_argument('--source', required=True, help='expected full Git commit SHA')
     args = parser.parse_args()
     try:

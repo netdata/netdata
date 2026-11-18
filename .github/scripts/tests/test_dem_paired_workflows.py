@@ -63,8 +63,11 @@ class CoupledWorkflowTests(unittest.TestCase):
                     self.assertIn(prerequisite, dependencies(jobs, consumer))
 
     @unittest.skipUnless(shutil.which('git'), 'requires Git')
-    def test_release_base_selects_canonical_stable_and_nightly_channels(self):
-        for channel, release_type, version in [('stable', 'patch', 'v2.12.1'), ('nightly', 'nightly', 'nightly')]:
+    def test_release_base_selects_canonical_release_channels(self):
+        cases = [('stable', 'patch', 'v2.12.1', 'v2.12.1'),
+                 ('release-candidate', 'release-candidate', 'v2.13.0-rc01', 'v2.13.0-rc01'),
+                 ('nightly', 'nightly', 'nightly', 'v2.12.0-0-post-nightly')]
+        for channel, release_type, version, expected_version in cases:
             with self.subTest(channel=channel), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 (root / 'packaging').mkdir()
@@ -77,7 +80,7 @@ class CoupledWorkflowTests(unittest.TestCase):
                 git('add', 'packaging/version')
                 git('commit', '-qm', 'Fixture')
                 git('tag', '-a', 'v2.12.0', '-m', 'Fixture')
-                git('branch', 'v2.12')
+                git('branch', 'release-v2.12')
                 output = root / 'outputs'
                 result = subprocess.run(['sh', str(ROOT / '.github/scripts/prepare-release-base.sh'),
                                          'netdata/netdata', 'workflow_dispatch', release_type, version, ''],
@@ -87,8 +90,7 @@ class CoupledWorkflowTests(unittest.TestCase):
                 fields = dict(line.split('=', 1) for line in output.read_text().splitlines())
                 self.assertEqual(fields['channel'], channel)
                 self.assertEqual(fields['run'], 'true')
-                self.assertEqual((root / 'packaging/version').read_text().strip(),
-                                 'v2.12.0-1-nightly' if channel == 'nightly' else 'v2.12.1')
+                self.assertEqual((root / 'packaging/version').read_text().strip(), expected_version)
 
     def test_lane_transport_refuses_mismatched_version_or_missing_frozen_inputs(self):
         gate = load('dem-runtime-companion-check.yml')['jobs']['check']
