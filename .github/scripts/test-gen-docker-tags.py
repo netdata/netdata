@@ -185,6 +185,16 @@ class DockerTagsTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     module['published_version']('netdata/netdata', 'stable')
 
+    def test_v_prefixed_version_does_not_double_prefix(self):
+        result, _ = self.generate('v2.14.0', {'v2': '2.13.0', 'stable': '2.13.0', 'preview': '2.14.0-rc01'},
+                                  registry='docker')
+        self.assertEqual(result['docker_tags'],
+                         'netdata/netdata:v2.14.0,netdata/netdata:latest,netdata/netdata:v2,'
+                         'netdata/netdata:v2.14,netdata/netdata:stable,netdata/netdata:preview')
+        rc, _ = self.generate('v2.14.0-rc01', {'preview': '2.13.0'}, registry='docker')
+        self.assertEqual(rc['docker_tags'],
+                         'netdata/netdata:v2.14.0-rc01,netdata/netdata:latest,netdata/netdata:preview')
+
     def test_publish_checks_are_serialized_and_used(self):
         workflow = (SCRIPT.parent.parent / 'workflows/docker.yml').read_text()
         for job, registry, prefix in (('publish-docker-hub', 'docker', "''"),

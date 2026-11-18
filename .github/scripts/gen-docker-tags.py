@@ -48,6 +48,7 @@ def generate(version: str, registries: list[str], *, metadata_only: bool = False
     prerelease = False
     if version not in ('', 'nightly'):
         version_core(version)
+        version = version.lstrip('v')
         prerelease = '-' in version.split('+', 1)[0]
 
     tags = {}
