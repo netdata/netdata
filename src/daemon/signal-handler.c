@@ -312,7 +312,7 @@ void nd_process_signals(void) {
 
     while (true) {
         bool save_again = false;
-        double free_mem = os_system_memory_available_percent(os_system_memory(false));
+        double free_mem = os_system_memory_available_percent(os_system_memory_cached(OS_SYSTEM_MEMORY_MAX_AGE_UT));
 
         save_again =
             threshold_trigger_smaller(&triggered1, 1.0, 1.0, free_mem) ||

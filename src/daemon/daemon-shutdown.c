@@ -461,6 +461,15 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     netdata_ssl_cleanup();
     watcher_step_complete(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES);
 
+    // last: everything after this (the final status save, the out-of-memory fatal) reads the retained sample.
+    // A sampler stuck in a system memory read (e.g. a hung lxcfs) is left behind.
+    bool sysmem_sampler_stopped __maybe_unused = os_system_memory_sampler_stop(5 * USEC_PER_SEC);
+    if(!sysmem_sampler_stopped) {
+        __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
+        daemon_status_file_shutdown_gave_up("SYSMEM ", "SYSMEM may still be reading system memory");
+    }
+    watcher_step_complete(WATCHER_STEP_ID_STOP_SYSTEM_MEMORY_SAMPLER);
+
     watcher_shutdown_end();
     watcher_thread_stop();
 
@@ -468,8 +477,8 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // a worker still running would use what the teardown frees. Health waits for notifications
     // without the alert dictionary lock, and rrdhost_free_all() does not take the host pin health
     // holds, so a health thread that has not exited yet can still be using a host.
-    if(!dbengine_drained || !weights_drained || service_is_running(SERVICE_HEALTH))
-        fprintf(stderr, "\nWARNING: dbengine, weights or health work may still be running, skipping the teardown.\n");
+    if(!dbengine_drained || !weights_drained || !sysmem_sampler_stopped || service_is_running(SERVICE_HEALTH))
+        fprintf(stderr, "\nWARNING: dbengine, weights, health or the system memory sampler may still be running, skipping the teardown.\n");
     else {
         fprintf(stderr, "\n");
 

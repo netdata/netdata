@@ -150,6 +150,7 @@ void watcher_main(void *arg)
     watcher_wait_for_step(WATCHER_STEP_ID_CLOSE_SQL_DATABASES, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_REMOVE_PID_FILE, shutdown_start_time);
     watcher_wait_for_step(WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES, shutdown_start_time);
+    watcher_wait_for_step(WATCHER_STEP_ID_STOP_SYSTEM_MEMORY_SAMPLER, shutdown_start_time);
 
     completion_wait_for(&shutdown_end_completion);
     usec_t shutdown_end_time = now_monotonic_usec();
@@ -193,6 +194,7 @@ void watcher_thread_start() {
     watcher_steps[WATCHER_STEP_ID_CLOSE_SQL_DATABASES].msg = "close SQL databases";
     watcher_steps[WATCHER_STEP_ID_REMOVE_PID_FILE].msg = "remove pid file";
     watcher_steps[WATCHER_STEP_ID_FREE_OPENSSL_STRUCTURES].msg = "free openssl structures";
+    watcher_steps[WATCHER_STEP_ID_STOP_SYSTEM_MEMORY_SAMPLER].msg = "stop system memory sampler";
 
     for (size_t i = 0; i != WATCHER_STEP_ID_MAX; i++) {
         completion_init(&watcher_steps[i].p);
