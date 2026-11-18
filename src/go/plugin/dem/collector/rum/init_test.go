@@ -116,11 +116,11 @@ func TestInitValidationContract(t *testing.T) {
 			want:   "name must be a nonempty URL-safe site key: letters, digits, underscores or hyphens",
 		},
 		"window too short": {
-			mutate: func(c *rum.Collector) { c.Window = confopt.Duration(30 * time.Second) },
+			mutate: func(c *rum.Collector) { c.Window = confopt.LongDuration(30 * time.Second) },
 			want:   "window must be between 1m and 30m",
 		},
 		"window too long": {
-			mutate: func(c *rum.Collector) { c.Window = confopt.Duration(31 * time.Minute) },
+			mutate: func(c *rum.Collector) { c.Window = confopt.LongDuration(31 * time.Minute) },
 			want:   "window must be between 1m and 30m",
 		},
 		"zero page groups": {
@@ -244,7 +244,7 @@ func TestInitValidationContract(t *testing.T) {
 		"site rules reported before window": {
 			mutate: func(c *rum.Collector) {
 				c.PageGroups = 0
-				c.Window = confopt.Duration(30 * time.Second)
+				c.Window = confopt.LongDuration(30 * time.Second)
 			},
 			want: "page_groups and countries must be between 1 and 100",
 		},
