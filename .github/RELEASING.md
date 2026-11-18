@@ -91,7 +91,7 @@ An existing tag cannot be reused.
   already advertised at each alias. Versioned artifacts are still published for releases of older series.
 - Native packages go to the stable repository on both package hosts, and also to preview when the same preview
   eligibility check passes.
-- Docker publishes the exact version and `latest` tags to Docker Hub, Quay and GHCR. The major, major/minor and
+- Docker publishes the exact version tag to Docker Hub, Quay and GHCR (`latest` is nightly-only). The major, major/minor and
   `stable` tags are added only when the release is not older than the image currently published at that alias
   in the destination registry. The same comparison controls `preview`. Each registry is checked independently,
   so a failed artifact or registry publication cannot make another registry's aliases move backwards.
@@ -129,7 +129,7 @@ correcting those failures; artifact metadata is never used as a fallback.
   RCs can update preview's `latest` alias according to the existing version comparison, but do not create major/minor aliases.
 - GitHub release drafts are created in the main repository and marked as prereleases. The existing manual
   draft-publication step still applies.
-- Docker publishes the exact version tag, such as `v2.13.0-rc01`, and `latest` to each registry, plus `preview`
+- Docker publishes the exact version tag, such as `v2.13.0-rc01`, to each registry, plus `preview`
   when the RC is not older than the image at that registry's `preview` alias. RCs do not update `stable`, major or minor Docker
   aliases. Stable Helmchart and MSI follow-up workflows are skipped.
 

@@ -64,16 +64,16 @@ class DockerTagsTest(unittest.TestCase):
                      'v2.14': 'v2.14.0', 'preview': 'v2.15.0-rc01'}
         cases = (
             # A patch for an older series only moves its own series alias.
-            ('2.13.5', published, ['v2.13.5', 'latest', 'v2.13']),
-            ('2.13.3', published, ['v2.13.3', 'latest']),
-            ('2.14.1', published, ['v2.14.1', 'latest', 'v2', 'v2.14', 'stable']),
-            ('2.15.0', published, ['v2.15.0', 'latest', 'v2', 'v2.15', 'stable', 'preview']),
-            ('2.14.1', {}, ['v2.14.1', 'latest', 'v2', 'v2.14', 'stable', 'preview']),
+            ('2.13.5', published, ['v2.13.5', 'v2.13']),
+            ('2.13.3', published, ['v2.13.3']),
+            ('2.14.1', published, ['v2.14.1', 'v2', 'v2.14', 'stable']),
+            ('2.15.0', published, ['v2.15.0', 'v2', 'v2.15', 'stable', 'preview']),
+            ('2.14.1', {}, ['v2.14.1', 'v2', 'v2.14', 'stable', 'preview']),
             ('2.14.0', {'preview': 'v2.14.0-rc03'},
-             ['v2.14.0', 'latest', 'v2', 'v2.14', 'stable', 'preview']),
+             ['v2.14.0', 'v2', 'v2.14', 'stable', 'preview']),
             ('2.14.0+build-7', {'stable': 'v2.14.0'},
-             ['v2.14.0+build-7', 'latest', 'v2', 'v2.14', 'stable', 'preview']),
-            ('3.0.0', {'stable': 'v2.99.99'}, ['v3.0.0', 'latest', 'v3', 'v3.0', 'stable', 'preview']),
+             ['v2.14.0+build-7', 'v2', 'v2.14', 'stable', 'preview']),
+            ('3.0.0', {'stable': 'v2.99.99'}, ['v3.0.0', 'v3', 'v3.0', 'stable', 'preview']),
         )
         for version, aliases, suffixes in cases:
             with self.subTest(version=version, aliases=aliases):
@@ -88,11 +88,11 @@ class DockerTagsTest(unittest.TestCase):
 
     def test_release_candidates(self):
         cases = (
-            ('2.14.0-rc01', {}, ['v2.14.0-rc01', 'latest', 'preview']),
-            ('2.14.0-rc02', {'preview': 'v2.14.0-rc01'}, ['v2.14.0-rc02', 'latest', 'preview']),
-            ('2.14.0-rc10', {'preview': 'v2.14.0-rc09'}, ['v2.14.0-rc10', 'latest', 'preview']),
-            ('2.14.0-rc02', {'preview': 'v2.14.0'}, ['v2.14.0-rc02', 'latest']),
-            ('2.14.0-rc02', {'preview': 'v2.15.0-rc01'}, ['v2.14.0-rc02', 'latest']),
+            ('2.14.0-rc01', {}, ['v2.14.0-rc01', 'preview']),
+            ('2.14.0-rc02', {'preview': 'v2.14.0-rc01'}, ['v2.14.0-rc02', 'preview']),
+            ('2.14.0-rc10', {'preview': 'v2.14.0-rc09'}, ['v2.14.0-rc10', 'preview']),
+            ('2.14.0-rc02', {'preview': 'v2.14.0'}, ['v2.14.0-rc02']),
+            ('2.14.0-rc02', {'preview': 'v2.15.0-rc01'}, ['v2.14.0-rc02']),
         )
         for version, aliases, suffixes in cases:
             with self.subTest(version=version, aliases=aliases):
@@ -122,7 +122,7 @@ class DockerTagsTest(unittest.TestCase):
     def test_build_metadata_does_not_check_aliases(self):
         result, inspect = self.generate('2.14.0-rc01', metadata_only=True)
         inspect.assert_not_called()
-        self.assert_tags(result, ['v2.14.0-rc01', 'latest'])
+        self.assert_tags(result, ['v2.14.0-rc01'])
         self.assertEqual(result['prerelease'], 'true')
 
     def test_non_release_does_not_fetch(self):
@@ -189,11 +189,11 @@ class DockerTagsTest(unittest.TestCase):
         result, _ = self.generate('v2.14.0', {'v2': '2.13.0', 'stable': '2.13.0', 'preview': '2.14.0-rc01'},
                                   registry='docker')
         self.assertEqual(result['docker_tags'],
-                         'netdata/netdata:v2.14.0,netdata/netdata:latest,netdata/netdata:v2,'
+                         'netdata/netdata:v2.14.0,netdata/netdata:v2,'
                          'netdata/netdata:v2.14,netdata/netdata:stable,netdata/netdata:preview')
         rc, _ = self.generate('v2.14.0-rc01', {'preview': '2.13.0'}, registry='docker')
         self.assertEqual(rc['docker_tags'],
-                         'netdata/netdata:v2.14.0-rc01,netdata/netdata:latest,netdata/netdata:preview')
+                         'netdata/netdata:v2.14.0-rc01,netdata/netdata:preview')
 
     def test_publish_checks_are_serialized_and_used(self):
         workflow = (SCRIPT.parent.parent / 'workflows/docker.yml').read_text()

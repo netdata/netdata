@@ -59,8 +59,8 @@ def generate(version: str, registries: list[str], *, metadata_only: bool = False
         elif nightly:
             versions = [NIGHTLY_TAG, 'latest']
         else:
-            # latest tracks publication time; only channel and series aliases are monotonic.
-            versions = [f'v{version}', 'latest']
+            # latest is reserved for nightly builds (it mirrors edge).
+            versions = [f'v{version}']
             aliases = []
             if not prerelease:
                 major, minor, _ = version.split('+', 1)[0].split('.')
