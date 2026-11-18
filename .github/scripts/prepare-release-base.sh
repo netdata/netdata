@@ -190,7 +190,7 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
     fi
     if [ -z "${new_branch}" ]; then
         if ! git checkout "${branch_name}"; then
-            echo "::error::Could not find a branch for the ${branch_name}.x release series."
+            echo "::error::Could not find a branch for the ${series}.x release series."
             exit 1
         fi
         major_matches || exit 1
