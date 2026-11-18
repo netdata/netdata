@@ -146,9 +146,11 @@ func main() {
 	var fnStore *socketFunctionStore
 
 	// Exactly one module owns the shared-memory segment; the others only
-	// contribute rows to the shared store.  Ownership order is cachestat, then
-	// dcstat, then fd, then socket, so a module's cgroup/apps charts keep working
-	// whichever subset of modules the operator enabled.
+	// contribute rows to the shared store.  Ownership order is process, then
+	// cachestat, then dcstat, then fd, then socket, so a module's cgroup/apps
+	// charts keep working whichever subset of modules the operator enabled.
+	// Every module MUST honour its shouldPublish: a second publisher races the
+	// owner for the segment header and drops the owner's flags.
 	var cachestatWillPublish bool
 	var dcstatWillPublish bool
 	var fdWillPublish bool
@@ -196,8 +198,9 @@ func main() {
 				cachestatWillPublish = !processWillPublish
 			}
 			anyStarted = true
+			shouldPublish := cachestatWillPublish
 			wg.Go(func() {
-				runCachestatGlobalCollector(api, handle, stop, cachestatStore, ue)
+				runCachestatGlobalCollector(api, handle, stop, cachestatStore, ue, shouldPublish)
 				handle.Close()
 			})
 		}
