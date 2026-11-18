@@ -3,15 +3,19 @@
 Runtime releases use the Agent's canonical version, channel and full source commit.
 `packaging/release-info` supplies that identity to both architecture builds. The
 runtime remains optional; a normal Agent image or installation does not include
-browser bytes. Actual signed public publication and public acceptance are pending.
+browser bytes. Verify public availability and deployment acceptance for the target release and platform.
 
 This runbook owns portable artifact assembly and publication. The normal Agent
 CPack, signing and upload jobs own optional native packages. There is no separate
 runtime version, publication sequence, native uploader or all-channel fan-out.
 
-Exact release identity governs publication and installation/update transactions. Execution separately checks the
+Exact release identity governs publication, runtime acquisition and published-release updates. Execution checks the
 runtime contract, architecture and integrity/provenance. A compatible installed runtime can serve a plugin with
 different or empty release stamps; this does not change publication pairing or create an independent update stream.
+
+Unstamped source Agent updates retain an already installed compatible runtime without publishing or acquiring a
+companion. Their validation and service policy are described in
+[paired Agent updates](../installer/DEM-RUNTIME.md#paired-agent-updates).
 
 ## Build and publication order
 

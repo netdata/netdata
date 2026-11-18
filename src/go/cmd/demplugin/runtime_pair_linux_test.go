@@ -191,6 +191,67 @@ func TestRuntimeExecutionDoesNotRequireMatchingBuildIdentity(t *testing.T) {
 	}
 }
 
+func TestRuntimeSourceUpdatePlan(t *testing.T) {
+	for name, test := range map[string]struct {
+		agent     browserruntime.AgentRelease
+		want      string
+		wantError string
+	}{
+		"unstamped": {want: "retain\n"},
+		"published": {agent: fixtureAgent("next-release"), want: "paired\n"},
+		"partial stamp": {agent: browserruntime.AgentRelease{
+			Version: "partial",
+		}, wantError: "expected Agent release"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			config := t.TempDir()
+			cache := filepath.Join(config, "runtime")
+			writeAdminTrust(t, config, cache)
+			release, archive := adminBundleFixture(t)
+			_, err := runtimeCommand(t, "runtime", "install", "--config-dir", config,
+				"--release", release, "--archive", archive, "--manual-updates")
+			require.NoError(t, err)
+			before, err := os.ReadFile(filepath.Join(cache, "selection.json"))
+			require.NoError(t, err)
+			setRuntimeAgent(t, test.agent)
+			result := runtimeRun(
+				t,
+				context.Background(),
+				"runtime",
+				"pair-plan",
+				"--source-update",
+				"--config-dir",
+				config,
+			)
+			if test.wantError != "" {
+				require.ErrorContains(t, result.err, test.wantError)
+			} else {
+				require.NoError(t, result.err)
+			}
+			require.Equal(t, test.want, result.stdout)
+			after, err := os.ReadFile(filepath.Join(cache, "selection.json"))
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+		})
+	}
+}
+
+func TestRuntimeSourceUpdatePlanValidatesPreloadWithoutExactPair(t *testing.T) {
+	config := t.TempDir()
+	writeAdminTrust(t, config, "")
+	release, archive := adminBundleFixture(t)
+	root := filepath.Join(config, "preload")
+	_, err := runtimeCommand(t, "runtime", "preload", "--config-dir", config,
+		"--root", root, "--release", release, "--archive", archive)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(filepath.Join(config, "dem.conf"),
+		[]byte("runtime:\n  mode: preloaded\n  preload_path: "+root+"\n"), 0600))
+	setRuntimeAgent(t, browserruntime.AgentRelease{})
+	result := runtimeRun(t, context.Background(), "runtime", "pair-plan", "--source-update", "--config-dir", config)
+	require.NoError(t, result.err)
+	require.Equal(t, "retain\n", result.stdout)
+}
+
 func TestRuntimeFetchDoesNotEnrollAndRejectsAlteredInputs(t *testing.T) {
 	for _, fault := range []string{"none", "archive", "version", "existing-output"} {
 		t.Run(fault, func(t *testing.T) {

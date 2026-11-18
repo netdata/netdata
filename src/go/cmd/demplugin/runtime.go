@@ -38,7 +38,7 @@ func runRuntimeCommand(ctx context.Context, args []string, input *os.File, stdou
 	case command == "setup-plan":
 		return runSetupPlan(flags, stdout, stderr)
 	case command == "pair-plan":
-		return runPairPlan(flags, stdout, stderr)
+		return runPairPlan(ctx, flags, stdout, stderr)
 	case strings.HasPrefix(command, "native-"):
 		return runNativeCommand(ctx, command, flags, stdout, stderr)
 	}
