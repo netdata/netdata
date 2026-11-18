@@ -369,12 +369,9 @@ jobs:
           ref: ${{ inputs.source_sha || github.sha }}
       - name: Generate Tags
         id: tag
-        run: |
-          if [ ${{ github.event_name }} = 'workflow_dispatch' ]; then
-            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ${{ github.event.inputs.version }}
-          else
-            .github/scripts/gen-docker-tags.py ${{ github.event_name }} ''
-          fi
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --metadata-only
 
   build-images-docker-hub:
     name: Push Images to Docker Hub
@@ -507,6 +504,10 @@ jobs:
       - build-images-docker-hub
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-docker
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -530,12 +531,25 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry docker
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests '' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -554,6 +568,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -695,6 +710,10 @@ jobs:
       - build-images-quay
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-quay
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -719,12 +738,25 @@ jobs:
           registry: quay.io
           username: ${{ secrets.NETDATABOT_QUAY_USERNAME }}
           password: ${{ secrets.NETDATABOT_QUAY_TOKEN }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry quay
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'quay.io' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -743,6 +775,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -884,6 +917,10 @@ jobs:
       - build-images-ghcr
       - gen-tags
     runs-on: ubuntu-latest
+    concurrency:
+      group: docker-publish-ghcr
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -908,12 +945,25 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install image inspection tool
+        if: github.repository == 'netdata/netdata'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y skopeo
+      - name: Select published image aliases
+        id: published-tags
+        if: github.repository == 'netdata/netdata'
+        env:
+          RELEASE_VERSION: ${{ github.event.inputs.version }}
+        run: |
+          REGISTRY_AUTH_FILE="${DOCKER_CONFIG:-${HOME}/.docker}/config.json" \
+            .github/scripts/gen-docker-tags.py "${{ github.event_name }}" "${RELEASE_VERSION}" --registry ghcr
       - name: Create and Push Manifest
         id: manifest
         if: github.repository == 'netdata/netdata'
         run: |
           # shellcheck disable=SC2046
-          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ needs.gen-tags.outputs.tags }}")
+          docker buildx imagetools create $(.github/scripts/gen-docker-imagetool-args.py /tmp/digests 'ghcr.io' "${{ steps.published-tags.outputs.tags }}")
       - name: Rotate Old Image Tags
         id: rotate
         if: github.repository == 'netdata/netdata' && needs.gen-tags.outputs.nightly == '1'
@@ -932,6 +982,7 @@ jobs:
               Download digests: ${{ steps.fetch-digests.outcome }}
               Setup buildx: ${{ steps.prepare.outcome }}
               Login to registry: ${{ steps.login.outcome }}
+              Select published aliases: ${{ steps.published-tags.outcome }}
               Create and push manifest: ${{ steps.manifest.outcome }}
               Rotate old image tags: ${{ steps.rotate.outcome }}
           SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -92,14 +92,22 @@ An existing tag cannot be reused.
 - Native packages go to the stable repository on both package hosts, and also to preview when the same preview
   eligibility check passes.
 - Docker publishes the exact version and `latest` tags to Docker Hub, Quay and GHCR. The major, major/minor and
-  `stable` tags are added only when the release is not older than the version published at the matching
-  `stable/<alias>/Version` artifact metadata, and `preview` under the preview eligibility check above, so a patch
-  for an older series does not move them.
+  `stable` tags are added only when the release is not older than the image currently published at that alias
+  in the destination registry. The same comparison controls `preview`. Each registry is checked independently,
+  so a failed artifact or registry publication cannot make another registry's aliases move backwards.
 - The Docker workflow dispatches the Agent Version PR workflow in `netdata/helmchart` and the stable Build
   workflow in `netdata/msi-installer`. Check those follow-up runs as part of the release.
 
 The [release preparation script](scripts/prepare-release-base.sh) owns version and branch validation.
-The [shared release ordering helper](scripts/modules/release_versions.py) owns preview and Docker alias eligibility.
+The [shared release ordering helper](scripts/modules/release_versions.py) owns release ordering and artifact/package
+preview eligibility. The [Docker tag generator](scripts/gen-docker-tags.py) reads each alias's
+`org.opencontainers.image.version` label from its Linux/amd64 image using
+[`skopeo inspect`](https://github.com/containers/skopeo/blob/main/docs/skopeo-inspect.1.md), without pulling layers.
+Registry publication jobs install `skopeo` and use the credentials established by the existing registry login step.
+Each job checks aliases after building images, immediately before pushing the manifest, and serializes that check
+and push across release refs for its registry, using a queued concurrency group. An absent alias can be created; missing/invalid version labels,
+authentication errors, rate limits and other inspection failures stop publication. Retry the Docker workflow after
+correcting those failures; artifact metadata is never used as a fallback.
 
 ## Release candidates
 
@@ -122,7 +130,7 @@ The [shared release ordering helper](scripts/modules/release_versions.py) owns p
 - GitHub release drafts are created in the main repository and marked as prereleases. The existing manual
   draft-publication step still applies.
 - Docker publishes the exact version tag, such as `v2.13.0-rc01`, and `latest` to each registry, plus `preview`
-  when the RC is not older than `preview/latest/Version`. RCs do not update `stable`, major or minor Docker
+  when the RC is not older than the image at that registry's `preview` alias. RCs do not update `stable`, major or minor Docker
   aliases. Stable Helmchart and MSI follow-up workflows are skipped.
 
 ## Other build and release workflows
