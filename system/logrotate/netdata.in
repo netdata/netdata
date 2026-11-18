@@ -7,6 +7,12 @@
 	notifempty
 	sharedscripts
 	postrotate
-		"@sbindir_POST@/netdatacli" reopen-logs >/dev/null 2>&1 || true
+		if [ -d /run/systemd/system ] && systemctl --quiet is-active netdata.service &&
+			{ systemctl kill --kill-whom=main --signal=HUP netdata.service 2>/dev/null ||
+			  systemctl kill --kill-who=main --signal=HUP netdata.service 2>/dev/null; }; then
+			:
+		else
+			/bin/kill -HUP `cat /run/netdata/netdata.pid 2>/dev/null` 2>/dev/null || true
+		fi
 	endscript
 }
