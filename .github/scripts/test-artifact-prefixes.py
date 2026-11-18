@@ -175,8 +175,10 @@ class PrepareArtifactAliasesTest(unittest.TestCase):
         }
         for name, (kind, version, stable, preview) in cases.items():
             root = self.prepare(stable, preview, build_type=kind, version=version)
-            if kind != 'nightly':
+            if name in ('older RC', 'older stable'):
                 self.assertFalse((root / 'artifacts/r2/latest').exists())
+            else:
+                self.assertTrue((root / 'artifacts/r2/latest').exists())
             for job_name in ('artifact-verification-dist', 'artifact-verification-static'):
                 job = re.split(r'\n  [a-z][a-z-]+:', WORKFLOW.split(f'  {job_name}:', 1)[1])[0]
                 with self.subTest(case=name, job=job_name), tempfile.TemporaryDirectory() as directory:
@@ -273,9 +275,15 @@ class PrepareArtifactAliasesTest(unittest.TestCase):
         self.assert_tree(root, 'r2-preview', ['latest', '2', '2.12'])
 
     def test_aliases_use_their_own_metadata(self):
-        root = self.prepare({}, {'latest': 'v3.0.0', '2': 'v2.12.2', '2.12': 'v2.12.2-rc01'})
+        root = self.prepare({}, {'latest': 'v3.0.0', '2': 'v2.12.3', '2.12': 'v2.12.2-rc01'})
         self.assert_tree(root, 'r2', ['latest', '2', '2.12'])
         self.assert_tree(root, 'r2-preview', ['2.12'])
+
+    def test_republishing_same_version_updates_aliases(self):
+        published = {'latest': 'v2.12.2', '2': 'v2.12.2', '2.12': 'v2.12.2'}
+        root = self.prepare(published, published)
+        self.assert_tree(root, 'r2', ['latest', '2', '2.12'])
+        self.assert_tree(root, 'r2-preview', ['latest', '2', '2.12'])
 
     def test_nightly_and_pull_request_skip_preview(self):
         for event, build_type in (('workflow_dispatch', 'nightly'), ('pull_request', 'release')):

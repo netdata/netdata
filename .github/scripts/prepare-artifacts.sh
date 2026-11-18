@@ -149,10 +149,10 @@ prepare_r2_artifacts() {
 
         case "${ret}" in
             0)
-                if version_compare "$(cat Version)" "${VERSION}"; then
-                    prepare_latest=0
-                else
+                if version_compare "${VERSION}" "$(cat Version)"; then
                     prepare_latest=1
+                else
+                    prepare_latest=0
                 fi
                 ;;
             8)
@@ -186,10 +186,10 @@ prepare_r2_artifacts() {
 
                 case "${ret}" in
                     0)
-                        if version_compare "$(cat Version)" "${VERSION}"; then
-                            prepare_target=0
-                        else
+                        if version_compare "${VERSION}" "$(cat Version)"; then
                             prepare_target=1
+                        else
+                            prepare_target=0
                         fi
                         ;;
                     8)
