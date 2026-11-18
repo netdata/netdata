@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets"
@@ -21,6 +22,7 @@ import (
 	rumregistry "github.com/netdata/netdata/go/plugins/plugin/dem/rum/registry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
@@ -70,6 +72,54 @@ func minimalRUMConfig() rum.Config {
 	cfg.Name = "shop"
 	cfg.AllowedOrigins = []string{"https://shop.example.org"}
 	return cfg
+}
+
+func TestNativeRUMWindowConfigurationMatchesForm(t *testing.T) {
+	ctx := context.Background()
+	factory, _ := nativeRUMConfigFactory(t)
+	var bundle map[string]any
+	require.NoError(t, json.Unmarshal([]byte(rum.Creator(rum.Dependencies{}).JobConfigSchema), &bundle))
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("rum.json", bundle["jsonSchema"]))
+	form, err := compiler.Compile("rum.json")
+	require.NoError(t, err)
+	windowSchema := form.Properties["window"]
+	require.NotNil(t, windowSchema)
+	require.NotNil(t, windowSchema.Default)
+
+	for name, tc := range map[string]struct {
+		setting string
+		want    time.Duration
+	}{
+		"default":                   {"", 5 * time.Minute},
+		"authored duration":         {"window: 7m30s\n", 7*time.Minute + 30*time.Second},
+		"legacy numeric seconds":    {"window: 60\n", time.Minute},
+		"legacy fractional seconds": {"window: 1000.5\n", 1000*time.Second + 500*time.Millisecond},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var input confgroup.Config
+			raw := "name: shop\nallowed_origins: [https://shop.example.org]\nupdate_every: 10\n" + tc.setting
+			require.NoError(t, yaml.Unmarshal([]byte(raw), &input))
+			input.SetModule("rum").SetSourceType(confgroup.TypeUser)
+			payload, err := factory.Configuration(ctx, input)
+			require.NoError(t, err)
+			var reload confgroup.Config
+			require.NoError(t, json.Unmarshal(payload, &reload))
+			require.NoError(t, form.Validate(map[string]any(reload)))
+			if tc.setting == "" {
+				assert.Equal(t, *windowSchema.Default, reload["window"])
+			}
+
+			var effective rum.Config
+			require.NoError(t, json.Unmarshal(payload, &effective))
+			assert.Equal(t, tc.want, effective.Window.Duration())
+			reload.SetModule("rum").SetSourceType(confgroup.TypeUser)
+			again, err := factory.Configuration(ctx, reload)
+			require.NoError(t, err)
+			assert.JSONEq(t, string(payload), string(again))
+			require.NoError(t, factory.Test(ctx, reload))
+		})
+	}
 }
 
 func TestNativeRUMConfigurationNullDefaultsAndReload(t *testing.T) {
