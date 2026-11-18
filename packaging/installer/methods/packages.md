@@ -257,6 +257,11 @@ curl localhost:19999/api/v1/info
 After installation, you can access the Netdata dashboard at `http://localhost:19999`.
 </details>
 
+On Debian and Ubuntu, upgrades and reinstalls leave a stopped Netdata service stopped. This also applies when
+reinstalling after `apt remove netdata` with configuration retained. Start it when ready with
+`sudo systemctl start netdata`. Fresh installations, including installation after a purge, start the service subject
+to the system's service policy.
+
 ## Local Mirrors of the Official Netdata Repositories
 
 You can create local mirrors of our repositories using two main approaches:
