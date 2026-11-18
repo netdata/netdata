@@ -114,10 +114,10 @@ func (s *Store) QuerySessions(ctx context.Context, f SessionFilter) ([]SessionRe
 // order. Activity-only presence records contribute to summaries, not timelines.
 func (s *Store) QuerySessionEvents(
 	ctx context.Context,
-	site, sessionID, vnodeGUID string,
+	site, sessionID, vnodeSelector string,
 ) ([]SessionEventRecord, error) {
 	var out []SessionEventRecord
-	err := s.matchSession(ctx, site, sessionID, vnodeGUID, func(r EventRecord) {
+	err := s.matchSession(ctx, site, sessionID, vnodeSelector, func(r EventRecord) {
 		if r.Type == aggregate.EventTypeActivity {
 			return
 		}

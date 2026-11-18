@@ -94,8 +94,9 @@ Voice, for every channel:
 
 ## 4. Types, Widgets, Constraints
 
-- Keep the declared type equal to the Go field's accepted values. Optional objects and arrays are
-  `["object", "null"]` / `["array", "null"]` (a YAML key with no value decodes to nil). Scalars stay single-typed.
+- Keep the declared type aligned with the collector's serialized configuration and accepted form input. Optional
+  objects and arrays are `["object", "null"]` / `["array", "null"]` (a YAML key with no value decodes to nil).
+  Scalars stay single-typed.
 - Enums: 2 to 5 values render as `"ui:widget": "radio"` with `"ui:options": {"inline": true}`; longer lists stay a
   select. Display labels come from `ui:options.enumNames` (the JSON Schema `enumNames` keyword is ignored). Avoid `0`,
   `false`, and `""` as enum values. An enum with a default SHOULD be a `confopt.Enum`, so an empty or omitted value
@@ -103,8 +104,10 @@ Voice, for every channel:
   field out of `required`.
 - Multi-line text (queries, request bodies, templates) uses `"ui:widget": "textarea"`, with `"ui:options": {"rows": N}`
   when 2 rows are too few.
-- Durations are strings in Netdata duration syntax (`30s`, `5m`); give a placeholder. Numbers carry `minimum`
-  (and `maximum` where the collector clamps); the UI enforces them live and blocks the save.
+- Use `confopt.LongDuration` for duration fields declared as strings in Netdata duration syntax (`30s`, `5m`).
+  It emits a string for DynCfg GET and still accepts legacy numeric seconds. Test the serialized job against the
+  registered form schema to verify that existing jobs can be edited and saved.
+- Numbers carry `minimum` (and `maximum` where the collector clamps). The UI enforces them live and blocks the save.
 - `default` in the schema MUST equal the collector's constructor default; the form materializes every default into the
   submitted job. An option whose omission drives runtime precedence ("unset means inherit") MUST NOT carry a `default`.
 - `required` lists only what the collector rejects when absent. A required property with a `default` is fine: the

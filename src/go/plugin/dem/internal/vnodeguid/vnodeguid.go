@@ -9,6 +9,22 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
+// Unassigned selects records that have an empty captured GUID.
+const Unassigned = "unassigned"
+
+// Matches reports whether a captured GUID belongs to the requested selection.
+// An empty selector matches every record.
+func Matches(selector, captured string) bool {
+	switch selector {
+	case "":
+		return true
+	case Unassigned:
+		return captured == ""
+	default:
+		return selector == captured
+	}
+}
+
 // Validate accepts an empty identity for observations without a configured vnode.
 func Validate(value string) error {
 	if value == "" {

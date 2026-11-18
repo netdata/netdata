@@ -201,7 +201,7 @@ func TestAdmit(t *testing.T) {
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
-			got, deny := Admit(tc.req, accepted, lookup)
+			got, deny := Admit(tc.req, accepted, lookup, false)
 			assert.Equal(t, tc.deny, deny)
 			assert.Equal(t, tc.want, got)
 		})
@@ -231,7 +231,7 @@ func TestResolveVnode(t *testing.T) {
 			err := resolveVnode(tc.args, func(name string) (string, bool) {
 				calls++
 				return guid, name == "storefront"
-			})
+			}, false)
 			assert.Equal(t, tc.calls, calls)
 			if tc.err != "" {
 				require.EqualError(t, err, tc.err)
@@ -241,7 +241,7 @@ func TestResolveVnode(t *testing.T) {
 			assert.Equal(t, tc.want, tc.args["vnode_guid"])
 		})
 	}
-	err := resolveVnode(map[string]string{"vnode": "storefront"}, nil)
+	err := resolveVnode(map[string]string{"vnode": "storefront"}, nil, false)
 	require.EqualError(t, err, "configured vnode lookup is unavailable")
 }
 

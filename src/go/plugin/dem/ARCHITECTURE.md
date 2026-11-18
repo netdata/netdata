@@ -186,6 +186,9 @@ Function site selection:
 - **Not authorization.** Neither selector is an authorization boundary. Omitting both, or supplying only an empty
   `vnode_guid`, reads every vnode and unassigned data. Empty or unknown `vnode` names and requests containing both
   selectors MUST fail, even if either value is empty.
+- **Unassigned selection.** `rum-live` and `rum-session-events` accept `vnode_guid:unassigned` for events with an empty
+  captured GUID. The value is reserved for requests. `vnode:unassigned` still looks up a configured vnode with that
+  name. Switching between wildcard, GUID and unassigned selections restarts the live cursor.
 - **Name lookup.** `vnode` is the exact configured resource name used by collector jobs, not the display hostname.
   Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
   active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,

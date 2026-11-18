@@ -56,7 +56,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	spec := methods[i]
-	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID)
+	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID, false)
 	if r != nil {
 		return r
 	}
