@@ -12,7 +12,7 @@
 #   vX.Y.Z-rcNN              release-candidate  X.Y.Z~rcNN               X.Y.NN.0
 #   vX.Y.Z-rcNN-C-gH         git                X.Y.Z~rcNN.git.C.gH      X.Y.NN.C
 #   vX.Y-N-nightly           nightly            X.Y.0~nightly.N          X.Y.0.N
-#   vX.Y.Z-N-post-nightly    nightly            X.Y.Z.post.N             X.Y.(100+Z).N
+#   vX.Y.Z-N-post-nightly    nightly            X.Y.Z.N.post             X.Y.(100+Z).N
 #   vX.Y.Z-N-nightly         nightly (legacy, treated as post)
 #   vX.Y[-C-gH]              git                X.Y.0~git.C[.gH]         X.Y.0.C
 #   vX.Y.Z-C-gH              git                X.Y.Z.git.C.gH           X.Y.(100+Z).C
@@ -113,7 +113,7 @@ function(netdata_parse_version version)
     set(package_version "${major}.${minor}.${patch}~rc${rc}.git.${tweak}${git_suffix}")
     set(project_version "${major}.${minor}.${rc_number}.${tweak}")
   elseif(type STREQUAL "nightly" AND post)
-    set(package_version "${major}.${minor}.${patch}.post.${tweak}")
+    set(package_version "${major}.${minor}.${patch}.${tweak}.post")
     set(project_version "${major}.${minor}.${stable_patch}.${tweak}")
   elseif(type STREQUAL "nightly")
     set(package_version "${major}.${minor}.0~nightly.${tweak}")

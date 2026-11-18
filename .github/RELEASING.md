@@ -23,7 +23,7 @@ around the `v2.14` series:
 | Release candidate | `v2.14.0-rc01`, `v2.14.0-rc02` | `2.14.0~rc01` | `2.14.1`, `2.14.2` |
 | Nightly before `v2.14.0-rc01` | `v2.14-29-nightly` | `2.14.0~nightly.29` | `2.14.0.29` |
 | Nightly after `v2.14.0-rc01` | `v2.15-37-nightly` | `2.15.0~nightly.37` | `2.15.0.37` |
-| Nightly after a stable tag on `master` (pre-marker transition) | `v2.13.0-29-post-nightly` | `2.13.0.post.29` | `2.13.100.29` |
+| Nightly after a stable tag on `master` (pre-marker transition) | `v2.13.0-29-post-nightly` | `2.13.0.29.post` | `2.13.100.29` |
 | Git build | `v2.15-617-g3340f53a85` | `2.15.0~git.617.g3340f53a85` | `2.15.0.617` |
 
 - Within one major.minor version, nightlies sort before release candidates, and release candidates before the
