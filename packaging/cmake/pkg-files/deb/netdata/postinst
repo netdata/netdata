@@ -44,7 +44,12 @@ if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-decon
 
     if [ -z "${DPKG_ROOT:-}" ] && [ -d /run/systemd/system ]; then
         systemctl --system daemon-reload >/dev/null || true
-        deb-systemd-invoke restart 'netdata.service' >/dev/null || true
+        # Keep previously configured installations stopped, including reinstall after removal.
+        # Fresh installs (no prior configured version) still start through the Debian helper.
+        if [ "$1" != configure ] || [ -z "${2:-}" ] ||
+            systemctl --system --quiet is-active 'netdata.service'; then
+            deb-systemd-invoke restart 'netdata.service' >/dev/null || true
+        fi
     fi
 fi
 

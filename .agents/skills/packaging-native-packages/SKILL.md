@@ -71,6 +71,11 @@ its distro; a build request alone does not authorize installing packages on the 
   user's actual runtime status. A failed RPM `%posttrans` can leave the package installed while the feature is
   unavailable. Debian can leave configuration pending for retry. The DEM recipe initially requires live systemd.
   Its documented commands and package-manager differences are in `packaging/dem-runtime/native/README.md`.
+- Check the main Agent's service action as well as component hooks: an earlier package can change the state the
+  component observes. DEB tests MUST distinguish stopped upgrades from installation after removal; dpkg retains
+  the prior configuration version after a non-purge removal. Keep Debian helper mask and `policy-rc.d` handling.
+  `packaging/installer/tests/test_deb_service.py` covers the Agent postinst decision; real transactions verify the
+  distribution helpers, administrator masks and package ordering.
 
 For repository submission, managed archives or an SRE release handoff, use
 `.agents/skills/packaging-component-releases/SKILL.md`.

@@ -58,6 +58,7 @@ jobs:
             packaging/installer/tests/test_support_bundle.py
             packaging/installer/tests/test_snmp_diagnostics.py
             packaging/installer/tests/test_install_state.py
+            packaging/installer/tests/test_deb_service.py
             packaging/installer/tests/test_prepare_fleet.py
             packaging/installer/tests/test_*ipmi*.py
             packaging/docker/**
@@ -463,9 +464,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Run install state tests
-        run:
+      - name: Run install state and DEB service tests
+        run: |
           python3 -m unittest discover packaging/installer/tests test_install_state.py -v
+          python3 -m unittest discover packaging/installer/tests test_deb_service.py -v
 
   ipmi-delivery:
     needs: changes
