@@ -6,9 +6,10 @@
 #
 # Version forms (see .github/RELEASING.md):
 #
-#   input                    type               package version          project (MSI) version
-#   vX.Y.Z                   stable             X.Y.Z                    X.Y.(100+Z)
-#   vX.Y.Z-rcNN              release-candidate  X.Y.Z~rcNN               X.Y.NN
+#   input                    type               package version          project (MSI) version (always four
+#                                                                                fields for Win32 manifests)
+#   vX.Y.Z                   stable             X.Y.Z                    X.Y.(100+Z).0
+#   vX.Y.Z-rcNN              release-candidate  X.Y.Z~rcNN               X.Y.NN.0
 #   vX.Y.Z-rcNN-C-gH         git                X.Y.Z~rcNN.git.C.gH      X.Y.NN.C
 #   vX.Y-N-nightly           nightly            X.Y.0~nightly.N          X.Y.0.N
 #   vX.Y.Z-N-post-nightly    nightly            X.Y.Z.post.N             X.Y.(100+Z).N
@@ -101,11 +102,11 @@ function(netdata_parse_version version)
 
   if(type STREQUAL "stable")
     set(package_version "${major}.${minor}.${patch}")
-    set(project_version "${major}.${minor}.${stable_patch}")
+    set(project_version "${major}.${minor}.${stable_patch}.0")
   elseif(type STREQUAL "release-candidate")
     math(EXPR rc_number "${rc}")
     set(package_version "${major}.${minor}.${patch}~rc${rc}")
-    set(project_version "${major}.${minor}.${rc_number}")
+    set(project_version "${major}.${minor}.${rc_number}.0")
     set(tweak ${rc_number})
   elseif(DEFINED rc)
     math(EXPR rc_number "${rc}")

@@ -13,11 +13,11 @@ UPDATER = REPO / 'packaging/installer/netdata-updater.sh'
 
 # version: (package version, project/MSI version)
 FORMS = {
-    'v2.14.0': ('2.14.0', '2.14.100'),
-    'v2.14.1': ('2.14.1', '2.14.101'),
-    'v2.14.0-rc01': ('2.14.0~rc01', '2.14.1'),
-    'v2.14.0-rc02': ('2.14.0~rc02', '2.14.2'),
-    'v2.14.0-rc10': ('2.14.0~rc10', '2.14.10'),
+    'v2.14.0': ('2.14.0', '2.14.100.0'),
+    'v2.14.1': ('2.14.1', '2.14.101.0'),
+    'v2.14.0-rc01': ('2.14.0~rc01', '2.14.1.0'),
+    'v2.14.0-rc02': ('2.14.0~rc02', '2.14.2.0'),
+    'v2.14.0-rc10': ('2.14.0~rc10', '2.14.10.0'),
     'v2.14.0-rc01-3-g3340f53a85': ('2.14.0~rc01.git.3.g3340f53a85', '2.14.1.3'),
     'v2.14-941-nightly': ('2.14.0~nightly.941', '2.14.0.941'),
     'v2.15-0-nightly': ('2.15.0~nightly.0', '2.15.0.0'),
@@ -72,6 +72,12 @@ class CMakeVersionTest(unittest.TestCase):
                 result = subprocess.run(['rpm', '--eval', f'%{{lua: print(rpm.vercmp("{older}", "{newer}"))}}'],
                                         capture_output=True, text=True, check=True)
                 self.assertEqual(result.stdout.strip(), '-1')
+
+    def test_project_versions_have_four_fields(self):
+        # Win32 assemblyIdentity versions (packaging/windows/resources/*.manifest.in) require four fields.
+        for version in FORMS:
+            with self.subTest(version=version):
+                self.assertEqual(len(self.parse(version)[1].split('.')), 4)
 
     def test_msi_order(self):
         # MSI compares only major.minor.build; nightlies share the field with the version they follow.

@@ -250,6 +250,11 @@ class ReleasePreparationTest(unittest.TestCase):
         self.write_version('v2.13-0-nightly')
         self.git('commit', '--allow-empty', '-m', 'change')
         self.assertEqual(self.nightly(), 'v2.13-2-nightly')
+        # A stray prerelease tag on master would yield an unparseable nightly version.
+        self.git('tag', '-a', 'v2.14.0-rc01', '-m', 'stray')
+        result, outputs = self.prepare('nightly', 'nightly')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('not a stable or development marker tag', result.stdout)
 
     def test_fork_guard(self):
         result, outputs = self.prepare('v2.13.0-rc01', repo='example/fork')

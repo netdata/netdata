@@ -93,6 +93,11 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
     # The count excludes the nightly commit itself, so a nightly of the tagged commit is number 0.
     COMMITS_SINCE_RELEASE=$(git rev-list "${LAST_TAG}"..HEAD --count)
     case "${LAST_TAG}" in
+        *-*)
+            # Release candidates are tagged only on release branches.
+            echo "::error::The nearest tag (${LAST_TAG}) is not a stable or development marker tag."
+            exit 1
+            ;;
         # Nightlies after a stable tag (from before marker tags existed) follow that release.
         v*.*.*) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-post-nightly" ;;
         # Marker tags (vX.Y) open development of that release, so nightlies precede it.
