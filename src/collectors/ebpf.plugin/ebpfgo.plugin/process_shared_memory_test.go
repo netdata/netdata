@@ -44,7 +44,7 @@ func TestUpdateProcessAppsPublishesIntervalDeltas(t *testing.T) {
 			},
 			want: ebpfProcessStat{
 				Tgid: 42, Pid: 42,
-				CreateProcess: 3, CreateThread: 1, ExitCall: 1, ReleaseCall: 3, TaskErr: 2,
+				CreateProcess: 3, CreateThread: 1, ExitCall: 1, ReleaseCall: 1, TaskErr: 2,
 				ProcessUpdateEverySec: 10,
 			},
 		},
@@ -62,19 +62,14 @@ func TestUpdateProcessAppsPublishesIntervalDeltas(t *testing.T) {
 			},
 			want: ebpfProcessStat{Tgid: 42, Pid: 42, CreateProcess: 1, ReleaseCall: 2, ProcessUpdateEverySec: 10},
 		},
-		"release_call reset above the baseline counts releases since the reset": {
+		// The fold sums every CPU's slot; a fork resets only its own CPU's slot,
+		// so a fork alongside a growing release_call is not a reset.
+		"fork without a decrease is an ordinary delta": {
 			cycles: [][]libbpfloader.ProcessAppSnapshot{
-				{withTaskClose(processApp(42, 4, 1, 2, 0), 1)},
-				{withTaskClose(processApp(42, 5, 1, 2, 0), 3)},
+				{withTaskClose(processApp(42, 4, 1, 2, 0), 5)},
+				{withTaskClose(processApp(42, 5, 1, 2, 1), 7)},
 			},
-			want: ebpfProcessStat{Tgid: 42, Pid: 42, CreateProcess: 1, ReleaseCall: 3, ProcessUpdateEverySec: 10},
-		},
-		"failed fork resets release_call": {
-			cycles: [][]libbpfloader.ProcessAppSnapshot{
-				{withTaskClose(processApp(42, 4, 1, 2, 0), 1)},
-				{withTaskClose(processApp(42, 4, 1, 2, 1), 3)},
-			},
-			want: ebpfProcessStat{Tgid: 42, Pid: 42, ReleaseCall: 3, TaskErr: 1, ProcessUpdateEverySec: 10},
+			want: ebpfProcessStat{Tgid: 42, Pid: 42, CreateProcess: 1, ReleaseCall: 2, TaskErr: 1, ProcessUpdateEverySec: 10},
 		},
 	}
 

@@ -408,7 +408,7 @@ modules:
               dimensions:
                 - name: task
             - name: cgroup.task_error
-              description: "Errors to create process or threads. Published only with `ebpf load mode = return`"
+              description: "Errors to create process or threads. Created only while the producer runs with `ebpf load mode = return`; an existing chart keeps updating after a change to `entry`."
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -1223,7 +1223,7 @@ modules:
               dimensions:
                 - name: calls
             - name: systemd.service.task_error
-              description: "Errors to create process or threads. Published only with `ebpf load mode = return`"
+              description: "Errors to create process or threads. Created only while the producer runs with `ebpf load mode = return`; an existing chart keeps updating after a change to `entry`."
               unit: "calls/s"
               chart_type: line
               dimensions:

@@ -151,11 +151,17 @@ static struct bpf_object *process_object(struct netdata_ebpf_process_runtime *rt
     return rt->obj;
 }
 
+/* Only the file name carries the flavor; a directory name must not select it. */
 static int process_flavor_from_path(const char *path)
 {
-    if (path && strstr(path, "_arena."))
+    if (!path)
+        return PROCESS_FLAVOR_BASE;
+
+    const char *name = strrchr(path, '/');
+    name = name ? name + 1 : path;
+    if (strstr(name, "_arena."))
         return PROCESS_FLAVOR_ARENA;
-    if (path && strstr(path, "_buffer."))
+    if (strstr(name, "_buffer."))
         return PROCESS_FLAVOR_BUFFER;
     return PROCESS_FLAVOR_BASE;
 }

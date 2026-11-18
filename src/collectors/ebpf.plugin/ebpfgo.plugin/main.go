@@ -63,10 +63,15 @@ func main() {
 		os.Exit(1)
 	}
 
+	// The legacy --dcstat / --fd selections disable process, so a malformed
+	// process configuration must not stop them (see resolveFDConfigForSelection).
 	processCfg, err := resolveProcessLegacyConfig()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ebpf-go.plugin: process config load failed: %v\n", err)
-		os.Exit(1)
+		if only == moduleSelectionNone {
+			fmt.Fprintf(os.Stderr, "ebpf-go.plugin: process config load failed: %v\n", err)
+			os.Exit(1)
+		}
+		processCfg = defaultProcessLegacyConfig()
 	}
 
 	// The legacy C plugin treated --dcstat / --fd as module-selection flags: each

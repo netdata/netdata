@@ -805,7 +805,7 @@ modules:
         - eBPF
     overview:
       data_collection:
-        metrics_description: "Monitor Linux process and thread creation, exit and release by tracing kernel task-lifecycle functions with eBPF. Setting `process = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section. The error charts require `ebpf load mode = return`; the counters behind them are always collected, but they are only charted in that mode, as in the C implementation of this collector."
+        metrics_description: "Monitor Linux process and thread creation, exit and release by tracing kernel task-lifecycle functions with eBPF. Setting `process = yes` enables collection and the host-wide charts only; the per-application and per-cgroup charts additionally require `apps = yes` and/or `cgroups = yes` in the `[global]` section. The error charts require `ebpf load mode = return` (or its legacy alias `dev`); the counters behind them are always collected, but they are only charted in those modes, as in the C implementation of this collector."
         method_description: "Attach tracepoints to `sched_process_exit` and `sched_process_exec`, kprobes to `release_task` and `wake_up_new_task`, and return tracepoints to the clone/fork syscalls, using the object flavor selected for the running kernel."
       supported_platforms:
         include:

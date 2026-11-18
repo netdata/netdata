@@ -50,11 +50,19 @@ func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
 	if !libbpfloader.ProcessRuntimeSupportsCore() {
 		selector := selectHighestIndexAtOrBelow(cfg.Kernels, cfg.IsRHF, cfg.KernelVersion,
 			effectiveMaxBaseSelectorForModule(processMaxBaseSelector, "process", cfg.IsRHF, cfg.KernelVersion), "process")
+		// Keep the plan consistent with the object: callers read Flavor (the
+		// arena drops chart) and Selector.
+		plan.Selector = selector
+		plan.Flavor = ObjectFlavorBase
 		plan.ObjectPath = BuildObjectPathWithFlavor(cfg.PluginsDir, selector, "process", true, cfg.IsRHF, ObjectFlavorBase)
 		plan.LoadMode = LoadLegacy
 		return tryLoadProcessPlan(cfg, plan)
 	}
 	plans := buildFallbackPlans(plan, cfg.PluginsDir, cfg.IsRHF, "process", processMaxBaseSelector)
+	if len(plans) == 0 {
+		return nil, fmt.Errorf("process has no shipped object for kernel %d.%d.%d",
+			cfg.KernelVersion>>16, (cfg.KernelVersion>>8)&0xff, cfg.KernelVersion&0xff)
+	}
 	var lastErr error
 	for i, candidate := range plans {
 		handle, loadErr := tryLoadProcessPlan(cfg, candidate)

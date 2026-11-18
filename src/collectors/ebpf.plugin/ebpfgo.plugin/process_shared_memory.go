@@ -44,13 +44,15 @@ func processDelta(current, previous uint32) uint32 {
 	return current - previous
 }
 
-// processTaskCloseDelta handles release_call, the one non-monotonic counter: the
-// BPF programs reset it on every fork, clone and exec of the TGID (ebpf-co-re
-// src/process.bpf.c), and each of those also advances create_process or
-// task_err.  After a reset the counter holds the releases since that reset; the
-// releases between the previous snapshot and the reset are not recoverable.
+// processTaskCloseDelta handles release_call, the one counter the base and
+// legacy objects reset: on every fork, clone and exec of the TGID (ebpf-co-re
+// src/process.bpf.c), but only in the slot of the CPU that ran it, while the
+// snapshot folds every CPU's slot.  A fork elsewhere therefore says nothing about
+// the folded value, and the buffer/arena accumulators never reset at all, so only
+// a decrease is taken as a reset.  Releases lost to a reset are not recoverable;
+// treating a fork as a reset would instead republish other slots' releases.
 func processTaskCloseDelta(current, previous processCounters) uint32 {
-	if current.TaskClose < previous.TaskClose || current.Forks != previous.Forks || current.Errors != previous.Errors {
+	if current.TaskClose < previous.TaskClose {
 		return current.TaskClose
 	}
 	return current.TaskClose - previous.TaskClose

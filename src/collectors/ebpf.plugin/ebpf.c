@@ -385,14 +385,6 @@ ebpf_module_t ebpf_modules[] = {
 };
 
 struct netdata_static_thread ebpf_threads[] = {
-    {.name = "EBPF PROCESS",
-     .config_section = NULL,
-     .config_name = NULL,
-     .env_name = NULL,
-     .enabled = 1,
-     .thread = NULL,
-     .init_routine = NULL,
-     .start_routine = NULL},
     {.name = "EBPF SYNC",
      .config_section = NULL,
      .config_name = NULL,
@@ -1970,7 +1962,8 @@ static void ebpf_initialize_data_sharing()
 
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SHM:
-            if (netdata_integration_initialize_shm(ND_EBPF_DEFAULT_PID_SIZE)) {
+            // `pid table size` from [global] is applied to every module.
+            if (netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_SYNC_IDX].pid_map_size)) {
                 ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_NO);
                 ebpf_disable_cgroups();
             }
