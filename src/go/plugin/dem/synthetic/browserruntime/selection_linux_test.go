@@ -50,6 +50,7 @@ func TestValidateSelectedForSourceUpdate(t *testing.T) {
 		"missing executable":         {fault: "executable", want: ErrDamaged},
 		"damaged provenance":         {fault: "provenance", want: ErrDamaged},
 		"incompatible contract":      {fault: "contract", want: ErrIncompatible},
+		"different architecture":     {fault: "platform", want: ErrIncompatible},
 		"pending pair":               {fault: "pending", want: ErrPairPending},
 		"damaged ownership":          {fault: "ownership", wantText: "owner.json"},
 	}
@@ -86,6 +87,18 @@ func TestValidateSelectedForSourceUpdate(t *testing.T) {
 				record, err := s.readSelectionRecord()
 				require.NoError(t, err)
 				record.Release.Manifest = setPersistedContract(t, s, release.Manifest, 1)
+				require.NoError(t, saveJSON(s.root, "selection.json", record))
+			case "platform":
+				g, err := loadGeneration(s.root, release.Manifest.Archive.SHA256)
+				require.NoError(t, err)
+				g.Manifest.Platform = "linux/arm64"
+				if g.Manifest.MatchesHost() {
+					g.Manifest.Platform = "linux/amd64"
+				}
+				require.NoError(t, saveJSON(s.root, generationRecord(release.Manifest.Archive.SHA256), g))
+				record, err := s.readSelectionRecord()
+				require.NoError(t, err)
+				record.Release.Manifest = g.Manifest
 				require.NoError(t, saveJSON(s.root, "selection.json", record))
 			case "pending":
 				next := pairFixture("v2.14.0")

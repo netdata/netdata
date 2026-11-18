@@ -5,6 +5,7 @@ package browserruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -177,6 +178,9 @@ func (s *Store) ValidateSelected(ctx context.Context) error {
 		}
 		if err := inv.release.Validate(); err != nil {
 			return err
+		}
+		if !inv.release.Manifest.MatchesHost() {
+			return fmt.Errorf("%w: runtime does not match this architecture", ErrIncompatible)
 		}
 		return s.validateRetainedSelection(selection{
 			Release: inv.release,
