@@ -12,7 +12,7 @@ import (
 )
 
 func tryLoadProcessPlan(cfg ProcessLegacyConfig, plan LoadPlan) (*ProcessLegacyHandle, error) {
-	rt, err := libbpfloader.ProcessRuntimeOpenMode(plan.ObjectPath, plan.LoadMode == LoadCore)
+	rt, err := libbpfloader.ProcessRuntimeOpenMode(plan.ObjectPath, plan.LoadMode == LoadCore, processCustomBTFPath(cfg.BTFPath))
 	if err != nil {
 		return nil, err
 	}

@@ -189,7 +189,8 @@ int netdata_process_runtime_supports_core(void)
 #endif
 }
 
-struct netdata_ebpf_process_runtime *netdata_process_runtime_open_mode(const char *path, int use_core)
+struct netdata_ebpf_process_runtime *
+netdata_process_runtime_open_mode(const char *path, int use_core, const char *custom_btf_path)
 {
     struct netdata_ebpf_process_runtime *rt = callocz(1, sizeof(*rt));
     rt->flavor = process_flavor_from_path(path);
@@ -200,7 +201,10 @@ struct netdata_ebpf_process_runtime *netdata_process_runtime_open_mode(const cha
 
     if (use_core) {
         rt->kind = PROCESS_KIND_CORE;
-        struct bpf_object_open_opts opts = {.sz = sizeof(opts)};
+        struct bpf_object_open_opts opts = {
+            .sz = sizeof(opts),
+            .btf_custom_path = custom_btf_path && *custom_btf_path ? custom_btf_path : NULL,
+        };
         switch (rt->flavor) {
         case PROCESS_FLAVOR_BUFFER:
             rt->core.buffer = process_buffer_bpf__open_opts(&opts);
@@ -226,6 +230,7 @@ struct netdata_ebpf_process_runtime *netdata_process_runtime_open_mode(const cha
     }
 #else
     (void)use_core;
+    (void)custom_btf_path;
 #endif
 
     struct bpf_object *obj = bpf_object__open_file(path, NULL);

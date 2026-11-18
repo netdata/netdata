@@ -2,9 +2,9 @@
 
 package main
 
-import "fmt"
+import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
 
 func LoadProcessLegacy(cfg ProcessLegacyConfig) (*ProcessLegacyHandle, error) {
 	_ = cfg
-	return nil, fmt.Errorf("process collector requires libbpf build (netdata_ebpf_libbpf tag)")
+	return nil, libbpfloader.ErrDisabled
 }

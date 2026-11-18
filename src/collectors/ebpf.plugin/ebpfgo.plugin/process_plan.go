@@ -1,13 +1,16 @@
 package main
 
-import "github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+import (
+	"path/filepath"
+
+	"github.com/netdata/netdata/src/collectors/ebpf.plugin/ebpfgo.plugin/libbpfloader"
+)
 
 // processKernelMask is the C process module's kernel list (3.10, 4.14, 4.16,
 // 4.18, 5.4, 5.10, 5.14, 6.12, 7.0; SelectKernelName indexes): the kernels with
 // a shipped base object.  Every flavor walks down to one of them.
 const processKernelMask uint32 = 1<<0 | 1<<1 | 1<<2 | 1<<3 | 1<<4 | 1<<5 | 1<<7 | 1<<11 | 1<<12
 const processDefaultPIDTableSize uint32 = 32768
-const processMaxPIDTableSize uint32 = 32768
 const processDefaultBTFFile = "vmlinux"
 
 // processMaxBaseSelector is the highest SelectKernelName index for which a
@@ -141,4 +144,11 @@ func BuildProcessLegacyPlan(cfg ProcessLegacyConfig) LoadPlan {
 		// both `entry` and `return` mode; see ProcessLegacyConfig.ReportErrors.
 		IsReturn: true,
 	})
+}
+
+// processCustomBTFPath returns the vmlinux BTF file from the configured
+// directory: `btf path` is a directory option, while libbpf's open options take
+// the file path.
+func processCustomBTFPath(btfDir string) string {
+	return filepath.Join(btfDir, processDefaultBTFFile)
 }

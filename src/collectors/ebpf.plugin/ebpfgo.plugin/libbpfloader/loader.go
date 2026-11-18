@@ -252,7 +252,14 @@ func (r *SocketRuntime) Close() {
 	// No-op in the disabled build because the runtime never acquired native resources.
 }
 
-func ProcessRuntimeOpenMode(path string, useCore bool) (*ProcessRuntime, error) {
+// ProcessRuntimeSupportsCore mirrors the libbpf build's probe; without libbpf
+// there are no process CO-RE skeletons compiled in.
+func ProcessRuntimeSupportsCore() bool {
+	return false
+}
+
+func ProcessRuntimeOpenMode(path string, useCore bool, customBTFPath string) (*ProcessRuntime, error) {
+	_ = customBTFPath
 	return newDisabledRuntime[ProcessRuntime](path, useCore)
 }
 
@@ -269,8 +276,6 @@ func (r *ProcessRuntime) UpdateController(appsEnabled bool, appsLevel int) error
 	_, _ = appsEnabled, appsLevel
 	return ErrDisabled
 }
-
-func (r *ProcessRuntime) SupportsCore() bool { return false }
 
 func (r *ProcessRuntime) Snapshot(mapsPerCore bool) (ProcessSnapshot, error) {
 	_ = mapsPerCore

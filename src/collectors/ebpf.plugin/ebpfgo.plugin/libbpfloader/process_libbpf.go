@@ -32,7 +32,7 @@ struct netdata_ebpf_process_pid_snapshot_list {
     size_t count;
 };
 
-struct netdata_ebpf_process_runtime *netdata_process_runtime_open_mode(const char *path, int use_core);
+struct netdata_ebpf_process_runtime *netdata_process_runtime_open_mode(const char *path, int use_core, const char *custom_btf_path);
 int netdata_process_runtime_prepare(
     struct netdata_ebpf_process_runtime *rt,
     unsigned int pid_table_size,
@@ -75,16 +75,20 @@ func ProcessRuntimeSupportsCore() bool {
 	return C.netdata_process_runtime_supports_core() != 0
 }
 
-func ProcessRuntimeOpenMode(path string, useCore bool) (*ProcessRuntime, error) {
+// ProcessRuntimeOpenMode opens the process object.  customBTFPath is the
+// vmlinux BTF file used for CO-RE relocation; empty means libbpf's default.
+func ProcessRuntimeOpenMode(path string, useCore bool, customBTFPath string) (*ProcessRuntime, error) {
 	cPath := C.CString(path)
 	defer C.free(unsafe.Pointer(cPath))
+	cBTFPath := C.CString(customBTFPath)
+	defer C.free(unsafe.Pointer(cBTFPath))
 
 	cUseCore := C.int(0)
 	if useCore {
 		cUseCore = 1
 	}
 
-	rt := C.netdata_process_runtime_open_mode(cPath, cUseCore)
+	rt := C.netdata_process_runtime_open_mode(cPath, cUseCore, cBTFPath)
 	if rt == nil {
 		return nil, fmt.Errorf("open process object %q failed", path)
 	}
@@ -148,10 +152,6 @@ func (r *ProcessRuntime) UpdateController(appsEnabled bool, appsLevel int) error
 	}
 
 	return nil
-}
-
-func (r *ProcessRuntime) SupportsCore() bool {
-	return C.netdata_process_runtime_supports_core() != 0
 }
 
 func (r *ProcessRuntime) Snapshot(mapsPerCore bool) (ProcessSnapshot, error) {
