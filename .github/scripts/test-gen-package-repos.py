@@ -93,7 +93,7 @@ class PackageReposTest(unittest.TestCase):
                                env={**os.environ, 'GITHUB_OUTPUT': str(output),
                                     'PYTHONPATH': os.pathsep.join((str(root), str(SCRIPTS))),
                                     'REPO_PREFIX': 'netdata/netdata', 'RELEASE_VERSION': version,
-                                    'GITHUB_SHA': 'abcdef'})
+                                    'SOURCE_SHA': 'abcdef'})
                 result = dict(line.split('=', 1) for line in output.read_text().splitlines())
                 self.assertEqual(result['repos'], expected)
 

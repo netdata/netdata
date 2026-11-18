@@ -190,15 +190,16 @@ class CMakeReleaseInfoTests(unittest.TestCase):
     def test_developer_build_has_no_official_identity(self):
         result, output = self.configure()
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.nightly', '', '', ''])
+        self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.post', '', '', ''])
         self.assertIn('.ReleaseVersion=', output[5])
 
     def test_official_identity_does_not_change_display_or_native_version(self):
-        for version, channel in [('v2.13.0', 'stable'), ('v2.13.0-20-nightly', 'nightly'), ('development', 'devel')]:
+        for version, channel in [('v2.13.0', 'stable'), ('v2.13.0-rc01', 'release-candidate'),
+                                 ('v2.13.0-20-nightly', 'nightly'), ('development', 'devel')]:
             with self.subTest(channel=channel):
                 result, output = self.configure(f'version={version}\nchannel={channel}\nsource={SOURCE}\n')
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.nightly', version, channel, SOURCE])
+                self.assertEqual(output[:5], ['v2.12.0-9-nightly', '2.12.0.9.post', version, channel, SOURCE])
                 self.assertIn('.ReleaseVersion=' + version, output[5])
                 self.assertIn('.ReleaseChannel=' + channel, output[5])
                 self.assertIn('.ReleaseRef=' + SOURCE, output[5])
