@@ -507,7 +507,6 @@ jobs:
     concurrency:
       group: docker-publish-docker
       cancel-in-progress: false
-      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -713,7 +712,6 @@ jobs:
     concurrency:
       group: docker-publish-quay
       cancel-in-progress: false
-      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -920,7 +918,6 @@ jobs:
     concurrency:
       group: docker-publish-ghcr
       cancel-in-progress: false
-      queue: max
     steps:
       - name: Checkout
         id: checkout

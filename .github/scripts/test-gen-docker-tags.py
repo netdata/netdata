@@ -205,7 +205,6 @@ class DockerTagsTest(unittest.TestCase):
             with self.subTest(registry=registry):
                 self.assertIn(f'group: docker-publish-{registry}', block)
                 self.assertIn('cancel-in-progress: false', block)
-                self.assertIn('queue: max', block)
                 self.assertIn(f'--registry {registry}', block)
                 self.assertLess(block.index('id: login'), block.index('id: published-tags'))
                 self.assertLess(block.index('id: published-tags'), block.index('id: manifest'))
