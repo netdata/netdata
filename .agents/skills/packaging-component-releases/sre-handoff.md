@@ -1,7 +1,8 @@
 # Packaging review and first publication
 
 Write the PR so a packaging reviewer can tell what to review, what has been proved locally, and who owns the next
-operation. Put the installation routes, outstanding decisions and test limitations in the visible description.
+operation. Separate implemented behavior from proposals. Put owner-labelled decisions and confirmations first,
+then the installation routes and evidence. Use tables with one test per row; keep background distinct from actions.
 
 1. **Describe the operator's path.** Show the opt-in action, download source, size, installation owner, update and
    activation behavior, and removal for each supported install method. In DEM, native users install an optional
@@ -25,10 +26,14 @@ operation. Put the installation routes, outstanding decisions and test limitatio
 |---|---|---|
 | Code review | Which catalog, repository and existing signing conventions does this component reuse? Which exceptions need agreement? | Workflow, generated destination matrix, dependency metadata and signing/verifier test |
 | Before first publication | Which storage remote and public HTTPS base serve the exact bytes? Who configures immutable retention and public serving? | Confirmed route, storage and cache settings, and release runbook |
-| Before first publication | Who owns key custody/rotation, environment reviewers, branch restrictions, host keys and scoped credential access? | Names of required settings, which already exist and which need provisioning |
+| Before first publication | Which existing release access settings apply, and what remains unconfirmed? | Setting names and responsible owners; include environment reviewers only when that environment is actually used |
 | Before first publication | Which exact artifacts were qualified and who approved the matching sources and licenses? | Artifact digests, supported host results and corresponding-source review |
 | Before exposing the matching Agent release | Can clients fetch the immutable runtime and sources through the public URL? | Public read-back sizes and digests matching the signed release |
 | Before availability is announced | Did each repository ingest the signed package, and can a client install it and use the feature? | Signed repository metadata and a fresh install/update through the published channel |
+
+Check key custody/rotation, branch restrictions, host keys and scoped credentials against the existing release
+setup before requesting new configuration. Carry forward confirmed answers; separate SRE access tasks from the
+maintainer's release ownership and first-run validation.
 
 If a reviewer asks to reuse a signing key, clarify **both** the signature protocol and how an installed client
 obtains replacement public keys. Record offline behavior and what happens when refresh fails. If someone proposes

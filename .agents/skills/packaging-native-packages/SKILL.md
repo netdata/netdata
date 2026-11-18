@@ -20,6 +20,8 @@ its distro; a build request alone does not authorize installing packages on the 
 | Add a component or change default plugin delivery | `./SKILL.md#preserve-dependency-policy`; component registry and plugin install rules |
 | Package a versioned runtime or helper | `./SKILL.md#versioned-payloads` and the component recipe |
 | Diagnose a missing account or wrong installed owner | `./SKILL.md#account-creation-and-payload-ownership`; selected scriptlets and transaction log |
+| Investigate source/updater callers or shared service integration | `.agents/skills/packaging-installers/SKILL.md`; package hook semantics stay here |
+| Reproduce a published package transaction | `./SKILL.md#transaction-inputs` |
 | Validate a native packaging change | `./SKILL.md#validate-at-the-relevant-layer`; metadata and transaction evidence |
 
 ## Source Owners
@@ -71,9 +73,26 @@ its distro; a build request alone does not authorize installing packages on the 
   user's actual runtime status. A failed RPM `%posttrans` can leave the package installed while the feature is
   unavailable. Debian can leave configuration pending for retry. The DEM recipe initially requires live systemd.
   Its documented commands and package-manager differences are in `packaging/dem-runtime/native/README.md`.
+- Check the main Agent's service action as well as component hooks: an earlier package can change the state the
+  component observes. DEB tests MUST distinguish stopped upgrades from installation after removal; dpkg retains
+  the prior configuration version after a non-purge removal. Keep Debian helper mask and `policy-rc.d` handling.
+  Exercise `packaging/cmake/pkg-files/deb/netdata/postinst` through shell fixtures and real transactions to verify
+  the distribution helpers, administrator masks and package ordering.
 
 For repository submission, managed archives or an SRE release handoff, use
 `.agents/skills/packaging-component-releases/SKILL.md`.
+
+## Transaction Inputs
+
+- For a historical version, inspect the package manager's complete resolved Netdata package set, including epochs
+  and companion versions. Requesting only the Agent/plugin/runtime can select newer auxiliary packages; distinguish
+  an invalid starting installation from a production dependency defect.
+- Use the normal repository configuration and updater prerequisites when claiming updater coverage. A signed
+  hand-written repository entry can prove direct installation without proving the normal updater path. Trace
+  `packaging/installer/netdata-updater.sh` and the distro's repo-config package.
+- Record actual package-manager ordering and final service state. Agent-first and runtime-first requests do not
+  force opposite unpack/configure orders. Compare component-only and unenrolled Agent controls when the failing
+  behavior could belong to a shared package or service owner.
 
 ## Account Creation And Payload Ownership
 
@@ -105,6 +124,10 @@ For repository submission, managed archives or an SRE release handoff, use
 4. Separate configure, build, transaction and runtime failures in CI. Read the failing step and diagnostics before
    changing compiler flags or relaxing runtime assertions. Report fixture checks and actual package transactions as
    different evidence; neither alone establishes all supported architectures.
+5. For shared systemd unit changes, check `system/systemd/tmpfiles.conf.in` and the Agent's startup ownership together.
+   `RuntimeDirectory` ownership follows the unit's startup user, which differs from the Agent's runtime user.
+   Verify missing-directory first start and restart with surviving IPC files under enforcing SELinux; do not remove
+   endpoint lock files to avoid an ownership failure, because that can break lock exclusion.
 
 The focused IPMI regression suite provides examples for dependency, account-ordering metadata, component staging and
 privileges in `packaging/installer/tests/test_ipmi_delivery.py`. From the repository root, with Python 3, Bash and
