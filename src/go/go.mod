@@ -79,7 +79,7 @@ require (
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8
 	github.com/stmcginnis/gofish v0.27.0
 	github.com/stretchr/testify v1.12.1
-	github.com/tidwall/gjson v1.20.2
+	github.com/tidwall/gjson v1.20.3
 	github.com/valyala/fastjson v1.6.10
 	github.com/vmware/govmomi v0.56.2
 	go.mongodb.org/mongo-driver/v2 v2.10.0
