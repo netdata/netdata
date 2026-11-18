@@ -101,12 +101,14 @@ class ReleaseInfoTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             source = self._stamp_fixture(root)
-            saved = os.fchmod
-            del os.fchmod
+            saved = getattr(os, 'fchmod', None)
+            if saved is not None:
+                del os.fchmod
             try:
                 release_info.stamp(root, 'stable', source)
             finally:
-                os.fchmod = saved
+                if saved is not None:
+                    os.fchmod = saved
             path = root / 'packaging/release-info'
             self.assertEqual(release_info.read_release_info(path)['source'], source)
             if os.name == 'posix':
