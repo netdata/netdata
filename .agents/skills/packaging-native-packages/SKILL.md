@@ -105,6 +105,10 @@ For repository submission, managed archives or an SRE release handoff, use
 4. Separate configure, build, transaction and runtime failures in CI. Read the failing step and diagnostics before
    changing compiler flags or relaxing runtime assertions. Report fixture checks and actual package transactions as
    different evidence; neither alone establishes all supported architectures.
+5. For shared systemd unit changes, check `system/systemd/tmpfiles.conf.in` and the Agent's startup ownership together.
+   `RuntimeDirectory` ownership follows the unit's startup user, which differs from the Agent's runtime user.
+   Verify missing-directory first start and restart with surviving IPC files under enforcing SELinux; do not remove
+   endpoint lock files to avoid an ownership failure, because that can break lock exclusion.
 
 The focused IPMI regression suite provides examples for dependency, account-ordering metadata, component staging and
 privileges in `packaging/installer/tests/test_ipmi_delivery.py`. From the repository root, with Python 3, Bash and

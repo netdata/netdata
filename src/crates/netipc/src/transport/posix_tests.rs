@@ -844,8 +844,7 @@ fn test_listen_socket_owner_only() {
 #[test]
 fn test_stale_recovery_in_group_writable_run_dir() {
     use std::os::unix::fs::PermissionsExt;
-    // Crash recovery must work regardless of run-dir permissions
-    // (netdata's systemd unit ships RuntimeDirectoryMode=0775).
+    // Crash recovery must also work with group-writable runtime directories.
     let dir = format!("{TEST_RUN_DIR}_0775");
     let _ = std::fs::create_dir_all(&dir);
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o775)).expect("chmod 0775");

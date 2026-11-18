@@ -11,8 +11,8 @@ LogNamespace=netdata
 Type=simple
 User=root
 Group=netdata
-RuntimeDirectory=netdata
-RuntimeDirectoryMode=0775
+# tmpfiles and the Agent own /run/netdata as the runtime user. RuntimeDirectory
+# would recursively reassign surviving IPC files to root before the Agent starts.
 PIDFile=/run/netdata/netdata.pid
 ExecStart=@sbindir_POST@/netdata -P /run/netdata/netdata.pid -D
 PermissionsStartOnly=true
@@ -72,7 +72,8 @@ ProtectHome=read-only
 #PrivateTmp=true
 ProtectControlGroups=on
 # We whitelist this because it's the standard location to listen on a UNIX socket.
-ReadWriteDirectories=/run/netdata
+# The Agent can create the directory if tmpfiles has not run yet.
+ReadWriteDirectories=-/run/netdata
 # This is needed to make email-based alert deliver work if Postfix is the email provider on the system.
 ReadWriteDirectories=-/var/spool/postfix/maildrop
 # LXCFS directories (https://github.com/lxc/lxcfs#lxcfs)
