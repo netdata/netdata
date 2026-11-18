@@ -463,10 +463,10 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
 
     // last: everything after this (the final status save, the out-of-memory fatal) reads the retained sample.
     // A sampler stuck in a system memory read (e.g. a hung lxcfs) is left behind.
-    bool sysmem_sampler_stopped __maybe_unused = os_system_memory_sampler_stop(5 * USEC_PER_SEC);
+    bool sysmem_sampler_stopped = os_system_memory_sampler_stop(5 * USEC_PER_SEC);
     if(!sysmem_sampler_stopped) {
         __atomic_store_n(&work_abandoned, true, __ATOMIC_RELAXED);
-        daemon_status_file_shutdown_gave_up("SYSMEM ", "SYSMEM may still be reading system memory");
+        daemon_status_file_shutdown_gave_up("SYSMEM ", "SYSMEM could not be stopped (may be stuck reading system memory)");
     }
     watcher_step_complete(WATCHER_STEP_ID_STOP_SYSTEM_MEMORY_SAMPLER);
 

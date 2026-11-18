@@ -34,14 +34,16 @@ typedef struct {
 OS_SYSTEM_MEMORY os_system_memory(void);
 
 // The last published sample if it is younger than max_age_ut (0 = any age), otherwise OS_SYSTEM_MEMORY_EMPTY.
-// Never does I/O. Safe on any thread, including fatal and out-of-memory paths.
+// Never does I/O and retries a bounded number of times: if a new sample keeps being written while it reads (rare),
+// it returns OS_SYSTEM_MEMORY_EMPTY. Safe on any thread, including fatal and out-of-memory paths.
 OS_SYSTEM_MEMORY os_system_memory_cached(usec_t max_age_ut);
 
 // Start the sampler thread. Call it once, after the process has forked into the background.
 void os_system_memory_sampler_start(void);
 
-// Stop the sampler thread, waiting at most timeout_ut. Returns false if it is still running (stuck in a read): it is
-// then abandoned, and the caller must not run teardown that a running thread could use.
+// Stop the sampler thread: after signaling it, wait at most timeout_ut for it to leave its loop, then join it (no
+// deadline on the join, which waits only for the thread's exit bookkeeping). Returns false if it is stuck in a read or could not be joined: it is then
+// abandoned, and the caller must not run teardown that a running thread could use.
 bool os_system_memory_sampler_stop(usec_t timeout_ut);
 
 double os_system_memory_available_percent(OS_SYSTEM_MEMORY mem);

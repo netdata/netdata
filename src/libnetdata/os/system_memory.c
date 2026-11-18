@@ -314,9 +314,10 @@ static OS_SYSTEM_MEMORY system_memory_read(bool query_total_ram) {
 #define SYSTEM_MEMORY_SAMPLE_EVERY_MS 1000
 #define SYSTEM_MEMORY_REDETECT_EVERY_UT (60 * USEC_PER_SEC)
 
+// A seqlock with a single writer (the bootstrap read, then the sampler - never both at once):
+// seq is odd while a sample is being written, so a reader never mixes the fields of two samples.
 static struct {
-    // the values are written before sampled_ut (release) and read after it (acquire),
-    // so a reader that sees a sample time never gets values older than that sample
+    uint32_t seq;
     uint64_t ram_total_bytes;
     uint64_t ram_available_bytes;
     usec_t sampled_ut;              // monotonic time of the last valid sample, 0 = none yet
@@ -327,23 +328,50 @@ static void system_memory_publish(OS_SYSTEM_MEMORY sm) {
     if(!OS_SYSTEM_MEMORY_OK(sm))
         return;
 
+    usec_t now_ut = now_monotonic_usec();   // outside the write window, to keep it short
+
+    uint32_t seq = __atomic_load_n(&published.seq, __ATOMIC_RELAXED);
+    __atomic_store_n(&published.seq, seq + 1, __ATOMIC_RELAXED);
+    __atomic_thread_fence(__ATOMIC_RELEASE);
+
     __atomic_store_n(&published.ram_total_bytes, sm.ram_total_bytes, __ATOMIC_RELAXED);
     __atomic_store_n(&published.ram_available_bytes, sm.ram_available_bytes, __ATOMIC_RELAXED);
-    __atomic_store_n(&published.sampled_ut, now_monotonic_usec(), __ATOMIC_RELEASE);
+    __atomic_store_n(&published.sampled_ut, now_ut, __ATOMIC_RELAXED);
+
+    __atomic_store_n(&published.seq, seq + 2, __ATOMIC_RELEASE);
 }
 
 OS_SYSTEM_MEMORY os_system_memory_cached(usec_t max_age_ut) {
-    usec_t sampled_ut = __atomic_load_n(&published.sampled_ut, __ATOMIC_ACQUIRE);
+    OS_SYSTEM_MEMORY sm;
+    usec_t sampled_ut;
+
+    // the writer does three stores and no I/O, so a retry is rare; still bounded, since this runs on fatal paths
+    for(size_t tries = 0; ; tries++) {
+        if(tries >= 1000)
+            return OS_SYSTEM_MEMORY_EMPTY;
+
+        uint32_t seq = __atomic_load_n(&published.seq, __ATOMIC_ACQUIRE);
+        if(seq & 1) {
+            yield_the_processor();
+            continue;
+        }
+
+        sm.ram_total_bytes = __atomic_load_n(&published.ram_total_bytes, __ATOMIC_RELAXED);
+        sm.ram_available_bytes = __atomic_load_n(&published.ram_available_bytes, __ATOMIC_RELAXED);
+        sampled_ut = __atomic_load_n(&published.sampled_ut, __ATOMIC_RELAXED);
+
+        __atomic_thread_fence(__ATOMIC_ACQUIRE);
+        if(__atomic_load_n(&published.seq, __ATOMIC_RELAXED) == seq)
+            break;
+    }
+
     if(!sampled_ut)
         return OS_SYSTEM_MEMORY_EMPTY;
 
     if(max_age_ut && now_monotonic_usec() > sampled_ut + max_age_ut)
         return OS_SYSTEM_MEMORY_EMPTY;
 
-    return (OS_SYSTEM_MEMORY){
-        .ram_total_bytes = __atomic_load_n(&published.ram_total_bytes, __ATOMIC_RELAXED),
-        .ram_available_bytes = __atomic_load_n(&published.ram_available_bytes, __ATOMIC_RELAXED),
-    };
+    return sm;
 }
 
 // ----------------------------------------------------------------------------
@@ -387,6 +415,7 @@ static struct {
     ND_THREAD *thread;
     struct completion wake;         // shortens the sleep when the thread is asked to stop
     bool exited;
+    bool join_failed;               // the handle was given up without a clean join
 } sampler = { 0 };
 
 static void system_memory_sampler_cancel(void *data __maybe_unused) {
@@ -430,11 +459,13 @@ void os_system_memory_sampler_start(void) {
 
     completion_init(&sampler.wake);
     sampler.thread = nd_thread_create("SYSMEM", NETDATA_THREAD_OPTION_MANUAL_JOIN, system_memory_sampler_thread, NULL);
+    if(!sampler.thread)
+        completion_destroy(&sampler.wake);
 }
 
 bool os_system_memory_sampler_stop(usec_t timeout_ut) {
     if(!sampler.thread)
-        return true;
+        return !sampler.join_failed;
 
     if(nd_thread_is_me(sampler.thread))
         // a fatal on the sampler itself - it cannot wait for itself
@@ -451,8 +482,15 @@ bool os_system_memory_sampler_stop(usec_t timeout_ut) {
         sleep_usec(10 * USEC_PER_MS);
     }
 
-    nd_thread_join(sampler.thread);
+    if(nd_thread_join(sampler.thread) != 0) {
+        // the join may have freed the handle anyway: never touch it again, and leave the thread behind
+        sampler.thread = NULL;
+        sampler.join_failed = true;
+        return false;
+    }
+
     sampler.thread = NULL;
+    completion_destroy(&sampler.wake);
     return true;
 }
 
@@ -475,6 +513,18 @@ static bool sm_equal(OS_SYSTEM_MEMORY a, OS_SYSTEM_MEMORY b) {
 #define SM_CHECK(cond, msg) do {                                        \
     if(!(cond)) { fprintf(stderr, "SYSTEM MEMORY: FAILED: %s\n", msg); errors++; } \
 } while(0)
+
+static bool sm_unittest_writer_stop = false;
+static bool sm_unittest_writer_started = false;
+
+// publishes samples whose two fields are always equal; a reader seeing them differ got a mixed sample
+static void sm_unittest_writer(void *ptr __maybe_unused) {
+    for(uint64_t v = 1; !__atomic_load_n(&sm_unittest_writer_stop, __ATOMIC_RELAXED); v++) {
+        system_memory_publish((OS_SYSTEM_MEMORY){ .ram_total_bytes = v, .ram_available_bytes = v });
+        if(v == 1)
+            __atomic_store_n(&sm_unittest_writer_started, true, __ATOMIC_RELEASE);
+    }
+}
 
 int os_system_memory_unittest(void) {
     int errors = 0;
@@ -504,6 +554,63 @@ int os_system_memory_unittest(void) {
 
     __atomic_store_n(&published.sampled_ut, 0, __ATOMIC_RELEASE);
     SM_CHECK(!OS_SYSTEM_MEMORY_OK(os_system_memory_cached(0)), "no sample returns empty");
+
+    // a sample being written is never returned: the reader gives up and returns empty
+    system_memory_publish(s1);
+    __atomic_add_fetch(&published.seq, 1, __ATOMIC_RELEASE);
+    SM_CHECK(!OS_SYSTEM_MEMORY_OK(os_system_memory_cached(0)), "a sample being written returns empty");
+    __atomic_add_fetch(&published.seq, 1, __ATOMIC_RELEASE);
+    SM_CHECK(sm_equal(os_system_memory_cached(0), s1), "a written sample is returned");
+
+    // readers racing the writer must never get the fields of two different samples
+    {
+        __atomic_store_n(&sm_unittest_writer_stop, false, __ATOMIC_RELAXED);
+        __atomic_store_n(&sm_unittest_writer_started, false, __ATOMIC_RELAXED);
+        ND_THREAD *writer = nd_thread_create("SYSMEMTEST", NETDATA_THREAD_OPTION_MANUAL_JOIN, sm_unittest_writer, NULL);
+        if(!writer) {
+            fprintf(stderr, "SYSTEM MEMORY: FAILED: cannot create the writer thread\n");
+            return 1;
+        }
+
+        for(int i = 0; i < 2000 && !__atomic_load_n(&sm_unittest_writer_started, __ATOMIC_ACQUIRE); i++)
+            sleep_usec(USEC_PER_MS);
+
+        if(!__atomic_load_n(&sm_unittest_writer_started, __ATOMIC_ACQUIRE)) {
+            __atomic_store_n(&sm_unittest_writer_stop, true, __ATOMIC_RELAXED);
+            nd_thread_join(writer);
+            fprintf(stderr, "SYSTEM MEMORY: FAILED: the writer thread did not start\n");
+            return 1;
+        }
+
+        // count the samples seen change, so that a pass needs reads overlapping the writer
+        size_t reads = 0, mixed = 0, changes = 0;
+        uint64_t last = 0;
+        usec_t until_ut = now_monotonic_usec() + 500 * USEC_PER_MS;
+        while(now_monotonic_usec() < until_ut) {
+            OS_SYSTEM_MEMORY sm = os_system_memory_cached(0);
+            if(!OS_SYSTEM_MEMORY_OK(sm))
+                continue;
+
+            reads++;
+            if(sm.ram_total_bytes != sm.ram_available_bytes)
+                mixed++;
+            if(sm.ram_total_bytes != last) {
+                changes++;
+                last = sm.ram_total_bytes;
+            }
+        }
+
+        __atomic_store_n(&sm_unittest_writer_stop, true, __ATOMIC_RELAXED);
+        if(nd_thread_join(writer) != 0) {
+            // the writer may still publish: the rest of the test cannot run
+            fprintf(stderr, "SYSTEM MEMORY: FAILED: cannot join the writer thread\n");
+            return 1;
+        }
+
+        fprintf(stderr, "SYSTEM MEMORY: %zu concurrent reads, %zu samples seen, %zu mixed\n", reads, changes, mixed);
+        SM_CHECK(changes > 1, "concurrent reads overlap the writer");
+        SM_CHECK(!mixed, "concurrent reads return whole samples");
+    }
 
     // restore, then run the real sampler: it must publish a new sample and stop on request
     __atomic_store_n(&published.ram_total_bytes, saved_total, __ATOMIC_RELAXED);
