@@ -69,7 +69,6 @@ void health_alarm_wait_for_execution(ALARM_ENTRY *ae) {
         }
     }
     ae->popen_instance = NULL;
-    netdata_log_debug(D_HEALTH, "done executing command - returned with code %d", code);
 
 cleanup:
     if (in_process)
@@ -383,12 +382,6 @@ static const char *health_raised_summary_my_expression_error(struct health_raise
 }
 
 void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_raised_summary *hrm) {
-    netdata_log_debug(D_HEALTH, "Health alarm '%s.%s' = " NETDATA_DOUBLE_FORMAT_AUTO " - changed status from %s to %s",
-                      ae->chart?ae_chart_id(ae):"NOCHART", ae_name(ae),
-                      ae->new_value,
-                      rrdcalc_status2string(ae->old_status),
-                      rrdcalc_status2string(ae->new_status)
-    );
 
     // The entry is published in the health log and no health-log lock is held here: other threads set
     // UPDATED (a newer transition) and SAVED (the metadata worker) on it concurrently, so every flag change
@@ -397,7 +390,6 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
 
     if(unlikely(ae->new_status < RRDCALC_STATUS_CLEAR)) {
         // do not send notifications for internal statuses
-        netdata_log_debug(D_HEALTH, "Health not sending notification for alarm '%s.%s' status %s (internal statuses)", ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
         goto done;
     }
 
@@ -435,8 +427,6 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
             // so, don't send CLEAR notifications
             if(unlikely(ae->new_status == RRDCALC_STATUS_CLEAR)) {
                 if((!(flags & HEALTH_ENTRY_RUN_ONCE)) || (flags & HEALTH_ENTRY_RUN_ONCE && ae->old_status < RRDCALC_STATUS_RAISED) ) {
-                    netdata_log_debug(D_HEALTH, "Health not sending notification for first initialization of alarm '%s.%s' status %s"
-                                      , ae_chart_id(ae), ae_name(ae), rrdcalc_status2string(ae->new_status));
                     goto done;
                 }
             }
@@ -518,7 +508,6 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
         __atomic_store_n(&ae->exec_run_timestamp, now_realtime_sec(), __ATOMIC_RELAXED);
         atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_RUN);
 
-        netdata_log_debug(D_HEALTH, "executing command '%s'", command_to_run);
         ae->popen_instance = spawn_popen_run(command_to_run);
         if(ae->popen_instance) {
             atomic_flags_set(&ae->flags, HEALTH_ENTRY_FLAG_EXEC_IN_PROGRESS);

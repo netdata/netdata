@@ -114,7 +114,6 @@ static MCP_RETURN_CODE mcp_resources_method_read(MCP_CLIENT *mcpc, struct json_o
         return MCP_RC_INVALID_PARAMS;
     }
 
-    netdata_log_debug(D_MCP, "MCP resources/read for URI: %s", uri);
     
     // Since we have no resources, always return not found
     buffer_sprintf(mcpc->error, "Unknown resource URI: %s", uri);
@@ -152,7 +151,6 @@ static MCP_RETURN_CODE mcp_resources_method_unsubscribe(MCP_CLIENT *mcpc, struct
 MCP_RETURN_CODE mcp_resources_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id __maybe_unused) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP resources method: %s", method);
 
     MCP_RETURN_CODE rc;
     

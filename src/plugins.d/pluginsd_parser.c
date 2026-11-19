@@ -24,17 +24,6 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 
     st->pluginsd.set = true;
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_PLUGINSD)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
-                              string2str(identity.hostname), rrdset_id(st), dimension, value && *value ? value : "UNSET");
-            rrdhost_identity_release(&identity);
-        }
-#endif
-    }
-
     if (value && *value) {
         if(rrddim_is_float(rd))
             rrddim_set_by_pointer_double(st, rd, str2ndd_encoded(value, NULL));
@@ -106,9 +95,6 @@ static inline PARSER_RC pluginsd_end(char **words, size_t num_words, PARSER *par
 
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_END, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
-
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        netdata_log_debug(D_PLUGINSD, "requested an END on chart '%s'", rrdset_id(st));
 
     // revive it while its scope still holds it, as rrdset_timed_done() would
     if(likely(!rrdset_flag_check(st, RRDSET_FLAG_COLLECTION_FINISHED)) &&
@@ -684,11 +670,6 @@ static inline PARSER_RC pluginsd_chart(char **words, size_t num_words, PARSER *p
     if (unlikely(!units))
         units = "unknown";
 
-    netdata_log_debug(
-        D_PLUGINSD,
-        "creating chart type='%s', id='%s', name='%s', family='%s', context='%s', chart='%s', priority=%d, update_every=%d",
-        type, id, name ? name : "", family ? family : "", context ? context : "", rrdset_type_name(chart_type),
-        priority, update_every);
 
     RRDSET *st = NULL;
 
@@ -781,13 +762,6 @@ static inline PARSER_RC pluginsd_dimension(char **words, size_t num_words, PARSE
 
     if (unlikely(!algorithm || !*algorithm))
         algorithm = "absolute";
-
-    if (unlikely(st && rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        netdata_log_debug(
-            D_PLUGINSD,
-            "creating dimension in chart %s, id='%s', name='%s', algorithm='%s', multiplier=%ld, divisor=%ld, hidden='%s'",
-            rrdset_id(st), id, name ? name : "", rrd_algorithm_name(rrd_algorithm_id(algorithm)), multiplier, divisor,
-            options ? options : "");
 
     RRDDIM *rd = rrddim_add(st, id, name, multiplier, divisor, rrd_algorithm_id(algorithm));
     if (unlikely(!rd))
@@ -934,7 +908,6 @@ static inline PARSER_RC pluginsd_variable(char **words, size_t num_words, PARSER
 }
 
 static inline PARSER_RC pluginsd_flush(char **words __maybe_unused, size_t num_words __maybe_unused, PARSER *parser) {
-    netdata_log_debug(D_PLUGINSD, "requested a " PLUGINSD_KEYWORD_FLUSH);
     pluginsd_clear_scope_chart(parser, PLUGINSD_KEYWORD_FLUSH, NULL);
     parser->user.replay.start_time = 0;
     parser->user.replay.end_time = 0;
@@ -999,7 +972,6 @@ static inline PARSER_RC pluginsd_overwrite(char **words __maybe_unused, size_t n
     RRDHOST *host = pluginsd_require_scope_host(parser, PLUGINSD_KEYWORD_OVERWRITE);
     if(!host) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
-    netdata_log_debug(D_PLUGINSD, "requested to OVERWRITE host labels");
 
     if (!parser->user.new_host_labels)
         parser->user.new_host_labels = rrdlabels_create();
@@ -1074,7 +1046,6 @@ static inline PARSER_RC pluginsd_clabel_commit(char **words __maybe_unused, size
     RRDSET *st = pluginsd_require_scope_chart(parser, PLUGINSD_KEYWORD_CLABEL_COMMIT, PLUGINSD_KEYWORD_BEGIN);
     if(!st) return PLUGINSD_PROTOCOL_ERROR(NULL, NULL);
 
-    netdata_log_debug(D_PLUGINSD, "requested to commit chart labels");
 
     if(!parser->user.clabel_count) {
         netdata_log_error("PLUGINSD: 'host:%s' got CLABEL_COMMIT, without a CHART or BEGIN. Ignoring it.", rrdhost_hostname(host));
@@ -1509,7 +1480,6 @@ static inline PARSER_RC pluginsd_trust_durations(char **words, size_t num_words,
 
     parser->user.trust_durations = trusted;
 
-    netdata_log_debug(D_PLUGINSD, "PLUGINSD: trust durations set to %d", trusted);
 
     return PARSER_RC_OK;
 }

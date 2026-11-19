@@ -157,13 +157,11 @@ static int load_private_key()
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/cloud.d/private.pem", netdata_configured_varlib_dir);
 
-    long bytes_read;
-    char *private_key = read_by_filename(filename, &bytes_read);
+    char *private_key = read_by_filename(filename, NULL);
     if (!private_key) {
         netdata_log_error("ACLK: Claimed agent cannot establish ACLK - unable to load private key '%s' failed.", filename);
         return 1;
     }
-    netdata_log_debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
     int rc = 1;
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
@@ -286,7 +284,6 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
     UNUSED(qos);
     __atomic_add_fetch(&aclk_rcvd_cloud_msgs, 1, __ATOMIC_RELAXED);
 
-    netdata_log_debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
     if (aclk_shared_state.mqtt_shutdown_msg_id > 0) {
         netdata_log_error("ACLK: Link is shutting down. Ignoring incoming message.");

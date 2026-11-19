@@ -96,7 +96,6 @@ void clean_pubsub_instance(struct instance *instance)
 void pubsub_connector_worker(void *instance_p)
 {
     struct instance *instance = (struct instance *)instance_p;
-    struct pubsub_specific_config *connector_specific_config = instance->config.connector_specific_config;
     struct pubsub_specific_data *connector_specific_data = instance->connector_specific_data;
 
     while (!instance->engine->exit) {
@@ -141,9 +140,6 @@ void pubsub_connector_worker(void *instance_p)
             goto cleanup;
         }
 
-        netdata_log_debug(
-            D_EXPORTING, "EXPORTING: pubsub_publish(): project = %s, topic = %s, buffer = %zu",
-            connector_specific_config->project_id, connector_specific_config->topic_id, buffer_len);
 
         if (pubsub_publish((void *)connector_specific_data, error_message, stats->buffered_metrics, buffer_len)) {
             netdata_log_error("EXPORTING: Instance: %s: Cannot publish a message: %s", instance->config.name, error_message);

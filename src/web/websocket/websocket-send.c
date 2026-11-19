@@ -26,7 +26,6 @@ ssize_t websocket_write_data(WS_CLIENT *wsc) {
         goto done;
 
     // Dump the data being written for debugging
-    websocket_dump_debug(wsc, data, data_length, "TX SOCK %zu bytes", data_length);
 
     // In the websocket thread we want non-blocking behavior
     // Use nd_sock_write with a single retry
@@ -178,15 +177,6 @@ static int websocket_protocol_send_frame(
         goto abnormal_disconnect;
     }
 
-    websocket_debug(wsc,
-                    "TX FRAME: OPCODE=0x%x (%s), FIN=%s, RSV1=%d, RSV2=%d, RSV3=%d, MASK=%s, LEN=%d, "
-                    "PAYLOAD_LEN=%zu, HEADER_SIZE=%zu, FRAME_SIZE=%zu, MASK=%02x%02x%02x%02x",
-                    header.opcode,
-                    WEBSOCKET_OPCODE_2str(opcode),
-                    header.fin ? "True" : "False", header.rsv1, header.rsv2, header.rsv3,
-                    header.mask ? "True" : "False", header.len,
-                    header.payload_length, header.header_size, header.frame_size,
-                    header.mask_key[0], header.mask_key[1], header.mask_key[2], header.mask_key[3]);
 #endif
 
     // Make sure the client's poll flags include WRITE
@@ -243,8 +233,6 @@ int websocket_protocol_send_payload(
             data_to_send = wsb_data(&wsc->c_payload);
             data_len = wsb_length(&wsc->c_payload);
             
-            websocket_debug(wsc, "Using compressed payload for transmission (%zu -> %zu bytes)",
-                           payload_len, data_len);
         }
     }
     
@@ -255,8 +243,6 @@ int websocket_protocol_send_payload(
     }
     
     // We need to fragment the message
-    websocket_debug(wsc, "Fragmenting large message (%zu bytes) into frames of max %zu bytes",
-                   data_len, wsc->max_outbound_frame_size);
     
     size_t total_sent = 0;
     size_t bytes_remaining = data_len;
@@ -298,7 +284,6 @@ int websocket_protocol_send_payload(
         first_frame = false;
     }
     
-    websocket_debug(wsc, "Successfully sent fragmented message in multiple frames, total bytes: %zu", total_sent);
     return total_sent;
 }
 
@@ -317,10 +302,8 @@ int websocket_protocol_send_text(WS_CLIENT *wsc, const char *text) {
 
     size_t text_len = strlen(text);
 
-    websocket_debug(wsc, "Sending text message, length=%zu", text_len);
 
     // Dump text message for debugging
-    websocket_dump_debug(wsc, text, text_len, "TX TEXT MSG");
 
     // Enable compression for text messages by default, with automatic fragmentation
     return websocket_protocol_send_payload(wsc, text, text_len, WS_OPCODE_TEXT, true);
@@ -340,10 +323,8 @@ int websocket_protocol_send_binary(WS_CLIENT *wsc, const void *data, size_t leng
     if (!wsc)
         return -1;
 
-    websocket_debug(wsc, "Sending binary message, length=%zu", length);
 
     // Dump binary message for debugging
-    websocket_dump_debug(wsc, data, length, "TX BIN MSG");
 
     // Enable compression for binary messages by default, with automatic fragmentation
     return websocket_protocol_send_payload(wsc, data, length, WS_OPCODE_BINARY, true);

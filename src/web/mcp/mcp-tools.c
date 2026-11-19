@@ -354,7 +354,6 @@ static MCP_RETURN_CODE mcp_tools_method_call(MCP_CLIENT *mcpc, struct json_objec
 MCP_RETURN_CODE mcp_tools_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP tools method: %s", method);
 
     MCP_RETURN_CODE rc;
 

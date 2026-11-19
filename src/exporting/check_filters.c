@@ -61,10 +61,6 @@ int rrdhost_is_exportable(struct instance *instance, RRDHOST *host)
  */
 int rrdset_is_exportable(struct instance *instance, RRDSET *st)
 {
-#ifdef NETDATA_INTERNAL_CHECKS
-    RRDHOST *host = st->rrdhost;
-#endif
-
     if (st->exporting_flags == NULL)
         st->exporting_flags = callocz(instance->engine->instance_num, sizeof(size_t));
 
@@ -79,36 +75,18 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
-#ifdef NETDATA_INTERNAL_CHECKS
-            if(unlikely(debug_flags & D_EXPORTING)) {
-                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-                netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.", rrdset_id(st), string2str(identity.hostname));
-                rrdhost_identity_release(&identity);
-            }
-#endif
+            nd_log(NDLS_DAEMON, NDLP_DEBUG,
+                   "EXPORTING: instance '%s' is not sending chart '%s', because it does not match its 'send charts matching'",
+                   instance->config.name, rrdset_id(st));
             return 0;
         }
     }
 
     if(unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_EXPORTING)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.", rrdset_id(st), string2str(identity.hostname));
-            rrdhost_identity_release(&identity);
-        }
-#endif
         return 0;
     }
 
     if(unlikely(st->rrd_memory_mode == RRD_DB_MODE_NONE && !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-#ifdef NETDATA_INTERNAL_CHECKS
-        if(unlikely(debug_flags & D_EXPORTING)) {
-            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
-            netdata_log_debug(D_EXPORTING, "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting engine requires database access.", rrdset_id(st), string2str(identity.hostname), rrd_memory_mode_name(host->rrd_memory_mode));
-            rrdhost_identity_release(&identity);
-        }
-#endif
         return 0;
     }
 

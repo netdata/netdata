@@ -213,7 +213,6 @@ const char *nd_log_sources[] = {
     [NDLS_COLLECTORS] = "collector",
     [NDLS_DAEMON] = "daemon",
     [NDLS_HEALTH] = "health",
-    [NDLS_DEBUG] = "debug",
 };
 
 size_t nd_log_source2id(const char *source, ND_LOG_SOURCES def) {
@@ -346,19 +345,6 @@ struct nd_log nd_log = {
             .fp = NULL,
             .min_priority = NDLP_INFO,
             .limits = ND_LOG_LIMITS_DEFAULT,
-        },
-        [NDLS_DEBUG] = {
-            .method = NDLM_DISABLED,
-            .format = NDLF_LOGFMT,
-            .filename = LOG_DIR "/debug.log",
-#if defined(FSANITIZE_ADDRESS)
-            .fd = -1,
-#else
-            .fd = STDOUT_FILENO,
-#endif
-            .fp = NULL,
-            .min_priority = NDLP_DEBUG,
-            .limits = ND_LOG_LIMITS_UNLIMITED,
         },
         [NDLS_DAEMON] = {
             .method = NDLM_DEFAULT,

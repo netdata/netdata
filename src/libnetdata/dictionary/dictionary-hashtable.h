@@ -124,7 +124,6 @@ static inline size_t hashtable_destroy_judy(DICTIONARY *dict) {
                           JU_ERRNO(&J_Error), JU_ERRID(&J_Error));
     }
 
-    netdata_log_debug(D_DICTIONARY, "Dictionary: hash table freed %lu bytes", ret);
 
     dict->index.JudyHSArray = NULL;
     return (size_t)ret;

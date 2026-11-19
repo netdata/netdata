@@ -105,8 +105,6 @@ Disable the Child's Agent logs in `netdata.conf`:
     collector = off
     access = off
     health = off
-    debug = off
-    debug flags = 0
 
 [cloud]
     conversation log = no

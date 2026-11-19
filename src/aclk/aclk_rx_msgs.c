@@ -164,7 +164,6 @@ int aclk_handle_cloud_cmd_message(char *payload)
         return 1;
     }
 
-    netdata_log_debug(D_ACLK, "ACLK incoming 'cmd' message (%s)", payload);
 
     int rc = json_parse(payload, &cloud_to_agent, cloud_to_agent_parse);
 
@@ -224,7 +223,6 @@ int create_node_instance_result(const char *msg, size_t msg_len)
         return 1;
     }
 
-    netdata_log_debug(D_ACLK, "CreateNodeInstanceResult: guid:%s nodeid:%s", res.machine_guid, res.node_id);
 
     aclk_query_t *query = aclk_query_new(CREATE_NODE_INSTANCE);
 
@@ -454,7 +452,6 @@ void aclk_init_rx_msg_handlers(void)
 void aclk_handle_new_cloud_msg(const char *message_type, const char *msg, size_t msg_len, const char *topic __maybe_unused)
 {
     new_cloud_rx_msg_t *msg_descriptor = find_rx_handler_by_hash(simple_hash(message_type));
-    netdata_log_debug(D_ACLK, "Got message named '%s' from cloud", message_type);
     if (unlikely(!msg_descriptor)) {
         netdata_log_error("Do not know how to handle message of type '%s'. Ignoring", message_type);
         return;

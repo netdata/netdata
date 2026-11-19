@@ -50,7 +50,6 @@ int api_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
         if(!name || !*name) continue;
         if(!value || !*value) continue;
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: API v1 alarm_count query param '%s' with value '%s'", w->id, name, value);
 
         char* p = value;
         if(!strcmp(name, "status")) {

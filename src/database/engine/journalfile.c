@@ -938,7 +938,6 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     *id = 0;
     jf_header = buf;
     if (STORE_PADDING == jf_header->type) {
-        netdata_log_debug(D_RRDENGINE, "Skipping padding.");
         return 0;
     }
     if (sizeof(*jf_header) > max_size) {
@@ -956,14 +955,12 @@ static unsigned journalfile_replay_transaction(struct rrdengine_instance *ctx, s
     crc = crc32(0L, Z_NULL, 0);
     crc = crc32(crc, buf, sizeof(*jf_header) + payload_length);
     ret = crc32cmp(jf_trailer->checksum, crc);
-    netdata_log_debug(D_RRDENGINE, "Transaction %"PRIu64" was read from disk. CRC32 check: %s", *id, ret ? "FAILED" : "SUCCEEDED");
     if (unlikely(ret)) {
         netdata_log_error("DBENGINE: transaction %"PRIu64" was read from disk. CRC32 check: FAILED", *id);
         return size_bytes;
     }
     switch (jf_header->type) {
     case STORE_DATA:
-        netdata_log_debug(D_RRDENGINE, "Replaying transaction %"PRIu64"", jf_header->id);
             journalfile_restore_extent_metadata(ctx, journalfile, buf + sizeof(*jf_header), payload_length);
         break;
     default:

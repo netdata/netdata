@@ -140,7 +140,6 @@ int help(int exitcode) {
 
     fprintf(stream, "\n Advanced options:\n\n"
             "  -W stacksize=N           Set the stacksize (in bytes).\n\n"
-            "  -W debug_flags=N         Set runtime tracing to debug.log.\n\n"
             "  -W unittest              Run internal unittests and exit.\n\n"
             "  -W sqlite-meta-recover   Run recovery on the metadata database and exit.\n\n"
             "  -W sqlite-compact        Reclaim metadata database unused space and exit.\n\n"
@@ -418,7 +417,6 @@ int netdata_main(int argc, char **argv) {
                         return 1;
                     }
                     else {
-                        netdata_log_debug(D_OPTIONS, "Configuration loaded from %s.", optarg);
                         cloud_conf_load(1);
                         config_loaded = 1;
                     }
@@ -456,7 +454,6 @@ int netdata_main(int argc, char **argv) {
                 case 'W':
                     {
                         char* stacksize_string = "stacksize=";
-                        char* debug_flags_string = "debug_flags=";
 #if defined(ENABLE_DBENGINE) && defined(ENABLE_UNITTESTS)
                         char* createdataset_string = "createdataset=";
                         char* stresstest_string = "stresstest=";
@@ -1032,11 +1029,6 @@ int netdata_main(int argc, char **argv) {
                             optarg += strlen(stacksize_string);
                             inicfg_set(&netdata_config, CONFIG_SECTION_GLOBAL, "pthread stack size", optarg);
                         }
-                        else if(strncmp(optarg, debug_flags_string, strlen(debug_flags_string)) == 0) {
-                            optarg += strlen(debug_flags_string);
-                            inicfg_set(&netdata_config, CONFIG_SECTION_LOGS, "debug flags",  optarg);
-                            debug_flags = strtoull(optarg, NULL, 0);
-                        }
                         else if(strcmp(optarg, "set") == 0) {
                             if(optind + 3 > argc) {
                                 fprintf(stderr, "%s", "\nUSAGE: -W set 'section' 'key' 'value'\n\n"
@@ -1374,17 +1366,6 @@ int netdata_main(int argc, char **argv) {
     // ----------------------------------------------------------------------------------------------------------------
     delta_startup_time("resource limits");
 
-#ifdef NETDATA_INTERNAL_CHECKS
-    if(debug_flags != 0) {
-        struct rlimit rl = { RLIM_INFINITY, RLIM_INFINITY };
-        if(setrlimit(RLIMIT_CORE, &rl) != 0)
-            netdata_log_error("Cannot request unlimited core dumps for debugging... Proceeding anyway...");
-#ifdef HAVE_SYS_PRCTL_H
-        prctl(PR_SET_DUMPABLE, 1, 0, 0, 0);
-#endif
-    }
-#endif /* NETDATA_INTERNAL_CHECKS */
-
     set_nofile_limit(&rlimit_nofile);
 
     // ----------------------------------------------------------------------------------------------------------------
@@ -1513,12 +1494,8 @@ int netdata_main(int argc, char **argv) {
     for (i = 0; static_threads[i].name != NULL ; i++) {
         struct netdata_static_thread *st = &static_threads[i];
 
-        if(st->enabled) {
-            netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
+        if(st->enabled)
             st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
-        }
-        else
-            netdata_log_debug(D_SYSTEM, "Not starting thread %s.", st->name);
     }
     ml_start_threads();
 
@@ -1555,7 +1532,6 @@ int netdata_main(int argc, char **argv) {
             if (!strncmp(static_threads[i].name, "ANALYTICS", 9)) {
                 struct netdata_static_thread *st = &static_threads[i];
                 st->enabled = 1;
-                netdata_log_debug(D_SYSTEM, "Starting thread %s.", st->name);
                 st->thread = nd_thread_create(st->name, NETDATA_THREAD_OPTION_DEFAULT, st->start_routine, st);
             }
         }

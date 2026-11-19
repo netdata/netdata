@@ -53,7 +53,6 @@ void mcp_websocket_on_connect(struct websocket_server_client *wsc) {
         return;
     }
     
-    websocket_debug(wsc, "MCP client connected");
 }
 
 static void mcp_websocket_send_payload(struct websocket_server_client *wsc, BUFFER *payload) {
@@ -64,7 +63,6 @@ static void mcp_websocket_send_payload(struct websocket_server_client *wsc, BUFF
     if (!text)
         return;
 
-    netdata_log_debug(D_MCP, "SND: %s", text);
     websocket_protocol_send_text(wsc, text);
 }
 
@@ -81,11 +79,9 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     }
 
     // Log the raw incoming message
-    netdata_log_debug(D_MCP, "RCV: %s", message);
     
     // Silently ignore standalone "PING" messages (legacy MCP client behavior)
     if (length == 4 && strncmp(message, "PING", 4) == 0) {
-        websocket_debug(wsc, "Ignoring legacy PING message");
         return;
     }
     
@@ -136,7 +132,6 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
 void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason) {
     if (!wsc) return;
     
-    websocket_debug(wsc, "MCP client closing (code: %d, reason: %s)", code, reason ? reason : "none");
     
     mcp_websocket_release_context(wsc);
 }
@@ -145,7 +140,6 @@ void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE
 void mcp_websocket_on_disconnect(struct websocket_server_client *wsc) {
     if (!wsc) return;
     
-    websocket_debug(wsc, "MCP client disconnected");
     
     mcp_websocket_release_context(wsc);
 }

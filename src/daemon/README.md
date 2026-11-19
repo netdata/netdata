@@ -177,17 +177,15 @@ This option has no effect on Linux, macOS, or FreeBSD; those operating systems u
 
 ## Debugging
 
-When Netdata is compiled with debugging enabled:
-
-- **Performance Impact**: Compiler optimizations are disabled, which may result in slightly reduced performance.
-- **Debug Logging**: Disabled by default. To enable logging for specific components:
-    - Open `netdata.conf`.
-    - Set the `debug flags` option to a hex value that corresponds to the components you want to trace.
-    - Debug flag options are defined in [nd_log.h](https://raw.githubusercontent.com/netdata/netdata/master/src/libnetdata/log/nd_log.h) as `D_*` values. Use `0xffffffffffffffff` to enable all debug flags.
+To see debug messages, set `level = debug` in the `[logs]` section of `netdata.conf` and restart Netdata. The level applies to all logs, and a per-log `level=` option (see [logging configuration](/src/libnetdata/log/README.md)) overrides it for that log. Debug messages go to the same destinations as the other messages of each log.
 
 > **Important**
 >
-> Remember to disable debug logging (`debug flags = 0`) after you finish troubleshooting. Debug logs can grow rapidly and consume significant disk space.
+> Set `level` back to `info` after you finish troubleshooting. Debug logging is verbose.
+>
+> Builds compiled with debugging (below) always log at debug level.
+
+Netdata does not change core dump limits. Core dumps follow the limits of the service manager or the shell that started Netdata.
 
 ### Compiling Netdata with debugging
 
@@ -200,8 +198,6 @@ cd /usr/src/netdata.git
 # Install with debugging enabled
 CFLAGS="-O1 -ggdb -DNETDATA_INTERNAL_CHECKS=1" ./netdata-installer.sh
 ```
-
-After installation, use the `debug flags` setting in your configuration to specify which components to trace.
 
 This compilation method includes debugging information in the binary and enables internal checks. **This is recommended only for development or troubleshooting purposes**.
 
