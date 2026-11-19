@@ -3,11 +3,10 @@
 #include "daemon/daemon-service.h"
 #include "websocket-internal.h"
 
-static void websocket_thread_client_socket_error(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc, const char *reason) {
+static void websocket_thread_client_socket_error(WEBSOCKET_THREAD *wth, WS_CLIENT *wsc) {
     internal_fatal(wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
 
     worker_is_busy(WORKERS_WEBSOCKET_SOCK_ERROR);
-
 
     // Send command to remove the client
     // Note: on_disconnect will be called in websocket_thread_remove_client
@@ -529,18 +528,18 @@ void websocket_thread(void *ptr) {
 
             // Check for errors
             if(ev.events & ND_POLL_HUP) {
-                websocket_thread_client_socket_error(wth, wsc, "Client hangup");
+                websocket_thread_client_socket_error(wth, wsc);
                 continue;
             }
             if(ev.events & ND_POLL_ERROR) {
-                websocket_thread_client_socket_error(wth, wsc, "Socket error");
+                websocket_thread_client_socket_error(wth, wsc);
                 continue;
             }
 
             // Process read events
             if(ev.events & ND_POLL_READ) {
                 if(websocket_receive_data(wsc) < 0) {
-                    websocket_thread_client_socket_error(wth, wsc, "Failed to receive data");
+                    websocket_thread_client_socket_error(wth, wsc);
                     continue;
                 }
             }
@@ -548,7 +547,7 @@ void websocket_thread(void *ptr) {
             // Process write events
             if(ev.events & ND_POLL_WRITE) {
                 if(websocket_write_data(wsc) < 0) {
-                    websocket_thread_client_socket_error(wth, wsc, "Failed to send data");
+                    websocket_thread_client_socket_error(wth, wsc);
                     continue;
                 }
 
@@ -644,9 +643,8 @@ void websocket_thread(void *ptr) {
             if(!skip_client) {
                 // Set send timeout: 100ms max per client
                 struct timeval timeout = { .tv_sec = 0, .tv_usec = 100000 };
-                if(setsockopt(wsc->sock.fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) < 0) {
-                    // Non-critical, continue anyway
-                }
+                // non-critical: continue even if it fails
+                (void)setsockopt(wsc->sock.fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout));
 
                 // Try to send close frame (won't block due to O_NONBLOCK + SO_SNDTIMEO)
                 websocket_protocol_send_close(wsc, WS_CLOSE_GOING_AWAY, "Server shutting down");

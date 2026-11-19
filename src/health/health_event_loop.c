@@ -281,7 +281,6 @@ static inline int check_if_resumed_from_suspension(void) {
 }
 
 static void do_eval_expression(
-    RRDHOST *host,
     RRDSET *st,
     RRDCALC *rc,
     EVAL_EXPRESSION *expression,
@@ -588,7 +587,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // ------------------------------------------------------------
         // if there is calculation expression, run it
 
-        do_eval_expression(host, st, rc, rc->config.calculation, WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
+        do_eval_expression(st, rc, rc->config.calculation, WORKER_HEALTH_JOB_CALC_EVAL, RRDCALC_FLAG_CALC_ERROR, NULL, &rc->value);
         rrdset_acquired_release(rsa);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
@@ -621,8 +620,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             RRDCALC_STATUS warning_status = RRDCALC_STATUS_UNDEFINED;
             RRDCALC_STATUS critical_status = RRDCALC_STATUS_UNDEFINED;
 
-            do_eval_expression(host, st, rc, rc->config.warning, WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
-            do_eval_expression(host, st, rc, rc->config.critical, WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
+            do_eval_expression(st, rc, rc->config.warning, WORKER_HEALTH_JOB_WARNING_EVAL, RRDCALC_FLAG_WARN_ERROR, &warning_status, NULL);
+            do_eval_expression(st, rc, rc->config.critical, WORKER_HEALTH_JOB_CRITICAL_EVAL, RRDCALC_FLAG_CRIT_ERROR, &critical_status, NULL);
 
             // --------------------------------------------------------
             // decide the final alarm status

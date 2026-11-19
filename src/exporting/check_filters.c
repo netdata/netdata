@@ -75,9 +75,6 @@ int rrdset_is_exportable(struct instance *instance, RRDSET *st)
             *flags |= RRDSET_FLAG_EXPORTING_SEND;
         else {
             *flags |= RRDSET_FLAG_EXPORTING_IGNORE;
-            nd_log(NDLS_DAEMON, NDLP_DEBUG,
-                   "EXPORTING: instance '%s' is not sending chart '%s', because it does not match its 'send charts matching'",
-                   instance->config.name, rrdset_id(st));
             return 0;
         }
     }

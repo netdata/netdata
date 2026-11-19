@@ -1161,16 +1161,16 @@ static inline void discovery_process_cgroup(struct cgroup *cg) {
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_names(cg->name))) {
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'",
-               cg->id, cg->name);
+        nd_log_collector(NDLP_DEBUG,
+                         "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups names matching'",
+                         cg->id, cg->name);
         return;
     }
 
     if (!(cg->enabled = matches_enabled_cgroup_paths(cg->id))) {
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
-               "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'",
-               cg->id, cg->name);
+        nd_log_collector(NDLP_DEBUG,
+                         "CGROUP: cgroup '%s' (name '%s') disabled by 'enable by default cgroups matching'",
+                         cg->id, cg->name);
         return;
     }
 

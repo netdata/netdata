@@ -25,8 +25,6 @@ ssize_t websocket_write_data(WS_CLIENT *wsc) {
     if (data_length == 0)
         goto done;
 
-    // Dump the data being written for debugging
-
     // In the websocket thread we want non-blocking behavior
     // Use nd_sock_write with a single retry
     bytes_written = nd_sock_write(&wsc->sock, data, data_length, 1); // 1 retry for non-blocking write
@@ -170,13 +168,12 @@ static int websocket_protocol_send_frame(
     cbuffer_commit_reserved_unsafe(&wsc->out_buffer, final_frame_size);
 
 #ifdef NETDATA_INTERNAL_CHECKS
-    // Log frame being sent with detailed format matching the received frame logging
+    // self-check: the header we generated must parse back
     WEBSOCKET_FRAME_HEADER header;
     if(!websocket_protocol_parse_header_from_buffer((const char *)header_dst, header_size, &header)) {
         disconnect_msg = "Failed to parse the header we generated";
         goto abnormal_disconnect;
     }
-
 #endif
 
     // Make sure the client's poll flags include WRITE
@@ -303,8 +300,6 @@ int websocket_protocol_send_text(WS_CLIENT *wsc, const char *text) {
     size_t text_len = strlen(text);
 
 
-    // Dump text message for debugging
-
     // Enable compression for text messages by default, with automatic fragmentation
     return websocket_protocol_send_payload(wsc, text, text_len, WS_OPCODE_TEXT, true);
 }
@@ -323,8 +318,6 @@ int websocket_protocol_send_binary(WS_CLIENT *wsc, const void *data, size_t leng
     if (!wsc)
         return -1;
 
-
-    // Dump binary message for debugging
 
     // Enable compression for binary messages by default, with automatic fragmentation
     return websocket_protocol_send_payload(wsc, data, length, WS_OPCODE_BINARY, true);

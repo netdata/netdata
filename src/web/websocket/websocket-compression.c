@@ -175,14 +175,9 @@ void websocket_compression_cleanup(WS_CLIENT *wsc) {
     wsc->compression.deflate_stream->next_out = dummy_buffer;
     wsc->compression.deflate_stream->avail_out = sizeof(dummy_buffer);
 
-    // Always call deflateEnd to release internal zlib resources
+    // Always call deflateEnd to release internal zlib resources; its result does not matter while cleaning up
     // Don't bother with deflateReset as deflateEnd will clean up properly
-    int ret = deflateEnd(wsc->compression.deflate_stream);
-
-    if (ret != Z_OK && ret != Z_DATA_ERROR) {
-        // Z_DATA_ERROR can happen in some edge cases, it's not critical here
-        // as we're cleaning up anyway
-    }
+    deflateEnd(wsc->compression.deflate_stream);
 
     // Free the stream structure
     freez(wsc->compression.deflate_stream);
@@ -330,10 +325,6 @@ WS_DECOMPRESS_RESULT websocket_client_decompress_message(WS_CLIENT *wsc) {
         websocket_decompression_reset(wsc);
         return too_large ? WS_DECOMPRESS_TOO_LARGE : WS_DECOMPRESS_FAILED;
     }
-
-    // Log successful decompression with detailed information
-
-    // Show a preview of the decompressed data
 
     // when client context takeover is disabled, reset the decompressor
     if (!wsc->compression.client_context_takeover) {
