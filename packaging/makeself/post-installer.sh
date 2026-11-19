@@ -47,7 +47,7 @@ dem_pair_run mkdir -p /opt/netdata || exit $?
         dem_pair_run tar -xpf - "$@" -C /opt/netdata
 ) || exit $?
 if [ "$dashboard_upgrade" = 1 ]; then
-    dem_pair_run sh "$DP_STAGE/system/cleanup-dashboard.sh" "$DP_STAGE/usr/share/netdata/web/v3" \
+    run sh "$DP_STAGE/system/cleanup-dashboard.sh" "$DP_STAGE/usr/share/netdata/web/v3" \
         /opt/netdata usr/share/netdata/web || exit $?
 fi
 if [ ! -d /opt/netdata/etc/netdata ]; then

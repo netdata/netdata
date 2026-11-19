@@ -587,7 +587,7 @@ class StaticOverlayTests(unittest.TestCase):
             for relative in ('etc/netdata', 'var/lib/netdata', 'system', 'bin', 'usr/share/netdata'):
                 (base / relative).mkdir(parents=True)
         (self.stage / 'bin/bash').symlink_to(shutil.which('bash'))
-        (self.stage / 'system/functions.sh').write_text('')
+        shutil.copyfile(HELPER.parent / 'functions.sh', self.stage / 'system/functions.sh')
         shutil.copyfile(HELPER, self.stage / 'system/netdata-dem-pair.sh')
         (self.stage / 'system/install-or-update.sh').write_text(
             '#!/bin/sh\nprintf completed > ' + shlex.quote(str(self.marker)) + '\n')
