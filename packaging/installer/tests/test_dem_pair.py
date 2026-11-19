@@ -330,7 +330,7 @@ class CommandTests(unittest.TestCase):
 def path_without(directory, hidden):
     """A PATH directory linking every command on PATH except the hidden ones."""
     for entry in os.environ.get('PATH', '').split(os.pathsep):
-        if not entry or not os.path.isdir(entry):
+        if not os.path.isabs(entry) or not os.path.isdir(entry):
             continue
         for name in os.listdir(entry):
             link = Path(directory) / name
@@ -342,7 +342,7 @@ def path_without(directory, hidden):
     return str(directory)
 
 
-@unittest.skipUnless(os.geteuid() == 0, 'switching to the service account requires root')
+@unittest.skipUnless(GNU_LINUX and os.geteuid() == 0, 'switching to the service account requires Linux root')
 class SwitchUserTests(unittest.TestCase):
     """dem_pair_as_user with runuser hidden, as on BusyBox hosts."""
 
@@ -361,20 +361,23 @@ class SwitchUserTests(unittest.TestCase):
         bin_dir = Path(self.temp.name) / ('bin-' + '-'.join(sorted(hidden)))
         bin_dir.mkdir()
         body = ('PATH=' + shlex.quote(path_without(bin_dir, hidden)) + '\n. ' + shlex.quote(str(HELPER)) + '\n'
+                'NETDATA_RUN_DIR=/run-dir; export NETDATA_RUN_DIR\n'
                 'DP_USER=nobody DP_LIB=/lib-dir DP_CONFIG=/config-dir DP_STOCK=/stock-dir DP_PREFIX=\n'
                 'dem_pair_as_user ' + shlex.join(arguments))
         return subprocess.run(['sh', '-c', body], text=True, capture_output=True, input=stdin)
 
     @unittest.skipUnless(shutil.which('su'), 'su unavailable')
     def test_su_fallback_preserves_identity_arguments_environment_stdin_and_status(self):
-        script = ('id -un; printf "%s|%s|%s\\n" "$NETDATA_LIB_DIR" "$NETDATA_USER_CONFIG_DIR" '
+        script = ('id -un; printf "%s\\n" "$PATH" "$NETDATA_RUN_DIR"; '
+                  'printf "%s|%s|%s\\n" "$NETDATA_LIB_DIR" "$NETDATA_USER_CONFIG_DIR" '
                   '"$NETDATA_STOCK_CONFIG_DIR"; for a do printf "<%s>\\n" "$a"; done; cat; exit 37')
         arguments = ['', '-', '--config-dir', '-c', 'a b', "it's", '$(false)']
         result = self.run_as_user({'runuser'}, ['sh', '-c', script, 'sh'] + arguments, stdin='from-stdin\n')
         self.assertEqual(result.returncode, 37, result.stderr)
         self.assertIn("'su' '-s' '/bin/sh'", result.stderr)
         self.assertEqual(result.stdout.splitlines(),
-                         ['nobody', '/lib-dir|/config-dir|/stock-dir'] +
+                         ['nobody', str(Path(self.temp.name) / 'bin-runuser'), '/run-dir',
+                          '/lib-dir|/config-dir|/stock-dir'] +
                          ['<' + a + '>' for a in arguments] + ['from-stdin'])
 
     def test_missing_switch_tools_report_the_requirement(self):

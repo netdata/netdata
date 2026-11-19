@@ -100,9 +100,11 @@ dem_pair_as_user() (
         dem_pair_run runuser -u "$DP_USER" -- "$@"
     elif command -v su >/dev/null 2>&1; then
         # BusyBox hosts (Alpine) have no runuser. The `--` ends su options before
-        # the account, and the fixed shell text forwards every argument verbatim.
+        # the account, the fixed shell text forwards every argument verbatim, and
+        # PATH is kept as runuser keeps it, since some su implementations reset it.
+        shift
         # shellcheck disable=SC2016
-        dem_pair_run su -s /bin/sh -c 'exec "$0" "$@"' -- "$DP_USER" "$@"
+        dem_pair_run su -s /bin/sh -c 'exec "$0" "$@"' -- "$DP_USER" env PATH="$PATH" "$@"
     else
         dem_pair_error "runuser or su is required to run dem.plugin as the service account $DP_USER"
         return 127
