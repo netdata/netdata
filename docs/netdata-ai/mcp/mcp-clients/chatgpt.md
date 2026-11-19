@@ -62,6 +62,7 @@ Use `https://` when the Agent or Parent is served over TLS.
 | **Type** | STDIO |
 | **Command** | `/usr/sbin/nd-mcp` |
 | **Arguments** | `ws://YOUR_NETDATA_IP:19999/mcp` |
+| **Environment variables** | `ND_MCP_BEARER_TOKEN` = your Netdata MCP API key |
 
 The bridge reads the API key from the `ND_MCP_BEARER_TOKEN` environment variable.
 
@@ -91,6 +92,7 @@ What changed on the web servers before the latency spike at 14:00?
 
 - Netdata Cloud: the API token must have `scope:mcp`
 - Agent or Parent: each Agent and Parent has its own MCP API key; use the key of the node in the URL
+- Agent or Parent: verify the Netdata Agent is claimed to Netdata Cloud
 - Check that the environment variable named in **Bearer token env var** is set for the app
 
 ### Connection errors
