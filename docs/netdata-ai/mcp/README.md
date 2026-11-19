@@ -7,7 +7,13 @@ combine them into one view, from a single node to 100,000+ nodes.
 
 ## What AI assistants get from Netdata MCP
 
-Netdata uses machine learning to model the behavior of the infrastructure and applications. Every metric is scored
+Through Netdata MCP, AI assistants query all of Netdata's observability data in real time: metrics, anomalies,
+alerts, logs, traces, database queries, network topology, flows and traps, and live Functions such as processes and
+network connections, across every node, from infrastructure and networks to applications. Assistants work on the
+live data held by Netdata Agents, Parents and Netdata Cloud, not on exported copies.
+
+On top of this data, Netdata gives assistants its machine learning. Netdata uses machine learning to model the
+behavior of the infrastructure and applications. Every metric is scored
 for anomalies as it is collected, and the scores are stored with the data. Netdata MCP gives assistants the scoring
 engine behind Netdata's Anomaly Advisor, so they start from the few metrics that matter instead of searching through
 all of them:
