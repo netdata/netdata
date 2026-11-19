@@ -10,8 +10,9 @@ import unittest
 
 HELPER = Path(__file__).resolve().parents[1] / "netdata-dem-pair.sh"
 GNU_LINUX = os.uname().sysname == "Linux" and all(shutil.which(x) for x in ("tar", "flock", "sync"))
-# BusyBox hosts such as Alpine have su but no runuser.
-SWITCH_USER = bool(shutil.which('runuser') or shutil.which('su'))
+# BusyBox hosts such as Alpine have su but no runuser. BSD su has other -s/-c
+# semantics, so the su fallback is exercised on Linux only.
+SWITCH_USER = bool(shutil.which('runuser') or (os.uname().sysname == 'Linux' and shutil.which('su')))
 
 
 class CommandTests(unittest.TestCase):
