@@ -19,7 +19,7 @@ endmeta-->
 
 The `systemd` journal plugin lets you view, explore and analyze `systemd` journal logs from the Netdata dashboard.
 
-It automatically discovers available journal sources, allows advanced filtering, offers interactive visual representations and supports exploring the logs of both individual servers and the logs on infrastructure wide journal centralization servers.
+It automatically discovers available journal sources, allows advanced filtering, offers interactive visual representations and supports exploring the logs of both individual servers and the logs on journal centralization servers that collect logs from many nodes.
 
 The plugin automatically detects the available journal sources, based on the journal files available in `/var/log/journal` (persistent logs) and `/run/log/journal` (volatile logs).
 
