@@ -594,4 +594,3 @@ procfile *procfile_reopen(procfile *ff, const char *filename, const char *separa
 
     return ff;
 }
-

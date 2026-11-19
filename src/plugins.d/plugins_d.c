@@ -533,7 +533,7 @@ void *pluginsd_main(void *ptr) {
 
                 // Skip any obsolete plugins.
                 if(is_obsolete_plugin(pluginname)) {
-                    // log info level first time, debug level afterwards.
+                    // log it only the first time
                     static bool logged_obsolete = false;
                     if(!logged_obsolete) {
                         logged_obsolete = true;
