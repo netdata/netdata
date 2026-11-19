@@ -84,12 +84,12 @@ clean_dir() (
 
     set --
     for file in ./* ./.[!.]* ./..?*; do
-        case "$mounts" in *"//${PWD#/}/${file#./}//"*) continue ;; esac
         [ ! -L "$file" ] || continue
         source_file="$source_dir/${file#./}"
         if [ -d "$file" ]; then
             clean_dir "$file" "$source_file" || exit $?
         elif [ -f "$file" ] && [ ! -e "$source_file" ] && [ ! -L "$source_file" ]; then
+            case "$mounts" in *"//${PWD#/}/${file#./}//"*) continue ;; esac
             set -- "$@" "$file"
             if [ "$#" -eq 128 ]; then
                 remove_files "$@" || exit $?
