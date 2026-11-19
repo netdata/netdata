@@ -807,7 +807,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 - **[Unsupervised anomaly detection per metric, at the edge](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md).** Every metric gets its own models, trained locally on its own recent behavior; no labels, thresholds or configuration are required. Models run where the data is (Agents and Parents), so detection scales with the fleet.
 - **[Consensus scoring](/docs/ml-ai/ml-anomaly-detection/ml-accuracy.md).** Each metric is scored by multiple models trained on successive time windows; a sample is flagged anomalous only when all models agree, which suppresses false positives from one-off training artifacts.
 - **Anomalies as data.** The anomaly flag is stored with every sample in the database, so anomaly rates can be queried, charted, correlated and alerted on for any time range, like any other metric.
-- **AI on live observability data.** Netdata AI and external AI assistants work on real metrics, anomalies, alerts and live Functions queried from the Agents and Parents, not on exported copies.
+- **AI on live observability data.** Netdata AI and external AI assistants query real metrics, anomalies, alerts and live Functions where they live, on the Agents and Parents.
 
 **Capabilities**
 
