@@ -92,12 +92,20 @@ dem_pair_cleanup_stage() {
 }
 dem_pair_as_user() (
     exec 9>&-
-    if [ "$(id -u)" = 0 ] && [ "$DP_USER" != root ]; then
-        dem_pair_run runuser -u "$DP_USER" -- env NETDATA_LIB_DIR="$DP_LIB" \
-            NETDATA_USER_CONFIG_DIR="$DP_CONFIG" NETDATA_STOCK_CONFIG_DIR="${DP_STOCK:-$DP_PREFIX/usr/lib/netdata/conf.d}" "$@"
+    set -- env NETDATA_LIB_DIR="$DP_LIB" NETDATA_USER_CONFIG_DIR="$DP_CONFIG" \
+        NETDATA_STOCK_CONFIG_DIR="${DP_STOCK:-$DP_PREFIX/usr/lib/netdata/conf.d}" "$@"
+    if [ "$(id -u)" != 0 ] || [ "$DP_USER" = root ]; then
+        dem_pair_run "$@"
+    elif command -v runuser >/dev/null 2>&1; then
+        dem_pair_run runuser -u "$DP_USER" -- "$@"
+    elif command -v su >/dev/null 2>&1; then
+        # BusyBox hosts (Alpine) have no runuser. The `--` ends su options before
+        # the account, and the fixed shell text forwards every argument verbatim.
+        # shellcheck disable=SC2016
+        dem_pair_run su -s /bin/sh -c 'exec "$0" "$@"' -- "$DP_USER" "$@"
     else
-        dem_pair_run env NETDATA_LIB_DIR="$DP_LIB" NETDATA_USER_CONFIG_DIR="$DP_CONFIG" \
-            NETDATA_STOCK_CONFIG_DIR="${DP_STOCK:-$DP_PREFIX/usr/lib/netdata/conf.d}" "$@"
+        dem_pair_error "runuser or su is required to run dem.plugin as the service account $DP_USER"
+        return 127
     fi
 )
 dem_pair_runtime() {
