@@ -1070,7 +1070,7 @@ We say Netdata supports 2,000+ integrations, counting collectors and network dev
 | **Community** | $0 | Anyone getting started | Up to 5 active connected nodes, 1 custom dashboard per Room |
 | **Homelab** | $90/year or $10/month | Personal, non-commercial use | No limit on custom dashboards ([Homelab plan](https://www.netdata.cloud/homelab/)) |
 | **Business** | From $7/node/month billed yearly; $8.75/node/month billed monthly (5-node minimum) | Freelancers, professionals, businesses of all sizes | Products priced individually (below); AI conversations, all roles (RBAC), enterprise SSO (Okta, OpenID Connect), SCIM, enterprise notification integrations, Netdata Cloud MCP, centralized configuration management, no limit on custom dashboards, audit events in the events feed |
-| **Enterprise** | Custom | Fleets above 500 nodes, on-premise deployments at any size (air-gapped facilities, critical infrastructure) | Everything in Business; commitment and multi-year discounts; custom quotas for logs, traces, flows and AI; on-premise deployment; AI Co-SRE; priority support plans |
+| **Enterprise** | Custom | Fleets above 500 nodes, on-premise deployments at any size (air-gapped facilities, critical infrastructure) | Everything in Business; commitment and multi-year discounts; custom quotas for logs, traces, flows and AI; on-premise deployment; AI SRE; priority support plans |
 | **Open-source Agent** | Free (Agent GPL v3+; dashboard NCUL1) | Self-hosted, any use | Complete Agent and Parents, no limit on metrics, local dashboards |
 
 Homelab is for personal, non-commercial use only. Beyond 5 nodes, freelancers, professionals and businesses use the open-source Agent or the Business plan. A 14-day Business trial with no limit on nodes is available on sign-up. As of November 2026, some recently released capabilities are in Early Access: you can use them free of charge for a limited time.
@@ -1088,7 +1088,7 @@ Prices are per month, in USD, excluding taxes. The billing choice (annual subscr
 | **Real User Monitoring** | From $250 (500K sessions) | $0.625 per 1K sessions, no minimum | Annual: 500,000 sessions | $0.50 per 1K sessions |
 | **Synthetic Browser Tests** | From $250 (125K runs) | $2.50 per 1K runs, no minimum | Annual: 125,000 runs | $2 per 1K runs |
 | **AI Investigations** | From $300 (100 investigations) | $6 per investigation, no minimum | Annual: 100 investigations | $6 per investigation |
-| **AI Co-SRE** | Custom | Custom | Autonomous SRE agent, quoted separately | |
+| **AI SRE** | Custom | Custom | Autonomous SRE agent, quoted separately | |
 
 - **Pooled quotas:** each node's log and trace quotas are shared across the account; logs and traces are counted separately, and only usage above the pooled quota is charged.
 - **Annual volume discounts** on Infrastructure and APM nodes combined: 5% for nodes 51-100, 10% for 101-200, 20% for 201-500 (each band discounted separately). Above 500 nodes, Enterprise pricing applies.

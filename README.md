@@ -6,7 +6,7 @@
   <img src="https://www.netdata.cloud/img/readme-images/netdata_readme_logo_dark.png" alt="Netdata" width="300"/>
 </a>
 </p>
-<h3 align="center">Full-stack observability. Every metric, every second.</h3>
+<h3 align="center">Full-stack observability: the AI SRE that learns your stack!</h3>
 <p align="center">
   <b>Metrics · Logs · Traces · Flows · Topology</b><br/>
   Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI<br/>
