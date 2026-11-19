@@ -81,13 +81,13 @@ use std::sync::atomic::AtomicUsize;
 
 use tokio_util::sync::CancellationToken;
 
-use super::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
 use super::fold::{MergedTrace, SourceFoldSpec, TokenFilter, merge_trace_sources};
 use super::predicate::{PredicateError, PredicateTarget, TokenQuery};
 use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::BuiltinField;
 use super::window::{TimeWindow, WindowError};
+use crate::duration_hist::{DurationHistogram, DurationPercentiles, HEATMAP_ROWS};
 
 /// Number of log-scale duration bins (fixed).
 pub const DURATION_BIN_COUNT: usize = 6;

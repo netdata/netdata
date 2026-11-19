@@ -17,11 +17,13 @@
 //! row table reflect every source as if it were a single index.
 //!
 //! `run` composes two steps: step 1, statistics (matched, facets,
-//! histogram, fields), is an aggregatable monoid —
+//! histogram, fields, and an optional value aggregation), is an
+//! aggregatable monoid —
 //! [`LogsShard::evaluate`] produces a [`LogsShard`] per source,
 //! [`LogsShard::merge`] folds them, so the query can fan out across
 //! nodes; step 2, row materialization, needs that global order and
-//! lives in the pagination path.
+//! lives in the pagination path. A query selects the parts it needs
+//! ([`Parts`]); a step with nothing to compute is skipped.
 //!
 //! This is the query *mechanism*: it evaluates the sources it is
 //! handed; which bytes become a sealed SFST, an in-memory chunk, or a
@@ -35,6 +37,8 @@
 //!
 //! - aggregate / merge — step 1: per-source evaluation and the pure
 //!   cross-file folds.
+//! - values — the value aggregation step 1 can carry ([`AggregateSpec`]:
+//!   top values or quantiles of a field, optionally grouped by another).
 //! - page — step 2: per-source page candidates ([`PageShard`]), merged
 //!   and materialized; `paginate` is the local orchestration.
 //! - cursor — [`Cursor`] / [`Part`]: the order above, encoded as the
@@ -57,12 +61,17 @@ mod mmap;
 mod page;
 mod query;
 mod result;
+mod values;
 mod wal_scan;
 
 pub use aggregate::LogsShard;
 pub use cursor::{Cursor, Part};
 pub use engine::{LogSource, SfstCandidate, Source, WalTail, run};
 pub use page::PageShard;
-pub use query::{Anchor, Direction, LogsQuery, LogsQueryBuilder};
+pub use query::{Anchor, Direction, LogsQuery, LogsQueryBuilder, Parts};
 pub use result::LogsData;
+pub use values::{
+    AggregateKind, AggregateResult, AggregateSpec, GroupAnswer, GroupResult, MAX_EXACT_ENTRIES,
+    ValueAgg,
+};
 pub use wal_scan::{FlattenedScanError, WalScan};

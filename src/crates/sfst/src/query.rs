@@ -185,6 +185,21 @@ pub struct FacetResult {
     pub values: Vec<(String, u32)>,
 }
 
+/// One field's values over a query's matching rows, as dense ids, from
+/// [`IndexReader::field_value_ids`](crate::IndexReader::field_value_ids).
+///
+/// `values[i]` is a distinct value of the field among the matching rows;
+/// `pairs` holds
+/// one `(position, value index)` per (row, value) occurrence among the
+/// matching rows, so a multi-valued (array-collapsed) row contributes one pair
+/// per value and a row without the field contributes none. Pair order is
+/// unspecified; sort by position to join two fields row by row.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FieldValueIds {
+    pub values: Vec<String>,
+    pub pairs: Vec<(u32, u32)>,
+}
+
 /// Bucket grid for a [`Timeline`] — the time geometry shared between
 /// the caller, the reader, and any downstream merger.
 ///

@@ -93,6 +93,69 @@ agent currently accepts.
 `info=true` returns the current authoritative list; rely on it, not
 this table, when in doubt.
 
+### `otel-logs` only: `parts` and `aggregate`
+
+`otel-logs` accepts two more body keys for API callers. The UI does not
+send them, so they are not in `accepted_params`.
+
+| Key | Type | Purpose |
+|---|---|---|
+| `parts` | string[] | Response parts to compute: any of `rows`, `matched`, `histogram`, `facets`. Omitted = all. A part left out comes back empty and its work is skipped |
+| `aggregate` | object | `{"field":F, "by":G, "top":N}` or `{"field":F, "by":G, "quantiles":[...]}`. `by` is optional. Set exactly one of `top` (1-10000) and `quantiles` (each in `[0, 1]`) |
+
+Use `parts` to make a query cheaper:
+
+- Rows only (`"parts":["rows"]`): reads only the page of rows. The
+  statistics pass (count, histogram, facets) does not run.
+- Count only (`"parts":["matched"]`): no rows are read.
+- `"parts":[]` with an `aggregate`: computes only the aggregation.
+
+The response echoes `parts` when the request limited them. When
+`aggregate` is set, the response has an `aggregate` member:
+
+```json
+"aggregate": {
+  "field": "attributes.duration_ms",
+  "by": "service.name",
+  "groups": [
+    {"group": "checkout", "count": 81234,
+     "quantiles": [{"q": 0.5, "value": 41.0}, {"q": 0.99, "value": 912.0}]}
+  ],
+  "ignored": 0,
+  "incomplete": false,
+  "approximate": false
+}
+```
+
+- `groups` are sorted by `count`, highest first. Without `by` there is
+  one group with `group: null`. With `by`, logs that do not have the
+  `by` field are in the `group: null` group.
+- A `top` group has `top: [{"value", "count"}]` (most frequent first)
+  and `distinct` (the number of different values in the group).
+- Quantiles parse each value as a number and use the nearest-rank
+  method. Values that are not finite numbers are counted in `ignored`.
+  A group with no numeric value gives `value: null`.
+- The answer is exact up to 250,000 different `(group, value)` pairs.
+  Above that, `top` keeps the most frequent values and sets
+  `incomplete: true` (counts can then be too low), and quantiles use a
+  histogram and set `approximate: true`. Each value is then within 1/32
+  for magnitudes of about 0.016 and more. Values keep three decimals,
+  so smaller magnitudes are less accurate.
+- A field with multiple values in one log (for example an array
+  attribute such as `attributes.tags[]`) counts each different value
+  once for that log. Then `count` is the number of values, which can be
+  more than the number of logs. When the `by` field has multiple values
+  in one log, the log is counted in each of those groups.
+
+Example: the 99th percentile of `attributes.duration_ms` per service in
+the last hour, with no rows, facets, or histogram:
+
+```json
+{"after": 1763200000, "before": 1763203600, "parts": [],
+ "aggregate": {"field": "attributes.duration_ms", "by": "service.name",
+               "quantiles": [0.99]}}
+```
+
 ---
 
 ## Selecting log sources (`info` → `selections`)

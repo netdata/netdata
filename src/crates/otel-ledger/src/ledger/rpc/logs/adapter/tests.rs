@@ -435,3 +435,107 @@ fn build_row_cells_single_value_is_bare_and_no_severity_is_null() {
     assert_eq!(cells[1], serde_json::Value::Null); // no severity_text
     assert_eq!(cells[3], serde_json::json!("api-1")); // single value, not joined
 }
+
+#[test]
+fn into_query_maps_parts_and_defaults_to_all() {
+    let req: OtelLogsRequest = serde_json::from_slice(br#"{}"#).unwrap();
+    assert_eq!(req.into_query().unwrap().parts(), Parts::ALL);
+
+    let req: OtelLogsRequest = serde_json::from_slice(br#"{"parts":["rows","matched"]}"#).unwrap();
+    let parts = req.into_query().unwrap().parts();
+    assert_eq!(
+        parts,
+        Parts {
+            rows: true,
+            matched: true,
+            histogram: false,
+            facets: false
+        }
+    );
+    assert_eq!(parts_to_names(parts), vec!["rows", "matched"]);
+
+    // An empty list asks for no part (an aggregate-only query).
+    let req: OtelLogsRequest = serde_json::from_slice(br#"{"parts":[]}"#).unwrap();
+    assert_eq!(req.into_query().unwrap().parts(), Parts::NONE);
+
+    // An unknown part name is a deserialization error.
+    assert!(serde_json::from_slice::<OtelLogsRequest>(br#"{"parts":["rowz"]}"#).is_err());
+}
+
+#[test]
+fn into_query_validates_the_aggregate() {
+    let req: OtelLogsRequest = serde_json::from_slice(
+        br#"{"aggregate":{"field":"attributes.path","by":"service.name","top":10}}"#,
+    )
+    .unwrap();
+    let spec = req.into_query().unwrap().aggregate().cloned().unwrap();
+    assert_eq!(spec.field, "attributes.path");
+    assert_eq!(spec.by.as_deref(), Some("service.name"));
+    assert_eq!(spec.kind, AggregateKind::Top(10));
+
+    let req: OtelLogsRequest =
+        serde_json::from_slice(br#"{"aggregate":{"field":"d","quantiles":[0.5,0.99]}}"#).unwrap();
+    let spec = req.into_query().unwrap().aggregate().cloned().unwrap();
+    assert_eq!(spec.kind, AggregateKind::Quantiles(vec![0.5, 0.99]));
+
+    for bad in [
+        r#"{"aggregate":{"field":"d"}}"#,
+        r#"{"aggregate":{"field":"d","top":3,"quantiles":[0.5]}}"#,
+        r#"{"aggregate":{"field":"d","top":0}}"#,
+        r#"{"aggregate":{"field":"d","quantiles":[]}}"#,
+        r#"{"aggregate":{"field":"d","quantiles":[1.5]}}"#,
+        r#"{"aggregate":{"field":"","top":3}}"#,
+        r#"{"aggregate":{"field":"d","by":"","top":3}}"#,
+    ] {
+        let req: OtelLogsRequest = serde_json::from_str(bad).unwrap();
+        assert!(req.into_query().is_err(), "{bad}");
+    }
+    // A misspelled member is rejected rather than silently ignored.
+    assert!(
+        serde_json::from_slice::<OtelLogsRequest>(br#"{"aggregate":{"field":"d","tpo":3}}"#)
+            .is_err()
+    );
+}
+
+#[test]
+fn to_result_echoes_limited_parts_and_shapes_the_aggregate() {
+    let grid = sfst::Grid::new(0, NS_PER_S, 1);
+    let full = to_result(LogsData::empty("severity_text", grid), 10);
+    let json = serde_json::to_value(&full).unwrap();
+    assert!(json.get("parts").is_none() && json.get("aggregate").is_none());
+
+    let mut data = LogsData::empty("severity_text", grid);
+    data.parts = Parts::NONE;
+    data.aggregate = Some(AggregateResult {
+        field: "attributes.path".into(),
+        by: None,
+        groups: vec![sfsq::logs::GroupResult {
+            group: None,
+            count: 7,
+            answer: GroupAnswer::Top {
+                values: vec![("/a".into(), 5), ("/b".into(), 2)],
+                distinct: 2,
+            },
+        }],
+        ignored: 0,
+        incomplete: false,
+        approximate: false,
+    });
+    let json = serde_json::to_value(to_result(data, 10)).unwrap();
+    assert_eq!(json["parts"], serde_json::json!([]));
+    assert_eq!(
+        json["aggregate"],
+        serde_json::json!({
+            "field": "attributes.path",
+            "groups": [{
+                "group": null,
+                "count": 7,
+                "top": [{"value": "/a", "count": 5}, {"value": "/b", "count": 2}],
+                "distinct": 2
+            }],
+            "ignored": 0,
+            "incomplete": false,
+            "approximate": false
+        })
+    );
+}

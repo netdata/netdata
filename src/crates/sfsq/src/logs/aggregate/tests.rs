@@ -76,6 +76,7 @@ fn merge_sums_matched_and_drops_facet_high_card_in_any_shard() {
             tier: sfst::FieldTier::Low,
         }]
         .into(),
+        values: None,
     };
     let shard_b = LogsShard {
         matched: 2,
@@ -87,6 +88,7 @@ fn merge_sums_matched_and_drops_facet_high_card_in_any_shard() {
             tier: sfst::FieldTier::High,
         }]
         .into(),
+        values: None,
     };
 
     let merged = LogsShard::merge(vec![shard_a, shard_b]);
@@ -125,6 +127,7 @@ fn merge_ignores_interspersed_default_shards() {
             tier: sfst::FieldTier::Low,
         }]
         .into(),
+        values: None,
     };
 
     let alone = LogsShard::merge(vec![real()]);
