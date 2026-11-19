@@ -32,7 +32,7 @@ jobs:
         run: |
           python3 -c 'import json; print("node=" + json.load(open("src/dem-runtime/manifest.json"))["node_version"])' >> "$GITHUB_OUTPUT"
       - if: inputs.run_tests
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: ${{ steps.runtime.outputs.node }}
       - name: Test real runner output against the frozen baseline
