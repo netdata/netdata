@@ -78,8 +78,6 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
         return;
     }
 
-    // Log the raw incoming message
-    
     // Silently ignore standalone "PING" messages (legacy MCP client behavior)
     if (length == 4 && strncmp(message, "PING", 4) == 0) {
         return;
@@ -129,7 +127,7 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
 }
 
 // WebSocket close handler for MCP
-void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason) {
+void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code __maybe_unused, const char *reason __maybe_unused) {
     if (!wsc) return;
     
     

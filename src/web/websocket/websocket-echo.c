@@ -23,7 +23,7 @@ void echo_on_message_callback(struct websocket_server_client *wsc, const char *m
 }
 
 // Called before sending a close frame to the client
-void echo_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason) {
+void echo_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code __maybe_unused, const char *reason __maybe_unused) {
     if (!wsc) return;
 
     

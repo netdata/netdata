@@ -39,8 +39,7 @@ static bool inicfg_windows_is_quoted_path_list_dir_var(const struct config_secti
 
 static bool inicfg_windows_is_log_path_setting(const struct config_section *sect, const struct config_option *opt) {
     return ((!string_strcmp(sect->name, CONFIG_SECTION_LOGS) &&
-             (!string_strcmp(opt->name, "debug") ||
-              !string_strcmp(opt->name, "daemon") ||
+             (!string_strcmp(opt->name, "daemon") ||
               !string_strcmp(opt->name, "collector") ||
               !string_strcmp(opt->name, "access") ||
               !string_strcmp(opt->name, "health"))) ||

@@ -95,8 +95,6 @@ ssize_t websocket_receive_data(WS_CLIENT *wsc) {
     // Update last activity time
     wsc->last_activity_t = now_monotonic_sec();
 
-    // Dump the received data for debugging
-
     if(wsc->next_frame_size  == 0 || cbuffer_has_enough_data_for_next_frame(wsc)) {
         // we don't know the next frame size
         // or, we know it and we have all the data for it
@@ -593,8 +591,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
     wsc->next_frame_size = 0; // reset it, since we have enough data now
     
     worker_is_busy(WORKERS_WEBSOCKET_COMPLETE_FRAME);
-
-    // Log detailed header information for debugging
 
     // Check for invalid RSV bits
     if (header.rsv2 || header.rsv3 || (header.rsv1 && !wsc->compression.enabled)) {

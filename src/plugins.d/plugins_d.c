@@ -490,7 +490,7 @@ void *pluginsd_main(void *ptr) {
     if (*ipmi_path)
         netdata_log_info("PLUGINSD: using '%s' for IPMI; other IPMI plugin candidates are suppressed until restart", ipmi_path);
     else
-        nd_log(NDLS_COLLECTORS, NDLP_DEBUG, "PLUGINSD: no enabled IPMI plugin selected; restart Netdata after installing or enabling one");
+        nd_log(NDLS_DAEMON, NDLP_DEBUG, "PLUGINSD: no enabled IPMI plugin selected; restart Netdata after installing or enabling one");
 
     // store the errno for each plugins directory
     // so that we don't log broken directories on each loop
