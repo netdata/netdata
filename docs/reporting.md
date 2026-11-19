@@ -119,7 +119,7 @@ Once connected, ask natural language questions:
 
 - **Cloud MCP**: Available on Paid plans — infrastructure-wide access, zero local setup
 - **Agent/Parent MCP**: Available on all plans (v2.6.0+) — free, open-source, direct local access
-- Unlimited queries with no per-query charges
+- No per-query charges
 - Requires API key (Cloud token or local API key) for access
 
 See [Netdata MCP](/docs/netdata-ai/mcp/README.md) for detailed setup instructions.

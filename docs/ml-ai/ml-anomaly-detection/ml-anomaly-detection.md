@@ -23,7 +23,7 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 | **Time-series Integrity** | Immutable anomaly history                                                                 | No hindsight bias — shows what was detectable then   |
 | **Coverage**            | Every metric, every dimension                                                                | No sampling, no blind spots                          |
 | **Correlation Engine**  | Real-time anomaly correlation across metrics                                                 | Powers Anomaly Advisor for root cause analysis       |
-| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | Reduces alert fatigue while enabling anomaly-based alerting |
+| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | ML does not influence alert transitions automatically; anomaly rates can be used in alert rules |
 
 :::note
 Netdata avoids deep learning models to maintain lightweight operation on any Linux system. The entire ML system is designed to run efficiently without specialized hardware or dependencies.

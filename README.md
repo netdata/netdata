@@ -91,7 +91,7 @@ According to the [University of Amsterdam study](https://www.ivanomalavolta.com/
 | **Infrastructure monitoring**           | Systems, containers, Kubernetes, virtualization and hardware through 2,000+ integrations, per second             |
 | **Application performance monitoring**  | Find any trace by ID, filter traces by any attribute, and see latency percentiles and errors for any slice of traffic, with service maps and browser sessions linked to backend traces. Traces stay on your infrastructure. |
 | **Digital experience monitoring**       | Real user monitoring with Core Web Vitals and JavaScript errors, Playwright journeys, Lighthouse audits, uptime   |
-| **Network performance monitoring**      | Zero-configuration SNMP with 1,700+ device profiles, L2/L3 topology, NetFlow/IPFIX/sFlow, SNMP traps, BGP         |
+| **Network performance monitoring**      | Zero-configuration SNMP with 1,750+ device profiles, L2/L3 topology, NetFlow/IPFIX/sFlow, SNMP traps, BGP         |
 | **Database monitoring**                 | 50+ databases and managed services, with live top-query views on 12 engines                                     |
 | **Logs monitoring**                     | systemd-journal, Windows Event Log and macOS unified logs queried in place on every node, with no shipping or extra storage |
 | **Logs management**                      | Collect logs from any source through OpenTelemetry and syslog, search every field, and explore with facets and histograms. Logs are acknowledged only once safely on disk and are searchable as they arrive, with retention and offload to your own S3 storage. |

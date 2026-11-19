@@ -15,9 +15,9 @@ The AI assistants have different visibility on your infrastructure, depending on
 
 You can use Netdata with the following AI assistants:
 
-- [Claude Desktop](https://claude.ai/download): supports flat-fee usage for unlimited access
-- [Claude Code](https://claude.ai/code): supports flat-fee usage for unlimited access
-- [Cursor](https://www.cursor.com/): supports flat-fee usage for unlimited access. Enables Netdata use with multiple AI assistants, including Claude, ChatGPT, and Gemini.
+- [Claude Desktop](https://claude.ai/download): supports flat-fee subscription plans
+- [Claude Code](https://claude.ai/code): supports flat-fee subscription plans
+- [Cursor](https://www.cursor.com/): supports flat-fee subscription plans. Enables Netdata use with multiple AI assistants, including Claude, ChatGPT, and Gemini.
 
 Probably more: Check the [MCP documentation](https://modelcontextprotocol.io/clients) for a full list of supported AI assistants.
 
