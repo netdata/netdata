@@ -58,7 +58,7 @@ Netdata is distributed and real-time. Netdata Agents collect, store and analyze 
 **Netdata Design:**
 
 * **Understanding over traffic lights** – Monitoring tells you that something is wrong; observability tells you why. Netdata gives you both, from the same data.
-* **Everything, every second, at a cost that does not grow with your data** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
+* **Everything, every second** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
 * **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
 * **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
 * **Machine learning as evidence, not alerts** – Every metric is scored for anomalies every second, as evidence of what changed, what changed together and how strongly.

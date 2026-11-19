@@ -40,7 +40,7 @@ How the design delivers it:
 - **Every alert opens into the full picture:** every metric of the affected systems, scored for anomalies, next to their logs, traces and live views of processes, connections and services.
 - **Alerts run where the data lives**, so they keep working through any outage outside that hub.
 
-### Everything, every second, at a cost that does not grow with your data
+### Everything, every second
 
 **The data you did not collect is the data your next incident needs. We collect everything, every second, and we engineer the cost down until choosing what to watch is no longer necessary.**
 
