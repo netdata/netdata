@@ -117,6 +117,10 @@ sidebar:
                   label: Offline systems
                   edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/offline.md
                   description: Install the Netdata Agent on offline/air gapped systems to benefit from real-time, per-second monitoring without connecting to the internet.
+              - meta:
+                  label: Browser runtime for synthetic monitoring
+                  edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/DEM-RUNTIME.md
+                  description: Install, update and repair the browser runtime that browser journeys and Lighthouse audits need, including offline, Docker and Ubuntu AppArmor setups.
           - meta:
               label: Windows
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/windows/WINDOWS_INSTALLER.md
