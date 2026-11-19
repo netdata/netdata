@@ -82,9 +82,9 @@ How the design delivers it:
 - **One data model, [NIDL](/docs/NIDL-Framework.md),** behind every chart, alert and query, so a wrong chart is a bug we fix, not a mistake you made.
 - **Your own data gets the same treatment.** Prometheus and OpenTelemetry metrics are structured through profiles, and application traces become per-service performance charts and a service map, with no dashboard work.
 
-### Machine learning as evidence, not alerts
+### Machine learning that models your infrastructure
 
-**Machine learning failed in observability as an alert engine: it needs more time tuning than the alerts it raises are worth. We use it for what it does uniquely well: evidence of what changed, what changed together and how strongly.**
+**We use machine learning to model the behavior of the infrastructure and applications. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.**
 
 How the design delivers it:
 
@@ -145,7 +145,6 @@ How the design delivers it:
 - **We move the code to the data, not the data to the code.** A fleet-wide query fans out to the hubs and comes back already aggregated, so nothing has to be shipped, ingested and indexed in one place first.
 - **We collect everything and engineer the cost down,** instead of asking you to predict which data the next incident will need.
 - **We give data its meaning when it is collected,** so Netdata carries the knowledge of each technology instead of leaving every team to rebuild it.
-- **Machine learning never decides an alert on its own:** anomaly rates reach alerts only through rules people can read, like any other metric, and machine learning is used where it has no equal: as evidence for people and AI.
 - **We keep the engine open,** so the core of your observability never depends on a vendor's goodwill.
 
 ## What it means for you
