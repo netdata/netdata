@@ -325,7 +325,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File packaging/windows/packag
 
 ### UCRT64 terminal workflow
 
-Run these commands from the repository root in an MSYS2 UCRT64 terminal (`MSYSTEM=UCRT64`):
+Run these commands from the repository root in an MSYS2 terminal. The scripts select the UCRT64 toolchain themselves (`MSYSTEM=UCRT64`, `/ucrt64/bin` first in `PATH`), so no manual `export` is needed:
 
 ```bash
 ./packaging/windows/compile-on-windows.sh

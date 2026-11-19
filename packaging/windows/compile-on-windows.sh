@@ -43,12 +43,8 @@ while (($#)); do
     esac
 done
 
-if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
-    echo "Run this script from an MSYS2 UCRT64 terminal (MSYSTEM=UCRT64)." >&2
-    exit 1
-fi
+netdata_use_ucrt64
 
-export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
 pkg_config_paths="$(cygpath -aw /ucrt64/lib/pkgconfig);$(cygpath -aw /ucrt64/share/pkgconfig)"
 export PKG_CONFIG_PATH="${pkg_config_paths}"
 export PKG_CONFIG_LIBDIR="${PKG_CONFIG_PATH}"

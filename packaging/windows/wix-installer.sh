@@ -6,10 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 # shellcheck source=./win-build-dir.sh
 source "${repo_root}/packaging/windows/win-build-dir.sh"
 
-if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
-    echo "Run this script from an MSYS2 UCRT64 terminal (MSYSTEM=UCRT64)." >&2
-    exit 1
-fi
+netdata_use_ucrt64
 
 required_wix_version="5.0.2"
 wix_candidates=()

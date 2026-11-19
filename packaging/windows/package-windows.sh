@@ -6,11 +6,7 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 # shellcheck source=./win-build-dir.sh
 source "${repo_root}/packaging/windows/win-build-dir.sh"
 
-if [[ "${MSYSTEM:-}" != "UCRT64" ]]; then
-    echo "Run this script from an MSYS2 UCRT64 terminal (MSYSTEM=UCRT64)." >&2
-    exit 1
-fi
-export PATH="/ucrt64/bin:/ucrt64/sbin:${PATH}"
+netdata_use_ucrt64
 export NETDATA_WINDOWS_RUNTIME_DLL_DIR="$(cygpath -aw /ucrt64/bin)"
 
 if [[ ! -d "${build}" || ! -f "${build}/CMakeCache.txt" || ! -f "${build}/cmake_install.cmake" ]]; then
