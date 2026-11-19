@@ -12,7 +12,7 @@ alerts, logs, traces, database queries, network topology, flows and traps, and l
 network connections, across every node, from infrastructure and networks to applications. Assistants query the data
 where it lives, on Netdata Agents and Parents, directly or through Netdata Cloud.
 
-On top of this data, Netdata gives assistants its machine learning. Netdata uses machine learning to model the
+Netdata uses machine learning to model the
 behavior of the infrastructure and applications. Every metric is scored
 for anomalies as it is collected, and the scores are stored with the data. Netdata MCP gives assistants the scoring engine behind Netdata's Anomaly Advisor: their context comes from the
 incident itself, ranked across every metric, not from a random selection of metrics or a playbook:
