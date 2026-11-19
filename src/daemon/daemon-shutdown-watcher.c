@@ -119,7 +119,6 @@ void watcher_main(void *arg)
 {
     UNUSED(arg);
 
-    netdata_log_debug(D_SYSTEM, "Watcher thread started");
 
     // wait until the agent starts the shutdown process
     completion_wait_for(&shutdown_begin_completion);

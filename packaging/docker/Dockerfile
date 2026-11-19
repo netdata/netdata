@@ -140,7 +140,6 @@ ENV NETDATA_EXTRA_DEB_PACKAGES=""
 RUN mkdir -p /opt/src /var/log/netdata && \
     ln -sf /dev/stdout /var/log/netdata/access.log && \
     ln -sf /dev/stdout /var/log/netdata/aclk.log && \
-    ln -sf /dev/stdout /var/log/netdata/debug.log && \
     ln -sf /dev/stderr /var/log/netdata/error.log && \
     ln -sf /dev/stderr /var/log/netdata/daemon.log && \
     ln -sf /dev/stdout /var/log/netdata/collector.log && \

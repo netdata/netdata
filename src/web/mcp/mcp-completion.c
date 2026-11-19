@@ -92,7 +92,6 @@ static MCP_RETURN_CODE mcp_completion_method_complete(MCP_CLIENT *mcpc, struct j
 MCP_RETURN_CODE mcp_completion_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP completion method: %s", method);
 
     MCP_RETURN_CODE rc;
     

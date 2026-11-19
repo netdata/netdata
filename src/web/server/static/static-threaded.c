@@ -40,14 +40,13 @@ static struct web_client *web_client_create_on_fd(POLLINFO *pi) {
     if(unlikely(!*w->client_port)) strcpy(w->client_port, "-");
 	w->port_acl = pi->port_acl;
 
+    // best effort: a socket without these options still works
     int flag = 1;
-    if(unlikely(
-            web_client_check_conn_tcp(w) && setsockopt(w->fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int)) != 0))
-        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable TCP_NODELAY on socket fd %d.", w->id, w->fd);
+    if(web_client_check_conn_tcp(w))
+        (void)setsockopt(w->fd, IPPROTO_TCP, TCP_NODELAY, (char *) &flag, sizeof(int));
 
     flag = 1;
-    if(unlikely(setsockopt(w->fd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int)) != 0))
-        netdata_log_debug(D_WEB_CLIENT, "%llu: failed to enable SO_KEEPALIVE on socket fd %d.", w->id, w->fd);
+    (void)setsockopt(w->fd, SOL_SOCKET, SO_KEEPALIVE, (char *) &flag, sizeof(int));
 
     web_client_update_acl_matches(w);
     web_client_enable_wait_receive(w);
@@ -191,7 +190,6 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
 
     *events = ND_POLL_READ;
 
-    netdata_log_debug(D_WEB_CLIENT_ACCESS, "LISTENER on %d: new connection.", pi->fd);
     struct web_client *w = web_client_create_on_fd(pi);
 
     if (!strncmp(pi->client_port, "UNIX", 4)) {
@@ -200,7 +198,6 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
         web_client_set_conn_tcp(w);
     }
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
     worker_is_idle();
     return w;
@@ -217,7 +214,6 @@ static void web_server_del_callback(POLLINFO *pi) {
     if(web_client_flag_check(w, WEB_CLIENT_FLAG_DONT_CLOSE_SOCKET))
         pi->flags |= POLLINFO_FLAG_DONT_CLOSE;
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: CLOSING CLIENT FD %d", w->id, pi->fd);
     web_server_log_connection(w, "DISCONNECTED");
     web_client_request_done(w);
     web_client_release_to_cache(w);
@@ -253,7 +249,6 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
     if (likely(bytes > 0)) {
         pulse_web_server_received_bytes(bytes);
 
-        netdata_log_debug(D_WEB_CLIENT, "%llu: processing received data on fd %d.", w->id, fd);
         worker_is_idle();
         worker_is_busy(WORKER_JOB_PROCESS);
         current_thread_pollinfo = pi;
@@ -334,7 +329,6 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
         goto cleanup;
     }
 
-    netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 
     current_thread_pollinfo = pi;
     ssize_t ret = web_client_send(w);

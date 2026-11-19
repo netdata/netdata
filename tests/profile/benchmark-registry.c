@@ -166,7 +166,6 @@ int test1(int argc, char **argv) {
 int main(int argc, char **argv) {
 	config_set_boolean("registry", "enabled", 1);
 
-	//debug_flags = 0xFFFFFFFF;
 	test1(argc, argv);
 	exit(0);
 

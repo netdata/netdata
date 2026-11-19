@@ -274,7 +274,6 @@ BUFFER *buffer_create(size_t size, size_t *statistics)
     else
         size++; // make room for the terminator
 
-    netdata_log_debug(D_WEB_BUFFER, "Creating new web buffer of size %zu.", size);
 
     b = callocz(1, sizeof(BUFFER));
     b->buffer = mallocz(size + sizeof(BUFFER_OVERFLOW_EOF) + 2);
@@ -297,7 +296,6 @@ void buffer_free(BUFFER *b) {
 
     buffer_overflow_check(b);
 
-    netdata_log_debug(D_WEB_BUFFER, "Freeing web buffer of size %zu.", (size_t)b->size);
 
     if(b->statistics)
         __atomic_sub_fetch(b->statistics, b->size + sizeof(BUFFER) + sizeof(BUFFER_OVERFLOW_EOF) + 2, __ATOMIC_RELAXED);
@@ -319,7 +317,6 @@ void buffer_increase(BUFFER *b, size_t free_size_required) {
     size_t optimal = (b->size > 5 * 1024 * 1024) ? b->size / 2 : b->size;
     if(optimal > increase) increase = optimal;
 
-    netdata_log_debug(D_WEB_BUFFER, "Increasing data buffer from size %zu to %zu.", (size_t)b->size, (size_t)(b->size + increase));
 
     b->buffer = reallocz(b->buffer, b->size + increase + sizeof(BUFFER_OVERFLOW_EOF) + 2);
     b->size += increase;

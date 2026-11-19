@@ -432,11 +432,6 @@ int main(int argc, const char **argv) {
                         channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_HEALTH;
                         break;
 
-                    case NDLS_DEBUG:
-                        src_txt = "DEBUG";
-                        channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;
-                        break;
-
                     case NDLS_DAEMON:
                         src_txt = "DAEMON";
                         channel = NETDATA_ETW_CHANNEL_NAME "/" NETDATA_ETW_SUBCHANNEL_DAEMON;

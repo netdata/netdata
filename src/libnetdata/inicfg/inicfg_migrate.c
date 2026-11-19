@@ -6,7 +6,6 @@ int inicfg_move(struct config *root, const char *section_old, const char *name_o
     struct config_option *opt_old, *opt_new;
     int ret = -1;
 
-    netdata_log_debug(D_CONFIG, "request to rename config in section '%s', old name '%s', to section '%s', new name '%s'", section_old, name_old, section_new, name_new);
 
     struct config_section *sect_old = inicfg_section_find(root, section_old);
     if(!sect_old) return ret;

@@ -53,7 +53,6 @@ struct websocket_thread;
 // high ratio) still decompress regardless of the ratio cap.
 #define WS_MAX_DECOMPRESSION_RATIO  100ULL                 // max decompressed:compressed size ratio
 #define WS_MIN_DECOMPRESSED_SIZE    (1ULL * 1024 * 1024)   // 1MB floor for the ratio guard
-#define WS_DEBUG_DUMP_BYTES         32                     // max payload bytes captured in debug hex dumps
 
 // WebSocket timeout constants (in seconds)
 #define WS_PERIODIC_PING_INTERVAL   60   // Send periodic ping every 60 seconds
@@ -237,10 +236,8 @@ struct websocket_server_client *websocket_client_find_by_id(size_t id);
 // Utility functions
 // Validates a WebSocket close code according to RFC 6455
 bool websocket_validate_close_code(uint16_t code);
-void websocket_debug(WS_CLIENT *wsc, const char *format, ...);
 void websocket_info(WS_CLIENT *wsc, const char *format, ...);
 void websocket_error(WS_CLIENT *wsc, const char *format, ...);
-void websocket_dump_debug(WS_CLIENT *wsc, const char *payload, size_t payload_length, const char *format, ...);
 
 // Frame processing result codes
 typedef enum {

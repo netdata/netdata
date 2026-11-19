@@ -2160,11 +2160,10 @@ void finalize_rrd_files(struct rrdengine_instance *ctx)
 #if defined(OS_WINDOWS)
 uint64_t last_async_callback;
 
-void async_cb(uv_async_t *handle)
+void async_cb(uv_async_t *handle __maybe_unused)
 {
     last_async_callback = uv_hrtime();
 
-    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 
 static void async_closed_cb(uv_handle_t *handle)
@@ -2179,7 +2178,6 @@ static void async_closed_cb(uv_handle_t *handle)
 #else
 void async_cb(uv_async_t *handle __maybe_unused)
 {
-    netdata_log_debug(D_RRDENGINE, "%s called, active=%d.", __func__, uv_is_active((uv_handle_t *)handle));
 }
 #endif
 

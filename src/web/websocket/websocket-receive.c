@@ -37,8 +37,6 @@ static ssize_t websocket_received_data_process(WS_CLIENT *wsc, ssize_t bytes_rea
     // Check if bytes_processed is 0 but this was a successful call
     // This means we have an incomplete frame and need to keep the entire buffer
     if (bytes_consumed == 0) {
-        websocket_debug(
-            wsc, "Incomplete frame detected - keeping all %zu bytes in buffer for next read", contiguous_input);
         return bytes_read; // Return the bytes read so caller knows we made progress
     }
 
@@ -76,7 +74,6 @@ ssize_t websocket_receive_data(WS_CLIENT *wsc) {
     if (bytes_read <= 0) {
         if (bytes_read == 0) {
             // Connection closed
-            websocket_debug(wsc, "Client closed connection");
             return -1;
         }
 
@@ -99,7 +96,6 @@ ssize_t websocket_receive_data(WS_CLIENT *wsc) {
     wsc->last_activity_t = now_monotonic_sec();
 
     // Dump the received data for debugging
-    websocket_dump_debug(wsc, buffer, bytes_read, "RX SOCK %zd bytes", bytes_read);
 
     if(wsc->next_frame_size  == 0 || cbuffer_has_enough_data_for_next_frame(wsc)) {
         // we don't know the next frame size
@@ -159,8 +155,6 @@ void websocket_protocol_exception(WS_CLIENT *wsc, WEBSOCKET_CLOSE_CODE reason_co
     }
     else if (wsc->state == WS_STATE_CLOSING_CLIENT || wsc->state == WS_STATE_CLOSING_SERVER) {
         // Already in closing state, nothing to do
-        websocket_debug(wsc, "Protocol exception during closing state %s",
-                       WEBSOCKET_STATE_2str(wsc->state));
     }
     else {
         // For any other state, move straight to CLOSED
@@ -204,7 +198,6 @@ static int websocket_is_frame_allowed(WS_CLIENT *wsc, const WEBSOCKET_FRAME_HEAD
         case WS_STATE_CLOSING_SERVER:
             // When server initiated closing, only control frames are allowed
             if (!is_control) {
-                websocket_debug(wsc, "Non-control frame rejected in CLOSING_SERVER state");
                 return WS_ALLOW_DISCARD;
             }
             return WS_ALLOW_USE;
@@ -212,22 +205,18 @@ static int websocket_is_frame_allowed(WS_CLIENT *wsc, const WEBSOCKET_FRAME_HEAD
         case WS_STATE_CLOSING_CLIENT:
             // When client initiated closing, we shouldn't process any further frames
             // All frames in this state should be silently ignored
-            websocket_debug(wsc, "Frame rejected in CLOSING_CLIENT state (will be silently ignored)");
             return WS_ALLOW_DISCARD;
 
         case WS_STATE_CLOSED:
             // In CLOSED state, no frames should be processed
-            websocket_debug(wsc, "Frame rejected in CLOSED state");
             return WS_ALLOW_DISCARD;
 
         case WS_STATE_HANDSHAKE:
             // In HANDSHAKE state, no WebSocket frames should be processed yet
-            websocket_debug(wsc, "Frame rejected in HANDSHAKE state");
             return WS_ALLOW_ERROR;
 
         default:
             // Unknown state - reject frame
-            websocket_debug(wsc, "Frame rejected in unknown state: %d", wsc->state);
             return WS_ALLOW_DISCARD;
     }
 }
@@ -236,7 +225,6 @@ static int websocket_is_frame_allowed(WS_CLIENT *wsc, const WEBSOCKET_FRAME_HEAD
 bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t length,
                                                       WEBSOCKET_FRAME_HEADER *header) {
     if (!buffer || !header || length < 2) {
-        websocket_debug(NULL, "We need at least 2 bytes to parse a header: buffer=%p, length=%zu", buffer, length);
         return false;
     }
 
@@ -263,7 +251,6 @@ bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t leng
     else if (header->len == 126) {
         // 16-bit length
         if (length < 4) {
-            websocket_debug(NULL, "We need at least 4 bytes to parse this header: buffer=%p, length=%zu", buffer, length);
             return false; // Not enough data
         }
         
@@ -273,7 +260,6 @@ bool websocket_protocol_parse_header_from_buffer(const char *buffer, size_t leng
     else if (header->len == 127) {
         // 64-bit length
         if (length < 10) {
-            websocket_debug(NULL, "We need at least 10 bytes to parse this header: buffer=%p, length=%zu", buffer, length);
             return false; // Not enough data
         }
         
@@ -403,8 +389,6 @@ static bool websocket_protocol_process_control_message(
     WS_CLIENT *wsc, WEBSOCKET_OPCODE opcode,
                                                     char *payload, size_t payload_length,
                                                     bool is_masked, const unsigned char *mask_key) {
-    websocket_debug(wsc, "Processing control frame opcode=0x%x, payload_length=%zu, is_masked=%d, connection state=%d",
-                  opcode, payload_length, is_masked, wsc->state);
 
     // If payload is masked, unmask it first
     if (is_masked && mask_key && payload && payload_length > 0)
@@ -462,7 +446,6 @@ static bool websocket_protocol_process_control_message(
             // Different handling based on connection state
             if (wsc->state == WS_STATE_OPEN) {
                 // This is the initial CLOSE from client - respond with our own CLOSE
-                websocket_debug(wsc, "Received initial CLOSE frame from client, responding with CLOSE");
 
                 // Send close frame in response
                 websocket_protocol_send_close(wsc, code, reason);
@@ -476,7 +459,6 @@ static bool websocket_protocol_process_control_message(
             else if (wsc->state == WS_STATE_CLOSING_SERVER) {
                 // We initiated the closing handshake and now received client's response
                 // This completes the closing handshake
-                websocket_debug(wsc, "Closing handshake complete - received client's CLOSE response to our close");
 
                 // Ensure immediate removal from thread/poll
                 if (wsc->wth) {
@@ -490,7 +472,6 @@ static bool websocket_protocol_process_control_message(
             else if (wsc->state == WS_STATE_CLOSING_CLIENT) {
                 // Client already sent a CLOSE, and we responded, but they sent another CLOSE
                 // This is not strictly according to protocol, but we'll handle it gracefully
-                websocket_debug(wsc, "Received another CLOSE frame while in client-initiated closing state");
 
                 // Remove client from thread
                 if (wsc->wth) {
@@ -503,7 +484,6 @@ static bool websocket_protocol_process_control_message(
             }
             else {
                 // Already in CLOSED state - ignore
-                websocket_debug(wsc, "Ignoring CLOSE frame - connection already in CLOSED state");
             }
             return true;
         }
@@ -515,18 +495,14 @@ static bool websocket_protocol_process_control_message(
             if (wsc->state == WS_STATE_CLOSING_SERVER || wsc->state == WS_STATE_CLOSING_CLIENT || wsc->state == WS_STATE_CLOSED) {
                 // When we initiated closing, we should still respond to control frames
                 if (wsc->state == WS_STATE_CLOSING_SERVER) {
-                    websocket_debug(wsc, "Received PING during server-initiated closing, responding with PONG");
                     return websocket_protocol_send_pong(wsc, payload, payload_length) > 0;
                 }
 
                 // For client-initiated closing or CLOSED, we should ignore control frames
-                websocket_debug(wsc, "Ignoring PING frame - connection in %s state",
-                             wsc->state == WS_STATE_CLOSING_CLIENT ? "client closing" : "closed");
                 return true; // Successfully processed (by ignoring)
             }
 
             // Ping frame - respond with pong
-            websocket_debug(wsc, "Received PING frame with %zu bytes, responding with PONG", payload_length);
 
             // Send pong with the same payload
             return websocket_protocol_send_pong(wsc, payload, payload_length) > 0;
@@ -537,14 +513,10 @@ static bool websocket_protocol_process_control_message(
             // If we're in CLOSING or CLOSED state, decide how to handle PONG
             if (wsc->state == WS_STATE_CLOSING_SERVER || wsc->state == WS_STATE_CLOSING_CLIENT || wsc->state == WS_STATE_CLOSED) {
                 // We can safely ignore PONG frames in any closing or closed state
-                websocket_debug(wsc, "Ignoring PONG frame - connection in %s state",
-                             wsc->state == WS_STATE_CLOSING_SERVER ? "server closing" :
-                             wsc->state == WS_STATE_CLOSING_CLIENT ? "client closing" : "closed");
                 return true; // Successfully processed (by ignoring)
             }
 
             // Pong frame - update last activity time
-            websocket_debug(wsc, "Received PONG frame, updating last activity time");
             wsc->last_activity_t = now_monotonic_sec();
             return true;
 
@@ -575,8 +547,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
 
     // Step 1: Parse the frame header
     if (!websocket_protocol_parse_header_from_buffer(data, length, &header)) {
-        websocket_debug(wsc, "Not enough data to parse a complete header: bytes available = %zu",
-                        length);
         return WS_FRAME_NEED_MORE_DATA;
     }
 
@@ -617,15 +587,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
         wsc->next_frame_size = header.frame_size;
 
         worker_is_busy(WORKERS_WEBSOCKET_INCOMPLETE_FRAME);
-        websocket_debug(wsc,
-                        "RX FRAME INCOMPLETE (need %zu bytes more): OPCODE=0x%x, FIN=%s, RSV1=%d, RSV2=%d, RSV3=%d, MASK=%s, LEN=%d, "
-                        "PAYLOAD_LEN=%zu, HEADER_SIZE=%zu, FRAME_SIZE=%zu, MASK=%02x%02x%02x%02x, bytes available = %zu",
-                        (bytes + header.frame_size) - length,
-                        header.opcode, header.fin ? "True" : "False", header.rsv1, header.rsv2, header.rsv3,
-                        header.mask ? "True" : "False", header.len,
-                        header.payload_length, header.header_size, header.frame_size,
-                        header.mask_key[0], header.mask_key[1], header.mask_key[2], header.mask_key[3],
-                        length);
 
         return WS_FRAME_NEED_MORE_DATA;
     }
@@ -634,13 +595,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
     worker_is_busy(WORKERS_WEBSOCKET_COMPLETE_FRAME);
 
     // Log detailed header information for debugging
-    websocket_debug(wsc,
-                    "RX FRAME: OPCODE=0x%x, FIN=%s, RSV1=%d, RSV2=%d, RSV3=%d, MASK=%s, LEN=%d, "
-                    "PAYLOAD_LEN=%zu, HEADER_SIZE=%zu, FRAME_SIZE=%zu, MASK=%02x%02x%02x%02x",
-                    header.opcode, header.fin ? "True" : "False", header.rsv1, header.rsv2, header.rsv3,
-                    header.mask ? "True" : "False", header.len,
-                    header.payload_length, header.header_size, header.frame_size,
-                    header.mask_key[0], header.mask_key[1], header.mask_key[2], header.mask_key[3]);
 
     // Check for invalid RSV bits
     if (header.rsv2 || header.rsv3 || (header.rsv1 && !wsc->compression.enabled)) {
@@ -689,8 +643,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
     
     if (websocket_frame_is_control_opcode(header.opcode)) {
         // Handle control frames (PING, PONG, CLOSE) directly
-        websocket_debug(wsc, "Handling control frame: opcode=0x%x, payload_length=%zu",
-                        (unsigned)header.opcode, header.payload_length);
 
         // Process the control frame with optional payload
         char *payload = (header.payload_length > 0) ? (data + bytes) : NULL;
@@ -717,10 +669,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
     // For non-control frames (text, binary, continuation), check if connection is closing
     if (wsc->state == WS_STATE_CLOSING_SERVER || wsc->state == WS_STATE_CLOSING_CLIENT || wsc->state == WS_STATE_CLOSED) {
         // Per RFC 6455, once the closing handshake is started, we should ignore non-control frames
-        websocket_debug(wsc, "Ignoring non-control frame (opcode=0x%x) - connection in %s state",
-                    header.opcode,
-                    wsc->state == WS_STATE_CLOSING_SERVER ? "server closing" :
-                    wsc->state == WS_STATE_CLOSING_CLIENT ? "client closing" : "closed");
 
         // Consume the frame bytes but don't process it
         bytes += header.header_size + header.payload_length;
@@ -743,7 +691,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
             // For zero-length non-final frames, just update and continue
             if (!header.fin) {
                 // Non-final zero-length frame
-                websocket_debug(wsc, "Zero-length non-final continuation frame");
                 *bytes_processed = bytes;
                 wsc->frame_id++;
                 return WS_FRAME_COMPLETE;
@@ -759,7 +706,6 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
     }
     else {
         if(!header.payload_length) {
-            websocket_debug(wsc, "Received data frame with zero-length payload (fin=%d)", header.fin);
 
             // Initialize the client's message state for a new message
             websocket_client_message_reset(wsc);
@@ -814,27 +760,16 @@ websocket_protocol_consume_frame(WS_CLIENT *wsc, char *data, size_t length, ssiz
 
         if (header.mask) {
             // Payload is masked - need to unmask it first
-            websocket_debug(wsc, "Unmasking and appending payload data at position %zu (key=%02x%02x%02x%02x)",
-                wsb_length(&wsc->payload),
-                            header.mask_key[0], header.mask_key[1], header.mask_key[2], header.mask_key[3]);
 
             // Use the new helper function to unmask and append the data in one step
             wsb_unmask_and_append(&wsc->payload, src, header.payload_length, header.mask_key);
         }
         else {
             // Payload is not masked - can directly append
-            websocket_debug(wsc, "Appending unmasked payload data at position %zu", wsb_length(&wsc->payload));
 
             // Append unmasked data directly
             wsb_append(&wsc->payload, src, header.payload_length);
         }
-
-        // Dump payload for debugging
-        size_t buffer_length = wsb_length(&wsc->payload);
-        websocket_dump_debug(wsc,
-            wsb_data(&wsc->payload) + (buffer_length - header.payload_length),
-                            header.payload_length,
-                            "RX FRAME PAYLOAD");
     }
 
     // Step 5: At this point, we know we've processed a complete frame
@@ -867,7 +802,6 @@ ssize_t websocket_protocol_got_data(WS_CLIENT *wsc, char *data, size_t length) {
         ssize_t consumed = 0;
         WEBSOCKET_FRAME_RESULT result = websocket_protocol_consume_frame(wsc, data + processed, length - processed, &consumed);
 
-        websocket_debug(wsc, "Frame processing result: %d, processed: %zu/%zu", result, consumed, length);
         
         // Safety check to ensure we always move forward in the buffer
         if (consumed == 0 && result != WS_FRAME_NEED_MORE_DATA && result != WS_FRAME_ERROR) {
@@ -884,12 +818,10 @@ ssize_t websocket_protocol_got_data(WS_CLIENT *wsc, char *data, size_t length) {
 
             case WS_FRAME_NEED_MORE_DATA:
                 // Need more data to complete the current frame
-                websocket_debug(wsc, "Need more data to complete the current frame");
                 return (ssize_t)processed;
 
             case WS_FRAME_COMPLETE:
                 // Frame was processed successfully, but more frames are needed for a complete message
-                websocket_debug(wsc, "Frame complete, but message not yet complete");
                 processed += consumed;
                 continue;
 

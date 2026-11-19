@@ -76,7 +76,6 @@ static MCP_RETURN_CODE mcp_logging_method_setLevel(MCP_CLIENT *mcpc, struct json
 MCP_RETURN_CODE mcp_logging_route(MCP_CLIENT *mcpc, const char *method, struct json_object *params, MCP_REQUEST_ID id) {
     if (!mcpc || !method) return MCP_RC_INTERNAL_ERROR;
 
-    netdata_log_debug(D_MCP, "MCP logging method: %s", method);
 
     MCP_RETURN_CODE rc;
     

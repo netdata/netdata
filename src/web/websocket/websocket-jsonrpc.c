@@ -6,7 +6,6 @@ static int websocket_client_send_json(struct websocket_server_client *wsc, struc
     if (!wsc || !json)
         return -1;
 
-    websocket_debug(wsc, "Sending JSON message");
 
     // Convert JSON to string
     const char *json_str = json_object_to_json_string_ext(json, JSON_C_TO_STRING_PLAIN);
@@ -18,7 +17,6 @@ static int websocket_client_send_json(struct websocket_server_client *wsc, struc
     // Send as text message
     int result = websocket_protocol_send_text(wsc, json_str);
 
-    websocket_debug(wsc, "Sent JSON message, result=%d", result);
     return result;
 }
 
@@ -26,7 +24,6 @@ static int websocket_client_send_json(struct websocket_server_client *wsc, struc
 void jsonrpc_on_connect(struct websocket_server_client *wsc) {
     if (!wsc) return;
 
-    websocket_debug(wsc, "JSON-RPC client connected");
 
     // Future implementation - can send a welcome message or initialize client state
 }
@@ -35,7 +32,6 @@ void jsonrpc_on_connect(struct websocket_server_client *wsc) {
 void jsonrpc_on_disconnect(struct websocket_server_client *wsc) {
     if (!wsc) return;
 
-    websocket_debug(wsc, "JSON-RPC client disconnected");
 
     // Future implementation - can clean up any client-specific resources
 }
@@ -44,13 +40,6 @@ void jsonrpc_on_disconnect(struct websocket_server_client *wsc) {
 void jsonrpc_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE_CODE code, const char *reason) {
     if (!wsc) return;
 
-    websocket_debug(wsc, "JSON-RPC client closing with code %d (%s): %s",
-                   code,
-                   code == WS_CLOSE_NORMAL ? "Normal" :
-                   code == WS_CLOSE_GOING_AWAY ? "Going Away" :
-                   code == WS_CLOSE_PROTOCOL_ERROR ? "Protocol Error" :
-                   code == WS_CLOSE_INTERNAL_ERROR ? "Internal Error" : "Other",
-                   reason ? reason : "No reason provided");
 
     // Future implementation - can send a final message before closing
 }
@@ -66,7 +55,6 @@ void jsonrpc_on_message_callback(struct websocket_server_client *wsc, const char
         return;
     }
 
-    websocket_debug(wsc, "JSON-RPC callback processing message: length=%zu", length);
 
     // Process the message
     websocket_jsonrpc_process_message(wsc, message, length);
@@ -206,7 +194,6 @@ bool websocket_jsonrpc_process_message(WS_CLIENT *wsc, const char *message, size
     if (!wsc || !message || length == 0)
         return false;
 
-    websocket_debug(wsc, "Processing JSON-RPC message: length=%zu", length);
 
     // Parse the JSON
     struct json_object *json = json_tokener_parse(message);
@@ -220,7 +207,6 @@ bool websocket_jsonrpc_process_message(WS_CLIENT *wsc, const char *message, size
     // Process based on message type
     if (json_object_get_type(json) == json_type_array) {
         // Batch request
-        websocket_debug(wsc, "Processing JSON-RPC batch request");
 
         size_t array_len = json_object_array_length(json);
         for (size_t i = 0; i < array_len; i++) {

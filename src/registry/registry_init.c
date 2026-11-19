@@ -199,15 +199,12 @@ static int machine_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 static int registry_person_del_callback(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *d __maybe_unused) {
     REGISTRY_PERSON *p = (REGISTRY_PERSON *)entry;
 
-    netdata_log_debug(D_REGISTRY, "Registry: registry_person_del('%s'): deleting person", p->guid);
 
     while(p->person_urls)
         registry_person_unlink_from_url(p, (REGISTRY_PERSON_URL *)p->person_urls);
 
-    //debug(D_REGISTRY, "Registry: deleting person '%s' from persons registry", p->guid);
     //dictionary_del(registry.persons, p->guid);
 
-    netdata_log_debug(D_REGISTRY, "Registry: freeing person '%s'", p->guid);
     aral_freez(registry.persons_aral, p);
 
     return 1;
@@ -219,12 +216,10 @@ void registry_free(void) {
     if(!registry.enabled) return;
     registry.enabled = false;
 
-    netdata_log_debug(D_REGISTRY, "Registry: destroying persons dictionary");
     dictionary_walkthrough_read(registry.persons, registry_person_del_callback, NULL);
     dictionary_destroy(registry.persons);
     registry.persons = NULL;
 
-    netdata_log_debug(D_REGISTRY, "Registry: destroying machines dictionary");
     dictionary_walkthrough_read(registry.machines, machine_delete_callback, NULL);
     dictionary_destroy(registry.machines);
     registry.machines = NULL;

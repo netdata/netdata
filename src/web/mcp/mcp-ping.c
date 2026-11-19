@@ -43,7 +43,6 @@ MCP_RETURN_CODE mcp_method_ping(MCP_CLIENT *mcpc, struct json_object *params __m
     buffer_json_finalize(mcpc->result);
     
     // Log the ping for debugging
-    netdata_log_debug(D_MCP, "Received ping request (ID: %zu), responded", id);
     
     return MCP_RC_OK;
 }

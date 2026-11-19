@@ -172,7 +172,6 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
     if(!filename) filename = CONFIG_DIR "/" CONFIG_FILENAME;
 
-    netdata_log_debug(D_CONFIG, "CONFIG: opening config file '%s'", filename);
 
     FILE *fp = fopen(filename, "r");
     if(!fp) {
@@ -203,7 +202,6 @@ int inicfg_load(struct config *root, char *filename, int overwrite_used, const c
 
         s = trim(buffer);
         if(!s || !*s || *s == '#') {
-            netdata_log_debug(D_CONFIG, "CONFIG: ignoring line %d of file '%s', it is empty.", line, filename);
             continue;
         }
 

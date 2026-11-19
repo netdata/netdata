@@ -308,7 +308,6 @@ static ALARM_ENTRY *health_alarm_log_link_entry(RRDHOST *host, ALARM_ENTRY *ae)
 
     rw_spinlock_write_unlock(&host->health_log.spinlock);
 
-    netdata_log_debug(D_HEALTH, "Health adding alarm log entry with id: %u", ae->unique_id);
 
     return update_ae;
 }

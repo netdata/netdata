@@ -80,8 +80,6 @@ bool websocket_client_compress_message(WS_CLIENT *wsc, const char *data, size_t 
     
     if (!success || total_out <= 4) {
         // Compression failed or didn't save space
-        websocket_debug(wsc, "Compression not beneficial (in=%zu, out=%lu) - not using compression",
-                     length, total_out);
         return false;
     }
     
@@ -91,8 +89,6 @@ bool websocket_client_compress_message(WS_CLIENT *wsc, const char *data, size_t 
     // Update the buffer's length
     wsb_set_length(&wsc->c_payload, compressed_size);
     
-    websocket_debug(wsc, "Compressed message from %zu to %zu bytes (%.1f%%)",
-                 length, compressed_size, (double)compressed_size * 100.0 / (double)length);
     
     return true;
 }
@@ -102,7 +98,6 @@ bool websocket_compression_init(WS_CLIENT *wsc) {
     internal_fatal(wsc->wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
 
     if (!wsc->compression.enabled) {
-        websocket_debug(wsc, "Compression is disabled");
         return false;
     }
 
@@ -131,8 +126,6 @@ bool websocket_compression_init(WS_CLIENT *wsc) {
         return false;
     }
 
-    websocket_debug(wsc, "Compression initialized (server window bits: %d)",
-                    wsc->compression.server_max_window_bits);
 
     return true;
 }
@@ -142,7 +135,6 @@ bool websocket_decompression_init(WS_CLIENT *wsc) {
     internal_fatal(wsc->wth->tid != gettid_cached(), "Function %s() should only be used by the websocket thread", __FUNCTION__ );
 
     if (!wsc->compression.enabled) {
-        websocket_debug(wsc, "Decompression is disabled");
         return false;
     }
 
@@ -164,8 +156,6 @@ bool websocket_decompression_init(WS_CLIENT *wsc) {
         return false;
     }
 
-    websocket_debug(wsc, "Decompression initialized (client window bits: %d)",
-                    wsc->compression.client_max_window_bits);
 
     return true;
 }
@@ -192,14 +182,12 @@ void websocket_compression_cleanup(WS_CLIENT *wsc) {
     if (ret != Z_OK && ret != Z_DATA_ERROR) {
         // Z_DATA_ERROR can happen in some edge cases, it's not critical here
         // as we're cleaning up anyway
-        websocket_debug(wsc, "deflateEnd returned %d: %s", ret, zError(ret));
     }
 
     // Free the stream structure
     freez(wsc->compression.deflate_stream);
     wsc->compression.deflate_stream = NULL;
 
-    websocket_debug(wsc, "Compression resources cleaned up");
 }
 
 // Clean up decompression resources for a client's inflate stream
@@ -214,7 +202,6 @@ void websocket_decompression_cleanup(WS_CLIENT *wsc) {
     freez(wsc->compression.inflate_stream);
     wsc->compression.inflate_stream = NULL;
 
-    websocket_debug(wsc, "Decompression resources cleaned up");
 }
 
 // Reset compression resources for a client - calls cleanup and init
@@ -239,13 +226,11 @@ WS_DECOMPRESS_RESULT websocket_client_decompress_message(WS_CLIENT *wsc) {
         return WS_DECOMPRESS_FAILED;
 
     if (wsb_is_empty(&wsc->payload)) {
-        websocket_debug(wsc, "Empty compressed message");
         wsb_reset(&wsc->u_payload);
         wsb_null_terminate(&wsc->u_payload);
         return WS_DECOMPRESS_OK;
     }
 
-    websocket_debug(wsc, "Decompressing message (%zu bytes)", wsb_length(&wsc->payload));
 
     z_stream *zstrm = wsc->compression.inflate_stream;
     wsb_reset(&wsc->u_payload);
@@ -307,10 +292,6 @@ WS_DECOMPRESS_RESULT websocket_client_decompress_message(WS_CLIENT *wsc) {
         // Try to decompress
         ret = inflate(zstrm, Z_SYNC_FLUSH);
 
-        websocket_debug(wsc, "inflate() returned %d (%s), "
-                             "avail_in=%u, avail_out=%u, total_in=%lu, total_out=%lu",
-                        ret, zError(ret),
-            zstrm->avail_in, zstrm->avail_out, zstrm->total_in, zstrm->total_out);
 
         // Handle different return codes from inflate()
         // Z_STREAM_END - Complete decompression success
@@ -351,20 +332,13 @@ WS_DECOMPRESS_RESULT websocket_client_decompress_message(WS_CLIENT *wsc) {
     }
 
     // Log successful decompression with detailed information
-    websocket_debug(wsc, "Successfully decompressed %zu bytes to %zu bytes (ratio: %.2fx)",
-                    wsb_length(&wsc->payload), wsb_length(&wsc->u_payload),
-                    (double)wsb_length(&wsc->u_payload) / (double)wsb_length(&wsc->payload));
 
     // Show a preview of the decompressed data
-    websocket_dump_debug(wsc, wsb_data(&wsc->u_payload), wsb_length(&wsc->u_payload), "RX UNCOMPRESSED PAYLOAD");
 
     // when client context takeover is disabled, reset the decompressor
     if (!wsc->compression.client_context_takeover) {
-        websocket_debug(wsc, "resetting compression");
         if(inflateReset2(zstrm, -wsc->compression.client_max_window_bits) != Z_OK) {
-            websocket_debug(wsc, "reset failed, re-initializing compression");
             if (!websocket_decompression_reset(wsc)) {
-                websocket_debug(wsc, "re-initializing failed, reporting failure");
                 return WS_DECOMPRESS_FAILED;
             }
             zstrm = wsc->compression.inflate_stream;

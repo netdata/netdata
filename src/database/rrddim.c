@@ -215,7 +215,6 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     ml_dimension_delete(rd);
 
-    netdata_log_debug(D_RRD_CALLS, "rrddim_free() %s.%s", rrdset_name(st), rrddim_name(rd));
 
     // finalize collection first (tears down tier collect handles); its return
     // means "the db still has retention for this dimension".
@@ -371,7 +370,6 @@ static inline const DICTIONARY_ITEM *rrddim_index_find_and_acquire(RRDSET *st, c
 // RRDDIM - find a dimension
 
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
     const DICTIONARY_ITEM *rd_item = rrddim_index_find_and_acquire(st, id);
     RRDDIM *rd = dictionary_acquired_item_value(rd_item);
@@ -388,7 +386,6 @@ inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
 }
 
 inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool include_obsolete) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_find_and_acquire() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDDIM_ACQUIRED *rda = (RRDDIM_ACQUIRED *)dictionary_get_and_acquire_item(st->rrddim_root_index, id);
     if(rda) {
@@ -426,7 +423,6 @@ inline int rrddim_reset_name(RRDSET *st __maybe_unused, RRDDIM *rd, const char *
     if(unlikely(!name || !*name || !strcmp(rrddim_name(rd), name)))
         return 0;
 
-    netdata_log_debug(D_RRD_CALLS, "rrddim_reset_name() from %s.%s to %s.%s", rrdset_name(st), rrddim_name(rd), rrdset_name(st), name);
 
     STRING *old = rd->name;
     rd->name = rrd_string_strdupz(name);
@@ -441,7 +437,6 @@ inline int rrddim_set_algorithm(RRDSET *st, RRDDIM *rd, RRD_ALGORITHM algorithm)
     if(unlikely(rd->algorithm == algorithm))
         return 0;
 
-    netdata_log_debug(D_RRD_CALLS, "Updating algorithm of dimension '%s/%s' from %s to %s", rrdset_id(st), rrddim_name(rd), rrd_algorithm_name(rd->algorithm), rrd_algorithm_name(algorithm));
     rd->algorithm = algorithm;
     rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -453,8 +448,6 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
     if(unlikely(rd->multiplier == multiplier))
         return 0;
 
-    netdata_log_debug(D_RRD_CALLS, "Updating multiplier of dimension '%s/%s' from %d to %d",
-          rrdset_id(st), rrddim_name(rd), rd->multiplier, multiplier);
     rd->multiplier = multiplier;
     rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -468,8 +461,6 @@ inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
     if(unlikely(rd->divisor == divisor))
         return 0;
 
-    netdata_log_debug(D_RRD_CALLS, "Updating divisor of dimension '%s/%s' from %d to %d",
-          rrdset_id(st), rrddim_name(rd), rd->divisor, divisor);
     rd->divisor = divisor;
     rrddim_metadata_updated(rd);
     rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
@@ -609,7 +600,6 @@ void rrddim_free(RRDSET *st, RRDDIM *rd) {
 // RRDDIM - set dimension options
 
 int rrddim_hide(RRDSET *st, const char *id) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_hide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
 
@@ -630,7 +620,6 @@ int rrddim_hide(RRDSET *st, const char *id) {
 }
 
 int rrddim_unhide(RRDSET *st, const char *id) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_unhide() for chart %s, dimension %s", rrdset_name(st), id);
 
     RRDHOST *host = st->rrdhost;
     RRDDIM *rd = rrddim_find(st, id, true);
@@ -662,7 +651,6 @@ inline void rrddim_is_obsolete___safe_from_collector_thread(RRDSET *st, RRDDIM *
     if(unlikely(rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
         return;
 
-    netdata_log_debug(D_RRD_CALLS, "rrddim_is_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_set(rd, RRDDIM_FLAG_OBSOLETE);
     rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE_DIMENSIONS);
@@ -687,7 +675,6 @@ inline void rrddim_isnot_obsolete___safe_from_collector_thread(RRDSET *st __mayb
     if(likely(!rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE)))
         return;
 
-    netdata_log_debug(D_RRD_CALLS, "rrddim_isnot_obsolete___safe_from_collector_thread() for chart %s, dimension %s", rrdset_name(st), rrddim_name(rd));
 
     rrddim_flag_clear(rd, RRDDIM_FLAG_OBSOLETE);
     rrddim_reinitialize_collection(rd);
@@ -729,7 +716,6 @@ NETDATA_DOUBLE rrddim_set_by_pointer_double(RRDSET *st, RRDDIM *rd, NETDATA_DOUB
 }
 
 collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *rd, struct timeval collected_time, collected_number value) {
-    netdata_log_debug(D_RRD_CALLS, "rrddim_set_by_pointer() for chart %s, dimension %s, value " COLLECTED_NUMBER_FORMAT, rrdset_name(st), rrddim_name(rd), value);
 
     rd->collector.last_collected_time = collected_time;
     if(rrddim_is_float(rd))

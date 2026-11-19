@@ -36,28 +36,6 @@ LISTEN_SOCKETS api_sockets = {
 		.backlog         = API_LISTEN_BACKLOG
 };
 
-void debug_sockets() {
-	BUFFER *wb = buffer_create(256 * sizeof(char), NULL);
-	int i;
-
-	for(i = 0 ; i < (int)api_sockets.opened ; i++) {
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_NOCHECK) ? "NONE " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_DASHBOARD) ? "dashboard " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_REGISTRY) ? "registry " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_BADGES) ? "badges " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MANAGEMENT) ? "management " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_STREAMING) ? "streaming " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_NETDATACONF) ? "netdata.conf " : "");
-		buffer_strcat(wb, (api_sockets.fds_acl_flags[i] & HTTP_ACL_MCP) ? "mcp " : "");
-        netdata_log_debug(D_WEB_CLIENT, "Socket fd %d name '%s' acl_flags: %s",
-			  i,
-			  api_sockets.fds_names[i],
-			  buffer_tostring(wb));
-		buffer_reset(wb);
-	}
-	buffer_free(wb);
-}
-
 void web_server_listen_sockets_setup(void) {
     errno_clear();
 
@@ -67,9 +45,6 @@ void web_server_listen_sockets_setup(void) {
         daemon_status_file_update_status(DAEMON_STATUS_NONE);
         fatal("Cannot setup listen port(s). Is Netdata already running?");
     }
-
-	if(unlikely(debug_flags & D_WEB_CLIENT))
-		debug_sockets();
 
     websocket_initialize();
 }

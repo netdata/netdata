@@ -593,7 +593,6 @@ static void health_add_file_prototype(RRD_ALERT_PROTOTYPE *ap) {
 }
 
 int health_readfile(const char *filename, void *data __maybe_unused, bool stock_config) {
-    netdata_log_debug(D_HEALTH, "Health configuration reading file '%s'", filename);
 
     static uint32_t
             hash_alarm = 0,

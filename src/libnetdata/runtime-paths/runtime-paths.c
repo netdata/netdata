@@ -52,5 +52,4 @@ void nd_runtime_paths_load_hostname_from_inicfg(void) {
         netdata_log_error("Cannot get machine hostname.");
 
     netdata_configured_hostname = inicfg_get(&netdata_config, CONFIG_SECTION_GLOBAL, "hostname", buf);
-    netdata_log_debug(D_OPTIONS, "hostname set to '%s'", netdata_configured_hostname);
 }
