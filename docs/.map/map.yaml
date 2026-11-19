@@ -38,7 +38,7 @@ sidebar:
       - meta:
           label: Real-time Monitoring
           edit_url: https://github.com/netdata/netdata/edit/master/docs/realtime-monitoring.md
-          description: Learn how Netdata delivers one-second collection and sub-two-second visibility without sacrificing fidelity as infrastructure scales.
+          description: Learn how Netdata delivers one-second collection and sub-two-second visibility without sacrificing fidelity as your stack scales.
       - meta:
           label: Scalability
           edit_url: https://github.com/netdata/netdata/edit/master/docs/scalability.md
