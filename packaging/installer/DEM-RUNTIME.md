@@ -6,15 +6,16 @@ JavaScript adapters. Installing it does not require, use or discover a system br
 
 :::info
 
-The browser runtime is experimental, and its first signed public release still needs deployment validation.
+The browser runtime is experimental.
 Release builds default to the exact matching Agent version, channel and architecture at
 `https://artifacts.netdata.cloud/dem-runtime/<channel>/<version>/<arch>/release.json`.
 An administrator can override `runtime.release_url` in `dem.conf`; an explicit empty value disables that default.
 If an older copied `dem.conf` retains `release_url: ''`, remove that line to adopt the release default, or keep it and
 supply matching offline inputs during updates. A local `--release` descriptor with explicit `--allow-download` can
 still download its archive; an empty discovery URL does not prohibit every network operation.
-Unstamped development builds can use an already installed compatible runtime. Installing or updating a runtime needs
-a helper with the target release identity; a URL override does not supply that identity. Offline setup needs the signed
+Unstamped development builds can use an already installed compatible runtime. Reinstalling the Agent from unstamped
+sources retains and validates that runtime; it does not acquire a new one. Installing or updating the runtime itself
+needs a helper with the target release identity; a URL override does not supply that identity. Offline setup needs the signed
 descriptor, its archive and an administrator-provisioned public keyring.
 
 :::
@@ -203,14 +204,16 @@ does not provide a separate browser update stream. Every run records the actual 
 
 Execution checks the runtime contract, architecture, provenance and integrity, independently of the plugin’s release
 stamp. A copied development plugin can use an installed runtime if that contract is compatible; it needs no bypass.
-Installer and deployment checks still require the exact Agent/runtime pair.
+Runtime acquisition and published-release updates still require the exact Agent/runtime pair. Unstamped source
+updates retain the installed runtime after checking its contract, platform, bound payload and provenance.
 
 | Installation | Update owner | Activation and recovery |
 |---|---|---|
 | Native DEB/RPM | Package manager; the Netdata updater requests the Agent, DEM plugin and runtime together when the runtime is installed | Hooks drain, validate the exact pair and restore prior service intent. Retry or downgrade the matching packages together. |
-| Source/static | Agent installer/updater, only for an enrolled runtime | Verify target inputs, stop/drain, install Agent files normally, activate and restore prior service intent. Repair/retry a failed Agent installation; runtime selection and ownership records remain protected. |
+| Released source/static | Agent installer/updater, only for an enrolled runtime | Verify target inputs, stop/drain, install Agent files normally, activate and restore prior service intent. Repair/retry a failed Agent installation; runtime selection and ownership records remain protected. |
+| Unstamped source | Source installer | Validate and retain the existing runtime, stop/drain, install Agent files and recheck before restoring service intent. No runtime download or selection change. |
 | Docker | Deployment administrator using the pinned target image | Fetch before stopping; prepare and activate against the persistent volume after drainage. Roll back selection and image together. |
-| Protected preload | Deployment administrator | Retain both sealed roots and configuration artifacts; select the matching target root and Agent together. Restore both on rollback. |
+| Protected preload | Deployment administrator | For released builds, select the matching sealed root and Agent together and retain both for rollback. Unstamped source builds validate and retain the existing compatible root. |
 
 No runtime is acquired by an ordinary Agent update unless it was already installed. DEM has no independent download
 timer. Initial `install` or `repair` permits companion acquisition during Agent updates unless `--manual-updates` is
@@ -219,15 +222,24 @@ release CI, and `runtime qualify` remains an optional local diagnostic.
 
 ### Source/static controls and repair
 
-The installer verifies the target descriptor and archive before changing live Agent files or stopping the service.
-Trust/download failures leave the current installation running. After stopping and draining consumers, it prepares
+For a released build, the installer verifies the target descriptor and archive before changing live Agent files or
+stopping the service. Trust/download failures leave the current installation running. After stopping and draining
+consumers, it prepares
 runtime storage, installs Agent files through the normal source/static path, and activates the exact companion.
 An already stopped Agent stays stopped; `--dont-start-it` also prevents starting it. This flag applies to the current
 invocation and is not saved as a permanent start policy.
 
-A prefix-specific lock serializes paired installers. For nonroot source installs, its directory and ancestors must
-be owned by the installing user or root and must not be group- or world-writable, except root-owned sticky temporary
-ancestors. An unsafe path is reported without changing its permissions. Source installs stage only the target helper
+For an unstamped source build, the installer validates the existing runtime before stopping the Agent and again
+before restarting it. Incompatibility, damaged payload or a pending paired transition blocks the update; it does not
+trigger a download or discard ownership evidence. The selected release and acquisition consent remain unchanged.
+This choice follows the built helper's release identity, not the `--dev` flag. Browser updates still require an
+explicit runtime installation with a matching published helper, or a normal update to a published Agent release.
+Preloaded deployments retain their explicit deployment controls; native runtimes remain package-manager-owned.
+
+A prefix-specific lock serializes Agent installers. Each managed-runtime validation holds the runtime installation
+lock; Agent file installation runs between the two checks. For nonroot source installs, the prefix lock's directory
+and ancestors must be owned by the installing user or root and must not be group- or world-writable, except root-owned
+sticky temporary ancestors. An unsafe path is reported without changing its permissions. Source installs stage only the target helper
 and authenticated inputs. Static installers extract temporarily before any live replacement.
 
 For controlled or offline updates, supply inputs to the ordinary Agent installer/updater:
@@ -244,8 +256,9 @@ change saved consent. Temporary helper/input files are cleaned after the attempt
 if a retry must work without network access.
 
 There is **no automatic Agent file backup or restore**. A failure after service shutdown reports its original error
-and leaves the installation for repair. Rerun the same Agent installation with its matching companion, then start it
-when validation succeeds. If the service was stopped by the failed attempt, the retry preserves that stopped state;
+and leaves the installation for repair. Rerun the same Agent installation: released builds require their matching
+companion; unstamped source builds revalidate the existing compatible runtime. Start the Agent when validation
+succeeds. If the service was stopped by the failed attempt, the retry preserves that stopped state;
 start it explicitly afterward. For a different target, resolve any pending runtime transition first. To return to an
 older Agent, reinstall that Agent through its normal installer and restore its runtime selection through the runtime
 CLI. `runtime rollback` changes runtime selection only; it cannot repair Agent executables.
@@ -255,8 +268,9 @@ runtime contents are verified without creating a new transition or replacing the
 For an instance with custom IPC, export the same `NETDATA_PIPENAME` or `NETDATA_RUN_DIR` used by its Agent; nonempty values
 must be absolute paths. Nonroot installations use their own CLI and executable for stop/start.
 
-For a protected preload, stop the Agent and publish configuration pointing to the already sealed matching target
-root. Run the installer with `--dont-start-it` and `NETDATA_DEM_PRELOAD_UPDATE=1`. The installer validates the target
+For a protected preload, stop the Agent. Released builds require configuration pointing to the already sealed
+matching target root; unstamped source builds validate and retain the existing compatible root. Run the installer
+with `--dont-start-it` and `NETDATA_DEM_PRELOAD_UPDATE=1`. The installer validates the target
 and leaves the service stopped. The deployment owner retains previous Agent artifacts, configuration and sealed roots
 if rollback is needed, and must stop every consumer before replacing or removing a preload. The installer does not
 copy, restore or remove either preload root.

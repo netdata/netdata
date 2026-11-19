@@ -71,7 +71,9 @@ inputs or acquisition authority. Native package operations and protected preload
 Structural metadata stays readable across execution-contract changes. A healthy incompatible selection remains
 inventory and recovery evidence. Execution requires a compatible contract, matching architecture and intact payload,
 including its own release provenance. It does not compare the plugin’s version/channel/source stamp; ordinary
-development builds follow the same checks. Exact release pairing belongs to installation and update validation.
+development builds follow the same checks. Exact release pairing belongs to runtime acquisition and published
+Agent updates. Unstamped source updates retain and validate the existing runtime through the installation owner;
+they do not acquire a companion or relax execution checks.
 See [installation and recovery](../browserruntime/README.md#installation-update-and-repair) for the store primitives.
 
 ## Shutdown

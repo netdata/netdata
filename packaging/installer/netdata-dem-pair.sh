@@ -380,7 +380,18 @@ dem_pair_begin() {
     if [ -z "$DP_STAGE_CREATED" ]; then dem_pair_source_stage_new || return $?; fi
     DP_WORK=$DP_DEST
     dem_pair_capture_ipc || return $?
-    if [ "$DP_MODE" = managed ]; then
+    DP_KEEP_RUNTIME=0
+    if [ "$DP_FLAVOR" = source ]; then
+        DP_SOURCE_STRATEGY=$(dem_pair_runtime pair-plan --source-update) || return $?
+        case "$DP_SOURCE_STRATEGY" in
+            paired) ;;
+            retain) DP_KEEP_RUNTIME=1 ;;
+            *) dem_pair_error 'invalid source runtime update strategy'; return 1 ;;
+        esac
+    fi
+    if [ "$DP_KEEP_RUNTIME" = 1 ]; then
+        dem_pair_error 'Retaining the installed runtime after compatibility and payload checks for this unstamped source build.'
+    elif [ "$DP_MODE" = managed ]; then
         set -- --config-dir "$DP_CONFIG" --output "$DP_WORK/inputs"
         if [ -n "${NETDATA_DEM_RELEASE:-}" ] && [ -n "${NETDATA_DEM_ARCHIVE:-}" ]; then
             set -- "$@" --release "$NETDATA_DEM_RELEASE" --archive "$NETDATA_DEM_ARCHIVE"
@@ -417,7 +428,7 @@ dem_pair_begin() {
     DP_ACTIVE=1
     if [ "$DP_MODE" = managed ]; then dem_pair_owner_stop || return $?; fi
     dem_pair_wait_stopped 60 || return $?
-    if [ "$DP_MODE" = managed ]; then
+    if [ "$DP_MODE" = managed ] && [ "$DP_KEEP_RUNTIME" = 0 ]; then
         dem_pair_runtime prepare --cache "$DP_CACHE" --release "$DP_WORK/inputs/release.json" \
             --archive "$DP_WORK/inputs/runtime.tar.zst" --keyring "$DP_WORK/inputs/release-public.gpg" || return $?
     fi
@@ -425,15 +436,23 @@ dem_pair_begin() {
 dem_pair_finish() {
     [ "${DP_ACTIVE:-0}" = 1 ] || return 0
     dem_pair_restore_ipc
-    if [ "$DP_MODE" = managed ]; then
+    if [ "$DP_KEEP_RUNTIME" = 1 ]; then
+        DP_SOURCE_STRATEGY=$(dem_pair_runtime pair-plan --source-update) || return $?
+        [ "$DP_SOURCE_STRATEGY" = retain ] || {
+            dem_pair_error 'source runtime update strategy changed during installation'; return 1;
+        }
+    elif [ "$DP_MODE" = managed ]; then
         # Activation also validates the exact selection when prepare was unchanged.
         dem_pair_runtime activate --cache "$DP_CACHE" || return $?
+    else
+        dem_pair_runtime preload-validate || return $?
+    fi
+    if [ "$DP_MODE" = managed ]; then
         if [ "$DP_WAS_RUNNING" = 1 ] && [ "${DP_DONT_START:-0}" != 1 ]; then
             dem_pair_owner_start || return $?
         fi
     else
-        dem_pair_runtime preload-validate || return $?
-        dem_pair_error 'Matching preload installed; the deployment owner restores service intent.'
+        dem_pair_error 'Preload verified; the deployment owner restores service intent.'
     fi
     DP_ACTIVE=0
 }

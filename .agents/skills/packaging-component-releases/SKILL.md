@@ -10,10 +10,15 @@ payload. Decide whether it follows the Agent release identity or has a separate 
 policy. The DEM runtime follows the Agent; its exact pair and publication order are owned by
 `packaging/dem-runtime/RELEASE.md#build-and-publication-order`. An independently released component would need a
 separate compatibility/overlap policy; do not inherit that model from historical DEM guidance.
+Reuse the normal Agent release workflow and access model for paired components; an additional environment or
+approval boundary needs a concrete requirement. Keep installation pairing distinct from execution compatibility:
+`packaging/installer/DEM-RUNTIME.md#paired-agent-updates` owns that boundary.
 
 | Task | Start here |
 |---|---|
 | Change a DEB/RPM relationship, payload or maintainer script | `.agents/skills/packaging-native-packages/SKILL.md#versioned-payloads` |
+| Change installer, updater or Docker deployment lifecycle | `.agents/skills/packaging-installers/SKILL.md` |
+| Change shared release helpers or CI selection | `./SKILL.md#release-helpers-and-ci-validation` |
 | Select build runners and native repository destinations | `./SKILL.md#runners-and-native-distribution` |
 | Review a signed archive, exact companion or publication retry | `./SKILL.md#archive-trust-and-publication` |
 | Prepare a packaging PR for SRE or assess release readiness | `./sre-handoff.md#packaging-review-and-first-publication` |
@@ -60,11 +65,31 @@ using signing credentials, publishing and contacting SRE each require scope for 
   timestamps can change signature bytes for the same content. Conflicting immutable content must fail. DEM publishes exact
   immutable identities without runtime latest aliases, promotion or Agent-version ordering. Test retries after one
   architecture succeeds and another fails. A successful SSH submission still requires repository ingestion.
+- Validate transport changes with the same pinned, checksum-verified client used by CI and direct publication.
+  Exercise real-client absence, existing content, immutable conflicts and failed reads/writes with the intended
+  permission boundary; include multipart when the payload uses it. A permissive emulator or mocked exit code is
+  insufficient. Preserve signatures, object verification and public readback when fixing access failures. Recheck
+  old workarounds when changing client versions. DEM's pin and transport owners are linked from
+  `packaging/dem-runtime/RELEASE.md#public-objects`.
+- Diagnose public HTTP failures with the actual helper/client and its recorded source revision; a successful curl
+  request does not establish that helper's behavior. Keep the canonical trust source. Retry and safe diagnostic
+  guidance belongs to `packaging/dem-runtime/RELEASE.md#trust-and-retries`.
+
+## Release helpers and CI validation
+
+- Trace shared helpers to every caller's OS, tool version and event condition. A passing PR job may skip a
+  release-only step. For release metadata, check exact output bytes and the downstream parser as well as available
+  filesystem APIs and temporary-file replacement. `packaging/release_info.py`, `packaging/test_release_info.py`
+  and its workflow callers own the portable stamping path; validate it without publishing.
+- Test actual embedded scripts, helpers and outputs; retain narrow publication dependency checks. Do not duplicate
+  YAML syntax or reimplement GitHub scheduling and glob matching. When changing selection, exercise the actual
+  selector and inspect each suite's source/data readers, including metadata, schemas and helper scripts. Include
+  relevant additions, deletions and renames in the selection checks.
+- Keep CI proportional: test-only edits run their suites without rebuilding products. Browser/source assembly
+  follows artifact or execution inputs. Gate public exposure and payload consumers rather than unrelated
+  compilation; GitHub intermediates are build transport. Reuse the Node wire workflow with the frozen source input.
+  Preserve full release smoke, focused ARM checks, same-run receipts and native inventory equality independently
+  of PR filters; measure added CI cost before expanding architecture matrices.
 
 Use `.github/workflows/dem-runtime-release.yml` for job boundaries and
-`packaging/dem-runtime/RELEASE.md#local-validation-and-limits` for the scope of publisher and package tests.
-
-Keep CI proportional: browser/source assembly follows artifact or execution inputs, excluding documentation,
-metadata and unit-test-only changes. Gate public exposure and payload consumers rather than unrelated compilation;
-GitHub intermediates are build transport. Reuse the Node wire workflow with the frozen source input. Retain release
-smoke, focused ARM checks, same-run receipts and native inventory equality.
+`packaging/dem-runtime/RELEASE.md#local-validation-and-limits` for suite prerequisites and evidence limits.

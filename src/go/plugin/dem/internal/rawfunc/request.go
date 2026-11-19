@@ -41,6 +41,9 @@ const VnodeHelp = "For one virtual node, pass vnode (its configured name) or vno
 // were recorded under; methods showing current state filter on the current one.
 const RecordedVnodeHelp = "Data of a virtual node no longer configured is still found by its vnode_guid."
 
+// UnassignedVnodeHelp describes the optional selector supported by some RUM methods.
+const UnassignedVnodeHelp = "Pass vnode_guid:" + vnodeguid.Unassigned + " for events recorded without a virtual node."
+
 // Permitted reports whether the request's access mask holds every required bit.
 func Permitted(req funcapi.RawMethodRequest, required uint64) bool {
 	mask, err := strconv.ParseUint(req.Permissions, 0, 64)
@@ -62,6 +65,7 @@ func Admit(
 	req funcapi.RawMethodRequest,
 	accepted []string,
 	lookup func(string) (string, bool),
+	allowUnassigned bool,
 ) (map[string]string, *funcapi.FunctionResponse) {
 	if !req.Info && !Permitted(req, MemberAccess) {
 		return nil, funcapi.ErrorResponse(403, "member permissions are required")
@@ -70,7 +74,7 @@ func Admit(
 	if err != nil {
 		return nil, funcapi.ErrorResponse(400, "%v", err)
 	}
-	if err := resolveVnode(args, lookup); err != nil {
+	if err := resolveVnode(args, lookup, allowUnassigned); err != nil {
 		return nil, funcapi.ErrorResponse(400, "%v", err)
 	}
 	return args, nil
@@ -109,9 +113,9 @@ func parameters(req funcapi.RawMethodRequest, accepted []string) (map[string]str
 }
 
 // resolveVnode sets args["vnode_guid"] from the vnode or vnode_guid selector: a
-// configured name resolved by lookup, a recorded GUID, or empty for all. Name
-// lookup is request-local; retained evidence is never renamed or reassigned.
-func resolveVnode(args map[string]string, lookup func(string) (string, bool)) error {
+// configured name resolved by lookup, a recorded GUID, empty for all, or
+// the explicit unassigned selector if the method supports it.
+func resolveVnode(args map[string]string, lookup func(string) (string, bool), allowUnassigned bool) error {
 	name, named := args["vnode"]
 	guid, identified := args["vnode_guid"]
 	if named && identified {
@@ -129,6 +133,8 @@ func resolveVnode(args map[string]string, lookup func(string) (string, bool)) er
 		if !ok || guid == "" {
 			return fmt.Errorf("unknown configured vnode %q", name)
 		}
+	} else if allowUnassigned && guid == vnodeguid.Unassigned {
+		return nil
 	}
 	if err := vnodeguid.Validate(guid); err != nil {
 		return err

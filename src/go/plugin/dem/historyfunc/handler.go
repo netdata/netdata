@@ -57,7 +57,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 	if req.Method != method.ID {
 		return funcapi.NotFoundResponse(req.Method)
 	}
-	if _, r := rawfunc.Admit(req, nil, nil); r != nil {
+	if _, r := rawfunc.Admit(req, nil, nil, false); r != nil {
 		return r
 	}
 	// Metadata remains available without accessing the store or reload state.

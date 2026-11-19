@@ -186,6 +186,9 @@ Function site selection:
 - **Not authorization.** Neither selector is an authorization boundary. Omitting both, or supplying only an empty
   `vnode_guid`, reads every vnode and unassigned data. Empty or unknown `vnode` names and requests containing both
   selectors MUST fail, even if either value is empty.
+- **Unassigned selection.** `rum-live` and `rum-session-events` accept `vnode_guid:unassigned` for events with an empty
+  captured GUID. The value is reserved for requests. `vnode:unassigned` still looks up a configured vnode with that
+  name. Switching between wildcard, GUID and unassigned selections restarts the live cursor.
 - **Name lookup.** `vnode` is the exact configured resource name used by collector jobs, not the display hostname.
   Resolve it once per request through the framework's read-only current configured-vnode authority, independently of
   active job registries. Lookup MUST work with disabled jobs or no jobs, use an in-memory name-to-canonical-GUID lookup,
@@ -1207,7 +1210,9 @@ is [browser runtime host setup](../../../../packaging/installer/DEM-RUNTIME.md).
   bind those bytes to the execution contract. The configured URL can change the source, not relax installation pairing.
   Execution checks contract/platform compatibility and payload integrity/provenance without comparing plugin release
   stamps. This same rule permits ordinary development builds to use an installed compatible runtime; no bypass exists.
-  Normal Agent updates acquire the exact companion only for enrolled installations. Native package dependencies
+  Published Agent updates acquire the exact companion only for enrolled installations. Unstamped source updates
+  validate and retain the installed runtime before replacement and restart, without acquiring bytes or changing
+  selection, consent or recovery records. Native package dependencies
   bind the final versions, while helper capabilities separately cover pre-unpack/pre-erasure hooks. Packages:
   `browserruntime`, `runtimehost`, `packaging/dem-runtime`, Agent release/packaging workflows.
 - **Durable recovery.** Managed `recovery.json` records one pending before/after transition and one previous pair;

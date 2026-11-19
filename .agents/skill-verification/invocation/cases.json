@@ -663,6 +663,76 @@
         "Check the main-to-plugin and plugin-to-runtime weak relationships separately from the reverse versioned helper capability and its transaction-phase dependencies.",
         "Check staged identity versus package version, weak-dependency support and the service-user readiness result. Package metadata review alone does not request publication."
       ]
+    },
+    {
+      "id": "INV-41",
+      "prompt": "Review a kickstart/updater change that runs the static archive from a temporary directory. Check failed-update cleanup, preserved configuration and propagation through sudo. Use source and existing evidence only.",
+      "required": [
+        "packaging-installers",
+        "packaging-static-installer"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-native-packages",
+        "repo-pr-reviews"
+      ],
+      "expect": [
+        "Trace actual caller argv, executable temporary-directory access, privilege-boundary environment and child exit-status handling.",
+        "Distinguish existing prefixes/state from fresh partial installations; consult makeself artifact/state owners without running an installation."
+      ]
+    },
+    {
+      "id": "INV-42",
+      "prompt": "Review Docker image replacement for an Agent with an enrolled DEM runtime on a persistent volume. Does the entrypoint update it, and which deployment steps own activation and host policy? Do not change or run containers.",
+      "required": [
+        "packaging-installers"
+      ],
+      "optional": [
+        "packaging-component-releases"
+      ],
+      "not_selected_by_prompt": [
+        "packaging-static-installer",
+        "packaging-native-packages"
+      ],
+      "expect": [
+        "Trace the real entrypoint/helpers and distinguish image, volume, machine identity and host-policy lifetimes; do not assume image replacement performs paired runtime switching.",
+        "Keep exact installation pairing distinct from compatible execution; use the documented Docker procedure without executing it or designing automatic updates."
+      ]
+    },
+    {
+      "id": "INV-43",
+      "prompt": "Review a shared systemd unit change that alters the Agent runtime directory and removes a PID-file option. Include logrotate and custom IPC effects. Use existing source and logs only.",
+      "required": [
+        "packaging-installers"
+      ],
+      "optional": [
+        "packaging-native-packages",
+        "packaging-static-installer"
+      ],
+      "not_selected_by_prompt": [
+        "packaging-component-releases"
+      ],
+      "expect": [
+        "Trace directory creation/ownership across unit, provisioning and Agent startup and all PID/IPC readers, including logrotate and legacy paths.",
+        "Assess actual service-account/policy and log-reopen evidence without restarting services, deleting locks or changing policy."
+      ]
+    },
+    {
+      "id": "INV-44",
+      "prompt": "Review a release helper change after an S3 upload works in mocks but fails with the CI client. A shared stamping helper also runs only during dispatched Windows releases. Do not publish or change credentials.",
+      "required": [
+        "packaging-component-releases"
+      ],
+      "optional": [],
+      "not_selected_by_prompt": [
+        "packaging-installers",
+        "packaging-native-packages",
+        "packaging-static-installer"
+      ],
+      "expect": [
+        "Check actual tested client/version, restricted permission behavior, immutable failure paths and public verification without weakening integrity.",
+        "Trace platform/tool/event callers and exact generated metadata bytes; a passing PR build does not prove release-only steps ran. Review does not authorize publication or credential changes."
+      ]
     }
   ]
 }

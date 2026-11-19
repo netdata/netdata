@@ -8,7 +8,7 @@
     icon_filename: "linux.svg"
   keywords:
     - linux
-  install_description: "Run the following command on your node to install and connnect Netdata to your Space:"
+  install_description: "Run the following command on your node to install and connect Netdata to your Space:"
   methods:
     - &ks_wget
       method: wget

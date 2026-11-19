@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/netdata/netdata/go/plugins/plugin/dem/internal/vnodeguid"
 	"github.com/netdata/netdata/go/plugins/plugin/dem/journalstore"
 	"github.com/netdata/systemd-journal-sdk/go/journal"
 )
@@ -49,7 +50,7 @@ func (s *Store) scan(ctx context.Context, f Filter, visit func(EventRecord)) err
 }
 
 // matchSession reads identity postings across all retained time.
-func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID string, visit func(EventRecord)) error {
+func (s *Store) matchSession(ctx context.Context, site, session, vnodeSelector string, visit func(EventRecord)) error {
 	reader, closeReader, err := s.store.OpenReader(ctx)
 	if err != nil {
 		return err
@@ -62,7 +63,7 @@ func (s *Store) matchSession(ctx context.Context, site, session, vnodeGUID strin
 			return err
 		}
 		previous = record
-		if rum && (vnodeGUID == "" || record.VnodeGUID == vnodeGUID) && record.SessionID == session &&
+		if rum && vnodeguid.Matches(vnodeSelector, record.VnodeGUID) && record.SessionID == session &&
 			(site == "" || record.Site == site) {
 			visit(record)
 		}
