@@ -694,7 +694,6 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 if (strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
                 }
-                // else
                 break;
 
             default:

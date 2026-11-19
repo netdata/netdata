@@ -33,4 +33,3 @@ void websocket_error(WS_CLIENT *wsc, const char *format, ...) {
     netdata_log_error("WEBSOCKET: C=%u M=%zu F=%zu %s",
                   wsc->id, wsc->message_id, wsc->frame_id, formatted_message);
 }
-

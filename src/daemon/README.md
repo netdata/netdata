@@ -185,7 +185,7 @@ To see debug messages, set `level = debug` in the `[logs]` section of `netdata.c
 >
 > Builds compiled with debugging (below) or in developer mode always log at debug level.
 
-Netdata does not change core dump limits. Core dumps follow the limits of the service manager or the shell that started Netdata.
+Netdata does not change core dump limits. Core dumps follow the limits of the service manager or the shell that started Netdata. On Linux, when Netdata starts as root and switches to the `netdata` user, the system dump policy (`fs.suid_dumpable`) also decides whether a crash produces a core dump.
 
 ### Compiling Netdata with debugging
 
