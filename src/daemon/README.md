@@ -177,13 +177,13 @@ This option has no effect on Linux, macOS, or FreeBSD; those operating systems u
 
 ## Debugging
 
-To see debug messages, set `level = debug` in the `[logs]` section of `netdata.conf` and restart Netdata. The level applies to all logs, and a per-log `level=` option (see [logging configuration](/src/libnetdata/log/README.md)) overrides it for that log. Debug messages go to the same destinations as the other messages of each log.
+To see debug messages, set `level = debug` in the `[logs]` section of `netdata.conf` and restart Netdata. The global level sets the default threshold for every log. In standard builds, a per-log `level=` option (see [logging configuration](/src/libnetdata/log/README.md)) overrides it for that log. Debug messages go to the same destinations as the other messages of each log.
 
 > **Important**
 >
 > Set `level` back to `info` after you finish troubleshooting. Debug logging is verbose.
 >
-> Builds compiled with debugging (below) always log at debug level.
+> Builds compiled with debugging (below) or in developer mode always log at debug level.
 
 Netdata does not change core dump limits. Core dumps follow the limits of the service manager or the shell that started Netdata.
 
