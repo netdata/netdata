@@ -17,6 +17,7 @@ on:
 concurrency: # Serialize tag/branch validation and publication across dispatch refs.
   group: release
   cancel-in-progress: false
+  queue: max # Keep every pending release; the default single slot replaces older pending runs.
 jobs:
   update-changelogs:
     name: Update changelog

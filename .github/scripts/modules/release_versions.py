@@ -53,4 +53,8 @@ def reaches(version: str, alias: str) -> bool:
 
 
 if __name__ == '__main__':
-    print('true' if reaches(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else 'preview/latest') else 'false')
+    if sys.argv[1] == '--at-least':
+        # Compare against an already-read published version (e.g. read from the bucket under a publication lock).
+        print('true' if release_key(sys.argv[2]) >= release_key(sys.argv[3]) else 'false')
+    else:
+        print('true' if reaches(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else 'preview/latest') else 'false')

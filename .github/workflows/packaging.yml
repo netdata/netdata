@@ -32,7 +32,9 @@ env:
   DISABLE_TELEMETRY: 1
   REPO_PREFIX: netdata/netdata
 concurrency:
-  group: packages-${{ github.ref }}-${{ github.event_name }}
+  # Numbered release dispatches get a per-run group so a newer release never replaces a pending one; job-level
+  # queued groups serialize shared publication state. Nightlies, PR and push runs keep the shared group.
+  group: packages-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && inputs.version != 'nightly' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
   runtime-companion:

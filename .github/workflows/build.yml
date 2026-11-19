@@ -25,7 +25,9 @@ on:
         required: false
         type: string
 concurrency: # This keeps multiple instances of the job from running concurrently for the same ref and event type.
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  # Numbered release dispatches get a per-run group so a newer release never replaces a pending one; job-level
+  # queued groups serialize shared publication state. Nightlies, PR and push runs keep the shared group.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && inputs.version != 'nightly' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 env:
   DISABLE_TELEMETRY: 1 # Disable telemetry reporting from the agent in our CI.
@@ -1435,6 +1437,10 @@ jobs:
       - windows-test
       - artifact-verification-dist
       - artifact-verification-static
+    concurrency: # One publisher at a time across release refs, so alias rechecks and alias writes cannot interleave.
+      group: r2-release-publish
+      cancel-in-progress: false
+      queue: max
     steps:
       - name: Checkout
         id: checkout
@@ -1488,14 +1494,47 @@ jobs:
           RCLONE_CONFIG_S3_REGION: "auto"
         working-directory: artifacts
         run: |
+          publish() {
+            rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${1}" "${2}"
+          }
           for prefix in ${ARTIFACT_PREFIXES}; do
             source_dir=.
             if [ "${prefix}" = preview ] && [ "${RELEASE_TYPE}" != release-candidate ]; then
               source_dir=../preview-artifacts
             fi
+            # The versioned directory (named after the Version it holds) always publishes, and before any alias.
+            aliases=()
             for dir in "${source_dir}"/*/ ; do
               name="$(basename "${dir}")"
-              rclone sync --verbose --fast-list --use-server-modtime --header-upload "Cache-Control: no-transform" "${dir}" "s3:netdata-agent-artifacts/${prefix}/${name}/" || exit 1
+              if [ "$(cat "${dir}Version")" = "${name}" ]; then
+                publish "${dir}" "s3:netdata-agent-artifacts/${prefix}/${name}/" || exit 1
+              else
+                aliases+=("${dir}")
+              fi
+            done
+            # Preparation chose these aliases from an earlier, possibly cached, read. Another release may have
+            # moved them since, so recheck against the bucket while holding the publication lock.
+            for dir in "${aliases[@]}" ; do
+              name="$(basename "${dir}")"
+              remote="s3:netdata-agent-artifacts/${prefix}/${name}/"
+              ret=0
+              published="$(rclone cat "${remote}Version")" || ret=$?
+              # Bucket remotes list a missing prefix as empty (exit 0, no output); others report not found (3/4).
+              if [ "${ret}" -eq 0 ] && [ -z "${published}" ]; then
+                ret=3
+              fi
+              case "${ret}" in
+                0)
+                  eligible="$(python3 ../.github/scripts/modules/release_versions.py --at-least "$(cat "${dir}Version")" "${published}")" || exit 1
+                  if [ "${eligible}" != true ]; then
+                    echo "::notice::Not moving ${prefix}/${name}: it already points to newer ${published}."
+                    continue
+                  fi
+                  ;;
+                3|4) ;; # Directory or file not found: nothing published under this alias yet.
+                *) exit 1 ;;
+              esac
+              publish "${dir}" "${remote}" || exit 1
             done
           done
       - name: Failure Notification

@@ -30,6 +30,11 @@ around the `v2.14` series:
   stable release. `-post` nightlies sort after the stable release they follow. Git builds are not ordered against
   nightlies.
 - MSI only compares the first three fields, so stable patch numbers are offset by 100 to sort after RCs (rc01-rc99).
+- MSI `ProductVersion` allows at most `255.255.65535`, and Win32 assembly manifests allow at most 65535 in each of
+  four fields. Preparation rejects a release or nightly whose mapped Windows version exceeds those limits, before
+  anything is tagged: major and minor at most 255, stable patch at most 65435, nightly count at most 65535.
+  See [ProductVersion](https://learn.microsoft.com/en-us/windows/win32/msi/productversion) and
+  [assembly versions](https://learn.microsoft.com/en-us/windows/win32/sbscs/assembly-versions).
 - [NetdataVersion.cmake](../packaging/cmake/Modules/NetdataVersion.cmake) derives the package and MSI versions;
   the updater's `parse_version` and [release_versions.py](scripts/modules/release_versions.py) implement the same
   ordering.
@@ -49,6 +54,11 @@ around the `v2.14` series:
 
 Release workflow runs are serialized across dispatch refs. Each preparation pushes its branch and tag updates
 atomically, so a failed push cannot publish only part of that update.
+
+Every serialized publication step uses a queued concurrency group (`queue: max`), so a newer release waits
+instead of replacing an older pending one. Numbered release dispatches of the Build, Docker and native package
+workflows do not share a workflow-level group. Nightly dispatches still replace an older pending nightly, and pull
+request and push runs still cancel superseded runs for the same ref.
 
 ## Changelog generation
 
@@ -102,11 +112,13 @@ An existing tag cannot be reused.
 |---|---|---|
 | `major` | Minor and patch must both be zero | `v3.0.0-rc01` → `v3.0.0` |
 | `minor` | Patch must be zero | `v2.13.0-rc01` → `v2.13.0` |
-| `patch` | Version must be newer than the branch's current core version | `v2.13.0` → `v2.13.1` |
+| `patch` | The branch must already carry a released version (not an RC), and the version must be newer than it | `v2.13.0` → `v2.13.1` |
 
 - All three types require an existing `release-vMAJOR.MINOR` branch and matching major/minor numbers in its
   `packaging/version`. Existing series using the old `vMAJOR.MINOR` branch name must be renamed to `release-vMAJOR.MINOR` before
-  dispatching this workflow; the `vMAJOR.MINOR` development marker tag stays in place.
+  dispatching this workflow; the `vMAJOR.MINOR` development marker tag stays in place. Such a branch also needs
+  the release tooling backported first; see
+  [Maintenance branches created before release candidates](#maintenance-branches-created-before-release-candidates).
 - Start a new series with an RC first; stable major/minor releases do not create branches.
 - Major/minor releases may promote a same-core prerelease to its final version. Otherwise the requested core
   must be newer than the branch's current core. Patch releases always require a newer core. Preparation rejects
@@ -114,8 +126,14 @@ An existing tag cannot be reused.
 - Source, static installer and Windows artifacts go under the `stable` artifact prefix. They also go to `preview`
   when their numeric version core is at least the core advertised by `preview/latest/Version`, or that metadata
   does not yet exist. A final release qualifies against an RC with the same core.
-- Artifact aliases (`latest`, major and major/minor) advance only when the release is newer than the version
+- Artifact aliases (`latest`, major and major/minor) advance only when the release is not older than the version
   already advertised at each alias. Versioned artifacts are still published for releases of older series.
+  The upload job holds one queued concurrency group shared by stable and RC publishers. Inside it, the job
+  publishes the versioned directory first, then re-reads each alias's `Version` from the bucket and skips any
+  alias that another release has already moved to a newer version.
+- The release identity (`packaging/release_info.py`, mirrored by `NetdataVersion.cmake`) accepts only `vX.Y.Z` for
+  the `stable` channel and `vX.Y.Z-rcNN` for `release-candidate`. A build dispatched with a type that does not match
+  its version therefore fails before its runtime companion or any artifact is published.
 - Native packages go to the stable repository on both package hosts, and also to preview when the same preview
   eligibility check passes.
 - Docker publishes the exact version tag to Docker Hub, Quay and GHCR (`latest` is nightly-only). The major, major/minor and
@@ -150,7 +168,8 @@ correcting those failures; artifact metadata is never used as a fallback.
   stable tag before markers exist); a new major requires minor zero. It creates the `release-vMAJOR.MINOR` release branch
   from `master` as it stands, commits the changelog/version there and tags the RC on that branch. It then adds an
   empty commit to `master` with the annotated marker tag for the next series (`v2.15` after `v2.14.0-rc01`,
-  `v3.1` after `v3.0.0-rc01`). Branch, tags and `master` are pushed atomically. Subsequent RCs require the branch.
+  `v3.1` after `v3.0.0-rc01`). Branch, tags and `master` are pushed atomically. Subsequent RCs require the branch,
+  still at an RC of the same version: once a release of the series is recorded there, the branch cannot go back.
 - Downstream builds receive type `release-candidate`. Source/static/Windows artifacts go exclusively to the
   `preview` artifact prefix; native packages go exclusively to the preview repository on both package hosts.
   RCs can update preview's `latest` alias according to the existing version comparison, but do not create major/minor aliases.
@@ -159,6 +178,27 @@ correcting those failures; artifact metadata is never used as a fallback.
 - Docker publishes the exact version tag, such as `v2.13.0-rc01`, to each registry, plus `preview`
   when the RC is not older than the image at that registry's `preview` alias. RCs do not update `stable`, major or minor Docker
   aliases. Stable Helmchart and MSI follow-up workflows are skipped.
+
+## Maintenance branches created before release candidates
+
+Release branches cut before release candidates existed (currently `v2.12`, whose tip is the shipped `v2.12.3`)
+lack the tooling the Release workflow needs once a tag is pushed:
+
+- The runtime companion workflows run from `master` but execute helpers from the tagged source:
+  `packaging/release_info.py`, `packaging/dem-runtime/` (including `ci.py`, `build.py`, `release.py` and
+  `sources.py`), the `src/dem-runtime/` manifests and the installer helpers and tests they reference.
+- The Build, Docker and native package workflows run from the tag itself and must accept the `source_sha` and
+  `companion_run_id` inputs the Release workflow sends, so their current versions and the scripts they call
+  must be on the branch.
+
+Before releasing from such a branch:
+
+1. Rename it to `release-vMAJOR.MINOR` (the `vMAJOR.MINOR` marker tag stays).
+2. Backport the items above to the branch through a normal pull request against it.
+3. Dispatch the release. Preparation checks the branch for every helper path the companion workflows reference and
+   for the dispatched workflows' inputs. It fails, naming what is missing, before anything is committed or tagged.
+   Without this check, the tag would be pushed and the release would then fail, and a fresh dispatch for the same
+   version would be rejected because its tag already exists.
 
 ## Other build and release workflows
 

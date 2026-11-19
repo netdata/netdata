@@ -78,6 +78,57 @@ check_newer_version() {
     fi
 }
 
+# Windows maps versions to MSI ProductVersion (major.minor.build: at most 255.255.65535) and to Win32 assembly
+# versions (four fields of at most 65535). Stable patches are offset by 100 (see NetdataVersion.cmake), so the
+# last representable stable patch is 65435. Arguments: major minor build [revision].
+check_windows_version() {
+    if [ "${1}" -gt 255 ] || [ "${2}" -gt 255 ] || [ "${3}" -gt 65535 ] || [ "${4:-0}" -gt 65535 ]; then
+        echo "::error::Version ${5} maps to Windows version ${1}.${2}.${3}.${4:-0}, which exceeds the MSI limits (255.255.65535.65535)."
+        return 1
+    fi
+}
+
+# Same check for an official release or release candidate version (vX.Y.Z or vX.Y.0-rcNN).
+check_windows_release() {
+    core="${1#v}"
+    core="${core%%-*}"
+    major="${core%%.*}"
+    minor="$(echo "${core}" | cut -f 2 -d '.')"
+    patch="${core##*.}"
+    case "${1}" in
+        *-rc*) build="$(( ${1##*-rc} ))" ;; # rc numbers are two digits, so the leading zero is not octal.
+        *) build="$(( 100 + patch ))" ;;
+    esac
+    check_windows_version "${major}" "${minor}" "${build}" 0 "${1}"
+}
+
+# Release tooling an existing release branch needs before its tag is pushed (see .github/RELEASING.md,
+# "Maintenance branches created before release candidates"). Pushing the tag first would leave a release that
+# its companion and artifact workflows cannot build, and the tag cannot be reused.
+#  - The companion workflows run from this (dispatching) revision but execute helpers from the tagged source.
+#  - build.yml, docker.yml and packaging.yml run from the tag itself and must accept the inputs release.yml sends.
+COMPANION_WORKFLOWS='.github/workflows/dem-runtime-release.yml .github/workflows/dem-runtime-companion-check.yml .github/workflows/dem-runtime-node-tests.yml'
+DISPATCHED_WORKFLOWS='.github/workflows/build.yml .github/workflows/docker.yml .github/workflows/packaging.yml'
+DISPATCH_INPUTS='source_sha companion_run_id'
+COMPANION_HELPERS="$(for wf in ${COMPANION_WORKFLOWS}; do git show "HEAD:${wf}" 2>/dev/null; done |
+    grep -oE '(packaging|\.github/scripts|src)/[A-Za-z0-9_./-]+\.(py|sh|json)' | sort -u)" || true
+
+check_release_tooling() {
+    missing=''
+    for path in ${COMPANION_HELPERS}; do
+        [ -e "${path}" ] || missing="${missing} ${path}"
+    done
+    for wf in ${DISPATCHED_WORKFLOWS}; do
+        for input in ${DISPATCH_INPUTS}; do
+            grep -qE "^      ${input}:" "${wf}" 2>/dev/null || missing="${missing} ${wf}(input:${input})"
+        done
+    done
+    if [ -n "${missing}" ]; then
+        echo "::error::${1} lacks release tooling that must be backported before releasing from it:${missing}. See .github/RELEASING.md."
+        return 1
+    fi
+}
+
 ##############################################################
 # Core logic
 
@@ -103,6 +154,13 @@ elif [ "${EVENT_NAME}" = 'schedule' ] || [ "${EVENT_TYPE}" = 'nightly' ]; then
         # Marker tags (vX.Y) open development of that release, so nightlies precede it.
         *) NEW_VERSION="${LAST_TAG}-${COMMITS_SINCE_RELEASE}-nightly" ;;
     esac
+    nightly_core="${LAST_TAG#v}"
+    case "${nightly_core}" in
+        *.*.*) nightly_build="$(( 100 + ${nightly_core##*.} ))" ;;
+        *) nightly_build=0 ;;
+    esac
+    check_windows_version "${nightly_core%%.*}" "$(echo "${nightly_core}" | cut -f 2 -d '.')" \
+        "${nightly_build}" "${COMMITS_SINCE_RELEASE}" "${NEW_VERSION}" || exit 1
     LAST_VERSION_COMMIT="$(git rev-list -1 HEAD packaging/version)"
     HEAD_COMMIT="$(git rev-parse HEAD)"
     if [ "${EVENT_NAME}" = 'schedule' ] && [ "${LAST_VERSION_COMMIT}" = "${HEAD_COMMIT}" ] && grep -qE '.*-nightly$' packaging/version; then
@@ -137,6 +195,7 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
             exit 1
             ;;
     esac
+    check_windows_release "${EVENT_VERSION}" || exit 1
     check_for_existing_tag || exit 1
     series="$(echo "${EVENT_VERSION}" | cut -f 1-2 -d '.')"
     branch_name="release-${series}"
@@ -195,9 +254,27 @@ elif [ "${EVENT_VERSION}" != nightly ]; then
         fi
         major_matches || exit 1
         minor_matches || exit 1
+        check_release_tooling "${branch_name}" || exit 1
+        current_version="$(cat packaging/version)"
         if [ "${EVENT_TYPE}" = patch ]; then
+            # A patch follows a released version of this series, never a release candidate.
+            case "${current_version}" in
+                *-*)
+                    echo "::error::A patch release requires a released ${series}.0 on ${branch_name}, but the branch is at ${current_version}."
+                    exit 1
+                    ;;
+            esac
             check_newer_version || exit 1
-        elif [ "${EVENT_TYPE}" != release-candidate ]; then
+        elif [ "${EVENT_TYPE}" = release-candidate ]; then
+            # Later RCs continue the same pre-release; once a release of this series ships, the branch cannot go back.
+            case "${current_version}" in
+                "${base_version}"-rc*) ;;
+                *)
+                    echo "::error::Release candidate ${EVENT_VERSION} cannot follow ${current_version} on ${branch_name}."
+                    exit 1
+                    ;;
+            esac
+        else
             case "$(cat packaging/version)" in
                 "${EVENT_VERSION}"-*) ;; # Same-core prerelease to final release.
                 *) check_newer_version || exit 1 ;;

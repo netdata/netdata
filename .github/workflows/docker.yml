@@ -32,7 +32,9 @@ env:
   DISABLE_TELEMETRY: 1
   NIGHTLY_COUNT: 4
 concurrency:
-  group: docker-${{ github.ref }}-${{ github.event_name }}
+  # Numbered release dispatches get a per-run group so a newer release never replaces a pending one; job-level
+  # queued groups serialize shared publication state. Nightlies, PR and push runs keep the shared group.
+  group: docker-${{ github.ref }}-${{ github.event_name }}${{ github.event_name == 'workflow_dispatch' && inputs.version != 'nightly' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 jobs:
   runtime-companion:
@@ -270,6 +272,7 @@ jobs:
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         if: github.repository == 'netdata/netdata' && needs.file-check.outputs.run == 'true' && github.event_name == 'workflow_dispatch'
@@ -303,7 +306,7 @@ jobs:
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             EXTRA_INSTALL_OPTS=${{ needs.file-check.outputs.skip-go }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || 'test' }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -408,6 +411,7 @@ jobs:
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -446,7 +450,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -507,6 +511,7 @@ jobs:
     concurrency:
       group: docker-publish-docker
       cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout
@@ -612,6 +617,7 @@ jobs:
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -650,7 +656,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -712,6 +718,7 @@ jobs:
     concurrency:
       group: docker-publish-quay
       cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout
@@ -818,6 +825,7 @@ jobs:
           python3 packaging/release_info.py --channel "$CHANNEL" --source "$SOURCE_SHA"
           echo "NETDATA_BUILD_VERSION=$(sed -n 's/^version=//p' packaging/release-info)" >> "$GITHUB_ENV"
           echo "NETDATA_RELEASE_SOURCE=$SOURCE_SHA" >> "$GITHUB_ENV"
+          echo "NETDATA_RELEASE_CHANNEL=$CHANNEL" >> "$GITHUB_ENV"
       - name: Generate Artifact Name
         id: artifact-name
         run: echo "platform=$(echo ${{ matrix.platform }} | tr '/' '-' | cut -f 2- -d '-')" >> "${GITHUB_OUTPUT}"
@@ -856,7 +864,7 @@ jobs:
           build-args: |
             OFFICIAL_IMAGE=${{ env.OFFICIAL_IMAGE }}
             BUILD_ARCH=${{ matrix.arch }}
-            RELEASE_CHANNEL=${{ inputs.version != '' && inputs.version != 'nightly' && 'stable' || 'nightly' }}
+            RELEASE_CHANNEL=${{ env.NETDATA_RELEASE_CHANNEL || 'nightly' }}
             RELEASE_SOURCE=${{ env.NETDATA_RELEASE_SOURCE }}
             BUILD_VERSION=${{ env.NETDATA_BUILD_VERSION || github.event.inputs.version }}
             BUILD_DATE=${{ github.event.repository.updated_at }}
@@ -918,6 +926,7 @@ jobs:
     concurrency:
       group: docker-publish-ghcr
       cancel-in-progress: false
+      queue: max # Keep every pending release publisher; the default single slot replaces older pending runs.
     steps:
       - name: Checkout
         id: checkout

@@ -84,21 +84,71 @@ class ArtifactPrefixesTest(unittest.TestCase):
         self.assertEqual(self.select('false', exit_code=1, build_type='release-candidate'),
                          (0, 'prefixes=preview\n'))
 
+    def upload(self, root, prefixes, release_type, published=None, empty_listing=False, fail_sync=False):
+        """Run the upload step from ROOT/artifacts; PUBLISHED maps '<prefix>/<alias>' to the bucket's Version."""
+        bucket = root / 'bucket'
+        for key, value in (published or {}).items():
+            (bucket / key).mkdir(parents=True)
+            (bucket / key / 'Version').write_text(value + '\n')
+        missing = 'return 0' if empty_listing else 'return 3'
+        stub = (
+            'rclone() {\n'
+            '  if [ "$1" = cat ]; then\n'
+            f'    f="{bucket}/${{2#s3:netdata-agent-artifacts/}}"\n'
+            f'    if [ -f "$f" ]; then cat "$f"; else {missing}; fi\n'
+            '    return\n'
+            '  fi\n'
+            f'  {"return 1" if fail_sync else "printf \"%s|%s\\n\" \"${7}\" \"${8}\""}\n'
+            '}\n'
+        )
+        script = step_script('Upload Artifacts').replace(
+            '../.github/scripts/modules/release_versions.py', str(SCRIPTS / 'modules/release_versions.py'))
+        return subprocess.run(['bash', '-eu', '-c', stub + script], cwd=root / 'artifacts',
+                              capture_output=True, text=True,
+                              env={**os.environ, 'ARTIFACT_PREFIXES': prefixes, 'RELEASE_TYPE': release_type})
+
+    @staticmethod
+    def tree(path, version, aliases):
+        for name in (version, *aliases):
+            (path / name).mkdir(parents=True)
+            (path / name / 'Version').write_text(version + '\n')
+
+    def test_publication_lock_is_shared_and_queued(self):
+        lock = JOB.split('    concurrency:', 1)[1].split('    steps:', 1)[0]
+        self.assertEqual([line.split('#')[0].strip() for line in lock.strip().splitlines()][1:],
+                         ['group: r2-release-publish', 'cancel-in-progress: false', 'queue: max'])
+
     def test_rc_uploads_only_preview(self):
-        script = step_script('Upload Artifacts')
-        stub = 'rclone() { printf "%s|%s\\n" "${7}" "${8}"; }\n'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            for name in ('v2.13.0-rc01', 'latest'):
-                (root / name).mkdir()
-            result = subprocess.run(['bash', '-eu', '-c', stub + script], cwd=root,
-                                    capture_output=True, text=True, check=True,
-                                    env={**os.environ, 'ARTIFACT_PREFIXES': 'preview',
-                                         'RELEASE_TYPE': 'release-candidate'})
-            self.assertCountEqual(result.stdout.splitlines(), [
-                f'./{name}/|s3:netdata-agent-artifacts/preview/{name}/'
-                for name in ('v2.13.0-rc01', 'latest')
+            self.tree(root / 'artifacts', 'v2.13.0-rc01', ('latest',))
+            result = self.upload(root, 'preview', 'release-candidate')
+            self.assertEqual(result.returncode, 0, result.stderr)
+            # The versioned directory publishes before its alias.
+            self.assertEqual(result.stdout.splitlines(), [
+                f'./{name}/|s3:netdata-agent-artifacts/preview/{name}/' for name in ('v2.13.0-rc01', 'latest')
             ])
+
+    def test_alias_recheck_under_lock(self):
+        # Preparation saw rc01 under preview/latest; a faster RC03 publisher moved it before this RC02 upload.
+        cases = {
+            'newer published alias is kept': ({'preview/latest': 'v2.13.0-rc03'}, False, ['v2.13.0-rc02']),
+            'older published alias moves': ({'preview/latest': 'v2.13.0-rc01'}, False,
+                                            ['v2.13.0-rc02', 'latest']),
+            'same release republishes': ({'preview/latest': 'v2.13.0-rc02'}, False, ['v2.13.0-rc02', 'latest']),
+            'missing alias (not found)': ({}, False, ['v2.13.0-rc02', 'latest']),
+            'missing alias (empty listing)': ({}, True, ['v2.13.0-rc02', 'latest']),
+        }
+        for case, (published, empty_listing, expected) in cases.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.tree(root / 'artifacts', 'v2.13.0-rc02', ('latest',))
+                result = self.upload(root, 'preview', 'release-candidate', published, empty_listing)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                uploads = [line for line in result.stdout.splitlines() if not line.startswith('::notice::')]
+                self.assertEqual(uploads, [
+                    f'./{name}/|s3:netdata-agent-artifacts/preview/{name}/' for name in expected
+                ])
 
     def test_comparison_and_selection(self):
         for stable, preview, expected in (
@@ -139,32 +189,26 @@ class ArtifactPrefixesTest(unittest.TestCase):
         self.assertEqual(output, '')
 
     def test_upload_directories_and_failure(self):
-        script = step_script('Upload Artifacts')
-        stub = 'rclone() { printf "%s|%s\\n" "${7}" "${8}"; }\n'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            stable = root / 'artifacts'
-            preview = root / 'preview-artifacts'
-            trees = {'stable': (stable, ('v2.12.2',)),
-                     'preview': (preview, ('latest', 'v2.12.2', '2', '2.12'))}
-            for tree, dirs in trees.values():
-                for name in dirs:
-                    (tree / name).mkdir(parents=True)
+            self.tree(root / 'artifacts', 'v2.12.2', ())
+            self.tree(root / 'preview-artifacts', 'v2.12.2', ('latest', '2', '2.12'))
+            trees = {'stable': ('v2.12.2',), 'preview': ('v2.12.2', 'latest', '2', '2.12')}
             for prefixes in ('stable', 'stable preview'):
                 with self.subTest(prefixes=prefixes):
-                    result = subprocess.run(['bash', '-eu', '-c', stub + script],
-                                            cwd=stable, capture_output=True, text=True, check=True,
-                                            env={**os.environ, 'ARTIFACT_PREFIXES': prefixes,
-                                                 'RELEASE_TYPE': 'release'})
+                    result = self.upload(root, prefixes, 'release')
+                    self.assertEqual(result.returncode, 0, result.stderr)
                     self.assertCountEqual(result.stdout.splitlines(), [
                         f'{"./" if prefix == "stable" else "../preview-artifacts/"}{name}/|'
                         f's3:netdata-agent-artifacts/{prefix}/{name}/'
-                        for prefix in prefixes.split() for name in trees[prefix][1]
+                        for prefix in prefixes.split() for name in trees[prefix]
                     ])
-            failure = subprocess.run(['bash', '-eu', '-c', 'rclone() { return 1; }\n' + script],
-                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview',
-                                                      'RELEASE_TYPE': 'release'})
+            failure = self.upload(root, 'stable preview', 'release', fail_sync=True)
             self.assertNotEqual(failure.returncode, 0)
+            # A bucket read error stops publication instead of treating the alias as unpublished.
+            (root / 'bucket').mkdir(exist_ok=True)
+            broken = self.upload(root, 'preview', 'release', {'preview/latest': 'garbage'})
+            self.assertNotEqual(broken.returncode, 0)
 
 
 class PrepareArtifactAliasesTest(unittest.TestCase):

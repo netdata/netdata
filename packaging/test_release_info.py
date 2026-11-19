@@ -47,6 +47,13 @@ class ReleaseInfoTests(unittest.TestCase):
             'injection': valid.replace('v2.12.0-9-nightly', '${INJECTED}'),
             'semicolon': valid.replace('v2.12.0-9-nightly', 'v2;injected'),
             'reordered': 'channel=nightly\nversion=v2.12.0\nsource=' + SOURCE + '\n',
+            'stable RC': valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01').replace('nightly\n', 'stable\n'),
+            'stable nightly': valid.replace('channel=nightly', 'channel=stable'),
+            'stable metadata': valid.replace('v2.12.0-9-nightly', 'v2.12.0+build.1').replace('nightly\n', 'stable\n'),
+            'RC without suffix': (valid.replace('v2.12.0-9-nightly', 'v2.13.0')
+                                  .replace('nightly\n', 'release-candidate\n')),
+            'RC one digit': (valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc1')
+                             .replace('nightly\n', 'release-candidate\n')),
         }
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / 'release-info'
@@ -83,9 +90,10 @@ class ReleaseInfoTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'differs'):
                 release_info.stamp(root, 'nightly', SOURCE)
             self.assertEqual(path.read_bytes(), original)
-            expected = {'version': 'v2.12.0', 'channel': 'release-candidate', 'source': source}
-            self.assertEqual(release_info.stamp(root, 'release-candidate', source), expected)
-            self.assertEqual(release_info.read_release_info(path), expected)
+            # A stable version cannot be stamped as an RC (nor the reverse), and the failure leaves metadata intact.
+            with self.assertRaisesRegex(ValueError, 'does not belong'):
+                release_info.stamp(root, 'release-candidate', source)
+            self.assertEqual(path.read_bytes(), original)
             expected = {'version': '0.' + source, 'channel': 'devel', 'source': source}
             self.assertEqual(release_info.stamp(root, 'devel', source), expected)
             self.assertEqual(release_info.read_release_info(path), expected)

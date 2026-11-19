@@ -166,6 +166,12 @@ function(netdata_version)
     if(release_version_length GREATER 128 OR NOT release_source_length EQUAL 40)
       message(FATAL_ERROR "Invalid packaging/release-info version, channel or source")
     endif()
+    # Mirror packaging/release_info.py: official channels pin the version shape.
+    set(release_core "v?(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)")
+    if((release_channel STREQUAL "stable" AND NOT release_version MATCHES "^${release_core}$") OR
+       (release_channel STREQUAL "release-candidate" AND NOT release_version MATCHES "^${release_core}-rc[0-9][0-9]$"))
+      message(FATAL_ERROR "packaging/release-info version ${release_version} does not belong to the ${release_channel} channel")
+    endif()
     set(NETDATA_RELEASE_VERSION "${release_version}" PARENT_SCOPE)
     set(NETDATA_RELEASE_CHANNEL "${release_channel}" PARENT_SCOPE)
     set(NETDATA_RELEASE_REF "${release_source}" PARENT_SCOPE)

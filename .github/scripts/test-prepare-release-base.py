@@ -21,9 +21,21 @@ class ReleasePreparationTest(unittest.TestCase):
         self.git('config', 'user.name', 'Release test')
         self.git('config', 'user.email', 'release@example.invalid')
         (self.root / 'packaging').mkdir()
+        self.add_release_tooling()
         self.write_version('v2.12.3-1-nightly')
         self.git('tag', 'v2.12.3')
         self.output = self.root / 'output'
+
+    def add_release_tooling(self):
+        """Minimal stand-ins for the tooling a release branch needs before its tag is pushed."""
+        workflows = self.root / '.github/workflows'
+        workflows.mkdir(parents=True)
+        (workflows / 'dem-runtime-release.yml').write_text('run: python3 packaging/release_info.py\n')
+        (self.root / 'packaging/release_info.py').write_text('')
+        for name in ('build', 'docker', 'packaging'):
+            (workflows / f'{name}.yml').write_text(
+                'on:\n  workflow_dispatch:\n    inputs:\n      source_sha:\n      companion_run_id:\n')
+        self.git('add', '.github', 'packaging/release_info.py')
 
     def git(self, *args):
         return subprocess.run(['git', *args], cwd=self.root, check=True,
@@ -164,7 +176,7 @@ class ReleasePreparationTest(unittest.TestCase):
     def test_stable_releases_from_release_branch(self):
         for kind, rc, version in (('minor', 'v2.13.0-rc03', 'v2.13.0'),
                                   ('major', 'v3.0.0-rc02', 'v3.0.0'),
-                                  ('patch', 'v2.14.0-rc01', 'v2.14.1')):
+                                  ('patch', 'v2.14.0', 'v2.14.1')):
             with self.subTest(kind=kind):
                 self.series(rc)
                 result, outputs = self.prepare(version, kind)
@@ -226,13 +238,80 @@ class ReleasePreparationTest(unittest.TestCase):
         self.assertEqual(self.git(*remote_git, 'show', 'master:packaging/version'), 'v2.12.3-1-nightly')
         self.assert_rejected('v2.13.0-rc04', error='regular release')
 
-    def test_stable_release_cannot_roll_back_patch(self):
-        self.series('v2.13.0-rc01')
-        result, outputs = self.prepare('v2.13.1', 'patch')
+    def release(self, version, kind):
+        result, outputs = self.prepare(version, kind)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.write_version('v2.13.1')
-        self.git('tag', 'v2.13.1')
-        self.assert_rejected('v2.13.0', 'minor', 'not newer')
+        self.write_version(version)
+        self.git('tag', version)
+
+    def test_release_sequence_cannot_move_backwards(self):
+        self.series('v2.13.0-rc01')
+        self.git('checkout', 'release-v2.13')
+        # No patch before the series' first release, so neither an older RC nor GA can follow it.
+        self.assert_rejected('v2.13.1', 'patch', 'requires a released')
+        self.release('v2.13.0-rc02', 'release-candidate')
+        self.release('v2.13.0', 'minor')
+        self.assert_rejected('v2.13.0-rc03', error='regular release')
+        self.release('v2.13.1', 'patch')
+        self.assert_rejected('v2.13.0', 'minor', 'already exists')
+
+    def test_rc_cannot_follow_a_patch_on_its_branch(self):
+        # A branch can already be past GA without a matching GA tag (e.g. a tag deleted after a failed release).
+        self.git('tag', 'v2.13.0-rc01')
+        self.series('v2.13.1')
+        self.git('checkout', 'release-v2.13')
+        self.assert_rejected('v2.13.0-rc02', error='cannot follow')
+
+    def test_branch_without_release_tooling(self):
+        # A maintenance branch cut before this tooling existed (like v2.12 at v2.12.3). Preparation runs from master.
+        self.git('checkout', '-b', 'release-v2.12')
+        self.git('rm', '-q', '-r', '.github', 'packaging/release_info.py')
+        self.write_version('v2.12.3')
+
+        def rejected(missing):
+            self.git('checkout', '-q', 'master')
+            result, outputs = self.prepare('v2.12.4', 'patch')
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(outputs, {})
+            for item in missing:
+                self.assertIn(item, result.stdout)
+            self.git('checkout', '-q', 'release-v2.12')
+
+        rejected(['packaging/release_info.py', '.github/workflows/build.yml(input:source_sha)'])
+        self.git('checkout', 'master', '--', 'packaging/release_info.py')
+        self.git('commit', '-m', 'backport helper')
+        rejected(['.github/workflows/docker.yml(input:companion_run_id)'])
+        self.git('checkout', 'master', '--', '.github')
+        self.git('commit', '-m', 'backport workflows')
+        self.git('checkout', '-q', 'master')
+        result, outputs = self.prepare('v2.12.4', 'patch')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_windows_version_bounds(self):
+        self.series('v2.13.0')
+        self.git('checkout', 'release-v2.13')
+        self.assert_rejected('v2.13.65436', 'patch', 'MSI limits')
+        self.release('v2.13.65435', 'patch')
+        self.git('checkout', 'master')
+        for version in ('v256.0.0-rc01', 'v2.256.0-rc01'):
+            with self.subTest(version=version):
+                self.assert_rejected(version, error='MSI limits')
+        for version in ('v255.0.0-rc01', 'v2.255.0-rc01'):
+            with self.subTest(version=version):
+                result, outputs = self.prepare(version)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.git('checkout', '--', 'packaging/version')
+
+    def test_nightly_windows_version_bounds(self):
+        self.git('commit', '--allow-empty', '-m', 'release')
+        self.git('tag', 'v2.12.65435')
+        self.assertEqual(self.nightly(), 'v2.12.65435-0-post-nightly')
+        self.git('checkout', '--', 'packaging/version')
+        self.git('commit', '--allow-empty', '-m', 'change')
+        self.git('tag', 'v2.12.65436')
+        result, outputs = self.prepare('nightly', 'nightly')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('MSI limits', result.stdout)
 
     def nightly(self):
         result, outputs = self.prepare('nightly', 'nightly')

@@ -72,12 +72,17 @@ class CoupledWorkflowTests(unittest.TestCase):
                 root = Path(temporary)
                 (root / 'packaging').mkdir()
                 (root / 'packaging/version').write_text('v2.12.0\n')
+                # Release preparation requires dispatched workflows on the branch to accept the release inputs.
+                (root / '.github/workflows').mkdir(parents=True)
+                for name in ('build', 'docker', 'packaging'):
+                    (root / f'.github/workflows/{name}.yml').write_text(
+                        'on:\n  workflow_dispatch:\n    inputs:\n      source_sha:\n      companion_run_id:\n')
 
                 def git(*args):
                     subprocess.run(['git', '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
                                     *args], cwd=root, check=True, capture_output=True)
                 git('init', '-q', '-b', 'master')
-                git('add', 'packaging/version')
+                git('add', 'packaging/version', '.github')
                 git('commit', '-qm', 'Fixture')
                 git('tag', '-a', 'v2.12.0', '-m', 'Fixture')
                 git('branch', 'release-v2.12')

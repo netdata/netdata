@@ -24,6 +24,7 @@ permissions:
 concurrency:
   group: dem-runtime-companion-${{ inputs.publish && inputs.channel || github.run_id }}
   cancel-in-progress: false
+  queue: max # Keep every pending companion publication for a channel instead of replacing older pending runs.
 jobs:
   matrix:
     name: Select native runners from the shared distro catalog

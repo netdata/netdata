@@ -13,6 +13,11 @@ import tempfile
 
 FIELDS = ('version', 'channel', 'source')
 CHANNELS = ('stable', 'release-candidate', 'nightly', 'devel')
+# Official channels pin the version shape, so a release candidate can never be stamped (and published) as stable.
+CHANNEL_VERSIONS = {
+    'stable': r'v?(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)',
+    'release-candidate': r'v?(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)-rc[0-9]{2}',
+}
 MAX_BYTES = 256
 
 
@@ -24,6 +29,9 @@ def validate_release_info(info):
         raise ValueError('release version must be a path-safe identifier of 1 to 128 characters')
     if info['channel'] not in CHANNELS:
         raise ValueError('release channel must be one of ' + ', '.join(CHANNELS))
+    pattern = CHANNEL_VERSIONS.get(info['channel'])
+    if pattern is not None and not re.fullmatch(pattern, info['version']):
+        raise ValueError(f"release version {info['version']!r} does not belong to the {info['channel']} channel")
     if not re.fullmatch(r'[0-9a-f]{40}', info['source']):
         raise ValueError('release source must be a full lowercase Git commit SHA')
     return dict(info)
