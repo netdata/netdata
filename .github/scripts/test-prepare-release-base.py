@@ -266,5 +266,6 @@ class ReleasePreparationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(outputs, {'run': 'false'})
 
+
 if __name__ == '__main__':
     unittest.main()

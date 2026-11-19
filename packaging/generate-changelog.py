@@ -55,8 +55,8 @@ def generate(repo):
         pattern = f'^{re.escape(tag)}$' if tag else '^$'
         template = f'{{% set timestamp = {int(dates[tag])} %}}' + body if tag else body
         return subprocess.run(['git-cliff', '--config', str(config), '--tag-pattern', pattern,
-                               '--body', template, '--strip', 'all', f'{start}..{end}'], cwd=repo, check=True,
-                              capture_output=True, text=True).stdout.strip()
+                               '--body', template, '--strip', 'all', '--output', '-', f'{start}..{end}'],
+                              cwd=repo, check=True, capture_output=True, text=True).stdout.strip()
 
     sections = [render(baseline, 'HEAD')]
     predecessors = [FIRST_TAG, *(tag for _, tag in releases[:-1])]

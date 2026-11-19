@@ -48,6 +48,9 @@ def generate(version: str, registries: list[str], *, metadata_only: bool = False
     prerelease = False
     if version not in ('', 'nightly'):
         version_core(version)
+        if '+' in version:
+            # Docker tags allow only [A-Za-z0-9_.-], so build metadata cannot be represented.
+            raise ValueError(f'Build metadata is not allowed in Docker image versions: {version!r}')
         version = version.lstrip('v')
         prerelease = '-' in version.split('+', 1)[0]
 

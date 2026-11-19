@@ -154,14 +154,16 @@ class ArtifactPrefixesTest(unittest.TestCase):
                 with self.subTest(prefixes=prefixes):
                     result = subprocess.run(['bash', '-eu', '-c', stub + script],
                                             cwd=stable, capture_output=True, text=True, check=True,
-                                            env={**os.environ, 'ARTIFACT_PREFIXES': prefixes, 'RELEASE_TYPE': 'release'})
+                                            env={**os.environ, 'ARTIFACT_PREFIXES': prefixes,
+                                                 'RELEASE_TYPE': 'release'})
                     self.assertCountEqual(result.stdout.splitlines(), [
                         f'{"./" if prefix == "stable" else "../preview-artifacts/"}{name}/|'
                         f's3:netdata-agent-artifacts/{prefix}/{name}/'
                         for prefix in prefixes.split() for name in trees[prefix][1]
                     ])
             failure = subprocess.run(['bash', '-eu', '-c', 'rclone() { return 1; }\n' + script],
-                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview', 'RELEASE_TYPE': 'release'})
+                                     cwd=stable, env={**os.environ, 'ARTIFACT_PREFIXES': 'stable preview',
+                                                      'RELEASE_TYPE': 'release'})
             self.assertNotEqual(failure.returncode, 0)
 
 

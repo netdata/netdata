@@ -23,7 +23,7 @@ on:
       - 'packaging/generate-changelog.py'
       - 'packaging/cliff.toml'
       - '.github/scripts/test-generate-changelog.py'
-  workflow_dispatch:
+  workflow_dispatch: null
 permissions:
   contents: read
 jobs:

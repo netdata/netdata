@@ -21,7 +21,8 @@ class ReleaseInfoTests(unittest.TestCase):
         valid = f'version=v2.12.0-9-nightly\nchannel=nightly\nsource={SOURCE}\n'
         cases = {
             'stable': valid.replace('v2.12.0-9-nightly', 'v2.12.0').replace('nightly\n', 'stable\n'),
-            'release candidate': valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01').replace('nightly\n', 'release-candidate\n'),
+            'release candidate': (valid.replace('v2.12.0-9-nightly', 'v2.13.0-rc01')
+                                  .replace('nightly\n', 'release-candidate\n')),
             'nightly': valid,
             'devel': valid.replace('channel=nightly', 'channel=devel'),
             'single character version': valid.replace('v2.12.0-9-nightly', '1'),

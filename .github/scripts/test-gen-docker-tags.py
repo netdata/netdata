@@ -22,7 +22,7 @@ class DockerTagsTest(unittest.TestCase):
 
         def inspect(command, **kwargs):
             self.assertEqual(command[:8], ['skopeo', '--command-timeout', '60s', '--override-os', 'linux',
-                                          '--override-arch', 'amd64', 'inspect'])
+                                           '--override-arch', 'amd64', 'inspect'])
             self.assertEqual(command[8], '--no-tags')
             self.assertEqual(kwargs, {'capture_output': True, 'text': True, 'check': False, 'timeout': 90})
             reference = command[9].removeprefix('docker://')
@@ -34,8 +34,9 @@ class DockerTagsTest(unittest.TestCase):
             elif alias in published:
                 value = published[alias]
             else:
-                return subprocess.CompletedProcess(command, 1, '',
-                    f'reading manifest {alias} in {reference.rsplit(":", 1)[0]}: manifest unknown: not found')
+                repository = reference.rsplit(':', 1)[0]
+                return subprocess.CompletedProcess(
+                    command, 1, '', f'reading manifest {alias} in {repository}: manifest unknown: not found')
             return subprocess.CompletedProcess(command, 0, json.dumps({
                 'Labels': {'org.opencontainers.image.version': value}}), '')
 
@@ -71,8 +72,6 @@ class DockerTagsTest(unittest.TestCase):
             ('2.14.1', {}, ['v2.14.1', 'v2', 'v2.14', 'stable', 'preview']),
             ('2.14.0', {'preview': 'v2.14.0-rc03'},
              ['v2.14.0', 'v2', 'v2.14', 'stable', 'preview']),
-            ('2.14.0+build-7', {'stable': 'v2.14.0'},
-             ['v2.14.0+build-7', 'v2', 'v2.14', 'stable', 'preview']),
             ('3.0.0', {'stable': 'v2.99.99'}, ['v3.0.0', 'v3', 'v3.0', 'stable', 'preview']),
         )
         for version, aliases, suffixes in cases:
@@ -157,7 +156,7 @@ class DockerTagsTest(unittest.TestCase):
 
     def test_invalid_explicit_versions_fail(self):
         for version in ('garbage-rc', '2.12-rc.1', '2.12.2-01',
-                        '2.12.2-rc..1', '02.12.2-rc.1'):
+                        '2.12.2-rc..1', '02.12.2-rc.1', '2.14.0+build-7'):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 self.generate(version, error='unavailable')
 
@@ -172,14 +171,14 @@ class DockerTagsTest(unittest.TestCase):
         module = runpy.run_path(str(SCRIPT))
         for error in ('reading manifest stable in docker.io/netdata/netdata: manifest unknown: not found',
                       'fetching manifest stable in docker.io/netdata/netdata: name unknown: not found'):
-            with self.subTest(error=error), patch('subprocess.run', return_value=
-                    subprocess.CompletedProcess([], 1, '', error)):
+            with self.subTest(error=error), \
+                    patch('subprocess.run', return_value=subprocess.CompletedProcess([], 1, '', error)):
                 self.assertIsNone(module['published_version']('netdata/netdata', 'stable'))
 
     def test_missing_or_malformed_labels_stop_publication(self):
         for body in ('{}', '{"Labels":null}', '{"Labels":{}}', 'not json'):
-            with self.subTest(body=body), patch('subprocess.run', return_value=
-                    subprocess.CompletedProcess([], 0, body, '')):
+            with self.subTest(body=body), \
+                    patch('subprocess.run', return_value=subprocess.CompletedProcess([], 0, body, '')):
                 # Exercise the production reader directly, bypassing generate's CLI mock.
                 module = runpy.run_path(str(SCRIPT))
                 with self.assertRaises(ValueError):
