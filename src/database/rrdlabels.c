@@ -2390,7 +2390,12 @@ static int rrdlabels_unittest_common_count_lock_order(void) {
         for(size_t waited = 0; waited < 1000 && !rrdlabels_unittest_common_count_all(t, 2, false); waited++)
             sleep_usec(10 * USEC_PER_MS);
 
-        sleep_usec(3 * USEC_PER_SEC);
+        if(rrdlabels_unittest_common_count_all(t, 2, false))
+            sleep_usec(3 * USEC_PER_SEC);
+        else {
+            fprintf(stderr, "rrdlabels common count: the test threads did not start comparing\n");
+            errors++;
+        }
     }
     else {
         fprintf(stderr, "rrdlabels common count: cannot create the test threads\n");
@@ -2407,7 +2412,8 @@ static int rrdlabels_unittest_common_count_lock_order(void) {
     if(!rrdlabels_unittest_common_count_all(t, started, true)) {
         // The workers spin on the label locks forever, so nothing can be freed or joined, and
         // a normal return would free the label ARAL under them. Exit at once.
-        fprintf(stderr, "rrdlabels common count: deadlock with swapped arguments\n");
+        fprintf(stderr, "rrdlabels common count: test threads did not stop within 10 seconds "
+                        "(deadlock with swapped arguments?)\n");
         fflush(stderr);
         _exit(1);
     }
