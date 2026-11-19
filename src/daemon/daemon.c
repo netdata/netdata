@@ -101,7 +101,7 @@ static int become_user(const char *username, int pid_fd) {
         }
     }
 
-    // only the log files we opened; an inherited stdout keeps its owner (we keep writing through the open fd)
+    // no unconditional chown of stdout: an inherited stdout file keeps its owner (we keep writing through the open fd)
     nd_log_chown_log_files(uid, gid);
     chown_open_file(STDERR_FILENO, uid, gid);
     chown_open_file(pid_fd, uid, gid);
