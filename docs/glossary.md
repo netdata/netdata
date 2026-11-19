@@ -125,7 +125,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 ## S
 
 - [**Scalability**](/docs/scalability.md): With Netdata's distributed architecture, you can observe a few, hundreds, thousands
-  or 100,000+ nodes. There is no central bottleneck, especially when metrics are retained locally on the Agents.
+  or 100,000+ nodes, with no central bottleneck.
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
