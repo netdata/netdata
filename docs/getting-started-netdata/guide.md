@@ -110,7 +110,7 @@ Netdata automatically discovers and monitors:
 - **Containers** - Docker, Kubernetes, LXC
 - **Databases** - MySQL, PostgreSQL, MongoDB, Redis
 - **Web Servers** - Apache, Nginx, IIS
-- **Applications** - Over 1000+ integrations available
+- **Applications** - 2,000+ integrations available
 
 **[Metric Correlations](/docs/metric-correlations.md):**
 Click the correlation button on any chart to instantly find related metrics that help diagnose issues - turning complex troubleshooting into point-and-click simplicity.
