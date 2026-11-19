@@ -24,16 +24,32 @@ if [ "$PWD" != "${prefix%/}/$web_dest" ]; then
     exit 0
 fi
 
-# Linux bind mounts can share a device number with their parent.
-mount_id() {
-    if [ "$platform" = Linux ]; then
-        while read -r key value; do
-            if [ "$key" = mnt_id: ]; then printf '%s\n' "$value"; return 0; fi
-        done < /proc/self/fdinfo/3
-        return 1
+# mountinfo escapes whitespace and backslashes in paths. Keep only mounts
+# below the prefix. A double slash separates complete, normalized paths.
+mounts=//
+platform=$(uname -s)
+if [ "$platform" = Linux ]; then
+    if [ ! -r /proc/self/mountinfo ]; then
+        echo >&2 "Skipping dashboard cleanup: cannot read mount table"
+        exit 0
     fi
-    stat -f %d .
-}
+    while read -r _ _ _ _ mount _; do
+        case "$mount" in
+            *\\*) mount=$(printf '%b/' "$mount"); mount=${mount%/} ;;
+        esac
+        case "$mount" in / | "$prefix") continue ;; esac
+        case "$mount" in "${prefix%/}/"*) ;; *) continue ;; esac
+        case "$PWD/" in "$mount/"*)
+            echo >&2 "Skipping dashboard cleanup: mounted web directory"
+            exit 0 ;;
+        esac
+        case "$mount/" in "$PWD/v3/"*) mounts="${mounts}${mount#/}//" ;; esac
+    done < /proc/self/mountinfo
+else
+    web_device=$(stat -f %d .) || exit 1
+    prefix_device=$(stat -f %d "$prefix") || exit 1
+    [ "$web_device" = "$prefix_device" ] || exit 0
+fi
 
 remove_files() {
     printf >&2 'Dashboard cleanup: rm -f (%s stale files)\n' "$#"
@@ -48,11 +64,14 @@ remove_files() {
 # that working directory, never an absolute path or a path read from a listing.
 clean_dir() (
     expected="$PWD/${1#./}"
+    case "$mounts" in *"//${expected#/}//"*) exit 0 ;; esac
     [ ! -L "$1" ] || exit 0
     cd -P "$1" || exit 1
     [ "$PWD" = "$expected" ] || exit 0
-    here=$(mount_id 3<.) || exit 1
-    [ "$here" = "$web_mount" ] || exit 0
+    if [ "$platform" != Linux ]; then
+        here=$(stat -f %d .) || exit 1
+        [ "$here" = "$web_device" ] || exit 0
+    fi
     source_dir=$2
     if [ -L "$source_dir" ]; then exit 0; fi
     if [ -d "$source_dir" ] && { [ ! -r "$source_dir" ] || [ ! -x "$source_dir" ]; }; then
@@ -62,6 +81,7 @@ clean_dir() (
 
     set --
     for file in ./* ./.[!.]* ./..?*; do
+        case "$mounts" in *"//${PWD#/}/${file#./}//"*) continue ;; esac
         [ ! -L "$file" ] || continue
         source_file="$source_dir/${file#./}"
         if [ -d "$file" ]; then
@@ -81,9 +101,4 @@ clean_dir() (
 # A build directory or a custom static TMPDIR can be placed inside the web tree.
 case "$incoming/" in "$PWD/v3/"*) echo >&2 "Skipping dashboard cleanup: overlapping source"; exit 0 ;; esac
 case "$PWD/v3/" in "$incoming/"*) echo >&2 "Skipping dashboard cleanup: overlapping destination"; exit 0 ;; esac
-platform=$(uname -s)
-if ! web_mount=$(mount_id 3<.); then
-    echo >&2 "Skipping dashboard cleanup: cannot identify the installed filesystem"
-    exit 0
-fi
 clean_dir ./v3 "$incoming"

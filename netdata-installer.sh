@@ -862,13 +862,12 @@ if [ "${DP_ENABLED}" = 1 ]; then
   DONOTSTART=1
 fi
 # CMake owns installation for both enrolled and ordinary Agents.
-if ! cmake_install "${NETDATA_BUILD_DIR}"; then
-  fatal "Failed to install Netdata." I000C
+dashboard_upgrade=0
+if [ -x "${DESTDIR:-}${NETDATA_PREFIX}/usr/sbin/netdata" ]; then
+  dashboard_upgrade=1
 fi
-dashboard_web_dest=$(cat "${NETDATA_BUILD_DIR}/dashboard-web-destination") || exit $?
-if [ -n "${dashboard_web_dest}" ]; then
-  run sh "${NETDATA_SOURCE_DIR}/packaging/installer/cleanup-dashboard.sh" \
-    "${NETDATA_BUILD_DIR}/dashboard-src/dist/agent/v3" "${DESTDIR:-}${NETDATA_PREFIX:-/}" "${dashboard_web_dest}" || exit $?
+if ! NETDATA_INSTALLER_DASHBOARD_UPGRADE=$dashboard_upgrade cmake_install "${NETDATA_BUILD_DIR}"; then
+  fatal "Failed to install Netdata." I000C
 fi
 
 # -----------------------------------------------------------------------------

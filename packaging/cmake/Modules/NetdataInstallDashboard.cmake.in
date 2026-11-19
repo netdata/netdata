@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+include([==[@NETDATA_DASHBOARD_MODULE_DIR@/NetdataUtil.cmake]==])
+include([==[@NETDATA_DASHBOARD_MODULE_DIR@/NetdataDashboard.cmake]==])
+
+# Each install gets a fresh extraction, including component installs and CPack.
+# Only this invocation's temporary directory is removed.
+string(RANDOM LENGTH 24 dashboard_nonce)
+set(dashboard_build [==[@CMAKE_BINARY_DIR@]==])
+set(dashboard_stage "${dashboard_build}/dashboard-stage-${dashboard_nonce}")
+if(EXISTS "${dashboard_stage}" OR IS_SYMLINK "${dashboard_stage}")
+  message(FATAL_ERROR "Dashboard staging directory already exists")
+endif()
+extract_gzipped_tarball([==[@CMAKE_BINARY_DIR@/dashboard.tar.gz]==] "${dashboard_stage}")
+set(dashboard_source "${dashboard_stage}/dist/agent")
+handle_braindead_versioning_insanity("${dashboard_source}")
+set(dashboard_web_dest [==[@WEB_DEST@]==])
+file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/${dashboard_web_dest}"
+     TYPE DIRECTORY FILES "${dashboard_source}/")
+
+if("$ENV{NETDATA_INSTALLER_DASHBOARD_UPGRADE}" STREQUAL "1")
+  execute_process(COMMAND sh [==[@NETDATA_DASHBOARD_MODULE_DIR@/../../installer/cleanup-dashboard.sh]==]
+                  "${dashboard_source}/v3" "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/" "${dashboard_web_dest}"
+                  RESULT_VARIABLE dashboard_status)
+endif()
+file(REMOVE_RECURSE "${dashboard_stage}")
+if(DEFINED dashboard_status AND NOT dashboard_status STREQUAL "0")
+  message(FATAL_ERROR "Dashboard cleanup failed: ${dashboard_status}")
+endif()

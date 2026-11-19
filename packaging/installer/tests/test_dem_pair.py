@@ -660,6 +660,7 @@ class StaticOverlayTests(unittest.TestCase):
         web = Path('usr/share/netdata/web')
         for base in (self.stage, self.target):
             (base / web / 'v3/nested').mkdir(parents=True)
+        (self.target / 'bin/netdata').symlink_to(shutil.which('true'))
         (self.stage / web / 'v3/index.html').write_text('new dashboard')
         (self.stage / web / 'v3/nested/current.js').write_text('new asset')
         (self.target / web / 'v3/nested/obsolete.gif').write_text('old asset')

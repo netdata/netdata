@@ -70,6 +70,32 @@ class DashboardUpdateTests(unittest.TestCase):
         self.assertTrue((self.incoming / 'index.html').exists())
         self.assertTrue((self.v3 / 'old.js').exists())
 
+    @unittest.skipUnless(shutil.which('unshare') and os.geteuid() == 0, 'Linux mount namespace required')
+    def test_mounted_web_root_directory_and_file(self):
+        namespace = ['unshare', '--mount', '--propagation', 'private']
+        if subprocess.run([*namespace, 'true'], capture_output=True).returncode:
+            self.skipTest('cannot create a private mount namespace')
+        self.put(self.incoming / 'index.html')
+        self.put(self.v3 / 'old.js')
+        self.put(self.v3 / 'mounted file')
+        (self.v3 / 'mounted dir').mkdir()
+        outside = self.root / 'outside'
+        self.put(outside / 'v3/keep')
+        script = '''set -eu
+mount --bind "$4" "$3"
+sh "$1" "$2" "$5" usr/share/netdata/web
+test -f "$4/v3/keep"
+umount "$3"
+mount --bind "$4/v3" "$3/v3/mounted dir"
+mount --bind "$4/v3/keep" "$3/v3/mounted file"
+sh "$1" "$2" "$5" usr/share/netdata/web
+test -f "$3/v3/mounted dir/keep"
+test -f "$3/v3/mounted file"
+test ! -e "$3/v3/old.js"
+'''
+        subprocess.run([*namespace, 'sh', '-c', script, 'test', str(CLEANUP), str(self.incoming),
+                        str(self.web), str(outside), str(self.prefix)], check=True)
+
     def test_directory_links_in_install_path(self):
         self.put(self.incoming / 'index.html')
         for component in ('v3', 'web', 'netdata', 'share', 'usr'):
@@ -89,7 +115,7 @@ class DashboardUpdateTests(unittest.TestCase):
     def test_reconfigure_and_install_two_bundles(self):
         project = self.root / 'CMakeLists.txt'
         system_files = (MODULES / 'NetdataSystemFiles.cmake').read_text()
-        begin = system_files.index('set(dashboard_web_dest "")')
+        begin = system_files.index('if(ENABLE_DASHBOARD)')
         end = system_files.index('\n#\n', begin)
         project.write_text(f'''cmake_minimum_required(VERSION 3.16)
 project(dashboard NONE)
@@ -100,7 +126,7 @@ function(netdata_add_deb_copyright)
 endfunction()
 ''' + system_files[begin:end])
         installer = (ROOT / 'netdata-installer.sh').read_text()
-        begin = installer.index('if ! cmake_install "${NETDATA_BUILD_DIR}"')
+        begin = installer.index('dashboard_upgrade=0')
         end = installer.index('\n# ---', begin)
         script = ('set -eu\nrun() { "$@"; }\nfatal() { exit 1; }\n'
                   'cmake_install() { cmake --install "$1" --component dashboard; }\n'
@@ -111,7 +137,12 @@ endfunction()
                    NETDATA_SOURCE_DIR=str(ROOT), DESTDIR='', NETDATA_WEB_DIR=str(self.root / 'user-web'))
         self.put(self.root / 'user-web/v3/keep.js')
         installed = self.prefix / 'custom web/v3'
+        self.put(installed / 'before-first-install.css')
         for version, asset in [('v2', 'retired/old.gif'), ('v3', 'nested/current.js')]:
+            if version == 'v3':
+                agent = self.prefix / 'usr/sbin/netdata'
+                self.put(agent)
+                agent.chmod(0o755)
             with tarfile.open(archive, 'w:gz') as tar:
                 for name in ('index.html', asset, '.well-known/id'):
                     entry = tarfile.TarInfo(f'dist/agent/{version}/{name}')
@@ -121,8 +152,11 @@ endfunction()
                             '-DCMAKE_INSTALL_PREFIX=' + str(self.prefix),
                             '-DDASHBOARD_URL=' + archive.as_uri()], check=True, capture_output=True)
             subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
+            expected = {'index.html', asset, '.well-known/id'}
+            if version == 'v2':
+                expected.add('before-first-install.css')
             self.assertEqual({str(p.relative_to(installed)) for p in installed.rglob('*') if p.is_file()},
-                             {'index.html', asset, '.well-known/id'})
+                             expected)
         subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-DENABLE_DASHBOARD=OFF'],
                        check=True, capture_output=True)
         self.put(installed / 'local.css')
