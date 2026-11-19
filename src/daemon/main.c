@@ -103,8 +103,8 @@ int help(int exitcode) {
 
     fprintf(stream, "%s", "\n"
             " ^\n"
-            " |.-.   .-.   .-.   .-.   .  Netdata                                         \n"
-            " |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!           \n"
+            " |.-.   .-.   .-.   .-.   .  Netdata, full-stack observability               \n"
+            " |   '-'   '-'   '-'   '-'   the AI SRE that learns your stack!              \n"
             " +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->\n"
             "\n"
             " Copyright 2018-2025 Netdata Inc.\n"
@@ -1496,7 +1496,7 @@ int netdata_main(int argc, char **argv) {
     usec_t median_start_time = get_agent_event_time_median(EVENT_AGENT_START_TIME);
     netdata_log_info(
         "NETDATA STARTUP: version '%s', sqlite '%s', completed in %llu ms (median start up time is %llu ms). "
-        "Enjoy X-Ray Vision for your infrastructure!",
+        "Netdata, full-stack observability: the AI SRE that learns your stack!",
         NETDATA_VERSION, sqlite3_libversion(),
         (ready_ut - started_ut) / USEC_PER_MS, median_start_time / USEC_PER_MS);
 

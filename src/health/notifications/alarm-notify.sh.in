@@ -3731,7 +3731,7 @@ Content-Transfer-Encoding: 8bit
                     <tbody>
                     <tr>
                       <td align="left" style="font-size:0px;padding:10px 25px;padding-top:0;padding-bottom:0;word-break:break-word;">
-                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata $(date +'%Y') - X-Ray Vision for your infrastructure</div>
+                        <div style="font-family:Open Sans, sans-serif;font-size:13px;line-height:1;text-align:center;color:#35414A;">© Netdata $(date +'%Y') - full-stack observability: the AI SRE that learns your stack</div>
                       </td>
                     </tr>
                     </tbody>
