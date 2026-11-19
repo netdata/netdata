@@ -144,8 +144,8 @@ bundle_dashboard()
     def test_reconfigure_and_install_two_bundles(self):
         project = self.root / 'CMakeLists.txt'
         system_files = (MODULES / 'NetdataSystemFiles.cmake').read_text()
-        begin = system_files.index('if(ENABLE_DASHBOARD)')
-        end = system_files.index('\n#\n', begin)
+        begin = system_files.index('# dashboard\n')
+        end = system_files.index('\n#\n', system_files.index('if(ENABLE_DASHBOARD)', begin))
         project.write_text(f'''cmake_minimum_required(VERSION 3.16)
 project(dashboard NONE)
 list(APPEND CMAKE_MODULE_PATH "{MODULES}")
@@ -155,9 +155,9 @@ function(netdata_add_deb_copyright)
 endfunction()
 ''' + system_files[begin:end])
         installer = (ROOT / 'netdata-installer.sh').read_text()
-        begin = installer.index('# Enrolled installations verify the companion')
+        begin = installer.index('dashboard_upgrade=0')
         end = installer.index('\n# ---', begin)
-        script = ('set -eu\nDONOTSTART=1\nrun() { "$@"; }\nfatal() { exit 1; }\n'
+        script = ('set -eu\nrun() { "$@"; }\nfatal() { exit 1; }\n'
                   'cmake_install() { cmake --install "$1" --component dashboard; }\n'
                   + installer[begin:end])
         # Run the source installer's actual completion path, with service and UI calls isolated.
@@ -208,6 +208,16 @@ netdata_banner() { :; }
                 self.assertIn('finish', result.stdout.splitlines(), result.stderr)
                 self.assertEqual(result.returncode, expected_status, result.stderr)
                 self.assertTrue((installed / 'obsolete.js').is_file())
+        subprocess.run(['sh', '-c', script], check=True, env=env, capture_output=True)
+        self.assertFalse((installed / 'obsolete.js').exists())
+        # Make the status destination unwritable even when the fixture runs as root.
+        status_file = build / 'CMakeFiles/dashboard-cleanup.status'
+        status_file.unlink()
+        status_file.mkdir()
+        result = subprocess.run(['sh', '-c', script], text=True, capture_output=True, env=env)
+        self.assertIn('finish', result.stdout.splitlines(), result.stderr)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        status_file.rmdir()
         subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-DENABLE_DASHBOARD=OFF'],
                        check=True, capture_output=True)
         self.put(installed / 'local.css')

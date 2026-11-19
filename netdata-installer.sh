@@ -847,12 +847,6 @@ progress "Install netdata"
 
 # Enrolled installations verify the companion before the first live write.
 # The ordinary no-runtime installation keeps the existing CMake install path.
-# CMake records cleanup failures separately from failures to install the payload.
-dashboard_cleanup_result="${NETDATA_BUILD_DIR}/CMakeFiles/dashboard-cleanup.status"
-dashboard_cleanup_status=0
-if [ -e "${dashboard_cleanup_result}" ] || [ -L "${dashboard_cleanup_result}" ]; then
-  rm -f "${dashboard_cleanup_result}" || fatal "Failed to clear previous dashboard cleanup status." I000C
-fi
 . "${NETDATA_SOURCE_DIR}/packaging/installer/netdata-dem-pair.sh"
 DP_ENABLED=0
 DP_DONT_START=$DONOTSTART
@@ -875,8 +869,9 @@ fi
 if ! NETDATA_INSTALLER_DASHBOARD_UPGRADE=$dashboard_upgrade cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
-if [ -f "${dashboard_cleanup_result}" ]; then
-  IFS= read -r dashboard_cleanup_status < "${dashboard_cleanup_result}" || dashboard_cleanup_status=1
+dashboard_cleanup_status=0
+if [ "$dashboard_upgrade" = 1 ]; then
+  IFS= read -r dashboard_cleanup_status < "${NETDATA_BUILD_DIR}/CMakeFiles/dashboard-cleanup.status" || dashboard_cleanup_status=1
 fi
 
 # -----------------------------------------------------------------------------
