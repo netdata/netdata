@@ -14,9 +14,8 @@ where it lives, on Netdata Agents and Parents, directly or through Netdata Cloud
 
 On top of this data, Netdata gives assistants its machine learning. Netdata uses machine learning to model the
 behavior of the infrastructure and applications. Every metric is scored
-for anomalies as it is collected, and the scores are stored with the data. Netdata MCP gives assistants the scoring
-engine behind Netdata's Anomaly Advisor, so they start from the few metrics that matter instead of searching through
-all of them:
+for anomalies as it is collected, and the scores are stored with the data. Netdata MCP gives assistants the scoring engine behind Netdata's Anomaly Advisor: their context comes from the
+incident itself, ranked across every metric, not from a random selection of metrics or a playbook:
 
 - **"What was interesting over the last week?"** Anomaly rates over time show when clusters of anomalies happened,
   on which nodes, and how anomalies cascaded across systems, networks and applications.
@@ -30,8 +29,8 @@ networks and applications, can identify issues before they become outages, and s
 From there, assistants drill down: query any metric, inspect alerts and their history, and explore logs and live
 processes.
 
-This matters most at scale: with thousands of nodes and millions of metrics, the assistant spends its context on what
-the scoring engine ranks highest, not on everything.
+This matters most at scale: across thousands of nodes and millions of metrics, the scoring engine finds the metrics
+that matter for each incident, wherever they are.
 
 [Get started with Netdata](/docs/deployment-guides/standalone-deployment.md) · [Sign in to Netdata Cloud](https://app.netdata.cloud)
 
