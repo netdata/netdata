@@ -101,7 +101,7 @@ Netdata monitors the full infrastructure stack — operating systems, processes,
 **Design**
 
 - **[Every metric visualized and analyzed automatically](/docs/dashboards-and-charts/netdata-charts.md).** Metrics from native collectors, Prometheus exporters, OpenTelemetry sources, Nagios plugins and StatsD clients are charted, grouped by their labels and analyzed by machine learning the moment they are collected — no dashboard design, no per-chart queries, no query language. Native collectors and profiles add full structure (contexts, instances, dimensions, families) declaratively.
-- **[Machine learning on every metric](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md), [AI over everything](/docs/netdata-ai/mcp/README.md).** Every metric gets unsupervised anomaly detection trained locally on its own behavior, with anomaly rates shown on every chart and used to find anomalous and correlated metrics across the infrastructure. Through Netdata's MCP server and Netdata AI, AI assistants query metrics, anomalies, correlations, alerts and live Functions (processes, containers, connections, logs, network topology, flows, traps) to investigate and explain issues.
+- **[Machine learning on every metric](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md), [AI over everything](/docs/netdata-ai/mcp/README.md).** Every metric gets unsupervised anomaly detection trained locally on its own behavior, with anomaly rates shown on every chart and used to find anomalous and correlated metrics across systems, networks and applications. Through Netdata's MCP server and Netdata AI, AI assistants query metrics, anomalies, correlations, alerts and live Functions (processes, containers, connections, logs, network topology, flows, traps) to investigate and explain issues.
 - **[Local collection on every system](/docs/realtime-monitoring.md).** The Netdata Agent collects from the kernel, processes, containers, hardware and local applications on the system it runs on, at one-second resolution by default for system metrics; remote and API-based targets are collected as frequently as needed.
 - **[Automatic discovery](/src/collectors/SERVICE-DISCOVERY.md).** Service discovery finds local applications (listening ports and processes), Docker containers and Kubernetes workloads, and starts the matching collectors; 650+ known Prometheus exporter ports are recognized automatically.
 - **[Structured metrics, automatic dashboards](/docs/NIDL-Framework.md).** Collectors organize metrics into contexts, instances, dimensions and labels (the NIDL model), so every chart can be sliced, filtered and grouped from the dashboard without query languages or dashboard building.
@@ -184,7 +184,7 @@ Netdata monitors the full infrastructure stack — operating systems, processes,
 - **Monitoring that starts on its own.** Applications, containers and Kubernetes workloads are discovered and charted automatically; collectors are configured from the UI when needed.
 - **Every second, every metric.** Per-second system metrics capture short spikes, saturation and contention that 10–60 second monitoring averages away.
 - **Anomalies surfaced across the whole stack.** Machine learning watches every metric of every system, container, device and application; unusual behavior is detected without thresholds, and correlated anomalies point to where a problem started.
-- **AI-assisted troubleshooting on live data.** AI assistants investigate incidents using the infrastructure's real metrics, anomalies, alerts and live Functions, reducing the time from question to root cause.
+- **AI-assisted troubleshooting on live data.** AI assistants investigate incidents using real metrics, anomalies, alerts and live Functions, reducing the time from question to root cause.
 - **Down to the process, container and device.** Metrics resolve to individual processes, containers, pods, disks, interfaces, GPUs and sensors, so problems are located to their source.
 - **Live answers from the node.** Functions return live process, container, service, connection, sensor and hardware tables on demand, without logging into the machine.
 - **Any metric source, with dashboards from day one.** Existing Prometheus exporters, OpenTelemetry instrumentation, Nagios checks and StatsD clients work as they are; their metrics are charted and analyzed automatically, and profiles turn them into structured dashboards without dashboard design or query languages.
@@ -592,7 +592,7 @@ Elasticsearch storage grows with indexing configuration; Loki storage grows with
 
 **Value**
 
-- **Log visibility across the infrastructure without shipping logs.** Logs Monitoring queries systemd-journal, Windows Event Log and macOS unified logs in place, providing log exploration on every monitored node without log shipping, pipelines or extra storage.
+- **Log visibility across every node without shipping logs.** Logs Monitoring queries systemd-journal, Windows Event Log and macOS unified logs in place, providing log exploration on every monitored node without log shipping, pipelines or extra storage.
 - **Centralize only what needs centralizing.** Logs Management is used for logs that must be centralized or retained, or that have no local log store (applications, containers, network devices, cloud services).
 - **Indexed search at low storage cost.** Every field is indexed and searchable at about 1/4 of raw log size; storage does not grow with stream count or indexing choices.
 - **No logging cluster to operate.** Logs are stored and queried by Netdata Agents; there is no separate log cluster to deploy, size, scale or upgrade.
@@ -788,7 +788,7 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 **Value**
 
 - **Standards-based pipeline.** Metrics, logs and traces enter through OTLP; existing OpenTelemetry SDKs, Collector configurations and team skills work unchanged, with no proprietary agent, protocol or instrumentation lock-in.
-- **One backend for three signals.** Metrics, logs and traces are stored, explored and correlated in one place, on one timeline, with the infrastructure Netdata monitors.
+- **One backend for three signals.** Metrics, logs and traces are stored, explored and correlated in one place, on one timeline, with the systems, networks and applications Netdata monitors.
 - **Investigation and monitoring from the same traces.** Query-time RED analysis answers questions about any slice of traffic after the fact; collection-time RED metrics provide long-term trends, machine learning anomaly detection and alerting.
 - **OpenTelemetry metrics treated as first-class.** OTLP metrics get the same per-second dashboards, anomaly detection and alerting as Netdata's native metrics.
 - **Flexibility of the Collector.** The Collector's receivers, processors and connectors extend what reaches Netdata — new sources, derived metrics, percentiles, routing to other destinations — without changes to Netdata.
@@ -816,7 +816,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 - Detection starts on a new metric after about 15 minutes of data (its first model); all 18 default models are in place after about 54 hours (over two days)
 - Anomaly flag stored with every sample (tier 0) and anomaly counts in higher tiers
 - Anomaly rate per chart, dimension, instance and node; [anomaly ribbon](/docs/dashboards-and-charts/netdata-charts.md) on every chart; node-level anomaly rate
-- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across the infrastructure, to identify where a problem started and what it affected; the root cause is usually among the top 30–50 ranked metrics
+- **[Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md):** ranks the metrics that were anomalous in a selected time range across systems, networks and applications, to identify where a problem started and what it affected; the root cause is usually among the top 30–50 ranked metrics
 - **[Metric Correlations](/docs/metric-correlations.md):** finds the metrics that changed most between a highlighted period and a baseline (KS2 and volume algorithms, on raw values or anomaly rates)
 - [Anomaly-based alerting](/src/health/REFERENCE.md): alerts on anomaly rates (stock examples for ML and BGP; user-defined on any metric)
 - Enabled by default on Agents and Parents with persistent storage; disabled automatically on constrained devices (`iot` profile)
@@ -843,7 +843,7 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 
 - **Anomaly detection on everything, without configuration.** Every metric of every system, container, application and device is monitored for unusual behavior from the moment it is collected.
 - **Fewer false positives.** A sample is flagged only when all 18 models, trained over the last ~54 hours, agree, which removes about 99% of false positives.
-- **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole infrastructure.
+- **Faster root-cause analysis.** Anomaly Advisor and Metric Correlations narrow thousands of metrics to the few that changed, across the whole stack.
 - **Investigations in minutes.** Netdata AI produces troubleshooting and root-cause reports, capacity and performance reviews, and alert explanations from live observability data.
 - **AI grounded in the customer's environment.** Infrastructure Knowledge, AI Memory and MCP Connections combine monitoring data with the customer's own context, code and incidents.
 - **Open to any AI assistant.** MCP servers on every Agent, Parent and Netdata Cloud let existing AI tools query live observability data directly, under the same access controls as the UI.
@@ -928,7 +928,7 @@ Netdata dashboards are generated automatically from the collected metrics and or
 
 ## Organization and Service Views
 
-Netdata organizes infrastructure and people in Netdata Cloud: Spaces isolate organizations, Rooms group nodes and the people responsible for them, and rule-based Rooms assemble nodes automatically from their labels. Because every system and device is monitored as its own node, any combination of servers, containers, network devices, cloud services and applications can be viewed, alerted on and investigated as one service.
+Netdata organizes nodes and people in Netdata Cloud: Spaces isolate organizations, Rooms group nodes and the people responsible for them, and rule-based Rooms assemble nodes automatically from their labels. Because every system and device is monitored as its own node, any combination of servers, containers, network devices, cloud services and applications can be viewed, alerted on and investigated as one service.
 
 **Learn more:** [Organize your infrastructure](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) · [Team collaboration on netdata.cloud](https://www.netdata.cloud/features/enterprise/team-collaboration/)
 
@@ -961,7 +961,7 @@ Netdata organizes infrastructure and people in Netdata Cloud: Spaces isolate org
 
 **Value**
 
-- **Service-level monitoring without configuration.** Rule-based Rooms turn labels into live service views that include every related node, and stay current as infrastructure changes.
+- **Service-level monitoring without configuration.** Rule-based Rooms turn labels into live service views that include every related node, and stay current as the environment changes.
 - **Every team sees its own scope.** Rooms give each team, service or customer its dashboards, alerts and notifications, without separate tools or duplicate configuration.
 - **Per-node depth inside every service view.** Because every component is monitored individually, a service view drills down to the exact server, container, device or cloud resource behind a problem.
 - **Safe multi-tenancy.** Spaces isolate customers and business units completely, with roles and sensitive-data permissions controlling what each user sees.

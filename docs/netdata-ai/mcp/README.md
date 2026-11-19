@@ -1,5 +1,11 @@
 # Netdata MCP
 
+**Full-stack observability: the AI SRE that learns your stack!**
+
+**Metrics · Logs · Traces · Flows · Topology**\
+Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI SRE\
+OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 2,000+ integrations
+
 Netdata is a full-stack observability platform: infrastructure, applications (OpenTelemetry traces), networks,
 databases, logs and cloud, with 2,000+ integrations. Netdata Agents collect, store and analyze data where it is
 generated, per second, with machine learning anomaly detection on every metric, and Netdata Parents and Netdata Cloud
