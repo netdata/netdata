@@ -787,12 +787,17 @@ endif()
 # dashboard
 #
 
+set(dashboard_web_dest "")
 if(ENABLE_DASHBOARD)
+  set(dashboard_web_dest "${WEB_DEST}/")
   include(NetdataDashboard)
   bundle_dashboard()
 
   netdata_add_deb_copyright(dashboard netdata-dashboard)
 endif()
+# The source installer needs the configured install destination, including when
+# a reused build switches the dashboard off. Runtime web-server settings differ.
+file(WRITE "${CMAKE_BINARY_DIR}/dashboard-web-destination" "${dashboard_web_dest}")
 
 #
 # Ship CMakeCache.txt as an archive

@@ -21,17 +21,9 @@ function(handle_braindead_versioning_insanity prefix)
   endif()
 endfunction()
 
-# Bundle the dashboard code for inclusion during install.
-#
-# The tarball's layout is not known ahead of time, so the install rules are
-# generated only after extraction, by scanning the tree into a CMakeLists.txt
-# that is then pulled in with add_subdirectory().
 function(bundle_dashboard)
-  include(ExternalProject)
-
   set(dashboard_src_dir "${CMAKE_BINARY_DIR}/dashboard-src")
   set(dashboard_src_prefix "${dashboard_src_dir}/dist/agent")
-  set(dashboard_bin_dir "${CMAKE_BINARY_DIR}/dashboard-bin")
   message(STATUS "Preparing local agent dashboard code")
 
   message(STATUS "  Fetching ${DASHBOARD_URL}")
@@ -50,6 +42,8 @@ function(bundle_dashboard)
   endif()
 
   message(STATUS "  Extracting dashboard code")
+  # Reconfiguration may fetch a different release into the same build tree.
+  file(REMOVE_RECURSE "${dashboard_src_dir}")
   extract_gzipped_tarball(
     "${CMAKE_BINARY_DIR}/dashboard.tar.gz"
     "${dashboard_src_dir}"
@@ -58,29 +52,6 @@ function(bundle_dashboard)
 
   handle_braindead_versioning_insanity("${dashboard_src_prefix}")
 
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code")
-  set(rules "")
-
-  subdirlist(dash_dirs "${dashboard_src_prefix}")
-
-  foreach(dir IN LISTS dash_dirs)
-    file(GLOB files
-         LIST_DIRECTORIES FALSE
-         RELATIVE "${dashboard_src_dir}"
-         "${dashboard_src_prefix}/${dir}/*")
-
-    set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST}/${dir})\n")
-  endforeach()
-
-  file(GLOB files
-       LIST_DIRECTORIES FALSE
-       RELATIVE "${dashboard_src_dir}"
-       "${dashboard_src_prefix}/*")
-
-  set(rules "${rules}install(FILES ${files} COMPONENT dashboard DESTINATION ${WEB_DEST})\n")
-
-  file(WRITE "${dashboard_src_dir}/CMakeLists.txt" "${rules}")
-  message(STATUS "  Generating CMakeLists.txt file for dashboard code -- Done")
-  add_subdirectory("${dashboard_src_dir}" "${dashboard_bin_dir}")
+  install(DIRECTORY "${dashboard_src_prefix}/" COMPONENT dashboard DESTINATION "${WEB_DEST}")
   message(STATUS "Preparing local agent dashboard code -- Done")
 endfunction()

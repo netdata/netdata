@@ -44,6 +44,10 @@ dem_pair_run mkdir -p /opt/netdata || exit $?
         --exclude=./var/cache/netdata --exclude=./var/log/netdata . |
         dem_pair_run tar -xpf - "$@" -C /opt/netdata
 ) || exit $?
+if [ -d "$DP_STAGE/usr/share/netdata/web/v3" ]; then
+    dem_pair_run sh "$DP_STAGE/system/cleanup-dashboard.sh" "$DP_STAGE/usr/share/netdata/web/v3" \
+        /opt/netdata usr/share/netdata/web || exit $?
+fi
 if [ ! -d /opt/netdata/etc/netdata ]; then
     dem_pair_run mkdir -p /opt/netdata/etc || exit $?
     dem_pair_run cp -a "$DP_STAGE/etc/netdata" /opt/netdata/etc/netdata || exit $?

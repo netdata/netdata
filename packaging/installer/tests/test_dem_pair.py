@@ -656,6 +656,22 @@ class StaticOverlayTests(unittest.TestCase):
                 self.assertEqual((target / 'local.conf').read_text(), 'administrator config')
                 self.assertFalse((target / 'stock.conf').exists())
 
+    def test_dashboard_overlay_reclaims_only_stale_v3_files(self):
+        web = Path('usr/share/netdata/web')
+        for base in (self.stage, self.target):
+            (base / web / 'v3/nested').mkdir(parents=True)
+        (self.stage / web / 'v3/index.html').write_text('new dashboard')
+        (self.stage / web / 'v3/nested/current.js').write_text('new asset')
+        (self.target / web / 'v3/nested/obsolete.gif').write_text('old asset')
+        (self.target / web / 'custom.html').write_text('local dashboard')
+        shutil.copyfile(HELPER.parent / 'cleanup-dashboard.sh', self.stage / 'system/cleanup-dashboard.sh')
+        result = self.run_static()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.target / web / 'v3/nested/obsolete.gif').exists())
+        self.assertEqual((self.target / web / 'v3/index.html').read_text(), 'new dashboard')
+        self.assertEqual((self.target / web / 'v3/nested/current.js').read_text(), 'new asset')
+        self.assertEqual((self.target / web / 'custom.html').read_text(), 'local dashboard')
+
     def test_relocated_state_parents_remain_symlinks_after_overlay(self):
         self.check_relocated_state_parents()
 

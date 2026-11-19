@@ -204,25 +204,6 @@ function(extract_gzipped_tarball tarball target)
   endif()
 endfunction()
 
-# Get a recursive list of all sub-directories of the specified directory,
-# relative to that directory.
-function(subdirlist result curdir)
-  file(GLOB_RECURSE children
-       LIST_DIRECTORIES TRUE
-       RELATIVE ${curdir}
-       ${curdir}/*)
-
-  set(dirlist "")
-
-  foreach(child ${children})
-    if(IS_DIRECTORY ${curdir}/${child})
-      list(APPEND dirlist ${child})
-    endif()
-  endforeach()
-
-  set(${result} ${dirlist} PARENT_SCOPE)
-endfunction()
-
 # Precompile python code in the specified directory relative to the
 # CMake install prefix at install time.
 # This must be called _after_ the install directive for the python code

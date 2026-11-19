@@ -865,6 +865,11 @@ fi
 if ! cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
+dashboard_web_dest=$(cat "${NETDATA_BUILD_DIR}/dashboard-web-destination") || exit $?
+if [ -n "${dashboard_web_dest}" ]; then
+  run sh "${NETDATA_SOURCE_DIR}/packaging/installer/cleanup-dashboard.sh" \
+    "${NETDATA_BUILD_DIR}/dashboard-src/dist/agent/v3" "${DESTDIR:-}${NETDATA_PREFIX:-/}" "${dashboard_web_dest}" || exit $?
+fi
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
