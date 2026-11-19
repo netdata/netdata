@@ -796,6 +796,8 @@ Netdata Logs Management is Netdata's OpenTelemetry logs pipeline: it collects, s
 
 ## Machine Learning and AI
 
+Netdata uses machine learning to model the behavior of the infrastructure and applications. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
+
 Netdata applies unsupervised machine learning to every metric it collects, on the Agents and Parents that hold the data, and makes everything it observes — metrics, anomalies, alerts, logs, traces, database queries, network topology, flows and traps, and live Functions, from infrastructure and networks to applications — available to AI: Netdata AI in Netdata Cloud (conversations, troubleshooting investigations, reports, alert automation) and Netdata's MCP servers for any AI assistant. Netdata also monitors AI infrastructure itself: NVIDIA GPUs (including DCGM) and AI serving with vLLM and LiteLLM.
 
 **Learn more:** [Machine learning and AI documentation](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md) · [AI-powered observability on netdata.cloud](https://www.netdata.cloud/features/aiml/aiops/)

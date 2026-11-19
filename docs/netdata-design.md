@@ -84,7 +84,7 @@ How the design delivers it:
 
 ### Machine learning that models your infrastructure
 
-**We use machine learning to model the behavior of the infrastructure and applications. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.**
+**We use machine learning to model the behavior of the infrastructure and applications. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.**
 
 How the design delivers it:
 
