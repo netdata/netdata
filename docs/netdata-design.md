@@ -40,7 +40,7 @@ How the design delivers it:
 - **Every alert opens into the full picture:** every metric of the affected systems, scored for anomalies, next to their logs, traces and live views of processes, connections and services.
 - **Alerts run where the data lives**, so they keep working through any outage outside that hub.
 
-### Everything, every second, affordably
+### Everything, every second, at a cost that does not grow with your data
 
 **The data you did not collect is the data your next incident needs. We collect everything, every second, and we engineer the cost down until choosing what to watch is no longer necessary.**
 
@@ -145,7 +145,7 @@ How the design delivers it:
 - **We move the code to the data, not the data to the code.** A fleet-wide query fans out to the hubs and comes back already aggregated, so nothing has to be shipped, ingested and indexed in one place first.
 - **We collect everything and engineer the cost down,** instead of asking you to predict which data the next incident will need.
 - **We give data its meaning when it is collected,** so Netdata carries the knowledge of each technology instead of leaving every team to rebuild it.
-- **We keep machine learning out of the alert path,** and use it where it has no equal: as evidence for people and AI.
+- **Machine learning never decides an alert on its own:** anomaly rates reach alerts only through rules people can read, like any other metric, and machine learning is used where it has no equal: as evidence for people and AI.
 - **We keep the engine open,** so the core of your observability never depends on a vendor's goodwill.
 
 ## What it means for you

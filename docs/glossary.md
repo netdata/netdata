@@ -124,6 +124,9 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## S
 
+- [**Scalability**](/docs/scalability.md): With Netdata's distributed architecture, you can observe a few, hundreds, thousands
+  or 100,000+ nodes. There is no central bottleneck, especially when metrics are retained locally on the Agents.
+
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
 - [**Stale** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating a child node stopped streaming to its Parent, but the Parent is still online and has historical data available. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
@@ -137,9 +140,6 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 - [**Tiers**](/src/database/engine/README.md#tiers): Tiering is a mechanism of providing multiple tiers of data with different granularity of metrics (the frequency they are collected and stored, i.e., their resolution).
 
 ## U
-
-- [**Unlimited Scalability**](https://www.netdata.cloud/#:~:text=love%20community%20contributions!-,Infinite%20Scalability,-By%20storing%20data): With Netdata's distributed architecture, you can seamlessly observe a couple, hundreds or
-  even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
 
 - [**Unseen** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node was claimed but has never connected. Also referred to as "Created" in code. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 

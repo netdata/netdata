@@ -34,8 +34,8 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Charts and dashboards              |      ✓      |     ✓      |     ✓     |
 | Anomaly detection (ML)             |      ✓      |     ✓      |     ✓     |
 | Alert notifications                |      ✓      |     ✓      |     ✓     |
-| Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
-| Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
+| Node dashboard access              |   5 nodes   |  5 nodes   | No limit  |
+| Custom dashboards                  | 1 per agent | 1 per room | No limit  |
 
 ### Functions (Live Tab)
 
@@ -133,7 +133,7 @@ Dynamic Configuration requires a paid plan:
 
 The 5-node limit applies to both **Anonymous** and **Community** users, on Netdata Cloud dashboards and on the local dashboard of Agents and Parents. You can:
 
-1. **Upgrade to a paid plan** for unlimited nodes
+1. **Upgrade to a paid plan** to remove the node limit
 2. **Select preferred nodes** to choose which 5 nodes stay accessible
 
 This limit is a **plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On a dashboard that shows more nodes than your limit, a node outside your preferred nodes shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
@@ -142,7 +142,7 @@ The local dashboard of an Agent or Parent gets the limit of your plan from Netda
 
 ```mermaid
 flowchart LR
-    subgraph S["Streaming — unlimited nodes"]
+    subgraph S["Streaming — no node limit"]
         C1["Child 1"] --> P["Parent"]
         CN["Child 2..N"] --> P
     end
@@ -176,8 +176,8 @@ Netdata Cloud and each Agent keep separate preferred-node lists. Netdata Cloud s
 | **Network Flows, Traces, OpenTelemetry Logs, SNMP Traps, Topology Maps, RUM, Browser Tests, DEM History Status** | Blocked     | Blocked       | Full access |
 | **AI Features**           | Blocked     | Not available | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
-| **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
-| **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
+| **Node Dashboard Access** | 5 nodes     | 5 nodes       | No limit    |
+| **Custom Dashboards**     | 1 per agent | 1 per room    | No limit    |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or use a paid plan or an active trial for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests and DEM history status. A paid plan also provides full configuration control and unlimited scale.
+Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or use a paid plan or an active trial for Network Flows, Traces, OpenTelemetry Logs, SNMP traps, topology maps, Real User Monitoring, synthetic browser tests and DEM history status. A paid plan also provides full configuration control and no node limit.

@@ -203,7 +203,7 @@ Technically, yes, but practically, no. To match Netdata's data density:
 2. **Target Assault:** Frequent scraping would overwhelm the very applications it's meant to monitor.
 3. **Storage Inefficiency:** The Prometheus TSDB isn't optimized for this volume of per-second data.
 
-Our [stress test](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/) against a Prometheus stack at 4.6M metrics/s proved this: Netdata used **-37% CPU, -88% RAM, -13% bandwidth, and -97% disk I/O** while providing **40x longer retention** and **22x faster queries**.
+Our [stress test](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/) against a Prometheus stack at 4.6M metrics/s proved this: Netdata used **-37% CPU, -88% RAM, -13% bandwidth, and -97% disk I/O** while providing **15x longer per-second retention (up to 40x in lower tiers)** and **22x faster large queries**.
 
 ### The Datadog Reality
 
@@ -262,7 +262,7 @@ For default-settings sizing guidance (CPU, RAM, disk, and bandwidth) across diff
 
 - **Billions of Metrics:** Processes over 4.5 billion metrics per second across all installations.
 - **100% Sampling Rate:** No statistical sampling - every data point is captured.
-- **Unlimited Metrics:** No artificial limits or pricing tiers based on volume.
+- **No Limit on Metrics:** No artificial limits or pricing tiers based on volume.
 - **Proven at Scale:** Monitors infrastructures with 100,000+ nodes seamlessly.
 
 ### Enterprise-Grade Reliability

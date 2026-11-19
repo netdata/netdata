@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 description = "Library for generating Netdata-compatible JSON Schema with UI annotations"
-license = "MIT OR Apache-2.0"
+license = "GPL-3.0-or-later"
 
 [lib]
 doctest = false

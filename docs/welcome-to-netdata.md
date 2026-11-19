@@ -14,7 +14,7 @@ This page explains what Netdata is and the principles behind it. [Netdata Design
 - **Systems:** Linux, Windows, macOS and FreeBSD, from IoT and edge devices to bare-metal servers, virtual machines, Kubernetes, HPC and data centers.
 - **Networks:** 1700+ SNMP profiles, 150k+ SNMP trap profiles, BGP, NetFlow, sFlow and IPFIX flows, topology, and licence management. See the [network performance monitoring docs](/docs/npm/README.md).
 - **Clouds:** AWS, Azure and GCP, plus private and hybrid clouds.
-- **Applications:** 800+ native integrations, OpenMetrics (Prometheus), OpenTelemetry (OTLP) and StatsD. See the [Complete Product Description](/docs/netdata-complete-product-description.md).
+- **Applications:** 2,000+ integrations and open standards: OpenTelemetry (OTLP), OpenMetrics (Prometheus), StatsD and Nagios. See the [Complete Product Description](/docs/netdata-complete-product-description.md).
 
 ## How Netdata is different
 
@@ -58,7 +58,7 @@ Each metric arrives with its unit, its family, its place in the structure and th
 
 - **A verified chart for every metric,** without building it.
 - **The same structure everywhere,** so what you learn on one system applies to all of them.
-- **Quality that does not depend on who is on call:** junior and senior engineers see the same views.
+- **Quality that does not depend on who is on call:** every engineer sees the same views.
 
 ### Collect everything
 
@@ -170,7 +170,7 @@ flowchart TB
 - **It collects everything, every second.** Collecting everything is usually too expensive, so teams have to choose what to watch, and during a crisis the data they need is often missing. Netdata stores data as close as possible to the systems that produce it, in compact databases, so complete coverage costs under 5% of one CPU core, about 200 MB of RAM and a few GB of disk per node, instead of a monitoring bill that rivals the infrastructure it monitors, and gives you the most complete picture when it matters most.
 - **It visualizes everything.** Usually every chart is built and maintained by hand, so dashboards cover only what someone thought of in advance, and large setups drift into hundreds of inconsistent dashboards nobody trusts. Netdata gives every metric its meaning at collection time and builds the dashboards from it, so every metric has a correct chart, organized the same way across the infrastructure, and nothing is missing when you go looking for it.
 - **It runs machine learning on every metric.** ML-based alerting has a reputation for floods of false alerts and endless tuning, so many teams have given up on it. Netdata uses machine learning mainly to tell you what is wrong, not to page you. During an incident, anomalies appear in clusters across related components, revealing how they depend on each other. Netdata uses these clusters to rank what changed and gives them to its AI as context to reason about the cause. This is the basis of its automated root-cause analysis.
-- **It needs no specialized skills.** Observability usually depends on query languages and dashboard engineering, so troubleshooting waits for the few experts who know them. In Netdata, senior and junior engineers work with the same views and the same tools, with no query language to learn. Junior engineers can investigate incidents on their own, and they learn the infrastructure by seeing the whole picture.
+- **It needs no specialized skills.** Observability usually depends on query languages and dashboard engineering, so troubleshooting waits for the few experts who know them. In Netdata, every engineer works with the same views and the same tools, with no query language to learn. Every engineer can investigate incidents on their own and learns the infrastructure by seeing the whole picture.
 
 Netdata is infrastructure and application observability. It is not a business-intelligence, SIEM, ITSM or data-warehouse platform; it can export metrics and forward logs and traces to the systems that are.
 

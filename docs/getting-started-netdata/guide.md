@@ -225,7 +225,7 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 |--------------------------|-------------------------------------|-----------------------------------|
 | **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments |
 | **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools      |
-| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports  |
+| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans have no report limit   |
 | **Anomaly Advisor**      | Find root causes in minutes         | Available to all users            |
 | **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                 |
 
@@ -282,7 +282,7 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 - **Performance Optimization** - Bottleneck identification and tuning suggestions
 - **Anomaly Analysis** - Deep dive into unusual patterns and their impacts
 
-**Access:** Paid plans get unlimited reports, free trial users get full access during trial, Community users get 10 free reports.
+**Access:** Paid plans have no report limit, free trial users get full access during trial, Community users get 10 free reports.
 
 </details>
 
@@ -320,7 +320,7 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 2. **Connect your Agents** - Use the simple one-command installation
 3. **Experience real-time observability** - 1-second granularity across all metrics
 4. **Try AI-powered features** - Chat with your infrastructure and generate insights
-5. **Build unlimited dashboards** - Create the monitoring views you need
+5. **Build as many dashboards as you need** - Create the monitoring views your team needs
 6. **Set up team access** - Invite colleagues and configure permissions
 
 **Transform your infrastructure monitoring today. Your future self and your team will thank you.**

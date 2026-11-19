@@ -1153,6 +1153,9 @@ sidebar:
                   label: OpenAI Codex CLI
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/codex-cli.md
               - meta:
+                  label: ChatGPT
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/chatgpt.md
+              - meta:
                   label: Crush
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/crush.md
               - meta:
