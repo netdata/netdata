@@ -596,6 +596,9 @@
 - Fix the connect typo in the deploy install description ([#24847](https://github.com/netdata/netdata/issues/24847))
 - Fix(dem): align RUM configuration and vnode selection with native clients ([#24850](https://github.com/netdata/netdata/issues/24850))
 - Regenerate integrations docs ([#24851](https://github.com/netdata/netdata/issues/24851))
+- Build(deps): bump the github-actions group with 3 updates ([#24854](https://github.com/netdata/netdata/issues/24854))
+- Build(deps): bump actions/setup-node from 6.5.0 to 7.1.0 ([#24855](https://github.com/netdata/netdata/issues/24855))
+- Fix(packaging): fall back to su for DEM pairing when runuser is unavailable ([#24859](https://github.com/netdata/netdata/issues/24859))
 
 ## [2.12.0] - 2026-09-30
 
