@@ -20,7 +20,7 @@ When you use Netdata's machine learning models, you benefit from these key princ
 |----------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | **Unsupervised Learning**  | Models operate independently without requiring your input                                                                  |
 | **Real-time Performance**  | While ML impacts CPU usage, you won't experience any compromise to Netdata's high-fidelity, real-time monitoring           |
-| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata infrastructure monitoring and troubleshooting workflow     |
+| **Seamless Integration**   | ML-based insights are fully embedded into your existing Netdata observability and troubleshooting workflow                    |
 | **Assistance Over Alerts** | ML helps you investigate potential issues rather than triggering unnecessary alerts - no 3 AM wake-ups for minor anomalies |
 | **Many Light Models**      | Netdata uses many lightweight models instead of a few heavy ones, optimizing for resource usage while maintaining accuracy |
 | **Scalable Architecture**  | The system is designed to handle thousands of metrics simultaneously, scoring each one every second with minimal latency   |

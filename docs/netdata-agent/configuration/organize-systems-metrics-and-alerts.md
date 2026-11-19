@@ -1,17 +1,17 @@
 # Organize systems, metrics, and alerts
 
-When you monitor dozens or hundreds of systems, you need powerful ways to keep everything organized. Netdata helps you structure your infrastructure with Spaces, Rooms, virtual nodes, host labels, and metric labels.
+When you monitor dozens or hundreds of systems, you need powerful ways to keep everything organized. Netdata helps you structure your nodes with Spaces, Rooms, virtual nodes, host labels, and metric labels.
 
 ## Choose your organization strategy
 
 Netdata provides multiple organization methods that work together:
 
-- **Spaces and Rooms**: Group your infrastructure and team members
+- **Spaces and Rooms**: Group your nodes and team members
 - **Virtual nodes**: Monitor multi-component systems as separate entities
 - **Host labels**: Tag systems by purpose, location, or any custom criteria
 - **Metric labels**: Filter and group metrics within charts
 
-### Organize your infrastructure and team
+### Organize your nodes and team
 
 <details>
 <summary><strong>Spaces</strong> are your primary collaboration environment where you:</summary>
@@ -25,7 +25,7 @@ Netdata provides multiple organization methods that work together:
 <details>
 <summary><strong>Rooms</strong> function as organizational units within Spaces, providing:</summary>
 
-- Infrastructure-wide dashboards
+- Dashboards across all your nodes
 - Real-time metrics visualization
 - Focused monitoring views
 - Flexible node grouping
@@ -51,7 +51,7 @@ Each node belongs to exactly one Space but can be assigned to multiple Rooms wit
 
 :::tip
 
-Most organizations need only one Space. Create multiple Rooms within that Space to organize your infrastructure effectively.
+Most organizations need only one Space. Create multiple Rooms within that Space to organize your nodes effectively.
 
 :::
 
@@ -61,7 +61,7 @@ Learn more in our [Spaces and Rooms documentation](/docs/netdata-cloud/organize-
 
 ### Monitor complex systems as separate entities
 
-Virtual nodes let you split multi-component systems into distinct, monitorable units. For example, you can monitor each Windows server in your infrastructure as its own node, even when collecting metrics through a single Netdata Agent.
+Virtual nodes let you split multi-component systems into distinct, monitorable units. For example, you can monitor each Windows server in your fleet as its own node, even when collecting metrics through a single Netdata Agent.
 
 See [Virtual Nodes (vnodes)](/docs/learn/node-identities.md#virtual-nodes-vnodes) for the full reference: how to define a vnode via YAML or the dynamic configuration GUI, and how to attach it to a collector job.
 
@@ -302,7 +302,7 @@ Notes:
 
 ## Next steps
 
-1. **Start with Spaces and Rooms** to organize your infrastructure and team
+1. **Start with Spaces and Rooms** to organize your nodes and team
 2. **Add host labels** to categorize your systems
 3. **Configure metric labels** for detailed filtering within charts
 4. **Set up virtual nodes** if you monitor complex, multi-component systems

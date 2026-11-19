@@ -1,10 +1,10 @@
 # Anomaly Advisor
 
-The Anomaly Advisor (the "Anomalies" tab on Netdata dashboards) is a troubleshooting assistant that correlates anomalies across your entire infrastructure and presents them as a ranked list of metrics, sorted by anomaly severity.
+The Anomaly Advisor (the "Anomalies" tab on Netdata dashboards) is a troubleshooting assistant that correlates anomalies across your entire stack and presents them as a ranked list of metrics, sorted by anomaly severity.
 
 Built on three components: per-metric anomaly detection using k-means clustering (18 models per metric), pre-computed Node Anomaly Rate (NAR) correlation charts, and a specialized scoring engine that evaluates thousands of metrics simultaneously. When you highlight an incident timeframe, the scoring engine analyzes all metrics and returns an ordered list - typically placing root causes within the top 30-50 results.
 
-The system works by detecting anomaly clusters. A single event (like an SSH login, a backup job, or a service restart) typically triggers anomalies across dozens of related metrics - CPU, memory, network, disk I/O, and application-specific counters. The Anomaly Advisor captures these correlations and ranks them by severity, effectively showing you what changed and how those changes cascaded through your infrastructure.
+The system works by detecting anomaly clusters. A single event (like an SSH login, a backup job, or a service restart) typically triggers anomalies across dozens of related metrics - CPU, memory, network, disk I/O, and application-specific counters. The Anomaly Advisor captures these correlations and ranks them by severity, effectively showing you what changed and how those changes cascaded across systems, networks and applications.
 
 This approach inverts traditional troubleshooting. Instead of forming hypotheses and validating them one by one, you start with data - a ranked list of what actually deviated from normal patterns. The tool works without requiring system-specific knowledge, though interpreting results still requires engineering expertise.
 
@@ -21,7 +21,7 @@ Limitations: Works best for sudden changes and patterns not seen in the last 54 
 | **Infrastructure View** | Dual charts: % anomalous and absolute count per node                            | Distinguishes small node spikes from large issues  |
 | **Time to Insight**     | Highlight timeframe → ranked results in seconds                                 | Minutes to root cause vs hours of hypothesis testing |
 | **Expertise Required**  | No system-specific knowledge needed to identify anomalies                       | Minimal expertise to interpret results             |
-| **Dependency Discovery**| Correlated anomalies reveal component relationships                             | Exposes hidden infrastructure dependencies         |
+| **Dependency Discovery**| Correlated anomalies reveal component relationships                             | Exposes hidden dependencies across the stack       |
 | **Best Use Cases**      | Sudden changes, cascading failures, multi-node incidents                        | Excellent for "what just happened?" scenarios      |
 | **Limitations**         | Cannot detect stopped services, gradual degradation                             | Not a replacement for all monitoring               |
 
@@ -32,9 +32,9 @@ Limitations: Works best for sudden changes and patterns not seen in the last 54 
 - **Pattern fragments**: If anomaly patterns existed separately in training data, consensus may not trigger
 :::
 
-## Visualizing Cascading Infrastructure Level Effects
+## Visualizing Cascading Effects Across Nodes
 
-The Anomaly Advisor provides two views of node-level anomalies, revealing how issues propagate across infrastructure. Each node-level chart aggregates the underlying anomaly bits calculated per metric (as described in [Machine Learning Anomaly Detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md)):
+The Anomaly Advisor provides two views of node-level anomalies, revealing how issues propagate across nodes. Each node-level chart aggregates the underlying anomaly bits calculated per metric (as described in [Machine Learning Anomaly Detection](/docs/ml-ai/ml-anomaly-detection/ml-anomaly-detection.md)):
 
 ![Anomaly cascading effects visualization](https://github.com/user-attachments/assets/a69b1461-c559-4b22-bb02-045670d84168)
 
@@ -62,7 +62,7 @@ This dual view helps distinguish between:
 - **Small nodes with high anomaly rates** (high percentage, low count)
 - **Large nodes with many anomalies** (lower percentage, high count)
 
-**This visualization provides the infrastructure-level blast radius of any incident.** At a glance, you can see:
+**This visualization provides the fleet-level blast radius of any incident.** At a glance, you can see:
 
 - Which nodes were affected
 - When each node was impacted

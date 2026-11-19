@@ -8,7 +8,7 @@ When the context is clear, we can omit the "Netdata" prefix for brevity.
 
 | Term                   | Definition                                                               |
 |------------------------|--------------------------------------------------------------------------|
-| **Agent** (**Agents**) | The core monitoring software that collects, processes and stores metrics |
+| **Agent** (**Agents**) | The core Netdata software that collects, stores, analyzes and serves metrics, logs and traces |
 | **Daemon**             | The main Netdata process                                                 |
 | **Collector(s)**       | The various collectors of Netdata                                        |
 | **Registry**           | The default Netdata Registry, or any Agent acting as one                 |

@@ -266,7 +266,7 @@ Through intelligent workload distribution between Parents and Agents:
 
 This isn't just optimization. It's a fundamentally different architecture that recognizes observability shouldn't compete with your applications for resources.
 
-**Welcome to observability that makes your infrastructure better, not heavier.**
+**Welcome to observability that makes your stack better, not heavier.**
 
 ## FAQ
 

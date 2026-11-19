@@ -170,9 +170,9 @@ Based on Netdata's documentation, here are recommended practices:
 
 ### Filtering Strategy
 
-- Use **Room-based filtering** to organize notifications by infrastructure components
+- Use **Room-based filtering** to organize notifications by service or team
 - Apply **severity filtering** to route Critical alerts to immediate channels (like PagerDuty) and Warning alerts to monitoring channels (like Slack)
-- Utilize **host labels** for granular targeting of specific infrastructure segments
+- Utilize **host labels** for granular targeting of specific nodes or services
 
 ### Avoiding Alert Fatigue
 

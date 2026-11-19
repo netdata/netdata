@@ -54,7 +54,7 @@ Use the right tool for the right job:
 
 Click the **"Conversations"** button above the space selectors in Netdata Cloud. Your conversation history is saved, allowing you to pick up an investigation where you left off.
 
-## Teaching Netdata AI about your infrastructure
+## Teaching Netdata AI about your environment
 
 Conversations are also where Netdata AI learns. Tell it what only your team knows — *"remember that this alert is expected on the batch nodes"*, *"db-3 is the replica, not the primary"* — and it keeps that for every future conversation, investigation, and report in your Space. See [Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md).
 
@@ -75,4 +75,4 @@ Real-Time Conversations are available for all users on a Business plan or free t
 - [Investigations](/docs/netdata-ai/investigations/index.md) – comprehensive async analysis
 - [Insights](/docs/ml-ai/ai-insights.md) – on-demand professional reports
 - [Troubleshooting](/docs/netdata-ai/troubleshooting/index.md) – alert analysis and anomaly exploration
-- [Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md) – what Netdata AI knows about your infrastructure, and how to teach it more
+- [Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md) – what Netdata AI knows about your environment, and how to teach it more

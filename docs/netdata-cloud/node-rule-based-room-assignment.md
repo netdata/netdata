@@ -1,6 +1,6 @@
 # Node Rule-Based Room Assignment
 
-You can organize Nodes within Rooms automatically using configurable label-based rules. This feature simplifies infrastructure management by dynamically assigning Nodes to appropriate Rooms based on their host labels, eliminating manual intervention.
+You can organize Nodes within Rooms automatically using configurable label-based rules. This feature automates fleet organization by dynamically assigning Nodes to appropriate Rooms based on their host labels, eliminating manual intervention.
 
 ## How It Works
 

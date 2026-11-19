@@ -29,7 +29,7 @@ Jump down to our instructions on [PRs](#making-a-pull-request) for your next ste
 You can create a pull request to add a completely new Markdown document in any of our public repositories.
 After the GitHub pull request is merged, our documentation team will decide where in the documentation hierarchy to publish that document.
 
-If you wish to contribute documentation tailored to your specific infrastructure monitoring/troubleshooting experience, please consider submitting a blog post about your experience.
+If you wish to contribute documentation tailored to your specific observability and troubleshooting experience, please consider submitting a blog post about your experience.
 
 Check out our [blog](https://github.com/netdata/blog#readme) repo! Any blog submissions that have widespread or universal application will be integrated into our permanent documentation.
 

@@ -82,7 +82,7 @@ How the design delivers it:
 - **One data model, [NIDL](/docs/NIDL-Framework.md),** behind every chart, alert and query, so a wrong chart is a bug we fix, not a mistake you made.
 - **Your own data gets the same treatment.** Prometheus and OpenTelemetry metrics are structured through profiles, and application traces become per-service performance charts and a service map, with no dashboard work.
 
-### Machine learning that models your infrastructure
+### Machine learning that models your entire stack
 
 **We use machine learning to model the behavior of the infrastructure and applications. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.**
 
@@ -102,7 +102,7 @@ Alerting stays with rules people can read and reason about. Anomaly rates are da
 How the design delivers it:
 
 - **Machine learning in the core.** Every Agent and Parent models every metric it holds and scores every sample for anomalies as it is collected. There is nothing to export, train or configure.
-- **A scoring engine that finds what matters.** For any time window, Netdata scores every metric across the infrastructure by anomaly severity, by how much it changed against a baseline, and by what changed together with it, and returns a ranked list. The cause usually sits within the first few dozen of thousands of metrics. See the [Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md) and [Metric Correlations](/docs/metric-correlations.md).
+- **A scoring engine that finds what matters.** For any time window, Netdata scores every metric across the stack by anomaly severity, by how much it changed against a baseline, and by what changed together with it, and returns a ranked list. The cause usually sits within the first few dozen of thousands of metrics. See the [Anomaly Advisor](/docs/ml-ai/anomaly-advisor.md) and [Metric Correlations](/docs/metric-correlations.md).
 - **AI that starts from evidence.** Netdata AI and any AI assistant receive the ranked evidence: what stands out, how strongly and what changed together, next to live logs, traces, topology, processes and connections. AI does not have to guess which of millions of series to check, and every metric it reads arrives with its meaning.
 - **Automated root-cause and impact analysis.** Netdata AI investigations trace any question or time window from symptom to cause and to everything it affected, in minutes, on demand or on a schedule.
 - **Open to any AI.** Every Agent, Parent and Netdata Cloud runs an [MCP server](/docs/netdata-ai/mcp/README.md), so the same evidence and the same scoring are available to the AI assistants your team already uses, under the same access controls as the dashboard.

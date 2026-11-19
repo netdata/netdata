@@ -247,7 +247,7 @@ On a freshly installed agent, ML begins detecting anomalies on a metric once its
 - Each 3-hour cycle improves detection quality
 - After 2-3 days, the system reaches steady-state accuracy
 
-**Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the system learns your infrastructure's patterns. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
+**Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the models learn the patterns of your metrics. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
 
 ## Creating Anomaly-Based Health Alerts
 
@@ -312,4 +312,4 @@ The `info` and `summary` fields support template variables that add contextual d
 When an anomaly alert fires, use Netdata's built-in tools to investigate the root cause:
 
 - **[Alert Troubleshooting](/docs/netdata-ai/troubleshooting/index.md)** — generate a one-click report from any fired alert, assessing its validity, uncovering correlated signals, and proposing a root-cause hypothesis
-- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your infrastructure for deeper analysis beyond a single alert
+- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your systems and applications for deeper analysis beyond a single alert

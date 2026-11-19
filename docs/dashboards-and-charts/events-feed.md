@@ -1,6 +1,6 @@
 # Events Tab
 
-The **Events tab** provides a powerful feed that tracks key activities across your infrastructure and Space. It helps you investigate historical events, making it easier to correlate changes with anomalies or node behavior.
+The **Events tab** provides a powerful feed that tracks key activities across your nodes and Space. It helps you investigate historical events, making it easier to correlate changes with anomalies or node behavior.
 
 Use the Events feed to:
 

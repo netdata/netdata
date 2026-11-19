@@ -54,7 +54,7 @@ Connect AI clients to Netdata’s MCP server to bring live observability into na
 
 ### 8) Infrastructure Knowledge
 
-[Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md) is what Netdata AI knows about *your* infrastructure that telemetry cannot show: service tiers, ownership, known behaviours, SLOs. Write it down in a shared document, or simply tell Netdata AI in a conversation and let it remember — every conversation, investigation, and report uses it.
+[Infrastructure Knowledge](/docs/netdata-ai/infrastructure-knowledge.md) is what Netdata AI knows about *your* environment that telemetry cannot show: service tiers, ownership, known behaviours, SLOs. Write it down in a shared document, or simply tell Netdata AI in a conversation and let it remember — every conversation, investigation, and report uses it.
 
 ## Usage and credits
 

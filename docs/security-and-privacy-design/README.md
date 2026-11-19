@@ -14,7 +14,7 @@
 
 This page explains how Netdata designs and operates secure, privacy-respecting services across the Netdata Agent and Netdata Cloud.
 
-Netdata builds security into every layer. You retain control over your observability data while benefiting from powerful real-time monitoring and insights.
+Netdata builds security into every layer. You retain control over your observability data while benefiting from real-time observability and insights.
 
 ## Netdata's Security Principles
 

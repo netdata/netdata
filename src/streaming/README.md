@@ -2,7 +2,7 @@
 
 ## Introduction
 
-This guide covers Netdata's advanced streaming and replication capabilities, which allow you to build centralized observability points across your infrastructure.
+This guide covers Netdata's advanced streaming and replication capabilities, which allow you to build centralized observability points across your environment.
 
 **[Streaming and replication](https://learn.netdata.cloud/docs/developer-and-contributor-corner/glossary#r)** work together to send metrics data from one Netdata Agent (Child) to another Netdata Agent (Parent). Streaming sends metrics in real-time, while replication ensures historical data is copied, as well, maintaining complete data integrity even after connection interruptions.
 
@@ -72,7 +72,7 @@ flowchart TB
 
 - **Efficiency**: Distribute collection workload across multiple nodes while centralizing visualization
 - **Resilience**: Maintain data collection even during network disruptions or Parent node failures
-- **Scalability**: Add more Child nodes or additional Parent nodes as your infrastructure grows
+- **Scalability**: Add more Child nodes or additional Parent nodes as your environment grows
 - **Flexibility**: Configure retention, alerts, and dashboards according to your specific needs
 
 ### Protocol Architecture
@@ -703,7 +703,7 @@ You can enable SSL in the destination setting by adding `:SSL` at the end. Confi
 <summary><strong>Do I need to configure streaming on every Child node?</strong></summary>
 <br/>
 
-Yes, you need to configure each Child node with its own streaming configuration. However, you can use configuration management tools to deploy a standard configuration across your infrastructure, making this process more efficient.
+Yes, you need to configure each Child node with its own streaming configuration. However, you can use configuration management tools to deploy a standard configuration across your nodes, making this process more efficient.
 
 </details>
 

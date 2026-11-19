@@ -15,7 +15,7 @@ Find bottlenecks before users notice. The Performance Optimization report analyz
 1. Open the `Insights` tab in Netdata Cloud
 2. Select `Performance Optimization`
 3. Choose a window (e.g., last 24h, 7d, 30d, or custom)
-4. Scope to infrastructure segments (rooms/spaces) or services of interest
+4. Scope to Rooms, Spaces or services of interest
 5. Click `Generate`
 
 ## What’s analyzed

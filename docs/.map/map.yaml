@@ -3,12 +3,17 @@ sidebar:
   - meta:
       label: Welcome to Netdata
       edit_url: https://github.com/netdata/netdata/edit/master/docs/welcome-to-netdata.md
-      description: Start here. What it is like to work with Netdata, the principles behind it, who it is for, how Agents, Parents and Netdata Cloud fit together, how to get started and where to go next.
+      description: Start here. Netdata is full-stack observability, the AI SRE that learns your stack. What it is like to work with Netdata, the principles behind it, who it is for, how Agents, Parents and Netdata Cloud fit together, how to get started and where to go next.
       keywords:
         - netdata
         - observability platform
+        - full-stack observability
+        - AI SRE
         - getting started
-        - monitoring
+        - OpenTelemetry
+        - APM
+        - network monitoring
+        - infrastructure monitoring
     items:
       - meta:
           label: Netdata Design
@@ -42,7 +47,7 @@ sidebar:
       - meta:
           label: Scalability
           edit_url: https://github.com/netdata/netdata/edit/master/docs/scalability.md
-          description: See how Netdata scales from one node to large infrastructures with distributed processing, per-second metrics, and horizontal Parent clusters.
+          description: See how Netdata scales from one node to 100,000+ nodes with distributed processing, per-second metrics, and horizontal Parent clusters.
       - meta:
           label: Monitor Anything
           edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/COLLECTORS.md
@@ -53,7 +58,7 @@ sidebar:
       - meta:
           label: Reporting
           edit_url: https://github.com/netdata/netdata/edit/master/docs/reporting.md
-          description: Extract infrastructure insights for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms.
+          description: Turn observability data into reports for stakeholders and BI tools using AI Insights, AI assistants (MCP), Grafana, or data export to Power BI, Tableau, and other analytics platforms.
           keywords:
             - power bi
             - tableau
@@ -148,7 +153,7 @@ sidebar:
           - meta:
               label: Ansible
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/ansible.md
-              description: Deploy an infrastructure monitoring solution in minutes with the Netdata Agent and Ansible. Use and customize a simple playbook for monitoring as code.
+              description: Deploy Netdata across your fleet in minutes with Ansible. Customize the playbook to manage Netdata as code.
           - meta:
               label: AWS
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/aws.md
@@ -235,7 +240,7 @@ sidebar:
           - meta:
               label: Securing Agents
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-agent/securing-netdata-agents.md
-              description: Your data and systems are safe with Netdata, but we recommend a few easy ways to improve the security of your infrastructure.
+              description: Your data and systems are safe with Netdata, but we recommend a few steps to harden your Netdata deployment.
             items:
               - meta:
                   label: Web Server Reference

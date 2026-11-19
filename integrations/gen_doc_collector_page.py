@@ -450,7 +450,7 @@ def _render_tech_navigation() -> str:
 
     return f"""### Find Your Technology
 
-**Select your primary infrastructure to jump directly to relevant integrations:**
+**Select your technology to jump directly to relevant integrations:**
 
 {tech_section}
 {generic_link}

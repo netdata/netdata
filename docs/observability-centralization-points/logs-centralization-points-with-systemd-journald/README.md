@@ -77,7 +77,7 @@ The logs centralization points and the metrics centralization points do not need
 
 :::
 
-## Centralization does not have to be infrastructure-wide
+## Centralization does not have to cover every node
 
 A centralization point can cover any slice of your estate, and different slices can use different technologies:
 

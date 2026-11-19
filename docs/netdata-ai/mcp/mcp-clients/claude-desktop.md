@@ -1,6 +1,6 @@
 # Claude Desktop
 
-Configure Claude Desktop to access your Netdata infrastructure through MCP.
+Configure Claude Desktop to access your Netdata observability data through MCP.
 
 ## Transport Support
 
@@ -17,7 +17,7 @@ Claude Desktop launches MCP servers as child processes over `stdio` (the only tr
 ## Prerequisites
 
 1. **Claude Desktop installed** - Download from [claude.ai/download](https://claude.ai/download)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 3. **Bridge required: Choose one:**
@@ -48,7 +48,7 @@ Claude Desktop supports MCP servers through two methods: Custom Connectors for r
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local Netdata setup
 or firewall changes needed.
 
@@ -182,7 +182,7 @@ Replace in all examples:
 
 ## Usage Examples
 
-Simply ask Claude about your infrastructure:
+Ask Claude about your systems, applications and network:
 
 ```
 What's the current CPU usage across all my servers?

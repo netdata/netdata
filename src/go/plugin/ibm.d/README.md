@@ -140,7 +140,7 @@ values on pre-7.4 systems.
 Network interface metrics have a fixed internal limit of 50 instances, and HTTP server metrics are capped at 200 instances; these limits are currently not configurable.
 
 
-This collector is part of the [Netdata](https://github.com/netdata/netdata) monitoring solution.
+This collector is part of [Netdata](https://github.com/netdata/netdata), a full-stack observability platform.
 
 ## Collected metrics
 

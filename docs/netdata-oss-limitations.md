@@ -21,7 +21,7 @@ Netdata functions can expose sensitive system information:
 - **System logs** may contain application errors, security events, and debugging information with sensitive context
 - **Database queries** can reveal query patterns, table structures, and potentially sensitive data in error messages
 
-Without authentication, anyone who can reach the Netdata dashboard could access this information. The access control system ensures that sensitive data is only available to authenticated users who belong to the same Netdata Cloud Space as the monitored infrastructure.
+Without authentication, anyone who can reach the Netdata dashboard could access this information. The access control system ensures that sensitive data is only available to authenticated users who belong to the same Netdata Cloud Space as the monitored nodes.
 
 ## Feature Availability by Access Level
 
@@ -97,7 +97,7 @@ Functions provide on-demand, detailed information beyond standard metrics.
 
 Netdata provides MCP in two ways:
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires a Paid plan)
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — access to all your nodes (requires a Paid plan)
 - **Agent/Parent MCP** — available directly at Netdata Agents and Parents, free and open-source
 
 When accessing Netdata via Agent/Parent MCP:

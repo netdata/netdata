@@ -1,12 +1,12 @@
 # Getting Started with Netdata
 
-## Transform Your Infrastructure Monitoring in Minutes, Not Weeks
+## Full-Stack Observability in Minutes, Not Weeks
 
-Netdata Cloud gives you complete visibility into every system and application performance metric across your entire infrastructure, whether it's on-premises or in the cloud. Bring teams together to find answers faster and squash the threat of anomalies or outages with composite charts, metric correlations, pre-built and custom dashboards, intelligent alarms, and collaboration tools to help you drive down your time to resolution.
+Netdata is full-stack observability, the AI SRE that learns your stack: infrastructure, applications, networks, databases, logs and cloud, from a single node to 100,000+ nodes. Netdata Cloud brings every metric, log and trace from all your nodes into one view, on-premises or in the cloud. Bring teams together to find answers faster and squash the threat of anomalies or outages with composite charts, metric correlations, pre-built and custom dashboards, intelligent alarms, and collaboration tools to help you drive down your time to resolution.
 
 :::tip
 
-This guide will show you how simple it is to get started with Netdata and experience the instant value of real-time observability.
+This guide takes you from sign-up to a connected node, dashboards, alerts and your team, in a few minutes.
 
 :::
 
@@ -46,17 +46,17 @@ unhideme-->
 
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
 
-Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata.cloud/) and creating your account.
+Visit [app.netdata.cloud](https://app.netdata.cloud/) and create your account.
 
 **What happens next:**
 
 - Your personalized Space is automatically created
-- You get your central hub for all monitoring needs
+- You get one place for all your observability data
 - The dashboard is ready to receive your first node
 
 :::info
 
-**Why Cloud Connection is Essential:** Starting with Netdata v2.0, all dashboards use Netdata Cloud for authentication, providing enhanced security and unified experience across all platforms. This unlocks enterprise-grade monitoring capabilities for deployments of any size.
+**Why Cloud Connection is Essential:** Starting with Netdata v2.0, all dashboards use Netdata Cloud for authentication, providing enhanced security and unified experience across all platforms. This gives every deployment, of any size, the same full-stack observability.
 
 :::
 
@@ -78,7 +78,7 @@ bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN
 - Automatically detects your operating system
 - Installs the latest Netdata Agent
 - Connects to your Cloud Space
-- Starts monitoring immediately
+- Starts collecting immediately
 
 </details>
 
@@ -99,7 +99,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 **Automatic Dashboards:**
 
 - **[Overview charts](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md#how-the-dashboard-is-organized)** - Automatically arranged at the start of every dashboard section to summarize its metrics
-- **Nodes Tab** - Unified view of all infrastructure with key metrics
+- **Nodes Tab** - Unified view of all your nodes with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
 - **Real-Time Updates** - Every metric updates with 1-second granularity
 
@@ -113,14 +113,14 @@ Netdata automatically discovers and monitors:
 - **Applications** - 2,000+ integrations available
 
 **[Metric Correlations](/docs/metric-correlations.md):**
-Click the correlation button on any chart to instantly find related metrics that help diagnose issues - turning complex troubleshooting into point-and-click simplicity.
+Click the correlation button on any chart to instantly find related metrics that help diagnose issues, across every metric of every node.
 
 ## [4. Customize & Set New Alerts](/src/health/REFERENCE.md)
 
 **Out-of-the-Box Alerts:**
-Netdata comes with intelligent alerts pre-configured for common issues. But you can easily customize them.
+Netdata comes with intelligent alerts pre-configured for common issues, and you can customize every one of them.
 
-**Simple Alert Customization:**
+**Alert Customization:**
 Navigate to your node and click "Edit" on any alert to modify thresholds:
 
 ```bash
@@ -168,7 +168,7 @@ Configure alerts to reach you through:
 
 :::
 
-## [5. Organize Your Infrastructure & Invite Your Team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md)
+## [5. Organize Your Nodes & Invite Your Team](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md)
 
 **Spaces and Rooms:**
 
@@ -205,9 +205,9 @@ Click "Invite Users" in your Space sidebar to add team members and assign each o
 - **Cancel anytime** - No commitments
 - **[Expert support](https://www.netdata.cloud/support/)** - Get help when you need it
 
-### Traditional Monitoring vs Netdata
+### Traditional Observability vs Netdata
 
-| **Traditional Monitoring**                       |        | **Netdata**                                        |
+| **Traditional Observability**                    |        | **Netdata**                                        |
 |--------------------------------------------------|:------:|----------------------------------------------------|
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
@@ -217,7 +217,7 @@ Click "Invite Users" in your Space sidebar to add team members and assign each o
 
 ### [AI Capabilities That Transform Operations](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
 
-Experience the future of infrastructure monitoring with AI that actually works. Chat with your infrastructure in natural language, get professional reports in minutes, and let machine learning find problems before they impact your users. From automated troubleshooting to predictive insights, Netdata's AI capabilities turn complex monitoring into simple conversations.
+Netdata is an AI SRE built on full-stack observability. Machine learning scores every metric for anomalies every second, and Netdata's AI investigates across metrics, logs, traces, flows and topology. Ask questions in natural language, get professional reports in minutes, and find problems before they impact your users.
 
 **AI Features Overview:**
 
@@ -234,9 +234,9 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 <details>
 <summary><strong>AI Chat with Netdata</strong></summary><br/>
 
-Transform troubleshooting from complex queries to natural conversation. Ask questions like "Which servers have high CPU usage?" or "Show database errors from last hour" or "What is wrong with my infrastructure now?"
+Transform troubleshooting from complex queries to natural conversation. Ask questions like "Which servers have high CPU usage?" or "Show database errors from last hour" or "What is wrong with my systems now?"
 
-**Why this matters:** No more complex queries or dashboard hunting - get instant answers about performance, find specific logs, identify top resource consumers, or investigate issues through simple conversation.
+**Why this matters:** No more complex queries or dashboard hunting - get instant answers about performance, find specific logs, identify top resource consumers, or investigate issues in plain language.
 
 **How it works:** Multi-node visibility through Netdata Parents, flexible AI options including cloud providers (Claude, GPT-4, Gemini, DeepSeek) and self-hosted providers (Ollama), with real-time access to metrics, logs, processes, network connections, and system state.
 
@@ -245,7 +245,7 @@ Transform troubleshooting from complex queries to natural conversation. Ask ques
 <details>
 <summary><strong>Model Context Protocol (MCP) Integration</strong></summary><br/>
 
-MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
+MCP is available via Netdata Cloud for access to all your nodes (Paid plan) and on every Agent/Parent for direct local access (free, open-source), enabling seamless integration with AI assistants for natural language queries and automated analysis.
 
 **Why this matters:** Use your existing AI tools or our standalone web chat with your choice of cloud or self-hosted LLM provider. Query live metrics, logs, processes, network connections, and system state securely.
 
@@ -258,11 +258,11 @@ MCP is available via Netdata Cloud for infrastructure-wide access (Paid plan) an
 <details>
 <summary><strong>AI DevOps Copilot</strong></summary><br/>
 
-Transform observability into action with CLI AI assistants. Combine the power of AI with system automation for intelligent infrastructure optimization.
+Transform observability into action with CLI AI assistants. Combine the power of AI with system automation to optimize your systems and applications.
 
 **Why this matters:** CLI-based AI assistants like Claude Code and Gemini CLI can access your Netdata metrics and execute commands, enabling observability-driven automation, automated troubleshooting, and configuration management driven by real observability data.
 
-**Key capabilities:** Observability-driven automation where AI analyzes metrics and executes fixes, infrastructure optimization with automatic tuning based on performance data, intelligent troubleshooting from problem detection to resolution, and AI-generated configs based on actual usage.
+**Key capabilities:** Observability-driven automation where AI analyzes metrics and executes fixes, optimization with automatic tuning based on performance data, intelligent troubleshooting from problem detection to resolution, and AI-generated configs based on actual usage.
 
 </details>
 
@@ -273,7 +273,7 @@ Transform observability into action with CLI AI assistants. Combine the power of
 
 Generate comprehensive reports in 2-3 minutes that explain what happened, why it happened, and what to do about it. Transform past data into actionable insights with AI-generated reports.
 
-**Why this matters:** Perfect for capacity planning, performance reviews, and executive briefings. Get comprehensive analysis of your infrastructure trends, optimization opportunities, and future requirements in professionally formatted PDFs.
+**Why this matters:** Perfect for capacity planning, performance reviews, and executive briefings. Get comprehensive analysis of your system and application trends, optimization opportunities, and future requirements in professionally formatted PDFs.
 
 **Four report types:**
 
@@ -291,11 +291,11 @@ Generate comprehensive reports in 2-3 minutes that explain what happened, why it
 <details>
 <summary><strong>Anomaly Advisor</strong></summary><br/>
 
-Revolutionary troubleshooting that finds root causes in minutes. Stop guessing what went wrong - the Anomaly Advisor instantly shows you how problems cascade across your infrastructure.
+Revolutionary troubleshooting that finds root causes in minutes. Stop guessing what went wrong - the Anomaly Advisor instantly shows you how problems cascade across systems, networks and applications.
 
 **Why this matters:** Root causes typically appear in the top 20-30 results, turning hours of investigation into minutes of discovery. See cascading effects as anomalies propagate across systems with automatic ranking of every metric by anomaly severity.
 
-**Revolutionary approach:** Data-driven analysis with no hypotheses needed, influence tracking showing what influenced and what was influenced, works identically from 10 to 10,000 nodes, visual propagation of anomaly clusters and cascades.
+**Revolutionary approach:** Data-driven analysis with no hypotheses needed, influence tracking showing what influenced and what was influenced, works identically from 10 to 100,000+ nodes, visual propagation of anomaly clusters and cascades.
 
 </details>
 
@@ -317,13 +317,13 @@ The foundation of Netdata's AI capabilities. Machine learning models run locally
 **What Happens Next:**
 
 1. **Sign up for your free trial** - No credit card required
-2. **Connect your Agents** - Use the simple one-command installation
+2. **Connect your Agents** - Use the one-command installation
 3. **Experience real-time observability** - 1-second granularity across all metrics
-4. **Try AI-powered features** - Chat with your infrastructure and generate insights
-5. **Build as many dashboards as you need** - Create the monitoring views your team needs
+4. **Try AI-powered features** - Chat with your systems and applications and generate insights
+5. **Build as many dashboards as you need** - Create the views your team needs
 6. **Set up team access** - Invite colleagues and configure permissions
 
-**Transform your infrastructure monitoring today. Your future self and your team will thank you.**
+**Start with Netdata today. Your future self and your team will thank you.**
 
 **[Start Free Trial](https://netdata.cloud/pricing)**
 

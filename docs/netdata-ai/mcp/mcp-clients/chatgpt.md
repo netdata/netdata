@@ -1,6 +1,6 @@
 # ChatGPT
 
-Configure the ChatGPT desktop app to access your Netdata infrastructure through MCP.
+Configure the ChatGPT desktop app to access your Netdata observability data through MCP.
 
 ## Transport Support
 
@@ -19,7 +19,7 @@ The ChatGPT desktop app adds custom MCP servers from its settings, with these tr
      ([create one](/docs/netdata-cloud/authentication-and-authorization/api-tokens.md))
    - **Netdata Agent or Parent** v2.6.0 or later, reachable from the computer running ChatGPT, and its MCP API key
      ([find your Netdata MCP API key](/docs/netdata-ai/mcp/README.md#finding-your-api-key)). Prefer a Netdata Parent
-     for infrastructure-level visibility.
+     for visibility across all its nodes.
 
 ## Add Netdata to ChatGPT
 
@@ -28,7 +28,7 @@ form opens.
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure through a single endpoint, with no local setup, bridges or firewall
+Connect to all your Netdata Cloud nodes through a single endpoint, with no local setup, bridges or firewall
 changes.
 
 | Field | Value |
@@ -73,7 +73,7 @@ launched from, then restart the app. If the app cannot see the variable, use the
 
 ## Using Netdata in ChatGPT
 
-Ask about your infrastructure in plain language:
+Ask about your systems, applications and network in plain language:
 
 ```text
 Which nodes have the highest CPU utilization right now?

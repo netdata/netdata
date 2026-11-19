@@ -1,6 +1,6 @@
 # Infrastructure Summary
 
-The Infrastructure Summary report synthesizes the last hours, days, or weeks of your infrastructure into a concise, shareable narrative. It combines critical timelines, anomaly context, alert analysis, and actionable recommendations so your team can quickly align on what happened and what to do next.
+The Infrastructure Summary report synthesizes the last hours, days, or weeks of your systems and applications into a concise, shareable narrative. It combines critical timelines, anomaly context, alert analysis, and actionable recommendations so your team can quickly align on what happened and what to do next.
 
 ![Infrastructure Summary tab](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/infrastructure-summary.png)
 
@@ -9,7 +9,7 @@ The Infrastructure Summary report synthesizes the last hours, days, or weeks of 
 - Monday morning recap of weekend incidents and health trends
 - Post-incident executive summary for leadership and stakeholders
 - Weekly team handoff and situational awareness
-- Baseline health before planned infrastructure changes
+- Baseline health before planned changes
 
 ## How to generate
 

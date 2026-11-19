@@ -61,7 +61,7 @@ Netdata is distributed and real-time. Netdata Agents collect, store and analyze 
 * **Everything, every second** – Netdata collects everything, every second, and engineers the cost down (about 0.6 bytes per sample) until choosing what to watch is no longer necessary.
 * **Independent hubs, not a central database** – Data stays close to where it is created, in independent hubs you place where they make sense. Netdata Cloud unifies and correlates them, and Netdata scales to 100,000+ nodes.
 * **Meaning at collection time** – Every piece of data gets its meaning when it is collected, so dashboards build themselves and every chart is correct.
-* **Machine learning that models your infrastructure** – Every metric is scored for anomalies every second. Clusters of anomalies reveal hidden dependencies, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
+* **Machine learning that models your entire stack** – Every metric is scored for anomalies every second. Clusters of anomalies reveal hidden dependencies, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
 * **AI at the core** – Machine learning, a scoring engine and AI work together to deliver automated root-cause and impact analysis. MCP servers give any AI assistant the same evidence.
 * **Expertise built in** – No query language and nothing to administer: the expertise is built into the product, so the whole team can investigate.
 * **Configured your way** – Automatic first, then as code, from the dashboard, or both.
@@ -300,8 +300,8 @@ With the Netdata Agent, you can use these core capabilities out-of-the-box:
 | **Visualization**            | • NIDL data model<br>• Auto-generated dashboards<br>• No query language needed                                                                |
 | **Alerting**                 | • 1,100+ stock alerts and your own<br>• Multiple notification methods<br>• Evaluated on every Agent, without Netdata Cloud                    |
 | **AI and MCP**               | • MCP server on every Agent and Parent<br>• Any AI assistant can query metrics, logs, alerts and live views                                   |
-| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Easy scalability<br>• CI/CD friendly                                                                 |
-| **Extensibility**            | • Modular architecture<br>• Easy to customize<br>• Integrates with existing tools                                                             |
+| **Operations**               | • Auto-detection<br>• Zero-touch ML<br>• Scales to 100,000+ nodes<br>• CI/CD friendly                                                                 |
+| **Extensibility**            | • Modular architecture<br>• Configurable as code, from the UI, or both<br>• Integrates with existing tools                                                             |
 
 ---
 

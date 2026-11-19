@@ -38,7 +38,7 @@ Your nodes using Dynamic Configuration Manager require a connection to Netdata C
 | Test configurations before deployment    | Validate settings to prevent errors                                                           |
 | Create alert templates                   | Build reusable alert definitions                                                              |
 | Apply templates to instances or contexts | Target specific services or apply broadly                                                     |
-| Deploy to multiple nodes simultaneously  | Ensure consistency across your infrastructure                                                 |
+| Deploy to multiple nodes simultaneously  | Ensure consistency across your nodes                                                          |
 | Manage Health tab alert templates        | Create configurations for templates and individual alerts that apply to instances or contexts |
 
 :::info
@@ -253,7 +253,7 @@ or restarting a discovered job does not adopt it. See [Secrets Management](/src/
 
 **What You'll Learn**
 
-How to deploy configurations to multiple nodes simultaneously, saving time and ensuring consistency across your infrastructure.
+How to deploy configurations to multiple nodes simultaneously, saving time and ensuring consistency across your nodes.
 
 :::
 

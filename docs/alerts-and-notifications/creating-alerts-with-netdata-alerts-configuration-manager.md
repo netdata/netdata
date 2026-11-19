@@ -66,7 +66,7 @@ You can define how Netdata should query the data before triggering an alert:
 
 ### Filtering Targets
 
-You can limit your alert to specific infrastructure components:
+You can limit your alert to specific nodes, instances or labels:
 
 - Hosts
 - Nodes

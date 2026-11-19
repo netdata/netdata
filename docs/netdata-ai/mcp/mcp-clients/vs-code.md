@@ -1,6 +1,6 @@
 # VS Code
 
-Configure Visual Studio Code extensions to access your Netdata infrastructure through MCP.
+Configure Visual Studio Code extensions to access your Netdata observability data through MCP.
 
 ## Available Extensions
 
@@ -30,7 +30,7 @@ VS Code extensions typically support stdio-based MCP servers:
 
 1. **VS Code installed** - [Download VS Code](https://code.visualstudio.com)
 2. **MCP-compatible extension** - Install from VS Code Marketplace
-3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Can use `npx mcp-remote` bridge for HTTP/SSE support
 4. **Bridge required: Choose one:**
@@ -44,7 +44,7 @@ VS Code extensions typically support stdio-based MCP servers:
 
 ## Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -392,7 +392,7 @@ Create snippets that include metric checks:
 
 ### Development Workflow
 
-1. Start coding with infrastructure context
+1. Start coding with observability context
 2. Check metrics before optimization
 3. Validate changes against production data
 4. Monitor impact of deployments

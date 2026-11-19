@@ -1,6 +1,6 @@
 # AI Chat with Netdata
 
-Chat with your infrastructure using natural language through two distinct integration architectures. The LLM powering the conversation can be a cloud service — such as OpenAI, Anthropic, or DeepSeek — or a self-hosted provider like Ollama running on your own infrastructure.
+Chat with your systems and applications using natural language through two distinct integration architectures. The LLM powering the conversation can be a cloud service — such as OpenAI, Anthropic, or DeepSeek — or a self-hosted provider like Ollama running on your own infrastructure.
 
 ## Integration Architecture
 
@@ -121,7 +121,7 @@ flowchart TB
 
 - Same client-controlled architecture as Method 1, but with a cloud-hosted MCP endpoint
 - No direct network access to Netdata Agents required
-- Complete visibility across all nodes in your infrastructure
+- Complete visibility across all your nodes
 - Any MCP-aware client can connect
 
 ## Quick Comparison
@@ -132,7 +132,7 @@ flowchart TB
 | **Data Privacy** | Depends on LLM provider | Depends on LLM provider |
 | **Internet Requirements** | AI client needs internet, MCP is local | Both AI client and MCP need internet |
 | **Supported AI Clients** | Any MCP-aware client | Any MCP-aware client |
-| **Infrastructure Access** | One Agent or Parent's scope | All infrastructure |
+| **Node Access** | One Agent or Parent's scope | All nodes |
 | **Network Access** | Direct access to Netdata IP | No firewall changes |
 
 To get started with Method 2, see

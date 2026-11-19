@@ -4,7 +4,7 @@ Analyze your metrics in-depth with Netdata's Expanded Chart Analysis feature. Ac
 
 ## Overview
 
-The Expanded Chart Analysis feature provides an analytical panel below your charts. It gives you four ways to investigate your data: view detailed statistics, explore hierarchical relationships, compare time periods, and discover correlated metrics across your infrastructure.
+The Expanded Chart Analysis feature provides an analytical panel below your charts. It gives you four ways to investigate your data: view detailed statistics, explore hierarchical relationships, compare time periods, and discover correlated metrics across your stack.
 
 No query language required—everything works with point-and-click.
 
@@ -35,7 +35,7 @@ Switch between modes by clicking the icons in the panel header. Each mode is des
 | **Chart Values**      | 📊   | Viewing detailed statistics for all dimensions     |
 | **Drill Down**        | 🔽   | Exploring which nodes or instances contribute most |
 | **Compare Periods**   | 📈   | Comparing current metrics with historical data     |
-| **Correlate Metrics** | 🔗   | Finding related metrics across your infrastructure |
+| **Correlate Metrics** | 🔗   | Finding related metrics across your stack          |
 
 ### Chart Values
 
@@ -80,7 +80,7 @@ Use Chart Values when investigating spikes to see which specific dimensions are 
 
 ### Drill Down
 
-Explore hierarchical relationships in your infrastructure. This mode organizes metrics into a three-level tree:
+Explore hierarchical relationships in your data. This mode organizes metrics into a three-level tree:
 
 ![drill down](https://raw.githubusercontent.com/netdata/docs-images/7a86c33450c24df340b7381c2c9587f332ad0c04/expanded-analysis/Drill%20Down.png)
 
@@ -192,7 +192,7 @@ Use Compare Periods to identify growth trends over time. Review Avg values acros
 
 ### Correlate Metrics
 
-Discover which metrics across your infrastructure correlate with the current chart's behavior. This mode shows you metrics that follow similar patterns, helping you find related issues.
+Discover which metrics across your stack correlate with the current chart's behavior. This mode shows you metrics that follow similar patterns, helping you find related issues.
 
 ![correlate metrics](https://raw.githubusercontent.com/netdata/docs-images/7a86c33450c24df340b7381c2c9587f332ad0c04/expanded-analysis/Correlate.png)
 
@@ -242,7 +242,7 @@ Click any metric row to navigate to that chart and investigate further.
 
 **When to use this mode:**
 
-Use Correlate Metrics when investigating a spike or anomaly. Highlight the problem period, switch to Selected Area tab, and review correlated metrics to find related issues across your infrastructure.
+Use Correlate Metrics when investigating a spike or anomaly. Highlight the problem period, switch to Selected Area tab, and review correlated metrics to find related issues across your stack.
 
 ## Highlight a Time Range
 

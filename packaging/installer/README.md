@@ -1,6 +1,6 @@
 # Netdata Agent Installation
 
-Netdata is very flexible and can be used to monitor all kinds of infrastructure. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suites your needs.
+Netdata is a full-stack observability platform. Install the Agent on any system, then choose a deployment strategy that fits your scale. Read more about possible [Deployment guides](/docs/deployment-guides/README.md) to understand what better suites your needs.
 
 ## Install through Netdata Cloud
 
@@ -21,7 +21,7 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 **Linux** - Install on any Linux distribution
 [→ Install on Linux](/packaging/installer/methods/kickstart.md)
 
-**Windows** - Native Windows monitoring agent
+**Windows** - Native Windows Netdata Agent
 [→ Install on Windows](/packaging/windows/WINDOWS_INSTALLER.md)
 
 **macOS** - Monitor your Mac systems

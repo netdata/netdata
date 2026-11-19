@@ -2,7 +2,7 @@
 
 ## Overview
 
-Custom Investigations let you ask open-ended questions about your infrastructure and receive deeply researched reports powered by AI. Unlike traditional dashboards or query languages, this conversational interface analyzes your real-time, high-fidelity data to answer complex operational questions in minutes.
+Custom Investigations let you ask open-ended questions about your systems and applications and receive deeply researched reports powered by AI. Unlike traditional dashboards or query languages, this conversational interface analyzes your real-time, high-fidelity data to answer complex operational questions in minutes.
 
 ### When to Use Custom Investigations
 

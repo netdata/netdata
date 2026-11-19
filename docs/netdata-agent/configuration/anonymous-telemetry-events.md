@@ -1,6 +1,6 @@
 # Anonymous telemetry events
 
-By default, Netdata collects anonymous usage information from the open-source monitoring Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry on the dashboard itself, the dashboard loads third-party services: [PostHog](https://github.com/PostHog/posthog) for product analytics, Google Tag Manager, Reo.dev and Sentry for error reporting.
+By default, Netdata collects anonymous usage information from the open-source Netdata Agent. For events like start, stop, crash, etc., we use our own cloud function in GCP. For frontend telemetry on the dashboard itself, the dashboard loads third-party services: [PostHog](https://github.com/PostHog/posthog) for product analytics, Google Tag Manager, Reo.dev and Sentry for error reporting.
 
 We are strongly committed to your [data privacy](https://netdata.cloud/privacy/).
 
