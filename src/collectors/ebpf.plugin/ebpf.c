@@ -1962,8 +1962,10 @@ static void ebpf_initialize_data_sharing()
 
     switch (integration_with_collectors) {
         case NETDATA_EBPF_INTEGRATION_SHM:
-            // `pid table size` from [global] is applied to every module.
-            if (netdata_integration_initialize_shm(ebpf_modules[EBPF_MODULE_SYNC_IDX].pid_map_size)) {
+            // The pool serves every module, so it takes the [global] `pid table size`
+            // rather than one module's value, which its own .conf may override.
+            if (netdata_integration_initialize_shm((uint32_t)inicfg_get_number(
+                    &collector_config, EBPF_GLOBAL_SECTION, EBPF_CFG_PID_SIZE, ND_EBPF_DEFAULT_PID_SIZE))) {
                 ebpf_set_apps_mode(NETDATA_EBPF_APPS_FLAG_NO);
                 ebpf_disable_cgroups();
             }

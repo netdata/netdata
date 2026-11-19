@@ -856,7 +856,7 @@ modules:
               default_value: 10
               required: false
             - name: ebpf load mode
-              description: "Selects whether the error charts are published. `entry` collects and charts only the call counts; `return` and its legacy alias `dev` additionally publish `system.task_error` and the per-application and per-cgroup error charts. Attachment is unaffected: the return-probe objects are always loaded, so switching modes costs nothing at collection time."
+              description: "Selects whether the error charts are published. The error counters are collected in every mode; `entry` charts only the call counts, while `return` and its legacy alias `dev` additionally publish `system.task_error` and the per-application and per-cgroup error charts. Attachment is unaffected: the return-probe objects are always loaded, so switching modes costs nothing at collection time."
               default_value: entry
               required: false
             - name: apps
@@ -915,14 +915,14 @@ modules:
           labels: []
           metrics:
             - name: system.process_thread
-              description: "Tasks started. `process` counts every new task (fork, clone and exec); `thread` counts the subset that are threads."
+              description: "Tasks started. `process` counts every new task (fork, clone and exec); `thread` counts the subset that are threads. As in the C implementation, each sample is the count for one collection interval (`update every`), not normalized to one second despite the unit."
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: process
                 - name: thread
             - name: system.exit
-              description: "Tasks that started exiting (`process`) and tasks whose resources were released (`task`)."
+              description: "Tasks that started exiting (`process`) and tasks whose resources were released (`task`). Each sample is the count for one collection interval, not normalized to one second."
               unit: "calls/s"
               chart_type: line
               dimensions:
@@ -936,14 +936,14 @@ modules:
                 - name: process
                 - name: zombie
             - name: system.task_error
-              description: "Process and thread creation calls that returned an error. Published only in the non-entry load modes, `ebpf load mode = return` and its legacy alias `dev`."
+              description: "Task creation calls that returned an error, counted per collection interval. Every failed fork or clone, including thread creation, is counted in `process`; the eBPF programs do not tell thread failures apart, so `thread` stays at zero. Published only in the non-entry load modes, `ebpf load mode = return` and its legacy alias `dev`."
               unit: "calls/s"
               chart_type: line
               dimensions:
                 - name: process
                 - name: thread
             - name: ebpf.process_arena_drops
-              description: "Per-PID events dropped by the Process arena queue. Published only when the arena object is active."
+              description: "Per-PID events dropped by the Process arena queue. Published only when the arena object is active. The arena object is used only for host-wide collection (`apps` and `cgroups` disabled), when no per-PID events are produced, so a zero value is not a drop diagnostic."
               unit: "events/s"
               chart_type: line
               dimensions:
