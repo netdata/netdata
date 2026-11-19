@@ -27,7 +27,9 @@ run the installation procedures in linked operator docs. Action boundaries remai
 1. Map the complete path from entrypoint to installed helper and service. Record which account runs each step,
    which paths it can traverse/execute, how arguments/environment survive privilege elevation, and how callers
    interpret exit statuses. A root-only helper test does not prove access by the service account; a correct child
-   failure can still trigger the wrong caller cleanup or fallback.
+   failure can still trigger the wrong caller cleanup or fallback. BusyBox hosts (Alpine static) have `su` but no
+   `runuser`; DEM pairing's root-to-service-account switch MUST fall back to
+   `su -s /bin/sh -c 'exec "$0" "$@"' -- <user> env PATH="$PATH" ...` (`dem_pair_as_user`) and be exercised on Alpine.
 2. Separate shipped content from retained configuration, data and runtime ownership records. Inspect the existing
    cleanup and permission owners before changing them. Preserve preexisting prefixes on failed updates, including
    symlinked prefixes; distinguish them from newly created partial installations. For static/source state boundaries,
