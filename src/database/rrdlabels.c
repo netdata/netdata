@@ -863,9 +863,10 @@ size_t rrdlabels_common_count(RRDLABELS *labels1, RRDLABELS *labels2)
     RRDLABEL *label;
     RRDLABEL_SRC ls;
 
-    // Callers pass the same two label sets in either order (health scores an alert's chart
-    // against a variable's chart, /api/v1/alarm_variables does the reverse), so take the
-    // locks in address order to avoid an AB/BA deadlock.
+    // The same two label sets reach here in opposite order from different threads: health
+    // passes (chart of the alert being evaluated, chart of a referenced alert), while
+    // /api/v1/alarm_variables for that referenced chart passes (chart of the other alert,
+    // requested chart). Take the locks in address order to avoid an AB/BA deadlock.
     RRDLABELS *first = labels1, *second = labels2;
     if ((uintptr_t)first > (uintptr_t)second) {
         first = labels2;
