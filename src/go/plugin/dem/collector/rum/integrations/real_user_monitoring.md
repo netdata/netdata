@@ -962,9 +962,9 @@ No additional configuration is required.
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
 | Virtual node name (`vnode`) | string | Only sites of the configured virtual node with this name. An empty or unknown name is an error. Do not combine with `vnode_guid`. | no |  |  |
-| Virtual node GUID (`vnode_guid`) | string | Only data recorded under the virtual node with this GUID. Do not combine with `vnode`. | no |  |  |
+| Virtual node GUID (`vnode_guid`) | string | Only events recorded under this virtual node GUID. Use `unassigned` for events recorded without a virtual node. Omit both virtual node selectors for all events. Use either `vnode_guid` or `vnode` per request. | no |  |  |
 | Site (`site`) | string | Only this site, by its site key. | no |  |  |
-| Cursor (`cursor`) | string | The `next` value of the previous response, unchanged. Empty returns the most recent events. The cursor keeps a position for each site, so a busy site never skips a quiet site's events; a site whose job restarted or was replaced starts a new stream, from that job's first events. | no |  |  |
+| Cursor (`cursor`) | string | The `next` value of the previous response, unchanged. Empty starts at the oldest event still held. The cursor keeps a position for each site. Changing the virtual node selection starts over. A site whose job restarted or was replaced starts a new stream from that job's first events. | no |  |  |
 
 #### Returns
 
@@ -1118,7 +1118,7 @@ No additional configuration is required.
 | Parameter | Type | Description | Required | Default | Options |
 |:---------|:-----|:------------|:--------:|:--------|:--------|
 | Virtual node name (`vnode`) | string | Only sites of the configured virtual node with this name. An empty or unknown name is an error. Do not combine with `vnode_guid`. | no |  |  |
-| Virtual node GUID (`vnode_guid`) | string | Only data recorded under the virtual node with this GUID. Do not combine with `vnode`. | no |  |  |
+| Virtual node GUID (`vnode_guid`) | string | Only events recorded under this virtual node GUID. Use `unassigned` for events recorded without a virtual node. Omit both virtual node selectors for all events. Use either `vnode_guid` or `vnode` per request. | no |  |  |
 | Site (`site`) | string | The session's site key. Needed when the same session ID exists on several sites. | no |  |  |
 | Session (`session_id`) | string | Session ID, from `rum-sessions`. | yes |  |  |
 

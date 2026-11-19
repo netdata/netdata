@@ -585,6 +585,8 @@
 - Fix(dem): identify publisher HTTP requests ([#24832](https://github.com/netdata/netdata/issues/24832))
 - Fix(dem): handle missing descriptors during first publication ([#24833](https://github.com/netdata/netdata/issues/24833))
 - Fix(dem): publish runtime artifacts with object-only permissions ([#24834](https://github.com/netdata/netdata/issues/24834))
+- Fix(dem): pin and verify rclone for runtime publication ([#24836](https://github.com/netdata/netdata/issues/24836))
+- Packaging: fix release-info stamping on Windows ([#24838](https://github.com/netdata/netdata/issues/24838))
 
 ## [2.12.0] - 2026-09-30
 

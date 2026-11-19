@@ -29,9 +29,9 @@ var charts string
 var schema string
 
 type Config struct {
-	Vnode       string           `yaml:"vnode,omitempty"        json:"vnode,omitempty"`
-	UpdateEvery int              `yaml:"update_every,omitempty" json:"update_every"`
-	Window      confopt.Duration `yaml:"window"                 json:"window"`
+	Vnode       string               `yaml:"vnode,omitempty"        json:"vnode,omitempty"`
+	UpdateEvery int                  `yaml:"update_every,omitempty" json:"update_every"`
+	Window      confopt.LongDuration `yaml:"window"                 json:"window"`
 	config.Site `yaml:",inline" json:""`
 }
 
@@ -67,7 +67,7 @@ func Creator(deps Dependencies) collectorapi.Creator {
 func New(deps Dependencies) *Collector {
 	return &Collector{
 		Config: Config{
-			Window: confopt.Duration(5 * time.Minute),
+			Window: confopt.LongDuration(5 * time.Minute),
 			Site: config.Site{
 				PageGroups: 20,
 				Countries:  20,

@@ -895,6 +895,98 @@ func TestVnodeCapturesHistoryAcrossInPlaceReassignment(t *testing.T) {
 	}
 }
 
+func TestLiveAndSessionEventsSelectUnassignedVnode(t *testing.T) {
+	const assigned = "11111111-1111-4111-8111-111111111111"
+	ctx := t.Context()
+	journalStore, err := journalstore.Open(ctx, t.TempDir(), "")
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, journalStore.Close()) })
+	store := history.NewStore(journalStore)
+	attempted, err := store.AppendEvent(ctx, history.EventRecord{VnodeGUID: "unassigned"})
+	require.ErrorContains(t, err, "vnode_guid must be empty or a canonical UUID")
+	assert.False(t, attempted)
+	hub := rumregistry.New()
+	a, retire := addSite(t, hub, "shop", "first")
+	writer := history.NewWriter(store, discardCounters{})
+	a.SetHistorySink(writer)
+	now := time.Now().Add(-time.Second)
+	ingest := func(guid, path string) {
+		a.SetVnodeGUID(guid)
+		now = now.Add(time.Microsecond)
+		a.Ingest(&beacon.Beacon{
+			Site:         "shop",
+			ExperienceID: path,
+			SessionID:    "visit",
+			PageGroup:    path,
+			Received:     now,
+			Events:       []beacon.Event{{Kind: beacon.EventDocument, ID: path, Revision: 1}},
+		})
+	}
+	ingest(assigned, "/assigned-retained")
+	ingest("", "/unassigned-retained")
+	flushHistory(ctx, writer)
+	ingest(assigned, "/assigned-pending")
+	ingest("", "/unassigned-pending")
+
+	service := query.New(hub, store)
+	handler := rumfunc.New(service, func(name string) (string, bool) { return assigned, name == "unassigned" })
+	request := func(method string, args ...string) *funcapi.FunctionResponse {
+		return handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+			Method:      method,
+			Args:        append([]string{"site:shop"}, args...),
+			Permissions: "0x1b",
+		})
+	}
+	pages := func(response *funcapi.FunctionResponse) []any {
+		t.Helper()
+		require.NotNil(t, response.RawResponse, "status %d: %s", response.Status, response.Message)
+		index := response.RawResponse["columns"].(map[string]any)["page"].(map[string]any)["index"].(int)
+		var out []any
+		for _, row := range response.RawResponse["data"].([][]any) {
+			out = append(out, row[index])
+		}
+		return out
+	}
+	unassigned := []any{"/unassigned-retained", "/unassigned-pending"}
+	all := []any{"/assigned-retained", "/unassigned-retained", "/assigned-pending", "/unassigned-pending"}
+	wildcard := request("rum-live")
+	assert.Equal(t, all, pages(wildcard))
+	scoped := request("rum-live", "vnode_guid:unassigned", "cursor:"+wildcard.RawResponse["next"].(string))
+	assert.Equal(t, unassigned, pages(scoped), "switching selection discards the wildcard cursor")
+	next := "cursor:" + scoped.RawResponse["next"].(string)
+	assert.Empty(t, pages(request("rum-live", "vnode_guid:unassigned", next)))
+	assert.Equal(t, all, pages(request("rum-live", "vnode_guid:", next)))
+	first, cursor, err := service.Live(ctx, "shop", "", 1, "unassigned")
+	require.NoError(t, err)
+	require.Len(t, first, 1)
+	assert.Equal(t, "/unassigned-retained", first[0].Page, "the row cap applies after filtering")
+	second, _, err := service.Live(ctx, "shop", cursor, 1, "unassigned")
+	require.NoError(t, err)
+	require.Len(t, second, 1)
+	assert.Equal(t, "/unassigned-pending", second[0].Page)
+
+	const timeline = "rum-session-events"
+	selected := handler.HandleRaw(ctx, funcapi.RawMethodRequest{
+		Method:      timeline,
+		Payload:     []byte(`{"site":"shop","session_id":"visit","vnode_guid":"unassigned"}`),
+		Permissions: "0x1b",
+	})
+	assert.Equal(t, unassigned, pages(selected))
+	assert.Equal(t, all, pages(request(timeline, "session_id:visit")))
+	assert.Equal(t, []any{"/assigned-retained", "/assigned-pending"},
+		pages(request(timeline, "session_id:visit", "vnode:unassigned")), "vnode is a configured name")
+	conflict := request(timeline, "session_id:visit", "vnode:unassigned", "vnode_guid:unassigned")
+	assert.Equal(t, funcapi.ErrorResponse(400, "vnode and vnode_guid are mutually exclusive"), conflict)
+	for _, method := range []string{"rum-sites", "rum-pages", "rum-sessions", "rum-errors"} {
+		assert.Equal(t, 400, request(method, "vnode_guid:unassigned").Status, method)
+	}
+
+	flushHistory(ctx, writer)
+	retire()
+	assert.Equal(t, unassigned, pages(request(timeline, "session_id:visit", "vnode_guid:unassigned")),
+		"history retains captured association after the site retires")
+}
+
 func TestSessionEventsMergePendingAndPersistedWithoutDuplicates(t *testing.T) {
 	ctx := context.Background()
 	journalStore, err := journalstore.Open(ctx, "", "")

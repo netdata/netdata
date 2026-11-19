@@ -15,6 +15,7 @@ requiring a native build toolchain on the target. Native DEB/RPM dependency and 
 | Build an artifact | Pre-flight, orchestration, output and cache sections; cross-architecture/debug sections when applicable |
 | Review or explain packaging | Affected source owners and matching sections; assess existing build evidence without executing operational examples |
 | Diagnose a build failure | Common failures plus the failing job and its current dependencies |
+| Change kickstart/updater callers or shared install lifecycle | `.agents/skills/packaging-installers/SKILL.md`; makeself build and artifact contracts stay here |
 | Change static artifact checks or add a shipped executable | `./SKILL.md#artifact-validation-ownership` |
 | Inspect or extract an archive | Output artifacts and extraction guidance; extraction writes files and requires root |
 | Deploy to a target | Deployment section, matching architecture and the actual installation/update policy requested |
@@ -303,6 +304,10 @@ sudo sh /tmp/netdata-x86_64-latest.gz.run
 `packaging/makeself/install-or-update.sh` installs the updater without enabling it; `--auto-update` is ignored,
 and `--no-updates` is an unknown option. Check existing updater scheduling separately when testing updates.
 For state preservation and its regression suite, see `packaging/makeself/README.md#state-permissions-during-updates`.
+For changes to staging or archive headers, trace kickstart, updater and `packaging/makeself/prepare-fleet.py`
+consumers. Exercise the real makeself producer/caller boundary with a harmless archive; the existing examples are
+`packaging/installer/tests/test_static_install_callers.py` and `packaging/installer/tests/test_prepare_fleet.py`.
+Include the chosen executable temporary directory across privilege elevation and relocated state directories.
 
 The installer always installs into `/opt/netdata`. It extracts to temporary staging before the installation owner
 changes live files. Executing with `--target` or `--keep` is refused; those options are for `--noexec` inspection only.

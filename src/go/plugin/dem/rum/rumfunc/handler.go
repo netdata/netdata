@@ -52,6 +52,8 @@ type method struct {
 	// samplingHelp adds the selected sites' current sampling policy to the help;
 	// sampled sets it together with the sampling caveat.
 	samplingHelp bool
+	// allowUnassignedVnode selects rows recorded without a virtual node.
+	allowUnassignedVnode bool
 	// rows reads the method's rows and may add method-specific response fields.
 	rows func(h *Handler, ctx context.Context, args map[string]string, response map[string]any) ([][]any, error)
 }
@@ -72,7 +74,7 @@ func (h *Handler) HandleRaw(ctx context.Context, req funcapi.RawMethodRequest) *
 		return funcapi.NotFoundResponse(req.Method)
 	}
 	spec := methods[i]
-	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID)
+	args, r := rawfunc.Admit(req, spec.Params, h.lookupVnodeGUID, spec.allowUnassignedVnode)
 	if r != nil {
 		return r
 	}
