@@ -825,8 +825,8 @@ Netdata applies unsupervised machine learning to every metric it collects, on th
 **Netdata AI** (Netdata Cloud)
 - **[AI Conversations](/docs/netdata-ai/conversations.md):** chat about systems and applications from anywhere in the UI, with up to five attached context items (charts, alerts, nodes), report mode and sharing
 - **[AI Investigations](/docs/netdata-ai/investigations/index.md):** automated troubleshooting and root-cause analysis for any question or time range; custom and scheduled investigations (daily, weekly, monthly); results in about two minutes, with email notification
-- **[AI Investigations reports](/docs/ml-ai/ai-insights.md):** Infrastructure Summary, Anomaly Analysis, Capacity Planning, Performance Optimization; scheduled reports; PDF export
-- **[AI for alerts](/docs/netdata-ai/alerts-automation/alerts-automation.md):** alert investigation reports, AI alert explanations, AI-generated and AI-suggested alert definitions, and alert evaluation against historical data before deployment
+- **[AI Insights](/docs/ml-ai/ai-insights.md):** Infrastructure Summary, Anomaly Analysis, Capacity Planning, Performance Optimization; scheduled reports; PDF export
+- **[AI Assistant](/docs/netdata-ai/alerts-automation/alerts-automation.md):** alert investigation reports, AI alert explanations, AI-generated and AI-suggested alert definitions, and alert evaluation against historical data before deployment
 - **[Infrastructure Knowledge and AI Memory](/docs/netdata-ai/infrastructure-knowledge.md):** a versioned description of the infrastructure (generated from the infrastructure, from a template or written) and remembered facts that ground AI answers in the customer's environment
 - **[MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md):** Netdata AI connects to external MCP servers — GitHub, Atlassian (Jira, Confluence, Bitbucket), PagerDuty and custom HTTPS MCP servers — to combine monitoring data with code, tickets and incidents
 
