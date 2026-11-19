@@ -587,6 +587,15 @@
 - Fix(dem): publish runtime artifacts with object-only permissions ([#24834](https://github.com/netdata/netdata/issues/24834))
 - Fix(dem): pin and verify rclone for runtime publication ([#24836](https://github.com/netdata/netdata/issues/24836))
 - Packaging: fix release-info stamping on Windows ([#24838](https://github.com/netdata/netdata/issues/24838))
+- Build(deps): bump github.com/tidwall/gjson from 1.20.2 to 1.20.3 in /src/go ([#24843](https://github.com/netdata/netdata/issues/24843))
+- Build(deps): bump github.com/prometheus/common from 0.73.1 to 0.74.0 in /src/go ([#24841](https://github.com/netdata/netdata/issues/24841))
+- Build(deps): bump github.com/moby/moby/client from 0.6.2 to 0.6.3 in /src/go ([#24844](https://github.com/netdata/netdata/issues/24844))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.75.7 to 1.76.0 in /src/go ([#24840](https://github.com/netdata/netdata/issues/24840))
+- Docs(skills): capture packaging release and installer workflows ([#24845](https://github.com/netdata/netdata/issues/24845))
+- Fix(dem): retain compatible runtimes during unstamped source updates ([#24846](https://github.com/netdata/netdata/issues/24846))
+- Fix the connect typo in the deploy install description ([#24847](https://github.com/netdata/netdata/issues/24847))
+- Fix(dem): align RUM configuration and vnode selection with native clients ([#24850](https://github.com/netdata/netdata/issues/24850))
+- Regenerate integrations docs ([#24851](https://github.com/netdata/netdata/issues/24851))
 
 ## [2.12.0] - 2026-09-30
 
