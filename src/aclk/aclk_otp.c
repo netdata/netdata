@@ -545,9 +545,17 @@ https_client_resp_t aclk_get_mqtt_otp(RSA *p_key, char **mqtt_id, char **mqtt_us
 #define JSON_KEY_BACKOFF_MIN "minSeconds"
 #define JSON_KEY_CAPS "capabilities"
 
+#define TRP_PARSE_OK            0
+#define TRP_PARSE_ERROR         1
+#define TRP_PARSE_UNKNOWN_TYPE  2
+
+// returns TRP_PARSE_UNKNOWN_TYPE for a well-formed transport this agent does not know,
+// so that the caller can skip it; on any result other than TRP_PARSE_OK trp owns nothing
 static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *trp) {
     struct json_object_iterator it;
     struct json_object_iterator itEnd;
+    bool type_seen = false;
+    const char *type_str = NULL;
 
     it = json_object_iter_begin(json);
     itEnd = json_object_iter_end(json);
@@ -555,15 +563,13 @@ static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *tr
     while (!json_object_iter_equal(&it, &itEnd)) {
         if (!strcmp(json_object_iter_peek_name(&it), JSON_KEY_TRP_TYPE)) {
             PARSE_ENV_JSON_CHK_TYPE(&it, json_type_string, JSON_KEY_TRP_TYPE)
-            if (trp->type != ACLK_TRP_UNKNOWN) {
+            if (type_seen) {
                 netdata_log_error("ACLK: " JSON_KEY_TRP_TYPE " set already");
                 goto exit;
             }
-            trp->type = aclk_transport_type_t_from_str(json_object_get_string(json_object_iter_peek_value(&it)));
-            if (trp->type == ACLK_TRP_UNKNOWN) {
-                netdata_log_error("ACLK: " JSON_KEY_TRP_TYPE " unknown type \"%s\"", json_object_get_string(json_object_iter_peek_value(&it)));
-                goto exit;
-            }
+            type_seen = true;
+            type_str = json_object_get_string(json_object_iter_peek_value(&it));
+            trp->type = aclk_transport_type_t_from_str(type_str);
             json_object_iter_next(&it);
             continue;
         }
@@ -588,16 +594,22 @@ static int parse_json_env_transport(json_object *json, aclk_transport_desc_t *tr
         goto exit;
     }
 
-    if (trp->type == ACLK_TRP_UNKNOWN) {
+    if (!type_seen) {
         netdata_log_error("ACLK: transport type not set");
         goto exit;
     }
 
-    return 0;
+    if (trp->type == ACLK_TRP_UNKNOWN) {
+        netdata_log_info("ACLK: ignoring transport of unknown type \"%s\"", type_str);
+        aclk_transport_desc_t_destroy(trp);
+        return TRP_PARSE_UNKNOWN_TYPE;
+    }
+
+    return TRP_PARSE_OK;
 
 exit:
     aclk_transport_desc_t_destroy(trp);
-    return 1;
+    return TRP_PARSE_ERROR;
 }
 
 static int parse_json_env_transports(json_object *json_array, aclk_env_t *env) {
@@ -612,7 +624,9 @@ static int parse_json_env_transports(json_object *json_array, aclk_env_t *env) {
         return 1;
     }
 
+    // keeps the order of the list (highest priority first), without the transports this agent does not know
     aclk_transport_desc_t **transports = callocz(count, sizeof(aclk_transport_desc_t *));
+    size_t used = 0;
 
     for (size_t i = 0; i < count; i++) {
         json_object *obj = json_object_array_get_idx(json_array, i);
@@ -621,23 +635,33 @@ static int parse_json_env_transports(json_object *json_array, aclk_env_t *env) {
             goto failed;
         }
 
-        transports[i] = callocz(1, sizeof(aclk_transport_desc_t));
-        if (parse_json_env_transport(obj, transports[i])) {
+        aclk_transport_desc_t *trp = callocz(1, sizeof(aclk_transport_desc_t));
+        int rc = parse_json_env_transport(obj, trp);
+        if (rc == TRP_PARSE_OK) {
+            transports[used++] = trp;
+            continue;
+        }
+
+        freez(trp);
+        if (rc != TRP_PARSE_UNKNOWN_TYPE) {
             netdata_log_error("ACLK: error parsing transport idx %d", (int)i);
             goto failed;
         }
     }
 
+    if (!used) {
+        netdata_log_error("ACLK: transports list has no transport this agent knows");
+        goto failed;
+    }
+
     env->transports = transports;
-    env->transport_count = count;
+    env->transport_count = used;
     return 0;
 
 failed:
-    for (size_t i = 0; i < count; i++) {
-        if (transports[i]) {
-            aclk_transport_desc_t_destroy(transports[i]);
-            freez(transports[i]);
-        }
+    for (size_t i = 0; i < used; i++) {
+        aclk_transport_desc_t_destroy(transports[i]);
+        freez(transports[i]);
     }
     freez(transports);
     return 1;
@@ -942,13 +966,43 @@ static int aclk_otp_unittest_env(void)
                   "valid /env transport is parsed");
     aclk_env_t_destroy(&env);
 
+    // transports this agent does not know are skipped, the rest keep their order
+    memset(&env, 0, sizeof(env));
+    ACLK_OTP_TEST(parse_json_env(ACLK_OTP_TEST_ENV_HEAD
+                                 "\"transports\":[{\"type\":\"bogus\",\"endpoint\":\"wss://localhost/new\"},"
+                                 "{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/first\"},"
+                                 "{\"endpoint\":\"wss://localhost/newer\",\"type\":\"bogus2\"},"
+                                 "{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/second\"}]}",
+                                 &env) == 0,
+                  "/env with unknown transport types next to known ones is accepted");
+    ACLK_OTP_TEST(env.transport_count == 2 && env.transports &&
+                      env.transports[0] && env.transports[0]->type == ACLK_TRP_MQTT_5 &&
+                      !strcmp(env.transports[0]->endpoint, "wss://localhost/first") &&
+                      env.transports[1] && env.transports[1]->type == ACLK_TRP_MQTT_5 &&
+                      !strcmp(env.transports[1]->endpoint, "wss://localhost/second"),
+                  "/env unknown transport types are skipped and the order is kept");
+    aclk_env_t_destroy(&env);
+
     errors += aclk_otp_unittest_env_rejected(
-        "/env with an unknown transport type is rejected",
-        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"bogus\",\"endpoint\":\"x\"}]}");
+        "/env with an unknown transport type without endpoint is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"type\":\"bogus\"}]}");
     errors += aclk_otp_unittest_env_rejected(
-        "/env with a bad transport after a good one is rejected",
+        "/env with a transport without endpoint after a good one is rejected",
         ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
                                "{\"type\":\"MQTTv5\"}]}");
+
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with only an unknown transport type is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"bogus\",\"endpoint\":\"x\"}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a transport without type after a good one is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"endpoint\":\"wss://localhost/x\"}]}");
+    errors += aclk_otp_unittest_env_rejected(
+        "/env with a malformed transport type after a good one is rejected",
+        ACLK_OTP_TEST_ENV_HEAD "\"transports\":[{\"type\":\"MQTTv5\",\"endpoint\":\"wss://localhost/mqtt\"},"
+                               "{\"endpoint\":\"wss://localhost/x\",\"type\":1}]}");
     errors += aclk_otp_unittest_env_rejected(
         "/env with an empty transport list is rejected",
         ACLK_OTP_TEST_ENV_HEAD "\"transports\":[]}");
