@@ -673,6 +673,30 @@ class StaticOverlayTests(unittest.TestCase):
         self.assertEqual((self.target / web / 'v3/nested/current.js').read_text(), 'new asset')
         self.assertEqual((self.target / web / 'custom.html').read_text(), 'local dashboard')
 
+    def test_dashboard_cleanup_failure_allows_paired_activation(self):
+        (self.target / 'bin/netdata').symlink_to(shutil.which('true'))
+        (self.stage / 'system/cleanup-dashboard.sh').write_text('exit 37\n')
+        with (self.stage / 'system/netdata-dem-pair.sh').open('a') as helper:
+            helper.write('''
+dem_pair_plan() { DP_ENABLED=1; DP_MODE=managed; }
+dem_pair_begin() { DP_ACTIVE=1; DP_WAS_RUNNING=1; DP_KEEP_RUNTIME=0; }
+dem_pair_runtime() { echo "$1" >> "$EVENTS"; return "$ACTIVATION_STATUS"; }
+dem_pair_owner_start() { echo start >> "$EVENTS"; }
+''')
+        events = self.root / 'events'
+        for options, activation, status, expected in (
+            ((), 0, 37, ['activate', 'start']),
+            (('--dont-start-it',), 0, 37, ['activate']),
+            ((), 43, 43, ['activate']),
+        ):
+            with self.subTest(options=options, activation=activation):
+                events.write_text('')
+                self.marker.write_text('pending')
+                result = self.run_static(options=options, EVENTS=str(events), ACTIVATION_STATUS=str(activation))
+                self.assertEqual(self.marker.read_text(), 'completed')
+                self.assertEqual(events.read_text().splitlines(), expected)
+                self.assertEqual(result.returncode, status, result.stderr)
+
     def test_relocated_state_parents_remain_symlinks_after_overlay(self):
         self.check_relocated_state_parents()
 

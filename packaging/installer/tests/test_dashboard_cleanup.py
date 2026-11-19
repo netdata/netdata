@@ -155,11 +155,20 @@ function(netdata_add_deb_copyright)
 endfunction()
 ''' + system_files[begin:end])
         installer = (ROOT / 'netdata-installer.sh').read_text()
-        begin = installer.index('dashboard_upgrade=0')
+        begin = installer.index('# Enrolled installations verify the companion')
         end = installer.index('\n# ---', begin)
-        script = ('set -eu\nrun() { "$@"; }\nfatal() { exit 1; }\n'
+        script = ('set -eu\nDONOTSTART=1\nrun() { "$@"; }\nfatal() { exit 1; }\n'
                   'cmake_install() { cmake --install "$1" --component dashboard; }\n'
                   + installer[begin:end])
+        # Run the source installer's actual completion path, with service and UI calls isolated.
+        script += '''
+DP_ENABLED=1; DP_WAS_RUNNING=1; DP_DONT_START=0; started=0
+dem_pair_finish() { echo finish; return "${ACTIVATION_STATUS:-0}"; }
+dem_pair_cleanup_stage() { :; }
+print_deferred_errors() { :; }
+progress() { :; }
+netdata_banner() { :; }
+''' + installer[installer.rindex('if [ "${DP_ENABLED:-0}" = 1 ]; then'):]
         build = self.root / 'build'
         archive = self.root / 'bundle.tar.gz'
         env = dict(os.environ, NETDATA_PREFIX=str(self.prefix), NETDATA_BUILD_DIR=str(build),
@@ -186,6 +195,19 @@ endfunction()
                 expected.add('before-first-install.css')
             self.assertEqual({str(p.relative_to(installed)) for p in installed.rglob('*') if p.is_file()},
                              expected)
+        # Fail only the unlink of a stale asset in the real cleanup helper.
+        rm = self.root / 'commands/rm'
+        self.put(rm, '#!/bin/sh\nif [ "$2" = ./obsolete.js ]; then exit 37; fi\nexec /bin/rm "$@"\n')
+        rm.chmod(0o755)
+        self.put(installed / 'obsolete.js')
+        for activation, expected_status in ((0, 37), (43, 43)):
+            with self.subTest(activation=activation):
+                result = subprocess.run(['sh', '-c', script], text=True, capture_output=True,
+                                        env=dict(env, PATH=str(rm.parent) + ':' + env['PATH'],
+                                                 ACTIVATION_STATUS=str(activation)))
+                self.assertIn('finish', result.stdout.splitlines(), result.stderr)
+                self.assertEqual(result.returncode, expected_status, result.stderr)
+                self.assertTrue((installed / 'obsolete.js').is_file())
         subprocess.run(['cmake', '-S', str(self.root), '-B', str(build), '-DENABLE_DASHBOARD=OFF'],
                        check=True, capture_output=True)
         self.put(installed / 'local.css')
