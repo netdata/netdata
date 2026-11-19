@@ -1,6 +1,6 @@
 # Node States
 
-Netdata provides dashboards at multiple levels of your infrastructure. Each level displays node states based on what it can observe. This page explains what each state means, when transitions happen, and how to configure the behavior.
+Netdata provides dashboards at multiple levels: node, Room and Space. Each level displays node states based on what it can observe. This page explains what each state means, when transitions happen, and how to configure the behavior.
 
 ## Dashboard Levels
 

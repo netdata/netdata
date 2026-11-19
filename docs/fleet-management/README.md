@@ -1,6 +1,6 @@
 # Edge Device Monitoring
 
-Monitor thousands of robots, digital signage players, gateways and autonomous vehicles from one place. Netdata gives your team fleet-wide visibility, alerts, anomaly detection and live troubleshooting while keeping monitoring lightweight on each device—even on 32-bit ARM hardware. Choose collection intervals from one second for fast-changing workloads to ten minutes for devices with tight power or cellular budgets.
+Monitor thousands of robots, digital signage players, gateways and autonomous vehicles from one place. Netdata gives your team fleet-wide visibility, alerts, anomaly detection and live troubleshooting while keeping the footprint on each device small—even on 32-bit ARM hardware. Choose collection intervals from one second for fast-changing workloads to ten minutes for devices with tight power or cellular budgets.
 
 A small Agent on each device collects system and application metrics and streams them to a Netdata Parent. The Parent provides the storage and analysis capacity. Your operators get the monitoring experience they need, while the devices stay focused on their workloads.
 

@@ -1,19 +1,19 @@
 # Infrastructure Knowledge
 
-Netdata AI sees everything your infrastructure *does* — every metric, every anomaly, every alert. What it cannot see is what your infrastructure *is*: which services matter, which host is the one that is supposed to run hot, who owns what, and what your team considers normal. Without that, "CPU at 91%" is a finding. With it, it may be a machine doing exactly its job.
+Netdata AI sees everything your systems and applications *do* — every metric, every anomaly, every alert. What it cannot see is what they *are*: which services matter, which host is the one that is supposed to run hot, who owns what, and what your team considers normal. Without that, "CPU at 91%" is a finding. With it, it may be a machine doing exactly its job.
 
 **Infrastructure Knowledge** is where that context lives. Think of it as onboarding a new SRE to your team: the more you tell Netdata AI about your infrastructure, the more accurate its conversations, investigations, and reports become — and the more its answers sound like they come from someone who already knows your environment.
 
 There are two ways to teach it, and they work together:
 
-- **Write it down.** Your Space has a shared document that describes your infrastructure. Your team edits it directly.
-- **Tell it in a conversation.** As you work with Netdata AI, you can ask it to remember things, and it can pick up what you tell it along the way. It gets to know your infrastructure progressively, the way a new colleague would.
+- **Write it down.** Your Space has a shared document that describes your environment. Your team edits it directly.
+- **Tell it in a conversation.** As you work with Netdata AI, you can ask it to remember things, and it can pick up what you tell it along the way. It gets to know your environment progressively, the way a new colleague would.
 
 Everything you teach Netdata AI is visible under **Manage Space → Infrastructure Knowledge**, in two tabs: **Your Context** and **AI Memory**.
 
 ## Your Context
 
-**Your Context** is a single Markdown document your team maintains. It is read at the start of every conversation, investigation, and report about your infrastructure.
+**Your Context** is a single Markdown document your team maintains. It is read at the start of every conversation, investigation, and report about your environment.
 
 Describe the things that only your team knows. The editor offers section templates to get you started:
 
@@ -29,11 +29,11 @@ You do not need to fill in everything. A few honest lines about what matters and
 
 Every save keeps a version, so you can review what changed and go back to an earlier version at any time.
 
-You can also ask Netdata AI to update the document for you in a conversation — for example, *"Add the new Kafka cluster to my infrastructure context"* — and it tells you what it changed.
+You can also ask Netdata AI to update the document for you in a conversation — for example, *"Add the new Kafka cluster to my environment context"* — and it tells you what it changed.
 
 ## AI Memory
 
-**AI Memory** is what Netdata AI has learned from talking to your team. Each memory is a single fact about your infrastructure, shared with everyone in the Space and used in every future conversation, investigation, and report.
+**AI Memory** is what Netdata AI has learned from talking to your team. Each memory is a single fact about your environment, shared with everyone in the Space and used in every future conversation, investigation, and report.
 
 You build it up simply by talking:
 

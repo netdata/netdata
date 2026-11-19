@@ -1,6 +1,6 @@
 # Netdata APIs
 
-Netdata Cloud provides APIs for programmatic access to your monitoring infrastructure.
+Netdata Cloud provides APIs for programmatic access to your observability data.
 
 :::note
 
@@ -20,7 +20,7 @@ Explore the Agent API using:
 
 ## Cloud API
 
-The Netdata Cloud REST API provides programmatic access to Cloud resources, spaces, rooms, and nodes across your infrastructure.
+The Netdata Cloud REST API provides programmatic access to Cloud resources, spaces, rooms, and nodes.
 
 Explore the Cloud API using the live API documentation:
 

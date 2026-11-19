@@ -1,7 +1,7 @@
 
   ^
-  |.-.   .-.   .-.   .-.   .  Netdata
-  |   '-'   '-'   '-'   '-'   X-Ray Vision for your infrastructure!
+  |.-.   .-.   .-.   .-.   .  Netdata, full-stack observability
+  |   '-'   '-'   '-'   '-'   the AI SRE that learns your stack!
   +----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+--->
 
   Copyright 2018-2025 Netdata Inc.

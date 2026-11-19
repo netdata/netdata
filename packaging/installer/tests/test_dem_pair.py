@@ -762,7 +762,7 @@ class ArchiveEntryTests(unittest.TestCase):
         self.temp.cleanup()
 
     def build(self, netdata=True):
-        label = 'Netdata, X-Ray Vision for your infrastructure' if netdata else 'Generic fixture'
+        label = 'Netdata, full-stack observability: the AI SRE that learns your stack' if netdata else 'Generic fixture'
         result = subprocess.run(['sh', str(self.makeself), '--gzip', '--header', str(self.header),
                                  str(self.tree), str(self.archive), label, './system/post-installer.sh'],
                                 text=True, capture_output=True)

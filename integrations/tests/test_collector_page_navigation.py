@@ -55,10 +55,10 @@ class CollectorPageNavigationTest(unittest.TestCase):
                 ("Windows", "#operating-systems"),
                 ("macOS", "#operating-systems"),
                 ("FreeBSD", "#operating-systems"),
-                ("Prometheus endpoints", "#beyond-the-850-integrations"),
+                ("Prometheus endpoints", "#beyond-the-2000-integrations"),
                 ("SNMP devices", "#networking"),
-                ("StatsD", "#beyond-the-850-integrations"),
-                ("custom data sources", "#beyond-the-850-integrations"),
+                ("StatsD", "#beyond-the-2000-integrations"),
+                ("custom data sources", "#beyond-the-2000-integrations"),
             ],
         )
 

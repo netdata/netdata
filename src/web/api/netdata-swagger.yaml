@@ -8648,9 +8648,11 @@ paths:
 
         **Storage Tiers:**
         Netdata supports multiple storage tiers with different retention periods:
-        - **Tier 0:** High resolution (1-second), short retention
-        - **Tier 1:** Medium resolution, medium retention
-        - **Tier 2:** Low resolution, long retention
+        - **Tier 0:** per-second
+        - **Tier 1:** per-minute
+        - **Tier 2:** per-hour
+
+        Each tier's retention is configurable by disk size and time.
 
         **Availability:**
         This endpoint only works if DBEngine is enabled. Returns 404 if DBEngine is disabled.
@@ -8766,7 +8768,7 @@ paths:
         Modern deployments should:
         - Use internal metrics: `netdata.ml_*` charts
         - Check Netdata Cloud for ML insights
-        - Use alert transitions API to see ML-based alerts
+        - Use the alert transitions API for alerts, and `/api/v2/data` for anomaly rates
         - Monitor anomaly rates via `/api/v2/data` with appropriate options
 
         **Security & Access Control:**

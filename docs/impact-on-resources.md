@@ -2,7 +2,7 @@
 
 ## Overview
 
-Netdata provides real-time performance monitoring and troubleshooting capabilities for your systems, offering unparalleled insights with minimal resource consumption. This document highlights the baseline impact of running Netdata on an empty cloud provider (AWS, GCP, Azure, etc.) Virtual Machine (VM), which serves as a reference for understanding the performance and resource usage of Netdata in a production environment.
+Netdata is a full-stack observability platform. This page measures the baseline cost of running its Agent. This document highlights the baseline impact of running Netdata on an empty cloud provider (AWS, GCP, Azure, etc.) Virtual Machine (VM), which serves as a reference for understanding the performance and resource usage of Netdata in a production environment.
 
 The resources used by Netdata depend primarily on the number of metrics collected (which may vary significantly among servers) and the features enabled (e.g., streaming to Netdata Parents, Machine Learning). However, Netdata has been designed to be significantly more efficient compared to other observability agents. Despite collecting, storing, and visualizing data in real-time with per-second granularity, Netdata is lighter and more efficient than many commercial and open-source alternatives.
 

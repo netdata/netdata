@@ -1,6 +1,6 @@
 # ML Configuration
 
-You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to detect anomalies in your infrastructure metrics. This feature is enabled by default if your [Database mode](/src/database/README.md) is set to `db = dbengine`.
+You can use Netdata's [Machine Learning](/src/ml/README.md) capabilities to detect anomalies in every metric. This feature is enabled by default if your [Database mode](/src/database/README.md) is set to `db = dbengine`.
 
 ## Enabling or Disabling Machine Learning
 

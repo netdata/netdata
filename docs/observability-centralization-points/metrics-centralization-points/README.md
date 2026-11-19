@@ -124,7 +124,7 @@ Copies **recent past samples** (replication) and **real-time new samples** (stre
 ### **For Netdata Parents**
 
 - **Standalone**:
-    - A single Parent in the infrastructure or the top-most Parent in a hierarchy.
+    - A single Parent in the deployment or the top-most Parent in a hierarchy.
 - **Cluster**:
     - A group of Parents that share the same data from the same Children.
     - Provides **high availability**.

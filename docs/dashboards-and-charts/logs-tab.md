@@ -151,7 +151,7 @@ The OS-native sources and the OpenTelemetry log store use different query engine
 ## Querying logs programmatically
 
 The Logs tab is built on the same function API that Netdata AI assistants and MCP clients use to query logs across
-your infrastructure. See [Netdata AI](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md).
+all your nodes. See [Netdata AI](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md).
 
 ## Where to next
 

@@ -1,6 +1,6 @@
 # JetBrains IDEs
 
-Configure JetBrains IDEs to access your Netdata infrastructure through MCP.
+Configure JetBrains IDEs to access your Netdata observability data through MCP.
 
 ## Supported IDEs
 
@@ -31,7 +31,7 @@ JetBrains AI Assistant currently communicates with MCP servers over `stdio` only
 
 1. **JetBrains IDE installed** - Any IDE from the list above
 2. **AI Assistant plugin** - Install from IDE marketplace
-3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent for full infrastructure visibility.
+3. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent for visibility across all its nodes.
 4. **Stdio launcher**:
    - `nd-mcp` bridge - Required for Netdata versions that only expose WebSocket (v2.6.0–v2.7.1)
    - `npx mcp-remote@latest` - Optional wrapper that exposes Netdata HTTP/SSE as stdio (useful for v2.7.2+)
@@ -58,7 +58,7 @@ MCP support in JetBrains IDEs may require additional plugins or configuration. C
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local Netdata setup
 or firewall changes needed.
 
@@ -205,7 +205,7 @@ Analyze database performance:
 
 ### Code Annotations
 
-Add infrastructure context to your code:
+Add observability context to your code:
 
 ```java
 @NetdataMonitor("cpu.usage > 80%")

@@ -4,7 +4,7 @@ Netdata Cloud sends Alert notifications for nodes in warning, critical, or [unre
 
 ## Benefits of Centralized Notifications
 
-- Consolidate health status views across all infrastructure components in one place
+- Consolidate health status views across all your nodes in one place
 - Set up and [manage your Alert notifications easily](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md)
 - Expedite troubleshooting with tools like [Metric Correlations](/docs/metric-correlations.md) and the [Anomaly Advisor](/docs/dashboards-and-charts/anomaly-advisor-tab.md)
 

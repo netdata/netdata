@@ -166,7 +166,7 @@ The performance optimization is clear from the speed at which the benchmark fini
 spike) and the reduced write/read syscalls and bytes written to disk.
 
 You can run similar performance benchmarks against any application, view the results on a Linux kernel level, and
-continuously improve the performance of your infrastructure.
+continuously improve the performance of your applications.
 
 ### Inspect for leaking file descriptors
 
@@ -227,7 +227,7 @@ same application on multiple systems and want to correlate how it performs on ea
 findings with someone else on your team.
 
 If you don't already have a Netdata Cloud account, go [sign in](https://app.netdata.cloud) and get started for free.
-You can also read how to [monitor your infrastructure with Netdata Cloud](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) to understand the key features that it has to offer.
+You can also read how to [organize your nodes with Netdata Cloud](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md) to understand the key features that it has to offer.
 
 Once you've added one or more nodes to a Space in Netdata Cloud, you can see aggregated eBPF metrics in the Overview
 dashboard under the same **Applications** or **eBPF** sections that you

@@ -295,7 +295,7 @@ set(CPACK_DEBIAN_NETDATA_PACKAGE_CONTROL_EXTRA
 set(CPACK_DEBIAN_NETDATA_DEBUGINFO_PACKAGE Off)
 
 set(CPACK_RPM_NETDATA_PACKAGE_NAME "netdata")
-set(CPACK_RPM_NETDATA_PACKAGE_SUMMARY "Netdata - X-Ray Vision for your infrastructure!")
+set(CPACK_RPM_NETDATA_PACKAGE_SUMMARY "Netdata, full-stack observability: the AI SRE that learns your stack!")
 set(CPACK_RPM_NETDATA_PACKAGE_OBSOLETES "netdata-conf, netdata-data, netdata-plugin-logs-management")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_NETDATA_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")

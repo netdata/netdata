@@ -40,7 +40,7 @@ an OS log store, such as Kubernetes.
 | Network devices sending SNMP traps, NetFlow, sFlow, or IPFIX | Netdata receives them directly and writes journal-compatible files on the receiving node; see [SNMP Trap Logs](/docs/logs/snmp-trap-logs.md) and [Network Flows](/docs/logs/network-flows.md). |
 | macOS | In place. macOS has no OS-native log forwarding; to centralize, use the [OpenTelemetry Collector's macOS receiver](/docs/opentelemetry/logs-collection.md#macos-unified-log). |
 
-Any mix works. Centralization points do not need to be infrastructure-wide: run one per team, environment, or
+Any mix works. Centralization points do not need to cover every node: run one per team, environment, or
 datacenter, sized for its own volume, and keep critical systems' logs local. Netdata Cloud presents every node and every
 centralization point in one dashboard with one role-based access model.
 

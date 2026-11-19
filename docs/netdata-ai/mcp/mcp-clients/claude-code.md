@@ -1,6 +1,6 @@
 # Claude Code
 
-Configure Claude Code to access your Netdata infrastructure through MCP.
+Configure Claude Code to access your Netdata observability data through MCP.
 
 ## Transport Support
 
@@ -16,7 +16,7 @@ Claude Code supports multiple MCP transport types, giving you flexibility in how
 ## Prerequisites
 
 1. **Claude Code installed** - Available at [anthropic.com/claude-code](https://www.anthropic.com/claude-code)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport available, requires `nd-mcp` bridge
    - **v2.7.2+**: Direct HTTP/SSE support available (recommended)
 3. **For WebSocket or stdio connections: `nd-mcp` bridge** - The stdio-to-websocket bridge. [Find its absolute path](/docs/netdata-ai/mcp/README.md#finding-the-nd-mcp-bridge). Not needed for direct HTTP connections on v2.7.2+.
@@ -30,7 +30,7 @@ Claude Code has comprehensive MCP server management capabilities. For detailed d
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -152,7 +152,7 @@ Replace in all examples:
 
 ## How to Use
 
-Claude Code can automatically use Netdata MCP when you ask infrastructure-related questions. If Netdata is your only observability solution configured via MCP, simply ask your question naturally:
+Claude Code can automatically use Netdata MCP when you ask questions about your systems and applications. If Netdata is the only observability MCP server configured, ask your question naturally:
 
 ```
 What's the current CPU usage across all servers?
@@ -169,7 +169,7 @@ Claude Code also allows you to explicitly specify which MCP server to use with t
 3. Use `/mcp netdata` followed by your query:
 
 ```
-/mcp netdata describe my infrastructure
+/mcp netdata describe my environment
 /mcp netdata what alerts are currently active?
 /mcp netdata show me database performance metrics
 ```

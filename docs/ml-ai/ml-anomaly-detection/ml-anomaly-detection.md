@@ -8,6 +8,8 @@ Anomaly bits are stored alongside metric data in the time-series database, with 
 
 A dedicated process correlates anomalies across all metrics within each node, generating real-time node-level anomaly charts. This correlation data feeds into Netdata's scoring engine - a specialized query system that can evaluate thousands of metrics simultaneously and return an ordered list ranked by anomaly severity, powering the Anomaly Advisor for rapid root cause analysis.
 
+Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
+
 ## System Characteristics
 
 | Aspect                  | Implementation                                                                              | Benefit                                              |
@@ -23,7 +25,7 @@ A dedicated process correlates anomalies across all metrics within each node, ge
 | **Time-series Integrity** | Immutable anomaly history                                                                 | No hindsight bias — shows what was detectable then   |
 | **Coverage**            | Every metric, every dimension                                                                | No sampling, no blind spots                          |
 | **Correlation Engine**  | Real-time anomaly correlation across metrics                                                 | Powers Anomaly Advisor for root cause analysis       |
-| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | Reduces alert fatigue while enabling anomaly-based alerting |
+| **Alert Philosophy**    | Primarily an investigation aid; anomaly bits and anomaly rate can also drive health alerts   | ML does not influence alert transitions automatically; anomaly rates can be used in alert rules |
 
 :::note
 Netdata avoids deep learning models to maintain lightweight operation on any Linux system. The entire ML system is designed to run efficiently without specialized hardware or dependencies.
@@ -185,7 +187,7 @@ The number 18 balances three competing requirements:
 
 3. **Consensus noise reduction** - Multiple models voting together eliminate random fluctuations. 18 models provide strong consensus without excessive memory use.
 
-This creates a sliding window memory: recent anomalies become "normal" quickly (within 3 hours for the newest model), while the full consensus takes 54 hours to completely forget an anomalous pattern. This balance prevents both alert fatigue from repeated anomalies and blindness to recurring issues.
+This creates a sliding window memory: recent anomalies become "normal" quickly (within 3 hours for the newest model), while the full consensus takes 54 hours to completely forget an anomalous pattern. This balance stops repeated anomalies from being flagged forever, without becoming blind to recurring issues.
 
 ### How Netdata Minimizes Training CPU Impact
 
@@ -247,7 +249,7 @@ On a freshly installed agent, ML begins detecting anomalies on a metric once its
 - Each 3-hour cycle improves detection quality
 - After 2-3 days, the system reaches steady-state accuracy
 
-**Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the system learns your infrastructure's patterns. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
+**Operational tip**: During the first 48 hours after deployment, expect elevated anomaly rates. This is normal as the models learn the patterns of your metrics. Use this period to observe ML behavior but avoid making critical decisions based solely on early anomaly detection.
 
 ## Creating Anomaly-Based Health Alerts
 
@@ -312,4 +314,4 @@ The `info` and `summary` fields support template variables that add contextual d
 When an anomaly alert fires, use Netdata's built-in tools to investigate the root cause:
 
 - **[Alert Troubleshooting](/docs/netdata-ai/troubleshooting/index.md)** — generate a one-click report from any fired alert, assessing its validity, uncovering correlated signals, and proposing a root-cause hypothesis
-- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your infrastructure for deeper analysis beyond a single alert
+- **[Investigations](/docs/netdata-ai/investigations/index.md)** — ask open-ended questions about your systems and applications for deeper analysis beyond a single alert

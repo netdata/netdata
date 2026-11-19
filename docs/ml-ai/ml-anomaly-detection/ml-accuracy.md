@@ -317,7 +317,7 @@ When evaluated against alternative approaches:
 |--------|------------|------------------|---------------|----------------|
 | False Positive Rate | 10^-36 | 0.3% | Variable | Typically 0.1-1% |
 | Configuration Required | None | Minimal | Extensive | Moderate to High |
-| Resource Overhead | 2-5% CPU | \<1% CPU | 30-60% CPU | Unknown |
+| Resource Overhead | 2-5% of one CPU core | \<1% CPU | 30-60% CPU | Unknown |
 | Pattern Memory | 57 hours<br/>(configurable) | Unlimited | Model-dependent | Days to Weeks |
 | Adaptation Speed | 3 hours<br/>(configurable) | Immediate | Retraining required | Hours to Days |
 | Metric Coverage | ALL metrics | Selected metrics | Selected metrics | Selected metrics |
@@ -329,7 +329,7 @@ When evaluated against alternative approaches:
 
 1. **Universal Coverage**: Netdata applies ML anomaly detection to every single metric collected (typically 3,000-20,000 per server) without configuration or additional cost. Commercial APMs typically require manual selection of metrics for ML analysis, often limit the number of ML-enabled metrics, and may charge additional fees for ML capabilities.
 
-2. **Infrastructure-Level Intelligence**: Netdata automatically calculates host-level anomaly rates, detecting when a server exhibits abnormal behavior across multiple metrics. This capability identifies infrastructure-wide issues that metric-by-metric approaches miss.
+2. **Fleet-Level Intelligence**: Netdata automatically calculates host-level anomaly rates, detecting when a server exhibits abnormal behavior across multiple metrics. This capability identifies fleet-wide issues that metric-by-metric approaches miss.
 
 3. **Automatic Correlation Discovery**: During incidents, Netdata's correlation engine automatically identifies which metrics are anomalous together, revealing hidden relationships and cascading failures. Commercial solutions typically require manual investigation or pre-configured correlation rules.
 
@@ -339,7 +339,7 @@ These fundamental differences mean Netdata can detect both obvious infrastructur
 
 Netdata's ML implementation represents a deliberate optimization for operational reliability over detection sophistication. The mathematical foundation ensures extraordinarily low false positive rates at the cost of potentially missing subtle or long-term patterns.
 
-The consensus mechanism's reduction of false positives to 10^-36 represents a significant achievement in practical anomaly detection, effectively eliminating random false insights while maintaining sensitivity to genuine infrastructure issues.
+The consensus mechanism's reduction of false positives to 10^-36 represents a significant achievement in practical anomaly detection, effectively eliminating random false insights while maintaining sensitivity to genuine issues.
 
 ### The Bottom Line
 
@@ -349,11 +349,11 @@ Netdata's ML is not a replacement for deep statistical analysis or business-inte
 
 - **Managing a complex microservice deployment with unpredictable patterns?**<br/>Layer this in as the safety net that never sleeps.
 
-- **Need to detect infrastructure problems without a team of data scientists?**<br/>This gives you automated anomaly detection that actually works.
+- **Need to detect problems across your stack without a team of data scientists?**<br/>This gives you automated anomaly detection that actually works.
 
-The system's strength lies in its ability to provide trustworthy anomaly detection and surface correlations and dependencies across components and applications, without configuration or tuning. The trade-offs — limited temporal memory, binary detection, and conservative thresholds — represent a careful balance between sensitivity and reliability, false positives and false negatives. These design choices ensure the system maintains its 10^-36 false positive rate while still catching meaningful infrastructure issues, working reliably out of the box without drowning you in false insights.
+The system's strength lies in its ability to provide trustworthy anomaly detection and surface correlations and dependencies across components and applications, without configuration or tuning. The trade-offs — limited temporal memory, binary detection, and conservative thresholds — represent a careful balance between sensitivity and reliability, false positives and false negatives. These design choices ensure the system maintains its 10^-36 false positive rate while still catching meaningful issues, working reliably out of the box without drowning you in false insights.
 
-For environments requiring detection of weekly patterns or gradual degradation over months, you'll need supplementary approaches (we also plan to support this with additional configuration to define periodicity). But for detecting significant, unexpected behavioral changes in infrastructure metrics — the kind that actually break things — Netdata's ML delivers exceptional reliability with negligible overhead.
+For environments requiring detection of weekly patterns or gradual degradation over months, you'll need supplementary approaches (we also plan to support this with additional configuration to define periodicity). But for detecting significant, unexpected behavioral changes in systems, networks and applications — the kind that actually break things — Netdata's ML delivers exceptional reliability with negligible overhead.
 
 **In short: Yes, you need it.**  
 Not as your only monitoring tool — but as the one that makes all the others smarter.

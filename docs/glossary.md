@@ -1,6 +1,6 @@
 # Glossary
 
-Welcome to Netdata's terminology guide! Whether you're a seasoned engineer or just starting your journey in system monitoring, this glossary helps demystify the terms used throughout our documentation and community.
+Welcome to Netdata's terminology guide! This glossary defines the terms used throughout our documentation and community.
 
 This glossary serves as a living document, continuously updated to help you understand Netdata concepts, features, and terminology. Each term links to detailed documentation for deeper exploration.
 
@@ -11,13 +11,13 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## A
 
-- [**Agent** or **Netdata Agent**](/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+- [**Agent** or **Netdata Agent**](/packaging/installer/README.md): Netdata's distributed Agent collects, stores and analyzes metrics, logs and traces from systems, hardware, networks and applications where they are generated, with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
 - [**Agent-cloud link** or **ACLK**](/src/aclk/README.md): The Agent-Cloud link (ACLK) is the mechanism responsible for securely connecting a Netdata Agent to your web browser through Netdata Cloud.
 
 - [**Aggregate Function**](/docs/dashboards-and-charts/netdata-charts.md#aggregate-functions-over-time): A function applied When the granularity of the data collected is higher than the plotted points on the chart.
 
-- [**Alerts** (formerly **Alarms**)](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your infrastructure's needs or your team's goals.
+- [**Alerts** (formerly **Alarms**)](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md): With the information that appears on Netdata Cloud and the local dashboard about active alerts, you can configure alerts to match your environment's needs or your team's goals.
 
 - [**Alarm Entity Type**](/src/health/REFERENCE.md#entity-types-overview): Entity types that are attached to specific charts and use the `alarm` label.
 
@@ -27,7 +27,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Child**](/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more Parents.
 
-- [**Cloud** or **Netdata Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
+- [**Cloud** or **Netdata Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility across your entire stack. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Collector**](/src/collectors/README.md): A catch-all term for any Netdata process that gathers metrics from an endpoint.
 
@@ -37,7 +37,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## D
 
-- [**Dashboard**](/docs/dashboards-and-charts/README.md): Out-of-the-box visual representation of metrics to provide insight into your infrastructure, its health and performance.
+- [**Dashboard**](/docs/dashboards-and-charts/README.md): Out-of-the-box visual representation of metrics to provide insight into your systems and applications, their health and performance.
 
 - [**Definition Bar**](/docs/dashboards-and-charts/netdata-charts.md): Bar within a composite chart that provides important information and options about the metrics within the chart.
 
@@ -91,12 +91,12 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## N
 
-- [**Netdata**](https://www.netdata.cloud/): Netdata is a monitoring tool designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
+- [**Netdata**](https://www.netdata.cloud/): Netdata is a full-stack observability platform, designed by system administrators, DevOps engineers, and developers to collect everything, help you visualize
   metrics, troubleshoot complex performance problems, and make data interoperable with the rest of your monitoring stack.
 
-- [**Netdata Agent** or **Agent**](/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
+- [**Netdata Agent** or **Agent**](/packaging/installer/README.md): Netdata's distributed Agent collects, stores and analyzes metrics, logs and traces from systems, hardware, networks and applications where they are generated, with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
-- [**Netdata Cloud** or **Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
+- [**Netdata Cloud** or **Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility across your entire stack. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
 - [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
@@ -120,9 +120,12 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Replication Streaming**](/src/streaming/README.md): Streaming configuration where child `A`, _with_ a database and web dashboard, streams metrics to parent `B`.
 
-- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): Rooms organize your connected nodes and provide infrastructure-wide dashboards using real-time metrics and visualizations.
+- [**Room**](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#overview): Rooms organize your connected nodes and provide dashboards across all their nodes using real-time metrics and visualizations.
 
 ## S
+
+- [**Scalability**](/docs/scalability.md): With Netdata's distributed architecture, you can observe a few, hundreds, thousands
+  or 100,000+ nodes, with no central bottleneck.
 
 - [**Single Node Dashboard**](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md): A dashboard pre-configured with every installation of the Netdata Agent, with thousands of metrics and hundreds of interactive charts that requires no setup.
 
@@ -138,14 +141,11 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## U
 
-- [**Unlimited Scalability**](https://www.netdata.cloud/#:~:text=love%20community%20contributions!-,Infinite%20Scalability,-By%20storing%20data): With Netdata's distributed architecture, you can seamlessly observe a couple, hundreds or
-  even thousands of nodes. There are no actual bottlenecks especially if you retain metrics locally in the Agents.
-
 - [**Unseen** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node was claimed but has never connected. Also referred to as "Created" in code. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 
 ## V
 
-- [**Visualizations**](/docs/dashboards-and-charts/README.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understanding of your infrastructure and your ability to troubleshoot it, along or on a team.
+- [**Visualizations**](/docs/dashboards-and-charts/README.md): Netdata uses dimensions, contexts, and families to sort your metric data into graphs, charts, and alerts that maximize your understanding of your systems and applications and your ability to troubleshoot it, along or on a team.
 
 ## Z
 

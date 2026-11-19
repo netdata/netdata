@@ -34,7 +34,7 @@ Netdata provides three data export modes:
 **Choosing the Right Mode**:
 
 - Use `as-collected` if you're building monitoring around a time-series database and know how to convert units
-- Use `average` for simpler long-term archiving that matches Netdata's visualization exactly
+- Use `average` for exports that match Netdata's visualization exactly
 
 :::
 

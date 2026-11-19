@@ -8,7 +8,7 @@
     categories:
       - export
     icon_filename: 'graphite.png'
-    description: 'Export Netdata metrics to Graphite providers for long-term storage, further analysis, and correlation with other data sources.'
+    description: 'Export Netdata metrics to Graphite providers to feed existing pipelines, further analysis, and correlation with other data sources.'
   keywords:
     - exporter
     - graphite
@@ -16,7 +16,7 @@
     - time series
   overview: &overview
     exporter_description: |
-      Use the Graphite connector for the exporting engine to archive your Netdata metrics to Graphite providers for long-term storage,
+      Use the Graphite connector for the exporting engine to send your Netdata metrics to Graphite providers to feed existing pipelines,
       further analysis, or correlation with data from other sources.
     exporter_limitations: ''
   setup:
@@ -178,13 +178,13 @@
   overview:
     <<: *overview
     exporter_description: |
-      Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
+      Export your Netdata metrics to Blueflood DB using the Graphite protocol, allowing you to feed your data to existing pipelines, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: Blueflood
     link: http://blueflood.io/
     icon_filename: 'blueflood.png'
-    description: 'Export Netdata metrics to Blueflood through the Graphite protocol for long-term storage, further analysis, and correlation with other data.'
+    description: 'Export Netdata metrics to Blueflood through the Graphite protocol to feed existing pipelines, further analysis, and correlation with other data.'
     keywords:
       - export
       - Blueflood
@@ -194,13 +194,13 @@
   overview:
     <<: *overview
     exporter_description: |
-      Export your Netdata metrics to KairosDB using the Graphite protocol, allowing you to archive your data for long-term storage, further analysis, or correlation with data from other sources.
+      Export your Netdata metrics to KairosDB using the Graphite protocol, allowing you to feed your data to existing pipelines, further analysis, or correlation with data from other sources.
   meta:
     <<: *meta
     name: KairosDB
     link: https://kairosdb.github.io/
     icon_filename: 'kairos.png'
-    description: 'Export Netdata metrics to KairosDB through the Graphite protocol for long-term storage, further analysis, and correlation with other data.'
+    description: 'Export Netdata metrics to KairosDB through the Graphite protocol to feed existing pipelines, further analysis, and correlation with other data.'
     keywords:
       - KairosDB
       - kairos

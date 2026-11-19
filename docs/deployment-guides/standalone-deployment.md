@@ -1,6 +1,6 @@
 # Single Agent Deployment
 
-The simplest way to use Netdata - install it, and you're monitoring. Each Agent works independently with zero configuration.
+Install the Agent and every system and application on the node is collected, charted, scored for anomalies and alerted on. Each Agent works independently with zero configuration.
 
 ## Single Agents With Netdata Cloud (Recommended)
 
@@ -55,7 +55,7 @@ flowchart TB
 
 ### Setup
 
-Getting started is simple:
+Getting started:
 
 1. **Sign up for Netdata Cloud** (it's free)
 2. **Get your connection command** - Once logged in, you have three ways to get it:

@@ -1,6 +1,6 @@
 # Monitor Nginx or Apache web server log files
 
-Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your infrastructure.
+Parsing web server log files with Netdata, revealing the volume of redirects, requests and other metrics, can give you a better overview of your web services.
 
 Too many bad requests? Maybe a recent deployment missed a few small SVG icons. Too many requests? Time to batten down the hatches—it's a DDoS.
 
@@ -12,7 +12,7 @@ The [web_log](/src/go/plugin/go.d/collector/weblog/README.md) collector is curre
 with [Nginx](https://nginx.org/en/) and [Apache](https://httpd.apache.org/).
 
 This guide will walk you through using the new Go-based web log collector to turn the logs these web servers
-constantly write to into real-time insights into your infrastructure.
+constantly write to into real-time insights into your web services.
 
 ## Set up your web servers
 

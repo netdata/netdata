@@ -1,6 +1,6 @@
 # Cursor
 
-Configure Cursor IDE to access your Netdata infrastructure through MCP.
+Configure Cursor IDE to access your Netdata observability data through MCP.
 
 ## Transport Support
 
@@ -16,7 +16,7 @@ Cursor’s MCP client natively supports multiple transports (https://cursor.com/
 ## Prerequisites
 
 1. **Cursor installed** - Download from [cursor.com](https://www.cursor.com)
-2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get infrastructure level visibility. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
+2. **Netdata v2.6.0 or later** with MCP support - Prefer a Netdata Parent to get visibility across all its nodes. Your AI Client (running on your desktop or laptop) needs to have direct network access to the Netdata IP and port (usually 19999).
    - **v2.6.0 - v2.7.1**: Only WebSocket transport is available, so launch Netdata through `nd-mcp`
    - **v2.7.2+**: Expose Netdata over SSE or HTTP directly, or continue to use `nd-mcp`
 3. **Optional bridge** - `npx mcp-remote@latest` remains useful if you prefer stdio-only setups or want to re-use the same launcher for multiple clients.
@@ -32,7 +32,7 @@ Cursor reads MCP definitions from `.cursor/mcp.json` in the workspace root. For 
 
 ### Netdata Cloud MCP
 
-Connect to your entire Netdata Cloud infrastructure
+Connect to all your Netdata Cloud nodes
 through a single endpoint — no local setup, bridges,
 or firewall changes needed.
 
@@ -135,7 +135,7 @@ Reference Netdata directly in your queries:
 
 ### In Code Comments
 
-Get infrastructure context while coding:
+Get observability context while coding:
 
 ```python
 # @netdata what's the typical memory usage of this service?
@@ -180,7 +180,7 @@ Use the toggle in settings to enable only the environment you need.
 
 ## Best Practices
 
-### Infrastructure-Aware Development
+### Observability-Aware Development
 
 While coding, ask about:
 

@@ -7,21 +7,21 @@ meta:
   categories:
     - export
   icon_filename: 'mongodb.svg'
-  description: 'Export Netdata Agent metrics to MongoDB for long-term storage, further analysis, and correlation with other data sources.'
+  description: 'Export Netdata Agent metrics to MongoDB to feed existing pipelines, further analysis, and correlation with other data sources.'
 keywords:
   - exporter
   - MongoDB
 overview:
   exporter_description: |
-    Use the MongoDB connector for the exporting engine to archive your Agent's metrics to a MongoDB database
-    for long-term storage, further analysis, or correlation with data from other sources.
+    Use the MongoDB connector for the exporting engine to send your Agent's metrics to a MongoDB database
+    to feed existing pipelines, further analysis, or correlation with data from other sources.
   exporter_limitations: ''
 setup:
   prerequisites:
     list:
       - title: ''
         description: |
-          - To use MongoDB as an external storage for long-term archiving, you should first [install](https://www.mongodb.com/docs/languages/c/c-driver/current/get-started/#download-and-install) libmongoc 1.7.0 or higher.
+          - To use MongoDB as an export destination, you should first [install](https://www.mongodb.com/docs/languages/c/c-driver/current/get-started/#download-and-install) libmongoc 1.7.0 or higher.
           - Next, re-install Netdata from the source, which detects that the required library is now available.
   configuration:
     file:

@@ -1,6 +1,6 @@
 # Investigations
 
-Ask Netdata anything about your infrastructure and get a deeply researched answer in minutes. Investigations turn your question and context into an analysis that correlates metrics, anomalies, and events across your systems.
+Ask Netdata anything about your systems and applications and get a deeply researched answer in minutes. Investigations turn your question and context into an analysis that correlates metrics, anomalies, and events across your systems.
 
 ## What Investigations are good for
 

@@ -4,7 +4,7 @@ This document explains how Netdata's alerting system is designed and how it dete
 
 ## The Problem: Alerts at Scale
 
-Netdata monitors infrastructure that can range from a single server to thousands of nodes, each with dozens of components: disks, network interfaces, databases, containers, and more.
+Netdata scales from one node to 100,000+ nodes, each with dozens of components: disks, network interfaces, databases, containers, and more.
 
 The challenge: How do you configure alerts that automatically apply to all Redis instances, all disks, or all network interfaces—without manually defining alerts for each one? And when one specific instance needs different thresholds, how do you override just that one predictably?
 

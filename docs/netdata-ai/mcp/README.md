@@ -1,13 +1,55 @@
 # Netdata MCP
 
+**Full-stack observability: the AI SRE that learns your stack!**
+
+**Metrics · Logs · Traces · Flows · Topology**\
+Infrastructure · APM · NPM · DBM · RUM · Synthetics · Cloud · AI SRE\
+OpenTelemetry · SNMP · NetFlow/IPFIX/sFlow · IPMI · Redfish · 2,000+ integrations
+
+Netdata is a full-stack observability platform: infrastructure, applications (OpenTelemetry traces), networks,
+databases, logs and cloud, with 2,000+ integrations. Netdata Agents collect, store and analyze data where it is
+generated, per second, with machine learning anomaly detection on every metric, and Netdata Parents and Netdata Cloud
+combine them into one view, from a single node to 100,000+ nodes.
+
+## What AI assistants get from Netdata MCP
+
+Through Netdata MCP, AI assistants query all of Netdata's observability data in real time: metrics, anomalies,
+alerts, logs, traces, database queries, network topology, flows and traps, and live Functions such as processes and
+network connections, across every node, from infrastructure and networks to applications. Assistants query the data
+where it lives, on Netdata Agents and Parents, directly or through Netdata Cloud.
+
+Netdata uses machine learning to model the
+behavior of the infrastructure and applications. Every metric is scored
+for anomalies as it is collected, and the scores are stored with the data. Netdata MCP gives assistants the scoring engine behind Netdata's Anomaly Advisor: their context comes from the
+incident itself, ranked across every metric, not from a random selection of metrics or a playbook:
+
+- **"What was interesting over the last week?"** Anomaly rates over time show when clusters of anomalies happened,
+  on which nodes, and how anomalies cascaded across systems, networks and applications.
+- **"What was anomalous in this timeframe?"** For a window the user gives, Netdata ranks what was anomalous: the blast
+  radius and impact of an incident, and where root cause analysis should start.
+- **"What changed the most in this timeframe?"** Netdata compares the window with a baseline and ranks the metrics
+  whose behavior changed.
+
+Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems,
+networks and applications, can identify issues before they become outages, and surface the actual impact of failures.
+From there, assistants drill down: query any metric, inspect alerts and their history, and explore logs and live
+processes.
+
+This matters most at scale: across thousands of nodes and millions of metrics, the scoring engine finds the metrics
+that matter for each incident, wherever they are.
+
+[Get started with Netdata](/docs/deployment-guides/standalone-deployment.md) · [Sign in to Netdata Cloud](https://app.netdata.cloud)
+
+## Netdata and MCP
+
 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) works in **two directions** with Netdata:
 
-- **Netdata as an MCP server** — AI assistants and clients (Claude, Cursor, VS Code, CLIs, and more) connect *to* Netdata to query your infrastructure. **This page** covers server setup; for per-client instructions see [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
+- **Netdata as an MCP server** — AI assistants and clients (Claude, ChatGPT, Cursor, VS Code, CLIs, and more) connect *to* Netdata to query your full stack: infrastructure, applications, networks, databases, logs and cloud. **This page** covers server setup; for per-client instructions see [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
 - **Netdata as an MCP client** — Netdata Cloud connects *out* to your own MCP servers (GitHub, PagerDuty, Atlassian, or any custom HTTPS MCP server) so Netdata AI can pull your team's institutional context into troubleshooting. See [MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md).
 
 The rest of this page covers **Netdata as an MCP server**.
 
-Netdata provides MCP servers that enable AI assistants to interact with your infrastructure monitoring data. You can connect via:
+Netdata provides MCP servers that enable AI assistants to interact with your observability data. You can connect via:
 
 - **[Netdata Cloud](#netdata-cloud-mcp)** — A single cloud-hosted endpoint at `https://app.netdata.cloud/api/v1/mcp` with full visibility across all your nodes. No bridges, no firewall changes.
 - **[Local Agent or Parent](#local-agent-or-parent-mcp)** —
@@ -665,6 +707,7 @@ For detailed configuration instructions for specific AI clients, see:
 
 **Chat Clients:**
 - [Claude Desktop](/docs/netdata-ai/mcp/mcp-clients/claude-desktop.md) - Anthropic's desktop AI assistant
+- [ChatGPT](/docs/netdata-ai/mcp/mcp-clients/chatgpt.md) - OpenAI's desktop app
 - [Cursor](/docs/netdata-ai/mcp/mcp-clients/cursor.md) - AI-powered code editor
 - [Visual Studio Code](/docs/netdata-ai/mcp/mcp-clients/vs-code.md) - VS Code with MCP support
 - [JetBrains IDEs](/docs/netdata-ai/mcp/mcp-clients/jetbrains-ides.md) - IntelliJ, PyCharm, WebStorm, etc.

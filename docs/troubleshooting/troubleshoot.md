@@ -2,7 +2,7 @@
 
 ## Overview
 
-When an alert fires, you can use AI to generate a detailed troubleshooting report that analyzes whether the alert requires immediate action or is just noise. The AI examines your alert's history, correlates it with thousands of other metrics across your infrastructure, and provides actionable insights—all within minutes.
+When an alert fires, you can use AI to generate a detailed troubleshooting report that analyzes whether the alert requires immediate action or is just noise. The AI examines your alert's history, correlates it with thousands of other metrics across your stack, and provides actionable insights—all within minutes.
 
 ![Ask AI from Alerts](https://raw.githubusercontent.com/netdata/docs-images/refs/heads/master/netdata-cloud/netdata-ai/alert-troubleshoot-1.png)
 
@@ -18,7 +18,7 @@ When an alert fires, you can use AI to generate a detailed troubleshooting repor
 The AI troubleshooting engine performs three key analyses when you trigger an investigation:
 
 1. **Alert Analysis** - Examines the alert's history and underlying metric behavior to determine if it's a transient false positive or legitimate issue
-2. **Correlation Discovery** - Scans thousands of metrics and log patterns across your infrastructure to identify what else was behaving abnormally at the same time
+2. **Correlation Discovery** - Scans thousands of metrics and log patterns across your stack to identify what else was behaving abnormally at the same time
 3. **Root Cause Hypothesis** - Provides a summary of findings and suggests likely root causes, pointing you to the most relevant metrics or dimensions
 
 ### Starting an Alert Investigation

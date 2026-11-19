@@ -18,7 +18,7 @@ Check out our [configuration documentation](/docs/netdata-agent/configuration/RE
 
 ### Lightweight Child Configuration
 
-This example helps you make Children super lightweight by offloading work to Parents, minimizing resource usage on production systems.
+This example helps you minimize the footprint of Children by offloading work to Parents, minimizing resource usage on production systems.
 
 **Why minimize Child footprint?**
 We don't recommend connecting Children to Cloud directly. This reduces the Netdata Agent footprint on your production systems, as some capabilities can be switched OFF for the Child and kept ON for the Parent.

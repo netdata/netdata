@@ -4,11 +4,11 @@
 
 **What You'll Learn**
 
-How Netdata identifies nodes across Agents, Parents, and Cloud - and why each identity type matters for your infrastructure.
+How Netdata identifies nodes across Agents, Parents, and Cloud - and why each identity type matters.
 
 :::
 
-Netdata uses several identity mechanisms to uniquely identify nodes, authenticate connections, and track metrics across your infrastructure. Understanding these identities is essential when:
+Netdata uses several identity mechanisms to uniquely identify nodes, authenticate connections, and track metrics across all your nodes. Understanding these identities is essential when:
 
 - Creating VM templates or golden images
 - Troubleshooting connection issues
@@ -118,7 +118,7 @@ Static virtual nodes use the existing YAML format (`mode: static` is optional):
 
 **GUID Uniqueness**
 
-Each virtual node GUID must be unique across your entire infrastructure. Using the same GUID as another node (real or virtual) causes identity conflicts - the same problems as [duplicate Machine GUIDs](#agent-self-identity).
+Each virtual node GUID must be unique across all your nodes. Using the same GUID as another node (real or virtual) causes identity conflicts - the same problems as [duplicate Machine GUIDs](#agent-self-identity).
 
 :::
 
@@ -206,7 +206,7 @@ The go.d GUI form selects `static` or `snmp` mode. The resource name entered whe
 
 The optional `stale_after` GUI field accepts whole seconds, from 0 to 4294967295. Omitting it preserves any legacy `_node_stale_after_seconds` label; an explicit value overrides that label, and zero disables it. When the timeout is enabled, stopping a job suppresses its chart cleanup to avoid refreshing host activity. Its charts can therefore remain while another job keeps the vnode active.
 
-Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across your infrastructure, as described in the GUID Uniqueness warning above. Each `hostname` must also be unique across all vnodes — the Agent rejects a new vnode whose hostname matches an existing one. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
+Generate a `guid` with `uuidgen` on Linux/macOS, or `[guid]::NewGuid()` in PowerShell. Each `guid` must be unique across all your nodes, as described in the GUID Uniqueness warning above. Each `hostname` must also be unique across all vnodes — the Agent rejects a new vnode whose hostname matches an existing one. See [Does renaming a virtual node change its identity?](#does-renaming-a-virtual-node-change-its-identity) for how each field affects the vnode.
 
 :::info
 

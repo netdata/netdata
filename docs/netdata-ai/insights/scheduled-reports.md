@@ -23,7 +23,7 @@ At the scheduled time, Netdata AI runs the report and delivers it to your email 
 
 ## Example setups
 
-### Weekly infrastructure health
+### Weekly health of your systems and applications
 - Type: Infrastructure Summary
 - Time range: Last 7 days
 - Schedule: Mondays 09:00

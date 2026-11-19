@@ -1,6 +1,6 @@
 # Spaces and Rooms
 
-This guide explains how you can effectively organize your infrastructure monitoring using Netdata Cloud.
+This guide explains how you can effectively organize your nodes and teams using Netdata Cloud.
 
 ## Overview
 
@@ -8,7 +8,7 @@ You can organize your monitoring with two primary concepts that work together.
 
 **Spaces** serve as your primary collaboration environment where you organize team members and manage access levels, connect nodes for monitoring, and create a unified monitoring environment.
 
-**Rooms** function as organizational units within Spaces that provide infrastructure-wide dashboards, real-time metrics visualization, focused monitoring views, and flexible node grouping.
+**Rooms** function as organizational units within Spaces that provide dashboards across their nodes, real-time metrics visualization, focused monitoring views, and flexible node grouping.
 
 **Key Relationship:** Each node can only belong to **one** Space, but you can assign a node to **multiple** Rooms within that Space.
 
@@ -63,7 +63,7 @@ All nodes automatically appear in the "All nodes" Room. Each Room has independen
 
 :::
 
-## Organize Your Infrastructure
+## Organize Your Nodes
 
 ### Room Organization Strategies
 

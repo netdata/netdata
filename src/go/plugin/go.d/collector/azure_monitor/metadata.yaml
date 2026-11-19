@@ -23,7 +23,7 @@ modules:
     overview: &overview
       data_collection:
         metrics_description: |
-          This collector provides real-time visibility into your Azure infrastructure by collecting platform metrics from the Azure Monitor Metrics API.
+          This collector provides real-time visibility into your Azure resources by collecting platform metrics from the Azure Monitor Metrics API.
 
           **Key capabilities:**
 
