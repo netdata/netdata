@@ -7,7 +7,7 @@ Netdata AI is a set of analysis and troubleshooting capabilities built into Netd
 ## Why it’s accurate and powerful
 
 - Per‑second granularity: Every Netdata Agent collects metrics at 1‑second resolution, preserving short‑lived spikes and transient behavior.
-- On‑device ML: Unsupervised models run on every agent, continuously scoring anomalies for every metric with zero configuration.
+- On‑device ML: Unsupervised models run on every agent, continuously scoring anomalies for every metric with zero configuration. Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
 - Evidence‑based correlation: Netdata’s correlation engine relates metrics, anomalies, and events across nodes to form defendable root‑cause hypotheses.
 - Full context: Reports and investigations combine statistical summaries, anomaly timelines, alert history, and dependency information.
 

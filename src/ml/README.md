@@ -4,6 +4,8 @@
 
 You can leverage machine learning to detect patterns and anomalies in your large datasets, enabling you to identify issues early before they escalate.
 
+Clusters of anomalies reveal dependencies that would otherwise go unnoticed, show how problems cascade across systems, networks and applications, can identify issues before they become outages, steer root cause analysis with data, and surface the actual impact of failures.
+
 Netdata offers **Anomaly Advisor**, a tool designed to improve your troubleshooting experience, reduce mean time to resolution, and prevent issues from escalating. You can access it through the [Netdata dashboard](/docs/dashboards-and-charts/README.md).
 
 :::tip

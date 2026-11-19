@@ -8766,7 +8766,7 @@ paths:
         Modern deployments should:
         - Use internal metrics: `netdata.ml_*` charts
         - Check Netdata Cloud for ML insights
-        - Use alert transitions API to see ML-based alerts
+        - Use the alert transitions API for alerts, and `/api/v2/data` for anomaly rates
         - Monitor anomaly rates via `/api/v2/data` with appropriate options
 
         **Security & Access Control:**
