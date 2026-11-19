@@ -45,10 +45,13 @@ if [ "$platform" = Linux ]; then
         esac
         case "$mount/" in "$PWD/v3/"*) mounts="${mounts}${mount#/}//" ;; esac
     done < /proc/self/mountinfo
-else
+elif [ "$platform" = Darwin ] || [ "$platform" = FreeBSD ]; then
     web_device=$(stat -f %d .) || exit 1
     prefix_device=$(stat -f %d "$prefix") || exit 1
     [ "$web_device" = "$prefix_device" ] || exit 0
+else
+    echo >&2 "Skipping dashboard cleanup: unknown filesystem tools on $platform"
+    exit 0
 fi
 
 remove_files() {

@@ -112,6 +112,35 @@ test ! -e "$3/v3/old.js"
                 target.rename(link)
 
     @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
+    def test_cmake_symlink_install_retains_its_targets(self):
+        version = subprocess.check_output(['cmake', '--version'], text=True).split()[2]
+        if tuple(map(int, version.split('.')[:2])) < (3, 22):
+            self.skipTest('CMAKE_INSTALL_MODE requires CMake 3.22')
+        (self.root / 'CMakeLists.txt').write_text(f'''cmake_minimum_required(VERSION 3.16)
+project(dashboard NONE)
+list(APPEND CMAKE_MODULE_PATH "{MODULES}")
+include(NetdataDashboard)
+set(WEB_DEST "web")
+bundle_dashboard()
+''')
+        archive = self.root / 'bundle.tar.gz'
+        build = self.root / 'build'
+        for release in (b'first', b'second'):
+            with tarfile.open(archive, 'w:gz') as tar:
+                entry = tarfile.TarInfo('dist/agent/v3/index.html')
+                entry.size = len(release)
+                tar.addfile(entry, io.BytesIO(release))
+            subprocess.run(['cmake', '-S', str(self.root), '-B', str(build),
+                            '-DDASHBOARD_URL=' + archive.as_uri()], check=True, capture_output=True)
+            for _ in range(2):
+                subprocess.run(['cmake', '--install', str(build), '--prefix', str(self.prefix)],
+                               env=dict(os.environ, CMAKE_INSTALL_MODE='REL_SYMLINK'),
+                               check=True, capture_output=True)
+                index = self.prefix / 'web/v3/index.html'
+                self.assertTrue(index.is_symlink())
+                self.assertEqual(index.read_bytes(), release)
+
+    @unittest.skipUnless(shutil.which('cmake'), 'CMake required')
     def test_reconfigure_and_install_two_bundles(self):
         project = self.root / 'CMakeLists.txt'
         system_files = (MODULES / 'NetdataSystemFiles.cmake').read_text()

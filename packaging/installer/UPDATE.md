@@ -45,9 +45,6 @@ wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && sh /
 
 **Installation Prefix**
 
-Source and static installers that ship the bundled dashboard remove obsolete regular files from the
-installed `web/v3/` directory, including locally added files. Keep custom dashboards elsewhere in the web root.
-
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to make sure it finds the existing installation.
 
 If you see a line starting with `--- Would attempt to update existing installation by running the updater script located at:`, then our [kickstart script update method](#update-methods-by-platform) will work for you.
@@ -77,6 +74,10 @@ The following table contains all possible installation types:
 <summary><strong>UNIX</strong></summary><br/>
 
 In most cases, you can update Netdata using our one-line kickstart script. This script will automatically run the update script installed as part of the initial install and preserve the existing installation options you specified.
+
+Source and static installers that ship the bundled dashboard remove obsolete regular files from the
+installed `web/v3/` directory, including locally added files. Keep custom dashboards elsewhere in the web root.
+Cleanup skips linked or separately mounted web paths. This includes a separate `/usr` mount when the install prefix is `/`.
 
 If you installed Netdata using an installation prefix, you will need to add an `--install-prefix` option specifying that prefix to this command to make sure it finds Netdata.
 
