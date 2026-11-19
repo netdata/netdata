@@ -787,10 +787,6 @@ endif()
 # dashboard
 #
 
-# Seed the source installer's fallback before it can stop a running Agent.
-# A build without a dashboard has no cleanup to perform.
-file(GENERATE OUTPUT "${CMAKE_BINARY_DIR}/CMakeFiles/dashboard-cleanup.status"
-     CONTENT "$<BOOL:${ENABLE_DASHBOARD}>\n")
 if(ENABLE_DASHBOARD)
   include(NetdataDashboard)
   bundle_dashboard()

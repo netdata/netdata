@@ -869,10 +869,6 @@ fi
 if ! NETDATA_INSTALLER_DASHBOARD_UPGRADE=$dashboard_upgrade cmake_install "${NETDATA_BUILD_DIR}"; then
   fatal "Failed to install Netdata." I000C
 fi
-dashboard_cleanup_status=0
-if [ "$dashboard_upgrade" = 1 ]; then
-  IFS= read -r dashboard_cleanup_status < "${NETDATA_BUILD_DIR}/CMakeFiles/dashboard-cleanup.status" || dashboard_cleanup_status=1
-fi
 
 # -----------------------------------------------------------------------------
 progress "Creating standard user and groups for netdata"
@@ -1400,4 +1396,4 @@ fi
 
 echo >&2 "  Enjoy X-Ray Vision for your infrastructure..."
 echo >&2
-exit "${dashboard_cleanup_status}"
+exit 0

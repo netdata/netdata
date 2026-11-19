@@ -46,10 +46,9 @@ dem_pair_run mkdir -p /opt/netdata || exit $?
         --exclude=./var/cache/netdata --exclude=./var/log/netdata . |
         dem_pair_run tar -xpf - "$@" -C /opt/netdata
 ) || exit $?
-dashboard_cleanup_status=0
 if [ "$dashboard_upgrade" = 1 ]; then
     run sh "$DP_STAGE/system/cleanup-dashboard.sh" "$DP_STAGE/usr/share/netdata/web/v3" \
-        /opt/netdata usr/share/netdata/web || dashboard_cleanup_status=$?
+        /opt/netdata usr/share/netdata/web || warning "Dashboard cleanup failed: $?. Continuing installation."
 fi
 if [ ! -d /opt/netdata/etc/netdata ]; then
     dem_pair_run mkdir -p /opt/netdata/etc || exit $?
@@ -81,4 +80,3 @@ else
 fi
 dem_pair_cleanup_stage || exit $?
 trap - EXIT HUP INT TERM
-exit "$dashboard_cleanup_status"

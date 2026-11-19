@@ -684,10 +684,10 @@ dem_pair_runtime() { echo "$1" >> "$EVENTS"; return "$ACTIVATION_STATUS"; }
 dem_pair_owner_start() { echo start >> "$EVENTS"; }
 ''')
         events = self.root / 'events'
-        for options, activation, status, expected in (
-            ((), 0, 37, ['activate', 'start']),
-            (('--dont-start-it',), 0, 37, ['activate']),
-            ((), 43, 43, ['activate']),
+        for options, activation, expected in (
+            ((), 0, ['activate', 'start']),
+            (('--dont-start-it',), 0, ['activate']),
+            ((), 43, ['activate']),
         ):
             with self.subTest(options=options, activation=activation):
                 events.write_text('')
@@ -695,7 +695,8 @@ dem_pair_owner_start() { echo start >> "$EVENTS"; }
                 result = self.run_static(options=options, EVENTS=str(events), ACTIVATION_STATUS=str(activation))
                 self.assertEqual(self.marker.read_text(), 'completed')
                 self.assertEqual(events.read_text().splitlines(), expected)
-                self.assertEqual(result.returncode, status, result.stderr)
+                self.assertIn('Dashboard cleanup failed: 37', result.stderr)
+                self.assertEqual(result.returncode, activation, result.stderr)
 
     def test_relocated_state_parents_remain_symlinks_after_overlay(self):
         self.check_relocated_state_parents()
