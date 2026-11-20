@@ -2564,52 +2564,80 @@ int handle_incoming_traffic(struct mqtt_ng_client *client)
                 return MQTT_NG_CLIENT_PROTOCOL_ERROR;
             break;
 
-        case MQTT_CPT_PUBLISH:
+        case MQTT_CPT_PUBLISH: {
             worker_is_busy(WORKER_ACLK_CPT_PUBLISH);
             pub = &client->parser.mqtt_packet.publish;
 
+            // pub->topic and pub->data belong to this packet and are released below,
+            // unless a new Topic Alias takes over pub->topic
+            const char *topic = pub->topic;
+            uint16_t new_alias = 0;
+
             if (pub->qos > 1) {
-                freez(pub->topic);
-                freez(pub->data);
-                return MQTT_NG_CLIENT_NOT_IMPL_YET;
+                rc = MQTT_NG_CLIENT_NOT_IMPL_YET;
+                goto publish_done;
             }
 
-            if ( pub->qos == 1 && ((rc = mqtt_ng_puback(client, pub->packet_id, 0))) ) {
-                client->client_state = MQTT_STATE_ERROR;
-                nd_log(NDLS_DAEMON, NDLP_ERR, "Error generating PUBACK reply for PUBLISH");
-                return rc;
-            }
-
+            // resolve the topic before acknowledging the message
             if ( (prop = get_property_by_id(client->parser.properties_parser.head, MQTT_PROP_TOPIC_ALIAS)) != NULL ) {
                 // Topic Alias property was sent from server
                 void *topic_ptr;
                 uint16_t topic_alias = prop->data.uint16;
+                if (!topic_alias) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "Topic alias 0 is not permitted");
+                    rc = MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                    goto publish_done;
+                }
                 if (!c_rhash_get_ptr_by_uint64(client->rx_aliases, topic_alias, &topic_ptr)) {
                     if (pub->topic != NULL) {
                         nd_log(NDLS_DAEMON, NDLP_ERR, "We do not yet support topic alias reassignment");
-                        return MQTT_NG_CLIENT_NOT_IMPL_YET;
+                        rc = MQTT_NG_CLIENT_NOT_IMPL_YET;
+                        goto publish_done;
                     }
-                    pub->topic = topic_ptr;
+                    topic = topic_ptr;
                 } else {
                     if (pub->topic == NULL) {
                         nd_log(NDLS_DAEMON, NDLP_ERR, "Topic alias with id %" PRIu16 " unknown and topic not set by server!", topic_alias);
-                        return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                        rc = MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                        goto publish_done;
                     }
-                    c_rhash_insert_uint64_ptr(client->rx_aliases, topic_alias, pub->topic);
+                    new_alias = topic_alias;
                 }
+            }
+
+            // a zero-length topic name is valid only with a Topic Alias (MQTT 5, 3.3.2.1)
+            if (topic == NULL) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "PUBLISH without a topic name or a topic alias");
+                rc = MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                goto publish_done;
+            }
+
+            if ( pub->qos == 1 && mqtt_ng_puback(client, pub->packet_id, 0) ) {
+                client->client_state = MQTT_STATE_ERROR;
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error generating PUBACK reply for PUBLISH");
+                rc = MQTT_NG_CLIENT_INTERNAL_ERROR;
+                goto publish_done;
+            }
+
+            if (new_alias) {
+                // the alias list takes over the topic string
+                c_rhash_insert_uint64_ptr(client->rx_aliases, new_alias, pub->topic);
+                pub->topic = NULL;
             }
 
             if (client->msg_callback) {
                 worker_is_busy(WORKER_ACLK_MSG_CALLBACK);
-                client->msg_callback(pub->topic, pub->data, pub->data_len, pub->qos);
+                client->msg_callback(topic, pub->data, pub->data_len, pub->qos);
             }
+            rc = MQTT_NG_CLIENT_WANT_WRITE;
 
-            // in case we have property topic alias and we have topic we take over the string
-            // and add pointer to it into topic alias list
-            if (prop == NULL)
-                freez(pub->topic);
+publish_done:
+            freez(pub->topic);
+            pub->topic = NULL;
             freez(pub->data);
-            return MQTT_NG_CLIENT_WANT_WRITE;
+            pub->data = NULL;
+            return rc;
+        }
 
         case MQTT_CPT_DISCONNECT:
             worker_is_busy(WORKER_ACLK_CPT_DISCONNECT);
@@ -2918,6 +2946,133 @@ static int mqtt_ng_unittest_topic_alias_uint16(void)
     MQTT_NG_TEST(mqtt_ng_unittest_msg.payload_len == 3 && !strcmp(mqtt_ng_unittest_msg.payload, "two"),
                  "alias-only PUBLISH with alias 300 callback payload");
     MQTT_NG_TEST(mqtt_ng_unittest_msg.qos == 0, "alias-only PUBLISH with alias 300 callback qos");
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
+// feeds one PUBLISH to a fresh client and expects it rejected before the callback and before any PUBACK
+static int mqtt_ng_unittest_reject_publish(const char *name, const char *packet, size_t packet_len, int expected_rc)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = mqtt_ng_unittest_msg_callback,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    memset(&mqtt_ng_unittest_msg, 0, sizeof(mqtt_ng_unittest_msg));
+
+    MQTT_NG_TEST(client != NULL, name);
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, packet, packet_len), name);
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == expected_rc, name);
+    MQTT_NG_TEST(mqtt_ng_unittest_msg.calls == 0, name);
+    MQTT_NG_TEST(BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer) == 0, name);
+    MQTT_NG_TEST(client->parser.mqtt_packet.publish.topic == NULL, name);
+    MQTT_NG_TEST(client->parser.mqtt_packet.publish.data == NULL, name);
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
+static int mqtt_ng_unittest_publish_topic_validation(void)
+{
+    int errors = 0;
+
+    // QoS 0, zero-length topic, no properties, no payload
+    const char qos0_no_topic[] = {
+        (char)(MQTT_CPT_PUBLISH << 4), 3,
+        0, 0,
+        0,
+    };
+    // QoS 1, zero-length topic, packet id 1, no properties, payload "x"
+    const char qos1_no_topic[] = {
+        (char)((MQTT_CPT_PUBLISH << 4) | 0x02), 6,
+        0, 0,
+        0, 1,
+        0,
+        'x',
+    };
+    // QoS 1, topic "t", packet id 1, Topic Alias 0
+    const char qos1_alias_zero[] = {
+        (char)((MQTT_CPT_PUBLISH << 4) | 0x02), 9,
+        0, 1, 't',
+        0, 1,
+        3, MQTT_PROP_TOPIC_ALIAS, 0x00, 0x00,
+    };
+
+    errors += mqtt_ng_unittest_reject_publish(
+        "QoS 0 PUBLISH without topic or alias is rejected",
+        qos0_no_topic, sizeof(qos0_no_topic), MQTT_NG_CLIENT_PROTOCOL_ERROR);
+    errors += mqtt_ng_unittest_reject_publish(
+        "QoS 1 PUBLISH without topic or alias is rejected",
+        qos1_no_topic, sizeof(qos1_no_topic), MQTT_NG_CLIENT_PROTOCOL_ERROR);
+    errors += mqtt_ng_unittest_reject_publish(
+        "PUBLISH with topic alias 0 is rejected",
+        qos1_alias_zero, sizeof(qos1_alias_zero), MQTT_NG_CLIENT_PROTOCOL_ERROR);
+
+    // alias reassignment is not supported: rejected without leaking the packet
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = mqtt_ng_unittest_msg_callback,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+    memset(&mqtt_ng_unittest_msg, 0, sizeof(mqtt_ng_unittest_msg));
+
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds for alias reassignment test");
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    const char publish_alias_5_a[] = {
+        (char)(MQTT_CPT_PUBLISH << 4), 9,
+        0, 1, 'a',
+        3, MQTT_PROP_TOPIC_ALIAS, 0x00, 0x05,
+        'h', 'i',
+    };
+    const char publish_alias_5_b[] = {
+        (char)(MQTT_CPT_PUBLISH << 4), 9,
+        0, 1, 'b',
+        3, MQTT_PROP_TOPIC_ALIAS, 0x00, 0x05,
+        'h', 'i',
+    };
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, publish_alias_5_a, sizeof(publish_alias_5_a)),
+                 "push PUBLISH defining alias 5");
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_WANT_WRITE, "PUBLISH defining alias 5 parses");
+    MQTT_NG_TEST(mqtt_ng_unittest_msg.calls == 1 && mqtt_ng_unittest_msg.topic &&
+                     !strcmp(mqtt_ng_unittest_msg.topic, "a"),
+                 "PUBLISH defining alias 5 invokes callback with its topic");
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, publish_alias_5_b, sizeof(publish_alias_5_b)),
+                 "push PUBLISH reassigning alias 5");
+    rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_NOT_IMPL_YET, "PUBLISH reassigning alias 5 is rejected");
+    MQTT_NG_TEST(mqtt_ng_unittest_msg.calls == 1, "PUBLISH reassigning alias 5 does not invoke callback");
+    MQTT_NG_TEST(client->parser.mqtt_packet.publish.topic == NULL &&
+                     client->parser.mqtt_packet.publish.data == NULL,
+                 "PUBLISH reassigning alias 5 releases its topic and payload");
 
     mqtt_ng_destroy(client);
     rbuf_free(input);
@@ -3500,6 +3655,7 @@ int mqtt_ng_unittest(void)
     errors += mqtt_ng_unittest_2byte_field_lengths();
     errors += mqtt_ng_unittest_reset_after_partial_publish();
     errors += mqtt_ng_unittest_topic_alias_uint16();
+    errors += mqtt_ng_unittest_publish_topic_validation();
     errors += mqtt_ng_unittest_partial_suback_reason_codes();
     errors += mqtt_ng_unittest_malformed_suback_properties_length();
     errors += mqtt_ng_unittest_malformed_ack_properties_length();

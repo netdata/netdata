@@ -53,6 +53,7 @@ aclk_transport_type_t aclk_transport_type_t_from_str(const char *str) {
 
 void aclk_transport_desc_t_destroy(aclk_transport_desc_t *trp_desc) {
     freez(trp_desc->endpoint);
+    trp_desc->endpoint = NULL;
 }
 
 void aclk_env_t_destroy(aclk_env_t *env) {
