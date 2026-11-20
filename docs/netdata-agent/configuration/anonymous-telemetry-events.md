@@ -49,12 +49,15 @@ reason, version, host and crash details) for up to 23 hours, while that hash rem
   timezone
 - Hardware: CPU, RAM and disk sizes, and the vendor and model of the system, board and chassis
 - Memory use and database sizes of the Agent
+- Counts of nodes (total, receiving, sending, archived), and of collected and available metrics, instances and
+  contexts. Reports never include metric samples (time-series values)
 - Identifiers: the Agent's machine GUID, the host's machine and boot IDs and the system UUID, and the Netdata Cloud
-  node and claim IDs when the Agent is connected to Netdata Cloud
+  node and claim IDs when the Agent has them
 
 The `crash reports` option in the `[global]` section of `netdata.conf` controls these reports: `all` (restarts and
-crashes), `crashes` (only events the Agent classifies as crashes) or `off`. Its default is `all` when telemetry is enabled or the Agent is, or was in its
-previous run, connected to Netdata Cloud (directly or through a Netdata Parent), and `off` otherwise.
+crashes), `crashes` (only events the Agent classifies as crashes) or `off`. Its default is `all` when telemetry is enabled, or when the Agent has a Netdata Cloud claim ID or node ID, now or in
+its previous run (it was claimed, or received a node ID through a Netdata Parent), even if it never reached Netdata
+Cloud. Otherwise the default is `off`.
 
 **Sentry crash reports:** builds that include Sentry support (some native packages) also send a crash report to
 Sentry when the daemon crashes. Sentry is not started when telemetry is disabled.
@@ -84,8 +87,8 @@ All opt-out methods prevent:
 
 - The daemon from starting Sentry crash reporting
 - The dashboard from loading PostHog, Google Tag Manager, Reo.dev and Sentry, so it sends them no data
-- The restart and crash reports, unless `crash reports` is set explicitly in `netdata.conf`, or the Agent is, or was in
-  its previous run, connected to Netdata Cloud. Set `crash reports = off` to stop them in every case
+- The restart and crash reports, unless `crash reports` is set explicitly in `netdata.conf`, or the Agent has a Netdata
+  Cloud claim ID or node ID, now or in its previous run. Set `crash reports = off` to stop them in every case
 
 :::
 
@@ -225,7 +228,7 @@ To confirm that telemetry is disabled:
 
 :::note
 
-If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer load PostHog, Google Tag Manager, Reo.dev or Sentry, and the daemon will not start Sentry. It also stops sending restart and crash reports, unless `crash reports` is set explicitly or the Agent is, or was in its previous run, connected to Netdata Cloud.
+If you used `DO_NOT_TRACK=1` with Docker or a Netdata installer script, confirm that it resulted in the `.opt-out-from-anonymous-statistics` file being created. The Agent dashboard will no longer load PostHog, Google Tag Manager, Reo.dev or Sentry, and the daemon will not start Sentry. It also stops sending restart and crash reports, unless `crash reports` is set explicitly or the Agent has a Netdata Cloud claim ID or node ID, now or in its previous run.
 
 :::
 
