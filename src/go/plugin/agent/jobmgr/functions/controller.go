@@ -712,7 +712,7 @@ func (c *Controller) finishAvailabilityPoll(
 		c.mu.Unlock()
 		return
 	}
-	if !poll.bundle.commitAvailability(result.availability) {
+	if !poll.bundle.commitAvailability(result) {
 		c.mu.Unlock()
 		return
 	}

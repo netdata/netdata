@@ -6,8 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"reflect"
 	"sync"
+	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -34,6 +36,8 @@ type functionBundle struct {
 	methods         []funcapi.FunctionConfig
 	availability    map[string]bool
 	pollable        bool
+	pollSequence    atomic.Uint64 // assigned inside the contained worker, in observation order
+	appliedPoll     uint64        // newest successful observation committed under mu
 	references      int
 	retired         bool
 	cleanupStart    bool
@@ -56,6 +60,7 @@ type functionAvailabilityPoll struct {
 }
 
 type functionAvailabilityResult struct {
+	sequence     uint64
 	availability map[string]bool
 	err          error
 }
@@ -131,11 +136,13 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 		OnContainment: callback.quarantineIfActive,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			defer callback.complete()
+			sequence := fb.pollSequence.Add(1)
 			availability, pollErr := fb.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
 			}
 			workerResult <- functionAvailabilityResult{
+				sequence:     sequence,
 				availability: availability,
 				err:          pollErr,
 			}
@@ -361,14 +368,13 @@ func newFunctionBundle(
 		}
 	}
 	bundle := &functionBundle{
-		kind:         kind,
-		module:       module,
-		job:          job,
-		handler:      handler,
-		methods:      append([]funcapi.FunctionConfig(nil), methods...),
-		availability: make(map[string]bool, len(methods)),
-		references:   1,
-		cleanupDone:  make(chan struct{}),
+		kind:        kind,
+		module:      module,
+		job:         job,
+		handler:     handler,
+		methods:     append([]funcapi.FunctionConfig(nil), methods...),
+		references:  1,
+		cleanupDone: make(chan struct{}),
 	}
 	if kind == functionBundleAgent {
 		for _, method := range methods {
@@ -377,13 +383,15 @@ func newFunctionBundle(
 	} else if callback, ok := job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
 		bundle.pollable = true
 	}
-	if _, err := bundle.refreshAvailability(); err != nil {
+	initial, err := bundle.evaluateAvailability()
+	if err != nil {
 		bundle.retire()
 		return nil, joinRetainedBundleCleanup(
 			err,
 			bundle.wait(context.Background()),
 		)
 	}
+	bundle.availability = initial
 	return bundle, nil
 }
 
@@ -553,14 +561,6 @@ func (fb *functionBundle) wait(ctx context.Context) error {
 	}
 }
 
-func (fb *functionBundle) refreshAvailability() (bool, error) {
-	next, err := fb.evaluateAvailability()
-	if err != nil {
-		return false, err
-	}
-	return fb.commitAvailability(next), nil
-}
-
 func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	if fb == nil {
 		return nil, errors.New("jobmgr Function bundle: nil availability refresh")
@@ -591,24 +591,20 @@ func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	return next, nil
 }
 
-func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
+func (fb *functionBundle) commitAvailability(result functionAvailabilityResult) bool {
 	if fb == nil {
 		return false
 	}
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
-	if fb.retired {
+	// Workers run in observation order, but their finishers can acquire the
+	// controller lock in reverse order after containment releases the workers.
+	if fb.retired || result.sequence <= fb.appliedPoll {
 		return false
 	}
-	changed := len(fb.availability) != len(next)
-	if !changed {
-		for method, available := range next {
-			if fb.availability[method] != available {
-				changed = true
-				break
-			}
-		}
-	}
+	fb.appliedPoll = result.sequence
+	next := result.availability
+	changed := !maps.Equal(fb.availability, next)
 	fb.availability = next
 	return changed
 }

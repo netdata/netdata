@@ -1430,8 +1430,9 @@ An attached job reserves the public names of its declared Functions. For collect
 `FunctionAvailability`, the catalog publishes each shared method and its aliases once any attached job reports it
 ready. It withdraws them when the last ready job loses readiness. An instance method follows its owning job.
 Each gated method has its own catalog lifetime so changes to the live job selector leave serving siblings and aliases
-in place. Collector capability comes from staging and successful availability polls. Temporary callback quarantine
-controls dispatch and clears when the retained callbacks finish. Agent and process Functions retain their existing
+in place. Collector capability comes from staging and successful availability polls. Once the controller applies a
+successful poll, it discards results from older polls that arrive later. Temporary callback quarantine controls
+dispatch and clears when the retained callbacks finish. Agent and process Functions retain their existing
 first-publication policy.
 
 Availability callback, contained-attempt, and asynchronous reconciliation failures emit separate fixed diagnostic
