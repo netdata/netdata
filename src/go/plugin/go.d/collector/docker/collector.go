@@ -5,12 +5,12 @@ package docker
 import (
 	"context"
 	_ "embed"
-	"errors"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/matcher"
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/docker/dockerfunc"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/dockerhost"
@@ -21,6 +21,9 @@ import (
 //go:embed "config_schema.json"
 var configSchema string
 
+//go:embed "charts.yaml"
+var chartTemplateYAML string
+
 func init() {
 	collectorapi.Register("docker", collectorapi.Creator{
 		JobConfigSchema: configSchema,
@@ -28,7 +31,7 @@ func init() {
 			// Docker Engine 29+ with the containerd image store makes the container list expensive for the daemon.
 			UpdateEvery: 10,
 		},
-		Create:          func() collectorapi.CollectorV1 { return New() },
+		CreateV2:        func() collectorapi.CollectorV2 { return New() },
 		Config:          func() any { return &Config{} },
 		SharedFunctions: dockerfunc.Methods,
 		MethodHandler: func(job collectorapi.RuntimeJob) funcapi.MethodHandler {
@@ -50,13 +53,12 @@ func New() *Collector {
 			CollectContainerSize: false,
 		},
 
-		charts: summaryCharts.Copy(),
 		newClient: func(cfg Config) (dockerClient, error) {
 			return docker.New(docker.WithHost(cfg.Address))
 		},
-		cntrSr:     matcher.TRUE(),
-		containers: make(map[string]bool),
-		now:        time.Now,
+		cntrSr: matcher.TRUE(),
+		now:    time.Now,
+		store:  metrix.NewCollectorStore(),
 	}
 	c.funcRouter = dockerfunc.NewRouter(funcDepsAdapter{collector: c})
 	return c
@@ -77,19 +79,18 @@ type (
 		collectorapi.Base
 		Config `yaml:",inline" json:""`
 
-		charts *collectorapi.Charts
-
 		client    dockerClient
 		newClient func(Config) (dockerClient, error)
 
 		funcRouter funcapi.MethodHandler
 
-		containers map[string]bool
-		cntrSr     matcher.Matcher
+		cntrSr matcher.Matcher
 
 		now               func() time.Time
 		images            imagesSnapshot
 		imagesNextRefresh time.Time
+
+		store metrix.CollectorStore
 	}
 	dockerClient interface {
 		Info(context.Context, docker.InfoOptions) (docker.SystemInfoResult, error)
@@ -122,32 +123,13 @@ func (c *Collector) Init(context.Context) error {
 	return nil
 }
 
-func (c *Collector) Check(context.Context) error {
-	mx, err := c.collect()
-	if err != nil {
-		return err
-	}
-	if len(mx) == 0 {
-		return errors.New("no metrics collected")
-
-	}
-	return nil
+func (c *Collector) Check(ctx context.Context) error {
+	_, err := c.info(ctx)
+	return err
 }
 
-func (c *Collector) Charts() *collectorapi.Charts {
-	return c.charts
-}
-
-func (c *Collector) Collect(context.Context) map[string]int64 {
-	mx, err := c.collect()
-	if err != nil {
-		c.Error(err)
-	}
-
-	if len(mx) == 0 {
-		return nil
-	}
-	return mx
+func (c *Collector) Collect(ctx context.Context) error {
+	return c.collect(ctx)
 }
 
 func (c *Collector) Cleanup(ctx context.Context) {
@@ -162,3 +144,7 @@ func (c *Collector) Cleanup(ctx context.Context) {
 	}
 	c.client = nil
 }
+
+func (c *Collector) MetricStore() metrix.CollectorStore { return c.store }
+
+func (c *Collector) ChartTemplateYAML() string { return chartTemplateYAML }

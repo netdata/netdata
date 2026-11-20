@@ -6,10 +6,14 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/chartengine"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
@@ -39,6 +43,25 @@ func TestCollector_ConfigurationSerialize(t *testing.T) {
 	collecttest.TestConfigurationSerialize(t, &Collector{}, dataConfigJSON, dataConfigYAML)
 }
 
+func TestArtifacts(t *testing.T) {
+	templateYAML := New().ChartTemplateYAML()
+	collecttest.AssertChartTemplateSchema(t, templateYAML)
+
+	spec, err := charttpl.DecodeYAML([]byte(templateYAML))
+	require.NoError(t, err)
+	require.NoError(t, spec.Validate())
+	_, err = chartengine.Compile(spec, 1)
+	require.NoError(t, err)
+
+	metadata, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	health, err := os.ReadFile("../../../../../health/health.d/docker.conf")
+	require.NoError(t, err)
+
+	collecttest.AssertMetadataDocumentsChartTemplate(t, metadata, templateYAML, nil)
+	collecttest.AssertHealthAlertsTargetChartTemplate(t, health, templateYAML)
+}
+
 func TestCollector_Init(t *testing.T) {
 	tests := map[string]struct {
 		config   Config
@@ -52,6 +75,13 @@ func TestCollector_Init(t *testing.T) {
 			wantFail: false,
 			config: Config{
 				Address: "",
+			},
+		},
+		"bad 'container_selector'": {
+			wantFail: true,
+			config: Config{
+				Address:           docker.DefaultDockerHost,
+				ContainerSelector: "[",
 			},
 		},
 	}
@@ -68,10 +98,6 @@ func TestCollector_Init(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestCollector_Charts(t *testing.T) {
-	assert.Equal(t, len(summaryCharts), len(*New().Charts()))
 }
 
 func TestCollector_Cleanup(t *testing.T) {
@@ -93,7 +119,10 @@ func TestCollector_Cleanup(t *testing.T) {
 		},
 		"after Collect": {
 			wantClose: true,
-			prepare:   func(c *Collector) { _ = c.Init(context.Background()); c.Collect(context.Background()) },
+			prepare: func(c *Collector) {
+				_ = c.Init(context.Background())
+				_, _ = collecttest.CollectScalarSeries(c)
+			},
 		},
 	}
 
@@ -106,12 +135,11 @@ func TestCollector_Cleanup(t *testing.T) {
 			test.prepare(collr)
 
 			require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+			assert.Equal(t, test.wantClose, m.closeCalled)
 
-			if test.wantClose {
-				assert.True(t, m.closeCalled)
-			} else {
-				assert.False(t, m.closeCalled)
-			}
+			m.closeCalled = false
+			require.NotPanics(t, func() { collr.Cleanup(context.Background()) })
+			assert.False(t, m.closeCalled, "second Cleanup must not close the client again")
 		})
 	}
 }
@@ -121,41 +149,23 @@ func TestCollector_Check(t *testing.T) {
 		prepare  func() *Collector
 		wantFail bool
 	}{
-		"case success": {
+		"success": {
+			wantFail: false,
+			prepare:  func() *Collector { return prepareCollector(&mockClient{}, true) },
+		},
+		"does not list images or containers": {
 			wantFail: false,
 			prepare: func() *Collector {
-				return prepareCaseSuccess()
+				return prepareCollector(&mockClient{errOnImageList: true, errOnContainerList: true}, true)
 			},
 		},
-		"case success without container size": {
-			wantFail: false,
-			prepare: func() *Collector {
-				return prepareCaseSuccessWithoutContainerSize()
-			},
-		},
-		"fail on case err on Info()": {
+		"fail on error on Info()": {
 			wantFail: true,
-			prepare: func() *Collector {
-				return prepareCaseErrOnInfo()
-			},
+			prepare:  func() *Collector { return prepareCollector(&mockClient{errOnInfo: true}, true) },
 		},
-		"fail on case err on ImageList()": {
+		"fail on error creating Docker client": {
 			wantFail: true,
-			prepare: func() *Collector {
-				return prepareCaseErrOnImageList()
-			},
-		},
-		"fail on case err on ContainerList()": {
-			wantFail: true,
-			prepare: func() *Collector {
-				return prepareCaseErrOnContainerList()
-			},
-		},
-		"fail on case err on creating Docker client": {
-			wantFail: true,
-			prepare: func() *Collector {
-				return prepareCaseErrCreatingClient()
-			},
+			prepare:  func() *Collector { return prepareCollector(nil, true) },
 		},
 	}
 
@@ -175,519 +185,111 @@ func TestCollector_Check(t *testing.T) {
 }
 
 func TestCollector_Collect(t *testing.T) {
+	// The expected values are those of the V1 collector for the same mock data.
+	summary := map[string]metrix.SampleValue{
+		"containers_running":               4,
+		"containers_paused":                5,
+		"containers_exited":                6,
+		"containers_healthy":               3,
+		"containers_unhealthy":             1,
+		"containers_not_running_unhealthy": 6,
+		"containers_starting":              3,
+		"containers_no_healthcheck":        4,
+		"images_active":                    2,
+		"images_dangling":                  1,
+		"images_size":                      300,
+	}
+	// container17 has the netdata.cloud/ignore label: it is counted in the summary only.
+	containers := []wantContainer{
+		{name: "container1", image: "example/example:v1", state: "created", health: "healthy"},
+		{name: "container2", image: "example/example:v1", state: "running", health: "healthy"},
+		{name: "container3", image: "example/example:v1", state: "running", health: "healthy"},
+		{name: "container4", image: "example/example:v2", state: "created", health: "not_running_unhealthy"},
+		{name: "container5", image: "example/example:v2", state: "running", health: "unhealthy"},
+		{name: "container6", image: "example/example:v2", state: "paused", health: "not_running_unhealthy"},
+		{name: "container7", image: "example/example:v2", state: "restarting", health: "not_running_unhealthy"},
+		{name: "container8", image: "example/example:v2", state: "removing", health: "not_running_unhealthy"},
+		{name: "container9", image: "example/example:v2", state: "exited", health: "not_running_unhealthy"},
+		{name: "container10", image: "example/example:v2", state: "dead", health: "not_running_unhealthy"},
+		{name: "container11", image: "example/example:v3", state: "removing", health: "starting"},
+		{name: "container12", image: "example/example:v3", state: "exited", health: "starting"},
+		{name: "container13", image: "example/example:v3", state: "exited", health: "starting"},
+		{name: "container14", image: "example/example:v4", state: "dead", health: "no_healthcheck"},
+		{name: "container15", image: "example/example:v4", state: "dead", health: "no_healthcheck"},
+		{name: "container16", image: "example/example:v4", state: "dead", health: "no_healthcheck"},
+	}
+
 	tests := map[string]struct {
-		prepare  func() *Collector
-		expected map[string]int64
+		prepare    func() *Collector
+		wantErr    bool
+		wantSeries map[string]metrix.SampleValue
 	}{
-		"case success": {
-			prepare: prepareCaseSuccess,
-			expected: map[string]int64{
-				"container_container10_health_status_healthy":               0,
-				"container_container10_health_status_none":                  0,
-				"container_container10_health_status_not_running_unhealthy": 1,
-				"container_container10_health_status_starting":              0,
-				"container_container10_health_status_unhealthy":             0,
-				"container_container10_size_root_fs":                        321,
-				"container_container10_size_rw":                             123,
-				"container_container10_state_created":                       0,
-				"container_container10_state_dead":                          1,
-				"container_container10_state_exited":                        0,
-				"container_container10_state_paused":                        0,
-				"container_container10_state_removing":                      0,
-				"container_container10_state_restarting":                    0,
-				"container_container10_state_running":                       0,
-				"container_container11_health_status_healthy":               0,
-				"container_container11_health_status_none":                  0,
-				"container_container11_health_status_not_running_unhealthy": 0,
-				"container_container11_health_status_starting":              1,
-				"container_container11_health_status_unhealthy":             0,
-				"container_container11_size_root_fs":                        321,
-				"container_container11_size_rw":                             123,
-				"container_container11_state_created":                       0,
-				"container_container11_state_dead":                          0,
-				"container_container11_state_exited":                        0,
-				"container_container11_state_paused":                        0,
-				"container_container11_state_removing":                      1,
-				"container_container11_state_restarting":                    0,
-				"container_container11_state_running":                       0,
-				"container_container12_health_status_healthy":               0,
-				"container_container12_health_status_none":                  0,
-				"container_container12_health_status_not_running_unhealthy": 0,
-				"container_container12_health_status_starting":              1,
-				"container_container12_health_status_unhealthy":             0,
-				"container_container12_size_root_fs":                        321,
-				"container_container12_size_rw":                             123,
-				"container_container12_state_created":                       0,
-				"container_container12_state_dead":                          0,
-				"container_container12_state_exited":                        1,
-				"container_container12_state_paused":                        0,
-				"container_container12_state_removing":                      0,
-				"container_container12_state_restarting":                    0,
-				"container_container12_state_running":                       0,
-				"container_container13_health_status_healthy":               0,
-				"container_container13_health_status_none":                  0,
-				"container_container13_health_status_not_running_unhealthy": 0,
-				"container_container13_health_status_starting":              1,
-				"container_container13_health_status_unhealthy":             0,
-				"container_container13_size_root_fs":                        321,
-				"container_container13_size_rw":                             123,
-				"container_container13_state_created":                       0,
-				"container_container13_state_dead":                          0,
-				"container_container13_state_exited":                        1,
-				"container_container13_state_paused":                        0,
-				"container_container13_state_removing":                      0,
-				"container_container13_state_restarting":                    0,
-				"container_container13_state_running":                       0,
-				"container_container14_health_status_healthy":               0,
-				"container_container14_health_status_none":                  1,
-				"container_container14_health_status_not_running_unhealthy": 0,
-				"container_container14_health_status_starting":              0,
-				"container_container14_health_status_unhealthy":             0,
-				"container_container14_size_root_fs":                        321,
-				"container_container14_size_rw":                             123,
-				"container_container14_state_created":                       0,
-				"container_container14_state_dead":                          1,
-				"container_container14_state_exited":                        0,
-				"container_container14_state_paused":                        0,
-				"container_container14_state_removing":                      0,
-				"container_container14_state_restarting":                    0,
-				"container_container14_state_running":                       0,
-				"container_container15_health_status_healthy":               0,
-				"container_container15_health_status_none":                  1,
-				"container_container15_health_status_not_running_unhealthy": 0,
-				"container_container15_health_status_starting":              0,
-				"container_container15_health_status_unhealthy":             0,
-				"container_container15_size_root_fs":                        321,
-				"container_container15_size_rw":                             123,
-				"container_container15_state_created":                       0,
-				"container_container15_state_dead":                          1,
-				"container_container15_state_exited":                        0,
-				"container_container15_state_paused":                        0,
-				"container_container15_state_removing":                      0,
-				"container_container15_state_restarting":                    0,
-				"container_container15_state_running":                       0,
-				"container_container16_health_status_healthy":               0,
-				"container_container16_health_status_none":                  1,
-				"container_container16_health_status_not_running_unhealthy": 0,
-				"container_container16_health_status_starting":              0,
-				"container_container16_health_status_unhealthy":             0,
-				"container_container16_size_root_fs":                        321,
-				"container_container16_size_rw":                             123,
-				"container_container16_state_created":                       0,
-				"container_container16_state_dead":                          1,
-				"container_container16_state_exited":                        0,
-				"container_container16_state_paused":                        0,
-				"container_container16_state_removing":                      0,
-				"container_container16_state_restarting":                    0,
-				"container_container16_state_running":                       0,
-				"container_container1_health_status_healthy":                1,
-				"container_container1_health_status_none":                   0,
-				"container_container1_health_status_not_running_unhealthy":  0,
-				"container_container1_health_status_starting":               0,
-				"container_container1_health_status_unhealthy":              0,
-				"container_container1_size_root_fs":                         321,
-				"container_container1_size_rw":                              123,
-				"container_container1_state_created":                        1,
-				"container_container1_state_dead":                           0,
-				"container_container1_state_exited":                         0,
-				"container_container1_state_paused":                         0,
-				"container_container1_state_removing":                       0,
-				"container_container1_state_restarting":                     0,
-				"container_container1_state_running":                        0,
-				"container_container2_health_status_healthy":                1,
-				"container_container2_health_status_none":                   0,
-				"container_container2_health_status_not_running_unhealthy":  0,
-				"container_container2_health_status_starting":               0,
-				"container_container2_health_status_unhealthy":              0,
-				"container_container2_size_root_fs":                         321,
-				"container_container2_size_rw":                              123,
-				"container_container2_state_created":                        0,
-				"container_container2_state_dead":                           0,
-				"container_container2_state_exited":                         0,
-				"container_container2_state_paused":                         0,
-				"container_container2_state_removing":                       0,
-				"container_container2_state_restarting":                     0,
-				"container_container2_state_running":                        1,
-				"container_container3_health_status_healthy":                1,
-				"container_container3_health_status_none":                   0,
-				"container_container3_health_status_not_running_unhealthy":  0,
-				"container_container3_health_status_starting":               0,
-				"container_container3_health_status_unhealthy":              0,
-				"container_container3_size_root_fs":                         321,
-				"container_container3_size_rw":                              123,
-				"container_container3_state_created":                        0,
-				"container_container3_state_dead":                           0,
-				"container_container3_state_exited":                         0,
-				"container_container3_state_paused":                         0,
-				"container_container3_state_removing":                       0,
-				"container_container3_state_restarting":                     0,
-				"container_container3_state_running":                        1,
-				"container_container4_health_status_healthy":                0,
-				"container_container4_health_status_none":                   0,
-				"container_container4_health_status_not_running_unhealthy":  1,
-				"container_container4_health_status_starting":               0,
-				"container_container4_health_status_unhealthy":              0,
-				"container_container4_size_root_fs":                         321,
-				"container_container4_size_rw":                              123,
-				"container_container4_state_created":                        1,
-				"container_container4_state_dead":                           0,
-				"container_container4_state_exited":                         0,
-				"container_container4_state_paused":                         0,
-				"container_container4_state_removing":                       0,
-				"container_container4_state_restarting":                     0,
-				"container_container4_state_running":                        0,
-				"container_container5_health_status_healthy":                0,
-				"container_container5_health_status_none":                   0,
-				"container_container5_health_status_not_running_unhealthy":  0,
-				"container_container5_health_status_starting":               0,
-				"container_container5_health_status_unhealthy":              1,
-				"container_container5_size_root_fs":                         321,
-				"container_container5_size_rw":                              123,
-				"container_container5_state_created":                        0,
-				"container_container5_state_dead":                           0,
-				"container_container5_state_exited":                         0,
-				"container_container5_state_paused":                         0,
-				"container_container5_state_removing":                       0,
-				"container_container5_state_restarting":                     0,
-				"container_container5_state_running":                        1,
-				"container_container6_health_status_healthy":                0,
-				"container_container6_health_status_none":                   0,
-				"container_container6_health_status_not_running_unhealthy":  1,
-				"container_container6_health_status_starting":               0,
-				"container_container6_health_status_unhealthy":              0,
-				"container_container6_size_root_fs":                         321,
-				"container_container6_size_rw":                              123,
-				"container_container6_state_created":                        0,
-				"container_container6_state_dead":                           0,
-				"container_container6_state_exited":                         0,
-				"container_container6_state_paused":                         1,
-				"container_container6_state_removing":                       0,
-				"container_container6_state_restarting":                     0,
-				"container_container6_state_running":                        0,
-				"container_container7_health_status_healthy":                0,
-				"container_container7_health_status_none":                   0,
-				"container_container7_health_status_not_running_unhealthy":  1,
-				"container_container7_health_status_starting":               0,
-				"container_container7_health_status_unhealthy":              0,
-				"container_container7_size_root_fs":                         321,
-				"container_container7_size_rw":                              123,
-				"container_container7_state_created":                        0,
-				"container_container7_state_dead":                           0,
-				"container_container7_state_exited":                         0,
-				"container_container7_state_paused":                         0,
-				"container_container7_state_removing":                       0,
-				"container_container7_state_restarting":                     1,
-				"container_container7_state_running":                        0,
-				"container_container8_health_status_healthy":                0,
-				"container_container8_health_status_none":                   0,
-				"container_container8_health_status_not_running_unhealthy":  1,
-				"container_container8_health_status_starting":               0,
-				"container_container8_health_status_unhealthy":              0,
-				"container_container8_size_root_fs":                         321,
-				"container_container8_size_rw":                              123,
-				"container_container8_state_created":                        0,
-				"container_container8_state_dead":                           0,
-				"container_container8_state_exited":                         0,
-				"container_container8_state_paused":                         0,
-				"container_container8_state_removing":                       1,
-				"container_container8_state_restarting":                     0,
-				"container_container8_state_running":                        0,
-				"container_container9_health_status_healthy":                0,
-				"container_container9_health_status_none":                   0,
-				"container_container9_health_status_not_running_unhealthy":  1,
-				"container_container9_health_status_starting":               0,
-				"container_container9_health_status_unhealthy":              0,
-				"container_container9_size_root_fs":                         321,
-				"container_container9_size_rw":                              123,
-				"container_container9_state_created":                        0,
-				"container_container9_state_dead":                           0,
-				"container_container9_state_exited":                         1,
-				"container_container9_state_paused":                         0,
-				"container_container9_state_removing":                       0,
-				"container_container9_state_restarting":                     0,
-				"container_container9_state_running":                        0,
-				"containers_health_status_healthy":                          3,
-				"containers_health_status_none":                             4,
-				"containers_health_status_not_running_unhealthy":            6,
-				"containers_health_status_starting":                         3,
-				"containers_health_status_unhealthy":                        1,
-				"containers_state_exited":                                   6,
-				"containers_state_paused":                                   5,
-				"containers_state_running":                                  4,
-				"images_active":                                             2,
-				"images_dangling":                                           1,
-				"images_size":                                               300,
+		"success": {
+			prepare:    func() *Collector { return prepareCollector(&mockClient{}, true) },
+			wantSeries: expectedSeries(summary, containers, true),
+		},
+		"success without container size": {
+			prepare:    func() *Collector { return prepareCollector(&mockClient{}, false) },
+			wantSeries: expectedSeries(summary, containers, false),
+		},
+		"container selector": {
+			prepare: func() *Collector {
+				collr := prepareCollector(&mockClient{}, false)
+				collr.ContainerSelector = "container1 container5"
+				return collr
 			},
+			wantSeries: expectedSeries(summary, []wantContainer{containers[0], containers[4]}, false),
 		},
-		"case success without container size": {
-			prepare: prepareCaseSuccessWithoutContainerSize,
-			expected: map[string]int64{
-				"container_container10_health_status_healthy":               0,
-				"container_container10_health_status_none":                  0,
-				"container_container10_health_status_not_running_unhealthy": 1,
-				"container_container10_health_status_starting":              0,
-				"container_container10_health_status_unhealthy":             0,
-				"container_container10_size_root_fs":                        0,
-				"container_container10_size_rw":                             0,
-				"container_container10_state_created":                       0,
-				"container_container10_state_dead":                          1,
-				"container_container10_state_exited":                        0,
-				"container_container10_state_paused":                        0,
-				"container_container10_state_removing":                      0,
-				"container_container10_state_restarting":                    0,
-				"container_container10_state_running":                       0,
-				"container_container11_health_status_healthy":               0,
-				"container_container11_health_status_none":                  0,
-				"container_container11_health_status_not_running_unhealthy": 0,
-				"container_container11_health_status_starting":              1,
-				"container_container11_health_status_unhealthy":             0,
-				"container_container11_size_root_fs":                        0,
-				"container_container11_size_rw":                             0,
-				"container_container11_state_created":                       0,
-				"container_container11_state_dead":                          0,
-				"container_container11_state_exited":                        0,
-				"container_container11_state_paused":                        0,
-				"container_container11_state_removing":                      1,
-				"container_container11_state_restarting":                    0,
-				"container_container11_state_running":                       0,
-				"container_container12_health_status_healthy":               0,
-				"container_container12_health_status_none":                  0,
-				"container_container12_health_status_not_running_unhealthy": 0,
-				"container_container12_health_status_starting":              1,
-				"container_container12_health_status_unhealthy":             0,
-				"container_container12_size_root_fs":                        0,
-				"container_container12_size_rw":                             0,
-				"container_container12_state_created":                       0,
-				"container_container12_state_dead":                          0,
-				"container_container12_state_exited":                        1,
-				"container_container12_state_paused":                        0,
-				"container_container12_state_removing":                      0,
-				"container_container12_state_restarting":                    0,
-				"container_container12_state_running":                       0,
-				"container_container13_health_status_healthy":               0,
-				"container_container13_health_status_none":                  0,
-				"container_container13_health_status_not_running_unhealthy": 0,
-				"container_container13_health_status_starting":              1,
-				"container_container13_health_status_unhealthy":             0,
-				"container_container13_size_root_fs":                        0,
-				"container_container13_size_rw":                             0,
-				"container_container13_state_created":                       0,
-				"container_container13_state_dead":                          0,
-				"container_container13_state_exited":                        1,
-				"container_container13_state_paused":                        0,
-				"container_container13_state_removing":                      0,
-				"container_container13_state_restarting":                    0,
-				"container_container13_state_running":                       0,
-				"container_container14_health_status_healthy":               0,
-				"container_container14_health_status_none":                  1,
-				"container_container14_health_status_not_running_unhealthy": 0,
-				"container_container14_health_status_starting":              0,
-				"container_container14_health_status_unhealthy":             0,
-				"container_container14_size_root_fs":                        0,
-				"container_container14_size_rw":                             0,
-				"container_container14_state_created":                       0,
-				"container_container14_state_dead":                          1,
-				"container_container14_state_exited":                        0,
-				"container_container14_state_paused":                        0,
-				"container_container14_state_removing":                      0,
-				"container_container14_state_restarting":                    0,
-				"container_container14_state_running":                       0,
-				"container_container15_health_status_healthy":               0,
-				"container_container15_health_status_none":                  1,
-				"container_container15_health_status_not_running_unhealthy": 0,
-				"container_container15_health_status_starting":              0,
-				"container_container15_health_status_unhealthy":             0,
-				"container_container15_size_root_fs":                        0,
-				"container_container15_size_rw":                             0,
-				"container_container15_state_created":                       0,
-				"container_container15_state_dead":                          1,
-				"container_container15_state_exited":                        0,
-				"container_container15_state_paused":                        0,
-				"container_container15_state_removing":                      0,
-				"container_container15_state_restarting":                    0,
-				"container_container15_state_running":                       0,
-				"container_container16_health_status_healthy":               0,
-				"container_container16_health_status_none":                  1,
-				"container_container16_health_status_not_running_unhealthy": 0,
-				"container_container16_health_status_starting":              0,
-				"container_container16_health_status_unhealthy":             0,
-				"container_container16_size_root_fs":                        0,
-				"container_container16_size_rw":                             0,
-				"container_container16_state_created":                       0,
-				"container_container16_state_dead":                          1,
-				"container_container16_state_exited":                        0,
-				"container_container16_state_paused":                        0,
-				"container_container16_state_removing":                      0,
-				"container_container16_state_restarting":                    0,
-				"container_container16_state_running":                       0,
-				"container_container1_health_status_healthy":                1,
-				"container_container1_health_status_none":                   0,
-				"container_container1_health_status_not_running_unhealthy":  0,
-				"container_container1_health_status_starting":               0,
-				"container_container1_health_status_unhealthy":              0,
-				"container_container1_size_root_fs":                         0,
-				"container_container1_size_rw":                              0,
-				"container_container1_state_created":                        1,
-				"container_container1_state_dead":                           0,
-				"container_container1_state_exited":                         0,
-				"container_container1_state_paused":                         0,
-				"container_container1_state_removing":                       0,
-				"container_container1_state_restarting":                     0,
-				"container_container1_state_running":                        0,
-				"container_container2_health_status_healthy":                1,
-				"container_container2_health_status_none":                   0,
-				"container_container2_health_status_not_running_unhealthy":  0,
-				"container_container2_health_status_starting":               0,
-				"container_container2_health_status_unhealthy":              0,
-				"container_container2_size_root_fs":                         0,
-				"container_container2_size_rw":                              0,
-				"container_container2_state_created":                        0,
-				"container_container2_state_dead":                           0,
-				"container_container2_state_exited":                         0,
-				"container_container2_state_paused":                         0,
-				"container_container2_state_removing":                       0,
-				"container_container2_state_restarting":                     0,
-				"container_container2_state_running":                        1,
-				"container_container3_health_status_healthy":                1,
-				"container_container3_health_status_none":                   0,
-				"container_container3_health_status_not_running_unhealthy":  0,
-				"container_container3_health_status_starting":               0,
-				"container_container3_health_status_unhealthy":              0,
-				"container_container3_size_root_fs":                         0,
-				"container_container3_size_rw":                              0,
-				"container_container3_state_created":                        0,
-				"container_container3_state_dead":                           0,
-				"container_container3_state_exited":                         0,
-				"container_container3_state_paused":                         0,
-				"container_container3_state_removing":                       0,
-				"container_container3_state_restarting":                     0,
-				"container_container3_state_running":                        1,
-				"container_container4_health_status_healthy":                0,
-				"container_container4_health_status_none":                   0,
-				"container_container4_health_status_not_running_unhealthy":  1,
-				"container_container4_health_status_starting":               0,
-				"container_container4_health_status_unhealthy":              0,
-				"container_container4_size_root_fs":                         0,
-				"container_container4_size_rw":                              0,
-				"container_container4_state_created":                        1,
-				"container_container4_state_dead":                           0,
-				"container_container4_state_exited":                         0,
-				"container_container4_state_paused":                         0,
-				"container_container4_state_removing":                       0,
-				"container_container4_state_restarting":                     0,
-				"container_container4_state_running":                        0,
-				"container_container5_health_status_healthy":                0,
-				"container_container5_health_status_none":                   0,
-				"container_container5_health_status_not_running_unhealthy":  0,
-				"container_container5_health_status_starting":               0,
-				"container_container5_health_status_unhealthy":              1,
-				"container_container5_size_root_fs":                         0,
-				"container_container5_size_rw":                              0,
-				"container_container5_state_created":                        0,
-				"container_container5_state_dead":                           0,
-				"container_container5_state_exited":                         0,
-				"container_container5_state_paused":                         0,
-				"container_container5_state_removing":                       0,
-				"container_container5_state_restarting":                     0,
-				"container_container5_state_running":                        1,
-				"container_container6_health_status_healthy":                0,
-				"container_container6_health_status_none":                   0,
-				"container_container6_health_status_not_running_unhealthy":  1,
-				"container_container6_health_status_starting":               0,
-				"container_container6_health_status_unhealthy":              0,
-				"container_container6_size_root_fs":                         0,
-				"container_container6_size_rw":                              0,
-				"container_container6_state_created":                        0,
-				"container_container6_state_dead":                           0,
-				"container_container6_state_exited":                         0,
-				"container_container6_state_paused":                         1,
-				"container_container6_state_removing":                       0,
-				"container_container6_state_restarting":                     0,
-				"container_container6_state_running":                        0,
-				"container_container7_health_status_healthy":                0,
-				"container_container7_health_status_none":                   0,
-				"container_container7_health_status_not_running_unhealthy":  1,
-				"container_container7_health_status_starting":               0,
-				"container_container7_health_status_unhealthy":              0,
-				"container_container7_size_root_fs":                         0,
-				"container_container7_size_rw":                              0,
-				"container_container7_state_created":                        0,
-				"container_container7_state_dead":                           0,
-				"container_container7_state_exited":                         0,
-				"container_container7_state_paused":                         0,
-				"container_container7_state_removing":                       0,
-				"container_container7_state_restarting":                     1,
-				"container_container7_state_running":                        0,
-				"container_container8_health_status_healthy":                0,
-				"container_container8_health_status_none":                   0,
-				"container_container8_health_status_not_running_unhealthy":  1,
-				"container_container8_health_status_starting":               0,
-				"container_container8_health_status_unhealthy":              0,
-				"container_container8_size_root_fs":                         0,
-				"container_container8_size_rw":                              0,
-				"container_container8_state_created":                        0,
-				"container_container8_state_dead":                           0,
-				"container_container8_state_exited":                         0,
-				"container_container8_state_paused":                         0,
-				"container_container8_state_removing":                       1,
-				"container_container8_state_restarting":                     0,
-				"container_container8_state_running":                        0,
-				"container_container9_health_status_healthy":                0,
-				"container_container9_health_status_none":                   0,
-				"container_container9_health_status_not_running_unhealthy":  1,
-				"container_container9_health_status_starting":               0,
-				"container_container9_health_status_unhealthy":              0,
-				"container_container9_size_root_fs":                         0,
-				"container_container9_size_rw":                              0,
-				"container_container9_state_created":                        0,
-				"container_container9_state_dead":                           0,
-				"container_container9_state_exited":                         1,
-				"container_container9_state_paused":                         0,
-				"container_container9_state_removing":                       0,
-				"container_container9_state_restarting":                     0,
-				"container_container9_state_running":                        0,
-				"containers_health_status_healthy":                          3,
-				"containers_health_status_none":                             4,
-				"containers_health_status_not_running_unhealthy":            6,
-				"containers_health_status_starting":                         3,
-				"containers_health_status_unhealthy":                        1,
-				"containers_state_exited":                                   6,
-				"containers_state_paused":                                   5,
-				"containers_state_running":                                  4,
-				"images_active":                                             2,
-				"images_dangling":                                           1,
-				"images_size":                                               300,
-			},
+		"fail on error on Info()": {
+			prepare: func() *Collector { return prepareCollector(&mockClient{errOnInfo: true}, true) },
+			wantErr: true,
 		},
-		"fail on case err on Info()": {
-			prepare:  prepareCaseErrOnInfo,
-			expected: nil,
+		"fail on error on ImageList()": {
+			prepare: func() *Collector { return prepareCollector(&mockClient{errOnImageList: true}, true) },
+			wantErr: true,
 		},
-		"fail on case err on ImageList()": {
-			prepare:  prepareCaseErrOnImageList,
-			expected: nil,
+		"fail on error on ContainerList()": {
+			prepare: func() *Collector { return prepareCollector(&mockClient{errOnContainerList: true}, true) },
+			wantErr: true,
 		},
-		"fail on case err on ContainerList()": {
-			prepare:  prepareCaseErrOnContainerList,
-			expected: nil,
-		},
-		"fail on case err on creating Docker client": {
-			prepare:  prepareCaseErrCreatingClient,
-			expected: nil,
+		"fail on error creating Docker client": {
+			prepare: func() *Collector { return prepareCollector(nil, true) },
+			wantErr: true,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			collr := test.prepare()
-
 			require.NoError(t, collr.Init(context.Background()))
 
-			mx := collr.Collect(context.Background())
-
-			require.Equal(t, test.expected, mx)
-
+			got, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
+			if test.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.wantSeries, got)
 		})
+	}
+}
+
+func TestCollector_Collect_UnknownContainerState(t *testing.T) {
+	m := &mockClient{containerState: "unknown"}
+	collr := prepareCollector(m, false)
+	collr.ContainerSelector = "container1"
+	require.NoError(t, collr.Init(context.Background()))
+
+	got, err := collecttest.CollectScalarSeries(collr, metrix.ReadFlatten())
+	require.NoError(t, err)
+
+	for _, state := range containerStates {
+		key := series("container_state",
+			"container_name", "container1",
+			"container_state", state,
+			"image", "example/example:v1",
+		)
+		assert.Equalf(t, metrix.SampleValue(0), got[key], "state %s", state)
 	}
 }
 
@@ -697,8 +299,8 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 		{ID: "sha256:unused", Containers: -1, Size: 200},
 	}
 	imagesV2 := []typesImage.Summary{{ID: "sha256:v2", Containers: -1, Size: 1000}}
-	mxV1 := map[string]int64{"images_active": 1, "images_dangling": 1, "images_size": 300}
-	mxV2 := map[string]int64{"images_active": 1, "images_dangling": 0, "images_size": 1000}
+	mxV1 := map[string]metrix.SampleValue{"images_active": 1, "images_dangling": 1, "images_size": 300}
+	mxV2 := map[string]metrix.SampleValue{"images_active": 1, "images_dangling": 0, "images_size": 1000}
 
 	type step struct {
 		advance          time.Duration
@@ -706,7 +308,7 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 		errOnImageList   bool
 		containerImageID string
 		wantCalls        int
-		wantImages       map[string]int64
+		wantImages       map[string]metrix.SampleValue
 	}
 	tests := map[string]struct {
 		steps []step
@@ -725,7 +327,7 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 					advance:          10 * time.Second,
 					containerImageID: "sha256:removed",
 					wantCalls:        1,
-					wantImages:       map[string]int64{"images_active": 0, "images_dangling": 2, "images_size": 300},
+					wantImages:       map[string]metrix.SampleValue{"images_active": 0, "images_dangling": 2, "images_size": 300},
 				},
 				{advance: 10 * time.Second, wantCalls: 1, wantImages: mxV1},
 			},
@@ -762,39 +364,211 @@ func TestCollector_Collect_ImagesRefresh(t *testing.T) {
 				m.errOnImageList = s.errOnImageList
 				m.containerImageID = s.containerImageID
 
-				mx := collr.Collect(context.Background())
-
+				got, err := collecttest.CollectScalarSeries(collr)
 				assert.Equalf(t, s.wantCalls, m.imageListCalls, "step %d: ImageList calls", i)
-				assert.Equalf(t, s.wantImages, imageMetrics(mx), "step %d: image metrics", i)
+				if s.wantImages == nil {
+					assert.Errorf(t, err, "step %d", i)
+					continue
+				}
+				require.NoErrorf(t, err, "step %d", i)
+				assert.Equalf(t, s.wantImages, imageSeries(got), "step %d: image metrics", i)
 			}
 		})
 	}
 }
 
-func TestCollector_Collect_FailedCollectionLeavesChartsUnchanged(t *testing.T) {
-	collr := New()
-	collr.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
+func TestCollector_ChartCoverage(t *testing.T) {
+	collr := prepareCollector(&mockClient{}, true)
 	require.NoError(t, collr.Init(context.Background()))
 
-	require.Nil(t, collr.Collect(context.Background()))
+	_, err := collecttest.CollectScalarSeries(collr)
+	require.NoError(t, err)
 
-	assert.Equal(t, chartIDs(summaryCharts.Copy()), chartIDs(collr.Charts()))
+	collecttest.AssertChartCoverage(t, collr, collecttest.ChartCoverageExpectation{})
 }
 
-func chartIDs(charts *collectorapi.Charts) []string {
-	var ids []string
-	for _, chart := range *charts {
-		ids = append(ids, chart.ID)
+// The V1 charts (charts.go before the migration) are the oracle: chart IDs may change, but contexts, dimension names,
+// presentation metadata and chart labels must survive.
+func TestCollector_ChartContract(t *testing.T) {
+	type chartContract struct {
+		Title, Family, Units, Type string
+		Priority                   int
+		Labels                     map[string]string
+		Dimensions                 []string
 	}
-	return ids
+	containerLabels := map[string]string{"container_name": "container2", "image": "example/example:v1"}
+	want := map[string]chartContract{
+		"docker.containers_state": {
+			"Total number of Docker containers in various states", "containers", "containers", "stacked", 70000,
+			map[string]string{}, []string{"running", "paused", "exited"},
+		},
+		"docker.containers_health_status": {
+			"Total number of Docker containers in various health states", "containers", "containers", "line", 70001,
+			map[string]string{}, []string{"healthy", "unhealthy", "not_running_unhealthy", "starting", "no_healthcheck"},
+		},
+		"docker.container_state": {
+			"Docker container state", "containers", "state", "line", 70002,
+			containerLabels, []string{"running", "paused", "exited", "created", "restarting", "removing", "dead"},
+		},
+		"docker.container_health_status": {
+			"Docker container health status", "containers", "status", "line", 70003,
+			containerLabels, []string{"healthy", "unhealthy", "not_running_unhealthy", "starting", "no_healthcheck"},
+		},
+		"docker.container_writeable_layer_size": {
+			"Docker container writable layer size", "containers", "bytes", "line", 70004,
+			containerLabels, []string{"writable_layer"},
+		},
+		"docker.images": {
+			"Total number of Docker images in various states", "images", "images", "stacked", 70005,
+			map[string]string{}, []string{"active", "dangling"},
+		},
+		"docker.images_size": {
+			"Total size of all Docker images", "images", "bytes", "line", 70006,
+			map[string]string{}, []string{"size"},
+		},
+	}
+
+	collr := prepareCollector(&mockClient{}, true)
+	collr.ContainerSelector = "container2"
+	require.NoError(t, collr.Init(context.Background()))
+	_, err := collecttest.CollectScalarSeries(collr)
+	require.NoError(t, err)
+
+	got := make(map[string]chartContract)
+	contexts := make(map[string]string)
+	for _, action := range preparePlan(t, newEngine(t, collr), collr).Actions {
+		switch a := action.(type) {
+		case chartengine.CreateChartAction:
+			contexts[a.ChartID] = a.Meta.Context
+			labels := a.Labels
+			if labels == nil {
+				labels = map[string]string{}
+			}
+			got[a.Meta.Context] = chartContract{
+				a.Meta.Title, a.Meta.Family, a.Meta.Units, string(a.Meta.Type), a.Meta.Priority, labels, nil,
+			}
+		case chartengine.CreateDimensionAction:
+			ctx := contexts[a.ChartID]
+			v := got[ctx]
+			v.Dimensions = append(v.Dimensions, a.Name)
+			got[ctx] = v
+			assert.Equalf(t, "absolute", string(a.Algorithm), "%s %s", ctx, a.Name)
+			assert.Equalf(t, 1, a.Multiplier, "%s %s", ctx, a.Name)
+			assert.Equalf(t, 1, a.Divisor, "%s %s", ctx, a.Name)
+			assert.Falsef(t, a.Hidden, "%s %s", ctx, a.Name)
+		}
+	}
+	assert.Equal(t, want, got)
+
+	creator := collectorapi.DefaultRegistry["docker"]
+	require.NotNil(t, creator.CreateV2)
+	assert.Nil(t, creator.Create)
+	assert.Equal(t, 10, creator.UpdateEvery)
 }
 
-func imageMetrics(mx map[string]int64) map[string]int64 {
-	if mx == nil {
-		return nil
+// Container "foo" is a name prefix of "foo-bar" and "foo_state": removing "foo" must retire only its own charts
+// (https://github.com/netdata/netdata/issues/24230).
+func TestCollector_RemovesOnlyChartsOfRemovedContainer(t *testing.T) {
+	m := &mockClient{}
+	collr := prepareCollector(m, true)
+	require.NoError(t, collr.Init(context.Background()))
+	engine := newEngine(t, collr)
+
+	created := make(map[string]map[string]string)
+	removed := make(map[string]bool)
+	cycle := func() {
+		t.Helper()
+		_, err := collecttest.CollectScalarSeries(collr)
+		require.NoError(t, err)
+		for _, action := range preparePlan(t, engine, collr).Actions {
+			switch a := action.(type) {
+			case chartengine.CreateChartAction:
+				created[a.ChartID] = a.Labels
+			case chartengine.RemoveChartAction:
+				removed[a.ChartID] = true
+			}
+		}
 	}
-	images := make(map[string]int64)
-	for k, v := range mx {
+
+	m.containers = []typesContainer.Summary{
+		{Names: []string{"/foo"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
+		{Names: []string{"/foo-bar"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
+		{Names: []string{"/foo_state"}, State: "running", Image: "alpine", ImageID: "sha256:alpine"},
+	}
+	cycle()
+	require.Empty(t, removed)
+
+	m.containers = m.containers[1:]
+	// Keep collecting well beyond the chart expiry and the metric-store retention.
+	for range 30 {
+		cycle()
+	}
+
+	wantRemoved := make(map[string]bool)
+	for chartID, labels := range created {
+		if labels["container_name"] == "foo" {
+			wantRemoved[chartID] = true
+		}
+	}
+	assert.Len(t, wantRemoved, 3)
+	assert.Equal(t, wantRemoved, removed)
+}
+
+type wantContainer struct {
+	name, image, state, health string
+}
+
+func expectedSeries(
+	summary map[string]metrix.SampleValue,
+	containers []wantContainer,
+	withSize bool,
+) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue, len(summary))
+	for k, v := range summary {
+		out[k] = v
+	}
+	for _, cntr := range containers {
+		for _, state := range containerStates {
+			key := series("container_state",
+				"container_name", cntr.name,
+				"container_state", state,
+				"image", cntr.image,
+			)
+			out[key] = boolValue(state == cntr.state)
+		}
+		for _, health := range containerHealthStates {
+			key := series("container_health_status",
+				"container_health_status", health,
+				"container_name", cntr.name,
+				"image", cntr.image,
+			)
+			out[key] = boolValue(health == cntr.health)
+		}
+		if withSize {
+			out[series("container_writable_layer_size", "container_name", cntr.name, "image", cntr.image)] = 123
+		}
+	}
+	return out
+}
+
+func boolValue(v bool) metrix.SampleValue {
+	if v {
+		return 1
+	}
+	return 0
+}
+
+func series(name string, labels ...string) string {
+	parts := make([]string, 0, len(labels)/2)
+	for i := 0; i+1 < len(labels); i += 2 {
+		parts = append(parts, labels[i]+"="+strconv.Quote(labels[i+1]))
+	}
+	return name + "{" + strings.Join(parts, ",") + "}"
+}
+
+func imageSeries(got map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	images := make(map[string]metrix.SampleValue)
+	for k, v := range got {
 		if strings.HasPrefix(k, "images_") {
 			images[k] = v
 		}
@@ -802,41 +576,27 @@ func imageMetrics(mx map[string]int64) map[string]int64 {
 	return images
 }
 
-func prepareCaseSuccess() *Collector {
-	collr := New()
-	collr.CollectContainerSize = true
-	collr.newClient = prepareNewClientFunc(&mockClient{})
-	return collr
+func newEngine(t *testing.T, c *Collector) *chartengine.Engine {
+	t.Helper()
+	engine, err := chartengine.New()
+	require.NoError(t, err)
+	require.NoError(t, engine.LoadYAML([]byte(c.ChartTemplateYAML()), 1))
+	return engine
 }
 
-func prepareCaseSuccessWithoutContainerSize() *Collector {
-	collr := New()
-	collr.CollectContainerSize = false
-	collr.newClient = prepareNewClientFunc(&mockClient{})
-	return collr
+func preparePlan(t *testing.T, engine *chartengine.Engine, c *Collector) chartengine.Plan {
+	t.Helper()
+	attempt, err := engine.PreparePlan(c.MetricStore().Read(metrix.ReadRaw(), metrix.ReadFlatten()))
+	require.NoError(t, err)
+	plan := attempt.Plan()
+	require.NoError(t, attempt.Commit())
+	return plan
 }
 
-func prepareCaseErrOnInfo() *Collector {
+func prepareCollector(m *mockClient, collectContainerSize bool) *Collector {
 	collr := New()
-	collr.newClient = prepareNewClientFunc(&mockClient{errOnInfo: true})
-	return collr
-}
-
-func prepareCaseErrOnImageList() *Collector {
-	collr := New()
-	collr.newClient = prepareNewClientFunc(&mockClient{errOnImageList: true})
-	return collr
-}
-
-func prepareCaseErrOnContainerList() *Collector {
-	collr := New()
-	collr.newClient = prepareNewClientFunc(&mockClient{errOnContainerList: true})
-	return collr
-}
-
-func prepareCaseErrCreatingClient() *Collector {
-	collr := New()
-	collr.newClient = prepareNewClientFunc(nil)
+	collr.CollectContainerSize = collectContainerSize
+	collr.newClient = prepareNewClientFunc(m)
 	return collr
 }
 
@@ -855,6 +615,10 @@ type mockClient struct {
 	images             []typesImage.Summary
 	imageListCalls     int
 	containerImageID   string
+	containerState     typesContainer.ContainerState
+	// containers, when set, replaces the default per-health-status lists: all of them are reported as having no
+	// health check.
+	containers []typesContainer.Summary
 }
 
 func (m *mockClient) Info(_ context.Context, _ docker.InfoOptions) (docker.SystemInfoResult, error) {
@@ -887,6 +651,13 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 	}
 
 	var containers []typesContainer.Summary
+
+	if m.containers != nil {
+		if typesContainer.HealthStatus(status) == typesContainer.NoHealthcheck {
+			containers = append(containers, m.containers...)
+		}
+		return docker.ContainerListResult{Items: containers}, nil
+	}
 
 	switch typesContainer.HealthStatus(status) {
 	case typesContainer.Healthy:
@@ -922,14 +693,14 @@ func (m *mockClient) ContainerList(_ context.Context, opts docker.ContainerListO
 		}
 	}
 
-	if m.containerImageID != "" {
-		for i := range containers {
+	for i := range containers {
+		if m.containerImageID != "" {
 			containers[i].ImageID = m.containerImageID
 		}
-	}
-
-	if opts.Size {
-		for i := range containers {
+		if m.containerState != "" {
+			containers[i].State = m.containerState
+		}
+		if opts.Size {
 			containers[i].SizeRw = 123
 			containers[i].SizeRootFs = 321
 		}
