@@ -109,7 +109,7 @@ bool cloud_conf_save(void) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     inicfg_generate(&cloud_config, wb, false, false);
     snprintfz(filename, sizeof(filename), "%s/cloud.conf", netdata_configured_cloud_dir);
-    FILE *fp = fopen(filename, "w");
+    FILE *fp = fopen_secret_write(filename, "w");
     if(!fp) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot open file '%s' for writing.", filename);
         return false;
