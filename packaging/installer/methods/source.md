@@ -26,6 +26,11 @@ The following additional dependencies are also needed, but will be prepared auto
 - libyaml
 - JSON-C
 
+By default SQLite is built from its own sources as part of the Netdata build. To link the SQLite library of
+the system instead (version 3.38.0 or newer), pass `-DENABLE_BUNDLED_SQLITE=Off` to `cmake`. Such a build
+cannot recover a damaged metadata database (`netdata -W sqlite-meta-recover`), because the SQLite recover
+extension is not part of the library.
+
 Additionally, the following build time features require additional dependencies:
 
 - Netdata Cloud support:
