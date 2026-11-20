@@ -972,8 +972,10 @@ static void dsf_capture_sqlite_unsafe_reason(void) {
         safecpy(session_status.shutdown.sqlite_unsafe, reason);
 }
 
-static void daemon_status_file_refresh(DAEMON_STATUS status) {
+// returns true when this call starts the shutdown (the first EXITING refresh)
+static bool daemon_status_file_refresh(DAEMON_STATUS status) {
     usec_t now_ut = now_realtime_usec();
+    bool exit_started = false;
 
     daemon_status_file_session_status_writer_enter();
     dsf_acquire(session_status);
@@ -991,8 +993,10 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(!session_status.timings.init_started_ut)
         session_status.timings.init_started_ut = now_ut;
 
-    if(status == DAEMON_STATUS_EXITING && !session_status.timings.exit_started_ut)
+    if(status == DAEMON_STATUS_EXITING && !session_status.timings.exit_started_ut) {
         session_status.timings.exit_started_ut = now_ut;
+        exit_started = true;
+    }
 
     if(session_status.status == DAEMON_STATUS_INITIALIZING)
         session_status.timings.init = (time_t)((now_ut - session_status.timings.init_started_ut + USEC_PER_SEC/2) / USEC_PER_SEC);
@@ -1107,6 +1111,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
 
     dsf_release(session_status);
     daemon_status_file_session_status_writer_leave();
+
+    return exit_started;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1756,13 +1762,14 @@ void daemon_status_file_register_fatal(const char *filename, const char *functio
 void daemon_status_file_update_status(DAEMON_STATUS status) {
     int saved_errno = errno;
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    daemon_status_file_refresh(status);
+    bool exit_started = daemon_status_file_refresh(status);
 
-    // EXITING saves record shutdown progress: one when the shutdown starts and one before every shutdown step.
-    // They only need to survive a process kill (docker stop gives 10 s, then SIGKILL), which keeps what was written
-    // in the page cache. An fsync per save costs 150-400 ms on a slow disk, enough to push a shutdown past the kill.
-    // The final EXITED save and the crash/timeout saves keep the fsync.
-    daemon_status_file_save(wb, &session_status, true, status != DAEMON_STATUS_EXITING);
+    // The first EXITING save records why we exit and is synced. The ones after it are progress saves, one before
+    // every shutdown step: they only need to survive a process kill (docker stop gives 10 s, then SIGKILL), which
+    // keeps what was written in the page cache. An fsync per step costs 150-400 ms on a slow disk, enough to push a
+    // shutdown past the kill. The final EXITED save and the crash/timeout saves keep the fsync.
+    bool sync_file = status != DAEMON_STATUS_EXITING || exit_started;
+    daemon_status_file_save(wb, &session_status, true, sync_file);
     errno = saved_errno;
 }
 
