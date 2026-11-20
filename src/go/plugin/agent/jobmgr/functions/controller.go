@@ -34,6 +34,7 @@ type Controller struct {
 
 	processNames       map[string]functionOwner                // reserved public provider names
 	processOwners      []functionOwner                         // immutable provider census
+	availability       map[functionOwner]*ownerAvailability    // allocated for owners with polled capabilities
 	plans              map[functionOwner]controllerModulePlan  // per-owner route plans
 	jobs               map[string]map[string]controllerJob     // live jobs by module then job name
 	groups             map[controllerGroupKey]*controllerGroup // method-generation groups by signature key
@@ -351,6 +352,7 @@ func newControllerWithPlans(
 		diagnostics:  diagnostics,
 		modules:      make(collectorapi.Registry, len(modules)),
 		plans:        plans,
+		availability: make(map[functionOwner]*ownerAvailability),
 		jobs:         make(map[string]map[string]controllerJob),
 		groups:       make(map[controllerGroupKey]*controllerGroup),
 		routes:       make(map[string]controllerRoute),
@@ -631,94 +633,6 @@ func (c *Controller) detachJob(
 
 func (c *Controller) ReconcileModule(ctx context.Context, module string) error {
 	return c.reconcileOwner(ctx, functionOwner{name: module})
-}
-
-func (c *Controller) reconcileOwner(ctx context.Context, owner functionOwner) error {
-	module := owner.name
-	if c == nil || ctx == nil || module == "" {
-		return errors.New("jobmgr Function controller: invalid module reconcile")
-	}
-	c.mu.Lock()
-	if err := c.usableLocked(); err != nil {
-		c.mu.Unlock()
-		return err
-	}
-	_, ok := c.plans[owner]
-	if !ok {
-		c.mu.Unlock()
-		return errors.New("jobmgr Function controller: module is not registered")
-	}
-	pollable := false
-	if bundle := c.plans[owner].agentBundle; bundle != nil {
-		pollable = pollable || bundle.pollable
-	}
-	for _, job := range c.ownerJobs(owner) {
-		pollable = pollable || job.bundle.pollable
-	}
-	if !pollable {
-		c.mu.Unlock()
-		return nil
-	}
-	bundles := make([]*functionBundle, 0, len(c.ownerJobs(owner))+1)
-	if bundle := c.plans[owner].agentBundle; bundle != nil && bundle.pollable {
-		bundles = append(bundles, bundle)
-	}
-	for _, job := range c.ownerJobs(owner) {
-		if job.bundle.pollable {
-			bundles = append(bundles, job.bundle)
-		}
-	}
-	c.mu.Unlock()
-
-	for _, bundle := range bundles {
-		poll, err := bundle.startAvailabilityPoll()
-		if errors.Is(err, jobmgr.ErrProcessAttemptBusy) ||
-			errors.Is(err, jobmgr.ErrProcessAttemptStopped) {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		if poll.attempt == nil {
-			continue
-		}
-		go c.finishAvailabilityPoll(owner, poll)
-	}
-	return nil
-}
-
-func (c *Controller) finishAvailabilityPoll(
-	owner functionOwner,
-	poll functionAvailabilityPoll,
-) {
-	if err := poll.attempt.Await(context.Background()); err != nil {
-		if !jobmgr.ContainsOnlyErrorLeaves(err,
-			context.Canceled,
-			jobmgr.ErrProcessAttemptRetired,
-			jobmgr.ErrProcessAttemptStopped,
-			jobmgr.ErrProcessAttemptSuperseded,
-		) {
-			c.observeAvailabilityFailure(DiagnosticAvailabilityAttemptFailed, poll.bundle, err)
-		}
-		return
-	}
-	result := <-poll.workerResult
-	if result.err != nil {
-		c.observeAvailabilityFailure(DiagnosticAvailabilityCallbackFailed, poll.bundle, result.err)
-		return
-	}
-	c.mu.Lock()
-	if c.usableLocked() != nil {
-		c.mu.Unlock()
-		return
-	}
-	if !poll.bundle.commitAvailability(result) {
-		c.mu.Unlock()
-		return
-	}
-	err := c.reconcileOwnerLocked(context.Background(), owner)
-	c.mu.Unlock()
-	c.observeAvailabilityFailure(DiagnosticAvailabilityReconciliationFailed, poll.bundle, err)
 }
 
 func (c *Controller) Stop(ctx context.Context, epoch uint64) error {
@@ -1034,6 +948,9 @@ func (c *Controller) buildGroup(
 	group.generation, err = newMethodGeneration(id, module, kind, policy, methods, bundles)
 	if err != nil {
 		return nil, err
+	}
+	if key.method != "" && len(bundles) > 1 {
+		group.generation.selectorMu = &c.ownerAvailabilityLocked(owner).selectors
 	}
 	declaration := group.generation.declaration()
 	for name, route := range group.routes {

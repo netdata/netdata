@@ -85,10 +85,7 @@ func TestDynamicInfoBoundUnavailableBootstrap(t *testing.T) {
 				if unavailable == "stopped" {
 					job.running = false
 				} else {
-					h.handles[job.Name()].bundle.commitAvailability(functionAvailabilityResult{
-						sequence:     1,
-						availability: map[string]bool{"events": false},
-					})
+					h.handles[job.Name()].bundle.commitAvailability(map[string]bool{"events": false})
 				}
 				got := h.call(t, []string{"info"}, nil, 200)
 				assert.Contains(t, string(got), `"id":"static"`)

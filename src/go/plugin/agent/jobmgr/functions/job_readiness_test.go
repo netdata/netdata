@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -134,33 +135,65 @@ func TestInstanceFunctionReadinessPublication(t *testing.T) {
 	require.Equal(t, []string{"publish:module:first", "withdraw:module:first"}, port.eventsSnapshot())
 }
 
-func TestOlderPollCannotRepublishWithdrawnFunction(t *testing.T) {
+// Count observations and hold one job in its callback after staging.
+type passReadiness struct {
+	ready atomic.Bool
+	polls atomic.Int32
+	wait  chan struct{}
+}
+
+func (r *passReadiness) FunctionAvailable(string) bool {
+	r.polls.Add(1)
+	if r.wait != nil {
+		<-r.wait
+	}
+	return r.ready.Load()
+}
+
+func TestModuleReadinessPassCannotBeOvertaken(t *testing.T) {
 	controller, _, port := newReadinessController(t, collectorapi.Creator{
 		SharedFunctions: func() []funcapi.FunctionConfig { return []funcapi.FunctionConfig{{ID: "shared"}} },
 	})
-	r, handle := prepareReadinessJob(t, controller, "job")
-	require.NoError(t, handle.Publish())
-	r.ready.Store(true)
-	poll := func() functionAvailabilityPoll {
+	start := func(name string) *passReadiness {
 		t.Helper()
-		p, err := handle.bundle.startAvailabilityPoll()
+		r := &passReadiness{}
+		job := &controllerTestJob{fullName: "module_" + name, module: "module", name: name, running: true, collector: r}
+		handle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
 		require.NoError(t, err)
-		waitBundleContainmentTestValue(t, p.attempt.Released(), "availability poll release")
-		return p
+		t.Cleanup(func() { require.NoError(t, handle.CloseAndDrain(context.Background())) })
+		require.NoError(t, handle.Publish())
+		return r
 	}
-	owner := functionOwner{name: "module"}
-	controller.finishAvailabilityPoll(owner, poll())
-	// Containment releases the worker identity before the controller applies its result.
-	older := poll()
-	r.ready.Store(false)
-	controller.finishAvailabilityPoll(owner, poll())
-	controller.finishAvailabilityPoll(owner, older)
-
-	// A newer observation of the same state must also supersede an older result.
-	r.ready.Store(true)
-	older = poll()
-	r.ready.Store(false)
-	controller.finishAvailabilityPoll(owner, poll())
-	controller.finishAvailabilityPoll(owner, older)
+	fast, slow := start("fast"), start("slow")
+	slow.wait = make(chan struct{})
+	release := sync.OnceFunc(func() { close(slow.wait) })
+	t.Cleanup(release)
+	fast.ready.Store(true)
+	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
+	identity := func(name string) jobmgr.ProcessAttemptIdentity {
+		return jobmgr.ProcessAttemptIdentity{
+			Namespace: jobmgr.ProcessAttemptFunctionPoll,
+			Key:       jobFunctionAttemptKey(1, "module_"+name),
+			Resource:  candidateFunctionResource("module_" + name),
+		}
+	}
+	waitForFast := func() {
+		t.Helper()
+		if done, ok := controller.attempts.ProcessAttemptReleased(identity("fast")); ok {
+			waitBundleContainmentTestValue(t, done, "fast worker release")
+		}
+	}
+	waitForFast()
+	require.EqualValues(t, 2, fast.polls.Load()) // staging plus one poll
+	fast.ready.Store(false)
+	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
+	waitForFast()
+	require.EqualValues(t, 2, fast.polls.Load())
+	// Logical settlement releases the pass even while slow's physical callback
+	// remains blocked. The next tick can still withdraw fast's last readiness.
+	require.True(t, controller.attempts.CutProcessAttempt(identity("slow"), jobmgr.ErrProcessAttemptDeadline))
+	require.Eventually(t, func() bool { return len(port.eventsSnapshot()) == 1 }, time.Second, time.Millisecond)
+	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
+	require.Eventually(t, func() bool { return len(port.eventsSnapshot()) == 2 }, time.Second, time.Millisecond)
 	require.Equal(t, []string{"publish:module:shared", "withdraw:module:shared"}, port.eventsSnapshot())
 }

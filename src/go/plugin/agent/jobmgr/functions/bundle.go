@@ -9,7 +9,6 @@ import (
 	"maps"
 	"reflect"
 	"sync"
-	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
@@ -36,8 +35,6 @@ type functionBundle struct {
 	methods         []funcapi.FunctionConfig
 	availability    map[string]bool
 	pollable        bool
-	pollSequence    atomic.Uint64 // assigned inside the contained worker, in observation order
-	appliedPoll     uint64        // newest successful observation committed under mu
 	references      int
 	retired         bool
 	cleanupStart    bool
@@ -56,11 +53,9 @@ type functionBundle struct {
 type functionAvailabilityPoll struct {
 	attempt      jobmgr.ProcessAttempt
 	workerResult <-chan functionAvailabilityResult
-	bundle       *functionBundle
 }
 
 type functionAvailabilityResult struct {
-	sequence     uint64
 	availability map[string]bool
 	err          error
 }
@@ -136,13 +131,11 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 		OnContainment: callback.quarantineIfActive,
 		Work: func(ctx context.Context, _ jobmgr.ProcessAttemptAdmission) error {
 			defer callback.complete()
-			sequence := fb.pollSequence.Add(1)
 			availability, pollErr := fb.evaluateAvailability()
 			if cause := context.Cause(ctx); cause != nil {
 				return cause
 			}
 			workerResult <- functionAvailabilityResult{
-				sequence:     sequence,
 				availability: availability,
 				err:          pollErr,
 			}
@@ -156,7 +149,6 @@ func (fb *functionBundle) startAvailabilityPoll() (functionAvailabilityPoll, err
 	return functionAvailabilityPoll{
 		attempt:      attempt,
 		workerResult: workerResult,
-		bundle:       fb,
 	}, nil
 }
 
@@ -591,22 +583,14 @@ func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 	return next, nil
 }
 
-func (fb *functionBundle) commitAvailability(result functionAvailabilityResult) bool {
-	if fb == nil {
-		return false
-	}
+func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
-	// Workers run in observation order, but their finishers can acquire the
-	// controller lock in reverse order after containment releases the workers.
-	if fb.retired || result.sequence <= fb.appliedPoll {
+	if fb.retired || maps.Equal(fb.availability, next) {
 		return false
 	}
-	fb.appliedPoll = result.sequence
-	next := result.availability
-	changed := !maps.Equal(fb.availability, next)
 	fb.availability = next
-	return changed
+	return true
 }
 
 // methodReady reads the last successful collector capability check. Temporary
