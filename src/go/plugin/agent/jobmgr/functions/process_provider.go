@@ -20,8 +20,9 @@ type functionOwner struct {
 }
 
 type controllerGroupKey struct {
-	owner functionOwner
-	scope string
+	owner  functionOwner
+	scope  string
+	method string // set for independently gated job methods
 }
 
 // ValidateProcessProviders checks fixed identity and callback requirements

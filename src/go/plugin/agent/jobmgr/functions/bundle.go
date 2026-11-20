@@ -613,6 +613,14 @@ func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
 	return changed
 }
 
+// methodReady reads the last successful collector capability check. Temporary
+// callback quarantine fences dispatch independently of advertised capability.
+func (fb *functionBundle) methodReady(method string) bool {
+	fb.mu.Lock()
+	defer fb.mu.Unlock()
+	return fb.availability[method]
+}
+
 func (fb *functionBundle) available(method string) bool {
 	if fb == nil {
 		return false

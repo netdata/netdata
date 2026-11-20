@@ -63,10 +63,9 @@ type controllerModulePlan struct {
 
 type controllerGroup struct {
 	key        controllerGroupKey         // owner and scope
-	owner      functionOwner              // owning collector or process provider
 	signature  string                     // content signature of the grouped methods
 	generation *methodGeneration          // the method generation backing the group
-	routes     map[string]controllerRoute // routes published for this group
+	routes     map[string]controllerRoute // declared names, including reservations while unavailable
 }
 
 type controllerRoute struct {
@@ -400,7 +399,7 @@ func newControllerWithPlans(
 			controller.groups[group.key] = group
 		}
 	}
-	routes, err := indexControllerRoutes(controller.groups)
+	routes, err := indexControllerRoutes(controller.groups, nil)
 	if err != nil {
 		return nil, nil, cleanupConstruction(err)
 	}
@@ -800,19 +799,14 @@ func (c *Controller) reconcileOwnerLocked(ctx context.Context, owner functionOwn
 
 	nextGroups := make(map[controllerGroupKey]*controllerGroup, len(c.groups)+len(desired))
 	for key, group := range c.groups {
-		if group.owner != owner {
+		if key.owner != owner {
 			nextGroups[key] = group
 		}
 	}
 	maps.Copy(nextGroups, desired)
-	nextRoutes, err := indexControllerRoutes(nextGroups)
+	nextRoutes, err := indexControllerRoutes(nextGroups, c.initialNames)
 	if err != nil {
 		return err
-	}
-	for name := range c.initialNames {
-		if _, exists := nextRoutes[name]; exists {
-			return errors.New("jobmgr Function controller: collector Function collides with initial route")
-		}
 	}
 	routeChanges := controllerRouteChanges(c.routes, nextRoutes)
 	if len(routeChanges) == 0 {
@@ -892,13 +886,28 @@ func (c *Controller) buildOwnerGroups(
 	}
 	module := owner.name
 	creator := c.modules[module]
-	if err := add(c.buildSharedGroup(module, creator)); err != nil {
-		return nil, err
-	}
 	jobs := c.jobs[module]
-	names := slices.Sorted(maps.Keys(jobs))
-	for _, name := range names {
-		if err := add(c.buildInstanceGroup(module, creator, jobs[name])); err != nil {
+	if len(jobs) == 0 {
+		return desired, nil
+	}
+	if shared := c.plans[owner].shared; len(shared) != 0 {
+		bundles := make(map[string]*functionBundle, len(jobs))
+		for name, job := range jobs {
+			bundles[name] = job.bundle
+		}
+		key := controllerGroupKey{owner: owner, scope: "shared"}
+		if err := c.buildJobGroups(key, methodGenerationShared, creator.InstancePolicy, shared, bundles, add); err != nil {
+			return nil, err
+		}
+	}
+	for _, name := range slices.Sorted(maps.Keys(jobs)) {
+		job := jobs[name]
+		if len(job.methods) == 0 {
+			continue
+		}
+		key := controllerGroupKey{owner: owner, scope: "instance/" + name}
+		bundles := map[string]*functionBundle{name: job.bundle}
+		if err := c.buildJobGroups(key, methodGenerationInstance, creator.InstancePolicy, job.methods, bundles, add); err != nil {
 			return nil, err
 		}
 	}
@@ -912,7 +921,6 @@ func (c *Controller) buildAgentGroup(owner functionOwner) (*controllerGroup, err
 	methods := c.availableAgentMethods(owner)
 	return c.buildGroup(
 		controllerGroupKey{owner: owner, scope: "agent"},
-		owner,
 		methodGenerationAgent,
 		collectorapi.InstancePolicyPerJob,
 		methods,
@@ -921,117 +929,117 @@ func (c *Controller) buildAgentGroup(owner functionOwner) (*controllerGroup, err
 	)
 }
 
-func (c *Controller) buildSharedGroup(module string, creator collectorapi.Creator) (*controllerGroup, error) {
-	if creator.SharedFunctions == nil || len(c.jobs[module]) == 0 {
-		return nil, nil
-	}
-	bundles := make(map[string]*functionBundle, len(c.jobs[module]))
-	for name, job := range c.jobs[module] {
-		bundles[name] = job.bundle
-	}
-	return c.buildGroup(
-		controllerGroupKey{owner: functionOwner{name: module}, scope: "shared"},
-		functionOwner{name: module},
-		methodGenerationShared,
-		creator.InstancePolicy,
-		c.plans[functionOwner{name: module}].shared,
-		bundles,
-		true,
-	)
-}
-
-func (c *Controller) buildInstanceGroup(
-	module string,
-	creator collectorapi.Creator,
-	job controllerJob,
-) (*controllerGroup, error) {
-	if creator.InstanceFunctions == nil {
-		return nil, nil
-	}
-	return c.buildGroup(
-		controllerGroupKey{owner: functionOwner{name: module}, scope: "instance/" + job.bundle.job.Name()},
-		functionOwner{name: module},
-		methodGenerationInstance,
-		creator.InstancePolicy,
-		job.methods,
-		map[string]*functionBundle{job.bundle.job.Name(): job.bundle},
-		false,
-	)
-}
-
-func (c *Controller) buildGroup(
+// Methods with independent readiness need independent catalog lifetimes. A
+// change to one method must not retire a sibling that still serves requests.
+func (c *Controller) buildJobGroups(
 	key controllerGroupKey,
-	owner functionOwner,
 	kind methodGenerationKind,
 	policy collectorapi.InstancePolicy,
 	methods []funcapi.FunctionConfig,
 	bundles map[string]*functionBundle,
-	aliases bool,
-) (*controllerGroup, error) {
-	module := owner.name
-	var err error
-	methods, err = validateConfiguredMethods(module, methods)
-	if err != nil {
-		return nil, err
+	add func(*controllerGroup, error) error,
+) error {
+	gated := false
+	for _, bundle := range bundles {
+		if bundle.pollable {
+			gated = true
+			break
+		}
 	}
+	if !gated {
+		return add(c.buildGroup(key, kind, policy, methods, bundles, true))
+	}
+	for i, method := range methods {
+		key.method = method.ID
+		ready := false
+		for _, bundle := range bundles {
+			if bundle.methodReady(method.ID) {
+				ready = true
+				break
+			}
+		}
+		if err := add(c.buildGroup(key, kind, policy, methods[i:i+1], bundles, ready)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *Controller) buildGroup(
+	key controllerGroupKey,
+	kind methodGenerationKind,
+	policy collectorapi.InstancePolicy,
+	methods []funcapi.FunctionConfig,
+	bundles map[string]*functionBundle,
+	ready bool,
+) (*controllerGroup, error) {
+	owner := key.owner
+	module := owner.name
 	if len(methods) == 0 {
 		return nil, nil
 	}
-	signature, err := controllerGroupSignature(kind, methods, bundles)
+	signature, err := controllerGroupSignature(kind, methods)
 	if err != nil {
 		return nil, err
 	}
 	if current := c.groups[key]; current != nil && current.signature == signature {
-		return current, nil
+		if !ready && current.generation == nil {
+			return current, nil
+		}
+		if ready && current.generation != nil && maps.Equal(current.generation.bundles, bundles) {
+			return current, nil
+		}
 	}
-	c.nextID++
-	if c.nextID == 0 {
-		return nil, errors.New("jobmgr Function controller: generation wrapped")
-	}
-	id := module + "/" + strconv.FormatUint(c.nextID, 10)
-	generation, err := newMethodGeneration(id, module, kind, policy, methods, bundles)
-	if err != nil {
-		return nil, err
-	}
-	declaration := generation.declaration()
 	group := &controllerGroup{
-		key:        key,
-		owner:      owner,
-		signature:  signature,
-		generation: generation,
-		routes:     make(map[string]controllerRoute),
+		key:       key,
+		signature: signature,
+		routes:    make(map[string]controllerRoute),
 	}
 	for _, method := range methods {
 		names := []string{funcapi.FunctionName(module, method)}
-		if aliases {
+		if kind != methodGenerationInstance {
 			names = funcapi.FunctionNames(module, method)
 		}
 		for _, name := range names {
 			if reserved, ok := c.processNames[name]; ok && reserved != owner {
-				_ = generation.cleanup(context.Background())
 				return nil, errors.New("jobmgr Function controller: Function collides with process provider")
 			}
 			if !validFunctionName(name) {
-				_ = generation.cleanup(context.Background())
 				return nil, errors.New("jobmgr Function controller: invalid public name")
 			}
 			if _, exists := group.routes[name]; exists {
-				_ = generation.cleanup(context.Background())
 				return nil, errors.New("jobmgr Function controller: duplicate public name")
 			}
 			group.routes[name] = controllerRoute{
 				module: module,
 				declaration: Declaration{
 					ID:                  method.ID,
-					Generation:          declaration,
 					PublicName:          name,
 					RawPayload:          method.RawRequest,
 					CooperativeCancel:   true,
 					CooperativeDeadline: true,
 				},
-				publication: methodPublicationRecord(name, module, method, c.nextID),
+				publication: methodPublicationRecord(name, module, method, 0),
 			}
 		}
+	}
+	if !ready {
+		return group, nil // reserve declared names without acquiring a handler generation
+	}
+	c.nextID++
+	if c.nextID == 0 {
+		return nil, errors.New("jobmgr Function controller: generation wrapped")
+	}
+	id := module + "/" + strconv.FormatUint(c.nextID, 10)
+	group.generation, err = newMethodGeneration(id, module, kind, policy, methods, bundles)
+	if err != nil {
+		return nil, err
+	}
+	declaration := group.generation.declaration()
+	for name, route := range group.routes {
+		route.declaration.Generation = declaration
+		route.publication.Generation = c.nextID
+		group.routes[name] = route
 	}
 	return group, nil
 }
@@ -1105,7 +1113,6 @@ func validateConfiguredMethods(module string, methods []funcapi.FunctionConfig) 
 func controllerGroupSignature(
 	kind methodGenerationKind,
 	methods []funcapi.FunctionConfig,
-	bundles map[string]*functionBundle,
 ) (string, error) {
 	digest := sha256.New()
 	_ = binary.Write(digest, binary.BigEndian, uint8(kind))
@@ -1165,21 +1172,6 @@ func controllerGroupSignature(
 		}
 		writeDigestString(digest, string(presentation))
 	}
-	names := slices.Sorted(maps.Keys(bundles))
-	for _, name := range names {
-		bundle := bundles[name]
-		writeDigestString(digest, name)
-		if bundle.job != nil {
-			writeDigestString(digest, bundle.job.FullName())
-		} else {
-			writeDigestString(digest, "")
-		}
-		if kind != methodGenerationAgent {
-			for _, method := range methods {
-				writeDigestBool(digest, bundle.available(method.ID))
-			}
-		}
-	}
 	return fmt.Sprintf("%x", digest.Sum(nil)), nil
 }
 
@@ -1224,7 +1216,7 @@ func methodAccess(method funcapi.FunctionConfig) string {
 	}
 }
 
-func indexControllerRoutes(groups map[controllerGroupKey]*controllerGroup) (map[string]controllerRoute, error) {
+func indexControllerRoutes(groups map[controllerGroupKey]*controllerGroup, initialNames map[string]struct{}) (map[string]controllerRoute, error) {
 	routes := make(map[string]controllerRoute)
 	keys := slices.Collect(maps.Keys(groups))
 	slices.SortFunc(keys, func(a, b controllerGroupKey) int {
@@ -1237,11 +1229,17 @@ func indexControllerRoutes(groups map[controllerGroupKey]*controllerGroup) (map[
 		if n := cmp.Compare(a.owner.name, b.owner.name); n != 0 {
 			return n
 		}
-		return cmp.Compare(a.scope, b.scope)
+		if n := cmp.Compare(a.scope, b.scope); n != 0 {
+			return n
+		}
+		return cmp.Compare(a.method, b.method)
 	})
 	for _, key := range keys {
 		group := groups[key]
 		for name, route := range group.routes {
+			if _, exists := initialNames[name]; exists {
+				return nil, errors.New("jobmgr Function controller: collector Function collides with initial route")
+			}
 			if current, exists := routes[name]; exists {
 				return nil, fmt.Errorf(
 					"jobmgr Function controller: public name %q collides between %s and %s",
@@ -1253,6 +1251,8 @@ func indexControllerRoutes(groups map[controllerGroupKey]*controllerGroup) (map[
 			routes[name] = route
 		}
 	}
+	// Check ownership across all declarations before keeping only publishable routes.
+	maps.DeleteFunc(routes, func(_ string, route controllerRoute) bool { return route.declaration.Generation == nil })
 	return routes, nil
 }
 
