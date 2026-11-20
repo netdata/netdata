@@ -86,6 +86,28 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
         list(APPEND _nd_rust_link_flags "-Cllvm-args=-align-all-functions=3")
     endif()
 
+    # Cargo release-profile overrides, applied to every Rust plugin below. The
+    # workspace release profile (src/crates/Cargo.toml) uses fat LTO with one
+    # codegen unit.
+    set(_nd_rust_release_env "")
+    if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      # On 32-bit targets that profile makes rustc-LLVM exhaust the ~3 GB process
+      # address space during codegen ("rustc-LLVM ERROR: out of memory"), so the
+      # whole dependency graph is built without LTO and debuginfo.
+      set(_nd_rust_release_env
+              "CARGO_PROFILE_RELEASE_DEBUG=0"
+              "CARGO_PROFILE_RELEASE_LTO=off"
+              "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+    elseif(NOT USE_LTO AND NETDATA_PACKAGE_KIND STREQUAL "bundle")
+      # A build that asked for no LTO gets none in Rust either: fat LTO is a
+      # several-minute single-core step on every clean build and Rust rebuild.
+      # Native packages keep the workspace profile even with USE_LTO off
+      # (openSUSE RPMs disable C/C++ LTO only).
+      set(_nd_rust_release_env
+              "CARGO_PROFILE_RELEASE_LTO=off"
+              "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=16")
+    endif()
+
     if(ENABLE_PLUGIN_OTEL)
       if(STATIC_BUILD)
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable "-C" "target-feature=+crt-static" ${_nd_rust_link_flags})
@@ -93,17 +115,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable ${_nd_rust_link_flags})
       endif()
 
-      # The workspace release profile propagates fat LTO, single-codegen-unit,
-      # and debuginfo settings through the whole dependency graph. On 32-bit
-      # targets that makes rustc-LLVM exhaust the ~3 GB process address space
-      # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
-      # release profile so the otel-plugin build stays within budget.
-      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        corrosion_set_env_vars(
-                otel-plugin
-                "CARGO_PROFILE_RELEASE_DEBUG=0"
-                "CARGO_PROFILE_RELEASE_LTO=off"
-                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
+      if(_nd_rust_release_env)
+        corrosion_set_env_vars(otel-plugin ${_nd_rust_release_env})
       endif()
     endif()
 
@@ -112,17 +125,8 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
       set(NETFLOW_PLUGIN_ENV_VARS
               "NETDATA_BUILD_CACHE_DIR=${CACHE_DIR}"
               "NETDATA_BUILD_LIB_DIR=${VARLIB_DIR}"
-              "NETDATA_BUILD_STOCK_DATA_DIR=${STOCK_DATA_DIR}")
-
-      if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        # The workspace release profile propagates fat LTO, single-codegen-unit,
-        # and debuginfo settings through Rust dependencies on 32-bit builds. Override
-        # Cargo's release profile so the entire dependency graph stays linkable.
-        list(APPEND NETFLOW_PLUGIN_ENV_VARS
-                "CARGO_PROFILE_RELEASE_DEBUG=0"
-                "CARGO_PROFILE_RELEASE_LTO=off"
-                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
-      endif()
+              "NETDATA_BUILD_STOCK_DATA_DIR=${STOCK_DATA_DIR}"
+              ${_nd_rust_release_env})
 
       if(STATIC_BUILD)
         list(APPEND NETFLOW_PLUGIN_RUSTFLAGS "-C" "target-feature=+crt-static")
@@ -137,5 +141,6 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
       corrosion_set_env_vars(netflow-plugin ${NETFLOW_PLUGIN_ENV_VARS})
     endif()
 
+    unset(_nd_rust_release_env)
     unset(_nd_rust_link_flags)
 endif()
