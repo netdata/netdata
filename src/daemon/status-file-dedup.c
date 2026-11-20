@@ -150,7 +150,7 @@ static bool daemon_status_dedup_save(void) {
     dedup.magic = DEDUP_MAGIC;
     dedup.v = DEDUP_VERSION;
     dedup.hash = fnv1a_hash_bin64(&dedup.slot, sizeof(dedup.slot));
-    return status_file_io_save(DEDUP_FILENAME, &dedup, sizeof(dedup), false);
+    return status_file_io_save(DEDUP_FILENAME, &dedup, sizeof(dedup), false, true);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
