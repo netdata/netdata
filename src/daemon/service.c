@@ -357,7 +357,12 @@ static void svc_rrdhost_cleanup_orphan_hosts(RRDHOST *protected_host) {
             // Look up fresh pointer for cloud operations (don't use stale 'host' pointer)
             RRDHOST *cloud_host = rrdhost_find_by_guid(machine_guid);
             if (cloud_host) {
-                send_node_info_with_wait(cloud_host);
+                // Node info is what carries the ephemeral label that lets the cloud delete the node.
+                // A host deleted only because it has no retention left has nothing new to report, and
+                // its labels are this agent's last copy: a child that moved to another parent would get
+                // its old labels back (the cloud keeps one copy of node info per node, last write wins).
+                if (rrdhost_option_check(cloud_host, RRDHOST_OPTION_EPHEMERAL_HOST))
+                    send_node_info_with_wait(cloud_host);
                 send_node_update_with_wait(cloud_host, 0, 0);
             }
 
