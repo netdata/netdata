@@ -373,7 +373,10 @@ func newFunctionBundle(
 			bundle.pollable = bundle.pollable || method.Available != nil
 		}
 	} else if callback, ok := job.Collector().(collectorapi.FunctionAvailability); ok && callback != nil {
-		bundle.pollable = true
+		// Job staging precedes runtime startup. Only a running-job poll can
+		// establish readiness for methods gated by the collector.
+		bundle.pollable = len(methods) != 0
+		return bundle, nil
 	}
 	initial, err := bundle.evaluateAvailability()
 	if err != nil {
@@ -558,6 +561,9 @@ func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 		return nil, errors.New("jobmgr Function bundle: nil availability refresh")
 	}
 	next := make(map[string]bool, len(fb.methods))
+	if fb.pollable && fb.job != nil && !fb.job.IsRunning() {
+		return next, nil
+	}
 	for _, method := range fb.methods {
 		available := true
 		var err error
@@ -584,6 +590,12 @@ func (fb *functionBundle) evaluateAvailability() (map[string]bool, error) {
 }
 
 func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
+	// Runtime exit takes effect before the failure command detaches the job.
+	if fb.job != nil && !fb.job.IsRunning() {
+		next = nil
+	} else if next == nil {
+		return false // failed or canceled observation of a live owner
+	}
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
 	if fb.retired || maps.Equal(fb.availability, next) {
@@ -593,9 +605,12 @@ func (fb *functionBundle) commitAvailability(next map[string]bool) bool {
 	return true
 }
 
-// methodReady reads the last successful collector capability check. Temporary
-// callback quarantine fences dispatch independently of advertised capability.
-func (fb *functionBundle) methodReady(method string) bool {
+// A job can exit between its last poll and a membership reconciliation.
+// Temporary callback quarantine fences dispatch independently of publication.
+func (fb *functionBundle) jobMethodReady(method string) bool {
+	if !fb.job.IsRunning() {
+		return false
+	}
 	fb.mu.Lock()
 	defer fb.mu.Unlock()
 	return fb.availability[method]

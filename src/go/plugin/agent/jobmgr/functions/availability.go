@@ -130,9 +130,6 @@ func (c *Controller) finishAvailabilityPass(owner functionOwner, state *ownerAva
 		state.selectors.Lock()
 		changed := false
 		for _, m := range members {
-			if m.result.availability == nil {
-				continue
-			}
 			if m.jobName != "" && c.ownerJobs(owner)[m.jobName].bundle != m.bundle {
 				continue // detached or replaced while the pass was settling
 			}

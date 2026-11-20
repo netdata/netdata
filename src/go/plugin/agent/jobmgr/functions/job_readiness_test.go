@@ -4,6 +4,7 @@ package functions
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -73,7 +74,11 @@ func TestSharedFunctionReadinessPublication(t *testing.T) {
 		require.NotZero(t, result.Rejected)
 	}
 
-	require.Contains(t, port.eventsSnapshot(), "publish:module:always")
+	require.Empty(t, port.eventsSnapshot())
+	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
+	require.Eventually(t, func() bool {
+		return slices.Contains(port.eventsSnapshot(), "publish:module:always")
+	}, time.Second, time.Millisecond)
 	for _, route := range []string{"alias", "module:shared", "module:first", "module:second"} {
 		require.NotContains(t, port.eventsSnapshot(), "publish:"+route)
 		absent(route)
@@ -166,8 +171,7 @@ func TestModuleReadinessPassCannotBeOvertaken(t *testing.T) {
 	}
 	fast, slow := start("fast"), start("slow")
 	slow.wait = make(chan struct{})
-	release := sync.OnceFunc(func() { close(slow.wait) })
-	t.Cleanup(release)
+	t.Cleanup(func() { close(slow.wait) })
 	fast.ready.Store(true)
 	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
 	identity := func(name string) jobmgr.ProcessAttemptIdentity {
@@ -184,11 +188,11 @@ func TestModuleReadinessPassCannotBeOvertaken(t *testing.T) {
 		}
 	}
 	waitForFast()
-	require.EqualValues(t, 2, fast.polls.Load()) // staging plus one poll
+	require.EqualValues(t, 1, fast.polls.Load())
 	fast.ready.Store(false)
 	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
 	waitForFast()
-	require.EqualValues(t, 2, fast.polls.Load())
+	require.EqualValues(t, 1, fast.polls.Load())
 	// Logical settlement releases the pass even while slow's physical callback
 	// remains blocked. The next tick can still withdraw fast's last readiness.
 	require.True(t, controller.attempts.CutProcessAttempt(identity("slow"), jobmgr.ErrProcessAttemptDeadline))
@@ -196,4 +200,34 @@ func TestModuleReadinessPassCannotBeOvertaken(t *testing.T) {
 	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
 	require.Eventually(t, func() bool { return len(port.eventsSnapshot()) == 2 }, time.Second, time.Millisecond)
 	require.Equal(t, []string{"publish:module:shared", "withdraw:module:shared"}, port.eventsSnapshot())
+}
+
+func TestExitedJobCannotPublishFromPendingReadinessPass(t *testing.T) {
+	controller, _, port := newReadinessController(t, collectorapi.Creator{
+		SharedFunctions: func() []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "exiting", Aliases: []string{"alias"}}, {ID: "sibling"}}
+		},
+	})
+	r := &passReadiness{wait: make(chan struct{})}
+	r.ready.Store(true)
+	job := &controllerTestJob{fullName: "module_exiting", module: "module", name: "exiting", running: true, collector: r}
+	handle, err := prepareControllerTestJob(t, controller, lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 1}, job)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, handle.CloseAndDrain(context.Background())) })
+	release := sync.OnceFunc(func() { close(r.wait) })
+	t.Cleanup(release)
+	require.NoError(t, handle.Publish())
+	sibling, siblingHandle := prepareReadinessJob(t, controller, "sibling")
+	require.NoError(t, siblingHandle.Publish())
+	sibling.ready.Store(true)
+
+	require.NoError(t, controller.ReconcileModule(t.Context(), "module"))
+	require.Eventually(t, func() bool { return r.polls.Load() != 0 }, time.Second, time.Millisecond)
+	// A completed run clears IsRunning before its queued failure command detaches the handle.
+	job.running = false
+	release()
+	require.Eventually(t, func() bool {
+		return slices.Contains(port.eventsSnapshot(), "publish:module:sibling")
+	}, time.Second, time.Millisecond)
+	require.Equal(t, []string{"publish:module:sibling"}, port.eventsSnapshot())
 }

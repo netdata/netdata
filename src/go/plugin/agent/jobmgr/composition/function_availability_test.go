@@ -254,6 +254,13 @@ func TestSingleTickSharedFunctionReadinessHandoff(t *testing.T) {
 		return job
 	}
 	first, second := start("first", true), start("second", false)
+	require.NoError(t, generation.tick(t.Context(), 1))
+	require.Eventually(t, func() bool {
+		wire := output.String()
+		return strings.Contains(wire, `FUNCTION GLOBAL "module:shared"`) &&
+			strings.Contains(wire, `FUNCTION GLOBAL "alias"`) &&
+			strings.Contains(wire, `FUNCTION GLOBAL "module:first"`)
+	}, time.Second, time.Millisecond)
 	first.observed, second.observed = make(chan struct{}), make(chan struct{})
 	second.resume = make(chan struct{})
 	resume := sync.OnceFunc(func() { close(second.resume) })
@@ -261,7 +268,7 @@ func TestSingleTickSharedFunctionReadinessHandoff(t *testing.T) {
 	startOffset := len(output.String())
 	second.ready.Store(true)
 	first.ready.Store(false)
-	require.NoError(t, generation.tick(t.Context(), 1))
+	require.NoError(t, generation.tick(t.Context(), 2))
 	for _, job := range []*handoffJob{first, second} {
 		select {
 		case <-job.observed:

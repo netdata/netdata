@@ -1430,13 +1430,14 @@ An attached job reserves the public names of its declared Functions. For collect
 `FunctionAvailability`, the catalog publishes each shared method and its aliases once any attached job reports it
 ready. It withdraws them when the last ready job loses readiness. An instance method follows its owning job.
 Each gated method has its own catalog lifetime so changes to the live job selector leave serving siblings and aliases
-in place. Collector capability comes from staging and successful availability polls. A module polls its attached bundles concurrently.
-After their contained attempts settle, the controller applies successful observations from still-attached bundles
-as one update for job selectors and reconciles publication once if readiness changed. Failed or busy bundles keep
-their previous capability. Ticks during an active pass skip that owner. A contained callback can delay its pass
-until the attempt deadline, even if the physical callback continues running afterward. Temporary callback quarantine controls
-dispatch and clears when the retained callbacks finish. Agent and process Functions retain their existing
-first-publication policy.
+in place. Gated job methods become eligible for first publication on a successful poll after runtime startup.
+A module polls its attached bundles concurrently. After their contained attempts settle, the controller applies
+successful observations from still-attached running jobs as one update for job selectors. An exited job cannot
+establish readiness while its detach is pending. The controller reconciles publication once if readiness changed.
+Failed or busy polls of live jobs keep their previous capability. Ticks during an active pass skip
+that owner. A contained callback can delay its pass until the attempt deadline, even if the physical callback
+continues running afterward. Temporary callback quarantine controls dispatch and clears when the retained
+callbacks finish. Agent and process Functions retain their existing first-publication policy.
 
 Availability callback, contained-attempt, and asynchronous reconciliation failures emit separate fixed diagnostic
 categories through the process observer. Events contain the run generation, sanitized bundle identity, and a safe

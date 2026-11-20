@@ -867,7 +867,7 @@ func (c *Controller) buildJobGroups(
 		key.method = method.ID
 		ready := false
 		for _, bundle := range bundles {
-			if bundle.methodReady(method.ID) {
+			if bundle.jobMethodReady(method.ID) {
 				ready = true
 				break
 			}
