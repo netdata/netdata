@@ -46,6 +46,7 @@ void register_libuv_worker_job_names(void) {
 
     // datafile full
     worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_INDEX, "jv2 indexing");
+    worker_register_job_name(UV_EVENT_DBENGINE_JOURNAL_FILTER, "jv2 time filters");
 
     // db rotation related
     worker_register_job_name(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT, "datafile delete wait");
