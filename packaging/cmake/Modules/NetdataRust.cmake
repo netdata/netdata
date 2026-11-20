@@ -101,8 +101,9 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NET
               "CARGO_PROFILE_RELEASE_LTO=off"
               "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
     elseif(NOT USE_LTO AND NETDATA_PACKAGE_KIND STREQUAL "bundle")
-      # A build that asked for no LTO gets none in Rust either: fat LTO is a
-      # several-minute single-core step on every clean build and Rust rebuild.
+      # A build that asked for no LTO builds otel-plugin and netflow-plugin
+      # without it too: fat LTO is a several-minute single-core step on every
+      # clean build and Rust rebuild. src/crates/jf keeps its own profile.
       # Native packages keep the workspace profile even with USE_LTO off
       # (openSUSE RPMs disable C/C++ LTO only).
       set(_nd_rust_release_env
