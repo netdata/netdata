@@ -2,6 +2,14 @@
 
 ### Merged Pull Requests:
 
+- Docs: align core docs on integrations, scale, cost and ML wording ([#24862](https://github.com/netdata/netdata/issues/24862))
+- Regenerate integrations docs ([#24868](https://github.com/netdata/netdata/issues/24868))
+- Docs: publish the DEM browser runtime setup page on Learn ([#24869](https://github.com/netdata/netdata/issues/24869))
+
+## [2.13.0] - 2026-11-19
+
+### Merged Pull Requests:
+
 - Sync repos (netdata, ebpf-co-re, kernel-collector) ([#24008](https://github.com/netdata/netdata/issues/24008))
 - Net Framework (windows.plugin) ([#22219](https://github.com/netdata/netdata/issues/22219))
 - Feat(go.d/prometheus): add counter_raw_charts to chart a counter's raw value alongside its rate ([#24103](https://github.com/netdata/netdata/issues/24103))
