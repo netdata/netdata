@@ -463,39 +463,44 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
     if(unlikely(!a)) return string_dup(string_2way_merge_X);
     if(unlikely(!b)) return string_dup(string_2way_merge_X);
 
-    size_t alen = string_strlen(a);
-    size_t blen = string_strlen(b);
-    size_t length = alen + blen + string_strlen(string_2way_merge_X) + 1;
-    CLEAN_CHAR_P *buf1 = mallocz(length + 1);
-    CLEAN_CHAR_P *buf2 = mallocz(length + 1);
-    char *dst1;
-    const char *s1, *s2;
+    const char *sa = string2str(a);
+    const char *sb = string2str(b);
+    const char *a_end = sa + string_strlen(a);
+    const char *b_end = sb + string_strlen(b);
 
-    s1 = string2str(a);
-    s2 = string2str(b);
-    dst1 = buf1;
-    for( ; *s1 && *s2 && *s1 == *s2 ;s1++, s2++)
-        *dst1++ = *s1;
+    // the common prefix
+    const char *s1 = sa, *s2 = sb;
+    for( ; *s1 && *s2 && *s1 == *s2 ;s1++, s2++) ;
 
-    *dst1 = '\0';
+    if(*s1 == '\0' && *s2 == '\0')
+        return string_dup(a);
+
     const char *prefix_end1 = s1, *prefix_end2 = s2;
+    size_t prefix_len = (size_t)(prefix_end1 - sa);
 
-    if(*s1 != '\0' || *s2 != '\0') {
-        *dst1++ = '[';
-        *dst1++ = 'x';
-        *dst1++ = ']';
+    // the common suffix, not overlapping the prefix
+    s1 = a_end;
+    s2 = b_end;
+    for( ; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1] ;s1--, s2--) ;
 
-        s1 = string2str(a) + alen;
-        s2 = string2str(b) + blen;
-        char *dst2 = &buf2[length];
-        *dst2 = '\0';
-        for (; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1]; s1--, s2--)
-            *(--dst2) = s1[-1];
+    size_t suffix_len = (size_t)(a_end - s1);
 
-        strcpy(dst1, dst2);
-    }
+    static const char placeholder[] = "[x]";
+    size_t placeholder_len = sizeof(placeholder) - 1;
 
-    return string_strdupz(buf1);
+    size_t size = prefix_len + placeholder_len + suffix_len + 1;
+    CLEAN_CHAR_P *buf = mallocz(size);
+    char *dst = buf;
+
+    memcpy(dst, sa, prefix_len);
+    dst += prefix_len;
+    memcpy(dst, placeholder, placeholder_len);
+    dst += placeholder_len;
+    memcpy(dst, s1, suffix_len);
+    dst += suffix_len;
+    *dst = '\0';
+
+    return string_strdupz(buf);
 }
 
 // ----------------------------------------------------------------------------
@@ -912,6 +917,14 @@ int string_unittest(size_t entries) {
             { "cp_UNIQUE_INFIX_cs", "cp_unique_infix_cs", "cp_[x]_cs"},
             { "cp_UNIQUE_INFIX_ci_unique_infix_cs", "cp_unique_infix_ci_UNIQUE_INFIX_cs", "cp_[x]_cs"},
             { "foo[1234]", "foo[4321]", "foo[[x]]"},
+            { "ab", "a", "a[x]"},
+            { "a", "ab", "a[x]"},
+            { "ba", "a", "[x]a"},
+            { "a", "ba", "[x]a"},
+            { "aXa", "aa", "a[x]a"},
+            { "aa", "aXa", "a[x]a"},
+            { "abc", "abd", "ab[x]"},
+            { "xbc", "ybc", "[x]bc"},
             { NULL, NULL, NULL },
         };
 
