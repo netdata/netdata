@@ -603,6 +603,7 @@ int netdata_main(int argc, char **argv) {
                             if (duration_unittest()) return 1;
                             if (statistical_unittest()) return 1;
                             if (utf8_sanitizer_unittest()) return 1;
+                            if (facets_unittest()) return 1;
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
@@ -815,6 +816,10 @@ int netdata_main(int argc, char **argv) {
                             return perflibnamestest_main();
                         }
 #endif
+                        else if(strcmp(optarg, "facetstest") == 0) {
+                            unittest_running = true;
+                            return facets_unittest();
+                        }
                         else if(strcmp(optarg, "utf8sanitizertest") == 0) {
                             unittest_running = true;
                             return utf8_sanitizer_unittest();
