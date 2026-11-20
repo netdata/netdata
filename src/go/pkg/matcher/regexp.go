@@ -12,11 +12,10 @@ func NewRegExpMatcher(expr string) (Matcher, error) {
 	case "^$", "$^":
 		return NewStringMatcher("", true, true)
 	}
-	size := len(expr)
 	chars := []rune(expr)
 	var startWith, endWith bool
 	startIdx := 0
-	endIdx := size - 1
+	endIdx := len(chars) - 1
 	if chars[startIdx] == '^' {
 		startWith = true
 		startIdx = 1
