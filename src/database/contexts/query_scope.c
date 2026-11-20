@@ -15,6 +15,12 @@ typedef enum {
 #define QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES 12
 #define QUERY_SCOPE_HOSTS_SET_MIN_HOSTS 32
 
+// The longest entry the set takes. JudyHS stores colliding strings of equal length as a tree with one level per 8
+// shared bytes, and its hash is easy to collide on purpose, while JudyHSFreeArray() recurses once per level: a list
+// with long crafted entries would overflow the thread's stack on free. Node ids and machine guids are 36 bytes and
+// hostnames at most 253, so real lists stay on the set; a longer entry keeps the whole list on the pattern.
+#define QUERY_SCOPE_HOSTS_SET_MAX_ENTRY_LEN 255
+
 typedef struct {
     SIMPLE_PATTERN *sp;
     Pvoid_t set;            // JudyHS of the entries of sp, when sp is a long list of exact strings
@@ -25,7 +31,8 @@ static void query_scope_hosts_filter_init(QUERY_SCOPE_HOSTS_FILTER *f, SIMPLE_PA
     f->sp = sp;
     f->set = NULL;
 
-    if(hosts < QUERY_SCOPE_HOSTS_SET_MIN_HOSTS || simple_pattern_exact_entries(sp) < QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES)
+    if(hosts < QUERY_SCOPE_HOSTS_SET_MIN_HOSTS ||
+       simple_pattern_exact_entries(sp, QUERY_SCOPE_HOSTS_SET_MAX_ENTRY_LEN) < QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES)
         return;
 
     SIMPLE_PATTERN *it = sp;
@@ -381,7 +388,7 @@ static int qsu_check(const char *list, struct qsu_host *hosts, size_t agent_host
 
     if(sp && (f.set != NULL) != expect_set) {
         fprintf(stderr, "QUERY SCOPE UNITTEST: pattern of %zu exact entries for %zu hosts %s the set, expected %s: %s\n",
-                simple_pattern_exact_entries(sp), agent_hosts, f.set ? "uses" : "does not use",
+                simple_pattern_exact_entries(sp, QUERY_SCOPE_HOSTS_SET_MAX_ENTRY_LEN), agent_hosts, f.set ? "uses" : "does not use",
                 expect_set ? "set" : "pattern", list);
         errors++;
     }
@@ -456,7 +463,7 @@ int query_scope_unittest(void) {
         };
         for(size_t i = 0; i < _countof(cases); i++) {
             SIMPLE_PATTERN *sp = string_to_simple_pattern(cases[i].list);
-            size_t got = simple_pattern_exact_entries(sp);
+            size_t got = simple_pattern_exact_entries(sp, SIZE_MAX);
             if(got != cases[i].expected) {
                 fprintf(stderr, "QUERY SCOPE UNITTEST: simple_pattern_exact_entries(\"%s\") = %zu, expected %zu\n",
                         cases[i].list ? cases[i].list : "(null)", got, cases[i].expected);
@@ -466,11 +473,48 @@ int query_scope_unittest(void) {
         }
 
         SIMPLE_PATTERN *sp = string_to_simple_pattern_nocase("a|b");
-        if(simple_pattern_exact_entries(sp) != 0) {
+        if(simple_pattern_exact_entries(sp, SIZE_MAX) != 0) {
             fprintf(stderr, "QUERY SCOPE UNITTEST: a case insensitive pattern must not count as exact\n");
             errors++;
         }
         simple_pattern_free(sp);
+
+        // the length limit: an entry at the limit counts, one byte more disqualifies the whole pattern
+        sp = string_to_simple_pattern("abc|abcd");
+        if(simple_pattern_exact_entries(sp, 4) != 2 || simple_pattern_exact_entries(sp, 3) != 0) {
+            fprintf(stderr, "QUERY SCOPE UNITTEST: the length limit of simple_pattern_exact_entries() is not applied\n");
+            errors++;
+        }
+        simple_pattern_free(sp);
+    }
+
+    // long entries: a list holding an entry longer than the limit stays on the pattern. The longest lists are pairs
+    // of equal length colliding in JudyHS's hash (prefix+"Aa" and prefix+"BB"), the input that makes its tree deep.
+    {
+        struct { size_t len; bool expect_set; } cases[] = {
+            { QUERY_SCOPE_HOSTS_SET_MAX_ENTRY_LEN,          true  },
+            { QUERY_SCOPE_HOSTS_SET_MAX_ENTRY_LEN + 1,      false },
+            { 256 * 1024,                                   false },
+        };
+
+        BUFFER *lb = buffer_create(0, NULL);
+        for(size_t c = 0; c < _countof(cases); c++) {
+            buffer_flush(lb);
+            for(size_t i = 0; i < QUERY_SCOPE_HOSTS_SET_MIN_ENTRIES; i++) {
+                buffer_strcat(lb, hosts[i + 2].machine_guid);
+                buffer_putc(lb, '|');
+            }
+
+            for(size_t pair = 0; pair < 2; pair++) {
+                if(pair) buffer_putc(lb, '|');
+                for(size_t i = 0; i < cases[c].len - 2; i++)
+                    buffer_putc(lb, 'x');
+                buffer_strcat(lb, pair ? "BB" : "Aa");
+            }
+
+            errors += qsu_check(buffer_tostring(lb), hosts, QSU_HOSTS, cases[c].expect_set);
+        }
+        buffer_free(lb);
     }
 
     // random lists on both sides of the threshold, plain ones (set) and mixed ones (pattern)
