@@ -213,7 +213,7 @@ modules:
               dimensions:
                 - name: running
                 - name: paused
-                - name: stopped
+                - name: exited
             - name: docker.containers_health_status
               description: Total number of Docker containers in various health states
               unit: containers
@@ -269,7 +269,7 @@ modules:
                 - name: no_healthcheck
             - name: docker.container_writeable_layer_size
               description: Docker container writable layer size
-              unit: size
+              unit: bytes
               chart_type: line
               dimensions:
-                - name: writeable_layer
+                - name: writable_layer
