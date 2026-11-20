@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "rrdengine.h"
+#include "retention-summary.h"
 
 #ifdef OS_WINDOWS
 void sync_uv_file_data(uv_file file)
@@ -497,6 +498,10 @@ static int scan_data_files(struct rrdengine_instance *ctx)
             if (!unknown_file)
                 (void) JudyLIns(&journafile_JudyL, (Word_t)fileno, PJE0);
         }
+
+        // retention summaries are loaded by retention_summary_claim()
+        if (unknown_file && strncmp(dent.name, RETENTION_SUMMARY_PREFIX, sizeof(RETENTION_SUMMARY_PREFIX) - 1) == 0)
+            unknown_file = false;
 
         if (unknown_file)
             nd_log_daemon(NDLP_WARNING, "Unknown file detected : \"%s/%s\"", ctx->config.dbfiles_path, dent.name);
