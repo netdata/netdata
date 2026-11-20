@@ -171,3 +171,4 @@ For exact results from advanced functions such as `median`, `stddev`, `ses`, `de
 ```console
 curl -H 'Accept: application/json' -H "Authorization: Bearer <token>" https://app.netdata.cloud/api/v2/contexts
 ```
+
