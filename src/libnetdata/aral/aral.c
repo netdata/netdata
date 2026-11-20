@@ -131,11 +131,6 @@ struct aral {
         } mmap;
     } config;
 
-    struct {
-        PAD64(size_t) user_malloc_operations;
-        PAD64(size_t) user_free_operations;
-    } atomic;
-
     struct aral_ops ops[2];
 
     struct aral_statistics *stats;
@@ -1005,7 +1000,6 @@ retry_acquisition:
     aral_page_unlock(ar, page);
 
     __atomic_sub_fetch(&ar->ops[idx].atomic.allocators, 1, __ATOMIC_RELAXED);
-    __atomic_add_fetch(&ar->atomic.user_malloc_operations, 1, __ATOMIC_RELAXED);
 
     return page;
 }
@@ -1232,7 +1226,6 @@ void aral_freez_internal(ARAL *ar, void *ptr TRACE_ALLOCATIONS_FUNCTION_DEFINITI
 
     // statistic, outside the lock
     aral_element_returned(ar, page);
-    __atomic_add_fetch(&ar->atomic.user_free_operations, 1, __ATOMIC_RELAXED);
 
     aral_page_lock(ar, page);
     internal_fatal(!page->page_lock.used_elements,
@@ -1619,6 +1612,8 @@ struct aral_unittest_config {
     size_t elements;
     size_t threads;
     int errors;
+    size_t malloc_ops;
+    size_t free_ops;
 };
 
 struct aral_unittest_entry {
@@ -2347,6 +2342,23 @@ int aral_unittest_concurrency(void) {
 
 #endif
 
+static inline struct aral_unittest_entry *aral_test_malloc(ARAL *ar, bool marked, size_t *mallocs) {
+    (*mallocs)++;
+    return unittest_aral_malloc(ar, marked);
+}
+
+static inline void aral_test_freez(ARAL *ar, struct aral_unittest_entry *ptr, size_t *frees) {
+    (*frees)++;
+    aral_freez(ar, ptr);
+}
+
+static inline void aral_test_publish_ops(struct aral_unittest_config *auc, size_t *mallocs, size_t *frees) {
+    __atomic_add_fetch(&auc->malloc_ops, *mallocs, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&auc->free_ops, *frees, __ATOMIC_RELAXED);
+    *mallocs = 0;
+    *frees = 0;
+}
+
 static void aral_test_thread(void *ptr) {
     struct aral_unittest_config *auc = ptr;
     ARAL *ar = auc->ar;
@@ -2355,9 +2367,13 @@ static void aral_test_thread(void *ptr) {
     bool marked = os_random(2);
     struct aral_unittest_entry **pointers = callocz(elements, sizeof(struct aral_unittest_entry *));
 
+    // counted locally and published once per pass, so the test does not
+    // add a shared atomic to every ARAL operation it measures
+    size_t mallocs = 0, frees = 0;
+
     do {
         for (size_t i = 0; i < elements; i++) {
-            pointers[i] = unittest_aral_malloc(ar, marked);
+            pointers[i] = aral_test_malloc(ar, marked, &mallocs);
         }
 
         if(marked) {
@@ -2368,28 +2384,28 @@ static void aral_test_thread(void *ptr) {
 
         for (size_t div = 5; div >= 2; div--) {
             for (size_t i = 0; i < elements / div; i++) {
-                aral_freez(ar, pointers[i]);
+                aral_test_freez(ar, pointers[i], &frees);
                 pointers[i] = NULL;
             }
 
             for (size_t i = 0; i < elements / div; i++) {
-                pointers[i] = unittest_aral_malloc(ar, marked);
+                pointers[i] = aral_test_malloc(ar, marked, &mallocs);
             }
         }
 
         for (size_t step = 50; step >= 10; step -= 10) {
             for (size_t i = 0; i < elements; i += step) {
-                aral_freez(ar, pointers[i]);
+                aral_test_freez(ar, pointers[i], &frees);
                 pointers[i] = NULL;
             }
 
             for (size_t i = 0; i < elements; i += step) {
-                pointers[i] = unittest_aral_malloc(ar, marked);
+                pointers[i] = aral_test_malloc(ar, marked, &mallocs);
             }
         }
 
         for (size_t i = 0; i < elements; i++) {
-            aral_freez(ar, pointers[i]);
+            aral_test_freez(ar, pointers[i], &frees);
             pointers[i] = NULL;
         }
 
@@ -2398,11 +2414,13 @@ static void aral_test_thread(void *ptr) {
             __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
         }
 
-        if(!auc->single_threaded && __atomic_load_n(&auc->stop, __ATOMIC_RELAXED))
+        if(!auc->single_threaded && __atomic_load_n(&auc->stop, __ATOMIC_RELAXED)) {
+            aral_test_publish_ops(auc, &mallocs, &frees);
             break;
+        }
 
         for (size_t i = 0; i < elements; i++) {
-            pointers[i] = unittest_aral_malloc(ar, marked);
+            pointers[i] = aral_test_malloc(ar, marked, &mallocs);
         }
 
         size_t max_page_elements = aral_elements_in_page_size(ar, aral_max_allocation_size(ar));
@@ -2418,21 +2436,21 @@ static void aral_test_thread(void *ptr) {
             size_t *free_list = mallocz(to_free * sizeof(*free_list));
             for (size_t i = 0; i < to_free; i++) {
                 size_t pos = step * i;
-                aral_freez(ar, pointers[pos]);
+                aral_test_freez(ar, pointers[pos], &frees);
                 pointers[pos] = NULL;
                 free_list[i] = pos;
             }
 
             for (size_t i = 0; i < to_free; i++) {
                 size_t pos = free_list[i];
-                pointers[pos] = unittest_aral_malloc(ar, marked);
+                pointers[pos] = aral_test_malloc(ar, marked, &mallocs);
             }
 
             freez(free_list);
         }
 
         for (size_t i = 0; i < elements; i++) {
-            aral_freez(ar, pointers[i]);
+            aral_test_freez(ar, pointers[i], &frees);
             pointers[i] = NULL;
         }
 
@@ -2440,6 +2458,8 @@ static void aral_test_thread(void *ptr) {
             fprintf(stderr, "\n\nARAL leftovers detected (2)\n\n");
             __atomic_add_fetch(&auc->errors, 1, __ATOMIC_RELAXED);
         }
+
+        aral_test_publish_ops(auc, &mallocs, &frees);
 
     } while(!auc->single_threaded && !__atomic_load_n(&auc->stop, __ATOMIC_RELAXED));
 
@@ -2478,8 +2498,8 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     size_t countdown = seconds;
     while(countdown-- > 0) {
         sleep_usec(1 * USEC_PER_SEC);
-        size_t m = __atomic_load_n(&auc.ar->atomic.user_malloc_operations, __ATOMIC_RELAXED);
-        size_t f = __atomic_load_n(&auc.ar->atomic.user_free_operations, __ATOMIC_RELAXED);
+        size_t m = __atomic_load_n(&auc.malloc_ops, __ATOMIC_RELAXED);
+        size_t f = __atomic_load_n(&auc.free_ops, __ATOMIC_RELAXED);
         fprintf(stderr, "ARAL executes %0.2f M malloc and %0.2f M free operations/s\n",
                 (double)(m - malloc_done) / 1000000.0, (double)(f - free_done) / 1000000.0);
         malloc_done = m;
@@ -2508,8 +2528,8 @@ int aral_stress_test(size_t threads, size_t elements, size_t seconds) {
     }
 
     fprintf(stderr, "ARAL: did %zu malloc, %zu free, using %zu threads, in %"PRIu64" usecs\n",
-            __atomic_load_n(&auc.ar->atomic.user_malloc_operations, __ATOMIC_RELAXED),
-            __atomic_load_n(&auc.ar->atomic.user_free_operations, __ATOMIC_RELAXED),
+            __atomic_load_n(&auc.malloc_ops, __ATOMIC_RELAXED),
+            __atomic_load_n(&auc.free_ops, __ATOMIC_RELAXED),
             threads,
             ended_ut - started_ut);
 
@@ -2522,8 +2542,8 @@ int aral_unittest(size_t elements) {
 #if defined(FSANITIZE_ADDRESS)
     // Under address sanitizer ARAL is bypassed entirely: aral_mallocz() and
     // aral_freez() delegate straight to glibc, so there is no pool to stress.
-    // The stress loop below would still run and still report PASSED, but with
-    // "did 0 malloc, 0 free" - a green result that proves nothing. Skip
+    // The stress loop below would still run and still report PASSED, but it
+    // would be timing glibc, not ARAL - a green result that proves nothing. Skip
     // explicitly instead, the same way aral_unittest_concurrency() does.
     (void)elements;
     fprintf(stderr, "ARAL unittest: SKIPPED (ARAL is disabled under FSANITIZE_ADDRESS)\n");
