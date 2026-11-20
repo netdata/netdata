@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +17,7 @@ import (
 )
 
 func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler,
@@ -25,7 +26,7 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 			"1.3.6.1.4.1.99999.1.2.0",
 			"1.3.6.1.4.1.99999.1.3.0",
 		},
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.99999.1.1.0", "active"),
 			createStringPDU("1.3.6.1.4.1.99999.1.2.0", "2031-11-11"),
 			createStringPDU("1.3.6.1.4.1.99999.1.3.0", "datacenter-a"),
@@ -93,12 +94,14 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -128,7 +131,7 @@ func TestCollector_Collect_LicenseRowsFromScalarLicensingConfig(t *testing.T) {
 
 func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) {
 	tests := map[string]struct {
-		licensePDU gosnmp.SnmpPDU
+		licensePDU gosnmp.VarBind
 	}{
 		"invalid licensing state does not drop scalar metric": {
 			licensePDU: createStringPDU("1.3.6.1.4.1.99999.7.1.0", "not-a-number"),
@@ -137,19 +140,21 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.7.1.0"},
-				[]gosnmp.SnmpPDU{tc.licensePDU},
+				[]gosnmp.VarBind{tc.licensePDU},
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -188,7 +193,7 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 				Log: logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Len(t, results[0].Metrics, 1)
@@ -201,7 +206,7 @@ func TestCollector_Collect_LicenseRowsBestEffortForRegularMetrics(t *testing.T) 
 
 func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) {
 	tests := map[string]struct {
-		missingPDU gosnmp.SnmpPDU
+		missingPDU gosnmp.VarBind
 	}{
 		"no such object cached after first licensing poll": {
 			missingPDU: createNoSuchObjectPDU("1.3.6.1.4.1.99999.8.1.0"),
@@ -210,23 +215,25 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 123456)},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.8.1.0"},
-				[]gosnmp.SnmpPDU{tc.missingPDU},
+				[]gosnmp.VarBind{tc.missingPDU},
 			)
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.2.1.1.3.0"},
-				[]gosnmp.SnmpPDU{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 223456)},
+				[]gosnmp.VarBind{createTimeTicksPDU("1.3.6.1.2.1.1.3.0", 223456)},
 			)
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles: []*ddsnmp.Profile{
 					{
@@ -265,14 +272,14 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 				Log: logger.New(),
 			})
 
-			first, err := collector.Collect()
+			first, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, first, 1)
 			assert.Empty(t, first[0].LicenseRows)
 			assert.EqualValues(t, 2, first[0].Stats.SNMP.GetOIDs)
 			assert.EqualValues(t, 1, first[0].Stats.Errors.MissingOIDs)
 
-			second, err := collector.Collect()
+			second, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, second, 1)
 			assert.Empty(t, second[0].LicenseRows)
@@ -283,13 +290,13 @@ func TestCollector_Collect_LicenseRowsSkipsKnownMissingScalarOIDs(t *testing.T) 
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.2",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.99999.2.1.1", "firewall"),
 			createStringPDU("1.3.6.1.4.1.99999.2.2.1", "Firewall subscription"),
 			createStringPDU("1.3.6.1.4.1.99999.2.3.1", "healthy"),
@@ -383,6 +390,8 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 
 	var report AcquisitionProfileReport
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: new(SourceRecorder).Wrap(mockHandler),
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
@@ -391,7 +400,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 		}),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 
@@ -447,13 +456,13 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig(t *testing.T) {
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTableTags(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.6",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createIntegerPDU("1.3.6.1.4.1.99999.6.1.1", 0),
 			createIntegerPDU("1.3.6.1.4.1.99999.6.1.2", 1),
 		},
@@ -461,7 +470,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.2.1.31.1.1.1.1",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.2.1.31.1.1.1.1.1", "eth1"),
 			createStringPDU("1.3.6.1.2.1.31.1.1.1.1.2", "eth2"),
 		},
@@ -507,12 +516,14 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
-	results, err := collector.Collect()
+	results, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, results, 1)
 	require.Len(t, results[0].LicenseRows, 2)
@@ -527,13 +538,13 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_ResolvesCrossTabl
 }
 
 func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollection(t *testing.T) {
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.3",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.99999.3.1.7", "security"),
 			createStringPDU("1.3.6.1.4.1.99999.3.2.7", "Security subscription"),
 			createIntegerPDU("1.3.6.1.4.1.99999.3.3.7", 0),
@@ -542,7 +553,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollect
 	expectSNMPWalk(mockHandler,
 		gosnmp.Version2c,
 		"1.3.6.1.4.1.99999.3",
-		[]gosnmp.SnmpPDU{
+		[]gosnmp.VarBind{
 			createStringPDU("1.3.6.1.4.1.99999.3.1.7", "security"),
 			createStringPDU("1.3.6.1.4.1.99999.3.2.7", "Security subscription"),
 			createIntegerPDU("1.3.6.1.4.1.99999.3.3.7", 1),
@@ -588,12 +599,14 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollect
 	}
 
 	collector := New(Config{
+		Version:    gosnmp.Version2c,
+		MaxOIDs:    10,
 		SnmpClient: mockHandler,
 		Profiles:   []*ddsnmp.Profile{profile},
 		Log:        logger.New(),
 	})
 
-	first, err := collector.Collect()
+	first, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, first, 1)
 	require.Len(t, first[0].LicenseRows, 1)
@@ -601,7 +614,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollect
 	assert.Zero(t, first[0].Stats.TableCache.Misses, "licensing rows are not table-cache participants")
 	assert.EqualValues(t, 1, first[0].Stats.SNMP.TablesWalked)
 
-	second, err := collector.Collect()
+	second, err := collector.Collect(context.Background())
 	require.NoError(t, err)
 	require.Len(t, second, 1)
 	require.Len(t, second[0].LicenseRows, 1)
@@ -613,7 +626,7 @@ func TestCollector_Collect_LicenseRowsFromTableLicensingConfig_WalksEveryCollect
 
 func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 	tests := map[string]struct {
-		value   int
+		value   uint
 		signals func(ddprofiledefinition.LicenseValueConfig) ddprofiledefinition.LicenseSignalsConfig
 	}{
 		"expiry timestamp zero": {
@@ -705,13 +718,13 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectSNMPGet(mockHandler,
 				[]string{"1.3.6.1.4.1.99999.4.1.0"},
-				[]gosnmp.SnmpPDU{
-					createGauge32PDU("1.3.6.1.4.1.99999.4.1.0", uint(tc.value)),
+				[]gosnmp.VarBind{
+					createGauge32PDU("1.3.6.1.4.1.99999.4.1.0", tc.value),
 				},
 			)
 
@@ -743,12 +756,14 @@ func TestCollector_Collect_LicenseRowsRejectsSentinelValues(t *testing.T) {
 			}
 
 			collector := New(Config{
+				Version:    gosnmp.Version2c,
+				MaxOIDs:    10,
 				SnmpClient: mockHandler,
 				Profiles:   []*ddsnmp.Profile{profile},
 				Log:        logger.New(),
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			assert.Empty(t, results[0].LicenseRows)

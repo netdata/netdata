@@ -3,10 +3,11 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"slices"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -29,27 +30,29 @@ func TestCollector_CollectDeviceMetadata_SynologyProfile(t *testing.T) {
 		ddprofiledefinition.MetadataDeviceResource: device,
 	}
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
 	expectSNMPGet(mockHandler, []string{
 		"1.3.6.1.4.1.6574.1.5.1.0",
 		"1.3.6.1.4.1.6574.1.5.2.0",
 		"1.3.6.1.4.1.6574.1.5.3.0",
-	}, []gosnmp.SnmpPDU{
+	}, []gosnmp.VarBind{
 		createStringPDU("1.3.6.1.4.1.6574.1.5.1.0", "Test NAS"),
 		createStringPDU("1.3.6.1.4.1.6574.1.5.2.0", "TEST-SERIAL"),
 		createStringPDU("1.3.6.1.4.1.6574.1.5.3.0", "DSM test"),
 	})
 
 	collector := New(Config{
+		Version:     gosnmp.Version2c,
+		MaxOIDs:     10,
 		SnmpClient:  mockHandler,
 		Profiles:    []*ddsnmp.Profile{profile},
 		Log:         logger.New(),
 		SysObjectID: sysObjectID,
 	})
 
-	got, err := collector.CollectDeviceMetadata()
+	got, err := collector.CollectDeviceMetadata(context.Background())
 	require.NoError(t, err)
 	assert.Equal(t, map[string]ddsnmp.MetaTag{
 		"vendor":        {Value: "Synology", IsExactMatch: true},
@@ -72,16 +75,16 @@ func TestScalarCollector_Collect_SynologyUtilizationProfile(t *testing.T) {
 	})
 	require.Len(t, profile.Definition.Metrics, 2)
 
-	ctrl, mockHandler := setupMockHandler(t)
+	ctrl, mockHandler := setupMockSession(t)
 	defer ctrl.Finish()
 
-	expectSNMPGet(mockHandler, []string{cpuOID, memoryOID}, []gosnmp.SnmpPDU{
+	expectSNMPGet(mockHandler, []string{cpuOID, memoryOID}, []gosnmp.VarBind{
 		createIntegerPDU(cpuOID, 6),
 		createIntegerPDU(memoryOID, 4),
 	})
 
-	collector := newScalarCollector(mockHandler, make(map[string]bool), logger.New())
-	got, err := collector.collect(profile, &ddsnmp.CollectionStats{})
+	collector := newScalarCollector(mockHandler, testRequests, make(map[string]bool), logger.New())
+	got, err := collector.collect(context.Background(), profile, &ddsnmp.CollectionStats{})
 	require.NoError(t, err)
 	assertMetricsEqual(t, []ddsnmp.Metric{
 		{

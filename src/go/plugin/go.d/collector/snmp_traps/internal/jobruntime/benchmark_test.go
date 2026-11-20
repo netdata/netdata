@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	snmptopology "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_traps/internal/catalog"
@@ -33,15 +33,19 @@ import (
 // ---------------------------------------------------------------------------
 
 // buildBenchV2cTrap generates a synthetic SNMPv2c trap packet.
-func buildBenchV2cTrap(b testing.TB, trapOID string, extra ...gosnmp.SnmpPDU) []byte {
+func buildBenchV2cTrap(b testing.TB, trapOID string, extra ...gosnmp.VarBind) []byte {
 	b.Helper()
-	x := &gosnmp.GoSNMP{Version: gosnmp.Version2c, Community: "example"}
-	pdus := []gosnmp.SnmpPDU{
-		{Name: model.SysUpTimeOID, Type: gosnmp.TimeTicks, Value: uint32(10)},
-		{Name: model.SNMPTrapOID, Type: gosnmp.ObjectIdentifier, Value: trapOID},
+	pdus := []gosnmp.VarBind{
+		{Name: model.SysUpTimeOID, Value: gosnmp.TimeTicksValue(10)},
+		{Name: model.SNMPTrapOID, Value: gosnmp.ObjectIdentifierValue(trapOID)},
 	}
 	pdus = append(pdus, extra...)
-	data, err := x.MkSnmpPacket(gosnmp.SNMPv2Trap, pdus, 0, 0).MarshalMsg()
+	data, err := (&gosnmp.Message{
+		Version:   gosnmp.Version2c,
+		Community: "example",
+		PDUType:   gosnmp.SNMPv2Trap,
+		VarBinds:  pdus,
+	}).Encode(nil)
 	if err != nil {
 		b.Fatalf("marshal benchmark v2c trap: %v", err)
 	}
@@ -109,11 +113,11 @@ func TestBenchmarkJobUsesRequiredDependencies(t *testing.T) {
 
 func BenchmarkPacketTrap(b *testing.B) {
 	data := buildBenchV2cTrap(b, "1.3.6.1.6.3.1.1.5.1",
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: "test-device"},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123456)},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.2", Type: gosnmp.Integer, Value: 2},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: "Gi0/1"},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("test-device"))},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.3.0", Value: gosnmp.TimeTicksValue(123456)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.1", Value: gosnmp.IntegerValue(1)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.2", Value: gosnmp.IntegerValue(2)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.2.1", Value: gosnmp.OctetStringValue([]byte("Gi0/1"))},
 	)
 	peer := net.ParseIP("10.1.2.3")
 
@@ -388,11 +392,11 @@ func BenchmarkFullPacketToJournalProductionQueue(b *testing.B) {
 	requireJournalctlBenchmark(b)
 
 	data := buildBenchV2cTrap(b, "1.3.6.1.6.3.1.1.5.1",
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: "test-device"},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123456)},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.2", Type: gosnmp.Integer, Value: 2},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: "Gi0/1"},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("test-device"))},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.3.0", Value: gosnmp.TimeTicksValue(123456)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.1", Value: gosnmp.IntegerValue(1)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.2", Value: gosnmp.IntegerValue(2)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.2.1", Value: gosnmp.OctetStringValue([]byte("Gi0/1"))},
 	)
 	peer := net.ParseIP("10.1.2.3")
 	trap := &catalog.TrapDef{
@@ -514,11 +518,11 @@ func newUDPPacketToJournalBenchmark(b *testing.B) *udpPacketToJournalBenchmark {
 	b.Helper()
 
 	data := buildBenchV2cTrap(b, "1.3.6.1.6.3.1.1.5.1",
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.1.0", Type: gosnmp.OctetString, Value: "test-device"},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.1.3.0", Type: gosnmp.TimeTicks, Value: uint32(123456)},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.1", Type: gosnmp.Integer, Value: 1},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.1.2", Type: gosnmp.Integer, Value: 2},
-		gosnmp.SnmpPDU{Name: "1.3.6.1.2.1.2.2.1.2.1", Type: gosnmp.OctetString, Value: "Gi0/1"},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.1.0", Value: gosnmp.OctetStringValue([]byte("test-device"))},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.1.3.0", Value: gosnmp.TimeTicksValue(123456)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.1", Value: gosnmp.IntegerValue(1)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.1.2", Value: gosnmp.IntegerValue(2)},
+		gosnmp.VarBind{Name: "1.3.6.1.2.1.2.2.1.2.1", Value: gosnmp.OctetStringValue([]byte("Gi0/1"))},
 	)
 	trap := &catalog.TrapDef{
 		OID:         "1.3.6.1.6.3.1.1.5.1",

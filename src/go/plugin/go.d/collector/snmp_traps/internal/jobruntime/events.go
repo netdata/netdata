@@ -90,10 +90,10 @@ func (j *Job) handleReceiverEvent(jobTelemetry *telemetry.Job, event receiver.Ev
 			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
 		}
 		j.deps.Log.warningf("SNMP trap INFORM response failed: %v", event.Err)
-	case receiver.EventDiscoveryReportFailed:
+	case receiver.EventReportFailed:
 		if jobTelemetry != nil {
 			jobTelemetry.Error(telemetry.ErrorInformResponseFailed)
 		}
-		j.deps.Log.warningf("SNMP trap INFORM discovery Report failed: %v", event.Err)
+		j.deps.Log.warningf("SNMP trap Report failed: %v", event.Err)
 	}
 }

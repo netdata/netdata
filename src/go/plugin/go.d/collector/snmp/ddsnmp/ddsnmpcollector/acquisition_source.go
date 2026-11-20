@@ -3,14 +3,14 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"math"
 	"slices"
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
@@ -27,12 +27,12 @@ type SourceRecorder struct {
 }
 
 type sourceClient struct {
-	gosnmp.Handler
+	snmputils.Client
 	recorder *SourceRecorder
 }
 
-func (r *SourceRecorder) Wrap(client gosnmp.Handler) gosnmp.Handler {
-	return &sourceClient{Handler: client, recorder: r}
+func (r *SourceRecorder) Wrap(client snmputils.Client) snmputils.Client {
+	return &sourceClient{Client: client, recorder: r}
 }
 
 func (c *sourceClient) SourceRecorder() *SourceRecorder { return c.recorder }
@@ -91,33 +91,33 @@ func (r *SourceRecorder) requestsSince(cursor uint64) map[string][]uint64 {
 	return result
 }
 
-func (c *sourceClient) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (c *sourceClient) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	start := time.Now()
-	packet, err := c.Handler.Get(oids)
+	packet, err := c.Client.Get(ctx, oids)
 	elapsed := time.Since(start)
-	var pdus []gosnmp.SnmpPDU
+	var pdus []gosnmp.VarBind
 	if packet != nil {
-		pdus = packet.Variables
+		pdus = packet.VarBinds
 	}
 	c.recorder.record("get", oids, start, elapsed, packet != nil, pdus, snmputils.ClassifyGetFailure(packet, err))
 	return packet, err
 }
 
-func (c *sourceClient) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (c *sourceClient) WalkAll(ctx context.Context, oid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	start := time.Now()
-	values, err := c.Handler.WalkAll(oid)
+	values, end, err := c.Client.WalkAll(ctx, oid)
 	c.recorder.recordWalk("walk", oid, start, time.Since(start), values, err)
-	return values, err
+	return values, end, err
 }
 
-func (c *sourceClient) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (c *sourceClient) BulkWalkAll(ctx context.Context, oid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	start := time.Now()
-	values, err := c.Handler.BulkWalkAll(oid)
+	values, end, err := c.Client.BulkWalkAll(ctx, oid, maxRepetitions)
 	c.recorder.recordWalk("bulk_walk", oid, start, time.Since(start), values, err)
-	return values, err
+	return values, end, err
 }
 
-func (r *SourceRecorder) recordWalk(method, oid string, started time.Time, elapsed time.Duration, values []gosnmp.SnmpPDU, err error) {
+func (r *SourceRecorder) recordWalk(method, oid string, started time.Time, elapsed time.Duration, values []gosnmp.VarBind, err error) {
 	failure := snmputils.ClassifyFailure(err)
 	if err != nil {
 		failure.Operation = "walk"
@@ -125,7 +125,7 @@ func (r *SourceRecorder) recordWalk(method, oid string, started time.Time, elaps
 	r.record(method, []string{oid}, started, elapsed, values != nil, values, failure)
 }
 
-func (r *SourceRecorder) record(method string, oids []string, started time.Time, elapsed time.Duration, present bool, pdus []gosnmp.SnmpPDU, failure snmputils.Failure) {
+func (r *SourceRecorder) record(method string, oids []string, started time.Time, elapsed time.Duration, present bool, pdus []gosnmp.VarBind, failure snmputils.Failure) {
 	if r == nil || r.finished {
 		return
 	}
@@ -135,56 +135,42 @@ func (r *SourceRecorder) record(method string, oids []string, started time.Time,
 		operation.RequestedOIDs[i] = strings.Clone(oid)
 	}
 	for i, pdu := range pdus {
-		operation.PDUs[i] = ddsnmp.SourcePDU{OID: strings.Clone(pdu.Name), Type: uint8(pdu.Type), Value: sourceValue(pdu.Value)}
+		operation.PDUs[i] = ddsnmp.SourcePDU{OID: strings.Clone(pdu.Name), Type: uint8(pdu.Value.Type()), Value: sourceValue(pdu.Value)}
 	}
 	r.operations = append(r.operations, operation)
 }
 
-func sourceValue(value any) ddsnmp.SourceValue {
-	v := ddsnmp.SourceValue{}
-	switch value := value.(type) {
-	case nil:
-		v.Kind = "null"
-	case []byte:
+// sourceValue records a value by its SMI type; the evidence kinds are the ones
+// the untyped values had: an IpAddress as its text, an empty one as null.
+func sourceValue(value gosnmp.Value) ddsnmp.SourceValue {
+	v := ddsnmp.SourceValue{Kind: "null"}
+	switch value.Type() {
+	case gosnmp.OctetString, gosnmp.Opaque:
+		b, _ := value.Bytes()
 		v.Kind = "bytes"
-		if value == nil {
+		if b == nil {
 			v.Kind = "bytes_nil"
 		}
-		v.Bytes = slices.Clone(value)
-	case string:
-		if utf8.ValidString(value) {
-			v.Kind = "string"
-			v.Text = strings.Clone(value)
-		} else {
-			v.Kind = "string_bytes"
-			v.Bytes = []byte(value)
+		v.Bytes = slices.Clone(b)
+	case gosnmp.ObjectIdentifier:
+		oid, _ := value.OID()
+		v.Kind, v.Text = "string", strings.Clone(oid)
+	case gosnmp.IPAddress:
+		if ip, _ := value.IP(); ip.IsValid() {
+			v.Kind, v.Text = "string", ip.String()
 		}
-	case int:
-		v.Kind = "signed"
-		v.Text = strconv.FormatInt(int64(value), 10)
-	case int32:
-		v.Kind = "signed"
-		v.Text = strconv.FormatInt(int64(value), 10)
-	case int64:
-		v.Kind = "signed"
-		v.Text = strconv.FormatInt(value, 10)
-	case uint:
-		v.Kind = "unsigned"
-		v.Text = strconv.FormatUint(uint64(value), 10)
-	case uint32:
-		v.Kind = "unsigned"
-		v.Text = strconv.FormatUint(uint64(value), 10)
-	case uint64:
-		v.Kind = "unsigned"
-		v.Text = strconv.FormatUint(value, 10)
-	case float32:
-		v.Kind = "float32"
-		v.Text = strconv.FormatUint(uint64(math.Float32bits(value)), 16)
-	case float64:
-		v.Kind = "float64"
-		v.Text = strconv.FormatUint(math.Float64bits(value), 16)
-	default:
-		v.Kind = "unavailable"
+	case gosnmp.Integer:
+		n, _ := value.Int32()
+		v.Kind, v.Text = "signed", strconv.FormatInt(int64(n), 10)
+	case gosnmp.Counter32, gosnmp.Gauge32, gosnmp.TimeTicks, gosnmp.Uinteger32, gosnmp.Counter64:
+		n, _ := value.Uint64()
+		v.Kind, v.Text = "unsigned", strconv.FormatUint(n, 10)
+	case gosnmp.OpaqueFloat:
+		f, _ := value.Float32()
+		v.Kind, v.Text = "float32", strconv.FormatUint(uint64(math.Float32bits(f)), 16)
+	case gosnmp.OpaqueDouble:
+		f, _ := value.Float64()
+		v.Kind, v.Text = "float64", strconv.FormatUint(math.Float64bits(f), 16)
 	}
 	return v
 }

@@ -3,14 +3,15 @@
 package ddsnmpcollector
 
 import (
+	"context"
 	"strings"
 	"testing"
 
-	"github.com/golang/mock/gomock"
-	"github.com/gosnmp/gosnmp"
-	snmpmock "github.com/gosnmp/gosnmp/mocks"
+	"github.com/netdata/gosnmp"
+	snmpmock "github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils/snmpmock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -127,20 +128,22 @@ func TestCollector_Collect_JuniperBGP_FromLibreNMSFixtures(t *testing.T) {
 			profile := matchedBGPProjectionByFile(t, tc.sysObjectID, tc.profileFile)
 			pdus := loadSnmprecPDUs(t, tc.fixture)
 
-			ctrl, mockHandler := setupMockHandler(t)
+			ctrl, mockHandler := setupMockSession(t)
 			defer ctrl.Finish()
 
 			expectJuniperMetadataGets(mockHandler)
 			expectBGPTableWalksFromFixture(mockHandler, profile, pdus)
 
 			collector := New(Config{
+				Version:     gosnmp.Version2c,
+				MaxOIDs:     10,
 				SnmpClient:  mockHandler,
 				Profiles:    []*ddsnmp.Profile{profile},
 				Log:         logger.New(),
 				SysObjectID: tc.sysObjectID,
 			})
 
-			results, err := collector.Collect()
+			results, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Len(t, results, 1)
 			require.Empty(t, results[0].Metrics)
@@ -170,8 +173,8 @@ func matchedBGPProjectionByFile(t *testing.T, sysObjectID, profileFile string) *
 	return nil
 }
 
-func expectJuniperMetadataGets(mockHandler *snmpmock.MockHandler) {
-	mockHandler.EXPECT().Get(gomock.Any()).Return(&gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{
+func expectJuniperMetadataGets(mockHandler *snmpmock.MockSession) {
+	mockHandler.EXPECT().Get(gomock.Any(), gomock.Any()).Return(&gosnmp.Message{VarBinds: []gosnmp.VarBind{
 		createStringPDU("1.0.8802.1.1.2.1.3.1.0", "juniper"),
 		createStringPDU("1.0.8802.1.1.2.1.3.2.0", "juniper"),
 		createStringPDU("1.0.8802.1.1.2.1.3.3.0", "juniper"),
@@ -185,8 +188,7 @@ func expectJuniperMetadataGets(mockHandler *snmpmock.MockHandler) {
 	}}, nil).AnyTimes()
 }
 
-func expectBGPTableWalksFromFixture(mockHandler *snmpmock.MockHandler, profile *ddsnmp.Profile, pdus []gosnmp.SnmpPDU) {
-	mockHandler.EXPECT().Version().Return(gosnmp.Version2c).AnyTimes()
+func expectBGPTableWalksFromFixture(mockHandler *snmpmock.MockSession, profile *ddsnmp.Profile, pdus []gosnmp.VarBind) {
 
 	tableNameToOID := bgpTableNameToOID(profile.Definition.BGP)
 	walked := make(map[string]bool)
@@ -196,7 +198,7 @@ func expectBGPTableWalksFromFixture(mockHandler *snmpmock.MockHandler, profile *
 		}
 		tableOID := trimOID(cfg.Table.OID)
 		if !walked[tableOID] {
-			mockHandler.EXPECT().BulkWalkAll(tableOID).Return(snmprecPDUsWithPrefix(pdus, tableOID+"."), nil)
+			mockHandler.EXPECT().BulkWalkAll(gomock.Any(), tableOID, gomock.Any()).Return(snmprecPDUsWithPrefix(pdus, tableOID+"."), gosnmp.WalkEnd{}, nil)
 			walked[tableOID] = true
 		}
 		metricsCfg := bgpConfigAsMetricsConfig(cfg)
@@ -205,7 +207,7 @@ func expectBGPTableWalksFromFixture(mockHandler *snmpmock.MockHandler, profile *
 			if walked[depOID] {
 				continue
 			}
-			mockHandler.EXPECT().BulkWalkAll(depOID).Return(snmprecPDUsWithPrefix(pdus, depOID+"."), nil)
+			mockHandler.EXPECT().BulkWalkAll(gomock.Any(), depOID, gomock.Any()).Return(snmprecPDUsWithPrefix(pdus, depOID+"."), gosnmp.WalkEnd{}, nil)
 			walked[depOID] = true
 		}
 	}

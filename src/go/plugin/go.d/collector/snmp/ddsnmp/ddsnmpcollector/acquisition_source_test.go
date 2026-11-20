@@ -8,64 +8,70 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/netip"
 	"regexp"
 	"runtime"
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/snmputils"
 	"github.com/stretchr/testify/require"
 )
 
 type sourceTestHandler struct {
-	gosnmp.Handler
-	get         func([]string) (*gosnmp.SnmpPacket, error)
-	walk        func(string) ([]gosnmp.SnmpPDU, error)
+	snmputils.Client
+	get         func([]string) (*gosnmp.Message, error)
+	walk        func(string) ([]gosnmp.VarBind, error)
 	gets, walks int
 }
 
-func (*sourceTestHandler) Version() gosnmp.SnmpVersion { return gosnmp.Version2c }
-func (*sourceTestHandler) MaxOids() int                { return 1 }
-func (h *sourceTestHandler) Get(oids []string) (*gosnmp.SnmpPacket, error) {
+func (h *sourceTestHandler) Get(ctx context.Context, oids []string) (*gosnmp.Message, error) {
 	h.gets++
 	return h.get(oids)
 }
-func (h *sourceTestHandler) BulkWalkAll(oid string) ([]gosnmp.SnmpPDU, error) {
+func (h *sourceTestHandler) BulkWalkAll(ctx context.Context, oid string, maxRepetitions uint32) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
 	h.walks++
-	return h.walk(oid)
+	values, err := h.walk(oid)
+	return values, gosnmp.WalkEnd{}, err
 }
-func (h *sourceTestHandler) WalkAll(oid string) ([]gosnmp.SnmpPDU, error) { return h.BulkWalkAll(oid) }
+func (h *sourceTestHandler) WalkAll(ctx context.Context, oid string) ([]gosnmp.VarBind, gosnmp.WalkEnd, error) {
+	return h.BulkWalkAll(ctx, oid, 0)
+}
 
 func TestSourceValuesPreserveDecodedData(t *testing.T) {
 	for name, tc := range map[string]struct {
-		value any
+		value gosnmp.Value
 		want  ddsnmp.SourceValue
 	}{
-		"null":              {nil, ddsnmp.SourceValue{Kind: "null"}},
-		"nil bytes":         {[]byte(nil), ddsnmp.SourceValue{Kind: "bytes_nil"}},
-		"empty bytes":       {[]byte{}, ddsnmp.SourceValue{Kind: "bytes", Bytes: []byte{}}},
-		"binary":            {[]byte{0, 255}, ddsnmp.SourceValue{Kind: "bytes", Bytes: []byte{0, 255}}},
-		"non UTF8 string":   {"\xff", ddsnmp.SourceValue{Kind: "string_bytes", Bytes: []byte{255}}},
-		"text":              {"device", ddsnmp.SourceValue{Kind: "string", Text: "device"}},
-		"signed minimum":    {int64(math.MinInt64), ddsnmp.SourceValue{Kind: "signed", Text: "-9223372036854775808"}},
-		"unsigned maximum":  {uint64(math.MaxUint64), ddsnmp.SourceValue{Kind: "unsigned", Text: "18446744073709551615"}},
-		"NaN payload":       {math.Float64frombits(0x7ff8000000000042), ddsnmp.SourceValue{Kind: "float64", Text: "7ff8000000000042"}},
-		"negative zero":     {math.Float32frombits(0x80000000), ddsnmp.SourceValue{Kind: "float32", Text: "80000000"}},
-		"unsupported value": {make(chan int), ddsnmp.SourceValue{Kind: "unavailable"}},
+		"null":             {gosnmp.NullValue(), ddsnmp.SourceValue{Kind: "null"}},
+		"no such object":   {gosnmp.NoSuchObjectValue(), ddsnmp.SourceValue{Kind: "null"}},
+		"nil bytes":        {gosnmp.OctetStringValue(nil), ddsnmp.SourceValue{Kind: "bytes_nil"}},
+		"empty bytes":      {gosnmp.OctetStringValue([]byte{}), ddsnmp.SourceValue{Kind: "bytes", Bytes: []byte{}}},
+		"binary":           {gosnmp.OctetStringValue([]byte{0, 255}), ddsnmp.SourceValue{Kind: "bytes", Bytes: []byte{0, 255}}},
+		"opaque":           {gosnmp.OpaqueValue([]byte{1}), ddsnmp.SourceValue{Kind: "bytes", Bytes: []byte{1}}},
+		"oid":              {gosnmp.ObjectIdentifierValue(".1.3.6"), ddsnmp.SourceValue{Kind: "string", Text: ".1.3.6"}},
+		"address":          {gosnmp.IPAddressValue(netip.MustParseAddr("192.0.2.1")), ddsnmp.SourceValue{Kind: "string", Text: "192.0.2.1"}},
+		"empty address":    {gosnmp.IPAddressValue(netip.Addr{}), ddsnmp.SourceValue{Kind: "null"}},
+		"signed minimum":   {gosnmp.IntegerValue(math.MinInt32), ddsnmp.SourceValue{Kind: "signed", Text: "-2147483648"}},
+		"unsigned maximum": {gosnmp.Counter64Value(math.MaxUint64), ddsnmp.SourceValue{Kind: "unsigned", Text: "18446744073709551615"}},
+		"time ticks":       {gosnmp.TimeTicksValue(math.MaxUint32), ddsnmp.SourceValue{Kind: "unsigned", Text: "4294967295"}},
+		"NaN payload":      {gosnmp.OpaqueDoubleValue(math.Float64frombits(0x7ff8000000000042)), ddsnmp.SourceValue{Kind: "float64", Text: "7ff8000000000042"}},
+		"negative zero":    {gosnmp.OpaqueFloatValue(math.Float32frombits(0x80000000)), ddsnmp.SourceValue{Kind: "float32", Text: "80000000"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			pdu := gosnmp.SnmpPDU{Name: "1.2.3.0", Type: gosnmp.OctetString, Value: tc.value}
-			handler := &sourceTestHandler{get: func([]string) (*gosnmp.SnmpPacket, error) {
-				return &gosnmp.SnmpPacket{Community: "never retain this", Variables: []gosnmp.SnmpPDU{pdu}}, nil
+			pdu := gosnmp.VarBind{Name: "1.2.3.0", Value: tc.value}
+			handler := &sourceTestHandler{get: func([]string) (*gosnmp.Message, error) {
+				return &gosnmp.Message{Community: "never retain this", VarBinds: []gosnmp.VarBind{pdu}}, nil
 			}}
 			source := &SourceRecorder{}
-			packet, err := source.Wrap(handler).Get([]string{"1.2.3.0"})
+			packet, err := source.Wrap(handler).Get(context.Background(), []string{"1.2.3.0"})
 			require.NoError(t, err)
 			evidence := source.Finish()
 			require.Equal(t, tc.want, evidence[0].PDUs[0].Value)
-			if b, ok := packet.Variables[0].Value.([]byte); ok && len(b) > 0 {
+			if b, _ := packet.VarBinds[0].Value.Bytes(); len(b) > 0 {
 				b[0] ^= 255
 				require.Equal(t, tc.want, evidence[0].PDUs[0].Value)
 			}
@@ -109,15 +115,15 @@ func TestSourceEvidenceFollowsActualCollection(t *testing.T) {
 				tc.profile.Topology[0].MetricTags[0].Symbol.MatchPatternCompiled = regexp.MustCompile("^does-not-match$")
 			}
 			handler := &sourceTestHandler{}
-			handler.get = func(oids []string) (*gosnmp.SnmpPacket, error) {
-				packet := &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{{Name: oids[0], Type: gosnmp.OctetString, Value: []byte("first")}, {Name: oids[0], Type: gosnmp.OctetString, Value: []byte("last")}, {Name: root + ".99", Type: gosnmp.NoSuchInstance}}}
+			handler.get = func(oids []string) (*gosnmp.Message, error) {
+				packet := &gosnmp.Message{VarBinds: []gosnmp.VarBind{{Name: oids[0], Value: gosnmp.OctetStringValue([]byte("first"))}, {Name: oids[0], Value: gosnmp.OctetStringValue([]byte("last"))}, {Name: root + ".99", Value: gosnmp.NoSuchInstanceValue()}}}
 				if tc.getFailure && handler.gets == 2 {
 					return packet, context.DeadlineExceeded
 				}
 				return packet, nil
 			}
-			handler.walk = func(string) ([]gosnmp.SnmpPDU, error) {
-				pdus := []gosnmp.SnmpPDU{{Name: root + ".1.7", Type: gosnmp.OctetString, Value: []byte("eth0")}}
+			handler.walk = func(string) ([]gosnmp.VarBind, error) {
+				pdus := []gosnmp.VarBind{{Name: root + ".1.7", Value: gosnmp.OctetStringValue([]byte("eth0"))}}
 				if tc.walkFailure {
 					return pdus, context.DeadlineExceeded
 				}
@@ -125,8 +131,8 @@ func TestSourceEvidenceFollowsActualCollection(t *testing.T) {
 			}
 			source := &SourceRecorder{}
 			var reports []AcquisitionProfileReport
-			collector := New(Config{SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
-			values, err := collector.Collect()
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: source.Wrap(handler), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: tc.profile}}, Log: logger.New(), AcquisitionObserver: AcquisitionObserverFunc(func(r AcquisitionProfileReport, _ *ddsnmp.ProfileMetrics) { reports = append(reports, r) })})
+			values, err := collector.Collect(context.Background())
 			if tc.wantErr {
 				require.Error(t, err)
 			} else {
@@ -185,16 +191,16 @@ func TestSourceRecorderLifecycleAndClientReplacement(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := scalarBGPTestConfig()
-			handler := &sourceTestHandler{get: func(oids []string) (*gosnmp.SnmpPacket, error) {
-				return &gosnmp.SnmpPacket{Variables: []gosnmp.SnmpPDU{createGauge32PDU(oids[0], 6)}}, nil
+			handler := &sourceTestHandler{get: func(oids []string) (*gosnmp.Message, error) {
+				return &gosnmp.Message{VarBinds: []gosnmp.VarBind{createGauge32PDU(oids[0], 6)}}, nil
 			}}
 			source := &SourceRecorder{}
 			client := source.Wrap(handler)
-			collector := New(Config{SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
+			collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: client, Log: logger.New(), Profiles: []*ddsnmp.Profile{{SourceFile: "synthetic.yaml", Definition: &ddprofiledefinition.ProfileDefinition{BGP: []ddprofiledefinition.BGPConfig{cfg}}}}, AcquisitionObserver: AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})})
 			if tc.replace {
 				collector.SetSNMPClient(client)
 			}
-			_, err := collector.Collect()
+			_, err := collector.Collect(context.Background())
 			require.NoError(t, err)
 			evidence := source.Finish()
 			require.NotEmpty(t, evidence)
@@ -202,7 +208,7 @@ func TestSourceRecorderLifecycleAndClientReplacement(t *testing.T) {
 			require.Nil(t, source.Finish(), "transfer occurs once")
 			before, err := json.Marshal(evidence)
 			require.NoError(t, err)
-			_, err = collector.Collect()
+			_, err = collector.Collect(context.Background())
 			require.NoError(t, err)
 			require.Nil(t, source.operations, "a completed recorder must not accumulate polling history")
 			after, err := json.Marshal(evidence)
@@ -215,7 +221,7 @@ func TestSourceRecorderLifecycleAndClientReplacement(t *testing.T) {
 func BenchmarkCollectorSourceEvidence(b *testing.B) {
 	const root = "1.3.6.1.4.1.99999.1"
 	for _, rows := range []int{4096, 100000} {
-		pdus := make([]gosnmp.SnmpPDU, rows)
+		pdus := make([]gosnmp.VarBind, rows)
 		for i := range pdus {
 			pdus[i] = createGauge32PDU(fmt.Sprintf("%s.1.%d", root, i), uint(i))
 		}
@@ -225,15 +231,15 @@ func BenchmarkCollectorSourceEvidence(b *testing.B) {
 				log := logger.New()
 				b.ReportAllocs()
 				for b.Loop() {
-					var client gosnmp.Handler = &sourceTestHandler{walk: func(string) ([]gosnmp.SnmpPDU, error) { return pdus, nil }}
+					var client snmputils.Client = &sourceTestHandler{walk: func(string) ([]gosnmp.VarBind, error) { return pdus, nil }}
 					source := &SourceRecorder{}
 					var observer AcquisitionObserver
 					if tc.capture {
 						client = source.Wrap(client)
 						observer = AcquisitionObserverFunc(func(AcquisitionProfileReport, *ddsnmp.ProfileMetrics) {})
 					}
-					collector := New(Config{SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: observer})
-					results, err := collector.Collect()
+					collector := New(Config{Version: gosnmp.Version2c, MaxOIDs: 1, SnmpClient: client, Log: log, Profiles: []*ddsnmp.Profile{profile}, AcquisitionObserver: observer})
+					results, err := collector.Collect(context.Background())
 					if err != nil {
 						b.Fatal(err)
 					}

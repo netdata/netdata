@@ -5,7 +5,7 @@ package ddsnmpcollector
 import (
 	"testing"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -13,20 +13,18 @@ import (
 
 func TestStringValueProcessor_ProcessValue_HexFormat(t *testing.T) {
 	processor := newValueProcessor()
-	pdu := gosnmp.SnmpPDU{
+	pdu := gosnmp.VarBind{
 		Name:  "1.3.6.1.2.1.15.3.1.14.192.0.2.1",
-		Type:  gosnmp.OctetString,
-		Value: []byte{0x04, 0x03},
+		Value: gosnmp.OctetStringValue([]byte{0x04, 0x03}),
 	}
-	zeroPDU := gosnmp.SnmpPDU{
+	zeroPDU := gosnmp.VarBind{
 		Name:  "1.3.6.1.2.1.15.3.1.14.192.0.2.2",
-		Type:  gosnmp.OctetString,
-		Value: []byte{0x00, 0x00},
+		Value: gosnmp.OctetStringValue([]byte{0x00, 0x00}),
 	}
 
 	tests := map[string]struct {
 		symbol   ddprofiledefinition.SymbolConfig
-		pdu      gosnmp.SnmpPDU
+		pdu      gosnmp.VarBind
 		expected int64
 	}{
 		"code": {
@@ -75,7 +73,7 @@ func TestNumericValueProcessor_ProcessValue_Uint32Format(t *testing.T) {
 
 	tests := map[string]struct {
 		symbol   ddprofiledefinition.SymbolConfig
-		pdu      gosnmp.SnmpPDU
+		pdu      gosnmp.VarBind
 		expected int64
 	}{
 		"reinterpret signed int32 as uint32": {
@@ -84,10 +82,9 @@ func TestNumericValueProcessor_ProcessValue_Uint32Format(t *testing.T) {
 				Name:   "bgpPeerRemoteAs",
 				Format: "uint32",
 			},
-			pdu: gosnmp.SnmpPDU{
+			pdu: gosnmp.VarBind{
 				Name:  "1.3.6.1.2.1.15.3.1.9.169.254.1.1",
-				Type:  gosnmp.Integer,
-				Value: -94967296,
+				Value: gosnmp.IntegerValue(-94967296),
 			},
 			expected: 4200000000,
 		},
@@ -97,10 +94,9 @@ func TestNumericValueProcessor_ProcessValue_Uint32Format(t *testing.T) {
 				Name:   "bgpPeerRemoteAs",
 				Format: "uint32",
 			},
-			pdu: gosnmp.SnmpPDU{
+			pdu: gosnmp.VarBind{
 				Name:  "1.3.6.1.2.1.15.3.1.9.192.0.2.1",
-				Type:  gosnmp.Integer,
-				Value: 64512,
+				Value: gosnmp.IntegerValue(64512),
 			},
 			expected: 64512,
 		},
@@ -123,18 +119,16 @@ func TestValueProcessor_ProcessValue_TextDateFormatOnNumericPDU(t *testing.T) {
 		Format: "text_date",
 	}
 
-	value, err := processor.processValue(symbol, gosnmp.SnmpPDU{
+	value, err := processor.processValue(symbol, gosnmp.VarBind{
 		Name:  "1.3.6.1.4.1.99999.1.1.0",
-		Type:  gosnmp.Gauge32,
-		Value: uint32(1798675200),
+		Value: gosnmp.Gauge32Value(1798675200),
 	})
 	require.NoError(t, err)
 	require.EqualValues(t, 1798675200, value)
 
-	_, err = processor.processValue(symbol, gosnmp.SnmpPDU{
+	_, err = processor.processValue(symbol, gosnmp.VarBind{
 		Name:  "1.3.6.1.4.1.99999.1.1.0",
-		Type:  gosnmp.Gauge32,
-		Value: uint32(4294967295),
+		Value: gosnmp.Gauge32Value(4294967295),
 	})
 	require.ErrorIs(t, err, errNoTextDateValue)
 }

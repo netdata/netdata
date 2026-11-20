@@ -4,11 +4,9 @@ package receiver
 
 import (
 	"net"
-	"os"
 	"testing"
-	"time"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -61,10 +59,13 @@ func newSecurityLevelTestReceiver(t *testing.T, users []USMUser) (*Receiver, *re
 	return recv, recorder
 }
 
+// A user whose level the message does not meet rejects it: the receiver's
+// level rule fails the decode (ErrUnknownSecurityLevel, usm_failures).
 func TestV3SecurityLevelStaticUsers(t *testing.T) {
 	type outcome struct {
-		accepted    bool
-		usmFailures int
+		accepted      bool
+		usmFailures   int
+		decodeFailure bool
 	}
 	tests := map[string]struct {
 		users []USMUser
@@ -77,8 +78,9 @@ func TestV3SecurityLevelStaticUsers(t *testing.T) {
 				return buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 			},
 			want: outcome{
-				accepted:    false,
-				usmFailures: 1,
+				accepted:      false,
+				usmFailures:   1,
+				decodeFailure: true,
 			},
 		},
 		"authPriv trap from an auth user is accepted": {
@@ -137,8 +139,9 @@ func TestV3SecurityLevelStaticUsers(t *testing.T) {
 				return buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 			},
 			want: outcome{
-				accepted:    false,
-				usmFailures: 1,
+				accepted:      false,
+				usmFailures:   1,
+				decodeFailure: true,
 			},
 		},
 		"unauthenticated INFORM to the local engine through a mixed-level user is accepted": {
@@ -163,8 +166,9 @@ func TestV3SecurityLevelStaticUsers(t *testing.T) {
 				return buildV3TrapWithEngineID(t, "testuser", testEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
 			},
 			want: outcome{
-				accepted:    false,
-				usmFailures: 1,
+				accepted:      false,
+				usmFailures:   1,
+				decodeFailure: true,
 			},
 		},
 	}
@@ -184,20 +188,18 @@ func TestV3SecurityLevelStaticUsers(t *testing.T) {
 			})
 
 			got := outcome{
-				accepted:    result.PDU != nil,
-				usmFailures: events.count(EventError, ErrorUSMFailure),
+				accepted:      result.PDU != nil,
+				usmFailures:   events.count(EventError, ErrorUSMFailure),
+				decodeFailure: result.DecodeFailure != nil,
 			}
 			assert.Equal(t, tc.want, got)
-			assert.Nil(t, result.DecodeFailure)
 		})
 	}
 }
 
 func TestV3SecurityLevelUnauthenticatedInformIsNotAcknowledged(t *testing.T) {
 	recv, events := newSecurityLevelTestReceiver(t, []USMUser{securityLevelAuthUser(testEngineIDHex)})
-	listenerConn, peerConn := informUDPConnPair(t)
-	defer listenerConn.Close()
-	defer peerConn.Close()
+	listenerConn, peerConn := udpConnPair(t)
 	peer := peerConn.LocalAddr().(*net.UDPAddr)
 
 	data := buildV3InformWithEngineID(t, "testuser", testLocalEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
@@ -209,12 +211,9 @@ func TestV3SecurityLevelUnauthenticatedInformIsNotAcknowledged(t *testing.T) {
 	})
 
 	assert.Nil(t, result.PDU)
-	assert.Nil(t, result.DecodeFailure)
+	assert.NotNil(t, result.DecodeFailure)
 	assert.Equal(t, 1, events.count(EventError, ErrorUSMFailure))
-
-	require.NoError(t, peerConn.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
-	_, _, err := peerConn.ReadFromUDP(make([]byte, 2048))
-	assert.ErrorIs(t, err, os.ErrDeadlineExceeded, "want no INFORM response")
+	requireNoResponse(t, peerConn)
 }
 
 func TestV3SecurityLevelUnauthenticatedTrapDoesNotRegisterDynamicEngineID(t *testing.T) {
@@ -229,10 +228,11 @@ func TestV3SecurityLevelUnauthenticatedTrapDoesNotRegisterDynamicEngineID(t *tes
 
 	assert.Nil(t, result.PDU)
 	assert.Equal(t, 1, events.count(EventError, ErrorUSMFailure))
-	assert.Equal(t, 0, recv.dynamicPairs())
+	assert.Zero(t, events.count(EventDynamicEngineIDRegistered, ""))
 }
 
-// A message whose msgSecurityModel is not USM decodes without digest verification, even with auth flags set.
+// A message whose msgSecurityModel is not USM has no security model the
+// receiver supports (ErrUnknownSecurityModels, usm_failures), whatever its flags.
 func TestV3SecurityLevelNonUSMSecurityModelIsDropped(t *testing.T) {
 	wrongKeySpec := func(engineIDHex string) v3SecuredTrapSpec {
 		spec := securityLevelSpec(engineIDHex)
@@ -253,20 +253,16 @@ func TestV3SecurityLevelNonUSMSecurityModelIsDropped(t *testing.T) {
 
 	t.Run("inform is not acknowledged", func(t *testing.T) {
 		recv, events := newSecurityLevelTestReceiver(t, []USMUser{securityLevelAuthUser(testEngineIDHex)})
-		listenerConn, peerConn := informUDPConnPair(t)
-		defer listenerConn.Close()
-		defer peerConn.Close()
+		listenerConn, peerConn := udpConnPair(t)
 		peer := peerConn.LocalAddr().(*net.UDPAddr)
-		inform := buildV3SecuredInformWithFlags(t, wrongKeySpec(testLocalEngineIDHex), gosnmp.AuthNoPriv|gosnmp.Reportable)
+		inform := buildV3SecuredInformWithFlags(t, wrongKeySpec(testLocalEngineIDHex), gosnmp.AuthNoPriv)
 		data := setV3SecurityModel(t, inform, 1)
 
 		result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer, Conn: listenerConn})
 
 		assert.Nil(t, result.PDU)
 		assert.Equal(t, 1, events.count(EventError, ErrorUSMFailure))
-		require.NoError(t, peerConn.SetReadDeadline(time.Now().Add(200*time.Millisecond)))
-		_, _, err := peerConn.ReadFromUDP(make([]byte, 2048))
-		assert.ErrorIs(t, err, os.ErrDeadlineExceeded, "want no INFORM response")
+		requireNoResponse(t, peerConn)
 	})
 
 	t.Run("dynamic engine ID is not registered", func(t *testing.T) {
@@ -278,7 +274,7 @@ func TestV3SecurityLevelNonUSMSecurityModelIsDropped(t *testing.T) {
 
 		assert.Nil(t, result.PDU)
 		assert.Equal(t, 1, events.count(EventError, ErrorUSMFailure))
-		assert.Equal(t, 0, recv.dynamicPairs())
+		assert.Zero(t, events.count(EventDynamicEngineIDRegistered, ""))
 	})
 }
 
@@ -298,7 +294,7 @@ func TestV3SecurityLevelDynamicNoAuthUserIsAccepted(t *testing.T) {
 
 	assert.NotNil(t, result.PDU)
 	assert.Equal(t, 0, recorder.count(EventError, ErrorUSMFailure))
-	assert.Equal(t, 1, recv.dynamicPairs())
+	assert.Equal(t, 1, recorder.count(EventDynamicEngineIDRegistered, ""))
 }
 
 func TestV3SecurityLevelDynamicNoAuthUserWithEngineIDAcceptsOtherEngines(t *testing.T) {
@@ -323,8 +319,9 @@ func TestV3SecurityLevelDynamicNoAuthUserWithEngineIDAcceptsOtherEngines(t *test
 // for its engine, the wildcard entry for every other engine.
 func TestV3SecurityLevelDynamicMixedLevelUser(t *testing.T) {
 	type outcome struct {
-		accepted    bool
-		usmFailures int
+		accepted      bool
+		usmFailures   int
+		decodeFailure bool
 	}
 	tests := map[string]struct {
 		engineIDHex string
@@ -340,8 +337,9 @@ func TestV3SecurityLevelDynamicMixedLevelUser(t *testing.T) {
 		"unauthenticated trap from the auth-bound engine is dropped": {
 			engineIDHex: testEngineIDHex,
 			want: outcome{
-				accepted:    false,
-				usmFailures: 1,
+				accepted:      false,
+				usmFailures:   1,
+				decodeFailure: true,
 			},
 		},
 	}
@@ -362,38 +360,37 @@ func TestV3SecurityLevelDynamicMixedLevelUser(t *testing.T) {
 			result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
 
 			got := outcome{
-				accepted:    result.PDU != nil,
-				usmFailures: recorder.count(EventError, ErrorUSMFailure),
+				accepted:      result.PDU != nil,
+				usmFailures:   recorder.count(EventError, ErrorUSMFailure),
+				decodeFailure: result.DecodeFailure != nil,
 			}
 			assert.Equal(t, tc.want, got)
 		})
 	}
 }
 
-// setV3SecurityModel rewrites the single-byte msgSecurityModel of an encoded SNMPv3 message.
-func setV3SecurityModel(t *testing.T, data []byte, model byte) []byte {
-	t.Helper()
-	out := append([]byte(nil), data...)
+// In dynamic mode a configured engine_id registers only its own user names
+// there: another name's message from that engine is decided by the name's
+// learned users, as from any other engine.
+func TestV3SecurityLevelDynamicOtherNameAtConfiguredEngine(t *testing.T) {
+	recorder := &receiverEventRecorder{}
+	recv := New(NewPolicy(PolicyConfig{
+		Versions: []string{"v3"},
+		USMUsers: []USMUser{
+			securityLevelNoAuthUser(""),
+			securityLevelAuthUser(testEngineIDHex),
+			{Username: "otheruser", EngineID: securityLevelOtherEngineIDHex, AuthProto: "none", PrivProto: "none"},
+		},
+		DynamicEngineID: true,
+	}), recorder.report)
+	require.NoError(t, recv.PrepareV3(t.TempDir(), "security-level-dynamic-other-name-test"))
+	t.Cleanup(recv.RollbackPreparedState)
+	peer := &net.UDPAddr{IP: net.ParseIP("10.1.2.3"), Port: 9162}
 
-	tag, valueStart, valueEnd, _, err := readBERElement(out, 0)
-	require.NoError(t, err)
-	require.Equal(t, byte(tagSequence), tag)
-	_, _, _, pos, err := readBERElement(out[:valueEnd], valueStart) // msgVersion
-	require.NoError(t, err)
-	tag, gdStart, gdEnd, _, err := readBERElement(out[:valueEnd], pos) // msgGlobalData
-	require.NoError(t, err)
-	require.Equal(t, byte(tagSequence), tag)
+	data := buildV3TrapWithEngineID(t, "testuser", securityLevelOtherEngineIDHex, "1.3.6.1.6.3.1.1.5.1")
+	result := recv.Process(Datagram{Data: data, PeerIP: peer.IP, Peer: peer})
 
-	gdPos := gdStart
-	for range 3 { // msgID, msgMaxSize, msgFlags
-		_, _, _, gdPos, err = readBERElement(out[:gdEnd], gdPos)
-		require.NoError(t, err)
-	}
-	tag, modelStart, modelEnd, _, err := readBERElement(out[:gdEnd], gdPos)
-	require.NoError(t, err)
-	require.Equal(t, byte(tagInteger), tag)
-	require.Equal(t, 1, modelEnd-modelStart)
-
-	out[modelStart] = model
-	return out
+	assert.NotNil(t, result.PDU, "decode failure: %+v", result.DecodeFailure)
+	assert.Zero(t, recorder.count(EventError, ErrorUSMFailure))
+	assert.Equal(t, 1, recorder.count(EventDynamicEngineIDRegistered, ""))
 }

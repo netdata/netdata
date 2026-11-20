@@ -8,7 +8,7 @@ import (
 	"maps"
 	"strconv"
 
-	"github.com/gosnmp/gosnmp"
+	"github.com/netdata/gosnmp"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp/ddprofiledefinition"
@@ -57,7 +57,7 @@ func (mb *metricBuilder) asTableMetric(table string) *metricBuilder {
 	return mb
 }
 
-func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.SnmpPDU) *metricBuilder {
+func (mb *metricBuilder) fromSymbol(sym ddprofiledefinition.SymbolConfig, pdu gosnmp.VarBind) *metricBuilder {
 	mb.metric.Unit = sym.ChartMeta.Unit
 	mb.metric.Description = sym.ChartMeta.Description
 	mb.metric.Family = sym.ChartMeta.Family
@@ -73,7 +73,7 @@ func (mb *metricBuilder) build() ddsnmp.Metric {
 
 func buildScalarMetric(
 	cfg ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 	value int64,
 	tags, staticTags map[string]string,
 ) (*ddsnmp.Metric, error) {
@@ -94,7 +94,7 @@ func buildScalarMetric(
 
 func buildTableMetric(
 	cfg ddprofiledefinition.SymbolConfig,
-	pdu gosnmp.SnmpPDU,
+	pdu gosnmp.VarBind,
 	value int64,
 	tags, staticTags map[string]string,
 	tableName string,
