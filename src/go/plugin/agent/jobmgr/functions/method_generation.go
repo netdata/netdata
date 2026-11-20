@@ -293,14 +293,13 @@ func (mg *methodGeneration) availableJobNames(methodID string) []string {
 		mg.selectorMu.RLock()
 	}
 	for name, bundle := range mg.bundles {
-		if bundle.job != nil && bundle.available(methodID) {
+		if bundle.job != nil && bundle.available(methodID) && bundle.job.IsRunning() {
 			names = append(names, name)
 		}
 	}
 	if mg.selectorMu != nil {
 		mg.selectorMu.RUnlock()
 	}
-	names = slices.DeleteFunc(names, func(name string) bool { return !mg.bundles[name].job.IsRunning() })
 	slices.Sort(names)
 	return names
 }

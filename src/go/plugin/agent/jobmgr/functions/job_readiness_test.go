@@ -119,6 +119,56 @@ func TestUnavailableJobFunctionReservesItsNames(t *testing.T) {
 	require.Empty(t, port.eventsSnapshot())
 }
 
+type selectorHandoffJob struct {
+	controllerTestJob
+	beforeRunningCheck func()
+}
+
+func (j *selectorHandoffJob) IsRunning() bool {
+	if check := j.beforeRunningCheck; check != nil {
+		j.beforeRunningCheck = nil
+		check()
+	}
+	return j.running
+}
+
+func TestSharedSelectorHandoffDuringRunningCheck(t *testing.T) {
+	method := funcapi.FunctionConfig{ID: "shared"}
+	outgoing := &selectorHandoffJob{controllerTestJob: controllerTestJob{running: true}}
+	first := &functionBundle{job: outgoing, availability: map[string]bool{method.ID: true}}
+	second := &functionBundle{job: &controllerTestJob{running: true}}
+	mg := methodGeneration{
+		module:     "module",
+		kind:       methodGenerationShared,
+		bundles:    map[string]*functionBundle{"first": first, "second": second},
+		selectorMu: &sync.RWMutex{},
+	}
+	handoff := func() {
+		first.commitAvailability(map[string]bool{method.ID: false})
+		second.commitAvailability(map[string]bool{method.ID: true})
+	}
+	// Schedule the pass and subsequent job exit at the outgoing running check
+	// if the selector has already released its snapshot.
+	outgoing.beforeRunningCheck = func() {
+		if mg.selectorMu.TryLock() {
+			handoff()
+			mg.selectorMu.Unlock()
+			outgoing.running = false
+		}
+	}
+	name, _, _, err := mg.resolveTarget(method, HandlerInput{})
+	require.NoError(t, err)
+	require.Equal(t, "first", name)
+
+	mg.selectorMu.Lock()
+	handoff()
+	mg.selectorMu.Unlock()
+	outgoing.running = false
+	name, _, _, err = mg.resolveTarget(method, HandlerInput{})
+	require.NoError(t, err)
+	require.Equal(t, "second", name)
+}
+
 func TestInstanceFunctionReadinessPublication(t *testing.T) {
 	controller, _, port := newReadinessController(t, collectorapi.Creator{
 		InstanceFunctions: func(job collectorapi.RuntimeJob) []funcapi.FunctionConfig {
