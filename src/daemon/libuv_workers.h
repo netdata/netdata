@@ -108,6 +108,7 @@ typedef struct worker_data {
     void *pending_alert_list;
     void *pending_ctx_cleanup_list;
     void *pending_uuid_deletion;
+    void *pending_expired_dimensions;
     void *pending_sql_statement;
     union {
         void *payload;
