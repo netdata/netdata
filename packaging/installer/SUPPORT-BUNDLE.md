@@ -175,6 +175,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | item | why |
 |---|---|
 | **`status-netdata.json`** (trusted fallback locations, newest safe file wins; shared `/tmp` is excluded) | the single most valuable crash artifact: last exit reason, fatal line/file/function, signal, **stack trace** — same data that feeds agent-events crash telemetry; support gets crash forensics with zero extra round trips |
+| `status-netdata-progress.json` (same locations) | the shutdown step the agent was in when its shutdown was cut short (e.g. killed by `docker stop`); written during shutdown, removed at the next start |
 | state dir aggregate inventory | unexpected file counts/sizes without exposing filenames that may themselves be live tokens, hostnames, or job identifiers; **contents of secret files are never read** (see exclusions) |
 | claim state (`claimed_id` only) | claim id is the identifier support needs to find the node in Cloud; a non-persisted `cloud.d` across restarts is a known Freshdesk root cause |
 | db disk usage per tier + sqlite sizes | retention questions ("why do I only have N days") are answered by tier sizes vs configured limits |

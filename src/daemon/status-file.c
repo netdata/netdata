@@ -1356,17 +1356,30 @@ static enum crash_report_t check_crash_reports_config(void) {
     return rc;
 }
 
+// Does the shutdown progress record carry newer information than the status file?
+static bool status_file_progress_supersedes(const DAEMON_STATUS_FILE *status, const DAEMON_STATUS_FILE *progress) {
+    // Only a record of the same session refines the status file; anything else is stale or not ours.
+    if(UUIDiszero(progress->invocation) || !UUIDeq(status->invocation, progress->invocation))
+        return false;
+
+    // The status file got the first EXITING save before any progress save. It keeps precedence when it holds a
+    // terminal record: the final EXITED save, or a crash/fatal/timeout record (no progress save follows a fatal,
+    // and a deadly signal or a timeout may have reached a progress save too, without the crash details).
+    return status->status != DAEMON_STATUS_EXITED && !(status->exit_reason & EXIT_REASON_ABNORMAL);
+}
+
 void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
-    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status, true);
+    bool loaded = status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status, true);
 
-    // A shutdown progress record newer than the status file is the last thing the previous session saved.
-    // An unreadable one (empty after a power loss) is ignored.
+    // The progress record only refines a loaded status file of the same session: deleting the status file (e.g. to
+    // reset the identity of a VM template) must not bring the previous session back. An unreadable one (empty after
+    // a power loss) is ignored.
     DAEMON_STATUS_FILE *progress = callocz(1, sizeof(*progress));
-    if(status_file_io_load(STATUS_PROGRESS_FILENAME, status_file_load_and_parse, progress, false) &&
-        progress->timestamp_ut > last_session_status.timestamp_ut)
+    if(loaded && status_file_io_load(STATUS_PROGRESS_FILENAME, status_file_load_and_parse, progress, false) &&
+        status_file_progress_supersedes(&last_session_status, progress))
         last_session_status = *progress;
     freez(progress);
     status_file_io_remove(STATUS_PROGRESS_FILENAME);

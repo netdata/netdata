@@ -50,6 +50,26 @@ static bool status_file_io_check(const char *directory, const char *filename, ch
     return true;
 }
 
+static void status_file_io_unlink(const char *directory, const char *filename) {
+    // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
+    // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
+
+    if(!directory || !*directory)
+        return;
+
+    char dst[FILENAME_MAX];
+    if(strlen(directory) + 1 + strlen(filename) >= sizeof(dst))
+        return; // never unlink a truncated path
+
+    size_t len = 0;
+    len = strcatz(dst, len, directory, sizeof(dst));
+    if(!len || dst[len - 1] != '/')
+        len = strcatz(dst, len, "/", sizeof(dst));
+    len = strcatz(dst, len, filename, sizeof(dst));
+
+    unlink(dst);
+}
+
 static void status_file_io_remove_obsolete(const char *protected_dir, const char *filename) {
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
@@ -57,39 +77,22 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
     if(__atomic_exchange_n(&status_file_io_obsolete_removed, true, __ATOMIC_RELAXED))
         return;
 
-    char dst[FILENAME_MAX];
-
     status_file_io_fallback_dirs_update();
     for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-        if(strcmp(status_file_io_fallback_dirs[i], protected_dir) == 0)
-            continue;
-
-        size_t len = 0;
-        len = strcatz(dst, len, status_file_io_fallback_dirs[i], sizeof(dst));
-        if(!len || dst[len - 1] != '/')
-            len = strcatz(dst, len, "/", sizeof(dst));
-        len = strcatz(dst, len, filename, sizeof(dst));
-
-        unlink(dst);
+        if(strcmp(status_file_io_fallback_dirs[i], protected_dir) != 0)
+            status_file_io_unlink(status_file_io_fallback_dirs[i], filename);
     }
 
     errno_clear();
 }
 
 void status_file_io_remove(const char *filename) {
-    // Do not call this from signal handlers.
-
-    char path[FILENAME_MAX];
-    time_t mtime;
-
-    if(status_file_io_check(netdata_configured_varlib_dir, filename, path, sizeof(path), &mtime))
-        unlink(path);
+    // Removes empty copies too: the loader skips them, a power loss can leave them.
+    status_file_io_unlink(netdata_configured_varlib_dir, filename);
 
     status_file_io_fallback_dirs_update();
-    for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++) {
-        if(status_file_io_check(status_file_io_fallback_dirs[i], filename, path, sizeof(path), &mtime))
-            unlink(path);
-    }
+    for(size_t i = 0; i < _countof(status_file_io_fallback_dirs); i++)
+        status_file_io_unlink(status_file_io_fallback_dirs[i], filename);
 
     errno_clear();
 }

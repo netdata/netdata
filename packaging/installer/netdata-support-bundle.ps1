@@ -1137,6 +1137,13 @@ $StatusFile = Join-Path $LibDir 'status-netdata.json'
 if (Test-Path $StatusFile) {
     Save-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
 }
+# the agent writes it to the first writable of these; the newest one is the last record
+$ProgressFile = @((Join-Path $LibDir 'status-netdata-progress.json'), (Join-Path $CacheDir 'status-netdata-progress.json')) |
+    Where-Object { (Test-Path $_ -PathType Leaf) -and (Get-Item $_).Length -gt 0 -and -not ((Get-Item $_).Attributes -band [IO.FileAttributes]::ReparsePoint) } |
+    Sort-Object { (Get-Item $_).LastWriteTimeUtc } -Descending | Select-Object -First 1
+if ($ProgressFile) {
+    Save-File '06-state\status-progress.json' 'Daemon shutdown progress record: the step the agent was in when its shutdown was cut short (removed at startup)' $ProgressFile
+}
 if (Test-Path $LibDir) {
     # bearer_tokens FILENAMES are live API tokens - list only their count
     Save-Cmd '06-state\state-tree.txt' 'State dir listing (bearer token filenames withheld - they are live tokens)' {
