@@ -43,6 +43,23 @@ def steps(job):
 
 
 class CoupledWorkflowTests(unittest.TestCase):
+    def test_docker_owns_the_only_unpublished_companion_and_consumes_it(self):
+        companion = './.github/workflows/dem-runtime-release.yml'
+        candidate_callers = []
+        for workflow in WORKFLOWS.iterdir():
+            if workflow.suffix not in {'.yml', '.yaml'} or companion not in workflow.read_text():
+                continue
+            for name, job in load(workflow.name)['jobs'].items():
+                if job.get('uses') == companion and job.get('with', {}).get('publish', False) is not True:
+                    candidate_callers.append((workflow.name, name))
+
+        self.assertEqual(len(candidate_callers), 1, candidate_callers)
+        workflow, producer = candidate_callers[0]
+        self.assertEqual(workflow, 'docker.yml')
+        jobs = load(workflow)['jobs']
+        self.assertIn(producer, dependencies(jobs, 'prepare-dem-inputs'))
+        self.assertIn('prepare-dem-inputs', dependencies(jobs, 'build-images'))
+
     def test_publication_dependencies_precede_agent_exposure(self):
         boundaries = (
             ('release.yml', 'runtime-companion',
