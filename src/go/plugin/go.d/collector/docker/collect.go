@@ -4,56 +4,53 @@ package docker
 
 import (
 	"context"
-	"fmt"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+
 	typesContainer "github.com/moby/moby/api/types/container"
+	typesSystem "github.com/moby/moby/api/types/system"
 	docker "github.com/moby/moby/client"
 )
 
-func (c *Collector) collect() (map[string]int64, error) {
+// Every Docker API call of a cycle runs before any metric is written, so a failed call aborts the cycle as a whole.
+func (c *Collector) collect(ctx context.Context) error {
+	info, err := c.info(ctx)
+	if err != nil {
+		return err
+	}
+	if err := c.refreshImages(ctx); err != nil {
+		return err
+	}
+	containers, err := c.listContainers(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.writeMetrics(info, containers)
+
+	return nil
+}
+
+func (c *Collector) info(ctx context.Context) (typesSystem.Info, error) {
 	if c.client == nil {
 		client, err := c.newClient(c.Config)
 		if err != nil {
-			return nil, err
+			return typesSystem.Info{}, err
 		}
 		c.client = client
 	}
 
-	mx := make(map[string]int64)
-
-	if err := c.collectInfo(mx); err != nil {
-		return nil, err
-	}
-	// collectContainers adds and removes charts, so every call that can fail the collection runs before it.
-	if err := c.refreshImages(); err != nil {
-		return nil, err
-	}
-	usedImages, err := c.collectContainers(mx)
-	if err != nil {
-		return nil, err
-	}
-	c.collectImages(mx, usedImages)
-
-	return mx, nil
-}
-
-func (c *Collector) collectInfo(mx map[string]int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.Info(ctx, docker.InfoOptions{})
 	if err != nil {
-		return err
+		return typesSystem.Info{}, err
 	}
-	info := result.Info
-
-	mx["containers_state_running"] = int64(info.ContainersRunning)
-	mx["containers_state_paused"] = int64(info.ContainersPaused)
-	mx["containers_state_exited"] = int64(info.ContainersStopped)
-
-	return nil
+	return result.Info, nil
 }
 
 // On Docker Engine 29+ with the containerd image store, listing images can cost the daemon over a second of CPU time
@@ -65,13 +62,13 @@ type imagesSnapshot struct {
 	size int64
 }
 
-func (c *Collector) refreshImages() error {
+func (c *Collector) refreshImages(ctx context.Context) error {
 	now := c.now()
 	if now.Before(c.imagesNextRefresh) {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+	ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 	defer cancel()
 
 	result, err := c.client.ImageList(ctx, docker.ImageListOptions{})
@@ -90,46 +87,23 @@ func (c *Collector) refreshImages() error {
 	return nil
 }
 
-// collectImages counts an image as active when a container in usedImages (keyed by image ID) was created from it.
-// The daemon's own per-image container count is not used: it is -1 when the negotiated API is older than 1.51.
-func (c *Collector) collectImages(mx map[string]int64, usedImages map[string]bool) {
-	mx["images_size"] = c.images.size
-	mx["images_dangling"] = 0
-	mx["images_active"] = 0
-
-	for _, id := range c.images.ids {
-		if usedImages[id] {
-			mx["images_active"]++
-		} else {
-			mx["images_dangling"]++
-		}
-	}
+var containerHealthStatuses = []typesContainer.HealthStatus{
+	typesContainer.Healthy,
+	typesContainer.Unhealthy,
+	typesContainer.Starting,
+	typesContainer.NoHealthcheck,
 }
 
-var (
-	containerHealthStatuses = []typesContainer.HealthStatus{
-		typesContainer.Healthy,
-		typesContainer.Unhealthy,
-		typesContainer.Starting,
-		typesContainer.NoHealthcheck,
-	}
-	containerStates = []string{
-		"created",
-		"running",
-		"paused",
-		"restarting",
-		"removing",
-		"exited",
-		"dead",
-	}
-)
+// containersByHealth holds the containers listed with each health status filter.
+type containersByHealth map[typesContainer.HealthStatus][]typesContainer.Summary
 
-func (c *Collector) collectContainers(mx map[string]int64) (map[string]bool, error) {
-	containerSet := make(map[typesContainer.HealthStatus][]typesContainer.Summary)
+// listContainers lists the containers once per health status, so each container comes with its health status.
+func (c *Collector) listContainers(ctx context.Context) (containersByHealth, error) {
+	containers := make(containersByHealth)
 
 	for _, status := range containerHealthStatuses {
 		if err := func() error {
-			ctx, cancel := context.WithTimeout(context.Background(), c.Timeout.Duration())
+			ctx, cancel := context.WithTimeout(ctx, c.Timeout.Duration())
 			defer cancel()
 
 			result, err := c.client.ContainerList(ctx, docker.ContainerListOptions{
@@ -140,90 +114,115 @@ func (c *Collector) collectContainers(mx map[string]int64) (map[string]bool, err
 			if err != nil {
 				return err
 			}
-			containerSet[status] = result.Items
+			containers[status] = result.Items
 			return nil
-
 		}(); err != nil {
 			return nil, err
 		}
 	}
 
-	seen := make(map[string]bool)
+	return containers, nil
+}
+
+const (
+	healthStatusNotRunningUnhealthy = "not_running_unhealthy"
+	healthStatusNoHealthcheck       = "no_healthcheck"
+)
+
+var (
+	// containerStates are the states of the Docker container state machine.
+	containerStates = []string{
+		string(typesContainer.StateRunning),
+		string(typesContainer.StatePaused),
+		string(typesContainer.StateExited),
+		string(typesContainer.StateCreated),
+		string(typesContainer.StateRestarting),
+		string(typesContainer.StateRemoving),
+		string(typesContainer.StateDead),
+	}
+	containerHealthStates = []string{
+		string(typesContainer.Healthy),
+		string(typesContainer.Unhealthy),
+		healthStatusNotRunningUnhealthy,
+		string(typesContainer.Starting),
+		healthStatusNoHealthcheck,
+	}
+)
+
+// writeMetrics builds the instruments every cycle: containers come and go, so a long-lived Vec would keep a handle for
+// every container ever seen.
+func (c *Collector) writeMetrics(info typesSystem.Info, containers containersByHealth) {
+	meter := c.store.Write().SnapshotMeter("")
+
+	meter.Gauge("containers_running").Observe(float64(info.ContainersRunning))
+	meter.Gauge("containers_paused").Observe(float64(info.ContainersPaused))
+	meter.Gauge("containers_exited").Observe(float64(info.ContainersStopped))
+
+	containerVec := meter.Vec("container_name", "image")
+	containerState := containerVec.StateSet("container_state", metrix.WithStateSetStates(containerStates...))
+	containerHealthStatus := containerVec.StateSet("container_health_status",
+		metrix.WithStateSetStates(containerHealthStates...), metrix.WithStateSetMode(metrix.ModeEnum))
+	var containerWritableLayerSize metrix.SnapshotGaugeVec
+	if c.CollectContainerSize {
+		containerWritableLayerSize = containerVec.Gauge("container_writable_layer_size")
+	}
+
+	healthCounts := make(map[string]int)
 	usedImages := make(map[string]bool)
 
-	for _, s := range containerHealthStatuses {
-		mx["containers_health_status_"+string(s)] = 0
-	}
-	mx["containers_health_status_not_running_unhealthy"] = 0
-
-	for status, containers := range containerSet {
-		statusKey := string(status)
-		if status != typesContainer.Unhealthy {
-			mx["containers_health_status_"+statusKey] = int64(len(containers))
-		}
-
-		for _, cntr := range containers {
+	for status, cntrs := range containers {
+		for _, cntr := range cntrs {
 			usedImages[cntr.ImageID] = true
 
-			state := string(cntr.State)
-			if status == typesContainer.Unhealthy {
-				if cntr.State == "running" {
-					mx["containers_health_status_"+statusKey] += 1
-				} else {
-					mx["containers_health_status_not_running_unhealthy"] += 1
-				}
+			// "unhealthy" counts only running containers; the others count as "not_running_unhealthy".
+			health := string(status)
+			switch {
+			case status == typesContainer.Unhealthy && cntr.State != typesContainer.StateRunning:
+				health = healthStatusNotRunningUnhealthy
+			case status == typesContainer.NoHealthcheck:
+				health = healthStatusNoHealthcheck
 			}
+			healthCounts[health]++
 
-			if hasIgnoreLabel(cntr) {
+			if hasIgnoreLabel(cntr) || len(cntr.Names) == 0 {
 				continue
 			}
-
-			if len(cntr.Names) == 0 {
-				continue
-			}
-
 			name := strings.TrimPrefix(cntr.Names[0], "/")
-
 			if c.cntrSr != nil && !c.cntrSr.MatchString(name) {
 				continue
 			}
 
-			seen[name] = true
-
-			if !c.containers[name] {
-				c.containers[name] = true
-				c.addContainerCharts(name, cntr.Image)
-			}
-
-			px := fmt.Sprintf("container_%s_", name)
-
-			for _, s := range containerHealthStatuses {
-				mx[px+"health_status_"+string(s)] = 0
-			}
-			mx[px+"health_status_not_running_unhealthy"] = 0
-			for _, s := range containerStates {
-				mx[px+"state_"+s] = 0
-			}
-
-			if status == typesContainer.Unhealthy && cntr.State != "running" {
-				mx[px+"health_status_not_running_unhealthy"] += 1
+			// A state outside the known set leaves every state dimension at zero.
+			state := containerState.WithLabelValues(name, cntr.Image)
+			if slices.Contains(containerStates, string(cntr.State)) {
+				state.Enable(string(cntr.State))
 			} else {
-				mx[px+"health_status_"+statusKey] = 1
+				state.ObserveStateSet(metrix.StateSetPoint{})
 			}
-			mx[px+"state_"+state] = 1
-			mx[px+"size_rw"] = cntr.SizeRw
-			mx[px+"size_root_fs"] = cntr.SizeRootFs
+			containerHealthStatus.WithLabelValues(name, cntr.Image).Enable(health)
+			if containerWritableLayerSize != nil {
+				containerWritableLayerSize.WithLabelValues(name, cntr.Image).Observe(float64(cntr.SizeRw))
+			}
 		}
 	}
 
-	for name := range c.containers {
-		if !seen[name] {
-			delete(c.containers, name)
-			c.removeContainerCharts(name)
-		}
+	for _, status := range containerHealthStates {
+		meter.Gauge("containers_" + status).Observe(float64(healthCounts[status]))
 	}
 
-	return usedImages, nil
+	// An image is active when a container was created from it. The daemon's own per-image container count is not
+	// used: it is -1 when the negotiated API is older than 1.51.
+	var active, dangling int
+	for _, id := range c.images.ids {
+		if usedImages[id] {
+			active++
+		} else {
+			dangling++
+		}
+	}
+	meter.Gauge("images_active").Observe(float64(active))
+	meter.Gauge("images_dangling").Observe(float64(dangling))
+	meter.Gauge("images_size").Observe(float64(c.images.size))
 }
 
 func hasIgnoreLabel(cntr typesContainer.Summary) bool {
