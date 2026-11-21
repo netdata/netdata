@@ -112,6 +112,12 @@ to recognize repeated reports for 30 minutes. In Netdata's tests, one site that 
 
 ### Prerequisites
 
+#### Select the DEM image on Docker
+
+If your Netdata Agent runs in Docker, use a `-dem` image such as `netdata/netdata:stable-dem`.
+See [Enable DEM in Docker](https://github.com/netdata/netdata/blob/master/packaging/docker/README.md#enable-dem-in-docker).
+
+
 #### Expose the RUM receiver to your visitors
 
 Browsers send reports to the [RUM Receiver](https://github.com/netdata/netdata/blob/master/src/go/plugin/dem/collector/receiver/integrations/rum_receiver.md), which
